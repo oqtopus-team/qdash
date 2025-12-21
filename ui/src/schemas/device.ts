@@ -7,6 +7,7 @@
  */
 import type { Qubit } from "./qubit";
 import type { Coupling } from "./coupling";
+import type { DeviceCalibratedAt } from "./deviceCalibratedAt";
 
 /**
  * Device information.
@@ -16,5 +17,5 @@ export interface Device {
   device_id: string;
   qubits: Qubit[];
   couplings: Coupling[];
-  calibrated_at: string;
+  calibrated_at: DeviceCalibratedAt;
 }

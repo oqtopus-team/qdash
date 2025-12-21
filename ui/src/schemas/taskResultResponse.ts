@@ -7,6 +7,9 @@
  */
 import type { TaskResultResponseInputParameters } from "./taskResultResponseInputParameters";
 import type { TaskResultResponseOutputParameters } from "./taskResultResponseOutputParameters";
+import type { TaskResultResponseStartAt } from "./taskResultResponseStartAt";
+import type { TaskResultResponseEndAt } from "./taskResultResponseEndAt";
+import type { TaskResultResponseElapsedTime } from "./taskResultResponseElapsedTime";
 
 /**
  * Response model for task result by task_id.
@@ -22,9 +25,9 @@ Attributes
     json_figure_path (list[str]): List of JSON figure paths.
     input_parameters (dict): Input parameters.
     output_parameters (dict): Output parameters.
-    start_at (str): Start time.
-    end_at (str): End time.
-    elapsed_time (str): Elapsed time.
+    start_at (datetime | None): Start time.
+    end_at (datetime | None): End time.
+    elapsed_time (timedelta | None): Elapsed time.
  */
 export interface TaskResultResponse {
   task_id: string;
@@ -36,7 +39,7 @@ export interface TaskResultResponse {
   json_figure_path: string[];
   input_parameters: TaskResultResponseInputParameters;
   output_parameters: TaskResultResponseOutputParameters;
-  start_at: string;
-  end_at: string;
-  elapsed_time: string;
+  start_at?: TaskResultResponseStartAt;
+  end_at?: TaskResultResponseEndAt;
+  elapsed_time?: TaskResultResponseElapsedTime;
 }

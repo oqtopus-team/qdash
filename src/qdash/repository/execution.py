@@ -9,10 +9,12 @@ Used by workflow components for managing calibration execution state.
 import logging
 import os
 from collections.abc import Callable
+from datetime import timedelta
 from typing import Any
 
 from pymongo import MongoClient, ReturnDocument
 from pymongo.collection import Collection
+from qdash.common.datetime_utils import parse_elapsed_time
 from qdash.datamodel.execution import (
     CalibDataModel,
     ExecutionModel,
@@ -24,6 +26,37 @@ from qdash.dbmodel.execution_history import ExecutionHistoryDocument
 from qdash.dbmodel.tag import TagDocument
 
 logger = logging.getLogger(__name__)
+
+
+def _convert_elapsed_time_to_seconds(data: Any) -> Any:
+    """Recursively convert elapsed_time fields to seconds (float).
+
+    This handles nested structures in task_results where elapsed_time
+    may be timedelta objects or formatted strings.
+    """
+    if isinstance(data, dict):
+        result: dict[str, Any] = {}
+        for key, value in data.items():
+            if key == "elapsed_time":
+                if value is None:
+                    result[key] = None
+                elif isinstance(value, (int, float)):
+                    result[key] = float(value)
+                elif isinstance(value, timedelta):
+                    result[key] = value.total_seconds()
+                elif isinstance(value, str):
+                    # Parse string formats like "H:MM:SS" or "a few seconds"
+                    td = parse_elapsed_time(value)
+                    result[key] = td.total_seconds() if td else None
+                else:
+                    result[key] = value
+            else:
+                result[key] = _convert_elapsed_time_to_seconds(value)
+        return result
+    elif isinstance(data, list):
+        return [_convert_elapsed_time_to_seconds(item) for item in data]
+    else:
+        return data
 
 
 class MongoExecutionRepository:
@@ -255,9 +288,9 @@ class MongoExecutionRepository:
                     "controller_info": {},
                     "fridge_info": {},
                     "chip_id": "",
-                    "start_at": "",
-                    "end_at": "",
-                    "elapsed_time": "",
+                    "start_at": None,
+                    "end_at": None,
+                    "elapsed_time": None,
                     "calib_data": {"qubit": {}, "coupling": {}},
                     "message": "",
                     "system_info": {},
@@ -280,7 +313,11 @@ class MongoExecutionRepository:
             MongoDB update operations
 
         """
-        update_data: dict[str, Any] = model.model_dump()
+        update_data: dict[str, Any] = model.model_dump(mode="json")
+
+        # Convert elapsed_time to seconds for MongoDB storage
+        elapsed_time = model.elapsed_time
+        elapsed_seconds = elapsed_time.total_seconds() if elapsed_time else None
 
         update_ops: dict[str, Any] = {
             "$set": {
@@ -292,21 +329,19 @@ class MongoExecutionRepository:
                 "status": update_data["status"],
                 "tags": update_data["tags"],
                 "chip_id": update_data["chip_id"],
-                "start_at": update_data["start_at"],
-                "end_at": update_data["end_at"],
-                "elapsed_time": update_data["elapsed_time"],
+                "start_at": model.start_at,
+                "end_at": model.end_at,
+                "elapsed_time": elapsed_seconds,
                 "message": update_data["message"],
                 "system_info": update_data["system_info"],
             }
         }
 
-        # Merge task_results
+        # Merge task_results (convert elapsed_time to seconds for MongoDB storage)
         if update_data.get("task_results"):
             for k, v in update_data["task_results"].items():
-                if hasattr(v, "model_dump"):
-                    update_ops["$set"][f"task_results.{k}"] = v.model_dump()
-                else:
-                    update_ops["$set"][f"task_results.{k}"] = v
+                # Convert elapsed_time fields to seconds recursively
+                update_ops["$set"][f"task_results.{k}"] = _convert_elapsed_time_to_seconds(v)
 
         # Merge controller_info
         if update_data.get("controller_info"):
@@ -372,9 +407,9 @@ class MongoExecutionRepository:
             controller_info=doc.get("controller_info", {}),
             fridge_info=doc.get("fridge_info", {}),
             chip_id=doc.get("chip_id", ""),
-            start_at=doc.get("start_at", ""),
-            end_at=doc.get("end_at", ""),
-            elapsed_time=doc.get("elapsed_time", ""),
+            start_at=doc.get("start_at") or None,
+            end_at=doc.get("end_at") or None,
+            elapsed_time=doc.get("elapsed_time") or None,
             calib_data=calib_data_model,
             message=doc.get("message", ""),
             system_info=doc.get("system_info", {}),

@@ -21,7 +21,7 @@ export interface OutputParameterModel {
   error?: number;
   unit?: string;
   description?: string;
-  /** The time when the system information was created */
+  /** The time when the calibration was performed */
   calibrated_at?: string;
   execution_id?: string;
   task_id?: string;

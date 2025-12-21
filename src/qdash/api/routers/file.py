@@ -23,6 +23,7 @@ from qdash.api.schemas.file import (
     SaveFileRequest,
     ValidateFileRequest,
 )
+from qdash.common.datetime_utils import now_iso
 from qdash.common.paths import QUBEX_CONFIG_BASE
 
 router = APIRouter()
@@ -573,8 +574,6 @@ def git_push_config(
     import tempfile
     from urllib.parse import urlparse, urlunparse
 
-    import pendulum
-
     try:
         # Get authentication details from environment
         github_user = os.getenv("GITHUB_USER")
@@ -632,7 +631,7 @@ def git_push_config(
             repo.git.config("user.email", "qdash-ui@users.noreply.github.com")
 
             # Commit with timestamp
-            now_jst = pendulum.now("Asia/Tokyo").to_iso8601_string()
+            now_jst = now_iso()
             commit_msg = f"{request.commit_message} at {now_jst}"
             repo.index.commit(commit_msg)
 

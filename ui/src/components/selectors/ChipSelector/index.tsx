@@ -12,7 +12,7 @@ import { useSelectStyles } from "@/hooks/useSelectStyles";
 interface ChipOption {
   value: string;
   label: string;
-  installed_at?: string;
+  installed_at?: string | null;
 }
 
 interface ChipSelectorProps {

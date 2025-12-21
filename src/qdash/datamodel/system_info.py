@@ -1,5 +1,7 @@
-import pendulum
-from pydantic import BaseModel, Field
+from datetime import datetime
+
+from pydantic import BaseModel, Field, field_serializer
+from qdash.common.datetime_utils import now
 
 
 class SystemInfoModel(BaseModel):
@@ -7,20 +9,26 @@ class SystemInfoModel(BaseModel):
 
     Attributes
     ----------
-        created_at (str): The time when the system information was created. e.g. "2021-01-01T00:00:00Z".
-        updated_at (str): The time when the system information was updated. e.g. "2021-01-01T00:00:00Z".
+        created_at (datetime): The time when the system information was created.
+        updated_at (datetime): The time when the system information was updated.
 
     """
 
-    created_at: str = Field(
-        default_factory=lambda: pendulum.now(tz="Asia/Tokyo").to_iso8601_string(),
+    created_at: datetime = Field(
+        default_factory=now,
         description="The time when the system information was created",
     )
-    updated_at: str = Field(
-        default_factory=lambda: pendulum.now(tz="Asia/Tokyo").to_iso8601_string(),
+    updated_at: datetime = Field(
+        default_factory=now,
         description="The time when the system information was updated",
     )
 
+    @field_serializer("created_at", "updated_at")
+    @classmethod
+    def _serialize_datetime(cls, v: datetime | None) -> str | None:
+        """Serialize datetime to ISO format for JSON compatibility."""
+        return v.isoformat() if v else None
+
     def update_time(self) -> None:
         """Update the time when the system information was updated."""
-        self.updated_at = pendulum.now(tz="Asia/Tokyo").to_iso8601_string()
+        self.updated_at = now()

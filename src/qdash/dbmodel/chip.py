@@ -1,9 +1,10 @@
+from datetime import datetime
 from typing import ClassVar
 
-import pendulum
 from bunnet import Document
 from pydantic import ConfigDict, Field
 from pymongo import ASCENDING, DESCENDING, IndexModel
+from qdash.common.datetime_utils import now
 from qdash.datamodel.coupling import CouplingModel
 from qdash.datamodel.qubit import QubitModel
 from qdash.datamodel.system_info import SystemInfoModel
@@ -33,9 +34,9 @@ class ChipDocument(Document):
     )
     qubits: dict[str, QubitModel] = Field({}, description="The qubits of the chip")
     couplings: dict[str, CouplingModel] = Field({}, description="The couplings of the chip")
-    installed_at: str = Field(
-        default_factory=lambda: pendulum.now(tz="Asia/Tokyo").to_iso8601_string(),
-        description="The time when the system information was created",
+    installed_at: datetime = Field(
+        default_factory=now,
+        description="The time when the chip was installed",
     )
 
     system_info: SystemInfoModel = Field(..., description="The system information")

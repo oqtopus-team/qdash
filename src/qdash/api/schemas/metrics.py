@@ -1,5 +1,7 @@
 """Schema definitions for metrics router."""
 
+from datetime import datetime
+
 from pydantic import BaseModel
 
 
@@ -49,8 +51,8 @@ class MetricHistoryItem(BaseModel):
     value: float | None
     execution_id: str
     task_id: str | None = None
-    timestamp: str
-    calibrated_at: str | None = None
+    timestamp: datetime
+    calibrated_at: datetime | None = None
 
 
 class QubitMetricHistoryResponse(BaseModel):

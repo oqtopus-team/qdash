@@ -20,6 +20,7 @@ import JsonView from "react18-json-view";
 import type { Node, Edge, NodeProps, NodeTypes } from "@xyflow/react";
 
 import { TaskFigure } from "@/components/charts/TaskFigure";
+import { formatDateTime } from "@/utils/datetime";
 import "@xyflow/react/dist/style.css";
 
 interface TaskNode {
@@ -100,7 +101,7 @@ const CustomNode = ({ data }: NodeProps) => {
       <div className="text-sm font-medium truncate">{nodeData.status}</div>
       {nodeData.startAt && (
         <div className="tooltip tooltip-bottom absolute -bottom-12 opacity-0 group-hover:opacity-100 transition-opacity bg-base-300 p-2 rounded text-xs whitespace-nowrap z-10">
-          <div>Start: {new Date(nodeData.startAt).toLocaleString()}</div>
+          <div>Start: {formatDateTime(nodeData.startAt)}</div>
           {nodeData.elapsedTime && <div>Duration: {nodeData.elapsedTime}</div>}
         </div>
       )}
@@ -429,7 +430,7 @@ export default function ExecutionDAG({ tasks }: ExecutionDAGProps) {
               <div>
                 <div className="font-medium">Start Time</div>
                 <div className="text-sm">
-                  {new Date(selectedTask.startAt).toLocaleString()}
+                  {formatDateTime(selectedTask.startAt)}
                 </div>
               </div>
             )}

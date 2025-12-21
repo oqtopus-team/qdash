@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Annotated, Any, Literal
 
-import pendulum
 from bunnet import SortDirection
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
@@ -22,6 +22,7 @@ from qdash.api.schemas.metrics import (
     QubitMetricHistoryResponse,
     QubitMetrics,
 )
+from qdash.common.datetime_utils import now, to_datetime
 from qdash.repository.chip import MongoChipRepository
 from qdash.repository.task_result_history import MongoTaskResultHistoryRepository
 
@@ -60,45 +61,78 @@ def normalize_qid(qid: str) -> str:
 
 def _extract_metric_output_info(
     metric_data: Any,
-) -> tuple[float | int | None, str | None, str | None]:
+) -> tuple[float | int | None, datetime | None, str | None]:
     """Extract value, calibrated_at, and task_id from metric output data."""
 
     if metric_data is None:
         return None, None, None
 
+    def _parse_calibrated_at(value: Any) -> datetime | None:
+        if value is None:
+            return None
+        if isinstance(value, datetime):
+            return value
+        if isinstance(value, str):
+            return to_datetime(value)
+        return None
+
     if isinstance(metric_data, dict):
         return (
             metric_data.get("value"),
-            metric_data.get("calibrated_at"),
+            _parse_calibrated_at(metric_data.get("calibrated_at")),
             metric_data.get("task_id"),
         )
 
     if hasattr(metric_data, "model_dump"):
         data = metric_data.model_dump()
-        return data.get("value"), data.get("calibrated_at"), data.get("task_id")
+        return (
+            data.get("value"),
+            _parse_calibrated_at(data.get("calibrated_at")),
+            data.get("task_id"),
+        )
 
     if hasattr(metric_data, "value"):
         return (
             getattr(metric_data, "value", None),
-            getattr(metric_data, "calibrated_at", None),
+            _parse_calibrated_at(getattr(metric_data, "calibrated_at", None)),
             getattr(metric_data, "task_id", None),
         )
 
     return metric_data, None, None
 
 
-def _get_task_timestamp(task_doc: Any) -> str:
+def _get_task_timestamp(task_doc: Any) -> datetime:
     """Get the best available timestamp for a task history document."""
 
-    timestamp = getattr(task_doc, "start_at", "") or getattr(task_doc, "end_at", "")
-    if timestamp:
-        return timestamp
+    timestamp = getattr(task_doc, "start_at", None) or getattr(task_doc, "end_at", None)
+    if timestamp is not None:
+        if isinstance(timestamp, datetime):
+            return timestamp
+        parsed = to_datetime(timestamp)
+        if parsed is not None:
+            return parsed
 
     system_info = getattr(task_doc, "system_info", None)
     if isinstance(system_info, dict):
-        return str(system_info.get("created_at", ""))
+        created_at = system_info.get("created_at")
+        if created_at is not None:
+            if isinstance(created_at, datetime):
+                return created_at
+            parsed = to_datetime(str(created_at))
+            if parsed is not None:
+                return parsed
+        return now()
 
-    return getattr(system_info, "created_at", "") if system_info is not None else ""
+    if system_info is not None:
+        created_at = getattr(system_info, "created_at", None)
+        if created_at is not None:
+            if isinstance(created_at, datetime):
+                return created_at
+            parsed = to_datetime(str(created_at))
+            if parsed is not None:
+                return parsed
+
+    return now()
 
 
 @router.get("/config", summary="Get metrics configuration", operation_id="getMetricsConfig")
@@ -137,7 +171,7 @@ def _extract_latest_metrics(
     ----
         entity_models: Dictionary of qubit/coupling models from ChipDocument
         valid_metric_keys: Set of metric keys to extract from config
-        cutoff_time: Optional pendulum datetime for filtering calibration times
+        cutoff_time: Optional datetime for filtering calibration times
         within_hours: Number of hours for time window (used for logging)
 
     Returns:
@@ -161,10 +195,10 @@ def _extract_latest_metrics(
                     include_param = True
                     if within_hours and cutoff_time is not None and "calibrated_at" in param_data:
                         try:
-                            calibrated_at = pendulum.parse(
-                                param_data["calibrated_at"], tz="Asia/Tokyo"
+                            calibrated_at = to_datetime(param_data["calibrated_at"])
+                            include_param = (
+                                calibrated_at is not None and calibrated_at >= cutoff_time
                             )
-                            include_param = calibrated_at >= cutoff_time
                         except Exception:
                             include_param = False
 
@@ -203,7 +237,7 @@ def _extract_best_metrics(
         entity_type: Type of entity - either "qubit" or "coupling"
         valid_metric_keys: Set of metric keys to extract from config
         metrics_config: Metrics configuration mapping metric_key -> MetricMetadata
-        cutoff_time: Optional pendulum datetime for filtering tasks
+        cutoff_time: Optional datetime for filtering tasks
 
     Returns:
     -------
@@ -235,7 +269,7 @@ def _extract_best_metrics(
         "$or": [{f"output_parameters.{metric}": {"$exists": True}} for metric in best_mode_metrics],
     }
     if cutoff_time:
-        query["start_at"] = {"$gte": cutoff_time.to_iso8601_string()}
+        query["start_at"] = {"$gte": cutoff_time}
 
     # Query task results that have at least one of the target metrics
     try:
@@ -347,7 +381,7 @@ def extract_qubit_metrics(
     # Determine cutoff time if filtering
     cutoff_time = None
     if within_hours:
-        cutoff_time = pendulum.now("Asia/Tokyo").subtract(hours=within_hours)
+        cutoff_time = now() - timedelta(hours=within_hours)
 
     # Extract metrics based on selection mode
     if selection_mode == "latest":
@@ -397,7 +431,7 @@ def extract_coupling_metrics(
     # Determine cutoff time if filtering
     cutoff_time = None
     if within_hours:
-        cutoff_time = pendulum.now("Asia/Tokyo").subtract(hours=within_hours)
+        cutoff_time = now() - timedelta(hours=within_hours)
 
     # Extract metrics based on selection mode
     if selection_mode == "latest":
@@ -514,7 +548,7 @@ async def get_qubit_metric_history(
     # Calculate cutoff time
     cutoff_time = None
     if within_days:
-        cutoff_time = pendulum.now("Asia/Tokyo").subtract(days=within_days)
+        cutoff_time = now() - timedelta(days=within_days)
 
     # Query task result history directly for matching metrics (scoped by project)
     query: dict[str, Any] = {
@@ -526,7 +560,7 @@ async def get_qubit_metric_history(
     }
 
     if cutoff_time:
-        query["start_at"] = {"$gte": cutoff_time.to_iso8601_string()}
+        query["start_at"] = {"$gte": cutoff_time}
 
     task_result_repo = MongoTaskResultHistoryRepository()
     task_results = task_result_repo.find(
@@ -612,7 +646,7 @@ async def get_coupling_metric_history(
     # Calculate cutoff time
     cutoff_time = None
     if within_days:
-        cutoff_time = pendulum.now("Asia/Tokyo").subtract(days=within_days)
+        cutoff_time = now() - timedelta(days=within_days)
 
     query: dict[str, Any] = {
         "project_id": ctx.project_id,
@@ -623,7 +657,7 @@ async def get_coupling_metric_history(
     }
 
     if cutoff_time:
-        query["start_at"] = {"$gte": cutoff_time.to_iso8601_string()}
+        query["start_at"] = {"$gte": cutoff_time}
 
     task_result_repo = MongoTaskResultHistoryRepository()
     task_results = task_result_repo.find(
@@ -719,7 +753,7 @@ async def download_metrics_pdf(
     # Calculate cutoff time if time filter specified
     cutoff_time = None
     if within_hours:
-        cutoff_time = pendulum.now("Asia/Tokyo").subtract(hours=within_hours)
+        cutoff_time = now() - timedelta(hours=within_hours)
 
     # Load metrics configuration
     config = load_metrics_config()
@@ -784,7 +818,7 @@ async def download_metrics_pdf(
         raise HTTPException(status_code=500, detail=f"PDF generation failed: {e!s}") from e
 
     # Generate filename
-    timestamp = pendulum.now("Asia/Tokyo").format("YYYYMMDD_HHmmss")
+    timestamp = now().strftime("%Y%m%d_%H%M%S")
     filename = f"metrics_report_{chip_id}_{timestamp}.pdf"
 
     return StreamingResponse(

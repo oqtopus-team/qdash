@@ -80,6 +80,7 @@ export default withMermaid(
               link: "/development/development-flow",
             },
             { text: "Setup", link: "/development/setup" },
+            { text: "Datetime Handling", link: "/development/datetime" },
             {
               text: "API",
               collapsed: true,

@@ -1,7 +1,9 @@
+from datetime import datetime, timedelta
 from enum import Enum
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_serializer, field_validator
+from qdash.common.datetime_utils import ensure_timezone, format_elapsed_time, parse_elapsed_time
 from qdash.datamodel.system_info import SystemInfoModel
 from qdash.datamodel.task import CalibDataModel, TaskResultModel
 
@@ -42,10 +44,10 @@ class ExecutionModel(BaseModel):
         note (str): The note. e.g. "This is a note".
         tags (list[str]): The tags. e.g. ["tag1", "tag2"].
         message (str): The message. e.g. "This is a message".
-        start_at (str): The time when the
-        end_at (str): The time when the execution ended.
-        elapsed_time (str): The elapsed time.
-        system_info (SystemInfo): The system information. e.g. {"created_at": "2021-01-01T00:00:00Z", "updated_at": "2021-01-01T00:00:00Z"}.
+        start_at (datetime): The time when the execution started.
+        end_at (datetime): The time when the execution ended.
+        elapsed_time (timedelta): The elapsed time.
+        system_info (SystemInfoModel): The system information.
 
     """
 
@@ -61,9 +63,38 @@ class ExecutionModel(BaseModel):
     controller_info: dict[str, Any] = Field(..., description="The controller information")
     fridge_info: dict[str, Any] = Field(..., description="The fridge information")
     chip_id: str = Field(..., description="The chip ID")
-    start_at: str = Field(..., description="The time when the execution started")
-    end_at: str = Field(..., description="The time when the execution ended")
-    elapsed_time: str = Field(..., description="The elapsed time")
+    start_at: datetime | None = Field(None, description="The time when the execution started")
+    end_at: datetime | None = Field(None, description="The time when the execution ended")
+    elapsed_time: timedelta | None = Field(None, description="The elapsed time")
     calib_data: CalibDataModel = Field(..., description="The calibration data")
     message: str = Field(..., description="The message")
     system_info: SystemInfoModel = Field(..., description="The system information")
+
+    @field_validator("start_at", "end_at", mode="before")
+    @classmethod
+    def _ensure_timezone(cls, v: Any) -> datetime | Any:
+        """Ensure datetime fields are timezone-aware."""
+        if v is None:
+            return None
+        if isinstance(v, datetime):
+            return ensure_timezone(v)
+        # For other inputs (e.g., strings), let pydantic handle the conversion
+        return v
+
+    @field_validator("elapsed_time", mode="before")
+    @classmethod
+    def _parse_elapsed_time(cls, v: Any) -> timedelta | None:
+        """Parse elapsed_time from various formats."""
+        return parse_elapsed_time(v)
+
+    @field_serializer("start_at", "end_at")
+    @classmethod
+    def _serialize_datetime(cls, v: datetime | None) -> str | None:
+        """Serialize datetime to ISO format for JSON compatibility."""
+        return v.isoformat() if v else None
+
+    @field_serializer("elapsed_time")
+    @classmethod
+    def _serialize_elapsed_time(cls, v: timedelta | None) -> str | None:
+        """Serialize elapsed_time to H:MM:SS format."""
+        return format_elapsed_time(v) if v else None

@@ -1,9 +1,9 @@
 from typing import Any, ClassVar
 
-import pendulum
 from bunnet import Document
 from pydantic import ConfigDict, Field
 from pymongo import ASCENDING, DESCENDING, IndexModel
+from qdash.common.datetime_utils import now
 from qdash.datamodel.coupling import CouplingModel, EdgeInfoModel
 from qdash.datamodel.system_info import SystemInfoModel
 
@@ -39,7 +39,7 @@ class CouplingHistoryDocument(Document):
     )
     system_info: SystemInfoModel = Field(..., description="The system information")
     recorded_date: str = Field(
-        default_factory=lambda: pendulum.now(tz="Asia/Tokyo").format("YYYYMMDD"),
+        default_factory=lambda: now().strftime("%Y%m%d"),
         description="The date when this history record was created",
     )
 
@@ -70,7 +70,7 @@ class CouplingHistoryDocument(Document):
     @classmethod
     def create_history(cls, coupling: CouplingModel) -> "CouplingHistoryDocument":
         """Create a history record from a CouplingDocument."""
-        today = pendulum.now(tz="Asia/Tokyo").format("YYYYMMDD")
+        today = now().strftime("%Y%m%d")
         existing_history = cls.find_one(
             {
                 "project_id": coupling.project_id,
@@ -96,10 +96,7 @@ class CouplingHistoryDocument(Document):
                 data=coupling.data,
                 best_data=coupling.best_data,
                 edge_info=coupling.edge_info,
-                system_info=SystemInfoModel(
-                    created_at=pendulum.now(tz="Asia/Tokyo").to_iso8601_string(),
-                    updated_at=pendulum.now(tz="Asia/Tokyo").to_iso8601_string(),
-                ),
+                system_info=SystemInfoModel(),
             )
         history.save()
         return history

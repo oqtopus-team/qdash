@@ -1,9 +1,9 @@
 from typing import Any, ClassVar
 
-import pendulum
 from bunnet import Document
 from pydantic import ConfigDict, Field
 from pymongo import ASCENDING, DESCENDING, IndexModel
+from qdash.common.datetime_utils import now
 from qdash.datamodel.qubit import NodeInfoModel, QubitModel
 from qdash.datamodel.system_info import SystemInfoModel
 
@@ -39,7 +39,7 @@ class QubitHistoryDocument(Document):
     )
     system_info: SystemInfoModel = Field(..., description="The system information")
     recorded_date: str = Field(
-        default_factory=lambda: pendulum.now(tz="Asia/Tokyo").format("YYYYMMDD"),
+        default_factory=lambda: now().strftime("%Y%m%d"),
         description="The date when this history record was created",
     )
 
@@ -70,7 +70,7 @@ class QubitHistoryDocument(Document):
     @classmethod
     def create_history(cls, qubit: QubitModel) -> "QubitHistoryDocument":
         """Create a history record from a QubitDocument."""
-        today = pendulum.now(tz="Asia/Tokyo").format("YYYYMMDD")
+        today = now().strftime("%Y%m%d")
         existing_history = cls.find_one(
             {
                 "project_id": qubit.project_id,
@@ -97,10 +97,7 @@ class QubitHistoryDocument(Document):
                 data=qubit.data,
                 best_data=qubit.best_data,
                 node_info=qubit.node_info,
-                system_info=SystemInfoModel(
-                    created_at=pendulum.now(tz="Asia/Tokyo").to_iso8601_string(),
-                    updated_at=pendulum.now(tz="Asia/Tokyo").to_iso8601_string(),
-                ),
+                system_info=SystemInfoModel(),
             )
         history.save()
         return history

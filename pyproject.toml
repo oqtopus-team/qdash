@@ -118,6 +118,35 @@ warn_required_dynamic_aliases = true
 [tool.pytest.ini_options]
 asyncio_default_fixture_loop_scope = "function"
 
+[tool.coverage.run]
+source = ["src/qdash"]
+omit = [
+    # Data models - primarily type definitions
+    "src/qdash/datamodel/*",
+    # Database models - document definitions
+    "src/qdash/dbmodel/*",
+    # API schemas - request/response models
+    "src/qdash/api/schemas/*",
+    # Auto-generated client code
+    "src/qdash/client/*",
+    # Internal service modules
+    "src/qdash/workflow/service/_internal/*",
+    # Worker tasks
+    "src/qdash/workflow/worker/*",
+    # Setup scripts
+    "src/qdash/workflow/setup_work_pool.py",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+    "if __name__ == .__main__.:",
+    "@abstractmethod",
+]
+
 [dependency-groups]
 api = [
     "fastapi==0.111.1",

@@ -1,7 +1,8 @@
+from datetime import timedelta
 from typing import Any, TypeVar
 
-import pendulum
 from pydantic import BaseModel
+from qdash.common.datetime_utils import now, to_datetime
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -17,8 +18,8 @@ def _process_data(
     if not raw_data:
         return result
 
-    now = pendulum.now("Asia/Tokyo")
-    cutoff = now.subtract(hours=cutoff_hours)
+    current_time = now()
+    cutoff = current_time - timedelta(hours=cutoff_hours)
 
     for key, value in raw_data.items():
         calibrated_at = value.get("calibrated_at")
@@ -26,8 +27,8 @@ def _process_data(
         if within_24hrs:
             if calibrated_at:
                 try:
-                    calibrated_at_dt = pendulum.parse(calibrated_at, tz="Asia/Tokyo")
-                    if isinstance(calibrated_at_dt, pendulum.DateTime):
+                    calibrated_at_dt = to_datetime(calibrated_at)
+                    if calibrated_at_dt is not None:
                         is_recent = calibrated_at_dt >= cutoff
                     else:
                         is_recent = False

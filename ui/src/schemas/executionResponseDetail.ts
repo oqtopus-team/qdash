@@ -5,6 +5,9 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
+import type { ExecutionResponseDetailStartAt } from "./executionResponseDetailStartAt";
+import type { ExecutionResponseDetailEndAt } from "./executionResponseDetailEndAt";
+import type { ExecutionResponseDetailElapsedTime } from "./executionResponseDetailElapsedTime";
 import type { Task } from "./task";
 import type { ExecutionResponseDetailNote } from "./executionResponseDetailNote";
 
@@ -15,18 +18,18 @@ Attributes
 ----------
     name (str): The name of the execution.
     status (str): The current status of the execution.
-    start_at (str): The start time of the execution.
-    end_at (str): The end time of the execution.
-    elapsed_time (str): The total elapsed time of the execution.
+    start_at (datetime | None): The start time of the execution.
+    end_at (datetime | None): The end time of the execution.
+    elapsed_time (timedelta | None): The total elapsed time of the execution.
     task (list[Task]): List of tasks in the execution.
     note (dict): Notes for the execution.
  */
 export interface ExecutionResponseDetail {
   name: string;
   status: string;
-  start_at: string;
-  end_at: string;
-  elapsed_time: string;
+  start_at?: ExecutionResponseDetailStartAt;
+  end_at?: ExecutionResponseDetailEndAt;
+  elapsed_time?: ExecutionResponseDetailElapsedTime;
   task: Task[];
   note: ExecutionResponseDetailNote;
 }

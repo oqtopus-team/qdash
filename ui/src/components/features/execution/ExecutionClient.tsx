@@ -16,6 +16,12 @@ import {
 } from "lucide-react";
 import Select, { type SingleValue, type StylesConfig } from "react-select";
 
+import {
+  formatDate,
+  formatTime,
+  formatDateTime as formatDateTimeUtil,
+} from "@/utils/datetime";
+
 import ExecutionDAG from "./ExecutionDAG";
 
 import type { ExecutionResponseDetail } from "@/schemas";
@@ -53,7 +59,11 @@ export default function ExecutionDetailClient({
   const [filterQubitId, setFilterQubitId] = useState<string>("all");
   const [filterTaskName, setFilterTaskName] = useState<string>("all");
 
-  const calculateDetailedDuration = (start: string, end: string) => {
+  const calculateDetailedDuration = (
+    start: string | null | undefined,
+    end: string | null | undefined,
+  ) => {
+    if (!start || !end) return "-";
     const startDate = new Date(start);
     const endDate = new Date(end);
     const diff = endDate.getTime() - startDate.getTime();
@@ -266,22 +276,11 @@ export default function ExecutionDetailClient({
 
   const formatDateTime = (dateStr?: string | null) => {
     if (!dateStr) return "-";
-    const date = new Date(dateStr);
     return (
       <>
-        <div className="font-medium">
-          {date.toLocaleDateString("ja-JP", {
-            year: "numeric",
-            month: "2-digit",
-            day: "2-digit",
-          })}
-        </div>
+        <div className="font-medium">{formatDate(dateStr)}</div>
         <div className="text-xs text-base-content/60">
-          {date.toLocaleTimeString("ja-JP", {
-            hour: "2-digit",
-            minute: "2-digit",
-            second: "2-digit",
-          })}
+          {formatTime(dateStr)}
         </div>
       </>
     );
@@ -330,14 +329,14 @@ export default function ExecutionDetailClient({
               <Calendar className="mr-2 text-info/70 flex-shrink-0" size={14} />
               <span className="font-medium mr-1">Start:</span>
               <time className="truncate">
-                {new Date(execution.start_at).toLocaleString()}
+                {formatDateTimeUtil(execution.start_at)}
               </time>
             </div>
             <div className="flex items-center text-base-content/70">
               <Calendar className="mr-2 text-info/70 flex-shrink-0" size={14} />
               <span className="font-medium mr-1">End:</span>
               <time className="truncate">
-                {new Date(execution.end_at).toLocaleString()}
+                {formatDateTimeUtil(execution.end_at)}
               </time>
             </div>
             <div

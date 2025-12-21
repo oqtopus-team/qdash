@@ -5,6 +5,7 @@ useful for unit testing without requiring a MongoDB instance.
 """
 
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 from typing import Any
 
 from qdash.datamodel.execution import ExecutionModel
@@ -26,9 +27,9 @@ class TaskResultHistoryEntry:
     figure_path: list[str]
     json_figure_path: list[str]
     raw_data_path: list[str]
-    start_at: str | None
-    end_at: str | None
-    elapsed_time: str | None
+    start_at: datetime | None
+    end_at: datetime | None
+    elapsed_time: timedelta | None
     task_type: str | None
     project_id: str | None
     chip_id: str

@@ -24,6 +24,8 @@ class Settings(BaseSettings):
     ui_port: int = 5714
     # Logging
     log_level: str = "INFO"
+    # Timezone
+    timezone: str = "Asia/Tokyo"
 
 
 @lru_cache(maxsize=1)

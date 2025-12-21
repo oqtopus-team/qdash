@@ -4,10 +4,11 @@ This module provides the ExecutionStateManager class that handles execution stat
 transitions without any database or I/O operations.
 """
 
+from datetime import datetime, timedelta
 from typing import Any, cast
 
-import pendulum
 from pydantic import BaseModel, field_validator
+from qdash.common.datetime_utils import calculate_elapsed_time, now
 from qdash.datamodel.execution import (
     CalibDataModel,
     ExecutionModel,
@@ -46,9 +47,9 @@ class ExecutionStateManager(BaseModel):
     fridge_info: dict[str, Any] = {}
     chip_id: str = ""
     project_id: str | None = None
-    start_at: str = ""
-    end_at: str = ""
-    elapsed_time: str = ""
+    start_at: datetime | None = None
+    end_at: datetime | None = None
+    elapsed_time: timedelta | None = None
     calib_data: CalibDataModel = CalibDataModel(qubit={}, coupling={})
     message: str = ""
     system_info: SystemInfoModel = SystemInfoModel()
@@ -70,7 +71,7 @@ class ExecutionStateManager(BaseModel):
             Self for method chaining
 
         """
-        self.start_at = pendulum.now(tz="Asia/Tokyo").to_iso8601_string()
+        self.start_at = now()
         self.status = ExecutionStatusModel.RUNNING
         self.system_info.update_time()
         return self
@@ -84,9 +85,10 @@ class ExecutionStateManager(BaseModel):
             Self for method chaining
 
         """
-        end_at = pendulum.now(tz="Asia/Tokyo").to_iso8601_string()
+        end_at = now()
         self.end_at = end_at
-        self.elapsed_time = self._calculate_elapsed_time(self.start_at, end_at)
+        if self.start_at is not None:
+            self.elapsed_time = calculate_elapsed_time(self.start_at, end_at)
         self.status = ExecutionStatusModel.COMPLETED
         self.system_info.update_time()
         return self
@@ -100,9 +102,10 @@ class ExecutionStateManager(BaseModel):
             Self for method chaining
 
         """
-        end_at = pendulum.now(tz="Asia/Tokyo").to_iso8601_string()
+        end_at = now()
         self.end_at = end_at
-        self.elapsed_time = self._calculate_elapsed_time(self.start_at, end_at)
+        if self.start_at is not None:
+            self.elapsed_time = calculate_elapsed_time(self.start_at, end_at)
         self.status = ExecutionStatusModel.FAILED
         self.system_info.update_time()
         return self
@@ -220,34 +223,6 @@ class ExecutionStateManager(BaseModel):
             return None
         # Handle OutputParameterModel
         return param.value if hasattr(param, "value") else param
-
-    def _calculate_elapsed_time(self, start_at: str, end_at: str) -> str:
-        """Calculate elapsed time between two timestamps.
-
-        Parameters
-        ----------
-        start_at : str
-            Start timestamp in ISO8601 format
-        end_at : str
-            End timestamp in ISO8601 format
-
-        Returns
-        -------
-        str
-            Human-readable elapsed time
-
-        Raises
-        ------
-        ValueError
-            If timestamps cannot be parsed
-
-        """
-        try:
-            start_time = pendulum.parse(start_at)
-            end_time = pendulum.parse(end_at)
-        except Exception as e:
-            raise ValueError(f"Failed to parse the time. {e}")
-        return end_time.diff_for_humans(start_time, absolute=True)  # type: ignore
 
     def to_datamodel(self) -> ExecutionModel:
         """Convert to ExecutionModel for persistence.

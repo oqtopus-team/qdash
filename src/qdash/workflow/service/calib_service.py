@@ -46,8 +46,8 @@ if TYPE_CHECKING:
     from qdash.workflow.service.steps import Step
     from qdash.workflow.service.targets import Target
 
-import pendulum
 from prefect import get_run_logger
+from qdash.common.datetime_utils import now
 
 logger = logging.getLogger(__name__)
 from qdash.workflow.engine import CalibConfig, CalibOrchestrator
@@ -88,7 +88,7 @@ def generate_execution_id(
 
         counter_repo = MongoExecutionCounterRepository()
 
-    date_str = pendulum.now(tz="Asia/Tokyo").date().strftime("%Y%m%d")
+    date_str = now().strftime("%Y%m%d")
     execution_index = counter_repo.get_next_index(
         date=date_str,
         username=username,
@@ -479,7 +479,7 @@ class CalibService:
         logger = get_run_logger()
 
         # Record stage result using the structured ExecutionNote API
-        timestamp = pendulum.now(tz="Asia/Tokyo").to_iso8601_string()
+        timestamp = now()
         self.execution_service.note.record_stage(stage_name, result, timestamp)
 
         # Persist to database immediately

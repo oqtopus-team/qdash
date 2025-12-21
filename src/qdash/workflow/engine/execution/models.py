@@ -4,6 +4,7 @@ This module defines structured models for execution metadata,
 replacing untyped dict[str, Any] with proper type annotations.
 """
 
+from datetime import datetime
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -13,7 +14,7 @@ class StageResult(BaseModel):
     """Result of a calibration stage execution."""
 
     result: dict[str, Any] = Field(default_factory=dict)
-    timestamp: str = ""
+    timestamp: datetime | None = None
 
 
 class ExecutionNote(BaseModel):
@@ -34,13 +35,13 @@ class ExecutionNote(BaseModel):
     config_commit_id: str | None = None
     extra: dict[str, Any] = Field(default_factory=dict)
 
-    def record_stage(self, stage_name: str, result: dict[str, Any], timestamp: str) -> None:
+    def record_stage(self, stage_name: str, result: dict[str, Any], timestamp: datetime) -> None:
         """Record a stage result.
 
         Args:
             stage_name: Name of the stage
             result: Stage result data
-            timestamp: ISO8601 timestamp
+            timestamp: Timestamp when the stage was recorded
         """
         self.stage_results[stage_name] = StageResult(result=result, timestamp=timestamp)
 

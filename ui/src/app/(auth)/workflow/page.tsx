@@ -11,6 +11,7 @@ import { FlowSchedulesSection } from "@/components/features/flow/FlowSchedulesSe
 import { PageContainer } from "@/components/ui/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { WorkflowListPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
+import { formatDateTime } from "@/utils/datetime";
 
 export default function FlowListPage() {
   const { data, isLoading, error } = useQuery({
@@ -78,8 +79,7 @@ export default function FlowListPage() {
                     <strong>Chip:</strong> {flow.chip_id}
                   </p>
                   <p>
-                    <strong>Updated:</strong>{" "}
-                    {new Date(flow.updated_at).toLocaleString()}
+                    <strong>Updated:</strong> {formatDateTime(flow.updated_at)}
                   </p>
                 </div>
                 {flow.tags && flow.tags.length > 0 && (

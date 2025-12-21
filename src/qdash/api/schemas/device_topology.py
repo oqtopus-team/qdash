@@ -1,5 +1,7 @@
 """Schema definitions for device_topology router."""
 
+from datetime import datetime
+
 from pydantic import BaseModel, Field
 
 
@@ -67,7 +69,7 @@ class Device(BaseModel):
     device_id: str
     qubits: list[Qubit]
     couplings: list[Coupling]
-    calibrated_at: str
+    calibrated_at: datetime | str
 
 
 class FidelityCondition(BaseModel):

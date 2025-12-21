@@ -5365,7 +5365,15 @@
             "title": "Note"
           },
           "timestamp": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Timestamp"
           }
         },
@@ -5374,8 +5382,7 @@
           "username",
           "execution_id",
           "task_id",
-          "note",
-          "timestamp"
+          "note"
         ],
         "title": "CalibrationNoteResponse",
         "description": "CalibrationNote is a subclass of BaseModel."
@@ -5475,9 +5482,16 @@
             "default": {}
           },
           "installed_at": {
-            "type": "string",
-            "title": "Installed At",
-            "default": ""
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Installed At"
           }
         },
         "type": "object",
@@ -5700,7 +5714,15 @@
             "title": "Couplings"
           },
           "calibrated_at": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "string"
+              }
+            ],
             "title": "Calibrated At"
           }
         },
@@ -5840,15 +5862,39 @@
             "title": "Status"
           },
           "start_at": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Start At"
           },
           "end_at": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "End At"
           },
           "elapsed_time": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "duration"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Elapsed Time"
           },
           "task": {
@@ -5868,14 +5914,11 @@
         "required": [
           "name",
           "status",
-          "start_at",
-          "end_at",
-          "elapsed_time",
           "task",
           "note"
         ],
         "title": "ExecutionResponseDetail",
-        "description": "ExecutionResponseDetail is a Pydantic model that represents the detail of an execution response.\n\nAttributes\n----------\n    name (str): The name of the execution.\n    status (str): The current status of the execution.\n    start_at (str): The start time of the execution.\n    end_at (str): The end time of the execution.\n    elapsed_time (str): The total elapsed time of the execution.\n    task (list[Task]): List of tasks in the execution.\n    note (dict): Notes for the execution."
+        "description": "ExecutionResponseDetail is a Pydantic model that represents the detail of an execution response.\n\nAttributes\n----------\n    name (str): The name of the execution.\n    status (str): The current status of the execution.\n    start_at (datetime | None): The start time of the execution.\n    end_at (datetime | None): The end time of the execution.\n    elapsed_time (timedelta | None): The total elapsed time of the execution.\n    task (list[Task]): List of tasks in the execution.\n    note (dict): Notes for the execution."
       },
       "ExecutionResponseSummary": {
         "properties": {
@@ -5892,15 +5935,39 @@
             "title": "Status"
           },
           "start_at": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Start At"
           },
           "end_at": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "End At"
           },
           "elapsed_time": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "duration"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Elapsed Time"
           },
           "tags": {
@@ -5921,14 +5988,11 @@
           "name",
           "execution_id",
           "status",
-          "start_at",
-          "end_at",
-          "elapsed_time",
           "tags",
           "note"
         ],
         "title": "ExecutionResponseSummary",
-        "description": "ExecutionResponseSummary is a Pydantic model that represents the summary of an execution response.\n\nAttributes\n----------\n    name (str): The name of the execution.\n    execution_id (str): The ID of the execution.\n    status (str): The current status of the execution.\n    start_at (str): The start time of the execution.\n    end_at (str): The end time of the execution.\n    elapsed_time (str): The total elapsed time of the execution.\n    tags (list[str]): Tags associated with the execution.\n    note (dict): Notes for the execution."
+        "description": "ExecutionResponseSummary is a Pydantic model that represents the summary of an execution response.\n\nAttributes\n----------\n    name (str): The name of the execution.\n    execution_id (str): The ID of the execution.\n    status (str): The current status of the execution.\n    start_at (datetime | None): The start time of the execution.\n    end_at (datetime | None): The end time of the execution.\n    elapsed_time (timedelta | None): The total elapsed time of the execution.\n    tags (list[str]): Tags associated with the execution.\n    note (dict): Notes for the execution."
       },
       "FidelityCondition": {
         "properties": {
@@ -6033,7 +6097,8 @@
           "next_run": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "format": "date-time"
               },
               {
                 "type": "null"
@@ -6049,6 +6114,7 @@
           },
           "created_at": {
             "type": "string",
+            "format": "date-time",
             "title": "Created At",
             "description": "Schedule creation time"
           }
@@ -6088,13 +6154,15 @@
           },
           "created_at": {
             "type": "string",
+            "format": "date-time",
             "title": "Created At",
-            "description": "Creation timestamp (ISO format)"
+            "description": "Creation timestamp"
           },
           "updated_at": {
             "type": "string",
+            "format": "date-time",
             "title": "Updated At",
-            "description": "Last update timestamp (ISO format)"
+            "description": "Last update timestamp"
           },
           "tags": {
             "items": {
@@ -6254,13 +6322,15 @@
           },
           "created_at": {
             "type": "string",
+            "format": "date-time",
             "title": "Created At",
-            "description": "Creation timestamp (ISO format)"
+            "description": "Creation timestamp"
           },
           "updated_at": {
             "type": "string",
+            "format": "date-time",
             "title": "Updated At",
-            "description": "Last update timestamp (ISO format)"
+            "description": "Last update timestamp"
           },
           "tags": {
             "items": {
@@ -6697,7 +6767,8 @@
           "last_accessed_at": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "format": "date-time"
               },
               {
                 "type": "null"
@@ -6762,12 +6833,14 @@
           },
           "timestamp": {
             "type": "string",
+            "format": "date-time",
             "title": "Timestamp"
           },
           "calibrated_at": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "format": "date-time"
               },
               {
                 "type": "null"
@@ -7001,7 +7074,8 @@
           "start_at": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "format": "date-time"
               },
               {
                 "type": "null"
@@ -7012,7 +7086,8 @@
           "end_at": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "format": "date-time"
               },
               {
                 "type": "null"
@@ -7023,7 +7098,8 @@
           "elapsed_time": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "format": "duration"
               },
               {
                 "type": "null"
@@ -7083,8 +7159,9 @@
           },
           "calibrated_at": {
             "type": "string",
+            "format": "date-time",
             "title": "Calibrated At",
-            "description": "The time when the system information was created"
+            "description": "The time when the calibration was performed"
           },
           "execution_id": {
             "type": "string",
@@ -7229,7 +7306,8 @@
           "created_at": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "format": "date-time"
               },
               {
                 "type": "null"
@@ -7284,10 +7362,12 @@
           },
           "created_at": {
             "type": "string",
+            "format": "date-time",
             "title": "Created At"
           },
           "updated_at": {
             "type": "string",
+            "format": "date-time",
             "title": "Updated At"
           }
         },
@@ -7859,14 +7939,15 @@
           "next_run": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "format": "date-time"
               },
               {
                 "type": "null"
               }
             ],
             "title": "Next Run",
-            "description": "Next scheduled run time (ISO format)"
+            "description": "Next scheduled run time"
           },
           "active": {
             "type": "boolean",
@@ -7963,6 +8044,11 @@
             "type": "string",
             "title": "Log Level",
             "default": "INFO"
+          },
+          "timezone": {
+            "type": "string",
+            "title": "Timezone",
+            "default": "Asia/Tokyo"
           }
         },
         "additionalProperties": false,
@@ -8154,7 +8240,8 @@
           "start_at": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "format": "date-time"
               },
               {
                 "type": "null"
@@ -8165,7 +8252,8 @@
           "end_at": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "format": "date-time"
               },
               {
                 "type": "null"
@@ -8176,7 +8264,8 @@
           "elapsed_time": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "format": "duration"
               },
               {
                 "type": "null"
@@ -8576,7 +8665,8 @@
           "start_at": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "format": "date-time"
               },
               {
                 "type": "null"
@@ -8587,7 +8677,8 @@
           "end_at": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "format": "date-time"
               },
               {
                 "type": "null"
@@ -8598,7 +8689,8 @@
           "elapsed_time": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "format": "duration"
               },
               {
                 "type": "null"
@@ -8679,15 +8771,39 @@
             "title": "Output Parameters"
           },
           "start_at": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Start At"
           },
           "end_at": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "End At"
           },
           "elapsed_time": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "duration"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Elapsed Time"
           }
         },
@@ -8701,13 +8817,10 @@
           "figure_path",
           "json_figure_path",
           "input_parameters",
-          "output_parameters",
-          "start_at",
-          "end_at",
-          "elapsed_time"
+          "output_parameters"
         ],
         "title": "TaskResultResponse",
-        "description": "Response model for task result by task_id.\n\nAttributes\n----------\n    task_id (str): The task ID.\n    task_name (str): The name of the task.\n    qid (str): The qubit or coupling ID.\n    status (str): The task status.\n    execution_id (str): The execution ID.\n    figure_path (list[str]): List of figure paths.\n    json_figure_path (list[str]): List of JSON figure paths.\n    input_parameters (dict): Input parameters.\n    output_parameters (dict): Output parameters.\n    start_at (str): Start time.\n    end_at (str): End time.\n    elapsed_time (str): Elapsed time."
+        "description": "Response model for task result by task_id.\n\nAttributes\n----------\n    task_id (str): The task ID.\n    task_name (str): The name of the task.\n    qid (str): The qubit or coupling ID.\n    status (str): The task status.\n    execution_id (str): The execution ID.\n    figure_path (list[str]): List of figure paths.\n    json_figure_path (list[str]): List of JSON figure paths.\n    input_parameters (dict): Input parameters.\n    output_parameters (dict): Output parameters.\n    start_at (datetime | None): Start time.\n    end_at (datetime | None): End time.\n    elapsed_time (timedelta | None): Elapsed time."
       },
       "TimeSeriesData": {
         "properties": {
@@ -9039,7 +9152,8 @@
           "created_at": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "format": "date-time"
               },
               {
                 "type": "null"
@@ -9050,7 +9164,8 @@
           "updated_at": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "format": "date-time"
               },
               {
                 "type": "null"
