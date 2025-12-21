@@ -116,7 +116,6 @@ class TaskExecutionResult(BaseModel):
     calib_data_delta: CalibDataModel = Field(
         default_factory=lambda: CalibDataModel(qubit={}, coupling={})
     )
-    controller_info: dict[str, dict[str, Any]] = Field(default_factory=dict)
 
     model_config = {"arbitrary_types_allowed": True}
 
@@ -192,18 +191,6 @@ class TaskExecutor:
         self.result_processor = result_processor or TaskResultProcessor()
         self.history_recorder = history_recorder or TaskHistoryRecorder()
         self.data_saver = data_saver or FilesystemCalibDataSaver(calib_dir)
-        self._controller_info: dict[str, dict[str, Any]] = {}
-
-    def set_controller_info(self, controller_info: dict[str, dict[str, Any]]) -> None:
-        """Set controller information for hardware tracking.
-
-        Parameters
-        ----------
-        controller_info : dict[str, dict]
-            Controller/hardware information to track
-
-        """
-        self._controller_info = controller_info
 
     def execute_task(
         self,
@@ -682,7 +669,6 @@ class TaskExecutor:
 
         # Build calib_data_delta from state manager
         result.calib_data_delta = self.state_manager.calib_data
-        result.controller_info = self._controller_info
 
         return execution_service, result
 
@@ -703,7 +689,6 @@ class TaskExecutor:
             task_manager_id=self.task_manager_id,
             task_result=self.state_manager.task_result,
             calib_data=self.state_manager.calib_data,
-            controller_info=self._controller_info,
         )
 
     def _process_results(

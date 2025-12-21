@@ -97,7 +97,6 @@ class ExecutionService:
         name: str = "",
         tags: list[str] | None = None,
         note: dict[str, Any] | None = None,
-        fridge_info: dict[str, Any] | None = None,
         project_id: str | None = None,
         repository: ExecutionRepository | None = None,
     ) -> "ExecutionService":
@@ -119,8 +118,6 @@ class ExecutionService:
             Tags for categorization
         note : dict | None
             Additional notes
-        fridge_info : dict | None
-            Fridge information
         project_id : str | None
             Project identifier
         repository : ExecutionRepository | None
@@ -139,7 +136,6 @@ class ExecutionService:
             name=name,
             tags=tags or [],
             note=ExecutionNote.from_dict(note),
-            fridge_info=fridge_info or {},
             project_id=project_id,
             status=ExecutionStatusModel.SCHEDULED,
         )
@@ -309,31 +305,6 @@ class ExecutionService:
         self.state_manager.merge_calib_data(calib_data)
         return self
 
-    def merge_controller_info(
-        self,
-        controller_info: dict[str, dict[str, Any]],
-    ) -> "ExecutionService":
-        """Merge controller info and persist with optimistic locking.
-
-        Parameters
-        ----------
-        controller_info : dict[str, dict]
-            Controller info to merge
-
-        Returns
-        -------
-        ExecutionService
-            Self for method chaining
-        """
-
-        def update_func(model: ExecutionModel) -> None:
-            for controller_id, info in controller_info.items():
-                model.controller_info[controller_id] = info
-
-        self._update_with_lock(update_func)
-        self.state_manager.merge_controller_info(controller_info)
-        return self
-
     def update_note(self, key: str, value: Any) -> "ExecutionService":
         """Update a note entry and persist.
 
@@ -414,11 +385,6 @@ class ExecutionService:
         return dict(self.state_manager.task_results)
 
     @property
-    def controller_info(self) -> dict[str, dict[Any, Any]]:
-        """Get controller info."""
-        return dict(self.state_manager.controller_info)
-
-    @property
     def note(self) -> ExecutionNote:
         """Get note (returns ExecutionNote model)."""
         return self.state_manager.note
@@ -452,11 +418,6 @@ class ExecutionService:
     def project_id(self) -> str | None:
         """Get project ID."""
         return cast(str | None, self.state_manager.project_id)
-
-    @property
-    def fridge_info(self) -> dict[str, Any]:
-        """Get fridge info."""
-        return dict(self.state_manager.fridge_info)
 
     @property
     def tags(self) -> list[str]:
@@ -495,9 +456,8 @@ class ExecutionService:
         task_manager_id: str,
         task_result: TaskResultModel,
         calib_data: CalibDataModel,
-        controller_info: dict[str, dict[str, Any]],
     ) -> "ExecutionService":
-        """Update execution with task results, calib data, and controller info.
+        """Update execution with task results and calib data.
 
         This is a replacement for ExecutionManager.update_with_task_manager().
 
@@ -509,8 +469,6 @@ class ExecutionService:
             Task result to merge
         calib_data : CalibDataModel
             Calibration data to merge
-        controller_info : dict[str, dict]
-            Controller info to merge
 
         Returns
         -------
@@ -520,7 +478,6 @@ class ExecutionService:
         # Merge all data via state manager
         self.state_manager.merge_task_result(task_manager_id, task_result)
         self.state_manager.merge_calib_data(calib_data)
-        self.state_manager.merge_controller_info(controller_info)
 
         # Persist with optimistic locking
         def updater(model: ExecutionModel) -> None:
@@ -537,10 +494,6 @@ class ExecutionService:
                     model.calib_data.setdefault("coupling", {}).setdefault(qid, {}).update(
                         data if isinstance(data, dict) else {}
                     )
-
-            # Update controller info
-            for _id, info in controller_info.items():
-                model.controller_info[_id] = info
 
         self._update_with_lock(updater)
         return self.reload()

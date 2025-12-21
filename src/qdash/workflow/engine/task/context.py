@@ -50,9 +50,6 @@ class TaskContext:
         Direct access to task state (no sync needed)
     executor : TaskExecutor
         Task executor for running calibration tasks
-    controller_info : dict
-        Controller/hardware information
-
     Example
     -------
     Production usage::
@@ -124,8 +121,6 @@ class TaskContext:
         self.username = username
         self.execution_id = execution_id
         self.calib_dir = calib_dir
-        self.controller_info: dict[str, dict[str, Any]] = {}
-
         # Initialize state manager (the source of truth)
         # Use injected or create default
         self.state: TaskStateManager = state_manager or TaskStateManager(qids=qids)
@@ -173,19 +168,6 @@ class TaskContext:
     def _is_coupling_format(self, qid: str) -> bool:
         """Check if qid is in coupling format (has hyphen)."""
         return "-" in qid
-
-    # === Controller Info ===
-
-    def put_controller_info(self, controller_info: dict[str, Any]) -> None:
-        """Store controller information.
-
-        Parameters
-        ----------
-        controller_info : dict
-            Controller/hardware information
-        """
-        self.controller_info = controller_info
-        self.executor.set_controller_info(controller_info)
 
     # === Upstream Task ID ===
 
@@ -294,7 +276,6 @@ class TaskContext:
             "username": self.username,
             "execution_id": self.execution_id,
             "calib_dir": self.calib_dir,
-            "controller_info": self.controller_info,
             "task_result": self.task_result.model_dump(mode="json"),
             "calib_data": self.calib_data.model_dump(mode="json"),
         }

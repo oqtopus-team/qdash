@@ -172,28 +172,6 @@ class TestCalibDataMerging:
         assert "t1" in manager.calib_data.qubit["0"]
 
 
-class TestControllerInfoMerging:
-    """Test controller info merging functionality."""
-
-    def test_merge_controller_info_adds_new(self):
-        """Test merging new controller info."""
-        manager = ExecutionStateManager(execution_id="exec-001")
-
-        manager.merge_controller_info({"box1": {"ip": "192.168.1.1"}})
-
-        assert "box1" in manager.controller_info
-        assert manager.controller_info["box1"]["ip"] == "192.168.1.1"
-
-    def test_merge_controller_info_updates_existing(self):
-        """Test merging updates existing controller info."""
-        manager = ExecutionStateManager(execution_id="exec-001")
-        manager.merge_controller_info({"box1": {"ip": "192.168.1.1"}})
-
-        manager.merge_controller_info({"box1": {"ip": "192.168.1.2"}})
-
-        assert manager.controller_info["box1"]["ip"] == "192.168.1.2"
-
-
 class TestDatamodelConversion:
     """Test conversion to/from ExecutionModel."""
 
@@ -229,8 +207,6 @@ class TestDatamodelConversion:
             status=ExecutionStatusModel.RUNNING,
             task_results={},
             tags=[],
-            controller_info={},
-            fridge_info={},
             start_at=None,
             end_at=None,
             elapsed_time=None,

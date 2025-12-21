@@ -199,24 +199,6 @@ class TestExecutionServiceMerge:
         assert result is service
         assert "0" in service.calib_data.qubit
 
-    def test_merge_controller_info(self):
-        """Test merging controller info."""
-        mock_repo = MockExecutionRepository()
-        service = ExecutionService.create(
-            username="test_user",
-            execution_id="exec-001",
-            calib_data_path="/tmp/calib",
-            chip_id="chip_1",
-            repository=mock_repo,
-        )
-        service.save()
-
-        result = service.merge_controller_info({"box1": {"ip": "192.168.1.1"}})
-
-        assert result is service
-        assert "box1" in service.controller_info
-        assert service.controller_info["box1"]["ip"] == "192.168.1.1"
-
 
 class TestExecutionServiceReload:
     """Test ExecutionService reload."""
@@ -274,8 +256,6 @@ class TestExecutionServiceFromExisting:
             status=ExecutionStatusModel.RUNNING,
             task_results={},
             tags=[],
-            controller_info={},
-            fridge_info={},
             chip_id="chip_1",
             start_at=None,
             end_at=None,
@@ -323,7 +303,6 @@ class TestExecutionServiceProperties:
         assert service.status == ExecutionStatusModel.SCHEDULED
         assert isinstance(service.calib_data, CalibDataModel)
         assert isinstance(service.task_results, dict)
-        assert isinstance(service.controller_info, dict)
         # note is now an ExecutionNote model
         assert isinstance(service.note, ExecutionNote)
 

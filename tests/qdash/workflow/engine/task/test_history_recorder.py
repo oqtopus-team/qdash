@@ -57,8 +57,6 @@ class TestTaskHistoryRecorder:
             note={},
             status=ExecutionStatusModel.RUNNING,
             task_results={},
-            controller_info={},
-            fridge_info={},
             start_at=None,
             end_at=None,
             elapsed_time=None,

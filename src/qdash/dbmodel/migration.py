@@ -1,194 +1,27 @@
 """Database migration utilities.
 
 Run migrations with:
-    python -m qdash.dbmodel.migration topology-id          # dry-run
-    python -m qdash.dbmodel.migration topology-id --execute  # actual migration
-    python -m qdash.dbmodel.migration datetime-fields          # dry-run
-    python -m qdash.dbmodel.migration datetime-fields --execute  # actual migration
-    python -m qdash.dbmodel.migration validate-datetime      # validate before migration
+    python -m qdash.dbmodel.migration remove-controller-fridge-info          # dry-run
+    python -m qdash.dbmodel.migration remove-controller-fridge-info --execute  # actual migration
 """
 
 import logging
 from typing import Any
 
-import pendulum
-
 logger = logging.getLogger(__name__)
 
 # Constants for migration safety
 BATCH_SIZE = 1000  # Process documents in batches for memory efficiency
-MAX_STRING_LENGTH = 100  # Maximum length for elapsed_time strings to prevent abuse
 
 
 class MigrationError(Exception):
     """Raised when migration encounters an unrecoverable error."""
 
 
-class ValidationResult:
-    """Results of pre-migration validation."""
+def migrate_remove_controller_fridge_info(dry_run: bool = True) -> dict[str, int]:
+    """Remove controller_info and fridge_info fields from execution_history and task_result_history.
 
-    def __init__(self) -> None:
-        self.valid_count = 0
-        self.invalid_count = 0
-        self.errors: list[dict[str, Any]] = []
-
-    def add_error(self, collection: str, doc_id: Any, field: str, value: Any, reason: str) -> None:
-        """Record a validation error."""
-        self.invalid_count += 1
-        self.errors.append(
-            {
-                "collection": collection,
-                "doc_id": str(doc_id),
-                "field": field,
-                "value": str(value)[:100],  # Truncate for safety
-                "reason": reason,
-            }
-        )
-
-    def add_valid(self) -> None:
-        """Record a valid field."""
-        self.valid_count += 1
-
-    @property
-    def is_valid(self) -> bool:
-        """Check if all validations passed."""
-        return self.invalid_count == 0
-
-    def summary(self) -> dict[str, Any]:
-        """Return summary of validation results."""
-        return {
-            "valid_count": self.valid_count,
-            "invalid_count": self.invalid_count,
-            "errors": self.errors[:50],  # Limit errors in summary
-            "is_valid": self.is_valid,
-        }
-
-
-def validate_datetime_data() -> ValidationResult:
-    """Validate existing datetime data before migration.
-
-    Checks all datetime fields for potential issues that could cause
-    migration failures.
-
-    Returns:
-        ValidationResult with details of any validation errors.
-    """
-    from qdash.dbmodel.calibration_note import CalibrationNoteDocument
-    from qdash.dbmodel.chip import ChipDocument
-    from qdash.dbmodel.chip_history import ChipHistoryDocument
-    from qdash.dbmodel.execution_history import ExecutionHistoryDocument
-    from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
-
-    result = ValidationResult()
-
-    def validate_datetime_string(value: Any) -> tuple[bool, str]:
-        """Validate a datetime string can be parsed."""
-        if value is None or value == "":
-            return True, ""
-        if not isinstance(value, str):
-            return True, ""  # Already non-string, will be handled by migration
-        try:
-            pendulum.parse(value)
-            return True, ""
-        except Exception as e:
-            return False, str(e)
-
-    def validate_elapsed_time_string(value: Any) -> tuple[bool, str]:
-        """Validate an elapsed_time string can be parsed."""
-        if value is None or value == "":
-            return True, ""
-        if not isinstance(value, str):
-            return True, ""
-        if len(value) > MAX_STRING_LENGTH:
-            return False, f"String too long ({len(value)} chars)"
-        # Try to parse
-        seconds = parse_elapsed_time_to_seconds(value)
-        if seconds == 0.0 and value.strip() not in ("0", "0.0", ""):
-            return False, "Could not parse elapsed time"
-        return True, ""
-
-    # Validate ExecutionHistoryDocument
-    collection = ExecutionHistoryDocument.get_motor_collection()
-    for doc in collection.find({}, {"_id": 1, "start_at": 1, "end_at": 1, "elapsed_time": 1}):
-        for field in ["start_at", "end_at"]:
-            if field in doc and isinstance(doc[field], str):
-                valid, error = validate_datetime_string(doc[field])
-                if valid:
-                    result.add_valid()
-                else:
-                    result.add_error("execution_history", doc["_id"], field, doc[field], error)
-
-        if "elapsed_time" in doc and isinstance(doc["elapsed_time"], str):
-            valid, error = validate_elapsed_time_string(doc["elapsed_time"])
-            if valid:
-                result.add_valid()
-            else:
-                result.add_error(
-                    "execution_history", doc["_id"], "elapsed_time", doc["elapsed_time"], error
-                )
-
-    # Validate TaskResultHistoryDocument
-    collection = TaskResultHistoryDocument.get_motor_collection()
-    for doc in collection.find({}, {"_id": 1, "start_at": 1, "end_at": 1, "elapsed_time": 1}):
-        for field in ["start_at", "end_at"]:
-            if field in doc and isinstance(doc[field], str):
-                valid, error = validate_datetime_string(doc[field])
-                if valid:
-                    result.add_valid()
-                else:
-                    result.add_error("task_result_history", doc["_id"], field, doc[field], error)
-
-        if "elapsed_time" in doc and isinstance(doc["elapsed_time"], str):
-            valid, error = validate_elapsed_time_string(doc["elapsed_time"])
-            if valid:
-                result.add_valid()
-            else:
-                result.add_error(
-                    "task_result_history", doc["_id"], "elapsed_time", doc["elapsed_time"], error
-                )
-
-    # Validate ChipDocument
-    collection = ChipDocument.get_motor_collection()
-    for doc in collection.find({}, {"_id": 1, "installed_at": 1}):
-        if "installed_at" in doc and isinstance(doc["installed_at"], str):
-            valid, error = validate_datetime_string(doc["installed_at"])
-            if valid:
-                result.add_valid()
-            else:
-                result.add_error("chip", doc["_id"], "installed_at", doc["installed_at"], error)
-
-    # Validate ChipHistoryDocument
-    collection = ChipHistoryDocument.get_motor_collection()
-    for doc in collection.find({}, {"_id": 1, "installed_at": 1}):
-        if "installed_at" in doc and isinstance(doc["installed_at"], str):
-            valid, error = validate_datetime_string(doc["installed_at"])
-            if valid:
-                result.add_valid()
-            else:
-                result.add_error(
-                    "chip_history", doc["_id"], "installed_at", doc["installed_at"], error
-                )
-
-    # Validate CalibrationNoteDocument
-    collection = CalibrationNoteDocument.get_motor_collection()
-    for doc in collection.find({}, {"_id": 1, "timestamp": 1}):
-        if "timestamp" in doc and isinstance(doc["timestamp"], str):
-            valid, error = validate_datetime_string(doc["timestamp"])
-            if valid:
-                result.add_valid()
-            else:
-                result.add_error(
-                    "calibration_note", doc["_id"], "timestamp", doc["timestamp"], error
-                )
-
-    logger.info(f"Validation complete: {result.valid_count} valid, {result.invalid_count} invalid")
-    return result
-
-
-def migrate_add_topology_id(dry_run: bool = True) -> dict[str, int]:
-    """Add topology_id to chips and chip_history that don't have it.
-
-    Sets topology_id to 'square-lattice-mux-{size}' based on chip size.
+    These fields were never used in production and are being removed from the codebase.
 
     Args:
         dry_run: If True, only reports what would be changed.
@@ -196,389 +29,43 @@ def migrate_add_topology_id(dry_run: bool = True) -> dict[str, int]:
     Returns:
         Migration statistics with counts of affected documents.
     """
-    from qdash.dbmodel.chip import ChipDocument
-    from qdash.dbmodel.chip_history import ChipHistoryDocument
-
-    stats = {"chip": 0, "chip_history": 0}
-
-    # Migrate ChipDocument
-    chip_collection = ChipDocument.get_motor_collection()
-    chips = list(
-        chip_collection.find({"$or": [{"topology_id": None}, {"topology_id": {"$exists": False}}]})
-    )
-    logger.info(f"Found {len(chips)} chips without topology_id")
-
-    for chip in chips:
-        size = chip.get("size", 64)
-        topology_id = f"square-lattice-mux-{size}"
-        if not dry_run:
-            chip_collection.update_one({"_id": chip["_id"]}, {"$set": {"topology_id": topology_id}})
-        stats["chip"] += 1
-        logger.debug(
-            f"{'[DRY RUN] Would set' if dry_run else 'Set'} topology_id={topology_id} on chip {chip.get('chip_id')}"
-        )
-
-    # Migrate ChipHistoryDocument
-    history_collection = ChipHistoryDocument.get_motor_collection()
-    histories = list(
-        history_collection.find(
-            {"$or": [{"topology_id": None}, {"topology_id": {"$exists": False}}]}
-        )
-    )
-    logger.info(f"Found {len(histories)} chip_history without topology_id")
-
-    for history in histories:
-        size = history.get("size", 64)
-        topology_id = f"square-lattice-mux-{size}"
-        if not dry_run:
-            history_collection.update_one(
-                {"_id": history["_id"]}, {"$set": {"topology_id": topology_id}}
-            )
-        stats["chip_history"] += 1
-
-    logger.info(
-        f"{'[DRY RUN] Would update' if dry_run else 'Updated'} {stats['chip']} chips, {stats['chip_history']} chip_history"
-    )
-    return stats
-
-
-def parse_elapsed_time_to_seconds(elapsed_str: str) -> float:
-    """Parse elapsed time string to seconds (float).
-
-    Handles formats like:
-    - "1:23:45" (hours:minutes:seconds)
-    - "0:30" (minutes:seconds)
-    - "a few seconds"
-    - "2 minutes"
-    - "38 seconds"
-    - etc.
-
-    Returns:
-        float: Elapsed time in seconds
-    """
-    import re
-
-    if not elapsed_str:
-        return 0.0
-
-    elapsed_str = str(elapsed_str).strip()
-
-    # Try numeric format first (H:MM:SS or MM:SS)
-    parts = elapsed_str.split(":")
-    if len(parts) == 3:
-        try:
-            hours, minutes, seconds = map(int, parts)
-            return float(hours * 3600 + minutes * 60 + seconds)
-        except ValueError:
-            pass
-    elif len(parts) == 2:
-        try:
-            minutes, seconds = map(int, parts)
-            return float(minutes * 60 + seconds)
-        except ValueError:
-            pass
-
-    # Parse human-readable format with numbers like "38 seconds", "1 minute"
-    total_seconds = 0.0
-    patterns = [
-        (r"([\d.]+)\s*(?:seconds|second)\b", 1),
-        (r"([\d.]+)\s*(?:minutes|minute)\b", 60),
-        (r"([\d.]+)\s*(?:hours|hour)\b", 3600),
-        (r"([\d.]+)\s*secs?\b", 1),
-        (r"([\d.]+)\s*mins?\b", 60),
-        (r"([\d.]+)\s*hrs?\b", 3600),
-    ]
-
-    matched = False
-    for pattern, multiplier in patterns:
-        for match in re.finditer(pattern, elapsed_str, re.IGNORECASE):
-            total_seconds += float(match.group(1)) * multiplier
-            matched = True
-
-    if matched:
-        return total_seconds
-
-    # Handle approximate formats from pendulum (no numbers)
-    if "few second" in elapsed_str.lower():
-        return 5.0
-    if "second" in elapsed_str.lower():
-        return 1.0
-    if "minute" in elapsed_str.lower():
-        return 60.0
-    if "hour" in elapsed_str.lower():
-        return 3600.0
-
-    # Try to parse as a plain number
-    try:
-        return float(elapsed_str)
-    except ValueError:
-        pass
-
-    return 0.0
-
-
-def migrate_datetime_fields(dry_run: bool = True) -> dict[str, int]:
-    """Migrate string datetime fields to native datetime types.
-
-    This migration converts:
-    - ISO8601 strings to datetime objects
-    - elapsed_time strings to timedelta (stored as seconds)
-    - SystemInfoModel.created_at/updated_at to datetime
-
-    Args:
-        dry_run: If True, only reports what would be changed.
-
-    Returns:
-        Migration statistics with counts of affected documents.
-    """
-    from qdash.dbmodel.calibration_note import CalibrationNoteDocument
-    from qdash.dbmodel.chip import ChipDocument
-    from qdash.dbmodel.chip_history import ChipHistoryDocument
     from qdash.dbmodel.execution_history import ExecutionHistoryDocument
     from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
 
-    stats: dict[str, int] = {}
+    stats: dict[str, int] = {"execution_history": 0, "task_result_history": 0}
 
-    from typing import Any
-
-    # Helper function to convert ISO8601 string to datetime
-    def to_datetime(value: str | None) -> Any:
-        if value is None or value == "":
-            return None
-        try:
-            return pendulum.parse(value)
-        except Exception:
-            return None
+    # Fields to remove
+    fields_to_unset = {"controller_info": "", "fridge_info": ""}
 
     # Migrate ExecutionHistoryDocument
     collection = ExecutionHistoryDocument.get_motor_collection()
-    docs = list(
-        collection.find(
-            {
-                "$or": [
-                    {"start_at": {"$type": "string"}},
-                    {"end_at": {"$type": "string"}},
-                    {"elapsed_time": {"$type": "string"}},
-                ]
-            }
-        )
-    )
-    stats["execution_history"] = len(docs)
-    logger.info(f"Found {len(docs)} execution_history with string datetime fields")
+    # Find documents that have either field
+    filter_query: dict[str, Any] = {
+        "$or": [
+            {"controller_info": {"$exists": True}},
+            {"fridge_info": {"$exists": True}},
+        ]
+    }
+    count = collection.count_documents(filter_query)
+    stats["execution_history"] = count
+    logger.info(f"Found {count} execution_history documents with controller_info or fridge_info")
 
-    for doc in docs:
-        updates: dict[str, Any] = {}
-        if isinstance(doc.get("start_at"), str):
-            if doc["start_at"] == "":
-                updates["start_at"] = None
-            else:
-                dt = to_datetime(doc["start_at"])
-                if dt:
-                    updates["start_at"] = dt
-        if isinstance(doc.get("end_at"), str):
-            if doc["end_at"] == "":
-                updates["end_at"] = None
-            else:
-                dt = to_datetime(doc["end_at"])
-                if dt:
-                    updates["end_at"] = dt
-        if isinstance(doc.get("elapsed_time"), str):
-            if doc["elapsed_time"] == "":
-                updates["elapsed_time"] = None
-            else:
-                seconds = parse_elapsed_time_to_seconds(doc["elapsed_time"])
-                updates["elapsed_time"] = seconds
-
-        # Update system_info
-        system_info = doc.get("system_info", {})
-        if isinstance(system_info, dict):
-            if isinstance(system_info.get("created_at"), str):
-                if system_info["created_at"] == "":
-                    updates["system_info.created_at"] = None
-                else:
-                    dt = to_datetime(system_info["created_at"])
-                    if dt:
-                        updates["system_info.created_at"] = dt
-            if isinstance(system_info.get("updated_at"), str):
-                if system_info["updated_at"] == "":
-                    updates["system_info.updated_at"] = None
-                else:
-                    dt = to_datetime(system_info["updated_at"])
-                    if dt:
-                        updates["system_info.updated_at"] = dt
-
-        if updates and not dry_run:
-            collection.update_one({"_id": doc["_id"]}, {"$set": updates})
+    if not dry_run and count > 0:
+        result = collection.update_many(filter_query, {"$unset": fields_to_unset})
+        logger.info(f"Updated {result.modified_count} execution_history documents")
 
     # Migrate TaskResultHistoryDocument
     collection = TaskResultHistoryDocument.get_motor_collection()
-    docs = list(
-        collection.find(
-            {
-                "$or": [
-                    {"start_at": {"$type": "string"}},
-                    {"end_at": {"$type": "string"}},
-                    {"elapsed_time": {"$type": "string"}},
-                ]
-            }
-        )
-    )
-    stats["task_result_history"] = len(docs)
-    logger.info(f"Found {len(docs)} task_result_history with string datetime fields")
+    count = collection.count_documents(filter_query)
+    stats["task_result_history"] = count
+    logger.info(f"Found {count} task_result_history documents with controller_info or fridge_info")
 
-    for doc in docs:
-        updates = {}
-        if isinstance(doc.get("start_at"), str):
-            if doc["start_at"] == "":
-                updates["start_at"] = None
-            else:
-                dt = to_datetime(doc["start_at"])
-                if dt:
-                    updates["start_at"] = dt
-        if isinstance(doc.get("end_at"), str):
-            if doc["end_at"] == "":
-                updates["end_at"] = None
-            else:
-                dt = to_datetime(doc["end_at"])
-                if dt:
-                    updates["end_at"] = dt
-        if isinstance(doc.get("elapsed_time"), str):
-            if doc["elapsed_time"] == "":
-                updates["elapsed_time"] = None
-            else:
-                seconds = parse_elapsed_time_to_seconds(doc["elapsed_time"])
-                updates["elapsed_time"] = seconds
-
-        system_info = doc.get("system_info", {})
-        if isinstance(system_info, dict):
-            if isinstance(system_info.get("created_at"), str):
-                if system_info["created_at"] == "":
-                    updates["system_info.created_at"] = None
-                else:
-                    dt = to_datetime(system_info["created_at"])
-                    if dt:
-                        updates["system_info.created_at"] = dt
-            if isinstance(system_info.get("updated_at"), str):
-                if system_info["updated_at"] == "":
-                    updates["system_info.updated_at"] = None
-                else:
-                    dt = to_datetime(system_info["updated_at"])
-                    if dt:
-                        updates["system_info.updated_at"] = dt
-
-        if updates and not dry_run:
-            collection.update_one({"_id": doc["_id"]}, {"$set": updates})
-
-    # Migrate ChipDocument (installed_at, system_info)
-    collection = ChipDocument.get_motor_collection()
-    docs = list(collection.find({"installed_at": {"$type": "string"}}))
-    stats["chip"] = len(docs)
-    logger.info(f"Found {len(docs)} chip with string datetime fields")
-
-    for doc in docs:
-        updates = {}
-        if isinstance(doc.get("installed_at"), str):
-            if doc["installed_at"] == "":
-                updates["installed_at"] = None
-            else:
-                dt = to_datetime(doc["installed_at"])
-                if dt:
-                    updates["installed_at"] = dt
-
-        system_info = doc.get("system_info", {})
-        if isinstance(system_info, dict):
-            if isinstance(system_info.get("created_at"), str):
-                if system_info["created_at"] == "":
-                    updates["system_info.created_at"] = None
-                else:
-                    dt = to_datetime(system_info["created_at"])
-                    if dt:
-                        updates["system_info.created_at"] = dt
-            if isinstance(system_info.get("updated_at"), str):
-                if system_info["updated_at"] == "":
-                    updates["system_info.updated_at"] = None
-                else:
-                    dt = to_datetime(system_info["updated_at"])
-                    if dt:
-                        updates["system_info.updated_at"] = dt
-
-        if updates and not dry_run:
-            collection.update_one({"_id": doc["_id"]}, {"$set": updates})
-
-    # Migrate ChipHistoryDocument
-    collection = ChipHistoryDocument.get_motor_collection()
-    docs = list(collection.find({"installed_at": {"$type": "string"}}))
-    stats["chip_history"] = len(docs)
-    logger.info(f"Found {len(docs)} chip_history with string datetime fields")
-
-    for doc in docs:
-        updates = {}
-        if isinstance(doc.get("installed_at"), str):
-            if doc["installed_at"] == "":
-                updates["installed_at"] = None
-            else:
-                dt = to_datetime(doc["installed_at"])
-                if dt:
-                    updates["installed_at"] = dt
-
-        system_info = doc.get("system_info", {})
-        if isinstance(system_info, dict):
-            if isinstance(system_info.get("created_at"), str):
-                if system_info["created_at"] == "":
-                    updates["system_info.created_at"] = None
-                else:
-                    dt = to_datetime(system_info["created_at"])
-                    if dt:
-                        updates["system_info.created_at"] = dt
-            if isinstance(system_info.get("updated_at"), str):
-                if system_info["updated_at"] == "":
-                    updates["system_info.updated_at"] = None
-                else:
-                    dt = to_datetime(system_info["updated_at"])
-                    if dt:
-                        updates["system_info.updated_at"] = dt
-
-        if updates and not dry_run:
-            collection.update_one({"_id": doc["_id"]}, {"$set": updates})
-
-    # Migrate CalibrationNoteDocument
-    collection = CalibrationNoteDocument.get_motor_collection()
-    docs = list(collection.find({"timestamp": {"$type": "string"}}))
-    stats["calibration_note"] = len(docs)
-    logger.info(f"Found {len(docs)} calibration_note with string datetime fields")
-
-    for doc in docs:
-        updates = {}
-        if isinstance(doc.get("timestamp"), str):
-            if doc["timestamp"] == "":
-                updates["timestamp"] = None
-            else:
-                dt = to_datetime(doc["timestamp"])
-                if dt:
-                    updates["timestamp"] = dt
-
-        system_info = doc.get("system_info", {})
-        if isinstance(system_info, dict):
-            if isinstance(system_info.get("created_at"), str):
-                if system_info["created_at"] == "":
-                    updates["system_info.created_at"] = None
-                else:
-                    dt = to_datetime(system_info["created_at"])
-                    if dt:
-                        updates["system_info.created_at"] = dt
-            if isinstance(system_info.get("updated_at"), str):
-                if system_info["updated_at"] == "":
-                    updates["system_info.updated_at"] = None
-                else:
-                    dt = to_datetime(system_info["updated_at"])
-                    if dt:
-                        updates["system_info.updated_at"] = dt
-
-        if updates and not dry_run:
-            collection.update_one({"_id": doc["_id"]}, {"$set": updates})
+    if not dry_run and count > 0:
+        result = collection.update_many(filter_query, {"$unset": fields_to_unset})
+        logger.info(f"Updated {result.modified_count} task_result_history documents")
 
     prefix = "[DRY RUN] Would update" if dry_run else "Updated"
-    logger.info(f"{prefix} datetime fields: {stats}")
+    logger.info(f"{prefix} documents: {stats}")
     return stats
 
 
@@ -590,65 +77,24 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Database migrations")
     subparsers = parser.add_subparsers(dest="command", help="Migration commands")
 
-    # topology-id migration
-    topo_parser = subparsers.add_parser("topology-id", help="Add topology_id to chips")
-    topo_parser.add_argument(
+    # remove-controller-fridge-info migration
+    remove_parser = subparsers.add_parser(
+        "remove-controller-fridge-info",
+        help="Remove controller_info and fridge_info fields from collections",
+    )
+    remove_parser.add_argument(
         "--execute",
         action="store_true",
         help="Actually execute the migration (default is dry-run)",
-    )
-
-    # datetime-fields migration
-    dt_parser = subparsers.add_parser(
-        "datetime-fields", help="Convert string datetime fields to native datetime"
-    )
-    dt_parser.add_argument(
-        "--execute",
-        action="store_true",
-        help="Actually execute the migration (default is dry-run)",
-    )
-
-    # validate-datetime command
-    validate_parser = subparsers.add_parser(
-        "validate-datetime", help="Validate datetime data before migration"
-    )
-    validate_parser.add_argument(
-        "--json",
-        action="store_true",
-        help="Output results as JSON",
     )
 
     args = parser.parse_args()
 
-    if args.command == "topology-id":
+    if args.command == "remove-controller-fridge-info":
         from qdash.dbmodel.initialize import initialize
 
         initialize()
-        stats = migrate_add_topology_id(dry_run=not args.execute)
+        stats = migrate_remove_controller_fridge_info(dry_run=not args.execute)
         logger.info(f"Migration complete: {stats}")
-    elif args.command == "datetime-fields":
-        from qdash.dbmodel.initialize import initialize
-
-        initialize()
-        stats = migrate_datetime_fields(dry_run=not args.execute)
-        logger.info(f"Migration complete: {stats}")
-    elif args.command == "validate-datetime":
-        import json
-
-        from qdash.dbmodel.initialize import initialize
-
-        initialize()
-        result = validate_datetime_data()
-        if hasattr(args, "json") and args.json:
-            print(json.dumps(result.summary(), indent=2))
-        else:
-            print(f"Validation {'PASSED' if result.is_valid else 'FAILED'}")
-            print(f"  Valid fields: {result.valid_count}")
-            print(f"  Invalid fields: {result.invalid_count}")
-            if result.errors:
-                print("\nErrors (first 10):")
-                for error in result.errors[:10]:
-                    print(f"  - {error['collection']}.{error['field']}: {error['reason']}")
-                    print(f"    Value: {error['value']}")
     else:
         parser.print_help()
