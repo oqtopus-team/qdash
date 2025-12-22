@@ -154,7 +154,7 @@ async def get_metrics_config() -> dict[str, Any]:
 
 def _extract_latest_metrics(
     chip_id: str,
-    username: str,
+    project_id: str,
     entity_type: Literal["qubit", "coupling"],
     valid_metric_keys: set[str],
     cutoff_time: Any | None,
@@ -168,7 +168,7 @@ def _extract_latest_metrics(
     Args:
     ----
         chip_id: The chip identifier
-        username: The username for filtering
+        project_id: The project identifier for filtering (allows all project members to see metrics)
         entity_type: Type of entity - either "qubit" or "coupling"
         valid_metric_keys: Set of metric keys to extract from config
         cutoff_time: Optional datetime for filtering tasks
@@ -185,7 +185,7 @@ def _extract_latest_metrics(
         task_result_repo = MongoTaskResultHistoryRepository()
         agg_results = task_result_repo.aggregate_latest_metrics(
             chip_id=chip_id,
-            username=username,
+            project_id=project_id,
             entity_type=entity_type,
             metric_keys=valid_metric_keys,
             cutoff_time=cutoff_time,
@@ -210,7 +210,7 @@ def _extract_latest_metrics(
 
 def _extract_best_metrics(
     chip_id: str,
-    username: str,
+    project_id: str,
     entity_type: Literal["qubit", "coupling"],
     valid_metric_keys: set[str],
     metrics_config: dict[str, Any],
@@ -224,7 +224,7 @@ def _extract_best_metrics(
     Args:
     ----
         chip_id: The chip identifier
-        username: The username for filtering
+        project_id: The project identifier for filtering (allows all project members to see metrics)
         entity_type: Type of entity - either "qubit" or "coupling"
         valid_metric_keys: Set of metric keys to extract from config
         metrics_config: Metrics configuration mapping metric_key -> MetricMetadata
@@ -251,7 +251,7 @@ def _extract_best_metrics(
         task_result_repo = MongoTaskResultHistoryRepository()
         agg_results = task_result_repo.aggregate_best_metrics(
             chip_id=chip_id,
-            username=username,
+            project_id=project_id,
             entity_type=entity_type,
             metric_modes=metric_modes,
             cutoff_time=cutoff_time,
@@ -274,7 +274,7 @@ def _extract_best_metrics(
 
 def extract_qubit_metrics(
     chip_id: str,
-    username: str,
+    project_id: str,
     within_hours: int | None = None,
     selection_mode: Literal["latest", "best"] = "latest",
 ) -> QubitMetrics:
@@ -283,7 +283,7 @@ def extract_qubit_metrics(
     Args:
     ----
         chip_id: The chip identifier
-        username: The username for filtering
+        project_id: The project identifier for filtering (allows all project members to see metrics)
         within_hours: Optional time filter in hours (e.g., 24 for last 24 hours)
         selection_mode: "latest" to get most recent value, "best" to get optimal value within time range
 
@@ -304,11 +304,11 @@ def extract_qubit_metrics(
     # Extract metrics based on selection mode
     if selection_mode == "latest":
         metrics_data = _extract_latest_metrics(
-            chip_id, username, "qubit", valid_metric_keys, cutoff_time
+            chip_id, project_id, "qubit", valid_metric_keys, cutoff_time
         )
     else:
         metrics_data = _extract_best_metrics(
-            chip_id, username, "qubit", valid_metric_keys, config.qubit_metrics, cutoff_time
+            chip_id, project_id, "qubit", valid_metric_keys, config.qubit_metrics, cutoff_time
         )
 
     # Build QubitMetrics response
@@ -326,7 +326,7 @@ def extract_qubit_metrics(
 
 def extract_coupling_metrics(
     chip_id: str,
-    username: str,
+    project_id: str,
     within_hours: int | None = None,
     selection_mode: Literal["latest", "best"] = "latest",
 ) -> CouplingMetrics:
@@ -335,7 +335,7 @@ def extract_coupling_metrics(
     Args:
     ----
         chip_id: The chip identifier
-        username: The username for filtering
+        project_id: The project identifier for filtering (allows all project members to see metrics)
         within_hours: Optional time filter in hours
         selection_mode: "latest" to get most recent value, "best" to get optimal value within time range
 
@@ -356,11 +356,11 @@ def extract_coupling_metrics(
     # Extract metrics based on selection mode
     if selection_mode == "latest":
         metrics_data = _extract_latest_metrics(
-            chip_id, username, "coupling", valid_metric_keys, cutoff_time
+            chip_id, project_id, "coupling", valid_metric_keys, cutoff_time
         )
     else:
         metrics_data = _extract_best_metrics(
-            chip_id, username, "coupling", valid_metric_keys, config.coupling_metrics, cutoff_time
+            chip_id, project_id, "coupling", valid_metric_keys, config.coupling_metrics, cutoff_time
         )
 
     return CouplingMetrics(
@@ -416,10 +416,10 @@ async def get_chip_metrics(
                 status_code=404, detail=f"Chip {chip_id} not found in project {ctx.project_id}"
             )
 
-    # Extract metrics from task result history
-    qubit_metrics = extract_qubit_metrics(chip_id, ctx.user.username, within_hours, selection_mode)
+    # Extract metrics from task result history (project-scoped for all members)
+    qubit_metrics = extract_qubit_metrics(chip_id, ctx.project_id, within_hours, selection_mode)
     coupling_metrics = extract_coupling_metrics(
-        chip_id, ctx.user.username, within_hours, selection_mode
+        chip_id, ctx.project_id, within_hours, selection_mode
     )
 
     return ChipMetricsResponse(
@@ -687,18 +687,18 @@ async def download_metrics_pdf(
     # Load metrics configuration
     config = load_metrics_config()
 
-    # Extract metrics based on selection mode
+    # Extract metrics based on selection mode (project-scoped for all members)
     if selection_mode == "latest":
         qubit_metrics_data = _extract_latest_metrics(
             chip_id=chip_id,
-            username=ctx.user.username,
+            project_id=ctx.project_id,
             entity_type="qubit",
             valid_metric_keys=set(config.qubit_metrics.keys()),
             cutoff_time=cutoff_time,
         )
         coupling_metrics_data = _extract_latest_metrics(
             chip_id=chip_id,
-            username=ctx.user.username,
+            project_id=ctx.project_id,
             entity_type="coupling",
             valid_metric_keys=set(config.coupling_metrics.keys()),
             cutoff_time=cutoff_time,
@@ -706,7 +706,7 @@ async def download_metrics_pdf(
     else:
         qubit_metrics_data = _extract_best_metrics(
             chip_id=chip_id,
-            username=ctx.user.username,
+            project_id=ctx.project_id,
             entity_type="qubit",
             valid_metric_keys=set(config.qubit_metrics.keys()),
             metrics_config=config.qubit_metrics,
@@ -714,7 +714,7 @@ async def download_metrics_pdf(
         )
         coupling_metrics_data = _extract_best_metrics(
             chip_id=chip_id,
-            username=ctx.user.username,
+            project_id=ctx.project_id,
             entity_type="coupling",
             valid_metric_keys=set(config.coupling_metrics.keys()),
             metrics_config=config.coupling_metrics,

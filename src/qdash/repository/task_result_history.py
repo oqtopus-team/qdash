@@ -161,7 +161,7 @@ class MongoTaskResultHistoryRepository:
         self,
         *,
         chip_id: str,
-        username: str,
+        project_id: str,
         entity_type: Literal["qubit", "coupling"],
         metric_keys: set[str],
         cutoff_time: datetime | None = None,
@@ -176,8 +176,8 @@ class MongoTaskResultHistoryRepository:
         ----------
         chip_id : str
             The chip identifier
-        username : str
-            The username for filtering
+        project_id : str
+            The project identifier for filtering (allows all project members to see metrics)
         entity_type : Literal["qubit", "coupling"]
             Type of entity to query
         metric_keys : set[str]
@@ -194,10 +194,10 @@ class MongoTaskResultHistoryRepository:
         if not metric_keys:
             return {}
 
-        # Build match stage
+        # Build match stage - filter by project_id to allow all project members to see metrics
         match_stage: dict[str, Any] = {
             "chip_id": chip_id,
-            "username": username,
+            "project_id": project_id,
             "task_type": entity_type,
             "status": "completed",
             "$or": [{f"output_parameters.{m}": {"$exists": True}} for m in metric_keys],
@@ -258,7 +258,7 @@ class MongoTaskResultHistoryRepository:
         self,
         *,
         chip_id: str,
-        username: str,
+        project_id: str,
         entity_type: Literal["qubit", "coupling"],
         metric_modes: dict[str, Literal["maximize", "minimize"]],
         cutoff_time: datetime | None = None,
@@ -272,8 +272,8 @@ class MongoTaskResultHistoryRepository:
         ----------
         chip_id : str
             The chip identifier
-        username : str
-            The username for filtering
+        project_id : str
+            The project identifier for filtering (allows all project members to see metrics)
         entity_type : Literal["qubit", "coupling"]
             Type of entity to query
         metric_modes : dict[str, Literal["maximize", "minimize"]]
@@ -292,10 +292,10 @@ class MongoTaskResultHistoryRepository:
 
         metric_keys = set(metric_modes.keys())
 
-        # Build match stage
+        # Build match stage - filter by project_id to allow all project members to see metrics
         match_stage: dict[str, Any] = {
             "chip_id": chip_id,
-            "username": username,
+            "project_id": project_id,
             "task_type": entity_type,
             "status": "completed",
             "$or": [{f"output_parameters.{m}": {"$exists": True}} for m in metric_keys],
