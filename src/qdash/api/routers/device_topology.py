@@ -471,12 +471,14 @@ def generate_device_plot(data: dict[str, Any]) -> bytes:
     #     fontsize=12,
     #     fontweight="bold",
     # )
+    fidelity_values = list(nx.get_node_attributes(g, "fidelity").values())
+    if fidelity_values:
+        vmin, vmax = min(fidelity_values), max(fidelity_values)
+    else:
+        vmin, vmax = 0, 1  # Default range when no fidelity values exist
     sm = plt.cm.ScalarMappable(
         cmap="viridis",
-        norm=mcolors.Normalize(
-            vmin=min(nx.get_node_attributes(g, "fidelity").values()),
-            vmax=max(nx.get_node_attributes(g, "fidelity").values()),
-        ),
+        norm=mcolors.Normalize(vmin=vmin, vmax=vmax),
     )
     cbar = plt.colorbar(sm, ax=ax, label="Qubit Fidelity (%)", fraction=0.046, pad=0.04)
     cbar.ax.tick_params(labelsize=12)
@@ -489,14 +491,14 @@ def generate_device_plot(data: dict[str, Any]) -> bytes:
     )
 
     # Adjust the plot limits with margins
-    x_coords = [coord[0] for coord in pos.values()]
-    y_coords = [coord[1] for coord in pos.values()]
-    x_min, x_max = min(x_coords), max(x_coords)
-    y_min, y_max = min(y_coords), max(y_coords)
-    margin = 50  # Add margin to prevent cutoff
-
-    ax.set_xlim(x_min - margin, x_max + margin)
-    ax.set_ylim(y_min - margin, y_max + margin)
+    if pos:
+        x_coords = [coord[0] for coord in pos.values()]
+        y_coords = [coord[1] for coord in pos.values()]
+        x_min, x_max = min(x_coords), max(x_coords)
+        y_min, y_max = min(y_coords), max(y_coords)
+        margin = 50  # Add margin to prevent cutoff
+        ax.set_xlim(x_min - margin, x_max + margin)
+        ax.set_ylim(y_min - margin, y_max + margin)
     ax.axis("off")  # Hide axes
     plt.tight_layout()
 
