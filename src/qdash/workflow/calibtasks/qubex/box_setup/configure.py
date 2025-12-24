@@ -14,6 +14,7 @@ class Configure(QubexTask):
 
     name: str = "Configure"
     task_type: str = "global"
+    input_parameters: ClassVar[dict[str, ParameterModel]] = {}
     run_parameters: ClassVar[dict[str, RunParameterModel]] = {}
     output_parameters: ClassVar[dict[str, ParameterModel]] = {}
 

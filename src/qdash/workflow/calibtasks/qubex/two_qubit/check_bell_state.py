@@ -15,6 +15,7 @@ class CheckBellState(QubexTask):
     name: str = "CheckBellState"
     task_type: str = "coupling"
     timeout: int = 60 * 25  # 25 minutes
+    input_parameters: ClassVar[dict[str, ParameterModel]] = {}
     run_parameters: ClassVar[dict[str, RunParameterModel]] = {}
     output_parameters: ClassVar[dict[str, ParameterModel]] = {}
 

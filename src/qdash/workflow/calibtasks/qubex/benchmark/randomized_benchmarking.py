@@ -16,6 +16,7 @@ class RandomizedBenchmarking(QubexTask):
 
     name: str = "RandomizedBenchmarking"
     task_type: str = "qubit"
+    input_parameters: ClassVar[dict[str, ParameterModel]] = {}
     run_parameters: ClassVar[dict[str, RunParameterModel]] = {
         "n_trials": RunParameterModel(
             unit="a.u.",

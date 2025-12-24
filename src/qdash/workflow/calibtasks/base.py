@@ -19,9 +19,10 @@ class BaseTask(ABC):
 
     Attributes
     ----------
-    input_parameters : dict[str, ParameterModel]
+    input_parameters : dict[str, ParameterModel | None]
         Calibration parameters that this task depends on (for provenance tracking).
-        These are loaded from previous task outputs or backend state.
+        - None: Load entirely from DB (parameter name is the key)
+        - ParameterModel(...): Use as fallback if DB doesn't have the value
     output_parameters : dict[str, ParameterModel]
         Calibration parameters that this task produces.
     run_parameters : dict[str, RunParameterModel]
@@ -31,8 +32,10 @@ class BaseTask(ABC):
 
     name: str = ""
     task_type: str
-    # NEW: Calibration input parameters (for provenance tracking)
-    input_parameters: ClassVar[dict[str, ParameterModel]] = {}
+    # Calibration input parameters (for provenance tracking)
+    # - None: Load entirely from DB
+    # - ParameterModel(...): Use as fallback if DB doesn't have the value
+    input_parameters: ClassVar[dict[str, ParameterModel | None]] = {}
     # Calibration output parameters
     output_parameters: ClassVar[dict[str, ParameterModel]] = {}
     # NEW: Experiment run configuration (renamed from old input_parameters)

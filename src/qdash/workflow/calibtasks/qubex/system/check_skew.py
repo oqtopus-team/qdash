@@ -18,6 +18,7 @@ class CheckSkew(QubexTask):
 
     name: str = "CheckSkew"
     task_type: str = "system"
+    input_parameters: ClassVar[dict[str, ParameterModel]] = {}
     run_parameters: ClassVar[dict[str, RunParameterModel]] = {
         "muxes": RunParameterModel(
             unit="a.u.",

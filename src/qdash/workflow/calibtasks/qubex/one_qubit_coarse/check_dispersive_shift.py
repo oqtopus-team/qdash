@@ -16,6 +16,7 @@ class CheckDispersiveShift(QubexTask):
 
     name: str = "CheckDispersiveShift"
     task_type: str = "qubit"
+    input_parameters: ClassVar[dict[str, ParameterModel]] = {}
     run_parameters: ClassVar[dict[str, RunParameterModel]] = {
         "shots": RunParameterModel(
             unit="a.u.",

@@ -14,6 +14,7 @@ class ReadoutConfigure(QubexTask):
 
     name: str = "ReadoutConfigure"
     task_type: str = "global"
+    input_parameters: ClassVar[dict[str, ParameterModel]] = {}
     run_parameters: ClassVar[dict[str, RunParameterModel]] = {
         "qubits": RunParameterModel(
             unit="a.u.",

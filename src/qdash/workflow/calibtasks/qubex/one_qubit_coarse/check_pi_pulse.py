@@ -14,6 +14,7 @@ class CheckPIPulse(QubexTask):
 
     name: str = "CheckPIPulse"
     task_type: str = "qubit"
+    input_parameters: ClassVar[dict[str, ParameterModel]] = {}
     run_parameters: ClassVar[dict[str, RunParameterModel]] = {
         "repetitions": RunParameterModel(
             unit="a.u.",

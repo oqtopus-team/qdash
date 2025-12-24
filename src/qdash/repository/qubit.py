@@ -119,6 +119,43 @@ class MongoQubitCalibrationRepository:
 
         return self._to_model(doc, doc.project_id)
 
+    def get_calibration_data(
+        self,
+        *,
+        project_id: str,
+        chip_id: str,
+        qid: str,
+    ) -> dict[str, Any]:
+        """Get calibration data for a qubit.
+
+        This method retrieves the calibration data dictionary for a specific qubit,
+        which can be used to populate input_parameters in task preprocessing.
+
+        Parameters
+        ----------
+        project_id : str
+            The project identifier
+        chip_id : str
+            The chip identifier
+        qid : str
+            The qubit identifier
+
+        Returns
+        -------
+        dict[str, Any]
+            The calibration data dictionary, or empty dict if not found.
+            Format: {"param_name": {"value": ..., "unit": ..., ...}, ...}
+
+        """
+        doc = QubitDocument.find_one(
+            {"project_id": project_id, "chip_id": chip_id, "qid": qid}
+        ).run()
+
+        if doc is None:
+            return {}
+
+        return doc.data
+
     def _to_model(self, doc: QubitDocument, project_id: str | None) -> QubitModel:
         """Convert a document to a domain model.
 

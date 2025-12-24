@@ -16,6 +16,7 @@ class CreateHPIPulse(QubexTask):
 
     name: str = "CreateHPIPulse"
     task_type: str = "qubit"
+    input_parameters: ClassVar[dict[str, ParameterModel]] = {}
     run_parameters: ClassVar[dict[str, RunParameterModel]] = {
         "duration": RunParameterModel(
             unit="ns", value_type="int", value=HPI_DURATION, description="HPI pulse length"

@@ -17,6 +17,7 @@ class CheckReadoutFrequency(QubexTask):
 
     name: str = "CheckReadoutFrequency"
     task_type: str = "qubit"
+    input_parameters: ClassVar[dict[str, ParameterModel]] = {}
     run_parameters: ClassVar[dict[str, RunParameterModel]] = {
         "detuning_range": RunParameterModel(
             unit="GHz",

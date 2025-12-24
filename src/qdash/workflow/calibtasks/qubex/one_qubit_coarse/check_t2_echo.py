@@ -16,6 +16,7 @@ class CheckT2Echo(QubexTask):
 
     name: str = "CheckT2Echo"
     task_type: str = "qubit"
+    input_parameters: ClassVar[dict[str, ParameterModel]] = {}
     run_parameters: ClassVar[dict[str, RunParameterModel]] = {
         "time_range": RunParameterModel(
             unit="ns",

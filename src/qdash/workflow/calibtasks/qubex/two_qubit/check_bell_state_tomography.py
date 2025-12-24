@@ -17,6 +17,7 @@ class CheckBellStateTomography(QubexTask):
     name: str = "CheckBellStateTomography"
     task_type: str = "coupling"
     timeout: int = 60 * 25  # 25 minutes
+    input_parameters: ClassVar[dict[str, ParameterModel]] = {}
     run_parameters: ClassVar[dict[str, RunParameterModel]] = {}
     output_parameters: ClassVar[dict[str, ParameterModel]] = {
         "bell_state_fidelity": ParameterModel(

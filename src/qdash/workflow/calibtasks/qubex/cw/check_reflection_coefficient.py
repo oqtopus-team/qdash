@@ -15,6 +15,7 @@ class CheckReflectionCoefficient(QubexTask):
 
     name: str = "CheckReflectionCoefficient"
     task_type: str = "qubit"
+    input_parameters: ClassVar[dict[str, ParameterModel]] = {}
     run_parameters: ClassVar[dict[str, RunParameterModel]] = {}
     output_parameters: ClassVar[dict[str, ParameterModel]] = {
         "resonator_frequency": ParameterModel(unit="GHz", description="Fine resonator frequency"),

@@ -206,6 +206,7 @@ class CalibOrchestrator:
             "note_path": note_path,
             "chip_id": config.chip_id,
             "classifier_dir": config.classifier_dir,
+            "project_id": config.project_id,
         }
 
         if config.muxes is not None:

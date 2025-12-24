@@ -18,6 +18,7 @@ class CreateDRAGPIPulse(QubexTask):
 
     name: str = "CreateDRAGPIPulse"
     task_type: str = "qubit"
+    input_parameters: ClassVar[dict[str, ParameterModel]] = {}
     run_parameters: ClassVar[dict[str, RunParameterModel]] = {
         "duration": RunParameterModel(
             unit="ns",

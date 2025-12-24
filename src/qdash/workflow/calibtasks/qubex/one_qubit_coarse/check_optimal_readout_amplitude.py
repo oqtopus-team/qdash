@@ -16,6 +16,7 @@ class CheckOptimalReadoutAmplitude(QubexTask):
 
     name: str = "CheckOptimalReadoutAmplitude"
     task_type: str = "qubit"
+    input_parameters: ClassVar[dict[str, ParameterModel]] = {}
     run_parameters: ClassVar[dict[str, RunParameterModel]] = {
         "amplitude_range": RunParameterModel(
             unit="a.u.",

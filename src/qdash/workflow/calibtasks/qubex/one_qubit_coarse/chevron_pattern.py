@@ -16,6 +16,7 @@ class ChevronPattern(QubexTask):
     name: str = "ChevronPattern"
     task_type: str = "qubit"
     timeout: int = 60 * 240
+    input_parameters: ClassVar[dict[str, ParameterModel]] = {}
     run_parameters: ClassVar[dict[str, RunParameterModel]] = {}
     output_parameters: ClassVar[dict[str, ParameterModel]] = {
         "qubit_frequency": ParameterModel(unit="GHz", description="Qubit bare frequency"),

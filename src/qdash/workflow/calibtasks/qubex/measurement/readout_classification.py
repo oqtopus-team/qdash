@@ -20,6 +20,7 @@ class ReadoutClassification(QubexTask):
 
     # High resolution for accurate threshold detection
     GRID_RESOLUTION: int = 2001
+    input_parameters: ClassVar[dict[str, ParameterModel]] = {}
     run_parameters: ClassVar[dict[str, RunParameterModel]] = {}
     output_parameters: ClassVar[dict[str, ParameterModel]] = {
         "average_readout_fidelity": ParameterModel(

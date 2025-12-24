@@ -16,6 +16,12 @@ class CheckRabi(QubexTask):
 
     name: str = "CheckRabi"
     task_type: str = "qubit"
+    input_parameters: ClassVar[dict[str, ParameterModel | None]] = {
+        "qubit_frequency": None,  # Load from DB
+        "control_amplitude": None,  # Load from DB
+        "readout_amplitude": None,  # Load from DB
+        "readout_frequency": None,  # Load from DB
+    }
     run_parameters: ClassVar[dict[str, RunParameterModel]] = {
         "time_range": RunParameterModel(
             unit="ns",

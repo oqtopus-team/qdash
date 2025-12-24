@@ -15,6 +15,7 @@ class CheckQubit(QubexTask):
 
     name: str = "CheckQubit"
     task_type: str = "qubit"
+    input_parameters: ClassVar[dict[str, ParameterModel]] = {}
     run_parameters: ClassVar[dict[str, RunParameterModel]] = {
         "time_range": RunParameterModel(
             unit="ns",
