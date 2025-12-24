@@ -184,6 +184,80 @@ class CustomTwoQubit(CalibrationStep):
 
 
 @dataclass
+class SetCRSchedule(TransformStep):
+    """Set pre-defined CR schedule for 2-qubit calibration.
+
+    Use this step when you have a pre-computed schedule (e.g., from external
+    scheduling logic or manual specification) instead of auto-generating it.
+
+    The schedule is a list of parallel groups, where each group contains
+    (control, target) qubit ID tuples that can be executed in parallel.
+
+    Requires: nothing
+    Provides: candidate_couplings, candidate_qids
+
+    Example:
+        # Manual schedule with 2 parallel groups
+        SetCRSchedule(
+            schedule=[
+                [("0", "1"), ("4", "5")],   # Group 1: run in parallel
+                [("2", "3"), ("8", "9")],   # Group 2: run after group 1
+            ]
+        )
+    """
+
+    schedule: list[list[tuple[str, str]]] = field(default_factory=list)
+
+    @property
+    def name(self) -> str:
+        return "set_cr_schedule"
+
+    @property
+    def requires(self) -> set[str]:
+        return set()
+
+    @property
+    def provides(self) -> set[str]:
+        return {"candidate_couplings", "candidate_qids"}
+
+    def execute(
+        self,
+        service: CalibService,
+        targets: Target,
+        ctx: StepContext,
+    ) -> StepContext:
+        """Set the CR schedule from external input."""
+        logger = get_run_logger()
+
+        if not self.schedule:
+            logger.warning(f"[{self.name}] Empty schedule provided")
+            ctx.candidate_couplings = []
+            ctx.candidate_qids = []
+            return ctx
+
+        # Flatten to coupling IDs
+        all_couplings = [f"{c}-{t}" for group in self.schedule for c, t in group]
+        ctx.candidate_couplings = all_couplings
+
+        # Extract unique qubit IDs
+        qids = set()
+        for group in self.schedule:
+            for control, target in group:
+                qids.add(control)
+                qids.add(target)
+        ctx.candidate_qids = sorted(qids)
+
+        # Store schedule in metadata for TwoQubitCalibration
+        ctx.metadata["cr_schedule"] = self.schedule
+
+        logger.info(
+            f"[{self.name}] Set {len(all_couplings)} couplings in "
+            f"{len(self.schedule)} parallel groups"
+        )
+        return ctx
+
+
+@dataclass
 class GenerateCRSchedule(TransformStep):
     """Generate CR (Cross-Resonance) schedule for 2-qubit calibration.
 

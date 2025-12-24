@@ -61,6 +61,7 @@ from qdash.workflow.service.steps.two_qubit import (
     CheckSkew,
     CustomTwoQubit,
     GenerateCRSchedule,
+    SetCRSchedule,
     TwoQubitCalibration,
 )
 
@@ -82,6 +83,7 @@ __all__ = [
     # 2-Qubit steps
     "CustomTwoQubit",
     "GenerateCRSchedule",
+    "SetCRSchedule",
     "TwoQubitCalibration",
     # System steps
     "CheckSkew",
