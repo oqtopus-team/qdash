@@ -128,10 +128,26 @@ db.coupling_history.create_index([("project_id", 1), ("chip_id", 1), ("recorded_
 
 ### TaskResultHistoryDocument
 
+Primary storage for task execution results. Linked to executions via `execution_id`.
+
 ```python
 db.task_result_history.create_index([("project_id", 1), ("task_id", 1)], unique=True)
-db.task_result_history.create_index([("project_id", 1), ("execution_id", 1)])
+db.task_result_history.create_index([("project_id", 1), ("execution_id", 1)])  # Join with execution_history
 db.task_result_history.create_index([("project_id", 1), ("chip_id", 1), ("start_at", -1)])
+db.task_result_history.create_index([
+    ("project_id", 1), ("chip_id", 1), ("name", 1), ("qid", 1), ("start_at", -1)
+])  # Latest task result queries
+```
+
+**Usage**: Used by `ExecutionService._fetch_tasks_for_execution()` for retrieving tasks by execution
+
+**Query Pattern**:
+
+```python
+TaskResultHistoryDocument.find({
+    "project_id": project_id,
+    "execution_id": execution_id,
+}).sort([("start_at", ASCENDING)])
 ```
 
 ## Performance Impact

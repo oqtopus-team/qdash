@@ -10,12 +10,11 @@ from typing import Any, cast
 from pydantic import BaseModel, field_validator
 from qdash.common.datetime_utils import calculate_elapsed_time, now
 from qdash.datamodel.execution import (
-    CalibDataModel,
     ExecutionModel,
     ExecutionStatusModel,
-    TaskResultModel,
 )
 from qdash.datamodel.system_info import SystemInfoModel
+from qdash.datamodel.task import CalibDataModel
 from qdash.workflow.engine.execution.models import ExecutionNote
 
 
@@ -24,7 +23,6 @@ class ExecutionStateManager(BaseModel):
 
     This class handles:
     - Execution lifecycle (start, complete, fail)
-    - Task result merging
     - Calibration data merging
     - Controller info updates
 
@@ -41,7 +39,6 @@ class ExecutionStateManager(BaseModel):
     calib_data_path: str = ""
     note: ExecutionNote = ExecutionNote()
     status: ExecutionStatusModel = ExecutionStatusModel.SCHEDULED
-    task_results: dict[str, TaskResultModel] = {}
     tags: list[str] = []
     chip_id: str = ""
     project_id: str | None = None
@@ -125,20 +122,6 @@ class ExecutionStateManager(BaseModel):
         self.status = new_status
         self.system_info.update_time()
         return self
-
-    def merge_task_result(self, task_manager_id: str, task_result: TaskResultModel) -> None:
-        """Merge task result into execution.
-
-        Parameters
-        ----------
-        task_manager_id : str
-            The task manager ID
-        task_result : TaskResultModel
-            The task result to merge
-
-        """
-        self.task_results[task_manager_id] = task_result
-        self.system_info.update_time()
 
     def merge_calib_data(self, calib_data: CalibDataModel) -> None:
         """Merge calibration data into execution.
@@ -225,14 +208,12 @@ class ExecutionStateManager(BaseModel):
             calib_data_path=self.calib_data_path,
             note=self.note.to_dict(),
             status=self.status,
-            task_results=self.task_results,
             tags=self.tags,
             chip_id=self.chip_id,
             project_id=self.project_id,
             start_at=self.start_at,
             end_at=self.end_at,
             elapsed_time=self.elapsed_time,
-            calib_data=self.calib_data,
             message=self.message,
             system_info=self.system_info,
         )
@@ -259,16 +240,12 @@ class ExecutionStateManager(BaseModel):
             calib_data_path=model.calib_data_path,
             note=ExecutionNote.from_dict(model.note),
             status=ExecutionStatusModel(model.status),
-            task_results=model.task_results,
             tags=model.tags,
             chip_id=model.chip_id,
             project_id=model.project_id,
             start_at=model.start_at,
             end_at=model.end_at,
             elapsed_time=model.elapsed_time,
-            calib_data=CalibDataModel(**model.calib_data)
-            if isinstance(model.calib_data, dict)
-            else model.calib_data,
             message=model.message,
             system_info=SystemInfoModel(**model.system_info)
             if isinstance(model.system_info, dict)

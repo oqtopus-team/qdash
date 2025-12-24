@@ -9,6 +9,9 @@ Run migrations with:
 
     python -m qdash.dbmodel.migration rename-database --from qubex --to qdash  # dry-run
     python -m qdash.dbmodel.migration rename-database --from qubex --to qdash --execute
+
+    python -m qdash.dbmodel.migration slim-execution-history          # dry-run
+    python -m qdash.dbmodel.migration slim-execution-history --execute  # execute
 """
 
 import logging
@@ -214,6 +217,111 @@ def migrate_remove_best_data(dry_run: bool = True) -> dict[str, int]:
     return stats
 
 
+def migrate_slim_execution_history(dry_run: bool = True) -> dict[str, Any]:
+    """Remove task_results and calib_data fields from execution_history collection.
+
+    These fields are no longer stored in execution_history:
+    - task_results: Now stored in task_result_history collection
+    - calib_data: Now stored in qubit/coupling collections
+
+    This migration removes these deprecated fields to reduce document size,
+    which is critical for supporting 256+ qubit systems (avoiding MongoDB's
+    16MB document limit).
+
+    Args:
+        dry_run: If True, only reports what would be changed.
+
+    Returns:
+        Migration statistics with counts of affected documents and size savings.
+
+    Raises:
+        ConnectionError: If database connection cannot be established.
+        RuntimeError: If database is not properly initialized.
+    """
+    from pymongo.errors import ConnectionFailure, ServerSelectionTimeoutError
+    from qdash.dbmodel.execution_history import ExecutionHistoryDocument
+
+    stats: dict[str, Any] = {
+        "total_documents": 0,
+        "with_task_results": 0,
+        "with_calib_data": 0,
+        "updated": 0,
+        "estimated_size_saved_mb": 0.0,
+    }
+
+    collection = ExecutionHistoryDocument.get_motor_collection()
+
+    # Verify database connection health
+    try:
+        # This will raise an exception if the connection is unhealthy
+        collection.database.command("ping")
+    except (ConnectionFailure, ServerSelectionTimeoutError) as e:
+        raise ConnectionError(f"Failed to connect to MongoDB: {e}") from e
+    except Exception as e:
+        raise RuntimeError(f"Database health check failed: {e}") from e
+
+    # Count total documents
+    stats["total_documents"] = collection.count_documents({})
+    logger.info(f"Total execution_history documents: {stats['total_documents']}")
+
+    # Find documents with task_results field
+    task_results_query: dict[str, Any] = {"task_results": {"$exists": True, "$ne": {}}}
+    stats["with_task_results"] = collection.count_documents(task_results_query)
+    logger.info(f"Documents with task_results: {stats['with_task_results']}")
+
+    # Find documents with calib_data field
+    calib_data_query: dict[str, Any] = {"calib_data": {"$exists": True, "$ne": {}}}
+    stats["with_calib_data"] = collection.count_documents(calib_data_query)
+    logger.info(f"Documents with calib_data: {stats['with_calib_data']}")
+
+    # Estimate size savings by sampling a few documents
+    if stats["with_task_results"] > 0 or stats["with_calib_data"] > 0:
+        sample_query: dict[str, Any] = {
+            "$or": [
+                {"task_results": {"$exists": True, "$ne": {}}},
+                {"calib_data": {"$exists": True, "$ne": {}}},
+            ]
+        }
+        sample_docs = list(collection.find(sample_query).limit(10))
+        if sample_docs:
+            import json
+
+            total_field_size = 0
+            for doc in sample_docs:
+                if task_results := doc.get("task_results"):
+                    total_field_size += len(json.dumps(task_results, default=str))
+                if calib_data := doc.get("calib_data"):
+                    total_field_size += len(json.dumps(calib_data, default=str))
+            avg_size = total_field_size / len(sample_docs)
+            affected_docs = max(stats["with_task_results"], stats["with_calib_data"])
+            stats["estimated_size_saved_mb"] = round((avg_size * affected_docs) / (1024 * 1024), 2)
+            logger.info(f"Estimated size savings: ~{stats['estimated_size_saved_mb']} MB")
+
+    # Perform the migration
+    if not dry_run:
+        # Remove both fields in a single update operation
+        update_query: dict[str, Any] = {
+            "$or": [
+                {"task_results": {"$exists": True}},
+                {"calib_data": {"$exists": True}},
+            ]
+        }
+        result = collection.update_many(
+            update_query,
+            {"$unset": {"task_results": "", "calib_data": ""}},
+        )
+        stats["updated"] = result.modified_count
+        logger.info(f"Updated {stats['updated']} documents")
+
+    prefix = "[DRY RUN] Would remove" if dry_run else "Removed"
+    logger.info(
+        f"{prefix} task_results and calib_data from execution_history. "
+        f"Affected: {max(stats['with_task_results'], stats['with_calib_data'])} documents"
+    )
+
+    return stats
+
+
 def _get_mongo_client() -> MongoClient[Any]:
     """Get MongoDB client for migration."""
     return MongoClient(
@@ -400,6 +508,17 @@ if __name__ == "__main__":
         help="Actually execute the migration (default is dry-run)",
     )
 
+    # slim-execution-history migration
+    slim_history_parser = subparsers.add_parser(
+        "slim-execution-history",
+        help="Remove task_results and calib_data from execution_history (for 256+ qubit support)",
+    )
+    slim_history_parser.add_argument(
+        "--execute",
+        action="store_true",
+        help="Actually execute the migration (default is dry-run)",
+    )
+
     args = parser.parse_args()
 
     if args.command == "fix-invalid-fidelity":
@@ -420,6 +539,12 @@ if __name__ == "__main__":
             target_db=args.target_db,
             dry_run=not args.execute,
         )
+        logger.info(f"Migration complete: {stats}")
+    elif args.command == "slim-execution-history":
+        from qdash.dbmodel.initialize import initialize
+
+        initialize()
+        stats = migrate_slim_execution_history(dry_run=not args.execute)
         logger.info(f"Migration complete: {stats}")
     else:
         parser.print_help()
