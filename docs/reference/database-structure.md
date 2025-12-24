@@ -111,13 +111,6 @@ class ChipModel(BaseModel):
 Model representing an individual qubit.
 
 ```python
-class PositionModel(BaseModel):
-    x: float  # X coordinate
-    y: float  # Y coordinate
-
-class NodeInfoModel(BaseModel):
-    position: PositionModel  # Display position
-
 class QubitModel(BaseModel):
     project_id: str        # Owning project ID
     username: str | None   # Username
@@ -125,8 +118,6 @@ class QubitModel(BaseModel):
     status: str            # Status ("pending", "completed", etc.)
     chip_id: str | None    # Parent chip ID
     data: dict             # Calibration data
-    best_data: dict        # Best calibration results
-    node_info: NodeInfoModel  # UI display information
 ```
 
 **Example data field structure:**
@@ -153,12 +144,6 @@ class QubitModel(BaseModel):
 Model representing coupling between qubits.
 
 ```python
-class EdgeInfoModel(BaseModel):
-    source: str   # Source node ID
-    target: str   # Target node ID
-    size: int     # Edge size
-    fill: str     # Fill color
-
 class CouplingModel(BaseModel):
     project_id: str        # Owning project ID
     username: str | None   # Username
@@ -166,15 +151,17 @@ class CouplingModel(BaseModel):
     status: str            # Status
     chip_id: str | None    # Chip ID
     data: dict             # Calibration data
-    best_data: dict        # Best calibration results
-    edge_info: EdgeInfoModel  # UI display information
 ```
 
 ---
 
 ### ExecutionModel
 
-Model representing a calibration execution.
+Model representing a calibration execution metadata.
+
+> **Note**: `task_results` and `calib_data` were removed to support 256+ qubit systems
+> (avoiding MongoDB's 16MB document limit). Task results are stored in `task_result_history`
+> collection. Calibration data is stored in `qubit`/`coupling` collections.
 
 ```python
 class ExecutionStatusModel(str, Enum):
@@ -191,13 +178,11 @@ class ExecutionModel(BaseModel):
     calib_data_path: str   # Calibration data path
     note: dict             # Notes
     status: str            # Status
-    task_results: dict[str, TaskResultModel]  # Task results
     tags: list[str]        # Tags
     chip_id: str           # Chip ID
-    start_at: str          # Start time
-    end_at: str            # End time
-    elapsed_time: str      # Elapsed time
-    calib_data: CalibDataModel  # Calibration data
+    start_at: datetime     # Start time
+    end_at: datetime       # End time
+    elapsed_time: timedelta  # Elapsed time
     message: str           # Message
     system_info: SystemInfoModel
 ```
@@ -408,17 +393,8 @@ class QubitDocument(Document):
     status: str = "pending"
     chip_id: str
     data: dict
-    best_data: dict = {}
-    node_info: NodeInfoModel
     system_info: SystemInfoModel
 ```
-
-**Fidelity Metrics (tracked in best_data):**
-
-- `average_readout_fidelity`
-- `readout_fidelity_0`, `readout_fidelity_1`
-- `x90_gate_fidelity`, `x180_gate_fidelity`
-- `t1`, `t2_echo`, `t2_star`
 
 **Key Methods:**
 
@@ -444,15 +420,8 @@ class CouplingDocument(Document):
     status: str = "pending"
     chip_id: str
     data: dict
-    best_data: dict = {}
-    edge_info: EdgeInfoModel
     system_info: SystemInfoModel
 ```
-
-**Fidelity Metrics (tracked in best_data):**
-
-- `zx90_gate_fidelity`
-- `bell_state_fidelity`
 
 ---
 
@@ -460,10 +429,14 @@ class CouplingDocument(Document):
 
 **Collection:** `execution_history`
 
+Stores execution metadata only. Task results and calibration data are stored in separate collections
+to support 256+ qubit systems (avoiding MongoDB's 16MB document limit).
+
 **Indexes:**
 
 - `(project_id, execution_id)` - Unique compound index
 - `(project_id, chip_id, start_at)` - Supports metrics/best queries
+- `(project_id, chip_id)` - Chip-based filtering
 - `(project_id, username, start_at)` - Audit per user
 
 ```python
@@ -475,16 +448,19 @@ class ExecutionHistoryDocument(Document):
     calib_data_path: str
     note: dict
     status: str
-    task_results: dict[str, TaskResultModel]
     tags: list[str]
     chip_id: str
-    start_at: str
-    end_at: str
-    elapsed_time: str
-    calib_data: dict
+    start_at: datetime
+    end_at: datetime
+    elapsed_time: float      # Stored in seconds
     message: str
     system_info: SystemInfoModel
 ```
+
+**Related Collections:**
+
+- Task results → `task_result_history` (query by `execution_id`)
+- Calibration data → `qubit` / `coupling` collections
 
 **Key Methods:**
 
@@ -497,9 +473,14 @@ class ExecutionHistoryDocument(Document):
 
 **Collection:** `task_result_history`
 
-- **Indexes:**
-- `(project_id, execution_id, task_id)` - Unique compound index
-- `(project_id, qid, task_type)` - Filter by scope/type
+Primary storage for task execution results. Linked to executions via `execution_id`.
+
+**Indexes:**
+
+- `(project_id, task_id)` - Unique compound index
+- `(project_id, execution_id)` - Join with execution_history
+- `(project_id, chip_id, start_at)` - Time-based queries
+- `(project_id, chip_id, name, qid, start_at)` - Latest task result queries
 
 ```python
 class TaskResultHistoryDocument(Document):
@@ -548,8 +529,6 @@ class QubitHistoryDocument(Document):
     status: str
     chip_id: str
     data: dict
-    best_data: dict = {}
-    node_info: NodeInfoModel
     system_info: SystemInfoModel
     recorded_date: str  # YYYYMMDD format
 ```
@@ -595,8 +574,6 @@ class CouplingHistoryDocument(Document):
     status: str
     chip_id: str
     data: dict
-    best_data: dict = {}
-    edge_info: EdgeInfoModel
     system_info: SystemInfoModel
     recorded_date: str  # YYYYMMDD format
 ```
@@ -849,21 +826,38 @@ Other project-scoped collections (tasks, tags, backends, flows, counters, locks,
 1. Acquire per-project lock via **ExecutionLockDocument(project_id)**
 2. Generate execution ID from **ExecutionCounterDocument** (YYYYMMDD-NNN scoped by project/chip)
 3. Execute each task:
-   - Save task results to **TaskResultHistoryDocument**
+   - Save task results to **TaskResultHistoryDocument** (with `execution_id` for linking)
    - Update calibration data in **QubitDocument** / **CouplingDocument**
    - Save history to **QubitHistoryDocument** / **CouplingHistoryDocument**
-4. Save overall results to **ExecutionHistoryDocument**
+4. Save execution metadata to **ExecutionHistoryDocument** (status, timing, notes only)
 5. Save chip snapshot to **ChipHistoryDocument**
 6. Release **ExecutionLock**
 
-### Best Data Update Logic
+### Data Architecture (256+ Qubit Support)
 
-The `best_data` field tracks the best fidelity metrics:
+To avoid MongoDB's 16MB document limit with large qubit counts:
 
-- **Qubit**: `average_readout_fidelity`, `readout_fidelity_0/1`, `x90/x180_gate_fidelity`, `t1`, `t2_echo`, `t2_star`
-- **Coupling**: `zx90_gate_fidelity`, `bell_state_fidelity`
+```
+┌─────────────────────────┐
+│  ExecutionHistoryDoc    │  ← Metadata only (~2KB)
+│  - execution_id         │
+│  - status, timing       │
+│  - tags, note           │
+└───────────┬─────────────┘
+            │ execution_id
+            ▼
+┌─────────────────────────┐
+│  TaskResultHistoryDoc   │  ← Individual task results
+│  - task_id              │     (one doc per task)
+│  - execution_id (FK)    │
+│  - output_parameters    │
+└─────────────────────────┘
 
-Values are only updated when new calibration results exceed existing values.
+┌─────────────────────────┐
+│  QubitDocument          │  ← Calibration data
+│  CouplingDocument       │     (persistent storage)
+└─────────────────────────┘
+```
 
 ---
 

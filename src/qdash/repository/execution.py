@@ -9,54 +9,19 @@ Used by workflow components for managing calibration execution state.
 import logging
 import os
 from collections.abc import Callable
-from datetime import timedelta
 from typing import Any
 
 from pymongo import MongoClient, ReturnDocument
 from pymongo.collection import Collection
-from qdash.common.datetime_utils import parse_elapsed_time
 from qdash.datamodel.execution import (
-    CalibDataModel,
     ExecutionModel,
     ExecutionStatusModel,
-    TaskResultModel,
 )
 from qdash.datamodel.system_info import SystemInfoModel
 from qdash.dbmodel.execution_history import ExecutionHistoryDocument
 from qdash.dbmodel.tag import TagDocument
 
 logger = logging.getLogger(__name__)
-
-
-def _convert_elapsed_time_to_seconds(data: Any) -> Any:
-    """Recursively convert elapsed_time fields to seconds (float).
-
-    This handles nested structures in task_results where elapsed_time
-    may be timedelta objects or formatted strings.
-    """
-    if isinstance(data, dict):
-        result: dict[str, Any] = {}
-        for key, value in data.items():
-            if key == "elapsed_time":
-                if value is None:
-                    result[key] = None
-                elif isinstance(value, (int, float)):
-                    result[key] = float(value)
-                elif isinstance(value, timedelta):
-                    result[key] = value.total_seconds()
-                elif isinstance(value, str):
-                    # Parse string formats like "H:MM:SS" or "a few seconds"
-                    td = parse_elapsed_time(value)
-                    result[key] = td.total_seconds() if td else None
-                else:
-                    result[key] = value
-            else:
-                result[key] = _convert_elapsed_time_to_seconds(value)
-        return result
-    elif isinstance(data, list):
-        return [_convert_elapsed_time_to_seconds(item) for item in data]
-    else:
-        return data
 
 
 class MongoExecutionRepository:
@@ -283,13 +248,11 @@ class MongoExecutionRepository:
                     "calib_data_path": initial_model.calib_data_path,
                     "note": {},
                     "status": ExecutionStatusModel.SCHEDULED,
-                    "task_results": {},
                     "tags": [],
                     "chip_id": "",
                     "start_at": None,
                     "end_at": None,
                     "elapsed_time": None,
-                    "calib_data": {"qubit": {}, "coupling": {}},
                     "message": "",
                     "system_info": {},
                 }
@@ -317,7 +280,7 @@ class MongoExecutionRepository:
         elapsed_time = model.elapsed_time
         elapsed_seconds = elapsed_time.total_seconds() if elapsed_time else None
 
-        update_ops: dict[str, Any] = {
+        return {
             "$set": {
                 "project_id": update_data["project_id"],
                 "username": update_data["username"],
@@ -335,24 +298,6 @@ class MongoExecutionRepository:
             }
         }
 
-        # Merge task_results (convert elapsed_time to seconds for MongoDB storage)
-        if update_data.get("task_results"):
-            for k, v in update_data["task_results"].items():
-                # Convert elapsed_time fields to seconds recursively
-                update_ops["$set"][f"task_results.{k}"] = _convert_elapsed_time_to_seconds(v)
-
-        # Merge calibration data
-        calib_data = update_data.get("calib_data", {})
-        if calib_data.get("qubit"):
-            for qid, data in calib_data["qubit"].items():
-                update_ops["$set"][f"calib_data.qubit.{qid}"] = data
-
-        if calib_data.get("coupling"):
-            for qid, data in calib_data["coupling"].items():
-                update_ops["$set"][f"calib_data.coupling.{qid}"] = data
-
-        return update_ops
-
     def _doc_to_model(self, doc: dict[str, Any]) -> ExecutionModel:
         """Convert MongoDB document to ExecutionModel.
 
@@ -367,21 +312,6 @@ class MongoExecutionRepository:
             Converted model
 
         """
-        # Handle TaskResultModel conversion
-        task_results = {}
-        for k, v in doc.get("task_results", {}).items():
-            if isinstance(v, dict):
-                task_results[k] = TaskResultModel(**v)
-            else:
-                task_results[k] = v
-
-        # Handle CalibDataModel conversion
-        calib_data = doc.get("calib_data", {"qubit": {}, "coupling": {}})
-        if isinstance(calib_data, dict):
-            calib_data_model = CalibDataModel(**calib_data)
-        else:
-            calib_data_model = calib_data
-
         return ExecutionModel(
             project_id=doc.get("project_id"),
             username=doc.get("username", "admin"),
@@ -390,13 +320,11 @@ class MongoExecutionRepository:
             calib_data_path=doc.get("calib_data_path", ""),
             note=doc.get("note", {}),
             status=doc.get("status", ExecutionStatusModel.SCHEDULED),
-            task_results=task_results,
             tags=doc.get("tags", []),
             chip_id=doc.get("chip_id", ""),
             start_at=doc.get("start_at") or None,
             end_at=doc.get("end_at") or None,
             elapsed_time=doc.get("elapsed_time") or None,
-            calib_data=calib_data_model,
             message=doc.get("message", ""),
             system_info=doc.get("system_info", {}),
         )

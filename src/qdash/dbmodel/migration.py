@@ -9,6 +9,12 @@ Run migrations with:
 
     python -m qdash.dbmodel.migration rename-database --from qubex --to qdash  # dry-run
     python -m qdash.dbmodel.migration rename-database --from qubex --to qdash --execute
+
+    python -m qdash.dbmodel.migration slim-execution-history          # dry-run
+    python -m qdash.dbmodel.migration slim-execution-history --execute  # execute
+
+    python -m qdash.dbmodel.migration remove-node-edge-info          # dry-run
+    python -m qdash.dbmodel.migration remove-node-edge-info --execute  # execute
 """
 
 import logging
@@ -214,6 +220,183 @@ def migrate_remove_best_data(dry_run: bool = True) -> dict[str, int]:
     return stats
 
 
+def migrate_slim_execution_history(dry_run: bool = True) -> dict[str, Any]:
+    """Remove task_results and calib_data fields from execution_history collection.
+
+    These fields are no longer stored in execution_history:
+    - task_results: Now stored in task_result_history collection
+    - calib_data: Now stored in qubit/coupling collections
+
+    This migration removes these deprecated fields to reduce document size,
+    which is critical for supporting 256+ qubit systems (avoiding MongoDB's
+    16MB document limit).
+
+    Args:
+        dry_run: If True, only reports what would be changed.
+
+    Returns:
+        Migration statistics with counts of affected documents and size savings.
+
+    Raises:
+        ConnectionError: If database connection cannot be established.
+        RuntimeError: If database is not properly initialized.
+    """
+    from pymongo.errors import ConnectionFailure, ServerSelectionTimeoutError
+    from qdash.dbmodel.execution_history import ExecutionHistoryDocument
+
+    stats: dict[str, Any] = {
+        "total_documents": 0,
+        "with_task_results": 0,
+        "with_calib_data": 0,
+        "updated": 0,
+        "estimated_size_saved_mb": 0.0,
+    }
+
+    collection = ExecutionHistoryDocument.get_motor_collection()
+
+    # Verify database connection health
+    try:
+        # This will raise an exception if the connection is unhealthy
+        collection.database.command("ping")
+    except (ConnectionFailure, ServerSelectionTimeoutError) as e:
+        raise ConnectionError(f"Failed to connect to MongoDB: {e}") from e
+    except Exception as e:
+        raise RuntimeError(f"Database health check failed: {e}") from e
+
+    # Count total documents
+    stats["total_documents"] = collection.count_documents({})
+    logger.info(f"Total execution_history documents: {stats['total_documents']}")
+
+    # Find documents with task_results field
+    task_results_query: dict[str, Any] = {"task_results": {"$exists": True, "$ne": {}}}
+    stats["with_task_results"] = collection.count_documents(task_results_query)
+    logger.info(f"Documents with task_results: {stats['with_task_results']}")
+
+    # Find documents with calib_data field
+    calib_data_query: dict[str, Any] = {"calib_data": {"$exists": True, "$ne": {}}}
+    stats["with_calib_data"] = collection.count_documents(calib_data_query)
+    logger.info(f"Documents with calib_data: {stats['with_calib_data']}")
+
+    # Estimate size savings by sampling a few documents
+    if stats["with_task_results"] > 0 or stats["with_calib_data"] > 0:
+        sample_query: dict[str, Any] = {
+            "$or": [
+                {"task_results": {"$exists": True, "$ne": {}}},
+                {"calib_data": {"$exists": True, "$ne": {}}},
+            ]
+        }
+        sample_docs = list(collection.find(sample_query).limit(10))
+        if sample_docs:
+            import json
+
+            total_field_size = 0
+            for doc in sample_docs:
+                if task_results := doc.get("task_results"):
+                    total_field_size += len(json.dumps(task_results, default=str))
+                if calib_data := doc.get("calib_data"):
+                    total_field_size += len(json.dumps(calib_data, default=str))
+            avg_size = total_field_size / len(sample_docs)
+            affected_docs = max(stats["with_task_results"], stats["with_calib_data"])
+            stats["estimated_size_saved_mb"] = round((avg_size * affected_docs) / (1024 * 1024), 2)
+            logger.info(f"Estimated size savings: ~{stats['estimated_size_saved_mb']} MB")
+
+    # Perform the migration
+    if not dry_run:
+        # Remove both fields in a single update operation
+        update_query: dict[str, Any] = {
+            "$or": [
+                {"task_results": {"$exists": True}},
+                {"calib_data": {"$exists": True}},
+            ]
+        }
+        result = collection.update_many(
+            update_query,
+            {"$unset": {"task_results": "", "calib_data": ""}},
+        )
+        stats["updated"] = result.modified_count
+        logger.info(f"Updated {stats['updated']} documents")
+
+    prefix = "[DRY RUN] Would remove" if dry_run else "Removed"
+    logger.info(
+        f"{prefix} task_results and calib_data from execution_history. "
+        f"Affected: {max(stats['with_task_results'], stats['with_calib_data'])} documents"
+    )
+
+    return stats
+
+
+def migrate_remove_node_edge_info(dry_run: bool = True) -> dict[str, int]:
+    """Remove deprecated node_info and edge_info fields from collections.
+
+    These fields were used for UI visualization but are no longer needed:
+    - node_info: Removed from qubit and qubit_history collections
+    - edge_info: Removed from coupling and coupling_history collections
+
+    Args:
+        dry_run: If True, only reports what would be changed.
+
+    Returns:
+        Migration statistics with counts of affected documents.
+    """
+    from qdash.dbmodel.coupling import CouplingDocument
+    from qdash.dbmodel.coupling_history import CouplingHistoryDocument
+    from qdash.dbmodel.qubit import QubitDocument
+    from qdash.dbmodel.qubit_history import QubitHistoryDocument
+
+    stats: dict[str, int] = {
+        "qubit": 0,
+        "qubit_history": 0,
+        "coupling": 0,
+        "coupling_history": 0,
+    }
+
+    # Remove node_info from QubitDocument
+    collection = QubitDocument.get_motor_collection()
+    filter_query: dict[str, Any] = {"node_info": {"$exists": True}}
+    count = collection.count_documents(filter_query)
+    stats["qubit"] = count
+    logger.info(f"Found {count} qubit documents with node_info")
+
+    if not dry_run and count > 0:
+        result = collection.update_many(filter_query, {"$unset": {"node_info": ""}})
+        logger.info(f"Updated {result.modified_count} qubit documents")
+
+    # Remove node_info from QubitHistoryDocument
+    collection = QubitHistoryDocument.get_motor_collection()
+    count = collection.count_documents(filter_query)
+    stats["qubit_history"] = count
+    logger.info(f"Found {count} qubit_history documents with node_info")
+
+    if not dry_run and count > 0:
+        result = collection.update_many(filter_query, {"$unset": {"node_info": ""}})
+        logger.info(f"Updated {result.modified_count} qubit_history documents")
+
+    # Remove edge_info from CouplingDocument
+    collection = CouplingDocument.get_motor_collection()
+    filter_query = {"edge_info": {"$exists": True}}
+    count = collection.count_documents(filter_query)
+    stats["coupling"] = count
+    logger.info(f"Found {count} coupling documents with edge_info")
+
+    if not dry_run and count > 0:
+        result = collection.update_many(filter_query, {"$unset": {"edge_info": ""}})
+        logger.info(f"Updated {result.modified_count} coupling documents")
+
+    # Remove edge_info from CouplingHistoryDocument
+    collection = CouplingHistoryDocument.get_motor_collection()
+    count = collection.count_documents(filter_query)
+    stats["coupling_history"] = count
+    logger.info(f"Found {count} coupling_history documents with edge_info")
+
+    if not dry_run and count > 0:
+        result = collection.update_many(filter_query, {"$unset": {"edge_info": ""}})
+        logger.info(f"Updated {result.modified_count} coupling_history documents")
+
+    prefix = "[DRY RUN] Would update" if dry_run else "Updated"
+    logger.info(f"{prefix} documents: {stats}")
+    return stats
+
+
 def _get_mongo_client() -> MongoClient[Any]:
     """Get MongoDB client for migration."""
     return MongoClient(
@@ -400,6 +583,28 @@ if __name__ == "__main__":
         help="Actually execute the migration (default is dry-run)",
     )
 
+    # slim-execution-history migration
+    slim_history_parser = subparsers.add_parser(
+        "slim-execution-history",
+        help="Remove task_results and calib_data from execution_history (for 256+ qubit support)",
+    )
+    slim_history_parser.add_argument(
+        "--execute",
+        action="store_true",
+        help="Actually execute the migration (default is dry-run)",
+    )
+
+    # remove-node-edge-info migration
+    remove_node_edge_parser = subparsers.add_parser(
+        "remove-node-edge-info",
+        help="Remove deprecated node_info and edge_info fields from qubit/coupling collections",
+    )
+    remove_node_edge_parser.add_argument(
+        "--execute",
+        action="store_true",
+        help="Actually execute the migration (default is dry-run)",
+    )
+
     args = parser.parse_args()
 
     if args.command == "fix-invalid-fidelity":
@@ -420,6 +625,18 @@ if __name__ == "__main__":
             target_db=args.target_db,
             dry_run=not args.execute,
         )
+        logger.info(f"Migration complete: {stats}")
+    elif args.command == "slim-execution-history":
+        from qdash.dbmodel.initialize import initialize
+
+        initialize()
+        stats = migrate_slim_execution_history(dry_run=not args.execute)
+        logger.info(f"Migration complete: {stats}")
+    elif args.command == "remove-node-edge-info":
+        from qdash.dbmodel.initialize import initialize
+
+        initialize()
+        stats = migrate_remove_node_edge_info(dry_run=not args.execute)
         logger.info(f"Migration complete: {stats}")
     else:
         parser.print_help()

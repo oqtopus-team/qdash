@@ -7,6 +7,7 @@ data persistence operations.
 import logging
 from typing import Any
 
+from pymongo import DESCENDING
 from qdash.datamodel.chip import ChipModel
 from qdash.datamodel.task import CalibDataModel
 from qdash.dbmodel.chip import ChipDocument
@@ -139,7 +140,9 @@ class MongoChipRepository:
             The current chip or None if not found
 
         """
-        doc = self.find_one_document({"username": username})
+        doc = ChipDocument.find_one(
+            {"username": username}, sort=[("installed_at", DESCENDING)]
+        ).run()
         if doc is None:
             return None
         return self._to_model(doc)

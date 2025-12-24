@@ -4,7 +4,7 @@ from bunnet import Document
 from pydantic import ConfigDict, Field
 from pymongo import ASCENDING, DESCENDING, IndexModel
 from qdash.common.datetime_utils import now
-from qdash.datamodel.coupling import CouplingModel, EdgeInfoModel
+from qdash.datamodel.coupling import CouplingModel
 from qdash.datamodel.system_info import SystemInfoModel
 
 
@@ -18,7 +18,6 @@ class CouplingHistoryDocument(Document):
         chip_id (str): The chip ID. e.g. "chip1".
         data (dict): The data of the coupling.
         status (str): The status of the coupling.
-        edge_info (EdgeInfoModel): The edge information.
         system_info (SystemInfo): The system information.
         recorded_date (str): The date when this history record was created (YYYYMMDD).
 
@@ -30,9 +29,6 @@ class CouplingHistoryDocument(Document):
     status: str = Field(..., description="The status of the coupling")
     chip_id: str = Field(..., description="The chip ID")
     data: dict[str, Any] = Field(..., description="The data of the coupling")
-    edge_info: EdgeInfoModel | None = Field(
-        default=None, description="The edge information (deprecated)"
-    )
     system_info: SystemInfoModel = Field(..., description="The system information")
     recorded_date: str = Field(
         default_factory=lambda: now().strftime("%Y%m%d"),
@@ -80,7 +76,6 @@ class CouplingHistoryDocument(Document):
             history = existing_history
             history.data = coupling.data
             history.status = coupling.status
-            history.edge_info = coupling.edge_info
         else:
             history = cls(
                 project_id=coupling.project_id,
@@ -89,7 +84,6 @@ class CouplingHistoryDocument(Document):
                 status=coupling.status,
                 chip_id=coupling.chip_id,
                 data=coupling.data,
-                edge_info=coupling.edge_info,
                 system_info=SystemInfoModel(),
             )
         history.save()

@@ -24,6 +24,22 @@
     "function_name": "full_calibration"
   },
   {
+    "id": "two_qubit",
+    "name": "2Q Calibration",
+    "description": "Two-qubit calibration from candidate qubits. Auto-generates optimal CR schedule based on hardware constraints.",
+    "category": "production",
+    "filename": "two_qubit.py",
+    "function_name": "two_qubit"
+  },
+  {
+    "id": "two_qubit_scheduled",
+    "name": "2Q Scheduled Calibration",
+    "description": "Two-qubit calibration with user-defined schedule. Specify qubit pairs and parallel groups directly.",
+    "category": "production",
+    "filename": "two_qubit_scheduled.py",
+    "function_name": "two_qubit_scheduled"
+  },
+  {
     "id": "parallel_retry",
     "name": "Parallel Retry Calibration",
     "description": "Parallel execution with @task + submit(). Demonstrates retry logic with frequency offset.",

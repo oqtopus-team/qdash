@@ -6,28 +6,30 @@ from bunnet import Document
 from pydantic import ConfigDict, Field, field_validator
 from pymongo import ASCENDING, DESCENDING, IndexModel
 from qdash.common.datetime_utils import ensure_timezone, parse_elapsed_time
-from qdash.datamodel.execution import ExecutionModel, TaskResultModel
+from qdash.datamodel.execution import ExecutionModel
 from qdash.datamodel.system_info import SystemInfoModel
 
 
 class ExecutionHistoryDocument(Document):
-    """Document for storing execution history.
+    """Document for storing execution history metadata.
 
     Attributes
     ----------
         project_id (str): The owning project identifier.
         execution_id (str): The execution ID. e.g. "0".
         status (str): The status of the execution. e.g. "completed".
-        tasks (dict): The tasks of the execution. e.g. {"task1": "completed"}.
-        calib_data (dict): The calibration data. e.g. {"qubit": {"0":{"qubit_frequency": 5.0}}, "coupling": {"0-1": {"coupling_strength": 0.1}}}.
-
         note (str): The note. e.g. "This is a note".
         tags (list[str]): The tags. e.g. ["tag1", "tag2"].
         message (str): The message. e.g. "This is a message".
         start_at (datetime): The time when the execution started.
         end_at (datetime): The time when the execution ended.
-        elapsed_time (timedelta): The elapsed time.
+        elapsed_time (float): The elapsed time in seconds.
         system_info (SystemInfoModel): The system information.
+
+    Note
+    ----
+        Task results are stored in task_result_history collection.
+        Calibration data is stored in qubit/coupling collections.
 
     """
 
@@ -38,13 +40,11 @@ class ExecutionHistoryDocument(Document):
     calib_data_path: str = Field(..., description="The path to the calibration data")
     note: dict[str, Any] = Field(..., description="The note")
     status: str = Field(..., description="The status of the execution")
-    task_results: dict[str, TaskResultModel] = Field(..., description="The results of the tasks")
     tags: list[str] = Field(..., description="The tags")
     chip_id: str = Field(..., description="The chip ID")
     start_at: datetime | None = Field(None, description="The time when the execution started")
     end_at: datetime | None = Field(None, description="The time when the execution ended")
     elapsed_time: float | None = Field(None, description="The elapsed time in seconds")
-    calib_data: dict[str, Any] = Field(..., description="The calibration data")
     message: str = Field(..., description="The message")
     system_info: SystemInfoModel = Field(..., description="The system information")
 
@@ -97,13 +97,11 @@ class ExecutionHistoryDocument(Document):
             calib_data_path=execution_model.calib_data_path,
             note=execution_model.note,
             status=execution_model.status,
-            task_results=execution_model.task_results,
             tags=execution_model.tags,
             chip_id=execution_model.chip_id,
             start_at=execution_model.start_at,
             end_at=execution_model.end_at,
             elapsed_time=execution_model.elapsed_time,
-            calib_data=execution_model.calib_data.model_dump(),
             message=execution_model.message,
             system_info=execution_model.system_info.model_dump(),
         )
@@ -118,7 +116,6 @@ class ExecutionHistoryDocument(Document):
             doc.save()
             return doc
 
-        # Update basic fields
         doc.project_id = execution_model.project_id
         doc.username = execution_model.username
         doc.name = execution_model.name
@@ -134,29 +131,6 @@ class ExecutionHistoryDocument(Document):
         )
         doc.message = execution_model.message
         doc.system_info = execution_model.system_info
-
-        # Merge task_results
-        for task_id, task_result in execution_model.task_results.items():
-            doc.task_results[task_id] = task_result
-
-        # Merge calib_data
-        calib_data = execution_model.calib_data.model_dump()
-        if "qubit" in calib_data:
-            if "qubit" not in doc.calib_data:
-                doc.calib_data["qubit"] = {}
-            for qid, data in calib_data["qubit"].items():
-                if qid not in doc.calib_data["qubit"]:
-                    doc.calib_data["qubit"][qid] = {}
-                doc.calib_data["qubit"][qid].update(data)
-
-        if "coupling" in calib_data:
-            if "coupling" not in doc.calib_data:
-                doc.calib_data["coupling"] = {}
-            for qid, data in calib_data["coupling"].items():
-                if qid not in doc.calib_data["coupling"]:
-                    doc.calib_data["coupling"][qid] = {}
-                doc.calib_data["coupling"][qid].update(data)
-
         doc.save()
         return doc
 

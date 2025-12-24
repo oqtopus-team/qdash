@@ -4,7 +4,7 @@ from bunnet import Document
 from pydantic import ConfigDict, Field
 from pymongo import ASCENDING, DESCENDING, IndexModel
 from qdash.common.datetime_utils import now
-from qdash.datamodel.qubit import NodeInfoModel, QubitModel
+from qdash.datamodel.qubit import QubitModel
 from qdash.datamodel.system_info import SystemInfoModel
 
 
@@ -18,7 +18,6 @@ class QubitHistoryDocument(Document):
         chip_id (str): The chip ID. e.g. "chip1".
         data (dict): The data of the qubit.
         status (str): The status of the qubit.
-        node_info (NodeInfoModel): The node information.
         system_info (SystemInfo): The system information.
         recorded_date (str): The date when this history record was created (YYYYMMDD).
 
@@ -30,9 +29,6 @@ class QubitHistoryDocument(Document):
     status: str = Field(..., description="The status of the qubit")
     chip_id: str = Field(..., description="The chip ID")
     data: dict[str, Any] = Field(..., description="The data of the qubit")
-    node_info: NodeInfoModel | None = Field(
-        default=None, description="The node information (deprecated)"
-    )
     system_info: SystemInfoModel = Field(..., description="The system information")
     recorded_date: str = Field(
         default_factory=lambda: now().strftime("%Y%m%d"),
@@ -80,7 +76,6 @@ class QubitHistoryDocument(Document):
             history = existing_history
             history.data = qubit.data
             history.status = qubit.status
-            history.node_info = qubit.node_info
         else:
             # Create a new history record
             history = cls(
@@ -90,7 +85,6 @@ class QubitHistoryDocument(Document):
                 status=qubit.status,
                 chip_id=qubit.chip_id,
                 data=qubit.data,
-                node_info=qubit.node_info,
                 system_info=SystemInfoModel(),
             )
         history.save()

@@ -1,11 +1,7 @@
 """Tests for ExecutionStateManager."""
 
-from qdash.datamodel.execution import (
-    CalibDataModel,
-    ExecutionStatusModel,
-    TaskResultModel,
-)
-from qdash.datamodel.task import OutputParameterModel
+from qdash.datamodel.execution import ExecutionStatusModel
+from qdash.datamodel.task import CalibDataModel, OutputParameterModel
 from qdash.workflow.engine.execution.state_manager import (
     ExecutionStateManager,
 )
@@ -22,7 +18,6 @@ class TestExecutionStateManagerInit:
 
         assert manager.execution_id == "exec-001"
         assert manager.status == ExecutionStatusModel.SCHEDULED
-        assert manager.task_results == {}
         assert manager.calib_data.qubit == {}
         assert manager.calib_data.coupling == {}
 
@@ -94,31 +89,6 @@ class TestExecutionLifecycle:
 
         manager.update_status(ExecutionStatusModel.COMPLETED)
         assert manager.status == ExecutionStatusModel.COMPLETED
-
-
-class TestTaskResultMerging:
-    """Test task result merging functionality."""
-
-    def test_merge_task_result_adds_new_result(self):
-        """Test merging a new task result."""
-        manager = ExecutionStateManager(execution_id="exec-001")
-        task_result = TaskResultModel()
-
-        manager.merge_task_result("task-manager-001", task_result)
-
-        assert "task-manager-001" in manager.task_results
-        assert manager.task_results["task-manager-001"] == task_result
-
-    def test_merge_task_result_overwrites_existing(self):
-        """Test merging overwrites existing task result."""
-        manager = ExecutionStateManager(execution_id="exec-001")
-        task_result1 = TaskResultModel()
-        task_result2 = TaskResultModel()
-
-        manager.merge_task_result("task-manager-001", task_result1)
-        manager.merge_task_result("task-manager-001", task_result2)
-
-        assert manager.task_results["task-manager-001"] == task_result2
 
 
 class TestCalibDataMerging:
@@ -205,12 +175,10 @@ class TestDatamodelConversion:
             chip_id="chip-001",
             note={},
             status=ExecutionStatusModel.RUNNING,
-            task_results={},
             tags=[],
             start_at=None,
             end_at=None,
             elapsed_time=None,
-            calib_data={"qubit": {}, "coupling": {}},
             message="",
             system_info={},
         )

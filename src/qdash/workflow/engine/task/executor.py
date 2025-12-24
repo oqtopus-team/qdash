@@ -685,9 +685,7 @@ class TaskExecutor:
         ExecutionService
             Updated execution service
         """
-        return execution_service.update_with_task_result(
-            task_manager_id=self.task_manager_id,
-            task_result=self.state_manager.task_result,
+        return execution_service.update_with_calib_data(
             calib_data=self.state_manager.calib_data,
         )
 
