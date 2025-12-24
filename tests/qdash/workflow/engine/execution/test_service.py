@@ -4,12 +4,10 @@ from collections.abc import Callable
 
 import pytest
 from qdash.datamodel.execution import (
-    CalibDataModel,
     ExecutionModel,
     ExecutionStatusModel,
-    TaskResultModel,
 )
-from qdash.datamodel.task import OutputParameterModel
+from qdash.datamodel.task import CalibDataModel, OutputParameterModel
 from qdash.workflow.engine.execution.service import ExecutionService
 
 
@@ -159,25 +157,6 @@ class TestExecutionServiceLifecycle:
 class TestExecutionServiceMerge:
     """Test ExecutionService merge methods."""
 
-    def test_merge_task_result(self):
-        """Test merging task result."""
-        mock_repo = MockExecutionRepository()
-        service = ExecutionService.create(
-            username="test_user",
-            execution_id="exec-001",
-            calib_data_path="/tmp/calib",
-            chip_id="chip_1",
-            repository=mock_repo,
-        )
-        service.save()  # Initialize stored model
-
-        task_result = TaskResultModel()
-        result = service.merge_task_result("task-001", task_result)
-
-        assert result is service
-        assert "task-001" in service.task_results
-        assert service.task_results["task-001"] == task_result
-
     def test_merge_calib_data(self):
         """Test merging calibration data."""
         mock_repo = MockExecutionRepository()
@@ -254,13 +233,11 @@ class TestExecutionServiceFromExisting:
             calib_data_path="/tmp/calib",
             note={},
             status=ExecutionStatusModel.RUNNING,
-            task_results={},
             tags=[],
             chip_id="chip_1",
             start_at=None,
             end_at=None,
             elapsed_time=None,
-            calib_data={"qubit": {}, "coupling": {}},
             message="",
             system_info={},
         )
@@ -302,7 +279,6 @@ class TestExecutionServiceProperties:
         assert service.calib_data_path == "/tmp/calib"
         assert service.status == ExecutionStatusModel.SCHEDULED
         assert isinstance(service.calib_data, CalibDataModel)
-        assert isinstance(service.task_results, dict)
         # note is now an ExecutionNote model
         assert isinstance(service.note, ExecutionNote)
 

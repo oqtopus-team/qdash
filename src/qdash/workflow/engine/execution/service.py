@@ -9,12 +9,11 @@ from collections.abc import Callable
 from typing import Any, cast
 
 from qdash.datamodel.execution import (
-    CalibDataModel,
     ExecutionModel,
     ExecutionStatusModel,
-    TaskResultModel,
 )
 from qdash.datamodel.system_info import SystemInfoModel
+from qdash.datamodel.task import CalibDataModel
 from qdash.dbmodel.initialize import initialize
 from qdash.repository import MongoExecutionRepository
 from qdash.repository.protocols import ExecutionRepository
@@ -59,8 +58,8 @@ class ExecutionService:
     # Start execution
     service.start()
 
-    # Merge task results
-    service.merge_task_result("task-001", task_result)
+    # Merge calibration data
+    service.merge_calib_data(calib_data)
 
     # Complete execution
     service.complete()
@@ -219,6 +218,11 @@ class ExecutionService:
     def reload(self) -> "ExecutionService":
         """Reload state from repository.
 
+        Note: calib_data is preserved from the current in-memory state since
+        it is no longer persisted to the database. This ensures workflow
+        tasks can continue to access calibration data accumulated during
+        the current execution.
+
         Returns
         -------
         ExecutionService
@@ -229,41 +233,25 @@ class ExecutionService:
         ValueError
             If execution not found in repository
         """
+        # Preserve in-memory calib_data before reload
+        current_calib_data = self.state_manager.calib_data
+
         model = self.repository.find_by_id(self.state_manager.execution_id)
         if model is None:
             raise ValueError(f"Execution {self.state_manager.execution_id} not found")
         self.state_manager = ExecutionStateManager.from_datamodel(model)
-        return self
 
-    def merge_task_result(
-        self,
-        task_manager_id: str,
-        task_result: TaskResultModel,
-    ) -> "ExecutionService":
-        """Merge task result and persist with optimistic locking.
-
-        Parameters
-        ----------
-        task_manager_id : str
-            Task manager identifier
-        task_result : TaskResultModel
-            Task result to merge
-
-        Returns
-        -------
-        ExecutionService
-            Self for method chaining
-        """
-
-        def update_func(model: ExecutionModel) -> None:
-            model.task_results[task_manager_id] = task_result
-
-        self._update_with_lock(update_func)
-        self.state_manager.merge_task_result(task_manager_id, task_result)
+        # Restore in-memory calib_data (not persisted to DB)
+        self.state_manager.calib_data = current_calib_data
         return self
 
     def merge_calib_data(self, calib_data: CalibDataModel) -> "ExecutionService":
-        """Merge calibration data and persist with optimistic locking.
+        """Merge calibration data into in-memory state.
+
+        Note: calib_data is no longer persisted to the database to reduce
+        document size. It is only maintained in-memory during workflow
+        execution. Persistent calibration data is stored in qubit/coupling
+        collections.
 
         Parameters
         ----------
@@ -275,33 +263,7 @@ class ExecutionService:
         ExecutionService
             Self for method chaining
         """
-
-        def update_func(model: ExecutionModel) -> None:
-            # Merge qubit data
-            for qid, data in calib_data.qubit.items():
-                if "calib_data" not in model.__dict__:
-                    model.calib_data = CalibDataModel()
-                if isinstance(model.calib_data, dict):
-                    model.calib_data.setdefault("qubit", {}).setdefault(qid, {}).update(
-                        data
-                        if isinstance(data, dict)
-                        else data.model_dump()
-                        if hasattr(data, "model_dump")
-                        else data
-                    )
-
-            # Merge coupling data
-            for qid, data in calib_data.coupling.items():
-                if isinstance(model.calib_data, dict):
-                    model.calib_data.setdefault("coupling", {}).setdefault(qid, {}).update(
-                        data
-                        if isinstance(data, dict)
-                        else data.model_dump()
-                        if hasattr(data, "model_dump")
-                        else data
-                    )
-
-        self._update_with_lock(update_func)
+        # Only update in-memory state, not persisted to DB
         self.state_manager.merge_calib_data(calib_data)
         return self
 
@@ -380,11 +342,6 @@ class ExecutionService:
         return self.state_manager.calib_data
 
     @property
-    def task_results(self) -> dict[str, Any]:
-        """Get task results."""
-        return dict(self.state_manager.task_results)
-
-    @property
     def note(self) -> ExecutionNote:
         """Get note (returns ExecutionNote model)."""
         return self.state_manager.note
@@ -451,22 +408,20 @@ class ExecutionService:
 
     # === Methods for ExecutionManager compatibility ===
 
-    def update_with_task_result(
+    def update_with_calib_data(
         self,
-        task_manager_id: str,
-        task_result: TaskResultModel,
         calib_data: CalibDataModel,
     ) -> "ExecutionService":
-        """Update execution with task results and calib data.
+        """Update execution with calibration data.
 
         This is a replacement for ExecutionManager.update_with_task_manager().
 
+        Note: calib_data is only updated in-memory and stored in qubit/coupling
+        collections. Task results are persisted separately to task_result_history
+        collection by TaskResultHistoryRepository.
+
         Parameters
         ----------
-        task_manager_id : str
-            Task manager/session identifier
-        task_result : TaskResultModel
-            Task result to merge
         calib_data : CalibDataModel
             Calibration data to merge
 
@@ -475,28 +430,8 @@ class ExecutionService:
         ExecutionService
             Self for method chaining
         """
-        # Merge all data via state manager
-        self.state_manager.merge_task_result(task_manager_id, task_result)
         self.state_manager.merge_calib_data(calib_data)
-
-        # Persist with optimistic locking
-        def updater(model: ExecutionModel) -> None:
-            # Update task results
-            model.task_results[task_manager_id] = task_result
-
-            # Merge calibration data
-            if isinstance(model.calib_data, dict):
-                for qid, data in calib_data.qubit.items():
-                    model.calib_data.setdefault("qubit", {}).setdefault(qid, {}).update(
-                        data if isinstance(data, dict) else {}
-                    )
-                for qid, data in calib_data.coupling.items():
-                    model.calib_data.setdefault("coupling", {}).setdefault(qid, {}).update(
-                        data if isinstance(data, dict) else {}
-                    )
-
-        self._update_with_lock(updater)
-        return self.reload()
+        return self
 
     def start_execution(self) -> "ExecutionService":
         """Start the execution (alias for start()).

@@ -5,14 +5,17 @@ abstracting away the repository layer from the routers.
 """
 
 import logging
+from datetime import timedelta
 from typing import Any
 
+from bunnet import SortDirection
 from qdash.api.schemas.execution import (
     ExecutionLockStatusResponse,
     ExecutionResponseDetail,
     ExecutionResponseSummary,
     Task,
 )
+from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
 
 logger = logging.getLogger(__name__)
 
@@ -111,8 +114,8 @@ class ExecutionService:
         if execution is None:
             return None
 
-        flat_tasks = self._flatten_tasks(execution.task_results)
-        tasks = [Task(**task) for task in flat_tasks]
+        # Fetch tasks directly from task_result_history collection
+        tasks = self._fetch_tasks_for_execution(project_id, execution_id)
 
         return ExecutionResponseDetail(
             name=f"{execution.name}-{execution.execution_id}",
@@ -143,70 +146,63 @@ class ExecutionService:
             return ExecutionLockStatusResponse(lock=False)
         return ExecutionLockStatusResponse(lock=status)
 
-    def _flatten_tasks(self, task_results: dict[str, Any]) -> list[dict[str, Any]]:
-        """Flatten the task results into a list of tasks.
+    def _fetch_tasks_for_execution(
+        self,
+        project_id: str,
+        execution_id: str,
+    ) -> list[Task]:
+        """Fetch tasks for an execution from task_result_history collection.
 
         Parameters
         ----------
-        task_results : dict
-            Task results to flatten
+        project_id : str
+            The project identifier
+        execution_id : str
+            The execution identifier
 
         Returns
         -------
-        list[dict]
-            Flattened list of tasks, sorted by completion time within qid groups
+        list[Task]
+            List of tasks, sorted by start_at
 
         """
-        grouped_tasks: dict[str, list[dict[str, Any]]] = {}
+        # Query task_result_history collection directly
+        task_docs: list[TaskResultHistoryDocument] = (
+            TaskResultHistoryDocument.find(
+                {
+                    "project_id": project_id,
+                    "execution_id": execution_id,
+                }
+            )
+            .sort([("start_at", SortDirection.ASCENDING)])
+            .run()
+        )
 
-        for result in task_results.values():
-            if not isinstance(result, dict):
-                result = result.model_dump()  # noqa: PLW2901
+        # Convert documents to Task schema objects
+        tasks = []
+        for doc in task_docs:
+            # Convert elapsed_time from seconds (float) to timedelta
+            elapsed = timedelta(seconds=doc.elapsed_time) if doc.elapsed_time is not None else None
+            tasks.append(
+                Task(
+                    task_id=doc.task_id,
+                    qid=doc.qid,
+                    name=doc.name,
+                    upstream_id=doc.upstream_id,
+                    status=doc.status,
+                    message=doc.message,
+                    input_parameters=doc.input_parameters,
+                    output_parameters=doc.output_parameters,
+                    output_parameter_names=doc.output_parameter_names,
+                    note=doc.note,
+                    figure_path=doc.figure_path,
+                    json_figure_path=doc.json_figure_path,
+                    raw_data_path=doc.raw_data_path,
+                    start_at=doc.start_at,
+                    end_at=doc.end_at,
+                    elapsed_time=elapsed,
+                    task_type=doc.task_type,
+                )
+            )
 
-            # Process global tasks
-            if "global_tasks" in result:
-                if "global" not in grouped_tasks:
-                    grouped_tasks["global"] = []
-                grouped_tasks["global"].extend(result["global_tasks"])
-
-            if "system_tasks" in result:
-                if "system" not in grouped_tasks:
-                    grouped_tasks["system"] = []
-                grouped_tasks["system"].extend(result["system_tasks"])
-
-            # Process qubit tasks
-            if "qubit_tasks" in result:
-                for qid, tasks in result["qubit_tasks"].items():
-                    if qid not in grouped_tasks:
-                        grouped_tasks[qid] = []
-                    for task in tasks:
-                        if "qid" not in task or not task["qid"]:
-                            task["qid"] = qid
-                        grouped_tasks[qid].append(task)
-
-            # Process coupling tasks
-            if "coupling_tasks" in result:
-                for tasks in result["coupling_tasks"].values():
-                    if "coupling" not in grouped_tasks:
-                        grouped_tasks["coupling"] = []
-                    grouped_tasks["coupling"].extend(tasks)
-
-        # Sort tasks within each group by start_at
-        for group_tasks in grouped_tasks.values():
-            group_tasks.sort(key=lambda x: x.get("start_at", "") or "9999-12-31T23:59:59")
-
-        # Sort groups by earliest start_at
-        def get_group_completion_time(group: list[dict[str, Any]]) -> str:
-            completed_tasks = [t for t in group if t.get("start_at")]
-            if not completed_tasks:
-                return "9999-12-31T23:59:59"
-            return max(str(t["start_at"]) for t in completed_tasks)
-
-        sorted_groups = sorted(grouped_tasks.items(), key=lambda x: get_group_completion_time(x[1]))
-
-        # Merge sorted groups into a single list
-        flat_tasks = []
-        for _, tasks in sorted_groups:
-            flat_tasks.extend(tasks)
-
-        return flat_tasks
+        return tasks
