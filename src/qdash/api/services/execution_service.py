@@ -181,8 +181,14 @@ class ExecutionService:
         # Convert documents to Task schema objects
         tasks = []
         for doc in task_docs:
-            # Convert elapsed_time from seconds (float) to timedelta
-            elapsed = timedelta(seconds=doc.elapsed_time) if doc.elapsed_time is not None else None
+            # Convert elapsed_time from seconds (float) to timedelta with validation
+            elapsed = None
+            if doc.elapsed_time is not None:
+                try:
+                    if isinstance(doc.elapsed_time, (int, float)) and doc.elapsed_time >= 0:
+                        elapsed = timedelta(seconds=doc.elapsed_time)
+                except (ValueError, OverflowError):
+                    pass  # Keep elapsed as None for invalid values
             tasks.append(
                 Task(
                     task_id=doc.task_id,

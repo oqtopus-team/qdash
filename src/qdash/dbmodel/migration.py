@@ -233,7 +233,12 @@ def migrate_slim_execution_history(dry_run: bool = True) -> dict[str, Any]:
 
     Returns:
         Migration statistics with counts of affected documents and size savings.
+
+    Raises:
+        ConnectionError: If database connection cannot be established.
+        RuntimeError: If database is not properly initialized.
     """
+    from pymongo.errors import ConnectionFailure, ServerSelectionTimeoutError
     from qdash.dbmodel.execution_history import ExecutionHistoryDocument
 
     stats: dict[str, Any] = {
@@ -245,6 +250,15 @@ def migrate_slim_execution_history(dry_run: bool = True) -> dict[str, Any]:
     }
 
     collection = ExecutionHistoryDocument.get_motor_collection()
+
+    # Verify database connection health
+    try:
+        # This will raise an exception if the connection is unhealthy
+        collection.database.command("ping")
+    except (ConnectionFailure, ServerSelectionTimeoutError) as e:
+        raise ConnectionError(f"Failed to connect to MongoDB: {e}") from e
+    except Exception as e:
+        raise RuntimeError(f"Database health check failed: {e}") from e
 
     # Count total documents
     stats["total_documents"] = collection.count_documents({})
