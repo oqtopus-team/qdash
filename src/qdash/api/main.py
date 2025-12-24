@@ -17,6 +17,7 @@ from qdash.api.routers import (
     flow,
     metrics,
     project,
+    provenance,
     settings,
     tag,
     task,
@@ -109,3 +110,6 @@ app.include_router(
     topology.router, prefix="/topology", tags=["topology"], dependencies=auth_dependency
 )
 app.include_router(config.router, tags=["config"], dependencies=auth_dependency)
+app.include_router(
+    provenance.router, prefix="/provenance", tags=["provenance"], dependencies=auth_dependency
+)
