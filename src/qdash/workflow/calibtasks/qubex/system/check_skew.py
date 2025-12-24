@@ -2,7 +2,7 @@ from pathlib import Path
 from typing import Any, ClassVar
 
 import yaml
-from qdash.datamodel.task import InputParameterModel, OutputParameterModel
+from qdash.datamodel.task import ParameterModel, RunParameterModel
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
     RunResult,
@@ -18,15 +18,15 @@ class CheckSkew(QubexTask):
 
     name: str = "CheckSkew"
     task_type: str = "system"
-    input_parameters: ClassVar[dict[str, InputParameterModel]] = {
-        "muxes": InputParameterModel(
+    run_parameters: ClassVar[dict[str, RunParameterModel]] = {
+        "muxes": RunParameterModel(
             unit="a.u.",
             value_type="list",
             value=[0, 1, 2, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
             description="List of muxes to check skew",
         ),
     }
-    output_parameters: ClassVar[dict[str, OutputParameterModel]] = {}
+    output_parameters: ClassVar[dict[str, ParameterModel]] = {}
 
     def postprocess(
         self, backend: QubexBackend, execution_id: str, run_result: RunResult, qid: str
@@ -57,7 +57,7 @@ class CheckSkew(QubexTask):
 
         exp = Experiment(
             chip_id=chip_id,
-            muxes=self.input_parameters["muxes"].get_value(),
+            muxes=self.run_parameters["muxes"].get_value(),
             config_dir=str(qubex_paths.config_dir(chip_id)),
             params_dir=str(qubex_paths.params_dir(chip_id)),
         )

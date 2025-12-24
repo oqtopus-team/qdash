@@ -1,6 +1,6 @@
 from typing import ClassVar
 
-from qdash.datamodel.task import InputParameterModel, OutputParameterModel
+from qdash.datamodel.task import ParameterModel, RunParameterModel
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
     RunResult,
@@ -14,27 +14,27 @@ class CheckResonatorSpectroscopy(QubexTask):
 
     name: str = "CheckResonatorSpectroscopy"
     task_type: str = "qubit"
-    input_parameters: ClassVar[dict[str, InputParameterModel]] = {
-        "frequency_range": InputParameterModel(
+    run_parameters: ClassVar[dict[str, RunParameterModel]] = {
+        "frequency_range": RunParameterModel(
             unit="GHz",
             value_type="np.arange",
             value=(9.75, 10.75, 0.002),
             description="Frequency range for resonator spectroscopy",
         ),
-        "power_range": InputParameterModel(
+        "power_range": RunParameterModel(
             unit="dB",
             value_type="np.arange",
             value=(-60, 5, 5),
             description="Power range for resonator spectroscopy",
         ),
-        "shots": InputParameterModel(
+        "shots": RunParameterModel(
             unit="a.u.",
             value_type="int",
             value=1024,
             description="Number of shots for resonator spectroscopy",
         ),
     }
-    output_parameters: ClassVar[dict[str, OutputParameterModel]] = {}
+    output_parameters: ClassVar[dict[str, ParameterModel]] = {}
 
     def postprocess(
         self, backend: QubexBackend, execution_id: str, run_result: RunResult, qid: str
@@ -56,12 +56,12 @@ class CheckResonatorSpectroscopy(QubexTask):
         if read_box.type == BoxType.QUEL1SE_R8:
             frequency_range = np.arange(5.75, 6.75, 0.002)
         else:
-            frequency_range = self.input_parameters["frequency_range"].get_value()
+            frequency_range = self.run_parameters["frequency_range"].get_value()
         result = exp.resonator_spectroscopy(
             target=label,
             frequency_range=frequency_range,
-            power_range=self.input_parameters["power_range"].get_value(),
-            shots=self.input_parameters["shots"].get_value(),
+            power_range=self.run_parameters["power_range"].get_value(),
+            shots=self.run_parameters["shots"].get_value(),
         )
         self.save_calibration(backend)
         return RunResult(raw_result=result)
@@ -77,11 +77,11 @@ class CheckResonatorSpectroscopy(QubexTask):
         if read_box.type == BoxType.QUEL1SE_R8:
             frequency_range = np.arange(5.75, 6.75, 0.002)
         else:
-            frequency_range = self.input_parameters["frequency_range"].get_value()
+            frequency_range = self.run_parameters["frequency_range"].get_value()
         result = exp.resonator_spectroscopy(
             labels[0],
             frequency_range=frequency_range,
-            power_range=self.input_parameters["power_range"].get_value(),
+            power_range=self.run_parameters["power_range"].get_value(),
             shots=1024,
         )
         self.save_calibration(backend)

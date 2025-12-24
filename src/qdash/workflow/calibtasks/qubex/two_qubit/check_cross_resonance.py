@@ -2,7 +2,7 @@ from typing import Any, ClassVar
 
 import numpy as np
 import plotly.graph_objects as go
-from qdash.datamodel.task import InputParameterModel, OutputParameterModel
+from qdash.datamodel.task import ParameterModel, RunParameterModel
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
     RunResult,
@@ -17,27 +17,27 @@ class CheckCrossResonance(QubexTask):
     name: str = "CheckCrossResonance"
     task_type: str = "coupling"
     timeout: int = 60 * 25  # 25 minutes
-    input_parameters: ClassVar[dict[str, InputParameterModel]] = {}
-    output_parameters: ClassVar[dict[str, OutputParameterModel]] = {
-        "cr_amplitude": OutputParameterModel(
+    run_parameters: ClassVar[dict[str, RunParameterModel]] = {}
+    output_parameters: ClassVar[dict[str, ParameterModel]] = {
+        "cr_amplitude": ParameterModel(
             unit="a.u.", value_type="float", description="Amplitude of the CR pulse."
         ),
-        "cr_phase": OutputParameterModel(
+        "cr_phase": ParameterModel(
             unit="a.u.", value_type="float", description="Phase of the CR pulse."
         ),
-        "cancel_amplitude": OutputParameterModel(
+        "cancel_amplitude": ParameterModel(
             unit="a.u.", value_type="float", description="Amplitude of the cancel pulse."
         ),
-        "cancel_phase": OutputParameterModel(
+        "cancel_phase": ParameterModel(
             unit="a.u.", value_type="float", description="Phase of the cancel pulse."
         ),
-        "cancel_beta": OutputParameterModel(
+        "cancel_beta": ParameterModel(
             unit="a.u.", value_type="float", description="Beta of the cancel pulse."
         ),
-        "rotary_amplitude": OutputParameterModel(
+        "rotary_amplitude": ParameterModel(
             unit="a.u.", value_type="float", description="Amplitude of the rotary pulse."
         ),
-        "zx_rotation_rate": OutputParameterModel(
+        "zx_rotation_rate": ParameterModel(
             unit="a.u.", value_type="float", description="ZX rotation rate."
         ),
     }

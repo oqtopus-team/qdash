@@ -2,7 +2,7 @@ from typing import Any, ClassVar
 
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-from qdash.datamodel.task import InputParameterModel, OutputParameterModel
+from qdash.datamodel.task import ParameterModel, RunParameterModel
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
     RunResult,
@@ -17,9 +17,9 @@ class CheckBellStateTomography(QubexTask):
     name: str = "CheckBellStateTomography"
     task_type: str = "coupling"
     timeout: int = 60 * 25  # 25 minutes
-    input_parameters: ClassVar[dict[str, InputParameterModel]] = {}
-    output_parameters: ClassVar[dict[str, OutputParameterModel]] = {
-        "bell_state_fidelity": OutputParameterModel(
+    run_parameters: ClassVar[dict[str, RunParameterModel]] = {}
+    output_parameters: ClassVar[dict[str, ParameterModel]] = {
+        "bell_state_fidelity": ParameterModel(
             unit="a.u.",
             description="Bell state fidelity",
             value_type="float",

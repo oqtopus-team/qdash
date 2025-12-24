@@ -323,12 +323,24 @@ class TestProvenanceService:
 
     def test_get_stats_returns_response(self, service, mock_repos):
         """Test get_stats returns ProvenanceStatsResponse."""
+        # Set up mock return values for the new repository methods
+        mock_repos["parameter_version"].count.return_value = 10
+        mock_repos["parameter_version"].get_recent.return_value = []
+        mock_repos["activity"].count.return_value = 5
+        mock_repos["provenance_relation"].count.return_value = 20
+        mock_repos["provenance_relation"].count_by_type.return_value = {
+            "wasGeneratedBy": 10,
+            "wasDerivedFrom": 10,
+        }
+
         result = service.get_stats("test_project")
 
         assert isinstance(result, ProvenanceStatsResponse)
-        assert result.total_entities == 0
-        assert result.total_activities == 0
-        assert result.total_relations == 0
+        assert result.total_entities == 10
+        assert result.total_activities == 5
+        assert result.total_relations == 20
+        assert result.relation_counts == {"wasGeneratedBy": 10, "wasDerivedFrom": 10}
+        assert result.recent_entities == []
 
     def test_build_version_response_from_dict(self, service):
         """Test _build_version_response handles dict input."""

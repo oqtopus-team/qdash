@@ -7,6 +7,7 @@ for provenance queries, delegating to repositories for data access.
 from __future__ import annotations
 
 import logging
+import math
 from typing import TYPE_CHECKING, Any
 
 from qdash.api.schemas.provenance import (
@@ -356,14 +357,33 @@ class ProvenanceService:
             Provenance statistics
 
         """
-        # Basic stats - count documents in collections
-        # This is a simplified implementation
+        try:
+            # Get counts from repositories
+            total_entities = self.parameter_version_repo.count(project_id)
+            total_activities = self.activity_repo.count(project_id)
+            total_relations = self.provenance_relation_repo.count(project_id)
+            relation_counts = self.provenance_relation_repo.count_by_type(project_id)
+
+            # Get recent parameter versions
+            recent_docs = self.parameter_version_repo.get_recent(project_id, limit=10)
+            recent_entities = [self._build_version_response(doc) for doc in recent_docs]
+        except Exception as e:
+            logger.warning(f"Failed to get provenance stats: {e}")
+            # Return empty stats if queries fail (e.g., collections don't exist)
+            return ProvenanceStatsResponse(
+                total_entities=0,
+                total_activities=0,
+                total_relations=0,
+                relation_counts={},
+                recent_entities=[],
+            )
+
         return ProvenanceStatsResponse(
-            total_entities=0,
-            total_activities=0,
-            total_relations=0,
-            relation_counts={},
-            recent_entities=[],
+            total_entities=total_entities,
+            total_activities=total_activities,
+            total_relations=total_relations,
+            relation_counts=relation_counts,
+            recent_entities=recent_entities,
         )
 
     def get_entity(
@@ -418,7 +438,7 @@ class ProvenanceService:
             entity_id=item.get("id", ""),
             parameter_name=metadata.get("parameter_name", ""),
             qid=metadata.get("qid", ""),
-            value=metadata.get("value", 0),
+            value=self._sanitize_float(metadata.get("value", 0)),
             value_type="float",
             unit=metadata.get("unit", ""),
             error=0.0,
@@ -464,6 +484,29 @@ class ProvenanceService:
             chip_id="",
         )
 
+    def _sanitize_float(self, value: Any) -> float | int | str:
+        """Sanitize float values for JSON serialization.
+
+        Converts inf, -inf, and nan to None-safe representations.
+
+        Parameters
+        ----------
+        value : Any
+            Value to sanitize
+
+        Returns
+        -------
+        float | int | str
+            Sanitized value
+
+        """
+        if isinstance(value, float):
+            if math.isnan(value):
+                return 0.0
+            if math.isinf(value):
+                return 0.0
+        return value
+
     def _build_version_response(self, entity: object) -> ParameterVersionResponse:
         """Build a ParameterVersionResponse from an entity.
 
@@ -483,10 +526,10 @@ class ProvenanceService:
                 entity_id=entity.get("entity_id", ""),
                 parameter_name=entity.get("parameter_name", ""),
                 qid=entity.get("qid", ""),
-                value=entity.get("value", 0),
+                value=self._sanitize_float(entity.get("value", 0)),
                 value_type=entity.get("value_type", "float"),
                 unit=entity.get("unit", ""),
-                error=entity.get("error", 0.0),
+                error=self._sanitize_float(entity.get("error", 0.0)),
                 version=entity.get("version", 1),
                 valid_from=entity.get("valid_from"),
                 valid_until=entity.get("valid_until"),
@@ -500,10 +543,10 @@ class ProvenanceService:
             entity_id=getattr(entity, "entity_id", ""),
             parameter_name=getattr(entity, "parameter_name", ""),
             qid=getattr(entity, "qid", ""),
-            value=getattr(entity, "value", 0),
+            value=self._sanitize_float(getattr(entity, "value", 0)),
             value_type=getattr(entity, "value_type", "float"),
             unit=getattr(entity, "unit", ""),
-            error=getattr(entity, "error", 0.0),
+            error=self._sanitize_float(getattr(entity, "error", 0.0)),
             version=getattr(entity, "version", 1),
             valid_from=getattr(entity, "valid_from", None),
             valid_until=getattr(entity, "valid_until", None),

@@ -2,7 +2,7 @@ from typing import TYPE_CHECKING, ClassVar
 
 if TYPE_CHECKING:
     import plotly.graph_objs as go
-from qdash.datamodel.task import InputParameterModel, OutputParameterModel
+from qdash.datamodel.task import ParameterModel, RunParameterModel
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
     RunResult,
@@ -18,29 +18,29 @@ class CreateDRAGPIPulse(QubexTask):
 
     name: str = "CreateDRAGPIPulse"
     task_type: str = "qubit"
-    input_parameters: ClassVar[dict[str, InputParameterModel]] = {
-        "duration": InputParameterModel(
+    run_parameters: ClassVar[dict[str, RunParameterModel]] = {
+        "duration": RunParameterModel(
             unit="ns",
             value_type="int",
             value=DRAG_PI_DURATION,
             description="PI pulse length",
         ),
-        "shots": InputParameterModel(
+        "shots": RunParameterModel(
             unit="a.u.",
             value_type="int",
             value=CALIBRATION_SHOTS,
             description="Number of shots",
         ),
-        "interval": InputParameterModel(
+        "interval": RunParameterModel(
             unit="ns",
             value_type="int",
             value=DEFAULT_INTERVAL,
             description="Time interval",
         ),
     }
-    output_parameters: ClassVar[dict[str, OutputParameterModel]] = {
-        "drag_pi_beta": OutputParameterModel(unit="", description="DRAG PI pulse beta"),
-        "drag_pi_amplitude": OutputParameterModel(unit="", description="DRAG PI pulse amplitude"),
+    output_parameters: ClassVar[dict[str, ParameterModel]] = {
+        "drag_pi_beta": ParameterModel(unit="", description="DRAG PI pulse beta"),
+        "drag_pi_amplitude": ParameterModel(unit="", description="DRAG PI pulse amplitude"),
     }
 
     def postprocess(
@@ -63,9 +63,9 @@ class CreateDRAGPIPulse(QubexTask):
             n_rotations=4,
             n_turns=1,
             n_iterations=2,
-            duration=self.input_parameters["duration"].get_value(),
-            shots=self.input_parameters["shots"].get_value(),
-            interval=self.input_parameters["interval"].get_value(),
+            duration=self.run_parameters["duration"].get_value(),
+            shots=self.run_parameters["shots"].get_value(),
+            interval=self.run_parameters["interval"].get_value(),
         )
         self.save_calibration(backend)
         r2 = result["amplitude"][exp.get_qubit_label(int(qid))]["r2"]

@@ -322,6 +322,49 @@ class MongoParameterVersionRepository:
             ).run()
         )
 
+    def count(self, project_id: str) -> int:
+        """Count parameter versions for a project.
+
+        Parameters
+        ----------
+        project_id : str
+            Project identifier
+
+        Returns
+        -------
+        int
+            Number of parameter versions
+
+        """
+        return ParameterVersionDocument.find({"project_id": project_id}).count()
+
+    def get_recent(
+        self,
+        project_id: str,
+        limit: int = 10,
+    ) -> list[ParameterVersionDocument]:
+        """Get the most recent parameter versions.
+
+        Parameters
+        ----------
+        project_id : str
+            Project identifier
+        limit : int
+            Maximum number of versions to return
+
+        Returns
+        -------
+        list[ParameterVersionDocument]
+            List of recent parameter versions
+
+        """
+        return list(
+            ParameterVersionDocument.find({"project_id": project_id})
+            .sort([("valid_from", SortDirection.DESCENDING)])
+            .limit(limit)
+            .run()
+        )
+
 
 class MongoProvenanceRelationRepository:
     """MongoDB implementation for provenance relation persistence.
@@ -780,6 +823,45 @@ class MongoProvenanceRelationRepository:
 
         return diffs
 
+    def count(self, project_id: str) -> int:
+        """Count provenance relations for a project.
+
+        Parameters
+        ----------
+        project_id : str
+            Project identifier
+
+        Returns
+        -------
+        int
+            Number of relations
+
+        """
+        return ProvenanceRelationDocument.find({"project_id": project_id}).count()
+
+    def count_by_type(self, project_id: str) -> dict[str, int]:
+        """Count relations by type for a project.
+
+        Parameters
+        ----------
+        project_id : str
+            Project identifier
+
+        Returns
+        -------
+        dict[str, int]
+            Counts by relation type
+
+        """
+        counts: dict[str, int] = {}
+        for rel_type in ProvenanceRelationType:
+            count = ProvenanceRelationDocument.find(
+                {"project_id": project_id, "relation_type": rel_type.value}
+            ).count()
+            if count > 0:
+                counts[rel_type.value] = count
+        return counts
+
 
 class MongoActivityRepository:
     """MongoDB implementation for activity persistence.
@@ -912,3 +994,19 @@ class MongoActivityRepository:
             .sort([("started_at", SortDirection.ASCENDING)])
             .run()
         )
+
+    def count(self, project_id: str) -> int:
+        """Count activities for a project.
+
+        Parameters
+        ----------
+        project_id : str
+            Project identifier
+
+        Returns
+        -------
+        int
+            Number of activities
+
+        """
+        return ActivityDocument.find({"project_id": project_id}).count()

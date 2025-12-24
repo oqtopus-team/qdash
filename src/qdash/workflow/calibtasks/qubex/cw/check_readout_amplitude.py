@@ -2,7 +2,7 @@ from typing import Any, ClassVar
 
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-from qdash.datamodel.task import InputParameterModel, OutputParameterModel
+from qdash.datamodel.task import ParameterModel, RunParameterModel
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
     RunResult,
@@ -16,15 +16,15 @@ class CheckReadoutAmplitude(QubexTask):
 
     name: str = "CheckReadoutAmplitude"
     task_type: str = "qubit"
-    input_parameters: ClassVar[dict[str, InputParameterModel]] = {
-        "amplitude_range": InputParameterModel(
+    run_parameters: ClassVar[dict[str, RunParameterModel]] = {
+        "amplitude_range": RunParameterModel(
             unit="a.u.",
             value_type="np.linspace",
             value=(0.0, 0.2, 51),
             description="Amplitude range for readout",
         )
     }
-    output_parameters: ClassVar[dict[str, OutputParameterModel]] = {}
+    output_parameters: ClassVar[dict[str, ParameterModel]] = {}
 
     def make_figure(
         self, signal: dict[str, Any], noise: dict[str, Any], snr: dict[str, Any], label: str
@@ -32,7 +32,7 @@ class CheckReadoutAmplitude(QubexTask):
         fig = make_subplots(rows=3, cols=1, shared_xaxes=True)
         fig.add_trace(
             go.Scatter(
-                x=self.input_parameters["amplitude_range"].get_value(),
+                x=self.run_parameters["amplitude_range"].get_value(),
                 y=signal[label],
                 mode="lines+markers",
                 name="Signal",
@@ -42,7 +42,7 @@ class CheckReadoutAmplitude(QubexTask):
         )
         fig.add_trace(
             go.Scatter(
-                x=self.input_parameters["amplitude_range"].get_value(),
+                x=self.run_parameters["amplitude_range"].get_value(),
                 y=noise[label],
                 mode="lines+markers",
                 name="Noise",
@@ -52,7 +52,7 @@ class CheckReadoutAmplitude(QubexTask):
         )
         fig.add_trace(
             go.Scatter(
-                x=self.input_parameters["amplitude_range"].get_value(),
+                x=self.run_parameters["amplitude_range"].get_value(),
                 y=snr[label],
                 mode="lines+markers",
                 name="SNR",
@@ -94,7 +94,7 @@ class CheckReadoutAmplitude(QubexTask):
         exp = self.get_experiment(backend)
         labels = [self.get_qubit_label(backend, qid) for qid in qids]
         result = exp.sweep_readout_amplitude(
-            targets=labels, amplitude_range=self.input_parameters["amplitude_range"].get_value()
+            targets=labels, amplitude_range=self.run_parameters["amplitude_range"].get_value()
         )
         self.save_calibration(backend)
         return RunResult(raw_result=result)

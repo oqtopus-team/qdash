@@ -1,6 +1,6 @@
 from typing import ClassVar
 
-from qdash.datamodel.task import InputParameterModel, OutputParameterModel
+from qdash.datamodel.task import ParameterModel, RunParameterModel
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
     RunResult,
@@ -16,32 +16,32 @@ class RandomizedBenchmarking(QubexTask):
 
     name: str = "RandomizedBenchmarking"
     task_type: str = "qubit"
-    input_parameters: ClassVar[dict[str, InputParameterModel]] = {
-        "n_trials": InputParameterModel(
+    run_parameters: ClassVar[dict[str, RunParameterModel]] = {
+        "n_trials": RunParameterModel(
             unit="a.u.",
             value_type="int",
             value=10,
             description="Number of trials",
         ),
-        "shots": InputParameterModel(
+        "shots": RunParameterModel(
             unit="a.u.",
             value_type="int",
             value=CALIBRATION_SHOTS,
             description="Number of shots",
         ),
-        "interval": InputParameterModel(
+        "interval": RunParameterModel(
             unit="ns",
             value_type="int",
             value=DEFAULT_INTERVAL,
             description="Time interval",
         ),
     }
-    output_parameters: ClassVar[dict[str, OutputParameterModel]] = {
-        "average_gate_fidelity": OutputParameterModel(
+    output_parameters: ClassVar[dict[str, ParameterModel]] = {
+        "average_gate_fidelity": ParameterModel(
             unit="a.u.",
             description="Average gate fidelity",
         ),
-        "depolarizing_rate": OutputParameterModel(
+        "depolarizing_rate": ParameterModel(
             unit="a.u.",
             description="Depolarization rate of the qubit",
         ),
@@ -67,10 +67,10 @@ class RandomizedBenchmarking(QubexTask):
         label = self.get_qubit_label(backend, qid)
         result = exp.randomized_benchmarking(
             targets=label,
-            n_trials=self.input_parameters["n_trials"].get_value(),
+            n_trials=self.run_parameters["n_trials"].get_value(),
             save_image=False,
-            shots=self.input_parameters["shots"].get_value(),
-            interval=self.input_parameters["interval"].get_value(),
+            shots=self.run_parameters["shots"].get_value(),
+            interval=self.run_parameters["interval"].get_value(),
         )
         self.save_calibration(backend)
         r2 = result[label]["r2"]

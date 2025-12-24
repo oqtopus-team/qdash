@@ -1,6 +1,6 @@
 from typing import ClassVar
 
-from qdash.datamodel.task import InputParameterModel, OutputParameterModel
+from qdash.datamodel.task import ParameterModel, RunParameterModel
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
     RunResult,
@@ -16,25 +16,25 @@ class CheckDispersiveShift(QubexTask):
 
     name: str = "CheckDispersiveShift"
     task_type: str = "qubit"
-    input_parameters: ClassVar[dict[str, InputParameterModel]] = {
-        "shots": InputParameterModel(
+    run_parameters: ClassVar[dict[str, RunParameterModel]] = {
+        "shots": RunParameterModel(
             unit="a.u.",
             value_type="int",
             value=CALIBRATION_SHOTS,
             description="Number of shots for Rabi oscillation",
         ),
-        "interval": InputParameterModel(
+        "interval": RunParameterModel(
             unit="ns",
             value_type="int",
             value=DEFAULT_INTERVAL,
             description="Time interval for Rabi oscillation",
         ),
     }
-    output_parameters: ClassVar[dict[str, OutputParameterModel]] = {
-        "optimal_readout_frequency": OutputParameterModel(
+    output_parameters: ClassVar[dict[str, ParameterModel]] = {
+        "optimal_readout_frequency": ParameterModel(
             unit="GHz", description="Optimal Readout Frequency"
         ),
-        "dispersive_shift": OutputParameterModel(unit="MHz", description="Dispersive shift"),
+        "dispersive_shift": ParameterModel(unit="MHz", description="Dispersive shift"),
     }
 
     def postprocess(
@@ -60,8 +60,8 @@ class CheckDispersiveShift(QubexTask):
             electrical_delay = exp.measure_electrical_delay(target=label)
             result = exp.measure_dispersive_shift(
                 electrical_delay=electrical_delay,
-                shots=self.input_parameters["shots"].get_value(),
-                interval=self.input_parameters["interval"].get_value(),
+                shots=self.run_parameters["shots"].get_value(),
+                interval=self.run_parameters["interval"].get_value(),
                 target=label,
             )
 

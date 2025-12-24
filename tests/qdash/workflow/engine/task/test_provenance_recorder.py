@@ -8,7 +8,7 @@ from qdash.datamodel.execution import ExecutionModel, ExecutionStatusModel
 from qdash.datamodel.system_info import SystemInfoModel
 from qdash.datamodel.task import (
     CalibDataModel,
-    OutputParameterModel,
+    ParameterModel,
     QubitTaskModel,
     TaskStatusModel,
 )
@@ -52,7 +52,7 @@ class TestProvenanceRecorder:
                 "pi_amplitude": {"value": 0.5, "unit": "a.u."},
             },
             output_parameters={
-                "rabi_frequency": OutputParameterModel(value=50.0, unit="MHz", error=0.5),
+                "rabi_frequency": ParameterModel(value=50.0, unit="MHz", error=0.5),
             },
         )
         task.start_at = datetime(2025, 1, 1, 10, 0, 0)
@@ -317,7 +317,7 @@ class TestProvenanceRecorder:
             status=TaskStatusModel.COMPLETED,
             input_parameters={},
             output_parameters={
-                "initial_value": OutputParameterModel(value=0.0, unit="", error=0.0),
+                "initial_value": ParameterModel(value=0.0, unit="", error=0.0),
             },
         )
 

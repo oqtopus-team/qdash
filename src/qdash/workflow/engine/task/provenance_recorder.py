@@ -22,7 +22,7 @@ from typing import Any, Protocol, runtime_checkable
 
 from bunnet import SortDirection
 from qdash.datamodel.execution import ExecutionModel
-from qdash.datamodel.task import BaseTaskResultModel, OutputParameterModel
+from qdash.datamodel.task import BaseTaskResultModel, ParameterModel
 from qdash.dbmodel.provenance import ProvenanceRelationType
 from qdash.repository.provenance import (
     MongoActivityRepository,
@@ -329,7 +329,7 @@ class ProvenanceRecorder:
                 unit = param_data.get("unit", "")
                 error = param_data.get("error", 0.0)
                 value_type = param_data.get("value_type", "float")
-            elif isinstance(param_data, OutputParameterModel):
+            elif isinstance(param_data, ParameterModel):
                 value = param_data.value
                 unit = param_data.unit
                 error = param_data.error

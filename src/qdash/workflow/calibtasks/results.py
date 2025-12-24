@@ -8,13 +8,22 @@ from typing import Any
 
 import plotly.graph_objs as go
 from pydantic import BaseModel
-from qdash.datamodel.task import OutputParameterModel
+from qdash.datamodel.task import ParameterModel, RunParameterModel
 
 
 class PreProcessResult(BaseModel):
-    """Result class for task preprocessing."""
+    """Result class for task preprocessing.
 
-    input_parameters: dict[str, Any]
+    Attributes
+    ----------
+    input_parameters : dict[str, ParameterModel]
+        Calibration parameters loaded from backend (for provenance tracking).
+    run_parameters : dict[str, RunParameterModel]
+        Experiment configuration parameters (shots, ranges, etc.).
+    """
+
+    input_parameters: dict[str, ParameterModel] = {}
+    run_parameters: dict[str, RunParameterModel] = {}
 
 
 class PostProcessResult(BaseModel):
@@ -22,7 +31,7 @@ class PostProcessResult(BaseModel):
 
     model_config = {"arbitrary_types_allowed": True}
 
-    output_parameters: dict[str, OutputParameterModel]
+    output_parameters: dict[str, ParameterModel]
     figures: list[go.Figure | go.FigureWidget] = []
     raw_data: list[Any] = []
 

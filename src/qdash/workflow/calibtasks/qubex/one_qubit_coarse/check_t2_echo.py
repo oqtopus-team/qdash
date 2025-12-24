@@ -1,7 +1,7 @@
 from typing import ClassVar
 
 import numpy as np
-from qdash.datamodel.task import InputParameterModel, OutputParameterModel
+from qdash.datamodel.task import ParameterModel, RunParameterModel
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
     RunResult,
@@ -16,28 +16,28 @@ class CheckT2Echo(QubexTask):
 
     name: str = "CheckT2Echo"
     task_type: str = "qubit"
-    input_parameters: ClassVar[dict[str, InputParameterModel]] = {
-        "time_range": InputParameterModel(
+    run_parameters: ClassVar[dict[str, RunParameterModel]] = {
+        "time_range": RunParameterModel(
             unit="ns",
             value_type="np.logspace",
             value=(np.log10(300), np.log10(100 * 1000), 51),
             description="Time range for T2 echo time",
         ),
-        "shots": InputParameterModel(
+        "shots": RunParameterModel(
             unit="",
             value_type="int",
             value=DEFAULT_SHOTS,
             description="Number of shots for T2 echo time",
         ),
-        "interval": InputParameterModel(
+        "interval": RunParameterModel(
             unit="ns",
             value_type="int",
             value=DEFAULT_INTERVAL,
             description="Time interval for T2 echo time",
         ),
     }
-    output_parameters: ClassVar[dict[str, OutputParameterModel]] = {
-        "t2_echo": OutputParameterModel(unit="μs", description="T2 echo time"),
+    output_parameters: ClassVar[dict[str, ParameterModel]] = {
+        "t2_echo": ParameterModel(unit="μs", description="T2 echo time"),
     }
 
     def postprocess(
@@ -60,9 +60,9 @@ class CheckT2Echo(QubexTask):
         with self._apply_frequency_override(backend, qid):
             result = exp.t2_experiment(
                 labels,
-                time_range=self.input_parameters["time_range"].get_value(),
-                shots=self.input_parameters["shots"].get_value(),
-                interval=self.input_parameters["interval"].get_value(),
+                time_range=self.run_parameters["time_range"].get_value(),
+                shots=self.run_parameters["shots"].get_value(),
+                interval=self.run_parameters["interval"].get_value(),
                 save_image=False,
             )
 

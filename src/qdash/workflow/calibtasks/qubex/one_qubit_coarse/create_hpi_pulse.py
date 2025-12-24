@@ -1,6 +1,6 @@
 from typing import ClassVar
 
-from qdash.datamodel.task import InputParameterModel, OutputParameterModel
+from qdash.datamodel.task import ParameterModel, RunParameterModel
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
     RunResult,
@@ -16,25 +16,25 @@ class CreateHPIPulse(QubexTask):
 
     name: str = "CreateHPIPulse"
     task_type: str = "qubit"
-    input_parameters: ClassVar[dict[str, InputParameterModel]] = {
-        "duration": InputParameterModel(
+    run_parameters: ClassVar[dict[str, RunParameterModel]] = {
+        "duration": RunParameterModel(
             unit="ns", value_type="int", value=HPI_DURATION, description="HPI pulse length"
         ),
-        "shots": InputParameterModel(
+        "shots": RunParameterModel(
             unit="",
             value_type="int",
             value=CALIBRATION_SHOTS,
             description="Number of shots for calibration",
         ),
-        "interval": InputParameterModel(
+        "interval": RunParameterModel(
             unit="ns",
             value_type="int",
             value=DEFAULT_INTERVAL,
             description="Time interval for calibration",
         ),
     }
-    output_parameters: ClassVar[dict[str, OutputParameterModel]] = {
-        "hpi_amplitude": OutputParameterModel(unit="", description="HPI pulse amplitude")
+    output_parameters: ClassVar[dict[str, ParameterModel]] = {
+        "hpi_amplitude": ParameterModel(unit="", description="HPI pulse amplitude")
     }
 
     def postprocess(
@@ -54,9 +54,9 @@ class CreateHPIPulse(QubexTask):
         result = exp.calibrate_hpi_pulse(
             targets=labels,
             n_rotations=1,
-            duration=self.input_parameters["duration"].get_value(),
-            shots=self.input_parameters["shots"].get_value(),
-            interval=self.input_parameters["interval"].get_value(),
+            duration=self.run_parameters["duration"].get_value(),
+            shots=self.run_parameters["shots"].get_value(),
+            interval=self.run_parameters["interval"].get_value(),
         )
         self.save_calibration(backend)
         r2 = result.data[exp.get_qubit_label(int(qid))].r2

@@ -14,7 +14,7 @@ import logging
 from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 from pydantic import BaseModel, Field
-from qdash.datamodel.task import CalibDataModel, OutputParameterModel
+from qdash.datamodel.task import CalibDataModel, ParameterModel
 from qdash.repository import FilesystemCalibDataSaver
 from qdash.workflow.calibtasks.results import PostProcessResult, PreProcessResult, RunResult
 from qdash.workflow.engine.params_updater import get_params_updater
@@ -71,7 +71,7 @@ class TaskProtocol(Protocol):
         """Run postprocessing."""
         ...
 
-    def attach_task_id(self, task_id: str) -> dict[str, OutputParameterModel]:
+    def attach_task_id(self, task_id: str) -> dict[str, ParameterModel]:
         """Attach task ID to output parameters."""
         ...
 
@@ -413,7 +413,7 @@ class TaskExecutor:
         task_name: str,
         qid: str,
         task_type: str,
-    ) -> dict[str, OutputParameterModel]:
+    ) -> dict[str, ParameterModel]:
         """Process output parameters.
 
         Parameters
@@ -429,7 +429,7 @@ class TaskExecutor:
 
         Returns
         -------
-        dict[str, OutputParameterModel]
+        dict[str, ParameterModel]
             The processed output parameters
 
         """

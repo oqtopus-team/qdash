@@ -38,7 +38,7 @@ class CalibConfig:
     muxes: list[int] | None = None
     project_id: str | None = None
     enable_github_pull: bool = False
-    enable_provenance_tracking: bool = False
+    enable_provenance_tracking: bool = True
 
     # Derived paths (computed after initialization)
     calib_data_path: str = field(default="", init=False)

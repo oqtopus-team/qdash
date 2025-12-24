@@ -1,6 +1,6 @@
 from typing import ClassVar
 
-from qdash.datamodel.task import InputParameterModel, OutputParameterModel
+from qdash.datamodel.task import ParameterModel, RunParameterModel
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
     RunResult,
@@ -14,9 +14,9 @@ class CheckElectricalDelay(QubexTask):
 
     name: str = "CheckElectricalDelay"
     task_type: str = "qubit"
-    input_parameters: ClassVar[dict[str, InputParameterModel]] = {}
-    output_parameters: ClassVar[dict[str, OutputParameterModel]] = {
-        "electrical_delay": OutputParameterModel(
+    run_parameters: ClassVar[dict[str, RunParameterModel]] = {}
+    output_parameters: ClassVar[dict[str, ParameterModel]] = {
+        "electrical_delay": ParameterModel(
             unit="ns", description="Electrical delay", value_type="float"
         )
     }

@@ -1,6 +1,6 @@
 from typing import ClassVar
 
-from qdash.datamodel.task import InputParameterModel, OutputParameterModel
+from qdash.datamodel.task import ParameterModel, RunParameterModel
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
     RunResult,
@@ -14,15 +14,15 @@ class CheckPIPulse(QubexTask):
 
     name: str = "CheckPIPulse"
     task_type: str = "qubit"
-    input_parameters: ClassVar[dict[str, InputParameterModel]] = {
-        "repetitions": InputParameterModel(
+    run_parameters: ClassVar[dict[str, RunParameterModel]] = {
+        "repetitions": RunParameterModel(
             unit="a.u.",
             value_type="int",
             value=20,
             description="Number of repetitions for the PI pulse",
         )
     }
-    output_parameters: ClassVar[dict[str, OutputParameterModel]] = {}
+    output_parameters: ClassVar[dict[str, ParameterModel]] = {}
 
     def postprocess(
         self, backend: QubexBackend, execution_id: str, run_result: RunResult, qid: str
@@ -41,7 +41,7 @@ class CheckPIPulse(QubexTask):
         pi_pulse = {qubit: exp.pi_pulse[qubit] for qubit in labels}
         result = exp.repeat_sequence(
             sequence=pi_pulse,
-            repetitions=self.input_parameters["repetitions"].get_value(),
+            repetitions=self.run_parameters["repetitions"].get_value(),
         )
         self.save_calibration(backend)
         return RunResult(raw_result=result)

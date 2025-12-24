@@ -1,7 +1,7 @@
 """Tests for ExecutionStateManager."""
 
 from qdash.datamodel.execution import ExecutionStatusModel
-from qdash.datamodel.task import CalibDataModel, OutputParameterModel
+from qdash.datamodel.task import CalibDataModel, ParameterModel
 from qdash.workflow.engine.execution.state_manager import (
     ExecutionStateManager,
 )
@@ -98,7 +98,7 @@ class TestCalibDataMerging:
         """Test merging qubit calibration data."""
         manager = ExecutionStateManager(execution_id="exec-001")
         calib_data = CalibDataModel(
-            qubit={"0": {"freq": OutputParameterModel(value=5.0)}},
+            qubit={"0": {"freq": ParameterModel(value=5.0)}},
             coupling={},
         )
 
@@ -112,7 +112,7 @@ class TestCalibDataMerging:
         manager = ExecutionStateManager(execution_id="exec-001")
         calib_data = CalibDataModel(
             qubit={},
-            coupling={"0-1": {"cr_amp": OutputParameterModel(value=0.5)}},
+            coupling={"0-1": {"cr_amp": ParameterModel(value=0.5)}},
         )
 
         manager.merge_calib_data(calib_data)
@@ -126,14 +126,14 @@ class TestCalibDataMerging:
 
         # First merge
         calib_data1 = CalibDataModel(
-            qubit={"0": {"freq": OutputParameterModel(value=5.0)}},
+            qubit={"0": {"freq": ParameterModel(value=5.0)}},
             coupling={},
         )
         manager.merge_calib_data(calib_data1)
 
         # Second merge - same qid, different param
         calib_data2 = CalibDataModel(
-            qubit={"0": {"t1": OutputParameterModel(value=100.0)}},
+            qubit={"0": {"t1": ParameterModel(value=100.0)}},
             coupling={},
         )
         manager.merge_calib_data(calib_data2)
@@ -198,7 +198,7 @@ class TestParameterRetrieval:
         """Test getting an existing qubit parameter."""
         manager = ExecutionStateManager(execution_id="exec-001")
         calib_data = CalibDataModel(
-            qubit={"0": {"freq": OutputParameterModel(value=5.0)}},
+            qubit={"0": {"freq": ParameterModel(value=5.0)}},
             coupling={},
         )
         manager.merge_calib_data(calib_data)
@@ -217,7 +217,7 @@ class TestParameterRetrieval:
         """Test getting parameter for unknown qubit."""
         manager = ExecutionStateManager(execution_id="exec-001")
         calib_data = CalibDataModel(
-            qubit={"0": {"freq": OutputParameterModel(value=5.0)}},
+            qubit={"0": {"freq": ParameterModel(value=5.0)}},
             coupling={},
         )
         manager.merge_calib_data(calib_data)
@@ -230,7 +230,7 @@ class TestParameterRetrieval:
         manager = ExecutionStateManager(execution_id="exec-001")
         calib_data = CalibDataModel(
             qubit={},
-            coupling={"0-1": {"cr_amp": OutputParameterModel(value=0.5)}},
+            coupling={"0-1": {"cr_amp": ParameterModel(value=0.5)}},
         )
         manager.merge_calib_data(calib_data)
 

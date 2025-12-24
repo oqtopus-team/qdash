@@ -1,6 +1,6 @@
 from typing import ClassVar
 
-from qdash.datamodel.task import InputParameterModel, OutputParameterModel
+from qdash.datamodel.task import ParameterModel, RunParameterModel
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
     RunResult,
@@ -14,8 +14,8 @@ class CheckNoise(QubexTask):
 
     name: str = "CheckNoise"
     task_type: str = "global"
-    input_parameters: ClassVar[dict[str, InputParameterModel]] = {}
-    output_parameters: ClassVar[dict[str, OutputParameterModel]] = {}
+    run_parameters: ClassVar[dict[str, RunParameterModel]] = {}
+    output_parameters: ClassVar[dict[str, ParameterModel]] = {}
 
     def postprocess(
         self, backend: QubexBackend, execution_id: str, run_result: RunResult, qid: str

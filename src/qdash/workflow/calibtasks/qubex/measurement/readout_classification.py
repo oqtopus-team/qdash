@@ -3,7 +3,7 @@ from typing import Any, ClassVar
 import numpy as np
 import numpy.typing as npt
 import plotly.graph_objs as go
-from qdash.datamodel.task import InputParameterModel, OutputParameterModel
+from qdash.datamodel.task import ParameterModel, RunParameterModel
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
     RunResult,
@@ -20,17 +20,17 @@ class ReadoutClassification(QubexTask):
 
     # High resolution for accurate threshold detection
     GRID_RESOLUTION: int = 2001
-    input_parameters: ClassVar[dict[str, InputParameterModel]] = {}
-    output_parameters: ClassVar[dict[str, OutputParameterModel]] = {
-        "average_readout_fidelity": OutputParameterModel(
+    run_parameters: ClassVar[dict[str, RunParameterModel]] = {}
+    output_parameters: ClassVar[dict[str, ParameterModel]] = {
+        "average_readout_fidelity": ParameterModel(
             unit="a.u.",
             description="Average readout fidelity",
         ),
-        "readout_fidelity_0": OutputParameterModel(
+        "readout_fidelity_0": ParameterModel(
             unit="a.u.",
             description="Readout fidelity with preparation state 0",
         ),
-        "readout_fidelity_1": OutputParameterModel(
+        "readout_fidelity_1": ParameterModel(
             unit="a.u.",
             description="Readout fidelity with preparation state 1",
         ),

@@ -2,7 +2,7 @@ from typing import TYPE_CHECKING, ClassVar
 
 if TYPE_CHECKING:
     import plotly.graph_objs as go
-from qdash.datamodel.task import InputParameterModel, OutputParameterModel
+from qdash.datamodel.task import ParameterModel, RunParameterModel
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
     RunResult,
@@ -17,34 +17,34 @@ class CheckReadoutFrequency(QubexTask):
 
     name: str = "CheckReadoutFrequency"
     task_type: str = "qubit"
-    input_parameters: ClassVar[dict[str, InputParameterModel]] = {
-        "detuning_range": InputParameterModel(
+    run_parameters: ClassVar[dict[str, RunParameterModel]] = {
+        "detuning_range": RunParameterModel(
             unit="GHz",
             value_type="np.linspace",
             value=(-0.01, 0.01, 21),
             description="Detuning range",
         ),
-        "time_range": InputParameterModel(
+        "time_range": RunParameterModel(
             unit="ns",
             value_type="range",
             value=(0, 101, 4),
             description="Time range",
         ),
-        "shots": InputParameterModel(
+        "shots": RunParameterModel(
             unit="a.u.",
             value_type="int",
             value=DEFAULT_SHOTS,
             description="Number of shots",
         ),
-        "interval": InputParameterModel(
+        "interval": RunParameterModel(
             unit="ns",
             value_type="int",
             value=DEFAULT_INTERVAL,
             description="Time interval",
         ),
     }
-    output_parameters: ClassVar[dict[str, OutputParameterModel]] = {
-        "readout_frequency": OutputParameterModel(unit="GHz", description="Readout frequency"),
+    output_parameters: ClassVar[dict[str, ParameterModel]] = {
+        "readout_frequency": ParameterModel(unit="GHz", description="Readout frequency"),
     }
 
     def postprocess(
@@ -63,10 +63,10 @@ class CheckReadoutFrequency(QubexTask):
         labels = [exp.get_qubit_label(int(qid))]
         result = exp.calibrate_readout_frequency(
             labels,
-            detuning_range=self.input_parameters["detuning_range"].get_value(),
-            time_range=self.input_parameters["time_range"].get_value(),
-            shots=self.input_parameters["shots"].get_value(),
-            interval=self.input_parameters["interval"].get_value(),
+            detuning_range=self.run_parameters["detuning_range"].get_value(),
+            time_range=self.run_parameters["time_range"].get_value(),
+            shots=self.run_parameters["shots"].get_value(),
+            interval=self.run_parameters["interval"].get_value(),
         )
         self.save_calibration(backend)
         return RunResult(raw_result=result)

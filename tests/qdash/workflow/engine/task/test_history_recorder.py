@@ -7,7 +7,7 @@ from qdash.datamodel.execution import ExecutionModel, ExecutionStatusModel
 from qdash.datamodel.system_info import SystemInfoModel
 from qdash.datamodel.task import (
     CalibDataModel,
-    OutputParameterModel,
+    ParameterModel,
     QubitTaskModel,
     TaskStatusModel,
 )
@@ -87,7 +87,7 @@ class TestTaskHistoryRecorder:
     def test_update_chip_with_calib_data_calls_repo(self, recorder, mock_repos):
         """Test update_chip_with_calib_data calls the repository."""
         calib_data = CalibDataModel(
-            qubit={"0": {"qubit_frequency": OutputParameterModel(value=5.0)}},
+            qubit={"0": {"qubit_frequency": ParameterModel(value=5.0)}},
             coupling={},
         )
 
