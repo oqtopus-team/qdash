@@ -144,5 +144,4 @@ class MongoCouplingCalibrationRepository:
             status=doc.status,
             chip_id=doc.chip_id,
             data=doc.data,
-            edge_info=doc.edge_info,
         )

@@ -601,10 +601,6 @@ Define constants at the module level:
 # Test constants
 TEST_DATE = "2024-01-01T00:00:00Z"
 TEST_USERNAME = "test_user"
-DEFAULT_POSITION_X = 0.0
-DEFAULT_POSITION_Y = 0.0
-DEFAULT_COUPLING_SIZE = 1
-DEFAULT_COUPLING_FILL = "#000000"
 ```
 
 ### Helper Functions
@@ -614,32 +610,23 @@ Create helper functions for test data creation:
 ```python
 def create_test_qubit(qid: str, x_180_length: float = 30.0) -> QubitModel:
     """Helper function to create a test qubit."""
-    node_info = NodeInfoModel(position=PositionModel(x=DEFAULT_POSITION_X, y=DEFAULT_POSITION_Y))
     return QubitModel(
         username=TEST_USERNAME,
         chip_id="test_chip",
         status="active",
         qid=qid,
         data={"x_180_length": x_180_length},
-        node_info=node_info,
     )
 
 
-def create_test_coupling(qid: str, source: str, target: str) -> CouplingModel:
+def create_test_coupling(qid: str) -> CouplingModel:
     """Helper function to create a test coupling."""
-    edge_info = EdgeInfoModel(
-        source=source,
-        target=target,
-        size=DEFAULT_COUPLING_SIZE,
-        fill=DEFAULT_COUPLING_FILL,
-    )
     return CouplingModel(
         username=TEST_USERNAME,
         chip_id="test_chip",
         status="active",
         qid=qid,
         data={},
-        edge_info=edge_info,
     )
 ```
 

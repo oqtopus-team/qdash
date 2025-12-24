@@ -111,13 +111,6 @@ class ChipModel(BaseModel):
 Model representing an individual qubit.
 
 ```python
-class PositionModel(BaseModel):
-    x: float  # X coordinate
-    y: float  # Y coordinate
-
-class NodeInfoModel(BaseModel):
-    position: PositionModel  # Display position
-
 class QubitModel(BaseModel):
     project_id: str        # Owning project ID
     username: str | None   # Username
@@ -125,8 +118,6 @@ class QubitModel(BaseModel):
     status: str            # Status ("pending", "completed", etc.)
     chip_id: str | None    # Parent chip ID
     data: dict             # Calibration data
-    best_data: dict        # Best calibration results
-    node_info: NodeInfoModel  # UI display information
 ```
 
 **Example data field structure:**
@@ -153,12 +144,6 @@ class QubitModel(BaseModel):
 Model representing coupling between qubits.
 
 ```python
-class EdgeInfoModel(BaseModel):
-    source: str   # Source node ID
-    target: str   # Target node ID
-    size: int     # Edge size
-    fill: str     # Fill color
-
 class CouplingModel(BaseModel):
     project_id: str        # Owning project ID
     username: str | None   # Username
@@ -166,8 +151,6 @@ class CouplingModel(BaseModel):
     status: str            # Status
     chip_id: str | None    # Chip ID
     data: dict             # Calibration data
-    best_data: dict        # Best calibration results
-    edge_info: EdgeInfoModel  # UI display information
 ```
 
 ---
@@ -410,17 +393,8 @@ class QubitDocument(Document):
     status: str = "pending"
     chip_id: str
     data: dict
-    best_data: dict = {}
-    node_info: NodeInfoModel
     system_info: SystemInfoModel
 ```
-
-**Fidelity Metrics (tracked in best_data):**
-
-- `average_readout_fidelity`
-- `readout_fidelity_0`, `readout_fidelity_1`
-- `x90_gate_fidelity`, `x180_gate_fidelity`
-- `t1`, `t2_echo`, `t2_star`
 
 **Key Methods:**
 
@@ -446,15 +420,8 @@ class CouplingDocument(Document):
     status: str = "pending"
     chip_id: str
     data: dict
-    best_data: dict = {}
-    edge_info: EdgeInfoModel
     system_info: SystemInfoModel
 ```
-
-**Fidelity Metrics (tracked in best_data):**
-
-- `zx90_gate_fidelity`
-- `bell_state_fidelity`
 
 ---
 
@@ -562,8 +529,6 @@ class QubitHistoryDocument(Document):
     status: str
     chip_id: str
     data: dict
-    best_data: dict = {}
-    node_info: NodeInfoModel
     system_info: SystemInfoModel
     recorded_date: str  # YYYYMMDD format
 ```
@@ -609,8 +574,6 @@ class CouplingHistoryDocument(Document):
     status: str
     chip_id: str
     data: dict
-    best_data: dict = {}
-    edge_info: EdgeInfoModel
     system_info: SystemInfoModel
     recorded_date: str  # YYYYMMDD format
 ```
@@ -895,15 +858,6 @@ To avoid MongoDB's 16MB document limit with large qubit counts:
 │  CouplingDocument       │     (persistent storage)
 └─────────────────────────┘
 ```
-
-### Best Data Update Logic
-
-The `best_data` field tracks the best fidelity metrics:
-
-- **Qubit**: `average_readout_fidelity`, `readout_fidelity_0/1`, `x90/x180_gate_fidelity`, `t1`, `t2_echo`, `t2_star`
-- **Coupling**: `zx90_gate_fidelity`, `bell_state_fidelity`
-
-Values are only updated when new calibration results exceed existing values.
 
 ---
 

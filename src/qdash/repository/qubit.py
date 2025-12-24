@@ -142,5 +142,4 @@ class MongoQubitCalibrationRepository:
             status=doc.status,
             chip_id=doc.chip_id,
             data=doc.data,
-            node_info=doc.node_info,
         )
