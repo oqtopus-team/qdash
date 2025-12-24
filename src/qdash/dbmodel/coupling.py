@@ -3,7 +3,7 @@ from typing import Any, ClassVar
 from bunnet import Document
 from pydantic import ConfigDict, Field
 from pymongo import ASCENDING, IndexModel
-from qdash.datamodel.coupling import CouplingModel, EdgeInfoModel
+from qdash.datamodel.coupling import CouplingModel
 from qdash.datamodel.system_info import SystemInfoModel
 from qdash.dbmodel.coupling_history import CouplingHistoryDocument
 
@@ -18,7 +18,6 @@ class CouplingDocument(Document):
         chip_id (str): The chip ID. e.g. "chip1".
         data (dict): The data of the coupling. e.g. {"coupling_strength": 0.1}.
         calibrated_at (str): The time when the coupling was calibrated. e.g. "2021-01-01T00:00:00Z".
-        edge_info (EdgeInfoModel): The edge information. e.g. {"fill": "red", "position": {"x": 0.0, "y": 0.0}}.
         system_info (SystemInfo): The system information. e.g. {"created_at": "2021-01-01T00:00:00Z", "updated_at": "2021-01-01T00:00:00Z"}.
 
     """
@@ -29,10 +28,6 @@ class CouplingDocument(Document):
     status: str = Field("pending", description="The status of the coupling")
     chip_id: str = Field(..., description="The chip ID")
     data: dict[str, Any] = Field(..., description="The data of the coupling")
-    edge_info: EdgeInfoModel | None = Field(
-        default=None, description="The edge information (deprecated)"
-    )
-
     system_info: SystemInfoModel = Field(..., description="The system information")
 
     model_config = ConfigDict(
@@ -88,7 +83,6 @@ class CouplingDocument(Document):
             qid=qid,
             chip_id=chip_id,
             data=coupling_doc.data,
-            edge_info=coupling_doc.edge_info,
             username=username,
         )
         CouplingHistoryDocument.create_history(coupling_model)

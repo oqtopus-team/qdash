@@ -3,7 +3,7 @@ from typing import Any, ClassVar
 from bunnet import Document
 from pydantic import ConfigDict, Field
 from pymongo import ASCENDING, IndexModel
-from qdash.datamodel.qubit import NodeInfoModel, QubitModel
+from qdash.datamodel.qubit import QubitModel
 from qdash.datamodel.system_info import SystemInfoModel
 from qdash.dbmodel.qubit_history import QubitHistoryDocument
 
@@ -28,10 +28,6 @@ class QubitDocument(Document):
     status: str = Field("pending", description="The status of the qubit")
     chip_id: str = Field(..., description="The chip ID")
     data: dict[str, Any] = Field(..., description="The data of the qubit")
-    node_info: NodeInfoModel | None = Field(
-        default=None, description="The node information (deprecated)"
-    )
-
     system_info: SystemInfoModel = Field(..., description="The system information")
 
     model_config = ConfigDict(

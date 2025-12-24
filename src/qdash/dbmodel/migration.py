@@ -12,6 +12,9 @@ Run migrations with:
 
     python -m qdash.dbmodel.migration slim-execution-history          # dry-run
     python -m qdash.dbmodel.migration slim-execution-history --execute  # execute
+
+    python -m qdash.dbmodel.migration remove-node-edge-info          # dry-run
+    python -m qdash.dbmodel.migration remove-node-edge-info --execute  # execute
 """
 
 import logging
@@ -322,6 +325,78 @@ def migrate_slim_execution_history(dry_run: bool = True) -> dict[str, Any]:
     return stats
 
 
+def migrate_remove_node_edge_info(dry_run: bool = True) -> dict[str, int]:
+    """Remove deprecated node_info and edge_info fields from collections.
+
+    These fields were used for UI visualization but are no longer needed:
+    - node_info: Removed from qubit and qubit_history collections
+    - edge_info: Removed from coupling and coupling_history collections
+
+    Args:
+        dry_run: If True, only reports what would be changed.
+
+    Returns:
+        Migration statistics with counts of affected documents.
+    """
+    from qdash.dbmodel.coupling import CouplingDocument
+    from qdash.dbmodel.coupling_history import CouplingHistoryDocument
+    from qdash.dbmodel.qubit import QubitDocument
+    from qdash.dbmodel.qubit_history import QubitHistoryDocument
+
+    stats: dict[str, int] = {
+        "qubit": 0,
+        "qubit_history": 0,
+        "coupling": 0,
+        "coupling_history": 0,
+    }
+
+    # Remove node_info from QubitDocument
+    collection = QubitDocument.get_motor_collection()
+    filter_query: dict[str, Any] = {"node_info": {"$exists": True}}
+    count = collection.count_documents(filter_query)
+    stats["qubit"] = count
+    logger.info(f"Found {count} qubit documents with node_info")
+
+    if not dry_run and count > 0:
+        result = collection.update_many(filter_query, {"$unset": {"node_info": ""}})
+        logger.info(f"Updated {result.modified_count} qubit documents")
+
+    # Remove node_info from QubitHistoryDocument
+    collection = QubitHistoryDocument.get_motor_collection()
+    count = collection.count_documents(filter_query)
+    stats["qubit_history"] = count
+    logger.info(f"Found {count} qubit_history documents with node_info")
+
+    if not dry_run and count > 0:
+        result = collection.update_many(filter_query, {"$unset": {"node_info": ""}})
+        logger.info(f"Updated {result.modified_count} qubit_history documents")
+
+    # Remove edge_info from CouplingDocument
+    collection = CouplingDocument.get_motor_collection()
+    filter_query = {"edge_info": {"$exists": True}}
+    count = collection.count_documents(filter_query)
+    stats["coupling"] = count
+    logger.info(f"Found {count} coupling documents with edge_info")
+
+    if not dry_run and count > 0:
+        result = collection.update_many(filter_query, {"$unset": {"edge_info": ""}})
+        logger.info(f"Updated {result.modified_count} coupling documents")
+
+    # Remove edge_info from CouplingHistoryDocument
+    collection = CouplingHistoryDocument.get_motor_collection()
+    count = collection.count_documents(filter_query)
+    stats["coupling_history"] = count
+    logger.info(f"Found {count} coupling_history documents with edge_info")
+
+    if not dry_run and count > 0:
+        result = collection.update_many(filter_query, {"$unset": {"edge_info": ""}})
+        logger.info(f"Updated {result.modified_count} coupling_history documents")
+
+    prefix = "[DRY RUN] Would update" if dry_run else "Updated"
+    logger.info(f"{prefix} documents: {stats}")
+    return stats
+
+
 def _get_mongo_client() -> MongoClient[Any]:
     """Get MongoDB client for migration."""
     return MongoClient(
@@ -519,6 +594,17 @@ if __name__ == "__main__":
         help="Actually execute the migration (default is dry-run)",
     )
 
+    # remove-node-edge-info migration
+    remove_node_edge_parser = subparsers.add_parser(
+        "remove-node-edge-info",
+        help="Remove deprecated node_info and edge_info fields from qubit/coupling collections",
+    )
+    remove_node_edge_parser.add_argument(
+        "--execute",
+        action="store_true",
+        help="Actually execute the migration (default is dry-run)",
+    )
+
     args = parser.parse_args()
 
     if args.command == "fix-invalid-fidelity":
@@ -545,6 +631,12 @@ if __name__ == "__main__":
 
         initialize()
         stats = migrate_slim_execution_history(dry_run=not args.execute)
+        logger.info(f"Migration complete: {stats}")
+    elif args.command == "remove-node-edge-info":
+        from qdash.dbmodel.initialize import initialize
+
+        initialize()
+        stats = migrate_remove_node_edge_info(dry_run=not args.execute)
         logger.info(f"Migration complete: {stats}")
     else:
         parser.print_help()
