@@ -12,6 +12,11 @@ from qdash.dbmodel.execution_lock import ExecutionLockDocument
 from qdash.dbmodel.flow import FlowDocument
 from qdash.dbmodel.project import ProjectDocument
 from qdash.dbmodel.project_membership import ProjectMembershipDocument
+from qdash.dbmodel.provenance import (
+    ActivityDocument,
+    ParameterVersionDocument,
+    ProvenanceRelationDocument,
+)
 from qdash.dbmodel.qubit import QubitDocument
 from qdash.dbmodel.qubit_history import QubitHistoryDocument
 from qdash.dbmodel.tag import TagDocument
@@ -41,4 +46,8 @@ def document_models() -> list[Any]:
         CouplingHistoryDocument,
         BackendDocument,
         FlowDocument,
+        # Provenance tracking
+        ParameterVersionDocument,
+        ProvenanceRelationDocument,
+        ActivityDocument,
     ]
