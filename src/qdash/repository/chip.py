@@ -8,7 +8,6 @@ import logging
 from typing import Any
 
 from pymongo import DESCENDING
-
 from qdash.datamodel.chip import ChipModel
 from qdash.datamodel.task import CalibDataModel
 from qdash.dbmodel.chip import ChipDocument

@@ -23,7 +23,9 @@ def check_documents() -> None:
     chips = list(ChipDocument.find_all().run())
     logger.info(f"Total chips: {len(chips)}")
     for chip in chips[:5]:
-        logger.info(f"  chip_id={chip.chip_id}, project_id={chip.project_id}, username={chip.username}")
+        logger.info(
+            f"  chip_id={chip.chip_id}, project_id={chip.project_id}, username={chip.username}"
+        )
 
     # Check QubitDocument
     logger.info("")
@@ -45,7 +47,7 @@ def check_documents() -> None:
     # Show sample qubit data
     if qubits:
         sample = qubits[0]
-        logger.info(f"\nSample qubit:")
+        logger.info("\nSample qubit:")
         logger.info(f"  qid={sample.qid}")
         logger.info(f"  project_id={sample.project_id}")
         logger.info(f"  chip_id={sample.chip_id}")
@@ -97,9 +99,16 @@ def check_documents() -> None:
     # Couplings without chips
     couplings_without_chips = coupling_keys - chip_keys
     if couplings_without_chips:
-        logger.warning(f"CouplingDocuments without matching ChipDocument: {couplings_without_chips}")
+        logger.warning(
+            f"CouplingDocuments without matching ChipDocument: {couplings_without_chips}"
+        )
 
-    if not (chips_without_qubits or chips_without_couplings or qubits_without_chips or couplings_without_chips):
+    if not (
+        chips_without_qubits
+        or chips_without_couplings
+        or qubits_without_chips
+        or couplings_without_chips
+    ):
         logger.info("No mismatches found - all documents are consistent.")
 
 
