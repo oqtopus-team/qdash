@@ -34,17 +34,23 @@ class FakeChevronPattern(FakeTask):
     input_parameters: ClassVar[dict[str, ParameterModel]] = {}
 
     run_parameters: ClassVar[dict[str, RunParameterModel]] = {
-        "detuning_range": RunParameterModel(
+        "frequency_range": RunParameterModel(
             unit="GHz",
             value_type="range",
-            value=(-0.05, 0.05, 51),
-            description="Detuning range for chevron pattern",
+            value=(7.82, 7.94, 101),
+            description="Drive frequency range for chevron pattern",
         ),
         "time_range": RunParameterModel(
             unit="ns",
             value_type="range",
-            value=(0, 201, 4),
+            value=(0, 200, 51),
             description="Time range for chevron pattern",
+        ),
+        "control_amplitude": RunParameterModel(
+            unit="a.u.",
+            value_type="float",
+            value=0.5,
+            description="Control pulse amplitude",
         ),
     }
 
@@ -66,34 +72,51 @@ class FakeChevronPattern(FakeTask):
     def run(self, backend: FakeBackend, qid: str) -> RunResult:
         """Simulate running a chevron pattern experiment.
 
-        Generates realistic-looking simulated data with some randomness.
+        Generates realistic-looking simulated data with characteristic V-shape.
         """
         # Base frequency depends on qubit ID for realistic variation
         qid_int = int(qid) if qid.isdigit() else hash(qid) % 64
-        base_qubit_freq = 5.0 + (qid_int % 10) * 0.1  # 5.0-5.9 GHz range
-        base_readout_freq = 7.0 + (qid_int % 10) * 0.05  # 7.0-7.45 GHz range
 
-        # Add some noise to simulate real measurements
-        qubit_frequency = base_qubit_freq + np.random.normal(0, 0.005)
-        readout_frequency = base_readout_freq + np.random.normal(0, 0.002)
+        # Qubit frequency in the 7.84-7.92 GHz range (matches readout freq range)
+        center_freq = 7.86 + (qid_int % 10) * 0.006  # 7.86-7.92 GHz range
+        qubit_frequency = center_freq + np.random.normal(0, 0.001)
 
-        # Generate fake chevron pattern data for visualization
-        detuning = np.linspace(-0.05, 0.05, 51)
-        time = np.arange(0, 201, 4)
-        T, D = np.meshgrid(time, detuning)
+        # Readout frequency slightly above qubit frequency
+        readout_frequency = qubit_frequency + 0.3 + np.random.normal(0, 0.002)
 
-        # Simulate chevron pattern: oscillation that depends on detuning
-        omega = 2 * np.pi * 0.01  # Rabi frequency
-        pattern = 0.5 * (1 - np.cos(omega * T) * np.exp(-np.abs(D) * 50))
-        pattern += np.random.normal(0, 0.02, pattern.shape)  # Add noise
+        # Generate chevron pattern data
+        frequencies = np.linspace(7.82, 7.94, 101)
+        times = np.linspace(0, 200, 51)
+        F, T = np.meshgrid(frequencies, times)
+
+        # Detuning from qubit frequency
+        detuning = F - qubit_frequency
+
+        # Generalized Rabi frequency: sqrt(detuning^2 + Omega^2)
+        omega_drive = 0.025  # Rabi frequency at resonance (GHz)
+        omega_gen = np.sqrt(detuning**2 + omega_drive**2)
+
+        # Chevron pattern: Rabi oscillations that spread out with detuning
+        # Signal oscillates faster off-resonance (V-shape in time vs frequency)
+        # The pattern shows cos oscillation with envelope decay
+        decay_rate = 0.005  # Decay per ns
+        oscillation = np.cos(2 * np.pi * omega_gen * T)
+        envelope = np.exp(-decay_rate * T)
+
+        # Pattern ranges from -1 to 1 like in the sample image
+        pattern = oscillation * envelope
+
+        # Add realistic noise
+        pattern += np.random.normal(0, 0.05, pattern.shape)
+        pattern = np.clip(pattern, -1, 1)
 
         return RunResult(
             raw_result={
                 "qubit_frequency": qubit_frequency,
                 "readout_frequency": readout_frequency,
                 "pattern": pattern,
-                "detuning": detuning,
-                "time": time,
+                "frequencies": frequencies,
+                "times": times,
             }
         )
 
@@ -105,23 +128,38 @@ class FakeChevronPattern(FakeTask):
 
         # Set output parameter values
         self.output_parameters["qubit_frequency"].value = result["qubit_frequency"]
+        self.output_parameters["qubit_frequency"].error = 0.001
         self.output_parameters["readout_frequency"].value = result["readout_frequency"]
+        self.output_parameters["readout_frequency"].error = 0.002
 
         output_parameters = self.attach_execution_id(execution_id)
 
-        # Generate a figure
+        # Generate a figure matching the sample image format
+        # X-axis: Drive frequency (GHz), Y-axis: Time (ns)
         fig = go.Figure(
             data=go.Heatmap(
-                z=result["pattern"],
-                x=result["time"],
-                y=result["detuning"] * 1000,  # Convert to MHz
-                colorscale="RdBu",
+                z=result["pattern"],  # Shape: (times, frequencies)
+                x=result["frequencies"],
+                y=result["times"],
+                colorscale="Viridis",
+                zmin=-1,
+                zmax=1,
+                colorbar={
+                    "title": "",
+                    "tickvals": [-1, -0.5, 0, 0.5, 1],
+                },
             )
         )
         fig.update_layout(
-            title=f"Chevron Pattern - {qid}",
-            xaxis_title="Time (ns)",
-            yaxis_title="Detuning (MHz)",
+            title={
+                "text": f"Chevron pattern : Q{qid}<br><sub>control_amplitude=</sub>",
+                "x": 0.5,
+                "xanchor": "center",
+            },
+            xaxis_title="Drive frequency (GHz)",
+            yaxis_title="Time (ns)",
+            width=600,
+            height=500,
         )
 
         return PostProcessResult(

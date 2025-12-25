@@ -145,8 +145,9 @@ export function ExecutionComparisonPanel() {
             </div>
           ) : recentExecutions.length < 2 ? (
             <div className="text-sm text-base-content/60 py-4">
-              At least 2 executions are needed for comparison. Run more
-              calibration workflows to enable this feature.
+              {recentExecutions.length === 0
+                ? "No executions found. Run a calibration workflow to create provenance data."
+                : "Only 1 execution found. Run another calibration workflow to enable comparison."}
             </div>
           ) : (
             <div className="flex flex-col md:flex-row gap-4 items-end">
