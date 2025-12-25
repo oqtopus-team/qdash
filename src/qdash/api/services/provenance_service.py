@@ -17,10 +17,12 @@ from qdash.api.schemas.provenance import (
     LineageEdgeResponse,
     LineageNodeResponse,
     LineageResponse,
+    ParameterChangeResponse,
     ParameterDiffResponse,
     ParameterHistoryResponse,
     ParameterVersionResponse,
     ProvenanceStatsResponse,
+    RecentChangesResponse,
 )
 
 if TYPE_CHECKING:
@@ -386,6 +388,105 @@ class ProvenanceService:
             recent_entities=recent_entities,
         )
 
+    def get_recent_changes(
+        self,
+        project_id: str,
+        limit: int = 20,
+        within_hours: int = 24,
+        parameter_names: list[str] | None = None,
+    ) -> RecentChangesResponse:
+        """Get recent parameter changes with delta from previous versions.
+
+        Parameters
+        ----------
+        project_id : str
+            Project identifier
+        limit : int
+            Maximum number of changes to return
+        within_hours : int
+            Time window in hours (default: 24)
+        parameter_names : list[str] | None
+            Filter by parameter names (e.g., from metrics.yaml config)
+
+        Returns
+        -------
+        RecentChangesResponse
+            Recent changes with delta information
+
+        """
+        try:
+            # Get recent parameter versions (version > 1 means there was a change)
+            # Fetch more if filtering by parameter names
+            fetch_limit = limit * 5 if parameter_names else limit * 2
+            recent_docs = self.parameter_version_repo.get_recent(
+                project_id, limit=fetch_limit
+            )
+
+            changes: list[ParameterChangeResponse] = []
+
+            for doc in recent_docs:
+                if len(changes) >= limit:
+                    break
+
+                # Filter by parameter names if specified
+                if parameter_names and doc.parameter_name not in parameter_names:
+                    continue
+
+                # Skip version 1 (first version has no previous)
+                current_version = getattr(doc, "version", 1)
+                if current_version <= 1:
+                    continue
+
+                # Get previous version
+                previous = self.parameter_version_repo.get_version(
+                    project_id=project_id,
+                    parameter_name=doc.parameter_name,
+                    qid=doc.qid,
+                    version=current_version - 1,
+                )
+
+                current_value = getattr(doc, "value", None)
+                previous_value = getattr(previous, "value", None) if previous else None
+
+                # Calculate delta
+                delta = None
+                delta_percent = None
+                if (
+                    current_value is not None
+                    and previous_value is not None
+                    and isinstance(current_value, (int, float))
+                    and isinstance(previous_value, (int, float))
+                ):
+                    delta = float(current_value) - float(previous_value)
+                    if previous_value != 0:
+                        delta_percent = (delta / float(previous_value)) * 100
+
+                changes.append(
+                    ParameterChangeResponse(
+                        entity_id=doc.entity_id,
+                        parameter_name=doc.parameter_name,
+                        qid=doc.qid,
+                        value=current_value,
+                        previous_value=previous_value,
+                        unit=getattr(doc, "unit", ""),
+                        delta=delta,
+                        delta_percent=delta_percent,
+                        version=current_version,
+                        valid_from=getattr(doc, "valid_from", None),
+                        task_name=getattr(doc, "task_name", ""),
+                        execution_id=getattr(doc, "execution_id", ""),
+                    )
+                )
+
+            return RecentChangesResponse(
+                changes=changes,
+                total_count=len(changes),
+            )
+
+        except Exception as e:
+            logger.warning(f"Failed to get recent changes: {e}")
+            return RecentChangesResponse(changes=[], total_count=0)
+
     def get_entity(
         self,
         project_id: str,
@@ -473,7 +574,7 @@ class ProvenanceService:
         return ActivityResponse(
             activity_id=item.get("id", ""),
             execution_id="",
-            task_id="",
+            task_id=metadata.get("task_id", ""),
             task_name=metadata.get("task_name", ""),
             task_type="",
             qid=metadata.get("qid", ""),

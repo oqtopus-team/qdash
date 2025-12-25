@@ -18,7 +18,11 @@ export function ExecutionComparisonPanel() {
   const [executionAfter, setExecutionAfter] = useState("");
   const [isComparing, setIsComparing] = useState(false);
 
-  const { data: response, isLoading, error } = useCompareExecutions(
+  const {
+    data: response,
+    isLoading,
+    error,
+  } = useCompareExecutions(
     {
       execution_id_before: executionBefore,
       execution_id_after: executionAfter,
@@ -196,7 +200,9 @@ export function ExecutionComparisonPanel() {
                     <tbody>
                       {data.changed_parameters.map((param, index) => (
                         <tr key={index}>
-                          <td className="font-medium">{param.parameter_name}</td>
+                          <td className="font-medium">
+                            {param.parameter_name}
+                          </td>
                           <td>{param.qid}</td>
                           <td className="font-mono">
                             {formatValue(param.value_before)}
@@ -206,21 +212,22 @@ export function ExecutionComparisonPanel() {
                           </td>
                           <td>
                             <div className="flex items-center gap-1">
-                              {param.delta !== null && param.delta !== undefined && (
-                                <>
-                                  {param.delta > 0 ? (
-                                    <TrendingUp className="h-4 w-4 text-success" />
-                                  ) : (
-                                    <TrendingDown className="h-4 w-4 text-error" />
-                                  )}
-                                  <span
-                                    className={`font-mono text-sm ${param.delta > 0 ? "text-success" : "text-error"}`}
-                                  >
-                                    {formatDelta(param.delta)}{" "}
-                                    {formatDeltaPercent(param.delta_percent)}
-                                  </span>
-                                </>
-                              )}
+                              {param.delta !== null &&
+                                param.delta !== undefined && (
+                                  <>
+                                    {param.delta > 0 ? (
+                                      <TrendingUp className="h-4 w-4 text-success" />
+                                    ) : (
+                                      <TrendingDown className="h-4 w-4 text-error" />
+                                    )}
+                                    <span
+                                      className={`font-mono text-sm ${param.delta > 0 ? "text-success" : "text-error"}`}
+                                    >
+                                      {formatDelta(param.delta)}{" "}
+                                      {formatDeltaPercent(param.delta_percent)}
+                                    </span>
+                                  </>
+                                )}
                             </div>
                           </td>
                         </tr>
@@ -252,7 +259,9 @@ export function ExecutionComparisonPanel() {
                     <tbody>
                       {data.added_parameters.map((param, index) => (
                         <tr key={index}>
-                          <td className="font-medium">{param.parameter_name}</td>
+                          <td className="font-medium">
+                            {param.parameter_name}
+                          </td>
                           <td>{param.qid}</td>
                           <td className="font-mono">
                             {formatValue(param.value_after)}
@@ -286,7 +295,9 @@ export function ExecutionComparisonPanel() {
                     <tbody>
                       {data.removed_parameters.map((param, index) => (
                         <tr key={index}>
-                          <td className="font-medium">{param.parameter_name}</td>
+                          <td className="font-medium">
+                            {param.parameter_name}
+                          </td>
                           <td>{param.qid}</td>
                           <td className="font-mono">
                             {formatValue(param.value_before)}

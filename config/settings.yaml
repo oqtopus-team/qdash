@@ -5,6 +5,29 @@
 # in source code. To customize host-side paths, use .env and docker-compose.yaml.
 
 # =============================================================================
+# Backend Configuration
+# =============================================================================
+# QDash supports two backend types:
+#   - qubex: Production backend using real quantum hardware via qubex library
+#   - fake: Testing backend with simulated measurements (no hardware required)
+#
+# Both backends use IDENTICAL task names, enabling seamless switching:
+#   task_names = ["ChevronPattern", "CheckRabi", "CheckT1"]
+#
+#   # For testing without hardware
+#   config = CalibConfig(backend_name="fake", ...)
+#
+#   # For production with real hardware
+#   config = CalibConfig(backend_name="qubex", ...)
+#
+# Fake backend available tasks (same names as qubex):
+#   - ChevronPattern: Entry point, outputs qubit_frequency, readout_frequency
+#   - CheckRabi: Rabi oscillation measurement
+#   - CheckT1: T1 relaxation time measurement
+#   - CheckT2Echo: T2 echo (Hahn echo) measurement
+#   - RandomizedBenchmarking: Gate fidelity measurement
+
+# =============================================================================
 # UI Settings
 # =============================================================================
 ui:

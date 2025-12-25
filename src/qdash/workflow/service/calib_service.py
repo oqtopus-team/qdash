@@ -27,6 +27,7 @@ Example:
 
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 from pathlib import Path
@@ -47,6 +48,7 @@ if TYPE_CHECKING:
     from qdash.workflow.service.targets import Target
 
 from prefect import get_run_logger
+from qdash.common.backend_config import get_default_backend
 from qdash.common.datetime_utils import now
 
 logger = logging.getLogger(__name__)
@@ -133,7 +135,7 @@ class CalibService:
         chip_id: str,
         qids: list[str] | None = None,
         execution_id: str | None = None,
-        backend_name: str = "qubex",
+        backend_name: str | None = None,
         name: str | None = None,
         flow_name: str | None = None,
         tags: list[str] | None = None,
@@ -172,7 +174,7 @@ class CalibService:
             qids: List of qubit IDs to calibrate. If None, session is lazily initialized.
             execution_id: Unique execution identifier (e.g., "20240101-001").
                 If None, auto-generates using current date and counter.
-            backend_name: Backend type, either 'qubex' or 'fake' (default: 'qubex')
+            backend_name: Backend type, either 'qubex' or 'fake' (default: from backend.yaml)
             name: Human-readable name for the execution (deprecated, use flow_name)
             flow_name: Flow name for display in execution list (auto-injected by API)
             tags: List of tags for categorization
@@ -196,7 +198,7 @@ class CalibService:
         self.chip_id = chip_id
         self.qids = qids
         self.muxes = muxes
-        self.backend_name = backend_name
+        self.backend_name = backend_name or get_default_backend()
         self.use_lock = use_lock
         self._lock_acquired = False
 
@@ -745,28 +747,53 @@ class CalibService:
         Returns:
             Dictionary with typed results from each step
         """
+        from qdash.workflow.service.session_context import (
+            clear_current_session,
+            set_current_session,
+        )
         from qdash.workflow.service.steps import Pipeline, StepContext
 
         logger = get_run_logger()
 
-        # Validate pipeline dependencies
-        pipeline = Pipeline(steps)
-        logger.info(f"Starting calibration pipeline with {len(pipeline)} steps")
+        # Set this CalibService as the current session for task execution
+        set_current_session(self)
 
-        # Initialize context
-        ctx = StepContext()
-        ctx.candidate_qids = targets.to_qids(self.chip_id)
+        try:
+            # Initialize session if not already initialized
+            qids = targets.to_qids(self.chip_id)
+            if not self._initialized:
+                self._initialize(qids)
 
-        # Execute steps sequentially
-        for i, step in enumerate(pipeline):
-            logger.info(f"Step {i + 1}/{len(pipeline)}: {step.name}")
-            try:
-                ctx = step.execute(self, targets, ctx)
-            except Exception as e:
-                logger.error(f"Step {step.name} failed: {e}")
-                raise
+            # Validate pipeline dependencies
+            pipeline = Pipeline(steps)
+            logger.info(f"Starting calibration pipeline with {len(pipeline)} steps")
 
-        logger.info("Pipeline completed successfully")
+            # Initialize context
+            ctx = StepContext()
+            ctx.candidate_qids = qids
+
+            # Execute steps sequentially
+            for i, step in enumerate(pipeline):
+                logger.info(f"Step {i + 1}/{len(pipeline)}: {step.name}")
+                try:
+                    ctx = step.execute(self, targets, ctx)
+                except Exception as e:
+                    logger.error(f"Step {step.name} failed: {e}")
+                    raise
+
+            logger.info("Pipeline completed successfully")
+
+            # Finalize execution (mark as completed, update chip history)
+            self.finish_calibration()
+        except Exception:
+            # Mark execution as failed on error (best effort)
+            if self.execution_service is not None:
+                with contextlib.suppress(Exception):
+                    self.execution_service.reload().fail_execution()
+            raise
+        finally:
+            # Clear session when done
+            clear_current_session()
 
         # Build results from typed context fields
         results: dict[str, Any] = {

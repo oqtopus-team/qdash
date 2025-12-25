@@ -1,0 +1,167 @@
+# Backend Configuration
+# =====================
+# This file defines available backends and their tasks.
+#
+# Tasks not listed here will NOT be shown in the UI or available
+# for workflow execution, even if the code exists in the codebase.
+#
+# Use this to:
+#   - Control which tasks are exposed to users per backend
+#   - Hide experimental or deprecated tasks
+
+# =============================================================================
+# Default Backend
+# =============================================================================
+default_backend: qubex
+
+# =============================================================================
+# Backend Definitions
+# =============================================================================
+backends:
+  # ---------------------------------------------------------------------------
+  # Qubex Backend (Production - Real Quantum Hardware)
+  # ---------------------------------------------------------------------------
+  qubex:
+    description: "Production backend using qubex library with real quantum hardware"
+
+    # Tasks available for this backend (shown in UI and available for workflows)
+    # Tasks are grouped by calibration phase for clarity
+    tasks:
+      # Box Setup
+      - Configure
+      - LinkUp
+      - CheckStatus
+      - CheckNoise
+      - DumpBox
+      - ReadoutConfigure
+
+      # System Level
+      - CheckSkew
+
+      # CW (Continuous Wave) Measurements
+      - CheckReflectionCoefficient
+      - CheckResonatorSpectroscopy
+      - CheckResonatorFrequencies
+      - CheckQubitSpectroscopy
+      - CheckQubitFrequencies
+      - CheckReadoutAmplitude
+      - CheckElectricalDelay
+
+      # One Qubit Coarse Calibration
+      - ChevronPattern
+      - CheckQubit
+      - CheckQubitFrequency
+      - CheckReadoutFrequency
+      - CheckDispersiveShift
+      - CheckOptimalReadoutAmplitude
+      - RabiOscillation
+      - CheckRabi
+      - CreateHPIPulse
+      - CheckHPIPulse
+      - CreatePIPulse
+      - CheckPIPulse
+      - CheckRamsey
+      - CheckT1
+      - CheckT2Echo
+
+      # One Qubit Fine Calibration
+      - CreateDRAGHPIPulse
+      - CheckDRAGHPIPulse
+      - CreateDRAGPIPulse
+      - CheckDRAGPIPulse
+
+      # Measurement
+      - ReadoutClassification
+
+      # Two Qubit Calibration
+      - CheckCrossResonance
+      - CreateZX90
+      - CheckZX90
+      - CheckBellState
+      - CheckBellStateTomography
+
+      # Benchmarking
+      - RandomizedBenchmarking
+      - X90InterleavedRandomizedBenchmarking
+      - X180InterleavedRandomizedBenchmarking
+      - ZX90InterleavedRandomizedBenchmarking
+
+  # ---------------------------------------------------------------------------
+  # Fake Backend (Testing - No Hardware Required)
+  # ---------------------------------------------------------------------------
+  fake:
+    description: "Testing backend with simulated measurements (no hardware required)"
+
+    # Fake backend tasks mirror qubex task names for seamless switching
+    tasks:
+      # Core calibration flow (with provenance dependencies)
+      - ChevronPattern          # Entry point: outputs qubit_frequency, readout_frequency
+      - CheckRamsey             # Depends on: qubit_frequency -> outputs refined qubit_frequency, t2_star
+      - CheckRabi               # Depends on: qubit_frequency
+      - CheckT1                 # Depends on: qubit_frequency
+      - CheckT2Echo             # Depends on: qubit_frequency
+      - RandomizedBenchmarking  # Depends on: qubit_frequency, rabi_amplitude, t1, t2_echo
+
+# =============================================================================
+# Task Categories (for UI grouping)
+# =============================================================================
+# Optional: Define how tasks are grouped in the UI
+categories:
+  "Box Setup":
+    - Configure
+    - LinkUp
+    - CheckStatus
+    - CheckNoise
+    - DumpBox
+    - ReadoutConfigure
+
+  "System":
+    - CheckSkew
+
+  "CW Measurements":
+    - CheckReflectionCoefficient
+    - CheckResonatorSpectroscopy
+    - CheckResonatorFrequencies
+    - CheckQubitSpectroscopy
+    - CheckQubitFrequencies
+    - CheckReadoutAmplitude
+    - CheckElectricalDelay
+
+  "1Q Coarse":
+    - ChevronPattern
+    - CheckQubit
+    - CheckQubitFrequency
+    - CheckReadoutFrequency
+    - CheckDispersiveShift
+    - CheckOptimalReadoutAmplitude
+    - RabiOscillation
+    - CheckRabi
+    - CreateHPIPulse
+    - CheckHPIPulse
+    - CreatePIPulse
+    - CheckPIPulse
+    - CheckRamsey
+    - CheckT1
+    - CheckT2Echo
+
+  "1Q Fine":
+    - CreateDRAGHPIPulse
+    - CheckDRAGHPIPulse
+    - CreateDRAGPIPulse
+    - CheckDRAGPIPulse
+
+  "Measurement":
+    - ReadoutClassification
+
+  "2Q Calibration":
+    - CheckCrossResonance
+    - CreateZX90
+    - CheckZX90
+    - CheckBellState
+    - CheckBellStateTomography
+
+  "Benchmarking":
+    - RandomizedBenchmarking
+    - X90InterleavedRandomizedBenchmarking
+    - X180InterleavedRandomizedBenchmarking
+    - ZX90InterleavedRandomizedBenchmarking

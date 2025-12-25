@@ -624,31 +624,17 @@ class TaskExecutor:
             # 6. Complete task
             self._complete_task(task_name, task_type, qid, f"{task_name} is completed")
 
-            # Record completion to history
-            executed_task = self.state_manager.get_task(task_name, task_type, qid)
-            self.history_recorder.record_task_result(
-                executed_task, execution_service.to_datamodel()
-            )
-
             execution_service = self._update_execution(execution_service)
             result.success = True
             result.message = "Completed"
 
         except (R2ValidationError, FidelityValidationError, ValueError) as e:
             self._fail_task(task_name, task_type, qid, str(e))
-            executed_task = self.state_manager.get_task(task_name, task_type, qid)
-            self.history_recorder.record_task_result(
-                executed_task, execution_service.to_datamodel()
-            )
             result.message = str(e)
             raise
 
         except Exception as e:
             self._fail_task(task_name, task_type, qid, str(e))
-            executed_task = self.state_manager.get_task(task_name, task_type, qid)
-            self.history_recorder.record_task_result(
-                executed_task, execution_service.to_datamodel()
-            )
             result.message = str(e)
             raise TaskExecutionError(f"Task {task_name} failed: {e}") from e
 

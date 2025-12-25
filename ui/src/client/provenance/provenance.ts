@@ -24,12 +24,14 @@ import type {
   GetParameterHistoryParams,
   GetProvenanceImpactParams,
   GetProvenanceLineageParams,
+  GetRecentChangesParams,
   HTTPValidationError,
   ImpactResponse,
   LineageResponse,
   ParameterHistoryResponse,
   ParameterVersionResponse,
   ProvenanceStatsResponse,
+  RecentChangesResponse,
 } from "../../schemas";
 
 import { customInstance } from "../../lib/custom-instance";
@@ -1128,6 +1130,187 @@ export function useGetProvenanceStats<
   queryClient?: QueryClient,
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
   const queryOptions = getGetProvenanceStatsQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Get recent parameter changes with delta from previous versions.
+
+Returns parameter changes that have a previous version, showing
+the delta (difference) from the previous value.
+
+Parameters
+----------
+ctx : ProjectContext
+    Project context with user and project information
+service : ProvenanceService
+    Provenance service instance
+limit : int
+    Maximum number of changes to return (1-50)
+within_hours : int
+    Time window in hours (1-168, default: 24)
+parameter_names : list[str] | None
+    Filter by parameter names (e.g., from metrics.yaml config)
+
+Returns
+-------
+RecentChangesResponse
+    List of recent parameter changes with delta information
+ * @summary Get recent parameter changes with delta
+ */
+export const getRecentChanges = (
+  params?: GetRecentChangesParams,
+  options?: SecondParameter<typeof customInstance>,
+  signal?: AbortSignal,
+) => {
+  return customInstance<RecentChangesResponse>(
+    { url: `/provenance/changes`, method: "GET", params, signal },
+    options,
+  );
+};
+
+export const getGetRecentChangesQueryKey = (
+  params?: GetRecentChangesParams,
+) => {
+  return [`/provenance/changes`, ...(params ? [params] : [])] as const;
+};
+
+export const getGetRecentChangesQueryOptions = <
+  TData = Awaited<ReturnType<typeof getRecentChanges>>,
+  TError = HTTPValidationError,
+>(
+  params?: GetRecentChangesParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof getRecentChanges>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetRecentChangesQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getRecentChanges>>
+  > = ({ signal }) => getRecentChanges(params, requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getRecentChanges>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData> };
+};
+
+export type GetRecentChangesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getRecentChanges>>
+>;
+export type GetRecentChangesQueryError = HTTPValidationError;
+
+export function useGetRecentChanges<
+  TData = Awaited<ReturnType<typeof getRecentChanges>>,
+  TError = HTTPValidationError,
+>(
+  params: undefined | GetRecentChangesParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof getRecentChanges>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getRecentChanges>>,
+          TError,
+          Awaited<ReturnType<typeof getRecentChanges>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData>;
+};
+export function useGetRecentChanges<
+  TData = Awaited<ReturnType<typeof getRecentChanges>>,
+  TError = HTTPValidationError,
+>(
+  params?: GetRecentChangesParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof getRecentChanges>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getRecentChanges>>,
+          TError,
+          Awaited<ReturnType<typeof getRecentChanges>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+export function useGetRecentChanges<
+  TData = Awaited<ReturnType<typeof getRecentChanges>>,
+  TError = HTTPValidationError,
+>(
+  params?: GetRecentChangesParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof getRecentChanges>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+/**
+ * @summary Get recent parameter changes with delta
+ */
+
+export function useGetRecentChanges<
+  TData = Awaited<ReturnType<typeof getRecentChanges>>,
+  TError = HTTPValidationError,
+>(
+  params?: GetRecentChangesParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof getRecentChanges>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+  const queryOptions = getGetRecentChangesQueryOptions(params, options);
 
   const query = useQuery(queryOptions, queryClient) as UseQueryResult<
     TData,

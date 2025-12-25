@@ -57,9 +57,26 @@ class TaskInfo(BaseModel):
     task_type: str | None = None
     description: str | None = None
     file_path: str
+    category: str | None = None  # From backend.yaml categories
+    enabled: bool = True  # Whether task is in enabled_tasks list
 
 
 class ListTaskInfoResponse(BaseModel):
     """Response model for listing task info."""
 
     tasks: list[TaskInfo]
+
+
+class BackendDefinitionResponse(BaseModel):
+    """Backend definition from configuration."""
+
+    description: str = ""
+    tasks: list[str] = []
+
+
+class BackendConfigResponse(BaseModel):
+    """Response model for backend configuration."""
+
+    default_backend: str = "qubex"
+    backends: dict[str, BackendDefinitionResponse] = {}
+    categories: dict[str, list[str]] = {}

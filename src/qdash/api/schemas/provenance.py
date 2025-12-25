@@ -342,3 +342,67 @@ class ProvenanceStatsResponse(BaseModel):
     recent_entities: list[ParameterVersionResponse] = Field(
         default_factory=list, description="Recent entities"
     )
+
+
+class ParameterChangeResponse(BaseModel):
+    """Response model for a parameter change (with delta from previous version).
+
+    Attributes
+    ----------
+    entity_id : str
+        Unique identifier for this parameter version
+    parameter_name : str
+        Name of the parameter
+    qid : str
+        Qubit or coupling identifier
+    value : float | int | str
+        Current value
+    previous_value : float | int | str | None
+        Previous value (None if first version)
+    unit : str
+        Physical unit
+    delta : float | None
+        Numeric difference (value - previous_value)
+    delta_percent : float | None
+        Percentage change ((value - previous) / previous * 100)
+    version : int
+        Version number
+    valid_from : datetime | None
+        When this version became valid
+    task_name : str
+        Name of the task that produced this value
+    execution_id : str
+        Execution that produced this value
+
+    """
+
+    entity_id: str
+    parameter_name: str
+    qid: str = ""
+    value: float | int | str
+    previous_value: float | int | str | None = None
+    unit: str = ""
+    delta: float | None = None
+    delta_percent: float | None = None
+    version: int
+    valid_from: datetime | None = None
+    task_name: str = ""
+    execution_id: str = ""
+
+
+class RecentChangesResponse(BaseModel):
+    """Response model for recent parameter changes.
+
+    Attributes
+    ----------
+    changes : list[ParameterChangeResponse]
+        List of recent parameter changes with delta
+    total_count : int
+        Total number of changes in the time window
+
+    """
+
+    changes: list[ParameterChangeResponse] = Field(
+        default_factory=list, description="Recent parameter changes"
+    )
+    total_count: int = Field(0, description="Total changes in time window")

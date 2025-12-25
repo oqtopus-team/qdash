@@ -158,6 +158,22 @@ qubit_metrics:
       max: 0.1
       step: 0.001
 
+  hpi_amplitude:
+    title: HPI Amplitude
+    unit: a.u.
+    scale: 1
+    description: Half-pi pulse amplitude for qubit control
+    evaluation:
+      mode: none
+
+  hpi_length:
+    title: HPI Length
+    unit: ns
+    scale: 1
+    description: Half-pi pulse duration
+    evaluation:
+      mode: none
+
 coupling_metrics:
   zx90_gate_fidelity:
     title: ZX90 Gate Fidelity

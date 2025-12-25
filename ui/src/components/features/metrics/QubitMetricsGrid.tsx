@@ -1,6 +1,9 @@
 "use client";
 
 import React, { useMemo, useState, useRef, useLayoutEffect } from "react";
+import Link from "next/link";
+
+import { GitBranch } from "lucide-react";
 
 import { RegionZoomToggle } from "@/components/ui/RegionZoomToggle";
 import { useGridLayout } from "@/hooks/useGridLayout";
@@ -312,7 +315,7 @@ export function QubitMetricsGrid({
                 ([, pos]) => pos.row === actualRow && pos.col === actualCol,
               );
               if (foundEntry) {
-                qid = `Q${foundEntry[0].padStart(2, "0")}`;
+                qid = foundEntry[0];
               }
             } else {
               // Fallback: try to find from metricData or compute
@@ -324,7 +327,7 @@ export function QubitMetricsGrid({
               if (!qid) {
                 const expectedQid = actualRow * gridSize + actualCol;
                 if (expectedQid < gridSize * gridSize) {
-                  qid = `Q${expectedQid.toString().padStart(2, "0")}`;
+                  qid = String(expectedQid);
                 }
               }
             }
@@ -573,19 +576,28 @@ export function QubitMetricsGrid({
               </div>
 
               {/* Modal Footer */}
-              <div className="px-4 sm:px-6 py-3 sm:py-4 border-t border-base-300 flex justify-end gap-2">
-                <button
-                  onClick={() => setSelectedQubitInfo(null)}
-                  className="btn btn-ghost btn-sm sm:btn-md"
+              <div className="px-4 sm:px-6 py-3 sm:py-4 border-t border-base-300 flex justify-between items-center">
+                <Link
+                  href={`/provenance?parameter=${encodeURIComponent(metricKey)}&qid=${encodeURIComponent(selectedQubitInfo.qid)}&tab=lineage`}
+                  className="btn btn-ghost btn-sm sm:btn-md gap-1"
                 >
-                  Close
-                </button>
-                <a
-                  href={`/chip/${chipId}/qubit/${selectedQubitInfo.qid}`}
-                  className="btn btn-primary btn-sm sm:btn-md"
-                >
-                  Details
-                </a>
+                  <GitBranch className="h-4 w-4" />
+                  <span className="hidden sm:inline">Lineage</span>
+                </Link>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setSelectedQubitInfo(null)}
+                    className="btn btn-ghost btn-sm sm:btn-md"
+                  >
+                    Close
+                  </button>
+                  <a
+                    href={`/chip/${chipId}/qubit/${selectedQubitInfo.qid}`}
+                    className="btn btn-primary btn-sm sm:btn-md"
+                  >
+                    Details
+                  </a>
+                </div>
               </div>
             </>
           )}

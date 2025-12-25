@@ -21,6 +21,7 @@ from qdash.api.schemas.provenance import (
     ParameterHistoryResponse,
     ParameterVersionResponse,
     ProvenanceStatsResponse,
+    RecentChangesResponse,
 )
 from qdash.api.services.provenance_service import ProvenanceService
 from qdash.repository.provenance import (
@@ -308,3 +309,57 @@ def get_stats(
 
     """
     return service.get_stats(ctx.project_id)
+
+
+@router.get(
+    "/changes",
+    response_model=RecentChangesResponse,
+    summary="Get recent parameter changes with delta",
+    operation_id="getRecentChanges",
+)
+def get_recent_changes(
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    service: Annotated[ProvenanceService, Depends(get_provenance_service)],
+    limit: Annotated[
+        int,
+        Query(description="Maximum number of changes to return", ge=1, le=50),
+    ] = 20,
+    within_hours: Annotated[
+        int,
+        Query(description="Time window in hours", ge=1, le=168),
+    ] = 24,
+    parameter_names: Annotated[
+        list[str] | None,
+        Query(description="Filter by parameter names (from metrics config)"),
+    ] = None,
+) -> RecentChangesResponse:
+    """Get recent parameter changes with delta from previous versions.
+
+    Returns parameter changes that have a previous version, showing
+    the delta (difference) from the previous value.
+
+    Parameters
+    ----------
+    ctx : ProjectContext
+        Project context with user and project information
+    service : ProvenanceService
+        Provenance service instance
+    limit : int
+        Maximum number of changes to return (1-50)
+    within_hours : int
+        Time window in hours (1-168, default: 24)
+    parameter_names : list[str] | None
+        Filter by parameter names (e.g., from metrics.yaml config)
+
+    Returns
+    -------
+    RecentChangesResponse
+        List of recent parameter changes with delta information
+
+    """
+    return service.get_recent_changes(
+        project_id=ctx.project_id,
+        limit=limit,
+        within_hours=within_hours,
+        parameter_names=parameter_names,
+    )

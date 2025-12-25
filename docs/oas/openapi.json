@@ -3297,13 +3297,40 @@
         }
       }
     },
+    "/task-files/backend-config": {
+      "get": {
+        "tags": [
+          "task-file"
+        ],
+        "summary": "Get backend configuration",
+        "description": "Get backend configuration from backend.yaml.\n\nReturns backend definitions, tasks, and categories.\n\nReturns\n-------\n    Backend configuration",
+        "operationId": "getBackendConfig",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BackendConfigResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/task-files/tasks": {
       "get": {
         "tags": [
           "task-file"
         ],
         "summary": "List all tasks in a backend",
-        "description": "List all task definitions found in a backend directory.\n\nParses Python files to extract task names, types, and descriptions.\nResults are cached and invalidated when files are modified.\n\nArgs:\n----\n    backend: Backend name (e.g., \"qubex\", \"fake\")\n    sort_order: Sort order for tasks (\"type_then_name\", \"name_only\", \"file_path\")\n\nReturns:\n-------\n    List of task information",
+        "description": "List all task definitions found in a backend directory.\n\nParses Python files to extract task names, types, and descriptions.\nResults are cached and invalidated when files are modified.\n\nArgs:\n----\n    backend: Backend name (e.g., \"qubex\", \"fake\")\n    sort_order: Sort order for tasks (\"type_then_name\", \"name_only\", \"file_path\")\n    enabled_only: If True, only return tasks that are enabled in backend.yaml\n\nReturns:\n-------\n    List of task information",
         "operationId": "listTaskInfo",
         "security": [
           {
@@ -3334,6 +3361,16 @@
                 }
               ],
               "title": "Sort Order"
+            }
+          },
+          {
+            "name": "enabled_only",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Enabled Only"
             }
           }
         ],
@@ -6172,6 +6209,110 @@
           }
         }
       }
+    },
+    "/provenance/changes": {
+      "get": {
+        "tags": [
+          "provenance"
+        ],
+        "summary": "Get recent parameter changes with delta",
+        "description": "Get recent parameter changes with delta from previous versions.\n\nReturns parameter changes that have a previous version, showing\nthe delta (difference) from the previous value.\n\nParameters\n----------\nctx : ProjectContext\n    Project context with user and project information\nservice : ProvenanceService\n    Provenance service instance\nlimit : int\n    Maximum number of changes to return (1-50)\nwithin_hours : int\n    Time window in hours (1-168, default: 24)\nparameter_names : list[str] | None\n    Filter by parameter names (e.g., from metrics.yaml config)\n\nReturns\n-------\nRecentChangesResponse\n    List of recent parameter changes with delta information",
+        "operationId": "getRecentChanges",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 50,
+              "minimum": 1,
+              "description": "Maximum number of changes to return",
+              "default": 20,
+              "title": "Limit"
+            },
+            "description": "Maximum number of changes to return"
+          },
+          {
+            "name": "within_hours",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 168,
+              "minimum": 1,
+              "description": "Time window in hours",
+              "default": 24,
+              "title": "Within Hours"
+            },
+            "description": "Time window in hours"
+          },
+          {
+            "name": "parameter_names",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by parameter names (from metrics config)",
+              "title": "Parameter Names"
+            },
+            "description": "Filter by parameter names (from metrics config)"
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecentChangesResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -6287,6 +6428,57 @@
         "type": "object",
         "title": "AllConfigResponse",
         "description": "Response containing all application configuration."
+      },
+      "BackendConfigResponse": {
+        "properties": {
+          "default_backend": {
+            "type": "string",
+            "title": "Default Backend",
+            "default": "qubex"
+          },
+          "backends": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/BackendDefinitionResponse"
+            },
+            "type": "object",
+            "title": "Backends",
+            "default": {}
+          },
+          "categories": {
+            "additionalProperties": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "type": "object",
+            "title": "Categories",
+            "default": {}
+          }
+        },
+        "type": "object",
+        "title": "BackendConfigResponse",
+        "description": "Response model for backend configuration."
+      },
+      "BackendDefinitionResponse": {
+        "properties": {
+          "description": {
+            "type": "string",
+            "title": "Description",
+            "default": ""
+          },
+          "tasks": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tasks",
+            "default": []
+          }
+        },
+        "type": "object",
+        "title": "BackendDefinitionResponse",
+        "description": "Backend definition from configuration."
       },
       "BackendResponseModel": {
         "properties": {
@@ -8491,8 +8683,21 @@
         "title": "MuxTask",
         "description": "Task information for mux display."
       },
-      "OutputParameterModel": {
+      "ParameterChangeResponse": {
         "properties": {
+          "entity_id": {
+            "type": "string",
+            "title": "Entity Id"
+          },
+          "parameter_name": {
+            "type": "string",
+            "title": "Parameter Name"
+          },
+          "qid": {
+            "type": "string",
+            "title": "Qid",
+            "default": ""
+          },
           "value": {
             "anyOf": [
               {
@@ -8500,51 +8705,93 @@
               },
               {
                 "type": "integer"
+              },
+              {
+                "type": "string"
               }
             ],
-            "title": "Value",
-            "default": 0
+            "title": "Value"
           },
-          "value_type": {
-            "type": "string",
-            "title": "Value Type",
-            "default": "float"
-          },
-          "error": {
-            "type": "number",
-            "title": "Error",
-            "default": 0
+          "previous_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous Value"
           },
           "unit": {
             "type": "string",
             "title": "Unit",
             "default": ""
           },
-          "description": {
-            "type": "string",
-            "title": "Description",
-            "default": ""
+          "delta": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delta"
           },
-          "calibrated_at": {
+          "delta_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delta Percent"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "valid_from": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valid From"
+          },
+          "task_name": {
             "type": "string",
-            "format": "date-time",
-            "title": "Calibrated At",
-            "description": "The time when the calibration was performed"
+            "title": "Task Name",
+            "default": ""
           },
           "execution_id": {
             "type": "string",
             "title": "Execution Id",
             "default": ""
-          },
-          "task_id": {
-            "type": "string",
-            "title": "Task Id",
-            "default": ""
           }
         },
         "type": "object",
-        "title": "OutputParameterModel",
-        "description": "Data model.\n\nAttributes\n----------\n    qubit (dict[str, dict[str, float | int]]): The calibration data for qubits.\n    coupling (dict[str, dict[str, float | int]]): The calibration data for couplings."
+        "required": [
+          "entity_id",
+          "parameter_name",
+          "value",
+          "version"
+        ],
+        "title": "ParameterChangeResponse",
+        "description": "Response model for a parameter change (with delta from previous version).\n\nAttributes\n----------\nentity_id : str\n    Unique identifier for this parameter version\nparameter_name : str\n    Name of the parameter\nqid : str\n    Qubit or coupling identifier\nvalue : float | int | str\n    Current value\nprevious_value : float | int | str | None\n    Previous value (None if first version)\nunit : str\n    Physical unit\ndelta : float | None\n    Numeric difference (value - previous_value)\ndelta_percent : float | None\n    Percentage change ((value - previous) / previous * 100)\nversion : int\n    Version number\nvalid_from : datetime | None\n    When this version became valid\ntask_name : str\n    Name of the task that produced this value\nexecution_id : str\n    Execution that produced this value"
       },
       "ParameterDiffResponse": {
         "properties": {
@@ -8652,6 +8899,61 @@
         ],
         "title": "ParameterHistoryResponse",
         "description": "Response model for parameter version history.\n\nAttributes\n----------\nparameter_name : str\n    Name of the parameter\nqid : str\n    Qubit or coupling identifier\nversions : list[ParameterVersionResponse]\n    List of all versions, newest first\ntotal_versions : int\n    Total count of versions"
+      },
+      "ParameterModel": {
+        "properties": {
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Value",
+            "default": 0
+          },
+          "value_type": {
+            "type": "string",
+            "title": "Value Type",
+            "default": "float"
+          },
+          "error": {
+            "type": "number",
+            "title": "Error",
+            "default": 0
+          },
+          "unit": {
+            "type": "string",
+            "title": "Unit",
+            "default": ""
+          },
+          "description": {
+            "type": "string",
+            "title": "Description",
+            "default": ""
+          },
+          "calibrated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Calibrated At",
+            "description": "The time when the calibration was performed"
+          },
+          "execution_id": {
+            "type": "string",
+            "title": "Execution Id",
+            "default": ""
+          },
+          "task_id": {
+            "type": "string",
+            "title": "Task Id",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "title": "ParameterModel",
+        "description": "Calibration parameter model.\n\nUsed for both input_parameters (calibration dependencies) and\noutput_parameters (calibration outputs) in tasks.\n\nAttributes\n----------\n    value: The parameter value.\n    value_type: The type of the value (default: \"float\").\n    error: The error/uncertainty of the value.\n    unit: The unit of measurement.\n    description: Description of the parameter.\n    calibrated_at: When the calibration was performed.\n    execution_id: The execution that produced this value.\n    task_id: The task that produced this value."
       },
       "ParameterVersionResponse": {
         "properties": {
@@ -9349,6 +9651,27 @@
         "title": "QubitResponse",
         "description": "Response model for a single qubit."
       },
+      "RecentChangesResponse": {
+        "properties": {
+          "changes": {
+            "items": {
+              "$ref": "#/components/schemas/ParameterChangeResponse"
+            },
+            "type": "array",
+            "title": "Changes",
+            "description": "Recent parameter changes"
+          },
+          "total_count": {
+            "type": "integer",
+            "title": "Total Count",
+            "description": "Total changes in time window",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "title": "RecentChangesResponse",
+        "description": "Response model for recent parameter changes.\n\nAttributes\n----------\nchanges : list[ParameterChangeResponse]\n    List of recent parameter changes with delta\ntotal_count : int\n    Total number of changes in the time window"
+      },
       "SaveFileRequest": {
         "properties": {
           "path": {
@@ -9660,11 +9983,6 @@
           "calib_data_path": {
             "type": "string",
             "title": "Calib Data Path"
-          },
-          "backend": {
-            "type": "string",
-            "title": "Backend",
-            "default": "qubex"
           },
           "mongo_db_name": {
             "type": "string",
@@ -10108,6 +10426,22 @@
           "file_path": {
             "type": "string",
             "title": "File Path"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category"
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "default": true
           }
         },
         "type": "object",
@@ -10478,7 +10812,7 @@
           "data": {
             "additionalProperties": {
               "items": {
-                "$ref": "#/components/schemas/OutputParameterModel"
+                "$ref": "#/components/schemas/ParameterModel"
               },
               "type": "array"
             },

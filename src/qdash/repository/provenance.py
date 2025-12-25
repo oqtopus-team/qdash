@@ -264,6 +264,41 @@ class MongoParameterVersionRepository:
             .run()
         )
 
+    def get_version(
+        self,
+        project_id: str,
+        parameter_name: str,
+        qid: str,
+        version: int,
+    ) -> ParameterVersionDocument | None:
+        """Get a specific version of a parameter.
+
+        Parameters
+        ----------
+        project_id : str
+            Project identifier
+        parameter_name : str
+            Parameter name
+        qid : str
+            Qubit or coupling identifier
+        version : int
+            Version number to retrieve
+
+        Returns
+        -------
+        ParameterVersionDocument | None
+            The specific version, or None if not found
+
+        """
+        return ParameterVersionDocument.find_one(
+            {
+                "project_id": project_id,
+                "parameter_name": parameter_name,
+                "qid": qid,
+                "version": version,
+            }
+        ).run()
+
     def get_by_execution(
         self,
         project_id: str,
@@ -735,6 +770,7 @@ class MongoProvenanceRelationRepository:
                 name = f"{activity.task_name} ({activity.qid})"
                 metadata = {
                     "task_name": activity.task_name,
+                    "task_id": activity.task_id,
                     "qid": activity.qid,
                     "status": activity.status,
                 }

@@ -229,6 +229,10 @@ class QubexTask(BaseTask):
             True if frequency was explicitly provided (differs from default)
 
         """
+        # If qubit_frequency is not in input_parameters, there's no override
+        if "qubit_frequency" not in self.input_parameters:
+            return False
+
         exp = self.get_experiment(backend)
         label = self.get_qubit_label(backend, qid)
 
