@@ -400,6 +400,49 @@ class MongoParameterVersionRepository:
             .run()
         )
 
+    def get_recent_execution_ids(
+        self,
+        project_id: str,
+        limit: int = 20,
+    ) -> list[dict[str, Any]]:
+        """Get unique execution IDs sorted by most recent.
+
+        Uses MongoDB aggregation to efficiently get distinct execution IDs
+        without fetching all parameter versions.
+
+        Parameters
+        ----------
+        project_id : str
+            Project identifier
+        limit : int
+            Maximum number of execution IDs to return
+
+        Returns
+        -------
+        list[dict[str, Any]]
+            List of dicts with execution_id and latest valid_from
+
+        """
+        pipeline = [
+            {"$match": {"project_id": project_id}},
+            {
+                "$group": {
+                    "_id": "$execution_id",
+                    "latest_valid_from": {"$max": "$valid_from"},
+                }
+            },
+            {"$sort": {"latest_valid_from": -1}},
+            {"$limit": limit},
+            {
+                "$project": {
+                    "_id": 0,
+                    "execution_id": "$_id",
+                    "valid_from": "$latest_valid_from",
+                }
+            },
+        ]
+        return list(ParameterVersionDocument.aggregate(pipeline).run())
+
 
 class MongoProvenanceRelationRepository:
     """MongoDB implementation for provenance relation persistence.

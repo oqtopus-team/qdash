@@ -6210,6 +6210,75 @@
         }
       }
     },
+    "/provenance/executions": {
+      "get": {
+        "tags": [
+          "provenance"
+        ],
+        "summary": "Get recent execution IDs",
+        "description": "Get recent unique execution IDs.\n\nReturns unique execution IDs sorted by most recent first.\nUses MongoDB aggregation for efficient retrieval.\n\nParameters\n----------\nctx : ProjectContext\n    Project context with user and project information\nservice : ProvenanceService\n    Provenance service instance\nlimit : int\n    Maximum number of execution IDs to return (1-50)\n\nReturns\n-------\nRecentExecutionsResponse\n    List of recent execution IDs",
+        "operationId": "getRecentExecutions",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 50,
+              "minimum": 1,
+              "description": "Maximum number of execution IDs to return",
+              "default": 20,
+              "title": "Limit"
+            },
+            "description": "Maximum number of execution IDs to return"
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecentExecutionsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/provenance/changes": {
       "get": {
         "tags": [
@@ -7107,6 +7176,34 @@
         ],
         "title": "ExecutionComparisonResponse",
         "description": "Response model for execution comparison.\n\nAttributes\n----------\nexecution_id_before : str\n    First execution ID\nexecution_id_after : str\n    Second execution ID\nadded_parameters : list[ParameterDiffResponse]\n    Parameters added in the second execution\nremoved_parameters : list[ParameterDiffResponse]\n    Parameters removed in the second execution\nchanged_parameters : list[ParameterDiffResponse]\n    Parameters with different values\nunchanged_count : int\n    Count of unchanged parameters"
+      },
+      "ExecutionIdResponse": {
+        "properties": {
+          "execution_id": {
+            "type": "string",
+            "title": "Execution Id",
+            "description": "Unique execution identifier"
+          },
+          "valid_from": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valid From",
+            "description": "Latest parameter timestamp"
+          }
+        },
+        "type": "object",
+        "required": [
+          "execution_id"
+        ],
+        "title": "ExecutionIdResponse",
+        "description": "Response model for a single execution ID with timestamp.\n\nAttributes\n----------\nexecution_id : str\n    The unique execution identifier\nvalid_from : datetime | None\n    When parameters from this execution were created"
       },
       "ExecutionLockStatusResponse": {
         "properties": {
@@ -9671,6 +9768,21 @@
         "type": "object",
         "title": "RecentChangesResponse",
         "description": "Response model for recent parameter changes.\n\nAttributes\n----------\nchanges : list[ParameterChangeResponse]\n    List of recent parameter changes with delta\ntotal_count : int\n    Total number of changes in the time window"
+      },
+      "RecentExecutionsResponse": {
+        "properties": {
+          "executions": {
+            "items": {
+              "$ref": "#/components/schemas/ExecutionIdResponse"
+            },
+            "type": "array",
+            "title": "Executions",
+            "description": "Recent execution IDs"
+          }
+        },
+        "type": "object",
+        "title": "RecentExecutionsResponse",
+        "description": "Response model for recent execution IDs.\n\nAttributes\n----------\nexecutions : list[ExecutionIdResponse]\n    List of recent execution IDs sorted by most recent first"
       },
       "SaveFileRequest": {
         "properties": {

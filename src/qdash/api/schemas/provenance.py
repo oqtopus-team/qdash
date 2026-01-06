@@ -406,3 +406,34 @@ class RecentChangesResponse(BaseModel):
         default_factory=list, description="Recent parameter changes"
     )
     total_count: int = Field(0, description="Total changes in time window")
+
+
+class ExecutionIdResponse(BaseModel):
+    """Response model for a single execution ID with timestamp.
+
+    Attributes
+    ----------
+    execution_id : str
+        The unique execution identifier
+    valid_from : datetime | None
+        When parameters from this execution were created
+
+    """
+
+    execution_id: str = Field(..., description="Unique execution identifier")
+    valid_from: datetime | None = Field(None, description="Latest parameter timestamp")
+
+
+class RecentExecutionsResponse(BaseModel):
+    """Response model for recent execution IDs.
+
+    Attributes
+    ----------
+    executions : list[ExecutionIdResponse]
+        List of recent execution IDs sorted by most recent first
+
+    """
+
+    executions: list[ExecutionIdResponse] = Field(
+        default_factory=list, description="Recent execution IDs"
+    )

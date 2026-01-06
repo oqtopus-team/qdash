@@ -25,6 +25,7 @@ import type {
   GetProvenanceImpactParams,
   GetProvenanceLineageParams,
   GetRecentChangesParams,
+  GetRecentExecutionsParams,
   HTTPValidationError,
   ImpactResponse,
   LineageResponse,
@@ -32,6 +33,7 @@ import type {
   ParameterVersionResponse,
   ProvenanceStatsResponse,
   RecentChangesResponse,
+  RecentExecutionsResponse,
 } from "../../schemas";
 
 import { customInstance } from "../../lib/custom-instance";
@@ -1130,6 +1132,183 @@ export function useGetProvenanceStats<
   queryClient?: QueryClient,
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
   const queryOptions = getGetProvenanceStatsQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Get recent unique execution IDs.
+
+Returns unique execution IDs sorted by most recent first.
+Uses MongoDB aggregation for efficient retrieval.
+
+Parameters
+----------
+ctx : ProjectContext
+    Project context with user and project information
+service : ProvenanceService
+    Provenance service instance
+limit : int
+    Maximum number of execution IDs to return (1-50)
+
+Returns
+-------
+RecentExecutionsResponse
+    List of recent execution IDs
+ * @summary Get recent execution IDs
+ */
+export const getRecentExecutions = (
+  params?: GetRecentExecutionsParams,
+  options?: SecondParameter<typeof customInstance>,
+  signal?: AbortSignal,
+) => {
+  return customInstance<RecentExecutionsResponse>(
+    { url: `/provenance/executions`, method: "GET", params, signal },
+    options,
+  );
+};
+
+export const getGetRecentExecutionsQueryKey = (
+  params?: GetRecentExecutionsParams,
+) => {
+  return [`/provenance/executions`, ...(params ? [params] : [])] as const;
+};
+
+export const getGetRecentExecutionsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getRecentExecutions>>,
+  TError = HTTPValidationError,
+>(
+  params?: GetRecentExecutionsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof getRecentExecutions>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetRecentExecutionsQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getRecentExecutions>>
+  > = ({ signal }) => getRecentExecutions(params, requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getRecentExecutions>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData> };
+};
+
+export type GetRecentExecutionsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getRecentExecutions>>
+>;
+export type GetRecentExecutionsQueryError = HTTPValidationError;
+
+export function useGetRecentExecutions<
+  TData = Awaited<ReturnType<typeof getRecentExecutions>>,
+  TError = HTTPValidationError,
+>(
+  params: undefined | GetRecentExecutionsParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof getRecentExecutions>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getRecentExecutions>>,
+          TError,
+          Awaited<ReturnType<typeof getRecentExecutions>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData>;
+};
+export function useGetRecentExecutions<
+  TData = Awaited<ReturnType<typeof getRecentExecutions>>,
+  TError = HTTPValidationError,
+>(
+  params?: GetRecentExecutionsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof getRecentExecutions>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getRecentExecutions>>,
+          TError,
+          Awaited<ReturnType<typeof getRecentExecutions>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+export function useGetRecentExecutions<
+  TData = Awaited<ReturnType<typeof getRecentExecutions>>,
+  TError = HTTPValidationError,
+>(
+  params?: GetRecentExecutionsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof getRecentExecutions>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+/**
+ * @summary Get recent execution IDs
+ */
+
+export function useGetRecentExecutions<
+  TData = Awaited<ReturnType<typeof getRecentExecutions>>,
+  TError = HTTPValidationError,
+>(
+  params?: GetRecentExecutionsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof getRecentExecutions>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+  const queryOptions = getGetRecentExecutionsQueryOptions(params, options);
 
   const query = useQuery(queryOptions, queryClient) as UseQueryResult<
     TData,

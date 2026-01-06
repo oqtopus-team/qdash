@@ -13,8 +13,7 @@ import {
 
 import {
   useCompareExecutions,
-  useGetProvenanceStats,
-  useGetRecentChanges,
+  useGetRecentExecutions,
 } from "@/client/provenance/provenance";
 
 export function ExecutionComparisonPanel() {
@@ -23,55 +22,15 @@ export function ExecutionComparisonPanel() {
   const [isComparing, setIsComparing] = useState(false);
   const [initialized, setInitialized] = useState(false);
 
-  // Fetch from both stats and changes to get complete execution ID list
-  // Stats includes version 1 (initial values), changes includes version > 1
-  const { data: statsResponse, isLoading: isLoadingStats } =
-    useGetProvenanceStats();
-  const { data: changesResponse, isLoading: isLoadingChanges } =
-    useGetRecentChanges({ limit: 50, within_hours: 168 }); // Last 7 days
+  // Fetch unique execution IDs directly using MongoDB aggregation
+  const { data: executionsResponse, isLoading: isLoadingExecutionList } =
+    useGetRecentExecutions({ limit: 20 });
 
-  const isLoadingExecutionList = isLoadingStats || isLoadingChanges;
-
-  // Extract unique execution IDs from both sources
-  const recentExecutions = useMemo(() => {
-    const uniqueExecIds = new Map<
-      string,
-      { execution_id: string; valid_from: string | null }
-    >();
-
-    // From stats (includes initial versions)
-    const entities = statsResponse?.data?.recent_entities || [];
-    for (const entity of entities) {
-      if (entity.execution_id && !uniqueExecIds.has(entity.execution_id)) {
-        uniqueExecIds.set(entity.execution_id, {
-          execution_id: entity.execution_id,
-          valid_from: entity.valid_from as string | null,
-        });
-      }
-    }
-
-    // From changes (includes updates)
-    const changes = changesResponse?.data?.changes || [];
-    for (const change of changes) {
-      if (change.execution_id && !uniqueExecIds.has(change.execution_id)) {
-        uniqueExecIds.set(change.execution_id, {
-          execution_id: change.execution_id,
-          valid_from: change.valid_from as string | null,
-        });
-      }
-    }
-
-    // Return as array, sorted by valid_from (most recent first)
-    return Array.from(uniqueExecIds.values())
-      .sort((a, b) => {
-        if (!a.valid_from) return 1;
-        if (!b.valid_from) return -1;
-        return (
-          new Date(b.valid_from).getTime() - new Date(a.valid_from).getTime()
-        );
-      })
-      .slice(0, 20);
-  }, [statsResponse, changesResponse]);
+  // Memoize the list of executions to prevent useEffect dependency issues
+  const recentExecutions = useMemo(
+    () => executionsResponse?.data?.executions || [],
+    [executionsResponse],
+  );
 
   // Set default values when executions are loaded
   useEffect(() => {
@@ -126,6 +85,25 @@ export function ExecutionComparisonPanel() {
     return `(${sign}${deltaPercent.toFixed(2)}%)`;
   };
 
+  // Format execution option label with ID and timestamp
+  const formatExecutionLabel = (exec: {
+    execution_id: string;
+    valid_from?: string | null;
+  }) => {
+    const id = exec.execution_id;
+    if (exec.valid_from) {
+      const date = new Date(exec.valid_from);
+      const timeStr = date.toLocaleString("ja-JP", {
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+      return `${id} (${timeStr})`;
+    }
+    return id;
+  };
+
   return (
     <div className="space-y-6">
       {/* Comparison Form */}
@@ -168,7 +146,7 @@ export function ExecutionComparisonPanel() {
                   </option>
                   {recentExecutions.map((exec) => (
                     <option key={exec.execution_id} value={exec.execution_id}>
-                      {exec.execution_id.slice(0, 8)}...
+                      {formatExecutionLabel(exec)}
                     </option>
                   ))}
                 </select>
@@ -195,7 +173,7 @@ export function ExecutionComparisonPanel() {
                   </option>
                   {recentExecutions.map((exec) => (
                     <option key={exec.execution_id} value={exec.execution_id}>
-                      {exec.execution_id.slice(0, 8)}...
+                      {formatExecutionLabel(exec)}
                     </option>
                   ))}
                 </select>

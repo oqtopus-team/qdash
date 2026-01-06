@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING, Any
 from qdash.api.schemas.provenance import (
     ActivityResponse,
     ExecutionComparisonResponse,
+    ExecutionIdResponse,
     ImpactResponse,
     LineageEdgeResponse,
     LineageNodeResponse,
@@ -23,6 +24,7 @@ from qdash.api.schemas.provenance import (
     ParameterVersionResponse,
     ProvenanceStatsResponse,
     RecentChangesResponse,
+    RecentExecutionsResponse,
 )
 
 if TYPE_CHECKING:
@@ -366,8 +368,8 @@ class ProvenanceService:
             total_relations = self.provenance_relation_repo.count(project_id)
             relation_counts = self.provenance_relation_repo.count_by_type(project_id)
 
-            # Get recent parameter versions
-            recent_docs = self.parameter_version_repo.get_recent(project_id, limit=10)
+            # Get recent parameter versions (100 to ensure we get multiple unique execution_ids)
+            recent_docs = self.parameter_version_repo.get_recent(project_id, limit=100)
             recent_entities = [self._build_version_response(doc) for doc in recent_docs]
         except Exception as e:
             logger.warning(f"Failed to get provenance stats: {e}")
@@ -387,6 +389,47 @@ class ProvenanceService:
             relation_counts=relation_counts,
             recent_entities=recent_entities,
         )
+
+    def get_recent_executions(
+        self,
+        project_id: str,
+        limit: int = 20,
+    ) -> RecentExecutionsResponse:
+        """Get recent unique execution IDs.
+
+        Uses MongoDB aggregation to efficiently get distinct execution IDs
+        without fetching all parameter versions.
+
+        Parameters
+        ----------
+        project_id : str
+            Project identifier
+        limit : int
+            Maximum number of execution IDs to return
+
+        Returns
+        -------
+        RecentExecutionsResponse
+            List of recent execution IDs
+
+        """
+        try:
+            execution_data = self.parameter_version_repo.get_recent_execution_ids(
+                project_id, limit=limit
+            )
+            executions = [
+                ExecutionIdResponse(
+                    execution_id=item.get("execution_id", ""),
+                    valid_from=item.get("valid_from"),
+                )
+                for item in execution_data
+                if item.get("execution_id")
+            ]
+        except Exception as e:
+            logger.warning(f"Failed to get recent executions: {e}")
+            executions = []
+
+        return RecentExecutionsResponse(executions=executions)
 
     def get_recent_changes(
         self,
@@ -466,8 +509,8 @@ class ProvenanceService:
                         entity_id=doc.entity_id,
                         parameter_name=doc.parameter_name,
                         qid=doc.qid,
-                        value=current_value,
-                        previous_value=previous_value,
+                        value=self._sanitize_value(current_value),
+                        previous_value=self._sanitize_value(previous_value) if previous_value is not None else None,
                         unit=getattr(doc, "unit", ""),
                         delta=delta,
                         delta_percent=delta_percent,
@@ -539,7 +582,7 @@ class ProvenanceService:
             entity_id=item.get("id", ""),
             parameter_name=metadata.get("parameter_name", ""),
             qid=metadata.get("qid", ""),
-            value=self._sanitize_float(metadata.get("value", 0)),
+            value=self._sanitize_value(metadata.get("value", 0)),
             value_type="float",
             unit=metadata.get("unit", ""),
             error=0.0,
@@ -585,10 +628,10 @@ class ProvenanceService:
             chip_id="",
         )
 
-    def _sanitize_float(self, value: Any) -> float | int | str:
-        """Sanitize float values for JSON serialization.
+    def _sanitize_value(self, value: Any) -> float | int | str:
+        """Sanitize values for JSON serialization.
 
-        Converts inf, -inf, and nan to None-safe representations.
+        Converts inf, -inf, nan to 0.0, and None to 0.
 
         Parameters
         ----------
@@ -601,12 +644,41 @@ class ProvenanceService:
             Sanitized value
 
         """
+        if value is None:
+            return 0
         if isinstance(value, float):
             if math.isnan(value):
                 return 0.0
             if math.isinf(value):
                 return 0.0
-        return value
+            return value
+        if isinstance(value, (int, str)):
+            return value
+        return str(value)
+
+    def _sanitize_error(self, value: Any) -> float:
+        """Sanitize error values for JSON serialization.
+
+        Parameters
+        ----------
+        value : Any
+            Value to sanitize
+
+        Returns
+        -------
+        float
+            Sanitized float value
+
+        """
+        if value is None:
+            return 0.0
+        if isinstance(value, float):
+            if math.isnan(value) or math.isinf(value):
+                return 0.0
+            return value
+        if isinstance(value, int):
+            return float(value)
+        return 0.0
 
     def _build_version_response(self, entity: object) -> ParameterVersionResponse:
         """Build a ParameterVersionResponse from an entity.
@@ -627,10 +699,10 @@ class ProvenanceService:
                 entity_id=entity.get("entity_id", ""),
                 parameter_name=entity.get("parameter_name", ""),
                 qid=entity.get("qid", ""),
-                value=self._sanitize_float(entity.get("value", 0)),
+                value=self._sanitize_value(entity.get("value", 0)),
                 value_type=entity.get("value_type", "float"),
                 unit=entity.get("unit", ""),
-                error=self._sanitize_float(entity.get("error", 0.0)),
+                error=self._sanitize_error(entity.get("error", 0.0)),
                 version=entity.get("version", 1),
                 valid_from=entity.get("valid_from"),
                 valid_until=entity.get("valid_until"),
@@ -644,10 +716,10 @@ class ProvenanceService:
             entity_id=getattr(entity, "entity_id", ""),
             parameter_name=getattr(entity, "parameter_name", ""),
             qid=getattr(entity, "qid", ""),
-            value=self._sanitize_float(getattr(entity, "value", 0)),
+            value=self._sanitize_value(getattr(entity, "value", 0)),
             value_type=getattr(entity, "value_type", "float"),
             unit=getattr(entity, "unit", ""),
-            error=self._sanitize_float(getattr(entity, "error", 0.0)),
+            error=self._sanitize_error(getattr(entity, "error", 0.0)),
             version=getattr(entity, "version", 1),
             valid_from=getattr(entity, "valid_from", None),
             valid_until=getattr(entity, "valid_until", None),

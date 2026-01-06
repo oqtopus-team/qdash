@@ -22,6 +22,7 @@ from qdash.api.schemas.provenance import (
     ParameterVersionResponse,
     ProvenanceStatsResponse,
     RecentChangesResponse,
+    RecentExecutionsResponse,
 )
 from qdash.api.services.provenance_service import ProvenanceService
 from qdash.repository.provenance import (
@@ -309,6 +310,46 @@ def get_stats(
 
     """
     return service.get_stats(ctx.project_id)
+
+
+@router.get(
+    "/executions",
+    response_model=RecentExecutionsResponse,
+    summary="Get recent execution IDs",
+    operation_id="getRecentExecutions",
+)
+def get_recent_executions(
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    service: Annotated[ProvenanceService, Depends(get_provenance_service)],
+    limit: Annotated[
+        int,
+        Query(description="Maximum number of execution IDs to return", ge=1, le=50),
+    ] = 20,
+) -> RecentExecutionsResponse:
+    """Get recent unique execution IDs.
+
+    Returns unique execution IDs sorted by most recent first.
+    Uses MongoDB aggregation for efficient retrieval.
+
+    Parameters
+    ----------
+    ctx : ProjectContext
+        Project context with user and project information
+    service : ProvenanceService
+        Provenance service instance
+    limit : int
+        Maximum number of execution IDs to return (1-50)
+
+    Returns
+    -------
+    RecentExecutionsResponse
+        List of recent execution IDs
+
+    """
+    return service.get_recent_executions(
+        project_id=ctx.project_id,
+        limit=limit,
+    )
 
 
 @router.get(
