@@ -10,7 +10,7 @@ from qdash.workflow.calibtasks.base import (
 from qdash.workflow.calibtasks.qubex.base import QubexTask
 from qdash.workflow.engine.backend.qubex import QubexBackend
 from qubex.experiment.experiment_constants import CALIBRATION_SHOTS, DRAG_HPI_DURATION
-from qubex.measurement.measurement import DEFAULT_INTERVAL
+from qubex.measurement.measurement import DEFAULT_INTERVAL, DEFAULT_READOUT_DURATION
 
 
 class CreateDRAGHPIPulse(QubexTask):
@@ -18,7 +18,15 @@ class CreateDRAGHPIPulse(QubexTask):
 
     name: str = "CreateDRAGHPIPulse"
     task_type: str = "qubit"
-    input_parameters: ClassVar[dict[str, ParameterModel]] = {}
+    input_parameters: ClassVar[dict[str, ParameterModel | None]] = {
+        "qubit_frequency": None,  # Load from DB
+        "control_amplitude": None,  # Load from DB
+        "readout_amplitude": None,  # Load from DB
+        "readout_frequency": None,  # Load from DB
+        "readout_length": ParameterModel(
+            value=DEFAULT_READOUT_DURATION, unit="ns", description="Readout pulse length"
+        ),
+    }
     run_parameters: ClassVar[dict[str, RunParameterModel]] = {
         "duration": RunParameterModel(
             unit="ns",
@@ -42,6 +50,9 @@ class CreateDRAGHPIPulse(QubexTask):
     output_parameters: ClassVar[dict[str, ParameterModel]] = {
         "drag_hpi_beta": ParameterModel(unit="a.u.", description="DRAG HPI pulse beta"),
         "drag_hpi_amplitude": ParameterModel(unit="a.u.", description="DRAG HPI pulse amplitude"),
+        "drag_hpi_length": ParameterModel(
+            value=DRAG_HPI_DURATION, unit="ns", description="DRAG HPI pulse length"
+        ),
     }
 
     def postprocess(

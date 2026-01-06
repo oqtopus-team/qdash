@@ -8,7 +8,7 @@ from qdash.workflow.calibtasks.base import (
 from qdash.workflow.calibtasks.qubex.base import QubexTask
 from qdash.workflow.engine.backend.qubex import QubexBackend
 from qubex.experiment.experiment_constants import CALIBRATION_SHOTS, HPI_DURATION
-from qubex.measurement.measurement import DEFAULT_INTERVAL
+from qubex.measurement.measurement import DEFAULT_INTERVAL, DEFAULT_READOUT_DURATION
 
 
 class CreateHPIPulse(QubexTask):
@@ -16,7 +16,15 @@ class CreateHPIPulse(QubexTask):
 
     name: str = "CreateHPIPulse"
     task_type: str = "qubit"
-    input_parameters: ClassVar[dict[str, ParameterModel]] = {}
+    input_parameters: ClassVar[dict[str, ParameterModel | None]] = {
+        "qubit_frequency": None,  # Load from DB
+        "control_amplitude": None,  # Load from DB
+        "readout_amplitude": None,  # Load from DB
+        "readout_frequency": None,  # Load from DB
+        "readout_length": ParameterModel(
+            value=DEFAULT_READOUT_DURATION, unit="ns", description="Readout pulse length"
+        ),
+    }
     run_parameters: ClassVar[dict[str, RunParameterModel]] = {
         "duration": RunParameterModel(
             unit="ns", value_type="int", value=HPI_DURATION, description="HPI pulse length"
@@ -35,7 +43,8 @@ class CreateHPIPulse(QubexTask):
         ),
     }
     output_parameters: ClassVar[dict[str, ParameterModel]] = {
-        "hpi_amplitude": ParameterModel(unit="", description="HPI pulse amplitude")
+        "hpi_amplitude": ParameterModel(unit="", description="HPI pulse amplitude"),
+        "hpi_length": ParameterModel(value=HPI_DURATION, unit="ns", description="HPI pulse length"),
     }
 
     def postprocess(
