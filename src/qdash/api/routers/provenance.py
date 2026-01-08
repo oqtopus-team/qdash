@@ -21,6 +21,7 @@ from qdash.api.schemas.provenance import (
     ParameterHistoryResponse,
     ParameterVersionResponse,
     ProvenanceStatsResponse,
+    RecalibrationRecommendationResponse,
     RecentChangesResponse,
     RecentExecutionsResponse,
 )
@@ -403,4 +404,61 @@ def get_recent_changes(
         limit=limit,
         within_hours=within_hours,
         parameter_names=parameter_names,
+    )
+
+
+@router.get(
+    "/recommendations/{entity_id}",
+    response_model=RecalibrationRecommendationResponse,
+    summary="Get recalibration task recommendations",
+    operation_id="getRecalibrationRecommendations",
+)
+def get_recalibration_recommendations(
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    service: Annotated[ProvenanceService, Depends(get_provenance_service)],
+    entity_id: Annotated[str, Path(description="Entity identifier of changed parameter")],
+    max_depth: Annotated[
+        int,
+        Query(description="Maximum impact traversal depth", ge=1, le=20),
+    ] = 10,
+) -> RecalibrationRecommendationResponse:
+    """Get recommended recalibration tasks based on parameter change impact.
+
+    When a calibration parameter changes (either through recalibration or
+    manual adjustment), this endpoint analyzes the provenance graph to
+    identify which downstream parameters are affected and recommends
+    which calibration tasks should be re-run.
+
+    The recommendations are prioritized based on dependency proximity:
+    tasks producing directly dependent parameters are ranked higher than
+    those producing transitively dependent parameters.
+
+    Parameters
+    ----------
+    ctx : ProjectContext
+        Project context with user and project information
+    service : ProvenanceService
+        Provenance service instance
+    entity_id : str
+        Entity identifier of the changed parameter
+    max_depth : int
+        Maximum traversal depth for impact analysis (1-20)
+
+    Returns
+    -------
+    RecalibrationRecommendationResponse
+        Prioritized list of recommended recalibration tasks
+
+    Example
+    -------
+    If qubit_frequency for Q0 changes:
+    - Priority 1: CheckRabiOscillation (direct dependency)
+    - Priority 2: CheckT1, CheckT2 (use frequency-dependent pulses)
+    - Priority 3: CheckCrossResonance (uses derived gate parameters)
+
+    """
+    return service.get_recalibration_recommendations(
+        project_id=ctx.project_id,
+        entity_id=entity_id,
+        max_depth=max_depth,
     )

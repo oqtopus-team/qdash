@@ -24,6 +24,7 @@ import type {
   GetParameterHistoryParams,
   GetProvenanceImpactParams,
   GetProvenanceLineageParams,
+  GetRecalibrationRecommendationsParams,
   GetRecentChangesParams,
   GetRecentExecutionsParams,
   HTTPValidationError,
@@ -32,6 +33,7 @@ import type {
   ParameterHistoryResponse,
   ParameterVersionResponse,
   ProvenanceStatsResponse,
+  RecalibrationRecommendationResponse,
   RecentChangesResponse,
   RecentExecutionsResponse,
 } from "../../schemas";
@@ -1490,6 +1492,224 @@ export function useGetRecentChanges<
   queryClient?: QueryClient,
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
   const queryOptions = getGetRecentChangesQueryOptions(params, options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Get recommended recalibration tasks based on parameter change impact.
+
+When a calibration parameter changes (either through recalibration or
+manual adjustment), this endpoint analyzes the provenance graph to
+identify which downstream parameters are affected and recommends
+which calibration tasks should be re-run.
+
+The recommendations are prioritized based on dependency proximity:
+tasks producing directly dependent parameters are ranked higher than
+those producing transitively dependent parameters.
+
+Parameters
+----------
+ctx : ProjectContext
+    Project context with user and project information
+service : ProvenanceService
+    Provenance service instance
+entity_id : str
+    Entity identifier of the changed parameter
+max_depth : int
+    Maximum traversal depth for impact analysis (1-20)
+
+Returns
+-------
+RecalibrationRecommendationResponse
+    Prioritized list of recommended recalibration tasks
+
+Example
+-------
+If qubit_frequency for Q0 changes:
+- Priority 1: CheckRabiOscillation (direct dependency)
+- Priority 2: CheckT1, CheckT2 (use frequency-dependent pulses)
+- Priority 3: CheckCrossResonance (uses derived gate parameters)
+ * @summary Get recalibration task recommendations
+ */
+export const getRecalibrationRecommendations = (
+  entityId: string,
+  params?: GetRecalibrationRecommendationsParams,
+  options?: SecondParameter<typeof customInstance>,
+  signal?: AbortSignal,
+) => {
+  return customInstance<RecalibrationRecommendationResponse>(
+    {
+      url: `/provenance/recommendations/${entityId}`,
+      method: "GET",
+      params,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getGetRecalibrationRecommendationsQueryKey = (
+  entityId?: string,
+  params?: GetRecalibrationRecommendationsParams,
+) => {
+  return [
+    `/provenance/recommendations/${entityId}`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getGetRecalibrationRecommendationsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getRecalibrationRecommendations>>,
+  TError = HTTPValidationError,
+>(
+  entityId: string,
+  params?: GetRecalibrationRecommendationsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof getRecalibrationRecommendations>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getGetRecalibrationRecommendationsQueryKey(entityId, params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getRecalibrationRecommendations>>
+  > = ({ signal }) =>
+    getRecalibrationRecommendations(entityId, params, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!entityId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getRecalibrationRecommendations>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData> };
+};
+
+export type GetRecalibrationRecommendationsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getRecalibrationRecommendations>>
+>;
+export type GetRecalibrationRecommendationsQueryError = HTTPValidationError;
+
+export function useGetRecalibrationRecommendations<
+  TData = Awaited<ReturnType<typeof getRecalibrationRecommendations>>,
+  TError = HTTPValidationError,
+>(
+  entityId: string,
+  params: undefined | GetRecalibrationRecommendationsParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof getRecalibrationRecommendations>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getRecalibrationRecommendations>>,
+          TError,
+          Awaited<ReturnType<typeof getRecalibrationRecommendations>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData>;
+};
+export function useGetRecalibrationRecommendations<
+  TData = Awaited<ReturnType<typeof getRecalibrationRecommendations>>,
+  TError = HTTPValidationError,
+>(
+  entityId: string,
+  params?: GetRecalibrationRecommendationsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof getRecalibrationRecommendations>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getRecalibrationRecommendations>>,
+          TError,
+          Awaited<ReturnType<typeof getRecalibrationRecommendations>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+export function useGetRecalibrationRecommendations<
+  TData = Awaited<ReturnType<typeof getRecalibrationRecommendations>>,
+  TError = HTTPValidationError,
+>(
+  entityId: string,
+  params?: GetRecalibrationRecommendationsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof getRecalibrationRecommendations>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+/**
+ * @summary Get recalibration task recommendations
+ */
+
+export function useGetRecalibrationRecommendations<
+  TData = Awaited<ReturnType<typeof getRecalibrationRecommendations>>,
+  TError = HTTPValidationError,
+>(
+  entityId: string,
+  params?: GetRecalibrationRecommendationsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof getRecalibrationRecommendations>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+  const queryOptions = getGetRecalibrationRecommendationsQueryOptions(
+    entityId,
+    params,
+    options,
+  );
 
   const query = useQuery(queryOptions, queryClient) as UseQueryResult<
     TData,

@@ -669,7 +669,7 @@ export function useDashboardUrlState(): UseDashboardUrlStateResult {
 }
 
 // Provenance page URL state
-type ProvenanceTab = "history" | "lineage" | "compare";
+type ProvenanceTab = "history" | "lineage" | "compare" | "seeds";
 
 interface UseProvenanceUrlStateResult {
   activeTab: ProvenanceTab;

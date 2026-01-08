@@ -299,8 +299,6 @@ class ProvenanceRelationDocument(Document):
         target_type: Type of target ("entity" or "activity")
         target_id: Identifier of the target
         created_at: When this relation was recorded
-        confidence: Confidence score (1.0 for explicit, <1.0 for inferred)
-        inference_method: Method used for inference (if applicable)
         project_id: Owning project identifier
 
     """
@@ -323,14 +321,6 @@ class ProvenanceRelationDocument(Document):
     created_at: datetime = Field(
         default_factory=now,
         description="When this relation was recorded",
-    )
-    confidence: float = Field(
-        1.0,
-        description="Confidence score (1.0=explicit, <1.0=inferred)",
-    )
-    inference_method: str | None = Field(
-        None,
-        description="Inference method if not explicit",
     )
 
     # Context
@@ -422,8 +412,6 @@ class ProvenanceRelationDocument(Document):
         target_id: str,
         project_id: str,
         execution_id: str = "",
-        confidence: float = 1.0,
-        inference_method: str | None = None,
     ) -> "ProvenanceRelationDocument":
         """Create or update a provenance relation.
 
@@ -443,10 +431,6 @@ class ProvenanceRelationDocument(Document):
             Project identifier
         execution_id : str
             Related execution ID
-        confidence : float
-            Confidence score
-        inference_method : str | None
-            Inference method if applicable
 
         Returns
         -------
@@ -473,8 +457,6 @@ class ProvenanceRelationDocument(Document):
             target_id=target_id,
             project_id=project_id,
             execution_id=execution_id,
-            confidence=confidence,
-            inference_method=inference_method,
         )
         relation.insert()
         return relation

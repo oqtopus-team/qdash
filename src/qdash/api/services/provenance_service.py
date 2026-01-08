@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import logging
 import math
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from qdash.api.schemas.provenance import (
     ActivityResponse,
@@ -23,8 +23,10 @@ from qdash.api.schemas.provenance import (
     ParameterHistoryResponse,
     ParameterVersionResponse,
     ProvenanceStatsResponse,
+    RecalibrationRecommendationResponse,
     RecentChangesResponse,
     RecentExecutionsResponse,
+    RecommendedTaskResponse,
 )
 
 if TYPE_CHECKING:
@@ -134,7 +136,6 @@ class ProvenanceService:
                     relation_type=str(edge_dict.get("relation_type", "")),
                     source_id=str(edge_dict.get("source", "")),
                     target_id=str(edge_dict.get("target", "")),
-                    confidence=1.0,
                 )
             )
 
@@ -208,7 +209,6 @@ class ProvenanceService:
                     relation_type=str(edge_dict.get("relation_type", "")),
                     source_id=str(edge_dict.get("source", "")),
                     target_id=str(edge_dict.get("target", "")),
-                    confidence=1.0,
                 )
             )
 
@@ -557,6 +557,130 @@ class ProvenanceService:
         if getattr(entity, "project_id", "") != project_id:
             return None
         return self._build_version_response(entity)
+
+    def get_recalibration_recommendations(
+        self,
+        project_id: str,
+        entity_id: str,
+        max_depth: int = 10,
+    ) -> RecalibrationRecommendationResponse:
+        """Get recalibration task recommendations based on impact analysis.
+
+        When a parameter changes, this method analyzes the impact graph
+        to recommend which calibration tasks should be re-run to maintain
+        consistency across dependent parameters.
+
+        Parameters
+        ----------
+        project_id : str
+            Project identifier
+        entity_id : str
+            Entity ID of the changed parameter
+        max_depth : int
+            Maximum depth for impact traversal (default: 10)
+
+        Returns
+        -------
+        RecalibrationRecommendationResponse
+            Prioritized list of recommended tasks
+
+        """
+        # Get the source entity info
+        source_entity = self.parameter_version_repo.get_by_entity_id(entity_id)
+        source_param_name = ""
+        source_qid = ""
+        if source_entity:
+            source_param_name = getattr(source_entity, "parameter_name", "")
+            source_qid = getattr(source_entity, "qid", "")
+
+        # Get impact graph
+        impact_data = self.provenance_relation_repo.get_impact(
+            project_id=project_id,
+            entity_id=entity_id,
+            max_depth=max_depth,
+        )
+
+        # Extract activities and their affected parameters
+        # task_name -> {qids: set, parameters: set, min_depth: int}
+        task_info: dict[str, dict[str, Any]] = {}
+        affected_entity_count = 0
+
+        for node_item in impact_data.get("nodes", []):
+            node_dict = dict(node_item)
+            node_type = str(node_dict.get("type", ""))
+            metadata = cast(dict[str, Any], node_dict.get("metadata") or {})
+
+            if node_type == "activity":
+                task_name = str(metadata.get("task_name", ""))
+                qid = str(metadata.get("qid", ""))
+                if task_name:
+                    if task_name not in task_info:
+                        task_info[task_name] = {
+                            "qids": set(),
+                            "parameters": set(),
+                            "min_depth": float("inf"),
+                        }
+                    if qid:
+                        task_info[task_name]["qids"].add(qid)
+
+            elif node_type == "entity":
+                # Count affected entities (excluding source)
+                if str(node_dict.get("id", "")) != entity_id:
+                    affected_entity_count += 1
+
+                # Track which parameters each task affects
+                param_name = str(metadata.get("parameter_name", ""))
+                task_name = str(metadata.get("task_name", ""))
+                qid = str(metadata.get("qid", ""))
+                if task_name and param_name:
+                    if task_name not in task_info:
+                        task_info[task_name] = {
+                            "qids": set(),
+                            "parameters": set(),
+                            "min_depth": float("inf"),
+                        }
+                    task_info[task_name]["parameters"].add(param_name)
+                    if qid:
+                        task_info[task_name]["qids"].add(qid)
+
+        # Calculate depth for each task based on edge traversal
+        # For simplicity, we use the order of appearance (earlier = closer)
+        for priority, task_name in enumerate(task_info.keys(), start=1):
+            task_info[task_name]["min_depth"] = priority
+
+        # Build recommendations sorted by proximity (min_depth)
+        sorted_tasks = sorted(
+            task_info.items(),
+            key=lambda x: x[1]["min_depth"],
+        )
+
+        recommendations = []
+        for priority, (task_name, info) in enumerate(sorted_tasks, start=1):
+            qids = sorted(info["qids"])
+            params = sorted(info["parameters"])
+
+            reason = f"Re-run to update {len(params)} parameter(s)"
+            if source_param_name:
+                reason += f" affected by {source_param_name} change"
+
+            recommendations.append(
+                RecommendedTaskResponse(
+                    task_name=task_name,
+                    priority=priority,
+                    affected_parameters=params,
+                    affected_qids=qids,
+                    reason=reason,
+                )
+            )
+
+        return RecalibrationRecommendationResponse(
+            source_entity_id=entity_id,
+            source_parameter_name=source_param_name,
+            source_qid=source_qid,
+            recommended_tasks=recommendations,
+            total_affected_parameters=affected_entity_count,
+            max_depth_reached=max_depth,
+        )
 
     def _build_version_from_metadata(self, item: dict[str, Any]) -> ParameterVersionResponse | None:
         """Build a ParameterVersionResponse from node metadata.

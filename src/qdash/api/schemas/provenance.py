@@ -83,10 +83,6 @@ class ProvenanceRelationResponse(BaseModel):
         Type of target node (entity or activity)
     target_id : str
         Identifier of target node
-    confidence : float
-        Confidence score (1.0 = explicit, < 1.0 = inferred)
-    inference_method : str | None
-        Method used for inference if applicable
     created_at : datetime
         When this relation was recorded
 
@@ -98,8 +94,6 @@ class ProvenanceRelationResponse(BaseModel):
     source_id: str
     target_type: str
     target_id: str
-    confidence: float = 1.0
-    inference_method: str | None = None
     created_at: datetime
 
 
@@ -182,15 +176,12 @@ class LineageEdgeResponse(BaseModel):
         Source node identifier
     target_id : str
         Target node identifier
-    confidence : float
-        Confidence score
 
     """
 
     relation_type: str
     source_id: str
     target_id: str
-    confidence: float = 1.0
 
 
 class LineageResponse(BaseModel):
@@ -437,3 +428,67 @@ class RecentExecutionsResponse(BaseModel):
     executions: list[ExecutionIdResponse] = Field(
         default_factory=list, description="Recent execution IDs"
     )
+
+
+class RecommendedTaskResponse(BaseModel):
+    """Response model for a recommended recalibration task.
+
+    Attributes
+    ----------
+    task_name : str
+        Name of the task to re-run
+    priority : int
+        Priority level (1=highest, larger=lower priority)
+    affected_parameters : list[str]
+        Parameters that would be recalibrated by this task
+    affected_qids : list[str]
+        Qubit/coupling IDs affected
+    reason : str
+        Human-readable explanation
+
+    """
+
+    task_name: str = Field(..., description="Name of the task to re-run")
+    priority: int = Field(..., description="Priority (1=highest)")
+    affected_parameters: list[str] = Field(
+        default_factory=list, description="Parameters affected"
+    )
+    affected_qids: list[str] = Field(
+        default_factory=list, description="Qubit IDs affected"
+    )
+    reason: str = Field("", description="Explanation for recommendation")
+
+
+class RecalibrationRecommendationResponse(BaseModel):
+    """Response model for recalibration recommendations.
+
+    When a parameter changes, this response provides a prioritized list
+    of calibration tasks that should be re-run to maintain consistency.
+
+    Attributes
+    ----------
+    source_entity_id : str
+        The changed parameter that triggered recommendations
+    source_parameter_name : str
+        Name of the changed parameter
+    source_qid : str
+        Qubit/coupling ID of the changed parameter
+    recommended_tasks : list[RecommendedTaskResponse]
+        Prioritized list of tasks to re-run
+    total_affected_parameters : int
+        Total count of downstream parameters affected
+    max_depth_reached : int
+        Depth of impact graph traversed
+
+    """
+
+    source_entity_id: str = Field(..., description="Changed parameter entity ID")
+    source_parameter_name: str = Field("", description="Changed parameter name")
+    source_qid: str = Field("", description="Changed parameter QID")
+    recommended_tasks: list[RecommendedTaskResponse] = Field(
+        default_factory=list, description="Prioritized task recommendations"
+    )
+    total_affected_parameters: int = Field(
+        0, description="Total downstream parameters affected"
+    )
+    max_depth_reached: int = Field(0, description="Impact graph depth traversed")

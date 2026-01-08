@@ -244,3 +244,4 @@ src/tools/schedule/*
 .tmp/*
 /.claude/settings.local.json
 docs/internal/*
+docs/papers/*

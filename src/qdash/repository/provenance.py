@@ -474,8 +474,6 @@ class MongoProvenanceRelationRepository:
         target_id: str,
         project_id: str,
         execution_id: str = "",
-        confidence: float = 1.0,
-        inference_method: str | None = None,
     ) -> ProvenanceRelationDocument:
         """Create a provenance relation.
 
@@ -495,10 +493,6 @@ class MongoProvenanceRelationRepository:
             Project identifier
         execution_id : str
             Related execution ID
-        confidence : float
-            Confidence score (1.0 = explicit)
-        inference_method : str | None
-            Inference method if applicable
 
         Returns
         -------
@@ -514,8 +508,6 @@ class MongoProvenanceRelationRepository:
             target_id=target_id,
             project_id=project_id,
             execution_id=execution_id,
-            confidence=confidence,
-            inference_method=inference_method,
         )
         return result
 

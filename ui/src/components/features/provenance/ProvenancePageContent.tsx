@@ -11,6 +11,7 @@ import {
   TrendingUp,
   TrendingDown,
   Minus,
+  Database,
 } from "lucide-react";
 
 import {
@@ -26,6 +27,7 @@ import { useProvenanceUrlState } from "@/hooks/useUrlState";
 import { ParameterHistoryPanel } from "./ParameterHistoryPanel";
 import { ExecutionComparisonPanel } from "./ExecutionComparisonPanel";
 import { LineageExplorerPanel } from "./LineageExplorerPanel";
+import { SeedParametersPanel } from "./SeedParametersPanel";
 
 const formatValue = (value: number | string) => {
   if (typeof value === "number") {
@@ -361,6 +363,15 @@ export function ProvenancePageContent() {
             <GitCompare className="h-3 w-3 sm:h-4 sm:w-4" />
             Compare
           </button>
+          <button
+            className={`tab tab-sm sm:tab-md gap-1 sm:gap-2 whitespace-nowrap ${
+              activeTab === "seeds" ? "tab-active" : ""
+            }`}
+            onClick={() => setActiveTab("seeds")}
+          >
+            <Database className="h-3 w-3 sm:h-4 sm:w-4" />
+            Seeds
+          </button>
         </div>
 
         {/* Tab Content */}
@@ -384,6 +395,7 @@ export function ProvenancePageContent() {
             />
           )}
           {activeTab === "compare" && <ExecutionComparisonPanel />}
+          {activeTab === "seeds" && <SeedParametersPanel />}
         </div>
       </div>
     </PageContainer>

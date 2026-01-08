@@ -79,8 +79,6 @@ class ProvenanceRelationRepoProtocol(Protocol):
         target_id: str,
         project_id: str,
         execution_id: str,
-        confidence: float,
-        inference_method: str | None,
     ) -> Any:
         """Create a provenance relation."""
         ...
@@ -286,8 +284,6 @@ class ProvenanceRecorder:
                     target_id=entity_id,
                     project_id=project_id,
                     execution_id=execution_id,
-                    confidence=1.0,
-                    inference_method=None,
                 )
 
         return input_entity_ids
@@ -365,8 +361,6 @@ class ProvenanceRecorder:
                 target_id=activity_id,
                 project_id=project_id,
                 execution_id=execution_id,
-                confidence=1.0,
-                inference_method=None,
             )
 
             # Record "wasDerivedFrom" relations: entity derived from input entities
@@ -379,8 +373,6 @@ class ProvenanceRecorder:
                     target_id=input_entity_id,
                     project_id=project_id,
                     execution_id=execution_id,
-                    confidence=1.0,
-                    inference_method=None,
                 )
 
     def infer_from_existing_history(
@@ -404,11 +396,6 @@ class ProvenanceRecorder:
         -------
         int
             Number of relations created
-
-        Note
-        ----
-        Inferred relations have confidence < 1.0 to indicate they were
-        not recorded at execution time.
 
         """
         # Import here to avoid circular dependency
@@ -477,7 +464,7 @@ class ProvenanceRecorder:
                     value_type="float",
                 )
 
-                # Record wasGeneratedBy with lower confidence (inferred)
+                # Record wasGeneratedBy relation
                 self.provenance_relation_repo.create_relation(
                     relation_type=ProvenanceRelationType.GENERATED_BY,
                     source_type="entity",
@@ -486,8 +473,6 @@ class ProvenanceRecorder:
                     target_id=activity_id,
                     project_id=project_id,
                     execution_id=execution_id,
-                    confidence=0.9,  # Lower confidence for inferred
-                    inference_method="temporal_ordering",
                 )
                 relations_created += 1
 

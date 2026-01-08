@@ -2040,6 +2040,221 @@
         }
       }
     },
+    "/calibrations/seed-import": {
+      "post": {
+        "tags": [
+          "calibration"
+        ],
+        "summary": "Import seed parameters from qubex or manual input",
+        "description": "Import initial calibration parameters from qubex params or manual input.\n\nThis endpoint allows importing seed parameters that are typically loaded\nfrom qubex's params directory (e.g., qubit_frequency, readout_amplitude)\ninto QDash's calibration database for tracking and provenance.\n\nParameters\n----------\nctx : ProjectContext\n    Project context with user and project information\nservice : SeedImportService\n    Service for seed import operations\nrequest : SeedImportRequest\n    Import request specifying source, chip_id, and parameters\n\nReturns\n-------\nSeedImportResponse\n    Results of the import operation including counts and individual results\n\nExamples\n--------\nImport from qubex params:\n```json\n{\n    \"chip_id\": \"64Qv3\",\n    \"source\": \"qubex_params\",\n    \"parameters\": [\"qubit_frequency\", \"readout_amplitude\"]\n}\n```\n\nManual import:\n```json\n{\n    \"chip_id\": \"64Qv3\",\n    \"source\": \"manual\",\n    \"manual_data\": {\n        \"qubit_frequency\": {\"Q00\": 7.9, \"Q01\": 8.6}\n    }\n}\n```",
+        "operationId": "importSeedParameters",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SeedImportRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SeedImportResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/calibrations/seed-parameters/{chip_id}": {
+      "get": {
+        "tags": [
+          "calibration"
+        ],
+        "summary": "Get available seed parameters for a chip",
+        "description": "Get list of available parameter files in qubex params directory.\n\nParameters\n----------\nctx : ProjectContext\n    Project context with user and project information\nservice : SeedImportService\n    Service for seed import operations\nchip_id : str\n    Chip ID to check parameters for\n\nReturns\n-------\nlist[str]\n    List of available parameter names (e.g., [\"qubit_frequency\", \"readout_amplitude\"])",
+        "operationId": "getAvailableSeedParameters",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chip_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Chip Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "title": "Response Getavailableseedparameters"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/calibrations/seed-compare/{chip_id}": {
+      "get": {
+        "tags": [
+          "calibration"
+        ],
+        "summary": "Compare YAML seed values with QDash values",
+        "description": "Compare seed parameter values from YAML files with current QDash values.\n\nThis endpoint allows users to preview what will be imported and see\nthe difference between YAML source values and current QDash values.\n\nParameters\n----------\nctx : ProjectContext\n    Project context with user and project information\nservice : SeedImportService\n    Service for seed import operations\nchip_id : str\n    Chip ID to compare parameters for\nparameters : str | None\n    Comma-separated list of parameters to compare (None = all available)\n\nReturns\n-------\ndict\n    Comparison data with structure:\n    {\n        \"chip_id\": str,\n        \"parameters\": {\n            \"param_name\": {\n                \"unit\": str,\n                \"qubits\": {\n                    \"Q0\": {\n                        \"yaml_value\": float | None,\n                        \"qdash_value\": float | None,\n                        \"status\": \"new\" | \"same\" | \"different\"\n                    }\n                }\n            }\n        }\n    }",
+        "operationId": "compareSeedValues",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chip_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Chip Id"
+            }
+          },
+          {
+            "name": "parameters",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Parameters"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Compareseedvalues"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/copilot/config": {
       "get": {
         "tags": [
@@ -6382,6 +6597,86 @@
           }
         }
       }
+    },
+    "/provenance/recommendations/{entity_id}": {
+      "get": {
+        "tags": [
+          "provenance"
+        ],
+        "summary": "Get recalibration task recommendations",
+        "description": "Get recommended recalibration tasks based on parameter change impact.\n\nWhen a calibration parameter changes (either through recalibration or\nmanual adjustment), this endpoint analyzes the provenance graph to\nidentify which downstream parameters are affected and recommends\nwhich calibration tasks should be re-run.\n\nThe recommendations are prioritized based on dependency proximity:\ntasks producing directly dependent parameters are ranked higher than\nthose producing transitively dependent parameters.\n\nParameters\n----------\nctx : ProjectContext\n    Project context with user and project information\nservice : ProvenanceService\n    Provenance service instance\nentity_id : str\n    Entity identifier of the changed parameter\nmax_depth : int\n    Maximum traversal depth for impact analysis (1-20)\n\nReturns\n-------\nRecalibrationRecommendationResponse\n    Prioritized list of recommended recalibration tasks\n\nExample\n-------\nIf qubit_frequency for Q0 changes:\n- Priority 1: CheckRabiOscillation (direct dependency)\n- Priority 2: CheckT1, CheckT2 (use frequency-dependent pulses)\n- Priority 3: CheckCrossResonance (uses derived gate parameters)",
+        "operationId": "getRecalibrationRecommendations",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "entity_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Entity identifier of changed parameter",
+              "title": "Entity Id"
+            },
+            "description": "Entity identifier of changed parameter"
+          },
+          {
+            "name": "max_depth",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 20,
+              "minimum": 1,
+              "description": "Maximum impact traversal depth",
+              "default": 10,
+              "title": "Max Depth"
+            },
+            "description": "Maximum impact traversal depth"
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecalibrationRecommendationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -7868,11 +8163,6 @@
           "target_id": {
             "type": "string",
             "title": "Target Id"
-          },
-          "confidence": {
-            "type": "number",
-            "title": "Confidence",
-            "default": 1
           }
         },
         "type": "object",
@@ -7882,7 +8172,7 @@
           "target_id"
         ],
         "title": "LineageEdgeResponse",
-        "description": "Response model for an edge in the lineage graph.\n\nAttributes\n----------\nrelation_type : str\n    Type of relation\nsource_id : str\n    Source node identifier\ntarget_id : str\n    Target node identifier\nconfidence : float\n    Confidence score"
+        "description": "Response model for an edge in the lineage graph.\n\nAttributes\n----------\nrelation_type : str\n    Type of relation\nsource_id : str\n    Source node identifier\ntarget_id : str\n    Target node identifier"
       },
       "LineageNodeResponse": {
         "properties": {
@@ -9748,6 +10038,53 @@
         "title": "QubitResponse",
         "description": "Response model for a single qubit."
       },
+      "RecalibrationRecommendationResponse": {
+        "properties": {
+          "source_entity_id": {
+            "type": "string",
+            "title": "Source Entity Id",
+            "description": "Changed parameter entity ID"
+          },
+          "source_parameter_name": {
+            "type": "string",
+            "title": "Source Parameter Name",
+            "description": "Changed parameter name",
+            "default": ""
+          },
+          "source_qid": {
+            "type": "string",
+            "title": "Source Qid",
+            "description": "Changed parameter QID",
+            "default": ""
+          },
+          "recommended_tasks": {
+            "items": {
+              "$ref": "#/components/schemas/RecommendedTaskResponse"
+            },
+            "type": "array",
+            "title": "Recommended Tasks",
+            "description": "Prioritized task recommendations"
+          },
+          "total_affected_parameters": {
+            "type": "integer",
+            "title": "Total Affected Parameters",
+            "description": "Total downstream parameters affected",
+            "default": 0
+          },
+          "max_depth_reached": {
+            "type": "integer",
+            "title": "Max Depth Reached",
+            "description": "Impact graph depth traversed",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "source_entity_id"
+        ],
+        "title": "RecalibrationRecommendationResponse",
+        "description": "Response model for recalibration recommendations.\n\nWhen a parameter changes, this response provides a prioritized list\nof calibration tasks that should be re-run to maintain consistency.\n\nAttributes\n----------\nsource_entity_id : str\n    The changed parameter that triggered recommendations\nsource_parameter_name : str\n    Name of the changed parameter\nsource_qid : str\n    Qubit/coupling ID of the changed parameter\nrecommended_tasks : list[RecommendedTaskResponse]\n    Prioritized list of tasks to re-run\ntotal_affected_parameters : int\n    Total count of downstream parameters affected\nmax_depth_reached : int\n    Depth of impact graph traversed"
+      },
       "RecentChangesResponse": {
         "properties": {
           "changes": {
@@ -9783,6 +10120,49 @@
         "type": "object",
         "title": "RecentExecutionsResponse",
         "description": "Response model for recent execution IDs.\n\nAttributes\n----------\nexecutions : list[ExecutionIdResponse]\n    List of recent execution IDs sorted by most recent first"
+      },
+      "RecommendedTaskResponse": {
+        "properties": {
+          "task_name": {
+            "type": "string",
+            "title": "Task Name",
+            "description": "Name of the task to re-run"
+          },
+          "priority": {
+            "type": "integer",
+            "title": "Priority",
+            "description": "Priority (1=highest)"
+          },
+          "affected_parameters": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Affected Parameters",
+            "description": "Parameters affected"
+          },
+          "affected_qids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Affected Qids",
+            "description": "Qubit IDs affected"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason",
+            "description": "Explanation for recommendation",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "task_name",
+          "priority"
+        ],
+        "title": "RecommendedTaskResponse",
+        "description": "Response model for a recommended recalibration task.\n\nAttributes\n----------\ntask_name : str\n    Name of the task to re-run\npriority : int\n    Priority level (1=highest, larger=lower priority)\naffected_parameters : list[str]\n    Parameters that would be recalibrated by this task\naffected_qids : list[str]\n    Qubit/coupling IDs affected\nreason : str\n    Human-readable explanation"
       },
       "SaveFileRequest": {
         "properties": {
@@ -10061,6 +10441,205 @@
         ],
         "title": "ScheduleFlowResponse",
         "description": "Response after scheduling a flow."
+      },
+      "SeedImportRequest": {
+        "properties": {
+          "chip_id": {
+            "type": "string",
+            "title": "Chip Id",
+            "description": "Target chip ID"
+          },
+          "source": {
+            "$ref": "#/components/schemas/SeedImportSource",
+            "description": "Source of parameters",
+            "default": "qubex_params"
+          },
+          "parameters": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parameters",
+            "description": "Parameter names to import (None = all available)",
+            "examples": [
+              [
+                "qubit_frequency",
+                "readout_amplitude",
+                "control_amplitude"
+              ]
+            ]
+          },
+          "qids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Qids",
+            "description": "Qubit IDs to import (None = all available)",
+            "examples": [
+              [
+                "Q00",
+                "Q01",
+                "Q02"
+              ]
+            ]
+          },
+          "manual_data": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Manual Data",
+            "description": "Manual data when source is MANUAL"
+          }
+        },
+        "type": "object",
+        "required": [
+          "chip_id"
+        ],
+        "title": "SeedImportRequest",
+        "description": "Request to import seed parameters from qubex or manual input.\n\nAttributes\n----------\nchip_id : str\n    Target chip ID (e.g., \"64Qv3\")\nsource : SeedImportSource\n    Source of the parameters\nparameters : list[str] | None\n    List of parameter names to import. If None, imports all available.\nqids : list[str] | None\n    List of qubit IDs to import. If None, imports all available.\nmanual_data : dict[str, dict[str, Any]] | None\n    Manual data when source is MANUAL.\n    Format: {\"parameter_name\": {\"Q0\": value, \"Q1\": value, ...}}"
+      },
+      "SeedImportResponse": {
+        "properties": {
+          "chip_id": {
+            "type": "string",
+            "title": "Chip Id"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "imported_count": {
+            "type": "integer",
+            "title": "Imported Count"
+          },
+          "skipped_count": {
+            "type": "integer",
+            "title": "Skipped Count"
+          },
+          "error_count": {
+            "type": "integer",
+            "title": "Error Count"
+          },
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/SeedImportResultItem"
+            },
+            "type": "array",
+            "title": "Results"
+          },
+          "provenance_activity_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provenance Activity Id",
+            "description": "Activity ID for provenance tracking"
+          }
+        },
+        "type": "object",
+        "required": [
+          "chip_id",
+          "source",
+          "imported_count",
+          "skipped_count",
+          "error_count",
+          "results"
+        ],
+        "title": "SeedImportResponse",
+        "description": "Response from seed import operation."
+      },
+      "SeedImportResultItem": {
+        "properties": {
+          "parameter_name": {
+            "type": "string",
+            "title": "Parameter Name"
+          },
+          "qid": {
+            "type": "string",
+            "title": "Qid"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Value"
+          },
+          "unit": {
+            "type": "string",
+            "title": "Unit"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "description": "'imported' or 'skipped' or 'error'"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "parameter_name",
+          "qid",
+          "value",
+          "unit",
+          "status"
+        ],
+        "title": "SeedImportResultItem",
+        "description": "Result for a single parameter import."
+      },
+      "SeedImportSource": {
+        "type": "string",
+        "enum": [
+          "qubex_params",
+          "manual"
+        ],
+        "title": "SeedImportSource",
+        "description": "Source of seed parameters."
       },
       "Settings": {
         "properties": {

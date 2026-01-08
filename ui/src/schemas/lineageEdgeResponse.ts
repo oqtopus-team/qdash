@@ -17,12 +17,9 @@ source_id : str
     Source node identifier
 target_id : str
     Target node identifier
-confidence : float
-    Confidence score
  */
 export interface LineageEdgeResponse {
   relation_type: string;
   source_id: string;
   target_id: string;
-  confidence?: number;
 }
