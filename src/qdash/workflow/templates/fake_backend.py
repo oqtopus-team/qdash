@@ -101,5 +101,6 @@ def fake_calibration(
         backend_name=backend_name,
         flow_name=flow_name,
         project_id=project_id,
+        skip_execution=True,  # Child sessions create their own Executions
     )
     return cal.run(targets, steps=steps)

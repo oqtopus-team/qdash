@@ -138,19 +138,22 @@ class CalibOrchestrator:
         if config.enable_github_pull:
             self._pull_github_config(logger)
 
-        # Initialize ExecutionService
-        self._execution_service = ExecutionService.create(
-            username=config.username,
-            execution_id=config.execution_id,
-            calib_data_path=config.calib_data_path,
-            chip_id=config.chip_id,
-            name=config.flow_name or "Python Flow Execution",
-            tags=config.tags,
-            note=config.note,
-            project_id=config.project_id,
-        )
-        self._execution_service.save_with_tags()
-        self._execution_service.start_execution()
+        # Initialize ExecutionService (skip if in wrapper mode)
+        if not config.skip_execution:
+            self._execution_service = ExecutionService.create(
+                username=config.username,
+                execution_id=config.execution_id,
+                calib_data_path=config.calib_data_path,
+                chip_id=config.chip_id,
+                name=config.flow_name or "Python Flow Execution",
+                tags=config.tags,
+                note=config.note,
+                project_id=config.project_id,
+            )
+            self._execution_service.save_with_tags()
+            self._execution_service.start_execution()
+        else:
+            logger.info("Skipping Execution creation (wrapper mode)")
 
         # Initialize TaskContext with optional provenance tracking
         self._task_context = TaskContext(
@@ -251,6 +254,11 @@ class CalibOrchestrator:
 
         logger = get_run_logger()
         config = self.config
+
+        # Skip completion if in wrapper mode (no ExecutionService)
+        if self._execution_service is None:
+            logger.info("Skipping completion (wrapper mode - no Execution)")
+            return
 
         # Reload and complete execution
         self._execution_service = self.execution_service.reload().complete_execution()
