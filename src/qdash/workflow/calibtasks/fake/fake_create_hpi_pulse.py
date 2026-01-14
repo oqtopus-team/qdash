@@ -34,7 +34,7 @@ class FakeCreateHPIPulse(FakeTask):
     task_type: str = "qubit"
     timeout: int = 60
 
-    input_parameters: ClassVar[dict[str, ParameterModel]] = {
+    input_parameters: ClassVar[dict[str, ParameterModel | None]] = {
         "qubit_frequency": ParameterModel(
             unit="GHz",
             description="Qubit frequency from ChevronPattern",
@@ -84,8 +84,9 @@ class FakeCreateHPIPulse(FakeTask):
         """
         # Get input parameter
         qubit_freq = None
-        if self.input_parameters.get("qubit_frequency"):
-            qubit_freq = self.input_parameters["qubit_frequency"].value
+        qubit_freq_param = self.input_parameters.get("qubit_frequency")
+        if qubit_freq_param is not None:
+            qubit_freq = qubit_freq_param.value
 
         # Simulate HPI amplitude (typically 0.2-0.4)
         # Higher frequency qubits may need slightly different amplitudes

@@ -181,12 +181,14 @@ class BaseTask(ABC):
         for name, param_data in calib_inputs.items():
             if name in self.input_parameters:
                 # Update existing parameter
-                if "value" in param_data:
-                    self.input_parameters[name].value = param_data["value"]
-                if "unit" in param_data:
-                    self.input_parameters[name].unit = param_data["unit"]
-                if "error" in param_data:
-                    self.input_parameters[name].error = param_data["error"]
+                param = self.input_parameters[name]
+                if param is not None:
+                    if "value" in param_data:
+                        param.value = param_data["value"]
+                    if "unit" in param_data:
+                        param.unit = param_data["unit"]
+                    if "error" in param_data:
+                        param.error = param_data["error"]
             else:
                 # Create new ParameterModel for calibration input
                 self.input_parameters[name] = ParameterModel(

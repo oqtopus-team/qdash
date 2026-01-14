@@ -36,7 +36,7 @@ class FakeCheckRabi(FakeTask):
     task_type: str = "qubit"
     timeout: int = 60
 
-    input_parameters: ClassVar[dict[str, ParameterModel]] = {
+    input_parameters: ClassVar[dict[str, ParameterModel | None]] = {
         "qubit_frequency": ParameterModel(
             unit="GHz",
             description="Qubit frequency from ChevronPattern",
@@ -88,8 +88,9 @@ class FakeCheckRabi(FakeTask):
         """
         # Get input parameter (may be loaded from DB or None)
         qubit_freq = None
-        if self.input_parameters.get("qubit_frequency"):
-            qubit_freq = self.input_parameters["qubit_frequency"].value
+        qubit_freq_param = self.input_parameters.get("qubit_frequency")
+        if qubit_freq_param is not None:
+            qubit_freq = qubit_freq_param.value
 
         # Base Rabi frequency depends on qubit frequency (realistic coupling)
         if qubit_freq:

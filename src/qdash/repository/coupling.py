@@ -156,7 +156,7 @@ class MongoCouplingCalibrationRepository:
         if doc is None:
             return {}
 
-        return doc.data
+        return dict(doc.data)
 
     def _to_model(self, doc: CouplingDocument, project_id: str | None) -> CouplingModel:
         """Convert a document to a domain model.

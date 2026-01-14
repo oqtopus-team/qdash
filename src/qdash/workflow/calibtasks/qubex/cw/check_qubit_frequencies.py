@@ -14,7 +14,7 @@ class CheckQubitFrequencies(QubexTask):
 
     name: str = "CheckQubitFrequencies"
     task_type: str = "qubit"
-    input_parameters: ClassVar[dict[str, ParameterModel]] = {}
+    input_parameters: ClassVar[dict[str, ParameterModel | None]] = {}
     run_parameters: ClassVar[dict[str, RunParameterModel]] = {}
     output_parameters: ClassVar[dict[str, ParameterModel]] = {
         "coarse_qubit_frequency": ParameterModel(unit="GHz", description="Coarse qubit frequency"),

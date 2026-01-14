@@ -31,7 +31,7 @@ class FakeChevronPattern(FakeTask):
     task_type: str = "qubit"
     timeout: int = 60
 
-    input_parameters: ClassVar[dict[str, ParameterModel]] = {}
+    input_parameters: ClassVar[dict[str, ParameterModel | None]] = {}
 
     run_parameters: ClassVar[dict[str, RunParameterModel]] = {
         "frequency_range": RunParameterModel(

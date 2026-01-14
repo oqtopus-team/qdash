@@ -17,7 +17,7 @@ class CheckCrossResonance(QubexTask):
     name: str = "CheckCrossResonance"
     task_type: str = "coupling"
     timeout: int = 60 * 25  # 25 minutes
-    input_parameters: ClassVar[dict[str, ParameterModel]] = {}
+    input_parameters: ClassVar[dict[str, ParameterModel | None]] = {}
     run_parameters: ClassVar[dict[str, RunParameterModel]] = {}
     output_parameters: ClassVar[dict[str, ParameterModel]] = {
         "cr_amplitude": ParameterModel(

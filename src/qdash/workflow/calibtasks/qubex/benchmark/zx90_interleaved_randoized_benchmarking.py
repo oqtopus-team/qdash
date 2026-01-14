@@ -17,7 +17,7 @@ class ZX90InterleavedRandomizedBenchmarking(QubexTask):
     name: str = "ZX90InterleavedRandomizedBenchmarking"
     task_type: str = "coupling"
     timeout: int = 60 * 30  # 25 minutes
-    input_parameters: ClassVar[dict[str, ParameterModel]] = {}
+    input_parameters: ClassVar[dict[str, ParameterModel | None]] = {}
     run_parameters: ClassVar[dict[str, RunParameterModel]] = {
         "n_trials": RunParameterModel(
             unit="a.u.",

@@ -34,7 +34,7 @@ class FakeCheckT2Echo(FakeTask):
     task_type: str = "qubit"
     timeout: int = 120
 
-    input_parameters: ClassVar[dict[str, ParameterModel]] = {
+    input_parameters: ClassVar[dict[str, ParameterModel | None]] = {
         "qubit_frequency": ParameterModel(
             unit="GHz",
             description="Qubit frequency from ChevronPattern",

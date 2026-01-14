@@ -34,7 +34,7 @@ class FakeCheckT1(FakeTask):
     task_type: str = "qubit"
     timeout: int = 120
 
-    input_parameters: ClassVar[dict[str, ParameterModel]] = {
+    input_parameters: ClassVar[dict[str, ParameterModel | None]] = {
         "qubit_frequency": ParameterModel(
             unit="GHz",
             description="Qubit frequency from ChevronPattern",
@@ -78,13 +78,14 @@ class FakeCheckT1(FakeTask):
         """
         # Get input parameter
         qubit_freq = None
-        if self.input_parameters.get("qubit_frequency"):
-            qubit_freq = self.input_parameters["qubit_frequency"].value
+        qubit_freq_param = self.input_parameters.get("qubit_frequency")
+        if qubit_freq_param is not None:
+            qubit_freq = qubit_freq_param.value
 
         # Simulate T1 value (typically 50-150 μs for transmons)
         # Higher frequency qubits tend to have slightly lower T1
         qid_int = int(qid) if qid.isdigit() else hash(qid) % 64
-        base_t1 = 80 + (qid_int % 20) * 3  # 80-137 μs base
+        base_t1: float = 80 + (qid_int % 20) * 3  # 80-137 μs base
 
         if qubit_freq:
             # Slight negative correlation with frequency

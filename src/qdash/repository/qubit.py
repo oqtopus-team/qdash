@@ -154,7 +154,7 @@ class MongoQubitCalibrationRepository:
         if doc is None:
             return {}
 
-        return doc.data
+        return dict(doc.data)
 
     def _to_model(self, doc: QubitDocument, project_id: str | None) -> QubitModel:
         """Convert a document to a domain model.

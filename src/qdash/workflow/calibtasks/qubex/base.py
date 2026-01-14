@@ -87,12 +87,16 @@ class QubexTask(BaseTask):
         # Fetch calibration data based on task type
         if "-" in qid:
             # Coupling task
-            repo = MongoCouplingCalibrationRepository()
-            calib_data = repo.get_calibration_data(project_id=project_id, chip_id=chip_id, qid=qid)
+            coupling_repo = MongoCouplingCalibrationRepository()
+            calib_data = coupling_repo.get_calibration_data(
+                project_id=project_id, chip_id=chip_id, qid=qid
+            )
         else:
             # Qubit task
-            repo = MongoQubitCalibrationRepository()
-            calib_data = repo.get_calibration_data(project_id=project_id, chip_id=chip_id, qid=qid)
+            qubit_repo = MongoQubitCalibrationRepository()
+            calib_data = qubit_repo.get_calibration_data(
+                project_id=project_id, chip_id=chip_id, qid=qid
+            )
 
         # Populate declared parameters with values from DB
         for param_name, param in list(self.input_parameters.items()):
@@ -102,7 +106,7 @@ class QubexTask(BaseTask):
                     if param is None:
                         # Create ParameterModel entirely from DB
                         self.input_parameters[param_name] = ParameterModel(
-                            value=db_value.get("value"),
+                            value=db_value.get("value", 0),
                             unit=db_value.get("unit", ""),
                             description=db_value.get("description", ""),
                         )
@@ -207,6 +211,8 @@ class QubexTask(BaseTask):
 
         """
         param = self.input_parameters[param_name]
+        if param is None:
+            raise ValueError(f"Parameter {param_name} not found or not loaded")
         # ParameterModel has .value, RunParameterModel has .get_value()
         if hasattr(param, "get_value"):
             return float(param.get_value())

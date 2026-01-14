@@ -1,7 +1,7 @@
 """Calibration router for QDash API."""
 
 from logging import getLogger
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException
 from qdash.api.dependencies import get_calibration_service
@@ -171,7 +171,7 @@ def compare_seed_values(
     service: Annotated[SeedImportService, Depends(get_seed_import_service)],
     chip_id: str,
     parameters: str | None = None,
-) -> dict:
+) -> dict[str, Any]:
     """Compare seed parameter values from YAML files with current QDash values.
 
     This endpoint allows users to preview what will be imported and see

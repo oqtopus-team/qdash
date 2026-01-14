@@ -14,7 +14,7 @@ class CheckResonatorSpectroscopy(QubexTask):
 
     name: str = "CheckResonatorSpectroscopy"
     task_type: str = "qubit"
-    input_parameters: ClassVar[dict[str, ParameterModel]] = {}
+    input_parameters: ClassVar[dict[str, ParameterModel | None]] = {}
     run_parameters: ClassVar[dict[str, RunParameterModel]] = {
         "frequency_range": RunParameterModel(
             unit="GHz",

@@ -22,7 +22,7 @@ class PreProcessResult(BaseModel):
         Experiment configuration parameters (shots, ranges, etc.).
     """
 
-    input_parameters: dict[str, ParameterModel] = {}
+    input_parameters: dict[str, ParameterModel | None] = {}
     run_parameters: dict[str, RunParameterModel] = {}
 
 

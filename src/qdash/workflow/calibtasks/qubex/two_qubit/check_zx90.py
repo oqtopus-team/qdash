@@ -15,7 +15,7 @@ class CheckZX90(QubexTask):
     name: str = "CheckZX90"
     task_type: str = "coupling"
     timeout: int = 60 * 25  # 25 minutes
-    input_parameters: ClassVar[dict[str, ParameterModel]] = {}
+    input_parameters: ClassVar[dict[str, ParameterModel | None]] = {}
     run_parameters: ClassVar[dict[str, RunParameterModel]] = {
         "repetitions": RunParameterModel(
             unit="a.u.",

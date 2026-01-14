@@ -37,7 +37,7 @@ class FakeRandomizedBenchmarking(FakeTask):
     task_type: str = "qubit"
     timeout: int = 300
 
-    input_parameters: ClassVar[dict[str, ParameterModel]] = {
+    input_parameters: ClassVar[dict[str, ParameterModel | None]] = {
         "qubit_frequency": ParameterModel(
             unit="GHz",
             description="Qubit frequency from ChevronPattern",
@@ -102,12 +102,15 @@ class FakeRandomizedBenchmarking(FakeTask):
         t2_value = None
         rabi_amp = None
 
-        if self.input_parameters.get("t1"):
-            t1_value = self.input_parameters["t1"].value
-        if self.input_parameters.get("t2_echo"):
-            t2_value = self.input_parameters["t2_echo"].value
-        if self.input_parameters.get("rabi_amplitude"):
-            rabi_amp = self.input_parameters["rabi_amplitude"].value
+        t1_param = self.input_parameters.get("t1")
+        if t1_param is not None:
+            t1_value = t1_param.value
+        t2_param = self.input_parameters.get("t2_echo")
+        if t2_param is not None:
+            t2_value = t2_param.value
+        rabi_param = self.input_parameters.get("rabi_amplitude")
+        if rabi_param is not None:
+            rabi_amp = rabi_param.value
 
         # Base fidelity (high quality device)
         base_fidelity = 0.998

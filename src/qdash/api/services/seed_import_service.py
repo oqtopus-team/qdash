@@ -702,4 +702,4 @@ class SeedImportService:
             if v1 == 0 or v2 == 0:
                 return abs(v1 - v2) < tolerance
             return abs(v1 - v2) / max(abs(v1), abs(v2)) < tolerance
-        return v1 == v2
+        return bool(v1 == v2)

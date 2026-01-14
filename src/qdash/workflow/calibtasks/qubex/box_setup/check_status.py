@@ -14,7 +14,7 @@ class CheckStatus(QubexTask):
 
     name: str = "CheckStatus"
     task_type: str = "global"
-    input_parameters: ClassVar[dict[str, ParameterModel]] = {}
+    input_parameters: ClassVar[dict[str, ParameterModel | None]] = {}
     run_parameters: ClassVar[dict[str, RunParameterModel]] = {}
     output_parameters: ClassVar[dict[str, ParameterModel]] = {}
 

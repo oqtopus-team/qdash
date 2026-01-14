@@ -37,7 +37,7 @@ class FakeCheckRamsey(FakeTask):
     task_type: str = "qubit"
     timeout: int = 120
 
-    input_parameters: ClassVar[dict[str, ParameterModel]] = {
+    input_parameters: ClassVar[dict[str, ParameterModel | None]] = {
         "qubit_frequency": ParameterModel(
             unit="GHz",
             description="Initial qubit frequency from ChevronPattern",
@@ -99,8 +99,9 @@ class FakeCheckRamsey(FakeTask):
         """
         # Get input qubit frequency
         input_freq = None
-        if self.input_parameters.get("qubit_frequency"):
-            input_freq = self.input_parameters["qubit_frequency"].value
+        qubit_freq_param = self.input_parameters.get("qubit_frequency")
+        if qubit_freq_param is not None:
+            input_freq = qubit_freq_param.value
 
         # Generate base values from qubit ID for reproducibility
         qid_int = int(qid) if qid.isdigit() else hash(qid) % 64
