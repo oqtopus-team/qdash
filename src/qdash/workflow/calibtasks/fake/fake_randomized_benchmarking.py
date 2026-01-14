@@ -116,13 +116,13 @@ class FakeRandomizedBenchmarking(FakeTask):
         if rabi_amp:
             # Optimal Rabi amplitude is around 0.5, deviation degrades fidelity
             amp_deviation = abs(rabi_amp - 0.5)
-            base_fidelity *= (1.0 - amp_deviation * 0.02)  # Small penalty for deviation
+            base_fidelity *= 1.0 - amp_deviation * 0.02  # Small penalty for deviation
         if t1_value:
             t1_factor = min(1.0, t1_value / 100)  # Normalized to 100 μs
-            base_fidelity *= (0.95 + 0.05 * t1_factor)
+            base_fidelity *= 0.95 + 0.05 * t1_factor
         if t2_value:
             t2_factor = min(1.0, t2_value / 80)  # Normalized to 80 μs
-            base_fidelity *= (0.95 + 0.05 * t2_factor)
+            base_fidelity *= 0.95 + 0.05 * t2_factor
 
         # Add some randomness
         gate_fidelity = base_fidelity + np.random.normal(0, 0.001)
@@ -173,8 +173,8 @@ class FakeRandomizedBenchmarking(FakeTask):
                 y=result["survival_prob"],
                 mode="markers",
                 name="Data",
-                marker=dict(size=8),
-                error_y=dict(type="constant", value=0.01),
+                marker={"size": 8},
+                error_y={"type": "constant", "value": 0.01},
             )
         )
 
@@ -188,7 +188,7 @@ class FakeRandomizedBenchmarking(FakeTask):
                 y=fit_prob,
                 mode="lines",
                 name=f"Fit (F = {result['gate_fidelity']:.4f})",
-                line=dict(color="red"),
+                line={"color": "red"},
             )
         )
 

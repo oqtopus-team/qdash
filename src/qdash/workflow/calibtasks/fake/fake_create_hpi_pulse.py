@@ -141,7 +141,7 @@ class FakeCreateHPIPulse(FakeTask):
                 y=result["signal"],
                 mode="markers",
                 name="Data",
-                marker=dict(size=6),
+                marker={"size": 6},
             )
         )
 
@@ -153,7 +153,7 @@ class FakeCreateHPIPulse(FakeTask):
                 y=fit_signal,
                 mode="lines",
                 name=f"Fit (amp = {result['hpi_amplitude']:.3f})",
-                line=dict(color="red"),
+                line={"color": "red"},
             )
         )
 

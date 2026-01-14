@@ -461,9 +461,7 @@ class ProvenanceService:
             # Get recent parameter versions (version > 1 means there was a change)
             # Fetch more if filtering by parameter names
             fetch_limit = limit * 5 if parameter_names else limit * 2
-            recent_docs = self.parameter_version_repo.get_recent(
-                project_id, limit=fetch_limit
-            )
+            recent_docs = self.parameter_version_repo.get_recent(project_id, limit=fetch_limit)
 
             changes: list[ParameterChangeResponse] = []
 
@@ -510,7 +508,9 @@ class ProvenanceService:
                         parameter_name=doc.parameter_name,
                         qid=doc.qid,
                         value=self._sanitize_value(current_value),
-                        previous_value=self._sanitize_value(previous_value) if previous_value is not None else None,
+                        previous_value=self._sanitize_value(previous_value)
+                        if previous_value is not None
+                        else None,
                         unit=getattr(doc, "unit", ""),
                         delta=delta,
                         delta_percent=delta_percent,

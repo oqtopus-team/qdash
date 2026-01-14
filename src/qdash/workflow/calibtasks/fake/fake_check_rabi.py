@@ -147,15 +147,14 @@ class FakeCheckRabi(FakeTask):
                 y=result["signal"],
                 mode="markers",
                 name="Data",
-                marker=dict(size=6),
+                marker={"size": 6},
             )
         )
 
         # Add fit line
         omega = 2 * np.pi * result["rabi_frequency"] / 1000
-        fit_signal = (
-            result["rabi_offset"]
-            + result["rabi_amplitude"] * np.cos(omega * result["time"] + result["rabi_phase"])
+        fit_signal = result["rabi_offset"] + result["rabi_amplitude"] * np.cos(
+            omega * result["time"] + result["rabi_phase"]
         )
         fig.add_trace(
             go.Scatter(
@@ -163,7 +162,7 @@ class FakeCheckRabi(FakeTask):
                 y=fit_signal,
                 mode="lines",
                 name="Fit",
-                line=dict(color="red"),
+                line={"color": "red"},
             )
         )
 

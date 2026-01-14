@@ -43,7 +43,9 @@ def validate_task_name(
 
     for task_name in task_names:
         if not is_task_available(task_name, backend):
-            raise ValueError(f"Invalid task name: {task_name} (not available for backend '{backend}')")
+            raise ValueError(
+                f"Invalid task name: {task_name} (not available for backend '{backend}')"
+            )
     return task_names
 
 

@@ -174,7 +174,7 @@ class FakeCheckRamsey(FakeTask):
                 y=result["signal"],
                 mode="markers",
                 name="Data",
-                marker=dict(size=5, color="blue"),
+                marker={"size": 5, "color": "blue"},
             )
         )
 
@@ -190,7 +190,7 @@ class FakeCheckRamsey(FakeTask):
                 y=fit_signal,
                 mode="lines",
                 name=f"Fit (T2* = {result['t2_star']:.1f} μs)",
-                line=dict(color="red", width=2),
+                line={"color": "red", "width": 2},
             )
         )
 
@@ -203,7 +203,7 @@ class FakeCheckRamsey(FakeTask):
                 y=upper_envelope,
                 mode="lines",
                 name="Envelope",
-                line=dict(color="gray", dash="dash", width=1),
+                line={"color": "gray", "dash": "dash", "width": 1},
                 showlegend=False,
             )
         )
@@ -212,7 +212,7 @@ class FakeCheckRamsey(FakeTask):
                 x=result["time"] / 1000,
                 y=lower_envelope,
                 mode="lines",
-                line=dict(color="gray", dash="dash", width=1),
+                line={"color": "gray", "dash": "dash", "width": 1},
                 showlegend=False,
             )
         )
@@ -221,17 +221,21 @@ class FakeCheckRamsey(FakeTask):
             title=f"Ramsey Fringes - {qid}",
             xaxis_title="Time (μs)",
             yaxis_title="Population",
-            legend=dict(x=0.7, y=0.95),
+            legend={"x": 0.7, "y": 0.95},
         )
 
         # Add annotation with results
         annotation_text = (
-            f"Input freq: {result['input_frequency']:.6f} GHz<br>"
-            f"Refined freq: {result['qubit_frequency']:.6f} GHz<br>"
-            f"T2* = {result['t2_star']:.1f} μs"
-        ) if result['input_frequency'] else (
-            f"Refined freq: {result['qubit_frequency']:.6f} GHz<br>"
-            f"T2* = {result['t2_star']:.1f} μs"
+            (
+                f"Input freq: {result['input_frequency']:.6f} GHz<br>"
+                f"Refined freq: {result['qubit_frequency']:.6f} GHz<br>"
+                f"T2* = {result['t2_star']:.1f} μs"
+            )
+            if result["input_frequency"]
+            else (
+                f"Refined freq: {result['qubit_frequency']:.6f} GHz<br>"
+                f"T2* = {result['t2_star']:.1f} μs"
+            )
         )
         fig.add_annotation(
             x=0.02,
@@ -240,7 +244,7 @@ class FakeCheckRamsey(FakeTask):
             yref="paper",
             text=annotation_text,
             showarrow=False,
-            font=dict(size=10),
+            font={"size": 10},
             align="left",
             bgcolor="rgba(255,255,255,0.8)",
             bordercolor="gray",

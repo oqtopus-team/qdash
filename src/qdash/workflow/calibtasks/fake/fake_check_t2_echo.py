@@ -115,7 +115,7 @@ class FakeCheckT2Echo(FakeTask):
                 y=result["signal"],
                 mode="markers",
                 name="Data",
-                marker=dict(size=6),
+                marker={"size": 6},
             )
         )
 
@@ -127,7 +127,7 @@ class FakeCheckT2Echo(FakeTask):
                 y=fit_signal,
                 mode="lines",
                 name=f"Fit (T2 echo = {result['t2_echo']:.1f} μs)",
-                line=dict(color="red"),
+                line={"color": "red"},
             )
         )
 

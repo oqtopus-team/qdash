@@ -450,12 +450,8 @@ class RecommendedTaskResponse(BaseModel):
 
     task_name: str = Field(..., description="Name of the task to re-run")
     priority: int = Field(..., description="Priority (1=highest)")
-    affected_parameters: list[str] = Field(
-        default_factory=list, description="Parameters affected"
-    )
-    affected_qids: list[str] = Field(
-        default_factory=list, description="Qubit IDs affected"
-    )
+    affected_parameters: list[str] = Field(default_factory=list, description="Parameters affected")
+    affected_qids: list[str] = Field(default_factory=list, description="Qubit IDs affected")
     reason: str = Field("", description="Explanation for recommendation")
 
 
@@ -488,7 +484,5 @@ class RecalibrationRecommendationResponse(BaseModel):
     recommended_tasks: list[RecommendedTaskResponse] = Field(
         default_factory=list, description="Prioritized task recommendations"
     )
-    total_affected_parameters: int = Field(
-        0, description="Total downstream parameters affected"
-    )
+    total_affected_parameters: int = Field(0, description="Total downstream parameters affected")
     max_depth_reached: int = Field(0, description="Impact graph depth traversed")
