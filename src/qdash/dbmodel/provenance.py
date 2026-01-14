@@ -154,6 +154,16 @@ class ParameterVersionDocument(Document):
                     ("valid_from", DESCENDING),
                 ]
             ),
+            # Unique constraint: Prevent duplicate versions (for concurrency safety)
+            IndexModel(
+                [
+                    ("project_id", ASCENDING),
+                    ("parameter_name", ASCENDING),
+                    ("qid", ASCENDING),
+                    ("version", ASCENDING),
+                ],
+                unique=True,
+            ),
         ]
 
     @classmethod
@@ -193,6 +203,11 @@ class ParameterVersionDocument(Document):
         qid: str,
     ) -> int:
         """Get the next version number for a parameter.
+
+        Note: Uses optimistic concurrency - the caller should handle
+        DuplicateKeyError by retrying with get_next_version() again.
+        The unique index on (project_id, parameter_name, qid, version)
+        ensures no duplicate versions are created.
 
         Parameters
         ----------

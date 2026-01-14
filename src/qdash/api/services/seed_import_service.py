@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 import pathlib
+import re
 import uuid
 from typing import Any
 
@@ -57,7 +58,27 @@ class SeedImportService:
         self._relation_repo = MongoProvenanceRelationRepository()
 
     def _params_dir(self, chip_id: str) -> pathlib.Path:
-        """Get the params directory for a chip."""
+        """Get the params directory for a chip.
+
+        Parameters
+        ----------
+        chip_id : str
+            Chip identifier (must contain only alphanumeric, underscore, or hyphen)
+
+        Returns
+        -------
+        pathlib.Path
+            Path to the params directory
+
+        Raises
+        ------
+        ValueError
+            If chip_id contains invalid characters (path traversal prevention)
+
+        """
+        # Validate chip_id to prevent path traversal attacks
+        if not re.match(r"^[a-zA-Z0-9_-]+$", chip_id):
+            raise ValueError(f"Invalid chip_id: {chip_id}")
         return pathlib.Path(self._config_base) / chip_id / "params"
 
     def import_seeds(
