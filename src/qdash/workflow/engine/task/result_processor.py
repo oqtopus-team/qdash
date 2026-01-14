@@ -8,7 +8,7 @@ import logging
 from collections.abc import Mapping
 from typing import Any
 
-from qdash.datamodel.task import OutputParameterModel
+from qdash.datamodel.task import ParameterModel
 
 logger = logging.getLogger(__name__)
 
@@ -95,7 +95,7 @@ class TaskResultProcessor:
 
     def validate_fidelity(
         self,
-        output_parameters: dict[str, OutputParameterModel],
+        output_parameters: dict[str, ParameterModel],
         task_name: str,
     ) -> bool:
         """Validate fidelity parameters (must be <= 1.0).
@@ -106,7 +106,7 @@ class TaskResultProcessor:
 
         Parameters
         ----------
-        output_parameters : dict[str, OutputParameterModel]
+        output_parameters : dict[str, ParameterModel]
             The output parameters from the task
         task_name : str
             The name of the task
@@ -137,14 +137,12 @@ class TaskResultProcessor:
 
         return True
 
-    def get_output_parameter_names(
-        self, output_parameters: dict[str, OutputParameterModel]
-    ) -> list[str]:
+    def get_output_parameter_names(self, output_parameters: dict[str, ParameterModel]) -> list[str]:
         """Get list of output parameter names.
 
         Parameters
         ----------
-        output_parameters : dict[str, OutputParameterModel]
+        output_parameters : dict[str, ParameterModel]
             The output parameters
 
         Returns
@@ -157,8 +155,8 @@ class TaskResultProcessor:
 
     def filter_output_parameters_on_r2_failure(
         self,
-        output_parameters: dict[str, OutputParameterModel],
-    ) -> dict[str, OutputParameterModel]:
+        output_parameters: dict[str, ParameterModel],
+    ) -> dict[str, ParameterModel]:
         """Filter out output parameters when R² validation fails.
 
         This is called when R² is too low - we don't want to save
@@ -166,12 +164,12 @@ class TaskResultProcessor:
 
         Parameters
         ----------
-        output_parameters : dict[str, OutputParameterModel]
+        output_parameters : dict[str, ParameterModel]
             The output parameters to filter
 
         Returns
         -------
-        dict[str, OutputParameterModel]
+        dict[str, ParameterModel]
             Empty dict (all parameters filtered out)
 
         """
@@ -229,16 +227,16 @@ class TaskResultProcessor:
 
     def process_output_parameters(
         self,
-        output_parameters: dict[str, OutputParameterModel],
+        output_parameters: dict[str, ParameterModel],
         task_name: str,
         execution_id: str,
         task_id: str,
-    ) -> dict[str, OutputParameterModel]:
+    ) -> dict[str, ParameterModel]:
         """Process output parameters, validating and attaching metadata.
 
         Parameters
         ----------
-        output_parameters : dict[str, OutputParameterModel]
+        output_parameters : dict[str, ParameterModel]
             The output parameters to process
         task_name : str
             The task name
@@ -249,7 +247,7 @@ class TaskResultProcessor:
 
         Returns
         -------
-        dict[str, OutputParameterModel]
+        dict[str, ParameterModel]
             Processed output parameters
 
         Raises

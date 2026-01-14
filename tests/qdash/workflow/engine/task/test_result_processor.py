@@ -1,7 +1,7 @@
 """Tests for TaskResultProcessor."""
 
 import pytest
-from qdash.datamodel.task import OutputParameterModel
+from qdash.datamodel.task import ParameterModel
 from qdash.workflow.engine.task.result_processor import (
     FidelityValidationError,
     R2ValidationError,
@@ -69,7 +69,7 @@ class TestFidelityValidation:
     def test_validate_fidelity_passes_for_normal_values(self):
         """Test validate_fidelity passes for fidelity <= 1.0."""
         processor = TaskResultProcessor()
-        output_params = {"fidelity": OutputParameterModel(value=0.99)}
+        output_params = {"fidelity": ParameterModel(value=0.99)}
 
         result = processor.validate_fidelity(output_params, "RandomizedBenchmarking")
 
@@ -78,7 +78,7 @@ class TestFidelityValidation:
     def test_validate_fidelity_raises_for_over_100_percent(self):
         """Test validate_fidelity raises for fidelity > 1.0."""
         processor = TaskResultProcessor()
-        output_params = {"fidelity": OutputParameterModel(value=1.5)}
+        output_params = {"fidelity": ParameterModel(value=1.5)}
 
         with pytest.raises(FidelityValidationError, match="exceeds 100%"):
             processor.validate_fidelity(output_params, "RandomizedBenchmarking")
@@ -86,7 +86,7 @@ class TestFidelityValidation:
     def test_validate_fidelity_validates_all_tasks(self):
         """Test validate_fidelity validates fidelity for all tasks."""
         processor = TaskResultProcessor()
-        output_params = {"fidelity": OutputParameterModel(value=1.5)}
+        output_params = {"fidelity": ParameterModel(value=1.5)}
 
         # Should raise FidelityValidationError for any task with invalid fidelity
         with pytest.raises(FidelityValidationError):
@@ -96,8 +96,8 @@ class TestFidelityValidation:
         """Test validate_fidelity validates parameters containing 'fidelity' in name."""
         processor = TaskResultProcessor()
         output_params = {
-            "average_readout_fidelity": OutputParameterModel(value=1.05),
-            "other_param": OutputParameterModel(value=5.0),
+            "average_readout_fidelity": ParameterModel(value=1.05),
+            "other_param": ParameterModel(value=5.0),
         }
 
         with pytest.raises(FidelityValidationError) as exc_info:
@@ -109,7 +109,7 @@ class TestFidelityValidation:
     def test_validate_fidelity_passes_when_no_fidelity(self):
         """Test validate_fidelity passes when fidelity param missing."""
         processor = TaskResultProcessor()
-        output_params = {"other_param": OutputParameterModel(value=5.0)}
+        output_params = {"other_param": ParameterModel(value=5.0)}
 
         result = processor.validate_fidelity(output_params, "RandomizedBenchmarking")
 
@@ -118,7 +118,7 @@ class TestFidelityValidation:
     def test_validate_fidelity_handles_interleaved_rb(self):
         """Test validate_fidelity handles InterleavedRandomizedBenchmarking."""
         processor = TaskResultProcessor()
-        output_params = {"fidelity": OutputParameterModel(value=1.5)}
+        output_params = {"fidelity": ParameterModel(value=1.5)}
 
         with pytest.raises(FidelityValidationError):
             processor.validate_fidelity(output_params, "InterleavedRandomizedBenchmarking")
@@ -131,8 +131,8 @@ class TestOutputParameterProcessing:
         """Test get_output_parameter_names returns param names."""
         processor = TaskResultProcessor()
         output_params = {
-            "qubit_frequency": OutputParameterModel(value=5.0),
-            "t1": OutputParameterModel(value=100.0),
+            "qubit_frequency": ParameterModel(value=5.0),
+            "t1": ParameterModel(value=100.0),
         }
 
         names = processor.get_output_parameter_names(output_params)
@@ -143,8 +143,8 @@ class TestOutputParameterProcessing:
         """Test filter_output_parameters_on_r2_failure returns empty dict."""
         processor = TaskResultProcessor()
         output_params = {
-            "qubit_frequency": OutputParameterModel(value=5.0),
-            "t1": OutputParameterModel(value=100.0),
+            "qubit_frequency": ParameterModel(value=5.0),
+            "t1": ParameterModel(value=100.0),
         }
 
         result = processor.filter_output_parameters_on_r2_failure(output_params)
@@ -155,7 +155,7 @@ class TestOutputParameterProcessing:
         """Test process_output_parameters attaches execution and task IDs."""
         processor = TaskResultProcessor()
         output_params = {
-            "qubit_frequency": OutputParameterModel(value=5.0),
+            "qubit_frequency": ParameterModel(value=5.0),
         }
 
         result = processor.process_output_parameters(
@@ -168,7 +168,7 @@ class TestOutputParameterProcessing:
     def test_process_output_parameters_validates_fidelity(self):
         """Test process_output_parameters validates fidelity for RB tasks."""
         processor = TaskResultProcessor()
-        output_params = {"fidelity": OutputParameterModel(value=1.5)}
+        output_params = {"fidelity": ParameterModel(value=1.5)}
 
         with pytest.raises(FidelityValidationError):
             processor.process_output_parameters(

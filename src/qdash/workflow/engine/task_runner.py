@@ -6,7 +6,6 @@ from prefect import get_run_logger, task
 from qdash.dbmodel.initialize import initialize
 
 if TYPE_CHECKING:
-    from qdash.repository.protocols import TaskRepository
     from qdash.workflow.calibtasks.base import BaseTask
     from qdash.workflow.engine.backend.base import BaseBackend
     from qdash.workflow.engine.execution.service import ExecutionService
@@ -15,19 +14,16 @@ if TYPE_CHECKING:
 
 def validate_task_name(
     task_names: list[str],
-    username: str,
-    task_repo: TaskRepository | None = None,
+    backend: str | None = None,
 ) -> list[str]:
-    """Validate task names.
+    """Validate task names against backend.yaml configuration.
 
     Parameters
     ----------
     task_names : list[str]
         List of task names to validate
-    username : str
-        Username to look up tasks for
-    task_repo : TaskRepository | None
-        Repository for task lookup. If None, uses MongoTaskRepository.
+    backend : str | None
+        Backend name (e.g., 'qubex', 'fake'). If None, uses default backend.
 
     Returns
     -------
@@ -37,18 +33,19 @@ def validate_task_name(
     Raises
     ------
     ValueError
-        If any task name is invalid
+        If any task name is invalid for the specified backend
 
     """
-    if task_repo is None:
-        from qdash.repository import MongoTaskRepository
+    from qdash.common.backend_config import get_default_backend, is_task_available
 
-        task_repo = MongoTaskRepository()
+    if backend is None:
+        backend = get_default_backend()
 
-    task_list = task_repo.get_task_names(username)
     for task_name in task_names:
-        if task_name not in task_list:
-            raise ValueError(f"Invalid task name: {task_name}")
+        if not is_task_available(task_name, backend):
+            raise ValueError(
+                f"Invalid task name: {task_name} (not available for backend '{backend}')"
+            )
     return task_names
 
 

@@ -1,13 +1,16 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowDown,
   ArrowUp,
+  Check,
+  Database,
   File,
   FileJson,
   Folder,
@@ -41,6 +44,28 @@ import { useToast } from "@/components/ui/Toast";
 
 const Editor = dynamic(() => import("@monaco-editor/react"), { ssr: false });
 
+// Helper to check if file is a params YAML that can be imported
+function parseParamsFilePath(
+  path: string,
+): { chipId: string; paramName: string } | null {
+  // Match pattern: config/qubex/{chip_id}/params/{param_name}.yaml
+  const match = path.match(/^config\/qubex\/([^/]+)\/params\/([^/]+)\.ya?ml$/);
+  if (match) {
+    return { chipId: match[1], paramName: match[2] };
+  }
+  return null;
+}
+
+// Seed import response type
+interface SeedImportResponse {
+  chip_id: string;
+  source: string;
+  imported_count: number;
+  skipped_count: number;
+  error_count: number;
+  provenance_activity_id?: string | null;
+}
+
 export default function FilesEditorPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -53,6 +78,15 @@ export default function FilesEditorPage() {
   const [commitMessage, setCommitMessage] = useState("");
   const [isEditorLocked, setIsEditorLocked] = useState(true);
   const [isSidebarVisible, setIsSidebarVisible] = useState(true);
+  const [importResult, setImportResult] = useState<SeedImportResponse | null>(
+    null,
+  );
+
+  // Check if selected file is a params YAML that can be imported
+  const paramsFileInfo = useMemo(() => {
+    if (!selectedFile) return null;
+    return parseParamsFilePath(selectedFile);
+  }, [selectedFile]);
 
   const {
     data: fileTreeData,
@@ -133,6 +167,41 @@ export default function FilesEditorPage() {
     },
   });
 
+  // Seed import mutation
+  const importMutation = useMutation({
+    mutationFn: async ({
+      chipId,
+      paramName,
+    }: {
+      chipId: string;
+      paramName: string;
+    }) => {
+      const response = await fetch("/api/calibrations/seed-import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chip_id: chipId,
+          source: "qubex_params",
+          parameters: [paramName],
+        }),
+      });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(
+          errorData.detail || `Import failed: ${response.status}`,
+        );
+      }
+      return response.json() as Promise<SeedImportResponse>;
+    },
+    onSuccess: (data) => {
+      setImportResult(data);
+      toast.success(`Imported ${data.imported_count} parameters to QDash`);
+    },
+    onError: (error: Error) => {
+      toast.error(`Import failed: ${error.message}`);
+    },
+  });
+
   useEffect(() => {
     if (
       fileContentData?.content !== undefined &&
@@ -156,6 +225,15 @@ export default function FilesEditorPage() {
     setSelectedFile(path);
     setHasUnsavedChanges(false);
     setIsEditorLocked(true); // Lock editor when opening new file
+    setImportResult(null); // Clear import result when selecting new file
+  };
+
+  const handleImportToQDash = () => {
+    if (!paramsFileInfo) return;
+    importMutation.mutate({
+      chipId: paramsFileInfo.chipId,
+      paramName: paramsFileInfo.paramName,
+    });
   };
 
   const toggleEditorLock = () => {
@@ -375,8 +453,51 @@ export default function FilesEditorPage() {
                 </>
               )}
             </button>
+            {/* Import to QDash button - only show for params YAML files */}
+            {paramsFileInfo && (
+              <button
+                onClick={handleImportToQDash}
+                className="btn btn-sm btn-accent hidden sm:flex"
+                disabled={importMutation.isPending}
+                title={`Import ${paramsFileInfo.paramName} to QDash for provenance tracking`}
+              >
+                {importMutation.isPending ? (
+                  <span className="loading loading-spinner loading-xs"></span>
+                ) : (
+                  <>
+                    <Database size={16} />
+                    <span className="ml-1">Import to QDash</span>
+                  </>
+                )}
+              </button>
+            )}
           </div>
         </div>
+
+        {/* Import success banner */}
+        {importResult && (
+          <div className="px-4 py-2 bg-success/20 border-b border-success/30 flex items-center justify-between">
+            <div className="flex items-center gap-2 text-sm">
+              <Check size={16} className="text-success" />
+              <span>
+                Imported {importResult.imported_count} values for{" "}
+                <strong>{paramsFileInfo?.paramName}</strong> from{" "}
+                <strong>{importResult.chip_id}</strong>
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Link href="/provenance" className="btn btn-xs btn-ghost">
+                View in Provenance →
+              </Link>
+              <button
+                onClick={() => setImportResult(null)}
+                className="btn btn-xs btn-ghost"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+        )}
 
         <div className="flex-1 flex overflow-hidden">
           <div

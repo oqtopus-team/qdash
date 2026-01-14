@@ -30,8 +30,12 @@ class TaskTypes:
     SYSTEM: Final[TaskType] = "system"
 
 
-class InputParameterModel(BaseModel):
-    """Input parameter class."""
+class RunParameterModel(BaseModel):
+    """Run parameter class for experiment configuration (e.g., shots, ranges).
+
+    This was previously named InputParameterModel. It handles experiment settings
+    that are passed to measurement functions, NOT calibration parameters.
+    """
 
     unit: str = ""
     value_type: str = "float"
@@ -94,13 +98,22 @@ class InputParameterModel(BaseModel):
         return self.value
 
 
-class OutputParameterModel(BaseModel):
-    """Data model.
+class ParameterModel(BaseModel):
+    """Calibration parameter model.
+
+    Used for both input_parameters (calibration dependencies) and
+    output_parameters (calibration outputs) in tasks.
 
     Attributes
     ----------
-        qubit (dict[str, dict[str, float | int]]): The calibration data for qubits.
-        coupling (dict[str, dict[str, float | int]]): The calibration data for couplings.
+        value: The parameter value.
+        value_type: The type of the value (default: "float").
+        error: The error/uncertainty of the value.
+        unit: The unit of measurement.
+        description: Description of the parameter.
+        calibrated_at: When the calibration was performed.
+        execution_id: The execution that produced this value.
+        task_id: The task that produced this value.
 
     """
 
@@ -157,20 +170,20 @@ class CalibDataModel(BaseModel):
 
     """
 
-    qubit: dict[str, dict[str, OutputParameterModel]] = Field(default_factory=dict)
-    coupling: dict[str, dict[str, OutputParameterModel]] = Field(default_factory=dict)
+    qubit: dict[str, dict[str, ParameterModel]] = Field(default_factory=dict)
+    coupling: dict[str, dict[str, ParameterModel]] = Field(default_factory=dict)
 
-    def put_qubit_data(self, qid: str, parameter_name: str, data: OutputParameterModel) -> None:
+    def put_qubit_data(self, qid: str, parameter_name: str, data: ParameterModel) -> None:
         if qid not in self.qubit:
             self.qubit[qid] = {}
         self.qubit[qid][parameter_name] = data
 
-    def put_coupling_data(self, qid: str, parameter_name: str, data: OutputParameterModel) -> None:
+    def put_coupling_data(self, qid: str, parameter_name: str, data: ParameterModel) -> None:
         if qid not in self.coupling:
             self.coupling[qid] = {}
         self.coupling[qid][parameter_name] = data
 
-    def __getitem__(self, key: str) -> dict[str, dict[str, OutputParameterModel]]:
+    def __getitem__(self, key: str) -> dict[str, dict[str, ParameterModel]]:
         """Get the item by key."""
         if key in ("qubit", "coupling"):
             return getattr(self, key)  # type: ignore

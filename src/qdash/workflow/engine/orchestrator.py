@@ -16,6 +16,7 @@ from prefect import get_run_logger
 from qdash.workflow.engine.backend.factory import create_backend
 from qdash.workflow.engine.execution.service import ExecutionService
 from qdash.workflow.engine.task.context import TaskContext
+from qdash.workflow.engine.task.history_recorder import TaskHistoryRecorder
 
 if TYPE_CHECKING:
     from qdash.workflow.engine.backend.base import BaseBackend
@@ -98,6 +99,22 @@ class CalibOrchestrator:
         """Check if the session is initialized."""
         return self._initialized
 
+    def _create_history_recorder(self) -> TaskHistoryRecorder:
+        """Create a TaskHistoryRecorder with optional provenance tracking.
+
+        Returns:
+            TaskHistoryRecorder configured based on enable_provenance_tracking
+        """
+        provenance_recorder = None
+        if self.config.enable_provenance_tracking:
+            from qdash.workflow.engine.task.provenance_recorder import (
+                ProvenanceRecorder,
+            )
+
+            provenance_recorder = ProvenanceRecorder()
+
+        return TaskHistoryRecorder(provenance_recorder=provenance_recorder)
+
     def initialize(self) -> None:
         """Initialize the calibration session.
 
@@ -135,12 +152,13 @@ class CalibOrchestrator:
         self._execution_service.save_with_tags()
         self._execution_service.start_execution()
 
-        # Initialize TaskContext
+        # Initialize TaskContext with optional provenance tracking
         self._task_context = TaskContext(
             username=config.username,
             execution_id=config.execution_id,
             qids=config.qids,
             calib_dir=config.calib_data_path,
+            history_recorder=self._create_history_recorder(),
         )
 
         # Initialize Backend
@@ -188,6 +206,7 @@ class CalibOrchestrator:
             "note_path": note_path,
             "chip_id": config.chip_id,
             "classifier_dir": config.classifier_dir,
+            "project_id": config.project_id,
         }
 
         if config.muxes is not None:
@@ -362,12 +381,13 @@ class CalibOrchestrator:
 
         config = self.config
 
-        # Create new context for this execution
+        # Create new context for this execution with optional provenance tracking
         exec_context = TaskContext(
             username=config.username,
             execution_id=config.execution_id,
             qids=[qid],
             calib_dir=self.task_context.calib_dir,
+            history_recorder=self._create_history_recorder(),
         )
 
         # Copy relevant calibration data

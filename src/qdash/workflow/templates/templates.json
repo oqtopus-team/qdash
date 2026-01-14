@@ -54,5 +54,13 @@
     "category": "system",
     "filename": "check_skew.py",
     "function_name": "check_skew"
+  },
+  {
+    "id": "fake_calibration",
+    "name": "Fake Backend Calibration",
+    "description": "Calibration with backend switching. Use backend_name='fake' for testing, 'qubex' for production. Customize tasks list for provenance testing.",
+    "category": "testing",
+    "filename": "fake_backend.py",
+    "function_name": "fake_calibration"
   }
 ]

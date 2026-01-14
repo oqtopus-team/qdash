@@ -1,14 +1,14 @@
 from typing import Any, ClassVar
 
 import plotly.graph_objects as go
-from qdash.datamodel.task import InputParameterModel, OutputParameterModel
+from qdash.datamodel.task import ParameterModel, RunParameterModel
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
     RunResult,
 )
 from qdash.workflow.calibtasks.qubex.base import QubexTask
 from qdash.workflow.engine.backend.qubex import QubexBackend
-from qubex.measurement.measurement import DEFAULT_INTERVAL, DEFAULT_SHOTS
+from qubex.measurement.measurement import DEFAULT_INTERVAL, DEFAULT_READOUT_DURATION, DEFAULT_SHOTS
 
 
 class CheckRamsey(QubexTask):
@@ -16,38 +16,46 @@ class CheckRamsey(QubexTask):
 
     name: str = "CheckRamsey"
     task_type: str = "qubit"
-    input_parameters: ClassVar[dict[str, InputParameterModel]] = {
-        "detuning": InputParameterModel(
+    input_parameters: ClassVar[dict[str, ParameterModel | None]] = {
+        "qubit_frequency": None,  # Load from DB
+        "hpi_amplitude": None,  # Load from DB
+        "hpi_length": None,  # Load from DB
+        "readout_amplitude": None,  # Load from DB
+        "readout_frequency": None,  # Load from DB
+        "readout_length": ParameterModel(
+            value=DEFAULT_READOUT_DURATION, unit="ns", description="Readout pulse length"
+        ),
+    }
+    run_parameters: ClassVar[dict[str, RunParameterModel]] = {
+        "detuning": RunParameterModel(
             unit="GHz",
             value_type="float",
             value=0.001,
             description="Detuning for Ramsey oscillation",
         ),
-        "time_range": InputParameterModel(
+        "time_range": RunParameterModel(
             unit="ns",
             value_type="np.arange",
             value=(0, 10001, 100),
             description="Time range for Rabi oscillation",
         ),
-        "shots": InputParameterModel(
+        "shots": RunParameterModel(
             unit="a.u.",
             value_type="int",
             value=DEFAULT_SHOTS,
             description="Number of shots for Rabi oscillation",
         ),
-        "interval": InputParameterModel(
+        "interval": RunParameterModel(
             unit="ns",
             value_type="int",
             value=DEFAULT_INTERVAL,
             description="Time interval for Rabi oscillation",
         ),
     }
-    output_parameters: ClassVar[dict[str, OutputParameterModel]] = {
-        "ramsey_frequency": OutputParameterModel(
-            unit="MHz", description="Ramsey oscillation frequency"
-        ),
-        "qubit_frequency": OutputParameterModel(unit="GHz", description="Qubit bare frequency"),
-        "t2_star": OutputParameterModel(unit="μs", description="T2* time"),
+    output_parameters: ClassVar[dict[str, ParameterModel]] = {
+        "ramsey_frequency": ParameterModel(unit="MHz", description="Ramsey oscillation frequency"),
+        "qubit_frequency": ParameterModel(unit="GHz", description="Qubit bare frequency"),
+        "t2_star": ParameterModel(unit="μs", description="T2* time"),
     }
 
     def make_figure(self, result_x: Any, result_y: Any, label: str) -> go.Figure:
@@ -275,19 +283,19 @@ class CheckRamsey(QubexTask):
         # Apply frequency override if qubit_frequency was explicitly provided
         with self._apply_frequency_override(backend, qid):
             result_y = exp.ramsey_experiment(
-                time_range=self.input_parameters["time_range"].get_value(),
-                shots=self.input_parameters["shots"].get_value(),
-                interval=self.input_parameters["interval"].get_value(),
-                detuning=self.input_parameters["detuning"].get_value(),
+                time_range=self.run_parameters["time_range"].get_value(),
+                shots=self.run_parameters["shots"].get_value(),
+                interval=self.run_parameters["interval"].get_value(),
+                detuning=self.run_parameters["detuning"].get_value(),
                 second_rotation_axis="Y",  # Default axis for Ramsey
                 spectator_state="0",
                 targets=label,
             )
             result_x = exp.ramsey_experiment(
-                time_range=self.input_parameters["time_range"].get_value(),
-                shots=self.input_parameters["shots"].get_value(),
-                interval=self.input_parameters["interval"].get_value(),
-                detuning=self.input_parameters["detuning"].get_value(),
+                time_range=self.run_parameters["time_range"].get_value(),
+                shots=self.run_parameters["shots"].get_value(),
+                interval=self.run_parameters["interval"].get_value(),
+                detuning=self.run_parameters["detuning"].get_value(),
                 second_rotation_axis="X",  # Default axis for Ramsey
                 spectator_state="0",
                 targets=label,

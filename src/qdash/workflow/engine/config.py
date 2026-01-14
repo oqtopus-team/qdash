@@ -24,6 +24,7 @@ class CalibConfig:
         muxes: MUX IDs for system-level tasks
         project_id: Project ID for multi-tenancy
         enable_github_pull: Whether to pull config from GitHub
+        enable_provenance_tracking: Whether to track data provenance for lineage
     """
 
     username: str
@@ -37,6 +38,7 @@ class CalibConfig:
     muxes: list[int] | None = None
     project_id: str | None = None
     enable_github_pull: bool = False
+    enable_provenance_tracking: bool = True
 
     # Derived paths (computed after initialization)
     calib_data_path: str = field(default="", init=False)

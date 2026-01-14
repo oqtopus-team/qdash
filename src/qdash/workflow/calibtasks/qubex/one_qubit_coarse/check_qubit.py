@@ -1,6 +1,6 @@
 from typing import ClassVar
 
-from qdash.datamodel.task import InputParameterModel, OutputParameterModel
+from qdash.datamodel.task import ParameterModel, RunParameterModel
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
     RunResult,
@@ -15,33 +15,30 @@ class CheckQubit(QubexTask):
 
     name: str = "CheckQubit"
     task_type: str = "qubit"
-    input_parameters: ClassVar[dict[str, InputParameterModel]] = {
-        "time_range": InputParameterModel(
+    input_parameters: ClassVar[dict[str, ParameterModel | None]] = {}
+    run_parameters: ClassVar[dict[str, RunParameterModel]] = {
+        "time_range": RunParameterModel(
             unit="ns",
             value_type="range",
             value=(0, 201, 4),
             description="Time range for Rabi oscillation",
         ),
-        "shots": InputParameterModel(
+        "shots": RunParameterModel(
             unit="a.u.",
             value_type="int",
             value=DEFAULT_SHOTS,
             description="Number of shots for Rabi oscillation",
         ),
-        "interval": InputParameterModel(
+        "interval": RunParameterModel(
             unit="ns",
             value_type="int",
             value=DEFAULT_INTERVAL,
             description="Time interval for Rabi oscillation",
         ),
     }
-    output_parameters: ClassVar[dict[str, OutputParameterModel]] = {
-        "rabi_amplitude": OutputParameterModel(
-            unit="a.u.", description="Rabi oscillation amplitude"
-        ),
-        "rabi_frequency": OutputParameterModel(
-            unit="MHz", description="Rabi oscillation frequency"
-        ),
+    output_parameters: ClassVar[dict[str, ParameterModel]] = {
+        "rabi_amplitude": ParameterModel(unit="a.u.", description="Rabi oscillation amplitude"),
+        "rabi_frequency": ParameterModel(unit="MHz", description="Rabi oscillation frequency"),
     }
 
     def postprocess(
@@ -74,9 +71,9 @@ class CheckQubit(QubexTask):
         exp = self.get_experiment(backend)
         label = self.get_qubit_label(backend, qid)
         result = exp.check_rabi(
-            time_range=self.input_parameters["time_range"].get_value(),
-            shots=self.input_parameters["shots"].get_value(),
-            interval=self.input_parameters["interval"].get_value(),
+            time_range=self.run_parameters["time_range"].get_value(),
+            shots=self.run_parameters["shots"].get_value(),
+            interval=self.run_parameters["interval"].get_value(),
             targets=[label],
         )
         self.save_calibration(backend)
@@ -88,9 +85,9 @@ class CheckQubit(QubexTask):
         exp = self.get_experiment(backend)
         labels = [self.get_qubit_label(backend, qid) for qid in qids]
         results = exp.check_rabi(
-            time_range=self.input_parameters["time_range"].get_value(),
-            shots=self.input_parameters["shots"].get_value(),
-            interval=self.input_parameters["interval"].get_value(),
+            time_range=self.run_parameters["time_range"].get_value(),
+            shots=self.run_parameters["shots"].get_value(),
+            interval=self.run_parameters["interval"].get_value(),
             targets=labels,
         )
         return RunResult(raw_result=results)

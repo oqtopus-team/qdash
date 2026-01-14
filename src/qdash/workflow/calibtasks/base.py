@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Any, ClassVar
 
-from qdash.datamodel.task import InputParameterModel, OutputParameterModel, TaskTypes
+from qdash.datamodel.task import ParameterModel, RunParameterModel, TaskTypes
 from qdash.workflow.calibtasks.results import PostProcessResult, PreProcessResult, RunResult
 from qdash.workflow.engine.backend.base import BaseBackend
 
@@ -10,16 +10,36 @@ __all__ = [
     "PostProcessResult",
     "PreProcessResult",
     "RunResult",
+    "RunParameterModel",
 ]
 
 
 class BaseTask(ABC):
-    """Base class for the task."""
+    """Base class for the task.
+
+    Attributes
+    ----------
+    input_parameters : dict[str, ParameterModel | None]
+        Calibration parameters that this task depends on (for provenance tracking).
+        - None: Load entirely from DB (parameter name is the key)
+        - ParameterModel(...): Use as fallback if DB doesn't have the value
+    output_parameters : dict[str, ParameterModel]
+        Calibration parameters that this task produces.
+    run_parameters : dict[str, RunParameterModel]
+        Experiment configuration parameters (shots, ranges, etc.).
+        This was previously named input_parameters.
+    """
 
     name: str = ""
     task_type: str
-    input_parameters: ClassVar[dict[str, InputParameterModel]] = {}
-    output_parameters: ClassVar[dict[str, OutputParameterModel]] = {}
+    # Calibration input parameters (for provenance tracking)
+    # - None: Load entirely from DB
+    # - ParameterModel(...): Use as fallback if DB doesn't have the value
+    input_parameters: ClassVar[dict[str, ParameterModel | None]] = {}
+    # Calibration output parameters
+    output_parameters: ClassVar[dict[str, ParameterModel]] = {}
+    # NEW: Experiment run configuration (renamed from old input_parameters)
+    run_parameters: ClassVar[dict[str, RunParameterModel]] = {}
     r2_threshold: float = 0.7
     timeout = 60 * 60  # Default timeout of 1 hour
     backend = "qubex"
@@ -45,16 +65,21 @@ class BaseTask(ABC):
             params: Optional dictionary containing task parameters
 
         """
-        # Create instance-specific deep copies of input/output parameters
+        # Create instance-specific deep copies of parameters
         # to avoid sharing state between task instances
         from copy import deepcopy
 
-        # These are instance copies that shadow the class variables
-        self.input_parameters: dict[str, InputParameterModel] = deepcopy(  # type: ignore[misc]
+        # Calibration input parameters (for provenance)
+        self.input_parameters: dict[str, ParameterModel] = deepcopy(  # type: ignore[misc]
             self.__class__.input_parameters
         )
-        self.output_parameters: dict[str, OutputParameterModel] = deepcopy(  # type: ignore[misc]
+        # Calibration output parameters
+        self.output_parameters: dict[str, ParameterModel] = deepcopy(  # type: ignore[misc]
             self.__class__.output_parameters
+        )
+        # Experiment run configuration
+        self.run_parameters: dict[str, RunParameterModel] = deepcopy(  # type: ignore[misc]
+            self.__class__.run_parameters
         )
 
         if params is not None:
@@ -102,36 +127,76 @@ class BaseTask(ABC):
             params: Dictionary containing task parameters
 
         """
-        if "input_parameters" in params:
-            input_params = params["input_parameters"]
-            for name, param_data in input_params.items():
-                if name in self.input_parameters:
-                    # Parameter already exists in class definition - update its value
-                    value = param_data.get("value")
-                    if value is not None:
-                        value_type = param_data.get(
-                            "value_type", self.input_parameters[name].value_type
-                        )
-                        converted_value = self._convert_value_to_type(value, value_type)
-                        self.input_parameters[name].value = converted_value
-                else:
-                    # Parameter doesn't exist yet (e.g., qubit_frequency added by preprocess)
-                    # Create a new InputParameterModel from the provided data
-                    from qdash.datamodel.task import InputParameterModel
+        # Handle run_parameters (experiment configuration)
+        if "run_parameters" in params:
+            self._set_run_parameters(params["run_parameters"])
+        # Backward compatibility: old input_parameters -> run_parameters
+        elif "input_parameters" in params:
+            self._set_run_parameters(params["input_parameters"])
 
-                    value = param_data.get("value")
-                    if value is not None:
-                        value_type = param_data.get("value_type", "float")
-                        unit = param_data.get("unit", "")
-                        description = param_data.get("description", "")
-                        converted_value = self._convert_value_to_type(value, value_type)
+        # Handle input_parameters (calibration inputs for provenance)
+        if "calibration_inputs" in params:
+            self._set_calibration_inputs(params["calibration_inputs"])
 
-                        self.input_parameters[name] = InputParameterModel(
-                            unit=unit,
-                            description=description,
-                            value=converted_value,
-                            value_type=value_type,
-                        )
+    def _set_run_parameters(self, run_params: dict[str, Any]) -> None:
+        """Set run parameters (experiment configuration).
+
+        Args:
+        ----
+            run_params: Dictionary of run parameters
+
+        """
+        for name, param_data in run_params.items():
+            if name in self.run_parameters:
+                # Parameter already exists - update its value
+                value = param_data.get("value")
+                if value is not None:
+                    value_type = param_data.get("value_type", self.run_parameters[name].value_type)
+                    converted_value = self._convert_value_to_type(value, value_type)
+                    self.run_parameters[name].value = converted_value
+            else:
+                # Create new RunParameterModel
+                value = param_data.get("value")
+                if value is not None:
+                    value_type = param_data.get("value_type", "float")
+                    unit = param_data.get("unit", "")
+                    description = param_data.get("description", "")
+                    converted_value = self._convert_value_to_type(value, value_type)
+
+                    self.run_parameters[name] = RunParameterModel(
+                        unit=unit,
+                        description=description,
+                        value=converted_value,
+                        value_type=value_type,
+                    )
+
+    def _set_calibration_inputs(self, calib_inputs: dict[str, Any]) -> None:
+        """Set calibration input parameters (for provenance tracking).
+
+        Args:
+        ----
+            calib_inputs: Dictionary of calibration input parameters
+
+        """
+        for name, param_data in calib_inputs.items():
+            if name in self.input_parameters:
+                # Update existing parameter
+                param = self.input_parameters[name]
+                if param is not None:
+                    if "value" in param_data:
+                        param.value = param_data["value"]
+                    if "unit" in param_data:
+                        param.unit = param_data["unit"]
+                    if "error" in param_data:
+                        param.error = param_data["error"]
+            else:
+                # Create new ParameterModel for calibration input
+                self.input_parameters[name] = ParameterModel(
+                    value=param_data.get("value", 0),
+                    unit=param_data.get("unit", ""),
+                    error=param_data.get("error", 0.0),
+                    description=param_data.get("description", ""),
+                )
 
     @abstractmethod
     def preprocess(self, backend: BaseBackend, qid: str) -> PreProcessResult:
@@ -187,8 +252,16 @@ class BaseTask(ABC):
             raise ValueError(f"R^2 value of {self.name} is too low: {r2}")
 
     def get_output_parameters(self) -> list[str]:
-        """Return the output parameters of the task."""
+        """Return the output parameter names of the task."""
         return list(self.output_parameters.keys())
+
+    def get_input_parameters(self) -> list[str]:
+        """Return the input parameter names (calibration dependencies) of the task."""
+        return list(self.input_parameters.keys())
+
+    def get_run_parameters(self) -> list[str]:
+        """Return the run parameter names (experiment configuration) of the task."""
+        return list(self.run_parameters.keys())
 
     def get_name(self) -> str:
         """Return the name of the task."""
@@ -214,13 +287,13 @@ class BaseTask(ABC):
         """Return True if the task is a system task."""
         return bool(self.task_type == TaskTypes.SYSTEM)
 
-    def attach_execution_id(self, execution_id: str) -> dict[str, OutputParameterModel]:
+    def attach_execution_id(self, execution_id: str) -> dict[str, ParameterModel]:
         """Attach the execution id to the output parameters."""
         for value in self.output_parameters.values():
             value.execution_id = execution_id
         return self.output_parameters
 
-    def attach_task_id(self, task_id: str) -> dict[str, OutputParameterModel]:
+    def attach_task_id(self, task_id: str) -> dict[str, ParameterModel]:
         """Attach the task id to the output parameters."""
         for value in self.output_parameters.values():
             value.task_id = task_id

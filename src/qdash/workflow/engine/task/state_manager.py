@@ -14,7 +14,7 @@ from qdash.datamodel.task import (
     CalibDataModel,
     CouplingTaskModel,
     GlobalTaskModel,
-    OutputParameterModel,
+    ParameterModel,
     QubitTaskModel,
     SystemTaskModel,
     TaskResultModel,
@@ -390,7 +390,7 @@ class TaskStateManager(BaseModel):
     def put_output_parameters(
         self,
         task_name: str,
-        output_parameters: dict[str, OutputParameterModel],
+        output_parameters: dict[str, ParameterModel],
         task_type: str,
         qid: str,
     ) -> None:
@@ -400,7 +400,7 @@ class TaskStateManager(BaseModel):
         ----------
         task_name : str
             Name of the task
-        output_parameters : dict[str, OutputParameterModel]
+        output_parameters : dict[str, ParameterModel]
             The output parameters
         task_type : str
             Type of task

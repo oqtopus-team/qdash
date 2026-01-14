@@ -1,19 +1,24 @@
 """TaskHistoryRecorder for recording task results to persistent storage.
 
 This module provides the TaskHistoryRecorder class that handles recording
-task results, chip updates, and chip history to MongoDB.
+task results, chip updates, chip history, and optionally provenance to MongoDB.
 """
 
-import logging
-from typing import Protocol, runtime_checkable
+from __future__ import annotations
 
-from qdash.datamodel.execution import ExecutionModel
-from qdash.datamodel.task import BaseTaskResultModel, CalibDataModel
+import logging
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
+
 from qdash.repository import (
     MongoChipHistoryRepository,
     MongoChipRepository,
     MongoTaskResultHistoryRepository,
 )
+
+if TYPE_CHECKING:
+    from qdash.datamodel.execution import ExecutionModel
+    from qdash.datamodel.task import BaseTaskResultModel, CalibDataModel
+    from qdash.workflow.engine.task.provenance_recorder import ProvenanceRecorder
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +57,7 @@ class TaskHistoryRecorder:
     - Recording task results to TaskResultHistoryDocument
     - Updating chip calibration data
     - Creating chip history snapshots
+    - Optionally recording provenance for data lineage tracking
 
     Attributes
     ----------
@@ -61,6 +67,8 @@ class TaskHistoryRecorder:
         Repository for chip data
     chip_history_repo : ChipHistoryRepoProtocol
         Repository for chip history
+    provenance_recorder : ProvenanceRecorder | None
+        Optional recorder for provenance tracking
 
     """
 
@@ -69,6 +77,7 @@ class TaskHistoryRecorder:
         task_result_history_repo: TaskResultHistoryRepoProtocol | None = None,
         chip_repo: ChipRepoProtocol | None = None,
         chip_history_repo: ChipHistoryRepoProtocol | None = None,
+        provenance_recorder: ProvenanceRecorder | None = None,
     ) -> None:
         """Initialize TaskHistoryRecorder.
 
@@ -80,6 +89,8 @@ class TaskHistoryRecorder:
             Repository for chip data (default: MongoChipRepository)
         chip_history_repo : ChipHistoryRepoProtocol | None
             Repository for chip history (default: MongoChipHistoryRepository)
+        provenance_recorder : ProvenanceRecorder | None
+            Optional recorder for provenance tracking (default: None, disabled)
 
         """
         self.task_result_history_repo = (
@@ -87,6 +98,7 @@ class TaskHistoryRecorder:
         )
         self.chip_repo = chip_repo or MongoChipRepository()
         self.chip_history_repo = chip_history_repo or MongoChipHistoryRepository()
+        self.provenance_recorder = provenance_recorder
 
     def record_task_result(
         self,
@@ -94,6 +106,9 @@ class TaskHistoryRecorder:
         execution_model: ExecutionModel,
     ) -> None:
         """Record a task result to the history.
+
+        This method saves the task result to history and optionally
+        records provenance for data lineage tracking.
 
         Parameters
         ----------
@@ -108,6 +123,14 @@ class TaskHistoryRecorder:
         except Exception as e:
             logger.error(f"Failed to record task result: {e}")
             raise
+
+        # Record provenance if enabled (non-blocking)
+        if self.provenance_recorder is not None:
+            try:
+                self.provenance_recorder.record_from_task(task, execution_model)
+            except Exception as e:
+                # Log but don't fail the task - provenance is optional
+                logger.warning(f"Failed to record provenance for task {task.name}: {e}")
 
     def update_chip_with_calib_data(
         self,
