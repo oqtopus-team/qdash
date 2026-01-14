@@ -37,7 +37,7 @@ class CalibConfig:
     note: dict[str, Any] | None = None
     muxes: list[int] | None = None
     project_id: str | None = None
-    enable_github_pull: bool = False
+    enable_github_pull: bool = True
     enable_provenance_tracking: bool = True
 
     # Derived paths (computed after initialization)

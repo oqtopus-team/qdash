@@ -837,7 +837,7 @@ def init_calibration(
     tags: list[str] | None = None,
     use_lock: bool = True,
     note: dict[str, Any] | None = None,
-    enable_github_pull: bool = False,
+    enable_github_pull: bool = True,
     github_push_config: GitHubPushConfig | None = None,
     muxes: list[int] | None = None,
     project_id: str | None = None,
