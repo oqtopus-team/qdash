@@ -146,6 +146,7 @@ class CalibService:
         github_push_config: GitHubPushConfig | None = None,
         muxes: list[int] | None = None,
         project_id: str | None = None,
+        skip_execution: bool = False,
         *,
         user_repo: UserRepository | None = None,
         lock_repo: ExecutionLockRepository | None = None,
@@ -186,6 +187,8 @@ class CalibService:
             muxes: List of MUX IDs for system-level tasks like CheckSkew (default: None)
             project_id: Project ID for multi-tenancy support. If None, auto-resolved
                 from username's default_project_id.
+            skip_execution: Skip Execution document creation (for wrapper/parent sessions
+                where child sessions will create their own Executions). Default: False.
             user_repo: Repository for user lookup (DI). If None, uses MongoUserRepository.
             lock_repo: Repository for lock operations (DI). If None, uses MongoExecutionLockRepository.
             counter_repo: Repository for counter operations (DI). If None, uses MongoExecutionCounterRepository.
@@ -200,6 +203,7 @@ class CalibService:
         self.muxes = muxes
         self.backend_name = backend_name or get_default_backend()
         self.use_lock = use_lock
+        self.skip_execution = skip_execution
         self._lock_acquired = False
 
         # Store injected repositories for later use
@@ -322,6 +326,7 @@ class CalibService:
                 muxes=self.muxes,
                 project_id=self.project_id,
                 enable_github_pull=self._enable_github_pull,
+                skip_execution=self.skip_execution,
             )
 
             # Create and initialize CalibOrchestrator
@@ -568,13 +573,18 @@ class CalibService:
             ```
 
         """
-        assert self.execution_service is not None, "ExecutionService not initialized"
-        assert self.task_context is not None, "TaskContext not initialized"
-        assert self.github_push_config is not None, "GitHubPushConfig not initialized"
         logger = get_run_logger()
         push_results = None
 
         try:
+            # Skip most finalization if in wrapper mode (no ExecutionService)
+            if self.execution_service is None:
+                logger.info("Skipping finalization (wrapper mode - no Execution)")
+                return None
+
+            assert self.task_context is not None, "TaskContext not initialized"
+            assert self.github_push_config is not None, "GitHubPushConfig not initialized"
+
             # Reload and complete execution
             self.execution_service = self.execution_service.reload().complete_execution()
 
@@ -786,10 +796,9 @@ class CalibService:
             # Finalize execution (mark as completed, update chip history)
             self.finish_calibration()
         except Exception:
-            # Mark execution as failed on error (best effort)
-            if self.execution_service is not None:
-                with contextlib.suppress(Exception):
-                    self.execution_service.reload().fail_execution()
+            # Mark execution as failed on error and release lock (best effort)
+            with contextlib.suppress(Exception):
+                self.fail_calibration()
             raise
         finally:
             # Clear session when done
@@ -837,7 +846,7 @@ def init_calibration(
     tags: list[str] | None = None,
     use_lock: bool = True,
     note: dict[str, Any] | None = None,
-    enable_github_pull: bool = False,
+    enable_github_pull: bool = True,
     github_push_config: GitHubPushConfig | None = None,
     muxes: list[int] | None = None,
     project_id: str | None = None,

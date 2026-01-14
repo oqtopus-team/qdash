@@ -37,8 +37,9 @@ class CalibConfig:
     note: dict[str, Any] | None = None
     muxes: list[int] | None = None
     project_id: str | None = None
-    enable_github_pull: bool = False
+    enable_github_pull: bool = True
     enable_provenance_tracking: bool = True
+    skip_execution: bool = False  # Skip Execution creation (for wrapper/parent sessions)
 
     # Derived paths (computed after initialization)
     calib_data_path: str = field(default="", init=False)
