@@ -573,13 +573,18 @@ class CalibService:
             ```
 
         """
-        assert self.execution_service is not None, "ExecutionService not initialized"
-        assert self.task_context is not None, "TaskContext not initialized"
-        assert self.github_push_config is not None, "GitHubPushConfig not initialized"
         logger = get_run_logger()
         push_results = None
 
         try:
+            # Skip most finalization if in wrapper mode (no ExecutionService)
+            if self.execution_service is None:
+                logger.info("Skipping finalization (wrapper mode - no Execution)")
+                return None
+
+            assert self.task_context is not None, "TaskContext not initialized"
+            assert self.github_push_config is not None, "GitHubPushConfig not initialized"
+
             # Reload and complete execution
             self.execution_service = self.execution_service.reload().complete_execution()
 
@@ -791,10 +796,9 @@ class CalibService:
             # Finalize execution (mark as completed, update chip history)
             self.finish_calibration()
         except Exception:
-            # Mark execution as failed on error (best effort)
-            if self.execution_service is not None:
-                with contextlib.suppress(Exception):
-                    self.execution_service.reload().fail_execution()
+            # Mark execution as failed on error and release lock (best effort)
+            with contextlib.suppress(Exception):
+                self.fail_calibration()
             raise
         finally:
             # Clear session when done
