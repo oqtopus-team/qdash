@@ -102,8 +102,6 @@ class TestMongoProvenanceRelationRepository:
                 target_id="activity-001",
                 project_id="project-001",
                 execution_id="exec-001",
-                confidence=1.0,
-                inference_method=None,
             )
 
             mock_create.assert_called_once_with(
@@ -114,8 +112,6 @@ class TestMongoProvenanceRelationRepository:
                 target_id="activity-001",
                 project_id="project-001",
                 execution_id="exec-001",
-                confidence=1.0,
-                inference_method=None,
             )
             assert result == mock_result
 
