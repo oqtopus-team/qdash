@@ -18,6 +18,7 @@ Example
 """
 
 import logging
+import re
 from typing import Any, Protocol, runtime_checkable
 
 from bunnet import SortDirection
@@ -31,6 +32,56 @@ from qdash.repository.provenance import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def resolve_qid(task_qid: str, qid_role: str) -> str:
+    """Resolve qid_role to actual qid.
+
+    For 2-qubit tasks, the task_qid is typically in the format "0-1",
+    where the first qubit is the control and the second is the target.
+
+    Parameters
+    ----------
+    task_qid : str
+        The task's qid (e.g., "0" for 1-qubit, "0-1" for 2-qubit/coupling)
+    qid_role : str
+        The role to resolve:
+        - "" or "self": Return task_qid as-is
+        - "control": Return control qubit's qid
+        - "target": Return target qubit's qid
+        - "coupling": Return task_qid as-is (coupling ID)
+
+    Returns
+    -------
+    str
+        The resolved qid
+
+    Examples
+    --------
+    >>> resolve_qid("0", "")
+    "0"
+    >>> resolve_qid("0-1", "control")
+    "0"
+    >>> resolve_qid("0-1", "target")
+    "1"
+    >>> resolve_qid("0-1", "coupling")
+    "0-1"
+
+    """
+    if qid_role in ("", "self", "coupling"):
+        return task_qid
+
+    # Try to parse as 2-qubit format: "0-1"
+    match = re.match(r"^(\d+)-(\d+)$", task_qid)
+    if match:
+        control, target = match.groups()
+        if qid_role == "control":
+            return control
+        elif qid_role == "target":
+            return target
+
+    # Fallback: return as-is
+    return task_qid
 
 
 @runtime_checkable
@@ -263,12 +314,26 @@ class ProvenanceRecorder:
         """
         input_entity_ids: list[str] = []
 
-        for param_name in task.input_parameters:
+        for param_key, param_data in task.input_parameters.items():
+            # Determine actual parameter name and resolved qid
+            if isinstance(param_data, ParameterModel):
+                # Use parameter_name if specified, otherwise use dict key
+                param_name = param_data.parameter_name or param_key
+                resolved_qid = resolve_qid(qid, param_data.qid_role)
+            elif isinstance(param_data, dict):
+                param_name = param_data.get("parameter_name") or param_key
+                qid_role = param_data.get("qid_role", "")
+                resolved_qid = resolve_qid(qid, qid_role)
+            else:
+                # Fallback: use key as param_name and task qid
+                param_name = param_key
+                resolved_qid = qid
+
             # Find the current version of this parameter
             current = self.parameter_version_repo.get_current(
                 project_id=project_id,
                 parameter_name=param_name,
-                qid=qid,
+                qid=resolved_qid,
             )
 
             if current is not None:
@@ -318,19 +383,26 @@ class ProvenanceRecorder:
             List of input entity IDs for derivation relations
 
         """
-        for param_name, param_data in task.output_parameters.items():
-            # Extract parameter details
-            if isinstance(param_data, dict):
-                value = param_data.get("value", 0)
-                unit = param_data.get("unit", "")
-                error = param_data.get("error", 0.0)
-                value_type = param_data.get("value_type", "float")
-            elif isinstance(param_data, ParameterModel):
+        for param_key, param_data in task.output_parameters.items():
+            # Extract parameter details and resolve qid
+            if isinstance(param_data, ParameterModel):
+                param_name = param_data.parameter_name or param_key
+                resolved_qid = resolve_qid(qid, param_data.qid_role)
                 value = param_data.value
                 unit = param_data.unit
                 error = param_data.error
                 value_type = param_data.value_type
+            elif isinstance(param_data, dict):
+                param_name = param_data.get("parameter_name") or param_key
+                qid_role = param_data.get("qid_role", "")
+                resolved_qid = resolve_qid(qid, qid_role)
+                value = param_data.get("value", 0)
+                unit = param_data.get("unit", "")
+                error = param_data.get("error", 0.0)
+                value_type = param_data.get("value_type", "float")
             else:
+                param_name = param_key
+                resolved_qid = qid
                 value = param_data
                 unit = ""
                 error = 0.0
@@ -339,7 +411,7 @@ class ProvenanceRecorder:
             # Create parameter version
             entity = self.parameter_version_repo.create_version(
                 parameter_name=param_name,
-                qid=qid,
+                qid=resolved_qid,
                 value=value,
                 execution_id=execution_id,
                 task_id=task.task_id,
