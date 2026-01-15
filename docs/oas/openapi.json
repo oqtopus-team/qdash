@@ -2040,6 +2040,221 @@
         }
       }
     },
+    "/calibrations/seed-import": {
+      "post": {
+        "tags": [
+          "calibration"
+        ],
+        "summary": "Import seed parameters from qubex or manual input",
+        "description": "Import initial calibration parameters from qubex params or manual input.\n\nThis endpoint allows importing seed parameters that are typically loaded\nfrom qubex's params directory (e.g., qubit_frequency, readout_amplitude)\ninto QDash's calibration database for tracking and provenance.\n\nParameters\n----------\nctx : ProjectContext\n    Project context with user and project information\nservice : SeedImportService\n    Service for seed import operations\nrequest : SeedImportRequest\n    Import request specifying source, chip_id, and parameters\n\nReturns\n-------\nSeedImportResponse\n    Results of the import operation including counts and individual results\n\nExamples\n--------\nImport from qubex params:\n```json\n{\n    \"chip_id\": \"64Qv3\",\n    \"source\": \"qubex_params\",\n    \"parameters\": [\"qubit_frequency\", \"readout_amplitude\"]\n}\n```\n\nManual import:\n```json\n{\n    \"chip_id\": \"64Qv3\",\n    \"source\": \"manual\",\n    \"manual_data\": {\n        \"qubit_frequency\": {\"Q00\": 7.9, \"Q01\": 8.6}\n    }\n}\n```",
+        "operationId": "importSeedParameters",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SeedImportRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SeedImportResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/calibrations/seed-parameters/{chip_id}": {
+      "get": {
+        "tags": [
+          "calibration"
+        ],
+        "summary": "Get available seed parameters for a chip",
+        "description": "Get list of available parameter files in qubex params directory.\n\nParameters\n----------\nctx : ProjectContext\n    Project context with user and project information\nservice : SeedImportService\n    Service for seed import operations\nchip_id : str\n    Chip ID to check parameters for\n\nReturns\n-------\nlist[str]\n    List of available parameter names (e.g., [\"qubit_frequency\", \"readout_amplitude\"])",
+        "operationId": "getAvailableSeedParameters",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chip_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Chip Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "title": "Response Getavailableseedparameters"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/calibrations/seed-compare/{chip_id}": {
+      "get": {
+        "tags": [
+          "calibration"
+        ],
+        "summary": "Compare YAML seed values with QDash values",
+        "description": "Compare seed parameter values from YAML files with current QDash values.\n\nThis endpoint allows users to preview what will be imported and see\nthe difference between YAML source values and current QDash values.\n\nParameters\n----------\nctx : ProjectContext\n    Project context with user and project information\nservice : SeedImportService\n    Service for seed import operations\nchip_id : str\n    Chip ID to compare parameters for\nparameters : str | None\n    Comma-separated list of parameters to compare (None = all available)\n\nReturns\n-------\ndict\n    Comparison data with structure:\n    {\n        \"chip_id\": str,\n        \"parameters\": {\n            \"param_name\": {\n                \"unit\": str,\n                \"qubits\": {\n                    \"Q0\": {\n                        \"yaml_value\": float | None,\n                        \"qdash_value\": float | None,\n                        \"status\": \"new\" | \"same\" | \"different\"\n                    }\n                }\n            }\n        }\n    }",
+        "operationId": "compareSeedValues",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chip_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Chip Id"
+            }
+          },
+          {
+            "name": "parameters",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Parameters"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Compareseedvalues"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/copilot/config": {
       "get": {
         "tags": [
@@ -3297,13 +3512,40 @@
         }
       }
     },
+    "/task-files/backend-config": {
+      "get": {
+        "tags": [
+          "task-file"
+        ],
+        "summary": "Get backend configuration",
+        "description": "Get backend configuration from backend.yaml.\n\nReturns backend definitions, tasks, and categories.\n\nReturns\n-------\n    Backend configuration",
+        "operationId": "getBackendConfig",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BackendConfigResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/task-files/tasks": {
       "get": {
         "tags": [
           "task-file"
         ],
         "summary": "List all tasks in a backend",
-        "description": "List all task definitions found in a backend directory.\n\nParses Python files to extract task names, types, and descriptions.\nResults are cached and invalidated when files are modified.\n\nArgs:\n----\n    backend: Backend name (e.g., \"qubex\", \"fake\")\n    sort_order: Sort order for tasks (\"type_then_name\", \"name_only\", \"file_path\")\n\nReturns:\n-------\n    List of task information",
+        "description": "List all task definitions found in a backend directory.\n\nParses Python files to extract task names, types, and descriptions.\nResults are cached and invalidated when files are modified.\n\nArgs:\n----\n    backend: Backend name (e.g., \"qubex\", \"fake\")\n    sort_order: Sort order for tasks (\"type_then_name\", \"name_only\", \"file_path\")\n    enabled_only: If True, only return tasks that are enabled in backend.yaml\n\nReturns:\n-------\n    List of task information",
         "operationId": "listTaskInfo",
         "security": [
           {
@@ -3334,6 +3576,16 @@
                 }
               ],
               "title": "Sort Order"
+            }
+          },
+          {
+            "name": "enabled_only",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Enabled Only"
             }
           }
         ],
@@ -5723,10 +5975,790 @@
           }
         ]
       }
+    },
+    "/provenance/entities/{entity_id}": {
+      "get": {
+        "tags": [
+          "provenance"
+        ],
+        "summary": "Get a parameter version by entity ID",
+        "description": "Get a specific parameter version by entity ID.\n\nParameters\n----------\nctx : ProjectContext\n    Project context with user and project information\nservice : ProvenanceService\n    Provenance service instance\nentity_id : str\n    Entity identifier (format: parameter_name:qid:execution_id:task_id)\n\nReturns\n-------\nParameterVersionResponse\n    Parameter version details\n\nRaises\n------\nHTTPException\n    404 if entity not found",
+        "operationId": "getProvenanceEntity",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "entity_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Entity identifier",
+              "title": "Entity Id"
+            },
+            "description": "Entity identifier"
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ParameterVersionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/provenance/lineage/{entity_id}": {
+      "get": {
+        "tags": [
+          "provenance"
+        ],
+        "summary": "Get lineage (ancestors) of a parameter version",
+        "description": "Get the lineage (ancestors) of a parameter version.\n\nTraverses wasDerivedFrom and wasGeneratedBy relations backward\nto find all entities and activities that contributed to this entity.\n\nParameters\n----------\nctx : ProjectContext\n    Project context with user and project information\nservice : ProvenanceService\n    Provenance service instance\nentity_id : str\n    Entity identifier to trace lineage from\nmax_depth : int\n    Maximum traversal depth (1-20)\n\nReturns\n-------\nLineageResponse\n    Lineage graph with nodes and edges",
+        "operationId": "getProvenanceLineage",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "entity_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Entity identifier",
+              "title": "Entity Id"
+            },
+            "description": "Entity identifier"
+          },
+          {
+            "name": "max_depth",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 20,
+              "minimum": 1,
+              "description": "Maximum traversal depth",
+              "default": 5,
+              "title": "Max Depth"
+            },
+            "description": "Maximum traversal depth"
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LineageResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/provenance/impact/{entity_id}": {
+      "get": {
+        "tags": [
+          "provenance"
+        ],
+        "summary": "Get impact (descendants) of a parameter version",
+        "description": "Get the impact (descendants) of a parameter version.\n\nTraverses wasDerivedFrom relations forward to find all entities\nthat were derived from this entity.\n\nParameters\n----------\nctx : ProjectContext\n    Project context with user and project information\nservice : ProvenanceService\n    Provenance service instance\nentity_id : str\n    Entity identifier to trace impact from\nmax_depth : int\n    Maximum traversal depth (1-20)\n\nReturns\n-------\nImpactResponse\n    Impact graph with affected nodes and edges",
+        "operationId": "getProvenanceImpact",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "entity_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Entity identifier",
+              "title": "Entity Id"
+            },
+            "description": "Entity identifier"
+          },
+          {
+            "name": "max_depth",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 20,
+              "minimum": 1,
+              "description": "Maximum traversal depth",
+              "default": 5,
+              "title": "Max Depth"
+            },
+            "description": "Maximum traversal depth"
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImpactResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/provenance/compare": {
+      "get": {
+        "tags": [
+          "provenance"
+        ],
+        "summary": "Compare parameter values between two executions",
+        "description": "Compare parameter values between two executions.\n\nShows which parameters were added, removed, or changed between\ntwo calibration executions.\n\nParameters\n----------\nctx : ProjectContext\n    Project context with user and project information\nservice : ProvenanceService\n    Provenance service instance\nexecution_id_before : str\n    First execution ID (before state)\nexecution_id_after : str\n    Second execution ID (after state)\n\nReturns\n-------\nExecutionComparisonResponse\n    Comparison of parameter values",
+        "operationId": "compareExecutions",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "execution_id_before",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "First execution ID (before)",
+              "title": "Execution Id Before"
+            },
+            "description": "First execution ID (before)"
+          },
+          {
+            "name": "execution_id_after",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Second execution ID (after)",
+              "title": "Execution Id After"
+            },
+            "description": "Second execution ID (after)"
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExecutionComparisonResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/provenance/history": {
+      "get": {
+        "tags": [
+          "provenance"
+        ],
+        "summary": "Get version history for a parameter",
+        "description": "Get version history for a parameter.\n\nReturns all versions of a parameter for a specific qubit,\nsorted by version number (newest first).\n\nParameters\n----------\nctx : ProjectContext\n    Project context with user and project information\nservice : ProvenanceService\n    Provenance service instance\nparameter_name : str\n    Name of the parameter (e.g., \"qubit_frequency\")\nqid : str\n    Qubit or coupling identifier (e.g., \"Q0\", \"Q0-Q1\")\nlimit : int\n    Maximum number of versions to return\n\nReturns\n-------\nParameterHistoryResponse\n    List of parameter versions",
+        "operationId": "getParameterHistory",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "parameter_name",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Name of the parameter",
+              "title": "Parameter Name"
+            },
+            "description": "Name of the parameter"
+          },
+          {
+            "name": "qid",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Qubit or coupling identifier",
+              "title": "Qid"
+            },
+            "description": "Qubit or coupling identifier"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Maximum number of versions",
+              "default": 50,
+              "title": "Limit"
+            },
+            "description": "Maximum number of versions"
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ParameterHistoryResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/provenance/stats": {
+      "get": {
+        "tags": [
+          "provenance"
+        ],
+        "summary": "Get provenance statistics",
+        "description": "Get provenance statistics for a project.\n\nReturns counts and recent entities for provenance tracking.\n\nParameters\n----------\nctx : ProjectContext\n    Project context with user and project information\nservice : ProvenanceService\n    Provenance service instance\n\nReturns\n-------\nProvenanceStatsResponse\n    Provenance statistics",
+        "operationId": "getProvenanceStats",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProvenanceStatsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/provenance/executions": {
+      "get": {
+        "tags": [
+          "provenance"
+        ],
+        "summary": "Get recent execution IDs",
+        "description": "Get recent unique execution IDs.\n\nReturns unique execution IDs sorted by most recent first.\nUses MongoDB aggregation for efficient retrieval.\n\nParameters\n----------\nctx : ProjectContext\n    Project context with user and project information\nservice : ProvenanceService\n    Provenance service instance\nlimit : int\n    Maximum number of execution IDs to return (1-50)\n\nReturns\n-------\nRecentExecutionsResponse\n    List of recent execution IDs",
+        "operationId": "getRecentExecutions",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 50,
+              "minimum": 1,
+              "description": "Maximum number of execution IDs to return",
+              "default": 20,
+              "title": "Limit"
+            },
+            "description": "Maximum number of execution IDs to return"
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecentExecutionsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/provenance/changes": {
+      "get": {
+        "tags": [
+          "provenance"
+        ],
+        "summary": "Get recent parameter changes with delta",
+        "description": "Get recent parameter changes with delta from previous versions.\n\nReturns parameter changes that have a previous version, showing\nthe delta (difference) from the previous value.\n\nParameters\n----------\nctx : ProjectContext\n    Project context with user and project information\nservice : ProvenanceService\n    Provenance service instance\nlimit : int\n    Maximum number of changes to return (1-50)\nwithin_hours : int\n    Time window in hours (1-168, default: 24)\nparameter_names : list[str] | None\n    Filter by parameter names (e.g., from metrics.yaml config)\n\nReturns\n-------\nRecentChangesResponse\n    List of recent parameter changes with delta information",
+        "operationId": "getRecentChanges",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 50,
+              "minimum": 1,
+              "description": "Maximum number of changes to return",
+              "default": 20,
+              "title": "Limit"
+            },
+            "description": "Maximum number of changes to return"
+          },
+          {
+            "name": "within_hours",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 168,
+              "minimum": 1,
+              "description": "Time window in hours",
+              "default": 24,
+              "title": "Within Hours"
+            },
+            "description": "Time window in hours"
+          },
+          {
+            "name": "parameter_names",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by parameter names (from metrics config)",
+              "title": "Parameter Names"
+            },
+            "description": "Filter by parameter names (from metrics config)"
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecentChangesResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/provenance/recommendations/{entity_id}": {
+      "get": {
+        "tags": [
+          "provenance"
+        ],
+        "summary": "Get recalibration task recommendations",
+        "description": "Get recommended recalibration tasks based on parameter change impact.\n\nWhen a calibration parameter changes (either through recalibration or\nmanual adjustment), this endpoint analyzes the provenance graph to\nidentify which downstream parameters are affected and recommends\nwhich calibration tasks should be re-run.\n\nThe recommendations are prioritized based on dependency proximity:\ntasks producing directly dependent parameters are ranked higher than\nthose producing transitively dependent parameters.\n\nParameters\n----------\nctx : ProjectContext\n    Project context with user and project information\nservice : ProvenanceService\n    Provenance service instance\nentity_id : str\n    Entity identifier of the changed parameter\nmax_depth : int\n    Maximum traversal depth for impact analysis (1-20)\n\nReturns\n-------\nRecalibrationRecommendationResponse\n    Prioritized list of recommended recalibration tasks\n\nExample\n-------\nIf qubit_frequency for Q0 changes:\n- Priority 1: CheckRabiOscillation (direct dependency)\n- Priority 2: CheckT1, CheckT2 (use frequency-dependent pulses)\n- Priority 3: CheckCrossResonance (uses derived gate parameters)",
+        "operationId": "getRecalibrationRecommendations",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "entity_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Entity identifier of changed parameter",
+              "title": "Entity Id"
+            },
+            "description": "Entity identifier of changed parameter"
+          },
+          {
+            "name": "max_depth",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 20,
+              "minimum": 1,
+              "description": "Maximum impact traversal depth",
+              "default": 10,
+              "title": "Max Depth"
+            },
+            "description": "Maximum impact traversal depth"
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecalibrationRecommendationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
+      "ActivityResponse": {
+        "properties": {
+          "activity_id": {
+            "type": "string",
+            "title": "Activity Id"
+          },
+          "execution_id": {
+            "type": "string",
+            "title": "Execution Id"
+          },
+          "task_id": {
+            "type": "string",
+            "title": "Task Id"
+          },
+          "task_name": {
+            "type": "string",
+            "title": "Task Name"
+          },
+          "task_type": {
+            "type": "string",
+            "title": "Task Type",
+            "default": ""
+          },
+          "qid": {
+            "type": "string",
+            "title": "Qid",
+            "default": ""
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "ended_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ended At"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "default": ""
+          },
+          "project_id": {
+            "type": "string",
+            "title": "Project Id"
+          },
+          "chip_id": {
+            "type": "string",
+            "title": "Chip Id",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "activity_id",
+          "execution_id",
+          "task_id",
+          "task_name",
+          "project_id"
+        ],
+        "title": "ActivityResponse",
+        "description": "Response model for an activity (task execution).\n\nAttributes\n----------\nactivity_id : str\n    Unique identifier (execution_id:task_id)\nexecution_id : str\n    Parent execution ID\ntask_id : str\n    Task identifier\ntask_name : str\n    Name of the task\ntask_type : str\n    Type of task\nqid : str\n    Qubit or coupling identifier\nstarted_at : datetime | None\n    When the activity started\nended_at : datetime | None\n    When the activity ended\nstatus : str\n    Execution status\nproject_id : str\n    Project identifier\nchip_id : str\n    Chip identifier"
+      },
       "AddMemberRequest": {
         "properties": {
           "username": {
@@ -5760,6 +6792,57 @@
         "type": "object",
         "title": "AllConfigResponse",
         "description": "Response containing all application configuration."
+      },
+      "BackendConfigResponse": {
+        "properties": {
+          "default_backend": {
+            "type": "string",
+            "title": "Default Backend",
+            "default": "qubex"
+          },
+          "backends": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/BackendDefinitionResponse"
+            },
+            "type": "object",
+            "title": "Backends",
+            "default": {}
+          },
+          "categories": {
+            "additionalProperties": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "type": "object",
+            "title": "Categories",
+            "default": {}
+          }
+        },
+        "type": "object",
+        "title": "BackendConfigResponse",
+        "description": "Response model for backend configuration."
+      },
+      "BackendDefinitionResponse": {
+        "properties": {
+          "description": {
+            "type": "string",
+            "title": "Description",
+            "default": ""
+          },
+          "tasks": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tasks",
+            "default": []
+          }
+        },
+        "type": "object",
+        "title": "BackendDefinitionResponse",
+        "description": "Backend definition from configuration."
       },
       "BackendResponseModel": {
         "properties": {
@@ -6341,6 +7424,82 @@
         "title": "ExecuteFlowResponse",
         "description": "Response after executing a flow."
       },
+      "ExecutionComparisonResponse": {
+        "properties": {
+          "execution_id_before": {
+            "type": "string",
+            "title": "Execution Id Before"
+          },
+          "execution_id_after": {
+            "type": "string",
+            "title": "Execution Id After"
+          },
+          "added_parameters": {
+            "items": {
+              "$ref": "#/components/schemas/ParameterDiffResponse"
+            },
+            "type": "array",
+            "title": "Added Parameters"
+          },
+          "removed_parameters": {
+            "items": {
+              "$ref": "#/components/schemas/ParameterDiffResponse"
+            },
+            "type": "array",
+            "title": "Removed Parameters"
+          },
+          "changed_parameters": {
+            "items": {
+              "$ref": "#/components/schemas/ParameterDiffResponse"
+            },
+            "type": "array",
+            "title": "Changed Parameters"
+          },
+          "unchanged_count": {
+            "type": "integer",
+            "title": "Unchanged Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "execution_id_before",
+          "execution_id_after",
+          "added_parameters",
+          "removed_parameters",
+          "changed_parameters",
+          "unchanged_count"
+        ],
+        "title": "ExecutionComparisonResponse",
+        "description": "Response model for execution comparison.\n\nAttributes\n----------\nexecution_id_before : str\n    First execution ID\nexecution_id_after : str\n    Second execution ID\nadded_parameters : list[ParameterDiffResponse]\n    Parameters added in the second execution\nremoved_parameters : list[ParameterDiffResponse]\n    Parameters removed in the second execution\nchanged_parameters : list[ParameterDiffResponse]\n    Parameters with different values\nunchanged_count : int\n    Count of unchanged parameters"
+      },
+      "ExecutionIdResponse": {
+        "properties": {
+          "execution_id": {
+            "type": "string",
+            "title": "Execution Id",
+            "description": "Unique execution identifier"
+          },
+          "valid_from": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valid From",
+            "description": "Latest parameter timestamp"
+          }
+        },
+        "type": "object",
+        "required": [
+          "execution_id"
+        ],
+        "title": "ExecutionIdResponse",
+        "description": "Response model for a single execution ID with timestamp.\n\nAttributes\n----------\nexecution_id : str\n    The unique execution identifier\nvalid_from : datetime | None\n    When parameters from this execution were created"
+      },
       "ExecutionLockStatusResponse": {
         "properties": {
           "lock": {
@@ -6886,6 +8045,40 @@
         "type": "object",
         "title": "HTTPValidationError"
       },
+      "ImpactResponse": {
+        "properties": {
+          "origin": {
+            "$ref": "#/components/schemas/LineageNodeResponse"
+          },
+          "nodes": {
+            "items": {
+              "$ref": "#/components/schemas/LineageNodeResponse"
+            },
+            "type": "array",
+            "title": "Nodes"
+          },
+          "edges": {
+            "items": {
+              "$ref": "#/components/schemas/LineageEdgeResponse"
+            },
+            "type": "array",
+            "title": "Edges"
+          },
+          "max_depth": {
+            "type": "integer",
+            "title": "Max Depth"
+          }
+        },
+        "type": "object",
+        "required": [
+          "origin",
+          "nodes",
+          "edges",
+          "max_depth"
+        ],
+        "title": "ImpactResponse",
+        "description": "Response model for impact query.\n\nAttributes\n----------\norigin : LineageNodeResponse\n    The queried entity\nnodes : list[LineageNodeResponse]\n    All nodes affected by this entity\nedges : list[LineageEdgeResponse]\n    All edges in the impact graph\nmax_depth : int\n    Maximum depth traversed"
+      },
       "InputParameterModel": {
         "properties": {
           "unit": {
@@ -6956,6 +8149,108 @@
         ],
         "title": "LatestTaskResultResponse",
         "description": "Response model for fetching the latest tasks grouped by qid/coupling_id."
+      },
+      "LineageEdgeResponse": {
+        "properties": {
+          "relation_type": {
+            "type": "string",
+            "title": "Relation Type"
+          },
+          "source_id": {
+            "type": "string",
+            "title": "Source Id"
+          },
+          "target_id": {
+            "type": "string",
+            "title": "Target Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "relation_type",
+          "source_id",
+          "target_id"
+        ],
+        "title": "LineageEdgeResponse",
+        "description": "Response model for an edge in the lineage graph.\n\nAttributes\n----------\nrelation_type : str\n    Type of relation\nsource_id : str\n    Source node identifier\ntarget_id : str\n    Target node identifier"
+      },
+      "LineageNodeResponse": {
+        "properties": {
+          "node_type": {
+            "type": "string",
+            "title": "Node Type"
+          },
+          "node_id": {
+            "type": "string",
+            "title": "Node Id"
+          },
+          "depth": {
+            "type": "integer",
+            "title": "Depth",
+            "default": 0
+          },
+          "entity": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ParameterVersionResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "activity": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ActivityResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "node_type",
+          "node_id"
+        ],
+        "title": "LineageNodeResponse",
+        "description": "Response model for a node in the lineage graph.\n\nAttributes\n----------\nnode_type : str\n    Type of node (entity or activity)\nnode_id : str\n    Identifier of the node\ndepth : int\n    Distance from the queried entity (0 = origin)\nentity : ParameterVersionResponse | None\n    Entity details if node is an entity\nactivity : ActivityResponse | None\n    Activity details if node is an activity"
+      },
+      "LineageResponse": {
+        "properties": {
+          "origin": {
+            "$ref": "#/components/schemas/LineageNodeResponse"
+          },
+          "nodes": {
+            "items": {
+              "$ref": "#/components/schemas/LineageNodeResponse"
+            },
+            "type": "array",
+            "title": "Nodes"
+          },
+          "edges": {
+            "items": {
+              "$ref": "#/components/schemas/LineageEdgeResponse"
+            },
+            "type": "array",
+            "title": "Edges"
+          },
+          "max_depth": {
+            "type": "integer",
+            "title": "Max Depth"
+          }
+        },
+        "type": "object",
+        "required": [
+          "origin",
+          "nodes",
+          "edges",
+          "max_depth"
+        ],
+        "title": "LineageResponse",
+        "description": "Response model for lineage query.\n\nAttributes\n----------\norigin : LineageNodeResponse\n    The queried entity\nnodes : list[LineageNodeResponse]\n    All nodes in the lineage graph\nedges : list[LineageEdgeResponse]\n    All edges in the lineage graph\nmax_depth : int\n    Maximum depth traversed"
       },
       "ListBackendsResponse": {
         "properties": {
@@ -7775,7 +9070,224 @@
         "title": "MuxTask",
         "description": "Task information for mux display."
       },
-      "OutputParameterModel": {
+      "ParameterChangeResponse": {
+        "properties": {
+          "entity_id": {
+            "type": "string",
+            "title": "Entity Id"
+          },
+          "parameter_name": {
+            "type": "string",
+            "title": "Parameter Name"
+          },
+          "qid": {
+            "type": "string",
+            "title": "Qid",
+            "default": ""
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Value"
+          },
+          "previous_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous Value"
+          },
+          "unit": {
+            "type": "string",
+            "title": "Unit",
+            "default": ""
+          },
+          "delta": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delta"
+          },
+          "delta_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delta Percent"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "valid_from": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valid From"
+          },
+          "task_name": {
+            "type": "string",
+            "title": "Task Name",
+            "default": ""
+          },
+          "execution_id": {
+            "type": "string",
+            "title": "Execution Id",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "entity_id",
+          "parameter_name",
+          "value",
+          "version"
+        ],
+        "title": "ParameterChangeResponse",
+        "description": "Response model for a parameter change (with delta from previous version).\n\nAttributes\n----------\nentity_id : str\n    Unique identifier for this parameter version\nparameter_name : str\n    Name of the parameter\nqid : str\n    Qubit or coupling identifier\nvalue : float | int | str\n    Current value\nprevious_value : float | int | str | None\n    Previous value (None if first version)\nunit : str\n    Physical unit\ndelta : float | None\n    Numeric difference (value - previous_value)\ndelta_percent : float | None\n    Percentage change ((value - previous) / previous * 100)\nversion : int\n    Version number\nvalid_from : datetime | None\n    When this version became valid\ntask_name : str\n    Name of the task that produced this value\nexecution_id : str\n    Execution that produced this value"
+      },
+      "ParameterDiffResponse": {
+        "properties": {
+          "parameter_name": {
+            "type": "string",
+            "title": "Parameter Name"
+          },
+          "qid": {
+            "type": "string",
+            "title": "Qid"
+          },
+          "value_before": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value Before"
+          },
+          "value_after": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value After"
+          },
+          "delta": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delta"
+          },
+          "delta_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delta Percent"
+          }
+        },
+        "type": "object",
+        "required": [
+          "parameter_name",
+          "qid"
+        ],
+        "title": "ParameterDiffResponse",
+        "description": "Response model for parameter difference between executions.\n\nAttributes\n----------\nparameter_name : str\n    Name of the parameter\nqid : str\n    Qubit or coupling identifier\nvalue_before : float | int | str | None\n    Value in the first execution\nvalue_after : float | int | str | None\n    Value in the second execution\ndelta : float | None\n    Numeric difference if applicable\ndelta_percent : float | None\n    Percentage change if applicable"
+      },
+      "ParameterHistoryResponse": {
+        "properties": {
+          "parameter_name": {
+            "type": "string",
+            "title": "Parameter Name"
+          },
+          "qid": {
+            "type": "string",
+            "title": "Qid"
+          },
+          "versions": {
+            "items": {
+              "$ref": "#/components/schemas/ParameterVersionResponse"
+            },
+            "type": "array",
+            "title": "Versions"
+          },
+          "total_versions": {
+            "type": "integer",
+            "title": "Total Versions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "parameter_name",
+          "qid",
+          "versions",
+          "total_versions"
+        ],
+        "title": "ParameterHistoryResponse",
+        "description": "Response model for parameter version history.\n\nAttributes\n----------\nparameter_name : str\n    Name of the parameter\nqid : str\n    Qubit or coupling identifier\nversions : list[ParameterVersionResponse]\n    List of all versions, newest first\ntotal_versions : int\n    Total count of versions"
+      },
+      "ParameterModel": {
         "properties": {
           "value": {
             "anyOf": [
@@ -7827,8 +9339,116 @@
           }
         },
         "type": "object",
-        "title": "OutputParameterModel",
-        "description": "Data model.\n\nAttributes\n----------\n    qubit (dict[str, dict[str, float | int]]): The calibration data for qubits.\n    coupling (dict[str, dict[str, float | int]]): The calibration data for couplings."
+        "title": "ParameterModel",
+        "description": "Calibration parameter model.\n\nUsed for both input_parameters (calibration dependencies) and\noutput_parameters (calibration outputs) in tasks.\n\nAttributes\n----------\n    value: The parameter value.\n    value_type: The type of the value (default: \"float\").\n    error: The error/uncertainty of the value.\n    unit: The unit of measurement.\n    description: Description of the parameter.\n    calibrated_at: When the calibration was performed.\n    execution_id: The execution that produced this value.\n    task_id: The task that produced this value."
+      },
+      "ParameterVersionResponse": {
+        "properties": {
+          "entity_id": {
+            "type": "string",
+            "title": "Entity Id"
+          },
+          "parameter_name": {
+            "type": "string",
+            "title": "Parameter Name"
+          },
+          "qid": {
+            "type": "string",
+            "title": "Qid",
+            "default": ""
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Value"
+          },
+          "value_type": {
+            "type": "string",
+            "title": "Value Type",
+            "default": "float"
+          },
+          "unit": {
+            "type": "string",
+            "title": "Unit",
+            "default": ""
+          },
+          "error": {
+            "type": "number",
+            "title": "Error",
+            "default": 0
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "valid_from": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valid From"
+          },
+          "valid_until": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valid Until"
+          },
+          "execution_id": {
+            "type": "string",
+            "title": "Execution Id"
+          },
+          "task_id": {
+            "type": "string",
+            "title": "Task Id"
+          },
+          "task_name": {
+            "type": "string",
+            "title": "Task Name",
+            "default": ""
+          },
+          "project_id": {
+            "type": "string",
+            "title": "Project Id"
+          },
+          "chip_id": {
+            "type": "string",
+            "title": "Chip Id",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "entity_id",
+          "parameter_name",
+          "value",
+          "version",
+          "execution_id",
+          "task_id",
+          "project_id"
+        ],
+        "title": "ParameterVersionResponse",
+        "description": "Response model for a parameter version (entity).\n\nAttributes\n----------\nentity_id : str\n    Unique identifier for this parameter version\nparameter_name : str\n    Name of the parameter\nqid : str\n    Qubit or coupling identifier\nvalue : float | int | str\n    The parameter value\nvalue_type : str\n    Type of the value\nunit : str\n    Physical unit\nerror : float\n    Measurement error/uncertainty\nversion : int\n    Version number\nvalid_from : datetime\n    When this version became valid\nvalid_until : datetime | None\n    When this version was superseded\nexecution_id : str\n    Execution that produced this value\ntask_id : str\n    Task that produced this value\ntask_name : str\n    Name of the task\nproject_id : str\n    Project identifier\nchip_id : str\n    Chip identifier"
       },
       "PasswordChange": {
         "properties": {
@@ -8106,6 +9726,49 @@
         "title": "ProjectUpdate",
         "description": "Request schema for updating a project."
       },
+      "ProvenanceStatsResponse": {
+        "properties": {
+          "total_entities": {
+            "type": "integer",
+            "title": "Total Entities",
+            "description": "Total parameter versions"
+          },
+          "total_activities": {
+            "type": "integer",
+            "title": "Total Activities",
+            "description": "Total activity records"
+          },
+          "total_relations": {
+            "type": "integer",
+            "title": "Total Relations",
+            "description": "Total provenance relations"
+          },
+          "relation_counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Relation Counts",
+            "description": "Count by relation type"
+          },
+          "recent_entities": {
+            "items": {
+              "$ref": "#/components/schemas/ParameterVersionResponse"
+            },
+            "type": "array",
+            "title": "Recent Entities",
+            "description": "Recent entities"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total_entities",
+          "total_activities",
+          "total_relations"
+        ],
+        "title": "ProvenanceStatsResponse",
+        "description": "Response model for provenance statistics.\n\nAttributes\n----------\ntotal_entities : int\n    Total number of parameter versions\ntotal_activities : int\n    Total number of activity records\ntotal_relations : int\n    Total number of provenance relations\nrelation_counts : dict[str, int]\n    Count by relation type\nrecent_entities : list[ParameterVersionResponse]\n    Most recently created entities"
+      },
       "Qubit": {
         "properties": {
           "id": {
@@ -8374,6 +10037,132 @@
         ],
         "title": "QubitResponse",
         "description": "Response model for a single qubit."
+      },
+      "RecalibrationRecommendationResponse": {
+        "properties": {
+          "source_entity_id": {
+            "type": "string",
+            "title": "Source Entity Id",
+            "description": "Changed parameter entity ID"
+          },
+          "source_parameter_name": {
+            "type": "string",
+            "title": "Source Parameter Name",
+            "description": "Changed parameter name",
+            "default": ""
+          },
+          "source_qid": {
+            "type": "string",
+            "title": "Source Qid",
+            "description": "Changed parameter QID",
+            "default": ""
+          },
+          "recommended_tasks": {
+            "items": {
+              "$ref": "#/components/schemas/RecommendedTaskResponse"
+            },
+            "type": "array",
+            "title": "Recommended Tasks",
+            "description": "Prioritized task recommendations"
+          },
+          "total_affected_parameters": {
+            "type": "integer",
+            "title": "Total Affected Parameters",
+            "description": "Total downstream parameters affected",
+            "default": 0
+          },
+          "max_depth_reached": {
+            "type": "integer",
+            "title": "Max Depth Reached",
+            "description": "Impact graph depth traversed",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "source_entity_id"
+        ],
+        "title": "RecalibrationRecommendationResponse",
+        "description": "Response model for recalibration recommendations.\n\nWhen a parameter changes, this response provides a prioritized list\nof calibration tasks that should be re-run to maintain consistency.\n\nAttributes\n----------\nsource_entity_id : str\n    The changed parameter that triggered recommendations\nsource_parameter_name : str\n    Name of the changed parameter\nsource_qid : str\n    Qubit/coupling ID of the changed parameter\nrecommended_tasks : list[RecommendedTaskResponse]\n    Prioritized list of tasks to re-run\ntotal_affected_parameters : int\n    Total count of downstream parameters affected\nmax_depth_reached : int\n    Depth of impact graph traversed"
+      },
+      "RecentChangesResponse": {
+        "properties": {
+          "changes": {
+            "items": {
+              "$ref": "#/components/schemas/ParameterChangeResponse"
+            },
+            "type": "array",
+            "title": "Changes",
+            "description": "Recent parameter changes"
+          },
+          "total_count": {
+            "type": "integer",
+            "title": "Total Count",
+            "description": "Total changes in time window",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "title": "RecentChangesResponse",
+        "description": "Response model for recent parameter changes.\n\nAttributes\n----------\nchanges : list[ParameterChangeResponse]\n    List of recent parameter changes with delta\ntotal_count : int\n    Total number of changes in the time window"
+      },
+      "RecentExecutionsResponse": {
+        "properties": {
+          "executions": {
+            "items": {
+              "$ref": "#/components/schemas/ExecutionIdResponse"
+            },
+            "type": "array",
+            "title": "Executions",
+            "description": "Recent execution IDs"
+          }
+        },
+        "type": "object",
+        "title": "RecentExecutionsResponse",
+        "description": "Response model for recent execution IDs.\n\nAttributes\n----------\nexecutions : list[ExecutionIdResponse]\n    List of recent execution IDs sorted by most recent first"
+      },
+      "RecommendedTaskResponse": {
+        "properties": {
+          "task_name": {
+            "type": "string",
+            "title": "Task Name",
+            "description": "Name of the task to re-run"
+          },
+          "priority": {
+            "type": "integer",
+            "title": "Priority",
+            "description": "Priority (1=highest)"
+          },
+          "affected_parameters": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Affected Parameters",
+            "description": "Parameters affected"
+          },
+          "affected_qids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Affected Qids",
+            "description": "Qubit IDs affected"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason",
+            "description": "Explanation for recommendation",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "task_name",
+          "priority"
+        ],
+        "title": "RecommendedTaskResponse",
+        "description": "Response model for a recommended recalibration task.\n\nAttributes\n----------\ntask_name : str\n    Name of the task to re-run\npriority : int\n    Priority level (1=highest, larger=lower priority)\naffected_parameters : list[str]\n    Parameters that would be recalibrated by this task\naffected_qids : list[str]\n    Qubit/coupling IDs affected\nreason : str\n    Human-readable explanation"
       },
       "SaveFileRequest": {
         "properties": {
@@ -8653,6 +10442,205 @@
         "title": "ScheduleFlowResponse",
         "description": "Response after scheduling a flow."
       },
+      "SeedImportRequest": {
+        "properties": {
+          "chip_id": {
+            "type": "string",
+            "title": "Chip Id",
+            "description": "Target chip ID"
+          },
+          "source": {
+            "$ref": "#/components/schemas/SeedImportSource",
+            "description": "Source of parameters",
+            "default": "qubex_params"
+          },
+          "parameters": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parameters",
+            "description": "Parameter names to import (None = all available)",
+            "examples": [
+              [
+                "qubit_frequency",
+                "readout_amplitude",
+                "control_amplitude"
+              ]
+            ]
+          },
+          "qids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Qids",
+            "description": "Qubit IDs to import (None = all available)",
+            "examples": [
+              [
+                "Q00",
+                "Q01",
+                "Q02"
+              ]
+            ]
+          },
+          "manual_data": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Manual Data",
+            "description": "Manual data when source is MANUAL"
+          }
+        },
+        "type": "object",
+        "required": [
+          "chip_id"
+        ],
+        "title": "SeedImportRequest",
+        "description": "Request to import seed parameters from qubex or manual input.\n\nAttributes\n----------\nchip_id : str\n    Target chip ID (e.g., \"64Qv3\")\nsource : SeedImportSource\n    Source of the parameters\nparameters : list[str] | None\n    List of parameter names to import. If None, imports all available.\nqids : list[str] | None\n    List of qubit IDs to import. If None, imports all available.\nmanual_data : dict[str, dict[str, Any]] | None\n    Manual data when source is MANUAL.\n    Format: {\"parameter_name\": {\"Q0\": value, \"Q1\": value, ...}}"
+      },
+      "SeedImportResponse": {
+        "properties": {
+          "chip_id": {
+            "type": "string",
+            "title": "Chip Id"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "imported_count": {
+            "type": "integer",
+            "title": "Imported Count"
+          },
+          "skipped_count": {
+            "type": "integer",
+            "title": "Skipped Count"
+          },
+          "error_count": {
+            "type": "integer",
+            "title": "Error Count"
+          },
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/SeedImportResultItem"
+            },
+            "type": "array",
+            "title": "Results"
+          },
+          "provenance_activity_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provenance Activity Id",
+            "description": "Activity ID for provenance tracking"
+          }
+        },
+        "type": "object",
+        "required": [
+          "chip_id",
+          "source",
+          "imported_count",
+          "skipped_count",
+          "error_count",
+          "results"
+        ],
+        "title": "SeedImportResponse",
+        "description": "Response from seed import operation."
+      },
+      "SeedImportResultItem": {
+        "properties": {
+          "parameter_name": {
+            "type": "string",
+            "title": "Parameter Name"
+          },
+          "qid": {
+            "type": "string",
+            "title": "Qid"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Value"
+          },
+          "unit": {
+            "type": "string",
+            "title": "Unit"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "description": "'imported' or 'skipped' or 'error'"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "parameter_name",
+          "qid",
+          "value",
+          "unit",
+          "status"
+        ],
+        "title": "SeedImportResultItem",
+        "description": "Result for a single parameter import."
+      },
+      "SeedImportSource": {
+        "type": "string",
+        "enum": [
+          "qubex_params",
+          "manual"
+        ],
+        "title": "SeedImportSource",
+        "description": "Source of seed parameters."
+      },
       "Settings": {
         "properties": {
           "env": {
@@ -8686,11 +10674,6 @@
           "calib_data_path": {
             "type": "string",
             "title": "Calib Data Path"
-          },
-          "backend": {
-            "type": "string",
-            "title": "Backend",
-            "default": "qubex"
           },
           "mongo_db_name": {
             "type": "string",
@@ -9134,6 +11117,22 @@
           "file_path": {
             "type": "string",
             "title": "File Path"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category"
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "default": true
           }
         },
         "type": "object",
@@ -9504,7 +11503,7 @@
           "data": {
             "additionalProperties": {
               "items": {
-                "$ref": "#/components/schemas/OutputParameterModel"
+                "$ref": "#/components/schemas/ParameterModel"
               },
               "type": "array"
             },

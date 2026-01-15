@@ -11,9 +11,15 @@ from typing import TYPE_CHECKING, Annotated, Any
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.logger import logger
 from qdash.api.lib.auth import get_current_active_user  # noqa: TCH002
+from qdash.api.lib.backend_config import (
+    get_task_category,
+    get_tasks,
+    load_backend_config,
+)
 from qdash.api.lib.config_loader import ConfigLoader
 from qdash.api.schemas.auth import User  # noqa: TCH002
 from qdash.api.schemas.task_file import (
+    BackendConfigResponse,
     FileNodeType,
     ListTaskFileBackendsResponse,
     ListTaskInfoResponse,
@@ -505,6 +511,37 @@ def _get_directory_mtime_sum(directory: Path) -> float:
 
 
 @router.get(
+    "/task-files/backend-config",
+    response_model=BackendConfigResponse,
+    summary="Get backend configuration",
+    operation_id="getBackendConfig",
+)
+def get_backend_config() -> BackendConfigResponse:
+    """Get backend configuration from backend.yaml.
+
+    Returns backend definitions, tasks, and categories.
+
+    Returns
+    -------
+        Backend configuration
+
+    """
+    try:
+        config = load_backend_config()
+        return BackendConfigResponse(
+            default_backend=config.default_backend,
+            backends={
+                name: {"description": b.description, "tasks": b.tasks}
+                for name, b in config.backends.items()
+            },
+            categories=config.categories,
+        )
+    except Exception as e:
+        logger.warning(f"Failed to load backend config: {e}")
+        return BackendConfigResponse()
+
+
+@router.get(
     "/task-files/tasks",
     response_model=ListTaskInfoResponse,
     summary="List all tasks in a backend",
@@ -513,6 +550,7 @@ def _get_directory_mtime_sum(directory: Path) -> float:
 def list_task_info(
     backend: str,
     sort_order: str | None = None,
+    enabled_only: bool = False,
 ) -> ListTaskInfoResponse:
     """List all task definitions found in a backend directory.
 
@@ -523,6 +561,7 @@ def list_task_info(
     ----
         backend: Backend name (e.g., "qubex", "fake")
         sort_order: Sort order for tasks ("type_then_name", "name_only", "file_path")
+        enabled_only: If True, only return tasks that are enabled in backend.yaml
 
     Returns:
     -------
@@ -537,8 +576,8 @@ def list_task_info(
     if not backend_path.is_dir():
         raise HTTPException(status_code=400, detail=f"Not a directory: {backend}")
 
-    # Check cache (include sort_order in cache key)
-    cache_key = f"{backend}:{sort_order or 'default'}"
+    # Check cache (include sort_order and enabled_only in cache key)
+    cache_key = f"{backend}:{sort_order or 'default'}:{enabled_only}"
     current_mtime = _get_directory_mtime_sum(backend_path)
     cached = _task_cache.get(cache_key)
 
@@ -552,16 +591,33 @@ def list_task_info(
     logger.debug(f"Parsing task files for backend: {backend}")
     tasks = collect_tasks_from_directory(backend_path, backend_path)
 
+    # Get available tasks from backend.yaml
+    available_tasks = set(get_tasks(backend))
+
+    # Enrich tasks with category and enabled status
+    enriched_tasks = []
+    for task in tasks:
+        task.category = get_task_category(task.name)
+        task.enabled = task.name in available_tasks
+        enriched_tasks.append(task)
+
+    # Filter if enabled_only is True
+    if enabled_only:
+        enriched_tasks = [t for t in enriched_tasks if t.enabled]
+
     # Sort based on sort_order parameter
     if sort_order == "name_only":
-        tasks.sort(key=lambda t: t.name)
+        enriched_tasks.sort(key=lambda t: t.name)
     elif sort_order == "file_path":
-        tasks.sort(key=lambda t: (t.file_path, t.name))
+        enriched_tasks.sort(key=lambda t: (t.file_path, t.name))
+    elif sort_order == "category":
+        # Sort by category, then by name within category
+        enriched_tasks.sort(key=lambda t: (t.category or "zzz", t.name))
     else:
         # Default: type_then_name
-        tasks.sort(key=lambda t: (t.task_type or "", t.name))
+        enriched_tasks.sort(key=lambda t: (t.task_type or "", t.name))
 
     # Update cache
-    _task_cache[cache_key] = (current_mtime, tasks)
+    _task_cache[cache_key] = (current_mtime, enriched_tasks)
 
-    return ListTaskInfoResponse(tasks=tasks)
+    return ListTaskInfoResponse(tasks=enriched_tasks)

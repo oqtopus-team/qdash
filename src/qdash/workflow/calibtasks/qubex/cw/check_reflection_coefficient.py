@@ -1,6 +1,6 @@
 from typing import ClassVar
 
-from qdash.datamodel.task import InputParameterModel, OutputParameterModel
+from qdash.datamodel.task import ParameterModel, RunParameterModel
 from qdash.dbmodel.initialize import initialize
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
@@ -15,15 +15,14 @@ class CheckReflectionCoefficient(QubexTask):
 
     name: str = "CheckReflectionCoefficient"
     task_type: str = "qubit"
-    input_parameters: ClassVar[dict[str, InputParameterModel]] = {}
-    output_parameters: ClassVar[dict[str, OutputParameterModel]] = {
-        "resonator_frequency": OutputParameterModel(
-            unit="GHz", description="Fine resonator frequency"
-        ),
-        "kappa_external": OutputParameterModel(
+    input_parameters: ClassVar[dict[str, ParameterModel | None]] = {}
+    run_parameters: ClassVar[dict[str, RunParameterModel]] = {}
+    output_parameters: ClassVar[dict[str, ParameterModel]] = {
+        "resonator_frequency": ParameterModel(unit="GHz", description="Fine resonator frequency"),
+        "kappa_external": ParameterModel(
             unit="MHz", description="External coupling rate (kappa_external)"
         ),
-        "kappa_internal": OutputParameterModel(
+        "kappa_internal": ParameterModel(
             unit="MHz", description="Internal coupling rate (kappa_internal)"
         ),
     }

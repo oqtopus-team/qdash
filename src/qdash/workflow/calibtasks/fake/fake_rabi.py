@@ -5,7 +5,7 @@ import numpy as np
 import numpy.typing as npt
 import plotly.graph_objects as go
 import qubex as qx
-from qdash.datamodel.task import InputParameterModel, OutputParameterModel
+from qdash.datamodel.task import ParameterModel, RunParameterModel
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
     PreProcessResult,
@@ -87,27 +87,27 @@ class FakeRabi(FakeTask):
 
     name: str = "FakeRabi"
     task_type: str = "qubit"
-    input_parameters: ClassVar[dict[str, InputParameterModel]] = {
-        "time_range": InputParameterModel(
+    run_parameters: ClassVar[dict[str, RunParameterModel]] = {
+        "time_range": RunParameterModel(
             unit="ns",
             value_type="range",
             value=(0, 201, 4),
             description="Time range for Rabi oscillation",
         ),
-        "shots": InputParameterModel(
+        "shots": RunParameterModel(
             unit="a.u.",
             value_type="int",
             value=DEFAULT_SHOTS,
             description="Number of shots for Rabi oscillation",
         ),
-        "interval": InputParameterModel(
+        "interval": RunParameterModel(
             unit="ns",
             value_type="int",
             value=DEFAULT_INTERVAL,
             description="Time interval for Rabi oscillation",
         ),
     }
-    output_parameters: ClassVar[dict[str, OutputParameterModel]] = {}
+    output_parameters: ClassVar[dict[str, ParameterModel]] = {}
 
     def preprocess(self, backend: FakeBackend, qid: str) -> PreProcessResult:
         """Preprocess the task."""

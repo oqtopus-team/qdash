@@ -27,6 +27,7 @@ Example:
 
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 from pathlib import Path
@@ -47,6 +48,7 @@ if TYPE_CHECKING:
     from qdash.workflow.service.targets import Target
 
 from prefect import get_run_logger
+from qdash.common.backend_config import get_default_backend
 from qdash.common.datetime_utils import now
 
 logger = logging.getLogger(__name__)
@@ -133,7 +135,7 @@ class CalibService:
         chip_id: str,
         qids: list[str] | None = None,
         execution_id: str | None = None,
-        backend_name: str = "qubex",
+        backend_name: str | None = None,
         name: str | None = None,
         flow_name: str | None = None,
         tags: list[str] | None = None,
@@ -144,6 +146,7 @@ class CalibService:
         github_push_config: GitHubPushConfig | None = None,
         muxes: list[int] | None = None,
         project_id: str | None = None,
+        skip_execution: bool = False,
         *,
         user_repo: UserRepository | None = None,
         lock_repo: ExecutionLockRepository | None = None,
@@ -172,7 +175,7 @@ class CalibService:
             qids: List of qubit IDs to calibrate. If None, session is lazily initialized.
             execution_id: Unique execution identifier (e.g., "20240101-001").
                 If None, auto-generates using current date and counter.
-            backend_name: Backend type, either 'qubex' or 'fake' (default: 'qubex')
+            backend_name: Backend type, either 'qubex' or 'fake' (default: from backend.yaml)
             name: Human-readable name for the execution (deprecated, use flow_name)
             flow_name: Flow name for display in execution list (auto-injected by API)
             tags: List of tags for categorization
@@ -184,6 +187,8 @@ class CalibService:
             muxes: List of MUX IDs for system-level tasks like CheckSkew (default: None)
             project_id: Project ID for multi-tenancy support. If None, auto-resolved
                 from username's default_project_id.
+            skip_execution: Skip Execution document creation (for wrapper/parent sessions
+                where child sessions will create their own Executions). Default: False.
             user_repo: Repository for user lookup (DI). If None, uses MongoUserRepository.
             lock_repo: Repository for lock operations (DI). If None, uses MongoExecutionLockRepository.
             counter_repo: Repository for counter operations (DI). If None, uses MongoExecutionCounterRepository.
@@ -196,8 +201,9 @@ class CalibService:
         self.chip_id = chip_id
         self.qids = qids
         self.muxes = muxes
-        self.backend_name = backend_name
+        self.backend_name = backend_name or get_default_backend()
         self.use_lock = use_lock
+        self.skip_execution = skip_execution
         self._lock_acquired = False
 
         # Store injected repositories for later use
@@ -320,6 +326,7 @@ class CalibService:
                 muxes=self.muxes,
                 project_id=self.project_id,
                 enable_github_pull=self._enable_github_pull,
+                skip_execution=self.skip_execution,
             )
 
             # Create and initialize CalibOrchestrator
@@ -341,7 +348,8 @@ class CalibService:
         """Get the ExecutionService from CalibOrchestrator."""
         if self._orchestrator is None:
             return None
-        return self._orchestrator.execution_service
+        # Access private attribute to avoid RuntimeError from property
+        return self._orchestrator._execution_service
 
     @execution_service.setter
     def execution_service(self, value: ExecutionService | None) -> None:
@@ -354,14 +362,16 @@ class CalibService:
         """Get the TaskContext from CalibOrchestrator."""
         if self._orchestrator is None:
             return None
-        return self._orchestrator.task_context
+        # Access private attribute to avoid RuntimeError from property
+        return self._orchestrator._task_context
 
     @property
     def backend(self) -> BaseBackend | None:
         """Get the Backend from CalibOrchestrator."""
         if self._orchestrator is None:
             return None
-        return self._orchestrator.backend
+        # Access private attribute to avoid RuntimeError from property
+        return self._orchestrator._backend
 
     def execute_task(
         self,
@@ -566,13 +576,18 @@ class CalibService:
             ```
 
         """
-        assert self.execution_service is not None, "ExecutionService not initialized"
-        assert self.task_context is not None, "TaskContext not initialized"
-        assert self.github_push_config is not None, "GitHubPushConfig not initialized"
         logger = get_run_logger()
         push_results = None
 
         try:
+            # Skip most finalization if in wrapper mode (no ExecutionService)
+            if self.execution_service is None:
+                logger.info("Skipping finalization (wrapper mode - no Execution)")
+                return None
+
+            assert self.task_context is not None, "TaskContext not initialized"
+            assert self.github_push_config is not None, "GitHubPushConfig not initialized"
+
             # Reload and complete execution
             self.execution_service = self.execution_service.reload().complete_execution()
 
@@ -745,28 +760,52 @@ class CalibService:
         Returns:
             Dictionary with typed results from each step
         """
+        from qdash.workflow.service.session_context import (
+            clear_current_session,
+            set_current_session,
+        )
         from qdash.workflow.service.steps import Pipeline, StepContext
 
         logger = get_run_logger()
 
-        # Validate pipeline dependencies
-        pipeline = Pipeline(steps)
-        logger.info(f"Starting calibration pipeline with {len(pipeline)} steps")
+        # Set this CalibService as the current session for task execution
+        set_current_session(self)
 
-        # Initialize context
-        ctx = StepContext()
-        ctx.candidate_qids = targets.to_qids(self.chip_id)
+        try:
+            # Initialize session if not already initialized
+            qids = targets.to_qids(self.chip_id)
+            if not self._initialized:
+                self._initialize(qids)
 
-        # Execute steps sequentially
-        for i, step in enumerate(pipeline):
-            logger.info(f"Step {i + 1}/{len(pipeline)}: {step.name}")
-            try:
-                ctx = step.execute(self, targets, ctx)
-            except Exception as e:
-                logger.error(f"Step {step.name} failed: {e}")
-                raise
+            # Validate pipeline dependencies
+            pipeline = Pipeline(steps)
+            logger.info(f"Starting calibration pipeline with {len(pipeline)} steps")
 
-        logger.info("Pipeline completed successfully")
+            # Initialize context
+            ctx = StepContext()
+            ctx.candidate_qids = qids
+
+            # Execute steps sequentially
+            for i, step in enumerate(pipeline):
+                logger.info(f"Step {i + 1}/{len(pipeline)}: {step.name}")
+                try:
+                    ctx = step.execute(self, targets, ctx)
+                except Exception as e:
+                    logger.error(f"Step {step.name} failed: {e}")
+                    raise
+
+            logger.info("Pipeline completed successfully")
+
+            # Finalize execution (mark as completed, update chip history)
+            self.finish_calibration()
+        except Exception:
+            # Mark execution as failed on error and release lock (best effort)
+            with contextlib.suppress(Exception):
+                self.fail_calibration()
+            raise
+        finally:
+            # Clear session when done
+            clear_current_session()
 
         # Build results from typed context fields
         results: dict[str, Any] = {
@@ -810,7 +849,7 @@ def init_calibration(
     tags: list[str] | None = None,
     use_lock: bool = True,
     note: dict[str, Any] | None = None,
-    enable_github_pull: bool = False,
+    enable_github_pull: bool = True,
     github_push_config: GitHubPushConfig | None = None,
     muxes: list[int] | None = None,
     project_id: str | None = None,

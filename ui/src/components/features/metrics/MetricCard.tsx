@@ -77,10 +77,12 @@ export function MetricCard({
     if (!rawData) return null;
 
     // Apply scale and convert to appropriate format
-    // Convert keys from "32" to "Q32" format
+    // Use simple numeric format (e.g., "0", "1")
     const scaledData: { [key: string]: number | null } = {};
     Object.entries(rawData).forEach(([key, value]) => {
-      const qid = key.startsWith("Q") ? key : `Q${key.padStart(2, "0")}`;
+      const qid = key.startsWith("Q")
+        ? String(parseInt(key.slice(1), 10))
+        : String(parseInt(key, 10));
       scaledData[qid] =
         value !== null && value !== undefined && typeof value === "number"
           ? value * scale

@@ -9,6 +9,7 @@ import { MetricsCdfChart } from "./MetricsCdfChart";
 import { MetricsPdfDownloadButton } from "./MetricsPdfDownloadButton";
 import { MetricsStatsCards, useMetricStats } from "./MetricsStatsCards";
 import { QubitMetricsGrid } from "./QubitMetricsGrid";
+import { RecentChangesCard } from "./RecentChangesCard";
 import { LinearGauge } from "@/components/ui/LinearGauge";
 
 import { useListChips, useGetChip } from "@/client/chip/chip";
@@ -195,12 +196,12 @@ export function MetricsPageContent() {
       };
     } = {};
     Object.entries(rawData).forEach(([key, metricValue]: [string, any]) => {
-      // For qubit metrics, format as "Q00", for coupling metrics keep "0-1" format
+      // Use simple numeric format for qubit metrics (e.g., "0", "1"), keep "0-1" format for coupling
       const formattedKey =
         metricType === "qubit"
           ? key.startsWith("Q")
-            ? key
-            : `Q${key.padStart(2, "0")}`
+            ? String(parseInt(key.slice(1), 10))
+            : String(parseInt(key, 10))
           : key;
       const value = metricValue?.value;
       scaledData[formattedKey] = {
@@ -242,8 +243,8 @@ export function MetricsPageContent() {
         const formattedKey =
           metricType === "qubit"
             ? key.startsWith("Q")
-              ? key
-              : `Q${key.padStart(2, "0")}`
+              ? String(parseInt(key.slice(1), 10))
+              : String(parseInt(key, 10))
             : key;
         const value = metricValue?.value;
         scaledData[formattedKey] = {
@@ -303,6 +304,9 @@ export function MetricsPageContent() {
               disabled={!selectedChip || isLoading}
             />
           </div>
+
+          {/* Recent Changes Card */}
+          <RecentChangesCard limit={8} />
 
           {/* Metric Type Tabs */}
           <div className="tabs tabs-boxed bg-base-200 w-fit">

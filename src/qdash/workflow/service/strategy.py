@@ -146,8 +146,10 @@ class OneQubitScheduledStrategy(OneQubitStrategy):
                 cal_service.chip_id,
                 stage_qids,
                 flow_name=stage_flow_name,
+                backend_name=cal_service.backend_name,  # Inherit backend from parent
                 tags=[config.flow_name] if config.flow_name else None,
                 project_id=config.project_id,
+                use_lock=False,  # Parent session already holds the lock
                 enable_github_pull=True,
                 github_push_config=GitHubPushConfig(
                     enabled=True,
@@ -264,8 +266,10 @@ class OneQubitSynchronizedStrategy(OneQubitStrategy):
                     cal_service.chip_id,
                     box_qids,
                     flow_name=stage_flow_name,
+                    backend_name=cal_service.backend_name,  # Inherit backend from parent
                     tags=[config.flow_name] if config.flow_name else None,
                     project_id=config.project_id,
+                    use_lock=False,  # Parent session already holds the lock
                     enable_github_pull=True,
                     github_push_config=GitHubPushConfig(
                         enabled=True,

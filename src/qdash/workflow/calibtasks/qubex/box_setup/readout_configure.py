@@ -1,6 +1,6 @@
 from typing import ClassVar
 
-from qdash.datamodel.task import InputParameterModel, OutputParameterModel
+from qdash.datamodel.task import ParameterModel, RunParameterModel
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
     RunResult,
@@ -14,15 +14,16 @@ class ReadoutConfigure(QubexTask):
 
     name: str = "ReadoutConfigure"
     task_type: str = "global"
-    input_parameters: ClassVar[dict[str, InputParameterModel]] = {
-        "qubits": InputParameterModel(
+    input_parameters: ClassVar[dict[str, ParameterModel | None]] = {}
+    run_parameters: ClassVar[dict[str, RunParameterModel]] = {
+        "qubits": RunParameterModel(
             unit="a.u.",
             value_type="list",
             value=[],
             description="List of muxes to check skew",
         ),
     }
-    output_parameters: ClassVar[dict[str, OutputParameterModel]] = {}
+    output_parameters: ClassVar[dict[str, ParameterModel]] = {}
 
     def postprocess(
         self, backend: QubexBackend, execution_id: str, run_result: RunResult, qid: str
@@ -36,7 +37,7 @@ class ReadoutConfigure(QubexTask):
             import numpy as np
 
             sys = exp.config_loader.get_experiment_system(chip_id=exp.chip_id)
-            qubits = self.input_parameters["qubits"].get_value()
+            qubits = self.run_parameters["qubits"].get_value()
             if len(qubits) == 0:
                 return RunResult(raw_result=None)
             qubits = [exp.get_qubit_label(int(qid)) for qid in qubits]

@@ -24,7 +24,7 @@
     "@tanstack/react-table": "^8.21.2",
     "@types/dagre": "^0.7.52",
     "@types/react-plotly.js": "^2.6.3",
-    "@xyflow/react": "^12.4.4",
+    "@xyflow/react": "^12.10.0",
     "ai": "4",
     "axios": "^1.7.7",
     "dagre": "^0.8.5",

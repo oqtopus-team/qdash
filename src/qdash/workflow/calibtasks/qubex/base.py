@@ -2,7 +2,9 @@ from collections.abc import Generator
 from contextlib import contextmanager
 from typing import TYPE_CHECKING, Any
 
-from qdash.datamodel.task import InputParameterModel
+from qdash.datamodel.task import ParameterModel
+from qdash.repository.coupling import MongoCouplingCalibrationRepository
+from qdash.repository.qubit import MongoQubitCalibrationRepository
 from qdash.workflow.calibtasks.base import (
     BaseTask,
     PreProcessResult,
@@ -25,121 +27,99 @@ class QubexTask(BaseTask):
     # Only concrete subclasses with a name should be registered
 
     def preprocess(self, backend: "QubexBackend", qid: str) -> PreProcessResult:
+        """Preprocess the task by loading calibration parameters from DB.
+
+        This method populates input_parameters with calibration values from QDash DB.
+
+        Behavior:
+        - If input_parameters is empty: No input dependencies (nothing to load)
+        - If input_parameters has declarations: Load values from QDash DB
+
+        Args:
+        ----
+            backend: Qubex backend object
+            qid: Qubit ID (or "control-target" for coupling tasks)
+
+        Returns:
+        -------
+            PreProcessResult with populated input_parameters
+
+        """
         # System tasks don't need parameter preprocessing
-        # They use qid="" and don't access qubit-specific parameters
         if self.task_type == "system" or qid == "":
-            return PreProcessResult(input_parameters=self.input_parameters)
+            return PreProcessResult(
+                input_parameters=self.input_parameters,
+                run_parameters=self.run_parameters,
+            )
 
-        exp = self.get_experiment(backend)
+        # Load declared input_parameters from DB
+        if self.input_parameters:
+            self._load_parameters_from_db(backend, qid)
 
-        # Check if this is a coupling task (qid format: "0-1")
+        return PreProcessResult(
+            input_parameters=self.input_parameters,
+            run_parameters=self.run_parameters,
+        )
+
+    def _load_parameters_from_db(self, backend: "QubexBackend", qid: str) -> None:
+        """Load declared parameter values from QDash database.
+
+        This method fetches calibration data from QubitDocument or CouplingDocument
+        and populates the declared input_parameters with actual values.
+
+        Behavior for each parameter:
+        - If value is None: Create ParameterModel entirely from DB data
+        - If value is ParameterModel: Use DB value if available, else use as fallback
+
+        Args:
+        ----
+            backend: Qubex backend object
+            qid: Qubit ID (or "control-target" for coupling tasks)
+
+        """
+        project_id = backend.config.get("project_id")
+        chip_id = backend.config.get("chip_id")
+
+        if not project_id or not chip_id:
+            # Cannot fetch from DB without project_id and chip_id
+            return
+
+        # Fetch calibration data based on task type
         if "-" in qid:
-            # Coupling task: add parameters for both qubits
-            control_qid, target_qid = qid.split("-")
-            control_label = exp.get_qubit_label(int(control_qid))
-            target_label = exp.get_qubit_label(int(target_qid))
-
-            # Add control qubit parameters
-            if "control_readout_amplitude" not in self.input_parameters:
-                self.input_parameters["control_readout_amplitude"] = InputParameterModel(
-                    unit="a.u.",
-                    description="Control Qubit Readout Amplitude",
-                    value=exp.experiment_system.control_params.get_readout_amplitude(control_label),
-                    value_type="float",
-                )
-            if "control_readout_frequency" not in self.input_parameters:
-                self.input_parameters["control_readout_frequency"] = InputParameterModel(
-                    unit="GHz",
-                    description="Control Qubit Readout Frequency",
-                    value=exp.experiment_system.quantum_system.get_resonator(
-                        exp.get_resonator_label(int(control_qid))
-                    ).frequency,
-                    value_type="float",
-                )
-            if "control_control_amplitude" not in self.input_parameters:
-                self.input_parameters["control_control_amplitude"] = InputParameterModel(
-                    unit="a.u.",
-                    description="Control Qubit Control Amplitude",
-                    value=exp.experiment_system.control_params.get_control_amplitude(control_label),
-                    value_type="float",
-                )
-            if "control_qubit_frequency" not in self.input_parameters:
-                self.input_parameters["control_qubit_frequency"] = InputParameterModel(
-                    unit="GHz",
-                    description="Control Qubit Frequency",
-                    value=exp.experiment_system.quantum_system.get_qubit(control_label).frequency,
-                    value_type="float",
-                )
-
-            # Add target qubit parameters
-            if "target_readout_amplitude" not in self.input_parameters:
-                self.input_parameters["target_readout_amplitude"] = InputParameterModel(
-                    unit="a.u.",
-                    description="Target Qubit Readout Amplitude",
-                    value=exp.experiment_system.control_params.get_readout_amplitude(target_label),
-                    value_type="float",
-                )
-            if "target_readout_frequency" not in self.input_parameters:
-                self.input_parameters["target_readout_frequency"] = InputParameterModel(
-                    unit="GHz",
-                    description="Target Qubit Readout Frequency",
-                    value=exp.experiment_system.quantum_system.get_resonator(
-                        exp.get_resonator_label(int(target_qid))
-                    ).frequency,
-                    value_type="float",
-                )
-            if "target_control_amplitude" not in self.input_parameters:
-                self.input_parameters["target_control_amplitude"] = InputParameterModel(
-                    unit="a.u.",
-                    description="Target Qubit Control Amplitude",
-                    value=exp.experiment_system.control_params.get_control_amplitude(target_label),
-                    value_type="float",
-                )
-            if "target_qubit_frequency" not in self.input_parameters:
-                self.input_parameters["target_qubit_frequency"] = InputParameterModel(
-                    unit="GHz",
-                    description="Target Qubit Frequency",
-                    value=exp.experiment_system.quantum_system.get_qubit(target_label).frequency,
-                    value_type="float",
-                )
+            # Coupling task
+            coupling_repo = MongoCouplingCalibrationRepository()
+            calib_data = coupling_repo.get_calibration_data(
+                project_id=project_id, chip_id=chip_id, qid=qid
+            )
         else:
-            # Single qubit task
-            label = self.get_qubit_label(backend, qid)
+            # Qubit task
+            qubit_repo = MongoQubitCalibrationRepository()
+            calib_data = qubit_repo.get_calibration_data(
+                project_id=project_id, chip_id=chip_id, qid=qid
+            )
 
-            # Add default parameters only if they don't exist yet
-            # This preserves any overrides provided via task_details
-            if "readout_amplitude" not in self.input_parameters:
-                self.input_parameters["readout_amplitude"] = InputParameterModel(
-                    unit="a.u.",
-                    description="Readout Amplitude",
-                    value=exp.experiment_system.control_params.get_readout_amplitude(label),
-                    value_type="float",
+        # Populate declared parameters with values from DB
+        for param_name, param in list(self.input_parameters.items()):
+            if param_name in calib_data:
+                db_value = calib_data[param_name]
+                if isinstance(db_value, dict):
+                    if param is None:
+                        # Create ParameterModel entirely from DB
+                        self.input_parameters[param_name] = ParameterModel(
+                            value=db_value.get("value", 0),
+                            unit=db_value.get("unit", ""),
+                            description=db_value.get("description", ""),
+                        )
+                    else:
+                        # Update existing ParameterModel with DB value
+                        if "value" in db_value:
+                            param.value = db_value["value"]
+            elif param is None:
+                # Parameter not in DB and no fallback - leave as None or create empty
+                self.input_parameters[param_name] = ParameterModel(
+                    unit="",
+                    description=f"Parameter {param_name} not found in DB",
                 )
-            if "readout_frequency" not in self.input_parameters:
-                self.input_parameters["readout_frequency"] = InputParameterModel(
-                    unit="GHz",
-                    description="Readout Frequency",
-                    value=exp.experiment_system.quantum_system.get_resonator(
-                        exp.get_resonator_label(int(qid))
-                    ).frequency,
-                    value_type="float",
-                )
-            if "control_amplitude" not in self.input_parameters:
-                self.input_parameters["control_amplitude"] = InputParameterModel(
-                    unit="a.u.",
-                    description="Qubit Control Amplitude",
-                    value=exp.experiment_system.control_params.get_control_amplitude(label),
-                    value_type="float",
-                )
-            if "qubit_frequency" not in self.input_parameters:
-                self.input_parameters["qubit_frequency"] = InputParameterModel(
-                    unit="GHz",
-                    description="Qubit Frequency",
-                    value=exp.experiment_system.quantum_system.get_qubit(label).frequency,
-                    value_type="float",
-                )
-
-        return PreProcessResult(input_parameters=self.input_parameters)
 
     def batch_run(self, backend: "QubexBackend", qids: list[str]) -> RunResult:
         """Default implementation for batch run.
@@ -218,6 +198,26 @@ class QubexTask(BaseTask):
         exp = self.get_experiment(backend)
         exp.calib_note.save()
 
+    def _get_calibration_value(self, param_name: str) -> float:
+        """Get value from calibration input parameter.
+
+        Args:
+        ----
+            param_name: Name of the parameter
+
+        Returns:
+        -------
+            The parameter value as float
+
+        """
+        param = self.input_parameters[param_name]
+        if param is None:
+            raise ValueError(f"Parameter {param_name} not found or not loaded")
+        # ParameterModel has .value, RunParameterModel has .get_value()
+        if hasattr(param, "get_value"):
+            return float(param.get_value())
+        return float(param.value)
+
     def _is_frequency_overridden(self, backend: "QubexBackend", qid: str) -> bool:
         """Check if qubit_frequency was explicitly overridden from default.
 
@@ -235,11 +235,15 @@ class QubexTask(BaseTask):
             True if frequency was explicitly provided (differs from default)
 
         """
+        # If qubit_frequency is not in input_parameters, there's no override
+        if "qubit_frequency" not in self.input_parameters:
+            return False
+
         exp = self.get_experiment(backend)
         label = self.get_qubit_label(backend, qid)
 
         # Get current frequency from input_parameters
-        current_freq = self.input_parameters["qubit_frequency"].get_value()
+        current_freq = self._get_calibration_value("qubit_frequency")
 
         # Get default frequency from quantum system
         default_freq = exp.experiment_system.quantum_system.get_qubit(label).frequency
@@ -309,7 +313,7 @@ class QubexTask(BaseTask):
         try:
             # Check and apply readout_amplitude override
             if "readout_amplitude" in self.input_parameters:
-                override_value = self.input_parameters["readout_amplitude"].get_value()
+                override_value = self._get_calibration_value("readout_amplitude")
                 default_value = exp.experiment_system.control_params.get_readout_amplitude(label)
                 # Only override if different from default
                 if abs(override_value - default_value) > 1e-9:
@@ -318,7 +322,7 @@ class QubexTask(BaseTask):
 
             # Check and apply control_amplitude override
             if "control_amplitude" in self.input_parameters:
-                override_value = self.input_parameters["control_amplitude"].get_value()
+                override_value = self._get_calibration_value("control_amplitude")
                 default_value = exp.experiment_system.control_params.get_control_amplitude(label)
                 # Only override if different from default
                 if abs(override_value - default_value) > 1e-9:
@@ -329,7 +333,7 @@ class QubexTask(BaseTask):
             if "readout_frequency" in self.input_parameters:
                 resonator_label = exp.get_resonator_label(int(qid))
                 resonator = exp.experiment_system.quantum_system.get_resonator(resonator_label)
-                override_value = self.input_parameters["readout_frequency"].get_value()
+                override_value = self._get_calibration_value("readout_frequency")
                 default_value = resonator.frequency
                 # Only override if different from default
                 if abs(override_value - default_value) > 1e-9:
@@ -338,7 +342,7 @@ class QubexTask(BaseTask):
 
             # Check qubit_frequency override (handled specially via modified_frequencies)
             if self._is_frequency_overridden(backend, qid):
-                frequency_override = self.input_parameters["qubit_frequency"].get_value()
+                frequency_override = self._get_calibration_value("qubit_frequency")
 
             # Execute with frequency override if needed
             if frequency_override is not None:
@@ -391,7 +395,7 @@ class QubexTask(BaseTask):
         label = self.get_qubit_label(backend, qid)
 
         if self._is_frequency_overridden(backend, qid):
-            override_freq = self.input_parameters["qubit_frequency"].get_value()
+            override_freq = self._get_calibration_value("qubit_frequency")
             with exp.modified_frequencies({label: override_freq}):
                 yield
         else:

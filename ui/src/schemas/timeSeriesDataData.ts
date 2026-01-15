@@ -5,6 +5,6 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { OutputParameterModel } from "./outputParameterModel";
+import type { ParameterModel } from "./parameterModel";
 
-export type TimeSeriesDataData = { [key: string]: OutputParameterModel[] };
+export type TimeSeriesDataData = { [key: string]: ParameterModel[] };

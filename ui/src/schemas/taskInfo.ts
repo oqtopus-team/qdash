@@ -7,6 +7,7 @@
  */
 import type { TaskInfoTaskType } from "./taskInfoTaskType";
 import type { TaskInfoDescription } from "./taskInfoDescription";
+import type { TaskInfoCategory } from "./taskInfoCategory";
 
 /**
  * Task information extracted from Python file.
@@ -17,4 +18,6 @@ export interface TaskInfo {
   task_type?: TaskInfoTaskType;
   description?: TaskInfoDescription;
   file_path: string;
+  category?: TaskInfoCategory;
+  enabled?: boolean;
 }

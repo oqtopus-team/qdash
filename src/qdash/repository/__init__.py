@@ -33,6 +33,13 @@ from qdash.repository.protocols import (
     TaskResultHistoryRepository,
     UserRepository,
 )
+
+# Provenance implementations
+from qdash.repository.provenance import (
+    MongoActivityRepository,
+    MongoParameterVersionRepository,
+    MongoProvenanceRelationRepository,
+)
 from qdash.repository.qubit import MongoQubitCalibrationRepository
 from qdash.repository.tag import MongoTagRepository
 from qdash.repository.task import MongoTaskRepository
@@ -75,4 +82,8 @@ __all__ = [
     "MongoUserRepository",
     # Filesystem implementations
     "FilesystemCalibDataSaver",
+    # Provenance implementations
+    "MongoActivityRepository",
+    "MongoParameterVersionRepository",
+    "MongoProvenanceRelationRepository",
 ]

@@ -1,6 +1,6 @@
 from typing import ClassVar
 
-from qdash.datamodel.task import InputParameterModel, OutputParameterModel
+from qdash.datamodel.task import ParameterModel, RunParameterModel
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
     RunResult,
@@ -8,7 +8,7 @@ from qdash.workflow.calibtasks.base import (
 from qdash.workflow.calibtasks.qubex.base import QubexTask
 from qdash.workflow.engine.backend.qubex import QubexBackend
 from qubex.experiment.experiment_constants import CALIBRATION_SHOTS, PI_DURATION
-from qubex.measurement.measurement import DEFAULT_INTERVAL
+from qubex.measurement.measurement import DEFAULT_INTERVAL, DEFAULT_READOUT_DURATION
 
 
 class CreatePIPulse(QubexTask):
@@ -16,25 +16,35 @@ class CreatePIPulse(QubexTask):
 
     name: str = "CreatePIPulse"
     task_type: str = "qubit"
-    input_parameters: ClassVar[dict[str, InputParameterModel]] = {
-        "duration": InputParameterModel(
+    input_parameters: ClassVar[dict[str, ParameterModel | None]] = {
+        "qubit_frequency": None,  # Load from DB
+        "control_amplitude": None,  # Load from DB
+        "readout_amplitude": None,  # Load from DB
+        "readout_frequency": None,  # Load from DB
+        "readout_length": ParameterModel(
+            value=DEFAULT_READOUT_DURATION, unit="ns", description="Readout pulse length"
+        ),
+    }
+    run_parameters: ClassVar[dict[str, RunParameterModel]] = {
+        "duration": RunParameterModel(
             unit="ns", value_type="int", value=PI_DURATION, description="PI pulse length"
         ),
-        "shots": InputParameterModel(
+        "shots": RunParameterModel(
             unit="",
             value_type="int",
             value=CALIBRATION_SHOTS,
             description="Number of shots for calibration",
         ),
-        "interval": InputParameterModel(
+        "interval": RunParameterModel(
             unit="ns",
             value_type="int",
             value=DEFAULT_INTERVAL,
             description="Time interval for calibration",
         ),
     }
-    output_parameters: ClassVar[dict[str, OutputParameterModel]] = {
-        "pi_amplitude": OutputParameterModel(unit="", description="PI pulse amplitude")
+    output_parameters: ClassVar[dict[str, ParameterModel]] = {
+        "pi_amplitude": ParameterModel(unit="", description="PI pulse amplitude"),
+        "pi_length": ParameterModel(value=PI_DURATION, unit="ns", description="PI pulse length"),
     }
 
     def postprocess(
@@ -54,9 +64,9 @@ class CreatePIPulse(QubexTask):
         result = exp.calibrate_pi_pulse(
             targets=labels,
             n_rotations=1,
-            duration=self.input_parameters["duration"].get_value(),
-            shots=self.input_parameters["shots"].get_value(),
-            interval=self.input_parameters["interval"].get_value(),
+            duration=self.run_parameters["duration"].get_value(),
+            shots=self.run_parameters["shots"].get_value(),
+            interval=self.run_parameters["interval"].get_value(),
         )
         self.save_calibration(backend)
         r2 = result.data[exp.get_qubit_label(int(qid))].r2

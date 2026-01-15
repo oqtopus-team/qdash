@@ -166,7 +166,7 @@ class ExecutionStateManager(BaseModel):
         param = qubit_data.get(param_name)
         if param is None:
             return None
-        # Handle OutputParameterModel
+        # Handle ParameterModel
         return param.value if hasattr(param, "value") else param
 
     def get_coupling_parameter(self, qid_pair: str, param_name: str) -> Any:
@@ -189,7 +189,7 @@ class ExecutionStateManager(BaseModel):
         param = coupling_data.get(param_name)
         if param is None:
             return None
-        # Handle OutputParameterModel
+        # Handle ParameterModel
         return param.value if hasattr(param, "value") else param
 
     def to_datamodel(self) -> ExecutionModel:

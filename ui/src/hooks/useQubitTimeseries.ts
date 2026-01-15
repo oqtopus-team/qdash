@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 
-import type { OutputParameterModel } from "@/schemas";
+import type { ParameterModel } from "@/schemas";
 import type {
   ParameterKey,
   TagKey,
@@ -65,7 +65,7 @@ export function useQubitTimeseries(options: UseQubitTimeseriesOptions) {
     if (!Array.isArray(qubitData)) return [];
 
     return qubitData
-      .map((point: OutputParameterModel) => ({
+      .map((point: ParameterModel) => ({
         time: point.calibrated_at || "",
         value: point.value || 0,
         error: point.error,
@@ -83,9 +83,9 @@ export function useQubitTimeseries(options: UseQubitTimeseriesOptions) {
       if (!Array.isArray(qubitData)) return [];
 
       const x = qubitData.map(
-        (point: OutputParameterModel) => point.calibrated_at || "",
+        (point: ParameterModel) => point.calibrated_at || "",
       );
-      const y = qubitData.map((point: OutputParameterModel) => {
+      const y = qubitData.map((point: ParameterModel) => {
         const value = point.value;
         if (typeof value === "number") return value;
         if (typeof value === "string") {
@@ -95,7 +95,7 @@ export function useQubitTimeseries(options: UseQubitTimeseriesOptions) {
         return 0;
       });
       const errorArray = qubitData.map(
-        (point: OutputParameterModel) => point.error || 0,
+        (point: ParameterModel) => point.error || 0,
       );
 
       return [
@@ -144,7 +144,7 @@ export function useQubitTimeseries(options: UseQubitTimeseriesOptions) {
       return { unit: "Value", description: "" };
     }
 
-    const firstPoint = qubitData[0] as OutputParameterModel;
+    const firstPoint = qubitData[0] as ParameterModel;
     return {
       unit: firstPoint.unit || "a.u.",
       description: firstPoint.description || "",

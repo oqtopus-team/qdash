@@ -14,6 +14,7 @@ import {
   Cpu,
   FileJson2,
   Files,
+  GitBranch,
   LayoutGrid,
   ListTodo,
   LogOut,
@@ -194,6 +195,23 @@ function Sidebar() {
           >
             <BarChart3 size={18} />
             {(isOpen || isMobileOpen) && <span className="ml-2">Analysis</span>}
+          </Link>
+        </li>
+        <li>
+          <Link
+            href="/provenance"
+            className={
+              isMobileOpen
+                ? linkClass(isActive("/provenance"))
+                : desktopLinkClass(isActive("/provenance"))
+            }
+            title="Provenance"
+            onClick={handleLinkClick}
+          >
+            <GitBranch size={18} />
+            {(isOpen || isMobileOpen) && (
+              <span className="ml-2">Provenance</span>
+            )}
           </Link>
         </li>
 
