@@ -348,7 +348,8 @@ class CalibService:
         """Get the ExecutionService from CalibOrchestrator."""
         if self._orchestrator is None:
             return None
-        return self._orchestrator.execution_service
+        # Access private attribute to avoid RuntimeError from property
+        return self._orchestrator._execution_service
 
     @execution_service.setter
     def execution_service(self, value: ExecutionService | None) -> None:
@@ -361,14 +362,16 @@ class CalibService:
         """Get the TaskContext from CalibOrchestrator."""
         if self._orchestrator is None:
             return None
-        return self._orchestrator.task_context
+        # Access private attribute to avoid RuntimeError from property
+        return self._orchestrator._task_context
 
     @property
     def backend(self) -> BaseBackend | None:
         """Get the Backend from CalibOrchestrator."""
         if self._orchestrator is None:
             return None
-        return self._orchestrator.backend
+        # Access private attribute to avoid RuntimeError from property
+        return self._orchestrator._backend
 
     def execute_task(
         self,

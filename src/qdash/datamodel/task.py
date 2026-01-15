@@ -106,6 +106,12 @@ class ParameterModel(BaseModel):
 
     Attributes
     ----------
+        parameter_name: The actual DB parameter name. If empty, the dict key is used.
+        qid_role: The qid role for 2-qubit tasks. One of:
+            - "" or "self": Use task's qid as-is (default, for 1-qubit tasks)
+            - "control": Use control qubit's qid (for 2-qubit tasks)
+            - "target": Use target qubit's qid (for 2-qubit tasks)
+            - "coupling": Use coupling qid as-is (for 2-qubit tasks)
         value: The parameter value.
         value_type: The type of the value (default: "float").
         error: The error/uncertainty of the value.
@@ -117,6 +123,8 @@ class ParameterModel(BaseModel):
 
     """
 
+    parameter_name: str = ""
+    qid_role: str = ""
     value: float | int = 0
     value_type: str = "float"
     error: float = 0
