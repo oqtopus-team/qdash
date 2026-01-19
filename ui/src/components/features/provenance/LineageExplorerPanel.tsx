@@ -20,6 +20,7 @@ import {
 import { useMetricsConfig } from "@/hooks/useMetricsConfig";
 
 import { ProvenanceGraph } from "./ProvenanceGraph";
+import { RecalibrationRecommendationsPanel } from "./RecalibrationRecommendationsPanel";
 
 type ViewMode = "graph" | "list";
 
@@ -372,110 +373,130 @@ export function LineageExplorerPanel({
             </div>
           </div>
 
-          {/* Graph View */}
-          {viewMode === "graph" && (
-            <ProvenanceGraph
-              nodes={data.nodes}
-              edges={data.edges}
-              originId={entityId}
-              onNodeClick={handleNodeClick}
-            />
-          )}
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+            <div className="xl:col-span-2 space-y-4">
+              {/* Graph View */}
+              {viewMode === "graph" && (
+                <ProvenanceGraph
+                  nodes={data.nodes}
+                  edges={data.edges}
+                  originId={entityId}
+                  onNodeClick={handleNodeClick}
+                />
+              )}
 
-          {/* List View */}
-          {viewMode === "list" && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              {/* Nodes List */}
-              <div className="card bg-base-200">
-                <div className="card-body p-4 sm:p-6">
-                  <h3 className="card-title text-base sm:text-lg">
-                    Nodes
-                    <span className="badge badge-primary badge-sm ml-2">
-                      {data.nodes.length}
-                    </span>
-                  </h3>
-                  <div className="space-y-2 max-h-80 overflow-y-auto">
-                    {data.nodes.length === 0 ? (
-                      <div className="text-center py-8 text-base-content/50">
-                        No nodes found
-                      </div>
-                    ) : (
-                      data.nodes.map((node) => (
-                        <div
-                          key={node.node_id}
-                          className={`p-3 rounded-lg border cursor-pointer hover:bg-base-300/50 ${
-                            node.node_type === "entity"
-                              ? "border-primary/30 bg-primary/5"
-                              : "border-secondary/30 bg-secondary/5"
-                          }`}
-                          onClick={() =>
-                            handleNodeClick(node.node_id, node.node_type)
-                          }
-                        >
-                          <div className="flex items-start gap-2">
-                            {getNodeIcon(node.node_type)}
-                            <div className="flex-1 min-w-0">
-                              <div className="font-medium text-sm truncate">
-                                {formatNodeLabel(node)}
-                              </div>
-                              <div className="text-xs text-base-content/70">
-                                {formatNodeValue(node)}
+              {/* List View */}
+              {viewMode === "list" && (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  {/* Nodes List */}
+                  <div className="card bg-base-200">
+                    <div className="card-body p-4 sm:p-6">
+                      <h3 className="card-title text-base sm:text-lg">
+                        Nodes
+                        <span className="badge badge-primary badge-sm ml-2">
+                          {data.nodes.length}
+                        </span>
+                      </h3>
+                      <div className="space-y-2 max-h-80 overflow-y-auto">
+                        {data.nodes.length === 0 ? (
+                          <div className="text-center py-8 text-base-content/50">
+                            No nodes found
+                          </div>
+                        ) : (
+                          data.nodes.map((node) => (
+                            <div
+                              key={node.node_id}
+                              className={`p-3 rounded-lg border cursor-pointer hover:bg-base-300/50 ${
+                                node.node_type === "entity"
+                                  ? "border-primary/30 bg-primary/5"
+                                  : "border-secondary/30 bg-secondary/5"
+                              }`}
+                              onClick={() =>
+                                handleNodeClick(node.node_id, node.node_type)
+                              }
+                            >
+                              <div className="flex items-start gap-2">
+                                {getNodeIcon(node.node_type)}
+                                <div className="flex-1 min-w-0">
+                                  <div className="font-medium text-sm truncate">
+                                    {formatNodeLabel(node)}
+                                  </div>
+                                  <div className="text-xs text-base-content/70">
+                                    {formatNodeValue(node)}
+                                  </div>
+                                </div>
+                                <span
+                                  className={`badge badge-xs ${
+                                    node.node_type === "entity"
+                                      ? "badge-primary"
+                                      : "badge-secondary"
+                                  }`}
+                                >
+                                  {node.node_type === "entity"
+                                    ? "param"
+                                    : "task"}
+                                </span>
                               </div>
                             </div>
-                            <span
-                              className={`badge badge-xs ${node.node_type === "entity" ? "badge-primary" : "badge-secondary"}`}
-                            >
-                              {node.node_type === "entity" ? "param" : "task"}
-                            </span>
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Edges List */}
-              <div className="card bg-base-200">
-                <div className="card-body p-4 sm:p-6">
-                  <h3 className="card-title text-base sm:text-lg">
-                    Relations
-                    <span className="badge badge-accent badge-sm ml-2">
-                      {data.edges.length}
-                    </span>
-                  </h3>
-                  <div className="space-y-2 max-h-80 overflow-y-auto">
-                    {data.edges.length === 0 ? (
-                      <div className="text-center py-8 text-base-content/50">
-                        No relations found
+                          ))
+                        )}
                       </div>
-                    ) : (
-                      data.edges.map((edge, index) => (
-                        <div
-                          key={index}
-                          className="p-2 rounded-lg border border-accent/30 bg-accent/5"
-                        >
-                          <div className="flex items-center gap-1 text-xs">
-                            <span className="font-mono truncate max-w-[100px]">
-                              {edge.source_id.split(":").slice(0, 2).join(":")}
-                            </span>
-                            <ChevronRight className="h-3 w-3 text-accent flex-shrink-0" />
-                            <span className="badge badge-accent badge-xs">
-                              {edge.relation_type}
-                            </span>
-                            <ChevronRight className="h-3 w-3 text-accent flex-shrink-0" />
-                            <span className="font-mono truncate max-w-[100px]">
-                              {edge.target_id.split(":").slice(0, 2).join(":")}
-                            </span>
+                    </div>
+                  </div>
+
+                  {/* Edges List */}
+                  <div className="card bg-base-200">
+                    <div className="card-body p-4 sm:p-6">
+                      <h3 className="card-title text-base sm:text-lg">
+                        Relations
+                        <span className="badge badge-accent badge-sm ml-2">
+                          {data.edges.length}
+                        </span>
+                      </h3>
+                      <div className="space-y-2 max-h-80 overflow-y-auto">
+                        {data.edges.length === 0 ? (
+                          <div className="text-center py-8 text-base-content/50">
+                            No relations found
                           </div>
-                        </div>
-                      ))
-                    )}
+                        ) : (
+                          data.edges.map((edge, index) => (
+                            <div
+                              key={index}
+                              className="p-2 rounded-lg border border-accent/30 bg-accent/5"
+                            >
+                              <div className="flex items-center gap-1 text-xs">
+                                <span className="font-mono truncate max-w-[100px]">
+                                  {edge.source_id
+                                    .split(":")
+                                    .slice(0, 2)
+                                    .join(":")}
+                                </span>
+                                <ChevronRight className="h-3 w-3 text-accent flex-shrink-0" />
+                                <span className="badge badge-accent badge-xs">
+                                  {edge.relation_type}
+                                </span>
+                                <ChevronRight className="h-3 w-3 text-accent flex-shrink-0" />
+                                <span className="font-mono truncate max-w-[100px]">
+                                  {edge.target_id
+                                    .split(":")
+                                    .slice(0, 2)
+                                    .join(":")}
+                                </span>
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
             </div>
-          )}
+
+            <div className="xl:col-span-1">
+              <RecalibrationRecommendationsPanel entityId={entityId} />
+            </div>
+          </div>
         </div>
       )}
 

@@ -796,6 +796,8 @@ class MongoProvenanceRelationRepository:
                     "qid": entity.qid,
                     "value": entity.value,
                     "unit": entity.unit,
+                    "error": entity.error,
+                    "value_type": entity.value_type,
                     "version": entity.version,
                     "task_name": entity.task_name,
                 }

@@ -364,6 +364,10 @@ class ParameterChangeResponse(BaseModel):
         Name of the task that produced this value
     execution_id : str
         Execution that produced this value
+    error : float
+        Measurement error/uncertainty for current value
+    previous_error : float | None
+        Measurement error/uncertainty for previous value (if available)
 
     """
 
@@ -379,6 +383,8 @@ class ParameterChangeResponse(BaseModel):
     valid_from: datetime | None = None
     task_name: str = ""
     execution_id: str = ""
+    error: float = 0.0
+    previous_error: float | None = None
 
 
 class RecentChangesResponse(BaseModel):

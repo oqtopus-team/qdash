@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 import math
+from collections import defaultdict, deque
 from typing import TYPE_CHECKING, Any, cast
 
 from qdash.api.schemas.provenance import (
@@ -139,6 +140,10 @@ class ProvenanceService:
                 )
             )
 
+        depths = self._compute_graph_depths(origin_id=entity_id, edges=edges, reverse=False)
+        for node in nodes:
+            node.depth = depths.get(node.node_id, 0)
+
         # Find or create origin node
         origin = next(
             (n for n in nodes if n.node_id == entity_id),
@@ -212,6 +217,10 @@ class ProvenanceService:
                 )
             )
 
+        depths = self._compute_graph_depths(origin_id=entity_id, edges=edges, reverse=True)
+        for node in nodes:
+            node.depth = depths.get(node.node_id, 0)
+
         # Find or create origin node
         origin = next(
             (n for n in nodes if n.node_id == entity_id),
@@ -224,6 +233,42 @@ class ProvenanceService:
             edges=edges,
             max_depth=max_depth,
         )
+
+    @staticmethod
+    def _compute_graph_depths(
+        *,
+        origin_id: str,
+        edges: list[LineageEdgeResponse],
+        reverse: bool,
+    ) -> dict[str, int]:
+        """Compute shortest-path depths from origin using graph edges.
+
+        Notes
+        -----
+        - For lineage graphs, edges are traversed from source_id -> target_id.
+        - For impact graphs, downstream traversal follows the reverse direction
+          (target_id -> source_id) of recorded PROV edges.
+        """
+        adjacency: dict[str, list[str]] = defaultdict(list)
+        for e in edges:
+            if reverse:
+                adjacency[e.target_id].append(e.source_id)
+            else:
+                adjacency[e.source_id].append(e.target_id)
+
+        depths: dict[str, int] = {origin_id: 0}
+        queue: deque[str] = deque([origin_id])
+
+        while queue:
+            current = queue.popleft()
+            current_depth = depths[current]
+            for nxt in adjacency.get(current, []):
+                if nxt in depths:
+                    continue
+                depths[nxt] = current_depth + 1
+                queue.append(nxt)
+
+        return depths
 
     def compare_executions(
         self,
@@ -458,6 +503,8 @@ class ProvenanceService:
 
         """
         try:
+            from qdash.common.datetime_utils import ensure_timezone
+
             # Get recent parameter versions (version > 1 means there was a change)
             # Fetch more if filtering by parameter names
             fetch_limit = limit * 5 if parameter_names else limit * 2
@@ -488,6 +535,8 @@ class ProvenanceService:
 
                 current_value = getattr(doc, "value", None)
                 previous_value = getattr(previous, "value", None) if previous else None
+                current_error = float(getattr(doc, "error", 0.0) or 0.0)
+                previous_error = float(getattr(previous, "error", 0.0) or 0.0) if previous else None
 
                 # Calculate delta
                 delta = None
@@ -515,9 +564,11 @@ class ProvenanceService:
                         delta=delta,
                         delta_percent=delta_percent,
                         version=current_version,
-                        valid_from=getattr(doc, "valid_from", None),
+                        valid_from=ensure_timezone(getattr(doc, "valid_from", None)),
                         task_name=getattr(doc, "task_name", ""),
                         execution_id=getattr(doc, "execution_id", ""),
+                        error=current_error,
+                        previous_error=previous_error,
                     )
                 )
 
@@ -600,15 +651,29 @@ class ProvenanceService:
             max_depth=max_depth,
         )
 
-        # Extract activities and their affected parameters
-        # task_name -> {qids: set, parameters: set, min_depth: int}
+        edges: list[LineageEdgeResponse] = [
+            LineageEdgeResponse(
+                relation_type=str(dict(e).get("relation_type", "")),
+                source_id=str(dict(e).get("source", "")),
+                target_id=str(dict(e).get("target", "")),
+            )
+            for e in impact_data.get("edges", [])
+        ]
+        depths = self._compute_graph_depths(origin_id=entity_id, edges=edges, reverse=True)
+
+        # Extract activities and their affected parameters from the impact graph.
+        # task_name -> {qids: set, parameters: set, min_depth: int, example: tuple | None}
         task_info: dict[str, dict[str, Any]] = {}
         affected_entity_count = 0
+        max_depth_reached = 0
 
         for node_item in impact_data.get("nodes", []):
             node_dict = dict(node_item)
             node_type = str(node_dict.get("type", ""))
             metadata = cast(dict[str, Any], node_dict.get("metadata") or {})
+            node_id = str(node_dict.get("id", ""))
+            node_depth = depths.get(node_id, 0)
+            max_depth_reached = max(max_depth_reached, node_depth)
 
             if node_type == "activity":
                 task_name = str(metadata.get("task_name", ""))
@@ -619,13 +684,17 @@ class ProvenanceService:
                             "qids": set(),
                             "parameters": set(),
                             "min_depth": float("inf"),
+                            "example": None,  # (param_name, qid, depth)
                         }
                     if qid:
                         task_info[task_name]["qids"].add(qid)
+                    task_info[task_name]["min_depth"] = min(
+                        task_info[task_name]["min_depth"], node_depth
+                    )
 
             elif node_type == "entity":
                 # Count affected entities (excluding source)
-                if str(node_dict.get("id", "")) != entity_id:
+                if node_id != entity_id:
                     affected_entity_count += 1
 
                 # Track which parameters each task affects
@@ -638,30 +707,41 @@ class ProvenanceService:
                             "qids": set(),
                             "parameters": set(),
                             "min_depth": float("inf"),
+                            "example": None,  # (param_name, qid, depth)
                         }
                     task_info[task_name]["parameters"].add(param_name)
                     if qid:
                         task_info[task_name]["qids"].add(qid)
-
-        # Calculate depth for each task based on edge traversal
-        # For simplicity, we use the order of appearance (earlier = closer)
-        for priority, task_name in enumerate(task_info.keys(), start=1):
-            task_info[task_name]["min_depth"] = priority
+                    task_info[task_name]["min_depth"] = min(
+                        task_info[task_name]["min_depth"], node_depth
+                    )
+                    ex = task_info[task_name]["example"]
+                    if ex is None or node_depth < ex[2]:
+                        task_info[task_name]["example"] = (param_name, qid, node_depth)
 
         # Build recommendations sorted by proximity (min_depth)
         sorted_tasks = sorted(
             task_info.items(),
-            key=lambda x: x[1]["min_depth"],
+            key=lambda x: (x[1]["min_depth"], x[0]),
         )
 
         recommendations = []
         for priority, (task_name, info) in enumerate(sorted_tasks, start=1):
             qids = sorted(info["qids"])
             params = sorted(info["parameters"])
+            min_depth = info["min_depth"] if info["min_depth"] != float("inf") else 0
 
-            reason = f"Re-run to update {len(params)} parameter(s)"
-            if source_param_name:
-                reason += f" affected by {source_param_name} change"
+            reason_parts = [
+                f"Found in impact graph (min depth={min_depth})",
+                f"would update {len(params)} parameter(s)",
+            ]
+            if source_param_name and source_qid:
+                reason_parts.append(f"triggered by {source_param_name} ({source_qid}) change")
+            example = info.get("example")
+            if example is not None:
+                ex_param, ex_qid, ex_depth = example
+                reason_parts.append(f"e.g., {ex_param} ({ex_qid}) at depth={ex_depth}")
+            reason = "; ".join(reason_parts)
 
             recommendations.append(
                 RecommendedTaskResponse(
@@ -679,7 +759,7 @@ class ProvenanceService:
             source_qid=source_qid,
             recommended_tasks=recommendations,
             total_affected_parameters=affected_entity_count,
-            max_depth_reached=max_depth,
+            max_depth_reached=max_depth_reached,
         )
 
     def _build_version_from_metadata(self, item: dict[str, Any]) -> ParameterVersionResponse | None:
@@ -707,9 +787,9 @@ class ProvenanceService:
             parameter_name=metadata.get("parameter_name", ""),
             qid=metadata.get("qid", ""),
             value=self._sanitize_value(metadata.get("value", 0)),
-            value_type="float",
+            value_type=str(metadata.get("value_type", "float") or "float"),
             unit=metadata.get("unit", ""),
-            error=0.0,
+            error=float(metadata.get("error", 0.0) or 0.0),
             version=metadata.get("version", 1),
             valid_from=now(),
             valid_until=None,
@@ -818,6 +898,8 @@ class ProvenanceService:
             Version response object
 
         """
+        from qdash.common.datetime_utils import ensure_timezone
+
         if isinstance(entity, dict):
             return ParameterVersionResponse(
                 entity_id=entity.get("entity_id", ""),
@@ -828,8 +910,8 @@ class ProvenanceService:
                 unit=entity.get("unit", ""),
                 error=self._sanitize_error(entity.get("error", 0.0)),
                 version=entity.get("version", 1),
-                valid_from=entity.get("valid_from"),
-                valid_until=entity.get("valid_until"),
+                valid_from=ensure_timezone(entity.get("valid_from")),
+                valid_until=ensure_timezone(entity.get("valid_until")),
                 execution_id=entity.get("execution_id", ""),
                 task_id=entity.get("task_id", ""),
                 task_name=entity.get("task_name", ""),
@@ -845,8 +927,8 @@ class ProvenanceService:
             unit=getattr(entity, "unit", ""),
             error=self._sanitize_error(getattr(entity, "error", 0.0)),
             version=getattr(entity, "version", 1),
-            valid_from=getattr(entity, "valid_from", None),
-            valid_until=getattr(entity, "valid_until", None),
+            valid_from=ensure_timezone(getattr(entity, "valid_from", None)),
+            valid_until=ensure_timezone(getattr(entity, "valid_until", None)),
             execution_id=getattr(entity, "execution_id", ""),
             task_id=getattr(entity, "task_id", ""),
             task_name=getattr(entity, "task_name", ""),
@@ -868,6 +950,8 @@ class ProvenanceService:
             Activity response object
 
         """
+        from qdash.common.datetime_utils import ensure_timezone
+
         if isinstance(activity, dict):
             return ActivityResponse(
                 activity_id=activity.get("activity_id", ""),
@@ -876,8 +960,8 @@ class ProvenanceService:
                 task_name=activity.get("task_name", ""),
                 task_type=activity.get("task_type", ""),
                 qid=activity.get("qid", ""),
-                started_at=activity.get("started_at"),
-                ended_at=activity.get("ended_at"),
+                started_at=ensure_timezone(activity.get("started_at")),
+                ended_at=ensure_timezone(activity.get("ended_at")),
                 status=activity.get("status", ""),
                 project_id=activity.get("project_id", ""),
                 chip_id=activity.get("chip_id", ""),
@@ -889,8 +973,8 @@ class ProvenanceService:
             task_name=getattr(activity, "task_name", ""),
             task_type=getattr(activity, "task_type", ""),
             qid=getattr(activity, "qid", ""),
-            started_at=getattr(activity, "started_at", None),
-            ended_at=getattr(activity, "ended_at", None),
+            started_at=ensure_timezone(getattr(activity, "started_at", None)),
+            ended_at=ensure_timezone(getattr(activity, "ended_at", None)),
             status=getattr(activity, "status", ""),
             project_id=getattr(activity, "project_id", ""),
             chip_id=getattr(activity, "chip_id", ""),
