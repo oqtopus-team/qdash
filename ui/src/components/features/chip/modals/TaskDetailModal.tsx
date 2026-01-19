@@ -63,6 +63,23 @@ export function TaskDetailModal({
   const modalRef = useRef<HTMLDialogElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
 
+  const resolveQid = (taskQid: string, qidRole?: string): string => {
+    if (!qidRole || qidRole === "self" || qidRole === "coupling")
+      return taskQid;
+    const match = taskQid.match(/^(\d+)-(\d+)$/);
+    if (!match) return taskQid;
+    const [, control, target] = match;
+    if (qidRole === "control") return control;
+    if (qidRole === "target") return target;
+    return taskQid;
+  };
+
+  const buildProvenanceUrl = (parameterName: string, qidValue: string) => {
+    const p = encodeURIComponent(parameterName);
+    const q = encodeURIComponent(qidValue);
+    return `/provenance?tab=lineage&parameter=${p}&qid=${q}`;
+  };
+
   // Handle keyboard navigation
   const handleKeyDown = useCallback(
     (event: KeyboardEvent) => {
@@ -705,7 +722,21 @@ export function TaskDetailModal({
                                               <li>
                                                 <button
                                                   onClick={() => {
-                                                    router.push("/provenance");
+                                                    const parameterName =
+                                                      (paramValue as any)
+                                                        ?.parameter_name || key;
+                                                    const resolvedQid =
+                                                      resolveQid(
+                                                        qid,
+                                                        (paramValue as any)
+                                                          ?.qid_role,
+                                                      );
+                                                    router.push(
+                                                      buildProvenanceUrl(
+                                                        parameterName,
+                                                        resolvedQid,
+                                                      ),
+                                                    );
                                                     onClose();
                                                   }}
                                                 >
@@ -739,8 +770,36 @@ export function TaskDetailModal({
                         <button
                           className="btn btn-ghost btn-sm gap-2 hover:btn-primary"
                           onClick={() => {
-                            // Navigate to Provenance page
-                            router.push("/provenance");
+                            const outputs =
+                              (task as any)?.output_parameters &&
+                              typeof (task as any).output_parameters ===
+                                "object"
+                                ? Object.entries(
+                                    (task as any).output_parameters,
+                                  )
+                                : [];
+                            const inputs =
+                              (task as any)?.input_parameters &&
+                              typeof (task as any).input_parameters === "object"
+                                ? Object.entries((task as any).input_parameters)
+                                : [];
+
+                            const [key, paramValue] =
+                              (outputs[0] as any) ?? (inputs[0] as any) ?? [];
+
+                            if (key && paramValue) {
+                              const parameterName =
+                                (paramValue as any)?.parameter_name || key;
+                              const resolvedQid = resolveQid(
+                                qid,
+                                (paramValue as any)?.qid_role,
+                              );
+                              router.push(
+                                buildProvenanceUrl(parameterName, resolvedQid),
+                              );
+                            } else {
+                              router.push("/provenance");
+                            }
                             onClose();
                           }}
                         >

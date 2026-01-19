@@ -59,6 +59,8 @@ function EntityNode({
     isOrigin?: boolean;
     unit?: string;
     qid?: string;
+    error?: string;
+    lowConfidence?: boolean;
   };
 }) {
   const styles = getNodeStyles(data.isOrigin ?? false, true);
@@ -94,6 +96,18 @@ function EntityNode({
       {data.value && (
         <div className="text-xs text-base-content/70 font-mono mt-1 bg-base-100/50 rounded px-2 py-1 text-center">
           {data.value} {data.unit || ""}
+        </div>
+      )}
+      {data.error && (
+        <div
+          className={`text-[10px] font-mono mt-1 rounded px-2 py-1 text-center ${
+            data.lowConfidence
+              ? "bg-warning/10 text-warning"
+              : "bg-base-100/50 text-base-content/60"
+          }`}
+          title="Measurement uncertainty (error)"
+        >
+          ±{data.error}
         </div>
       )}
       <Handle
@@ -248,6 +262,8 @@ function convertToFlowElements(
 
     let label = node.node_id.split(":").slice(0, 2).join(":");
     let value: string | undefined;
+    let error: string | undefined;
+    let lowConfidence: boolean | undefined;
     let status: string | undefined;
     let unit: string | undefined;
     let taskId: string | undefined;
@@ -258,6 +274,17 @@ function convertToFlowElements(
       value = formatValue(node.entity.value);
       unit = node.entity.unit;
       qid = node.entity.qid;
+      if (typeof node.entity.error === "number" && node.entity.error !== 0) {
+        error = formatValue(node.entity.error);
+        if (typeof node.entity.value === "number") {
+          if (node.entity.value === 0) {
+            lowConfidence = true;
+          } else {
+            lowConfidence =
+              Math.abs(node.entity.error / node.entity.value) >= 0.05;
+          }
+        }
+      }
     } else if (!isEntity && node.activity) {
       label = node.activity.task_name || node.node_id;
       status = node.activity.status;
@@ -272,6 +299,8 @@ function convertToFlowElements(
       data: {
         label,
         value,
+        error,
+        lowConfidence,
         unit,
         status,
         taskId,
