@@ -8,6 +8,7 @@ Uses ConfigLoader for unified configuration loading with local override support.
 
 from __future__ import annotations
 
+import os
 from functools import lru_cache
 
 from pydantic import BaseModel, Field
@@ -93,12 +94,17 @@ def get_available_backends() -> list[str]:
 def get_default_backend() -> str:
     """Get the default backend name.
 
+    Environment variable DEFAULT_BACKEND takes precedence over config file.
+
     Returns
     -------
     str
-        Default backend name from configuration
+        Default backend name from environment variable or configuration
 
     """
+    env_backend = os.environ.get("DEFAULT_BACKEND")
+    if env_backend:
+        return env_backend
     config = load_backend_config()
     return config.default_backend
 
