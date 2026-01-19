@@ -55,7 +55,7 @@ from qdash.workflow.service.targets import QubitTargets
 @flow
 def fake_calibration(
     username: str,
-    chip_id: str,
+    chip_id: str = "64Q",
     qids: list[str] | None = None,
     tasks: list[str] | None = None,
     backend_name: str | None = None,
@@ -66,7 +66,7 @@ def fake_calibration(
 
     Args:
         username: User name (from UI)
-        chip_id: Chip ID (from UI)
+        chip_id: Chip ID (default: "64Q")
         qids: Qubit IDs to calibrate (default: ["0", "1", "2", "3"])
         tasks: Task names to run. Default: ["ChevronPattern", "CheckRabi", "CheckT1", "CheckT2Echo"]
                For full provenance test, add "RandomizedBenchmarking".
@@ -101,6 +101,6 @@ def fake_calibration(
         backend_name=backend_name,
         flow_name=flow_name,
         project_id=project_id,
-        skip_execution=True,  # Child sessions create their own Executions
+        skip_execution=False,  # Child sessions create their own Executions
     )
     return cal.run(targets, steps=steps)

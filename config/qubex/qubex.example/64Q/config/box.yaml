@@ -1,0 +1,97 @@
+# prefix:
+#   U: QuBE OU
+#   R: QuBE Riken
+#   Q: QuEL-1
+#   S: QuEL-1 SE
+#   T: QuEL-3
+#   M: QuEL-Moon
+# suffix:
+#   A: 7-11GHz Type-A
+#   B: 7-11GHz Type-B
+#   R: 2-8GHz
+
+Q2A:
+  name: "QuBE OU #1-02"
+  type: "quel1-a"
+  address: "..."
+  adapter: ""
+U7B:
+  name: "QuBE OU #2-03"
+  type: "qube-riken-a"
+  address: "..."
+  adapter: ""
+U10B:
+  name: "QuBE OU #2-06"
+  type: "qube-ou-b"
+  address: "..."
+  adapter: ""
+U11A:
+  name: "QuBE OU #2-"
+  type: "qube-ou-a"
+  address: "..."
+  adapter: ""
+U13B:
+  name: "QuBE OU #2-09"
+  type: "qube-ou-b"
+  address: "..."
+  adapter: ""
+U14A:
+  name: "QuBE OU #2-10"
+  type: "qube-ou-a"
+  address: "..."
+  adapter: ""
+U15A:
+  name: "QuBE OU #2-11"
+  type: "qube-ou-a"
+  address: "..."
+  adapter: ""
+R19A:
+  name: "QuBE Riken #1-01"
+  type: "qube-riken-a"
+  address: "..."
+  adapter: ""
+R20A:
+  name: "QuBE Riken #1-02"
+  type: "qube-riken-a"
+  address: "..."
+  adapter: ""
+R21B:
+  name: "QuBE Riken #1-03"
+  type: "qube-riken-b"
+  address: "..."
+  adapter: ""
+R23A:
+  name: "QuBE Riken #1-05"
+  type: "qube-riken-a"
+  address: "..."
+  adapter: ""
+R25A:
+  name: "QuBE Riken #1-07"
+  type: "qube-riken-a"
+  address: "..."
+  adapter: ""
+R26A:
+  name: "QuBE Riken #1-08"
+  type: "qube-riken-a"
+  address: "..."
+  adapter: ""
+R28A:
+  name: "QuBE Riken #1-10"
+  type: "qube-riken-a"
+  address: "..."
+  adapter: ""
+R31A:
+  name: "QuBE OU #3-01"
+  type: "qube-riken-a"
+  address: "..."
+  adapter: ""
+Q73A:
+  name: "QuEL-1 #5-01"
+  type: "quel1-a"
+  address: "..."
+  adapter: ""
+S159A:
+  name: "QuEL-1 SE (7-11GHz)"
+  type: "quel1se-fujitsu11-a"
+  address: "..."
+  adapter: ""
