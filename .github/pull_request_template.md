@@ -7,10 +7,3 @@
 
 ## Changes
 <!-- Bullet list of key changes -->
-
-## Testing
-- [ ] `make test`
-<!-- Add other checks / results if needed -->
-
-## Related
-<!-- Related PRs / docs / follow-ups -->

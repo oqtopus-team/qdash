@@ -9,7 +9,6 @@ import { MetricsCdfChart } from "./MetricsCdfChart";
 import { MetricsPdfDownloadButton } from "./MetricsPdfDownloadButton";
 import { MetricsStatsCards, useMetricStats } from "./MetricsStatsCards";
 import { QubitMetricsGrid } from "./QubitMetricsGrid";
-import { RecentChangesCard } from "./RecentChangesCard";
 import { LinearGauge } from "@/components/ui/LinearGauge";
 
 import { useListChips, useGetChip } from "@/client/chip/chip";
@@ -304,9 +303,6 @@ export function MetricsPageContent() {
               disabled={!selectedChip || isLoading}
             />
           </div>
-
-          {/* Recent Changes Card */}
-          <RecentChangesCard limit={8} />
 
           {/* Metric Type Tabs */}
           <div className="tabs tabs-boxed bg-base-200 w-fit">
