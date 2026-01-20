@@ -11,10 +11,10 @@
  */
 export interface Settings {
   env: string;
-  client_url: string;
+  client_url?: string;
   prefect_api_url: string;
-  slack_bot_token: string;
-  slack_channel_id: string;
+  slack_bot_token?: string;
+  slack_channel_id?: string;
   postgres_data_path: string;
   mongo_data_path: string;
   calib_data_path: string;

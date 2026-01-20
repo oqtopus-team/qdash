@@ -10,6 +10,7 @@ import type { ParameterChangeResponsePreviousValue } from "./parameterChangeResp
 import type { ParameterChangeResponseDelta } from "./parameterChangeResponseDelta";
 import type { ParameterChangeResponseDeltaPercent } from "./parameterChangeResponseDeltaPercent";
 import type { ParameterChangeResponseValidFrom } from "./parameterChangeResponseValidFrom";
+import type { ParameterChangeResponsePreviousError } from "./parameterChangeResponsePreviousError";
 
 /**
  * Response model for a parameter change (with delta from previous version).
@@ -40,6 +41,10 @@ task_name : str
     Name of the task that produced this value
 execution_id : str
     Execution that produced this value
+error : float
+    Measurement error/uncertainty for current value
+previous_error : float | None
+    Measurement error/uncertainty for previous value (if available)
  */
 export interface ParameterChangeResponse {
   entity_id: string;
@@ -54,4 +59,6 @@ export interface ParameterChangeResponse {
   valid_from?: ParameterChangeResponseValidFrom;
   task_name?: string;
   execution_id?: string;
+  error?: number;
+  previous_error?: ParameterChangeResponsePreviousError;
 }
