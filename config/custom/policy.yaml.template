@@ -1,0 +1,42 @@
+# Copy this file to `policy.yaml` in this directory to customize provenance quality policies.
+#
+# Policy files are loaded in this order (later overrides earlier):
+#   1. METRICS_CONFIG_PATH (if set) is for metrics.yaml, not policy.yaml.
+#   2. config/policy.yaml
+#   3. config/policy.local.yaml (optional, gitignored)
+#   4. /app/config/policy.yaml (Docker)
+#
+# To customize locally:
+#   cp config/custom/policy.yaml.template config/policy.local.yaml
+#   # Edit config/policy.local.yaml as needed
+#
+# Notes:
+# - Policies apply to current (latest valid) parameter versions.
+# - Rules match by `parameter` key (e.g., "t1") and apply to all qids by default.
+# - This MVP uses a single severity level: "warn" (one threshold per check).
+
+version: 1
+rules:
+  # Example: T1 must be at least 20us (warn)
+  - id: t1-min
+    parameter: t1
+    checks:
+      - type: min
+        warn: 2.0e-05
+        message: "T1 is below threshold"
+
+  # Example: staleness (hours since valid_from)
+  - id: t1-stale
+    parameter: t1
+    checks:
+      - type: staleness_hours
+        warn: 24
+        message: "T1 is stale"
+
+  # Example: relative uncertainty (error/value)
+  - id: t1-uncertainty
+    parameter: t1
+    checks:
+      - type: uncertainty_ratio
+        warn: 0.05
+        message: "T1 uncertainty is high"

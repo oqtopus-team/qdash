@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import {
   Bell,
+  AlertTriangle,
   GitBranch,
   History,
   Clock,
@@ -16,6 +17,10 @@ import {
 } from "lucide-react";
 
 import { useGetRecentChanges } from "@/client/provenance/provenance";
+import {
+  useGetPolicyImpactViolations,
+  useGetPolicyViolations,
+} from "@/client/provenance/policy";
 import { RecalibrationRecommendationsPanel } from "@/components/features/provenance/RecalibrationRecommendationsPanel";
 import { PageContainer } from "@/components/ui/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -71,7 +76,12 @@ function formatDeltaPercent(percent: number | null | undefined): string {
 
 export function InboxPageContent() {
   const [withinHours, setWithinHours] = useState<WindowHours>(48);
-  const [expandedEntityId, setExpandedEntityId] = useState<string | null>(null);
+  const [expandedSelection, setExpandedSelection] = useState<{
+    kind: "change" | "policy";
+    entityId: string;
+    parameterName: string;
+    qid: string;
+  } | null>(null);
   const [query, setQuery] = useState("");
   const [qidType, setQidType] = useState<"all" | "qubit" | "coupling">("all");
   const [showSignificantOnly, setShowSignificantOnly] = useState(true);
@@ -101,6 +111,20 @@ export function InboxPageContent() {
       },
     },
   );
+
+  const { data: policyResponse, isLoading: isPolicyLoading } =
+    useGetPolicyViolations(
+      {
+        limit: 200,
+        parameter_names: parameterNames.length > 0 ? parameterNames : undefined,
+      },
+      {
+        query: {
+          staleTime: 30000,
+          enabled: !isLoadingConfig && parameterNames.length > 0,
+        },
+      },
+    );
 
   const changes = useMemo(
     () => changesResponse?.data?.changes ?? [],
@@ -195,9 +219,48 @@ export function InboxPageContent() {
   }, [filteredChanges, showAllRows]);
 
   const selectedChange = useMemo(() => {
-    if (!expandedEntityId) return null;
-    return changeById.get(expandedEntityId) ?? null;
-  }, [changeById, expandedEntityId]);
+    if (!expandedSelection || expandedSelection.kind !== "change") return null;
+    return changeById.get(expandedSelection.entityId) ?? null;
+  }, [changeById, expandedSelection]);
+
+  const policyViolations = useMemo(
+    () => policyResponse?.data?.violations ?? [],
+    [policyResponse],
+  );
+
+  const policyCounts = useMemo(() => {
+    return { warn: policyViolations.length, total: policyViolations.length };
+  }, [policyViolations]);
+
+  const selectedPolicyEntityId = useMemo(() => {
+    if (!expandedSelection || expandedSelection.kind !== "policy") return null;
+    return expandedSelection.entityId;
+  }, [expandedSelection]);
+
+  const {
+    data: impactViolationsResponse,
+    isLoading: isImpactViolationsLoading,
+  } = useGetPolicyImpactViolations(
+    selectedPolicyEntityId,
+    {
+      max_depth: 10,
+      limit: 200,
+    },
+    {
+      query: {
+        staleTime: 30000,
+        enabled: !!selectedPolicyEntityId,
+      },
+    },
+  );
+
+  const impactViolations = useMemo(() => {
+    return impactViolationsResponse?.data?.violations ?? [];
+  }, [impactViolationsResponse]);
+
+  const impactViolationCounts = useMemo(() => {
+    return { warn: impactViolations.length, total: impactViolations.length };
+  }, [impactViolations]);
 
   return (
     <PageContainer maxWidth>
@@ -206,6 +269,135 @@ export function InboxPageContent() {
           title="Inbox"
           description="Review recent calibration parameter changes and take next actions"
         />
+
+        <div className="card bg-base-200">
+          <div className="card-body p-4 sm:p-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5 text-warning" />
+                <h3 className="card-title text-base sm:text-lg">
+                  Policy Violations
+                </h3>
+                <span className="badge badge-sm">{policyCounts.total}</span>
+                {policyCounts.warn > 0 && (
+                  <span className="badge badge-warning badge-sm">
+                    warn {policyCounts.warn}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {isPolicyLoading && (
+              <div className="flex justify-center py-10">
+                <span className="loading loading-spinner loading-lg"></span>
+              </div>
+            )}
+
+            {!isPolicyLoading && policyViolations.length === 0 && (
+              <div className="text-center py-8 text-base-content/60">
+                No current policy violations.
+              </div>
+            )}
+
+            {!isPolicyLoading && policyViolations.length > 0 && (
+              <div className="overflow-x-auto -mx-4 sm:mx-0 mt-4">
+                <table className="table table-sm">
+                  <thead>
+                    <tr>
+                      <th>Severity</th>
+                      <th>Parameter</th>
+                      <th>QID</th>
+                      <th className="hidden md:table-cell">Value</th>
+                      <th>Message</th>
+                      <th className="hidden sm:table-cell">Updated</th>
+                      <th className="w-24">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {policyViolations.slice(0, 20).map((v) => {
+                      const isExpanded =
+                        expandedSelection?.entityId === v.entity_id;
+                      return (
+                        <tr key={v.entity_id}>
+                          <td>
+                            <span className="badge badge-warning badge-sm">
+                              warn
+                            </span>
+                          </td>
+                          <td className="font-medium">{v.parameter_name}</td>
+                          <td className="font-mono text-xs">{v.qid || "-"}</td>
+                          <td className="hidden md:table-cell font-mono text-xs">
+                            {formatValue(v.value)} {v.unit || ""}
+                          </td>
+                          <td className="text-sm">
+                            {v.message || v.check_type}
+                          </td>
+                          <td className="hidden sm:table-cell text-sm text-base-content/70">
+                            {v.valid_from
+                              ? formatRelativeTime(v.valid_from)
+                              : "-"}
+                          </td>
+                          <td>
+                            <div className="flex gap-1 justify-end">
+                              <Link
+                                className="btn btn-xs btn-ghost"
+                                href={`/provenance?tab=lineage&entity=${encodeURIComponent(
+                                  v.entity_id,
+                                )}`}
+                                title="Open lineage"
+                              >
+                                <GitBranch className="h-3 w-3" />
+                              </Link>
+                              <Link
+                                className="btn btn-xs btn-ghost"
+                                href={`/provenance?tab=history&parameter=${encodeURIComponent(
+                                  v.parameter_name,
+                                )}&qid=${encodeURIComponent(v.qid || "")}`}
+                                title="Open history"
+                              >
+                                <History className="h-3 w-3" />
+                              </Link>
+                              <button
+                                className="btn btn-xs btn-ghost"
+                                onClick={() =>
+                                  setExpandedSelection(
+                                    isExpanded
+                                      ? null
+                                      : {
+                                          kind: "policy",
+                                          entityId: v.entity_id,
+                                          parameterName: v.parameter_name,
+                                          qid: v.qid || "",
+                                        },
+                                  )
+                                }
+                                title="Show suggested next actions"
+                              >
+                                <ChevronDown
+                                  className={`h-3 w-3 transition-transform ${
+                                    isExpanded ? "rotate-180" : ""
+                                  }`}
+                                />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+
+                {policyViolations.length > 20 && (
+                  <div className="mt-3 flex justify-center">
+                    <Link className="btn btn-sm btn-ghost" href="/provenance">
+                      View more in Provenance
+                    </Link>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
 
         <div className="card bg-base-200">
           <div className="card-body p-4 sm:p-6">
@@ -318,7 +510,8 @@ export function InboxPageContent() {
                   </thead>
                   <tbody>
                     {visibleChanges.map((change) => {
-                      const isExpanded = change.entity_id === expandedEntityId;
+                      const isExpanded =
+                        change.entity_id === expandedSelection?.entityId;
                       const isSignificant =
                         Math.abs(change.delta_percent ?? 0) > 10;
                       const uncertainty = formatUncertainty(change as any);
@@ -423,8 +616,15 @@ export function InboxPageContent() {
                               <button
                                 className="btn btn-xs btn-ghost"
                                 onClick={() =>
-                                  setExpandedEntityId(
-                                    isExpanded ? null : change.entity_id,
+                                  setExpandedSelection(
+                                    isExpanded
+                                      ? null
+                                      : {
+                                          kind: "change",
+                                          entityId: change.entity_id,
+                                          parameterName: change.parameter_name,
+                                          qid: change.qid || "",
+                                        },
                                   )
                                 }
                                 title="Show suggested next actions"
@@ -469,28 +669,152 @@ export function InboxPageContent() {
           </div>
         </div>
 
-        {expandedEntityId && (
+        {expandedSelection && (
           <div className="space-y-3">
             <div className="flex items-center justify-between gap-3">
               <div className="text-sm text-base-content/70">
                 <Clock className="h-4 w-4 inline mr-2" />
                 Selected:{" "}
                 <span className="font-medium text-base-content">
-                  {selectedChange?.parameter_name ?? "?"}
+                  {expandedSelection.parameterName ??
+                    selectedChange?.parameter_name ??
+                    "?"}
                 </span>{" "}
                 <span className="text-base-content/60">
-                  ({selectedChange?.qid ?? "?"})
+                  ({expandedSelection.qid ?? selectedChange?.qid ?? "?"})
+                </span>
+                <span className="ml-2 text-xs text-base-content/50">
+                  {expandedSelection.kind === "policy"
+                    ? "policy violation"
+                    : "recent change"}
                 </span>
               </div>
               <button
                 className="btn btn-sm btn-ghost"
-                onClick={() => setExpandedEntityId(null)}
+                onClick={() => setExpandedSelection(null)}
               >
                 Close
               </button>
             </div>
 
-            <RecalibrationRecommendationsPanel entityId={expandedEntityId} />
+            {expandedSelection.kind === "policy" && (
+              <div className="card bg-base-200">
+                <div className="card-body p-4 sm:p-6">
+                  <div className="flex items-center justify-between gap-2">
+                    <h3 className="card-title text-base sm:text-lg">
+                      Impact Violations
+                    </h3>
+                    <div className="flex items-center gap-2">
+                      <span className="badge badge-sm">
+                        {impactViolationCounts.total}
+                      </span>
+                      {impactViolationCounts.warn > 0 && (
+                        <span className="badge badge-warning badge-sm">
+                          warn {impactViolationCounts.warn}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <p className="text-sm text-base-content/70">
+                    Violations evaluated on current values for parameters in the
+                    downstream impact set.
+                  </p>
+
+                  {isImpactViolationsLoading && (
+                    <div className="flex justify-center py-8">
+                      <span className="loading loading-spinner loading-lg"></span>
+                    </div>
+                  )}
+
+                  {!isImpactViolationsLoading &&
+                    impactViolations.length === 0 && (
+                      <div className="text-center py-6 text-base-content/60">
+                        No downstream policy violations found.
+                      </div>
+                    )}
+
+                  {!isImpactViolationsLoading &&
+                    impactViolations.length > 0 && (
+                      <div className="overflow-x-auto -mx-4 sm:mx-0 mt-3">
+                        <table className="table table-sm">
+                          <thead>
+                            <tr>
+                              <th>Severity</th>
+                              <th>Parameter</th>
+                              <th>QID</th>
+                              <th className="hidden md:table-cell">Value</th>
+                              <th>Message</th>
+                              <th className="w-20"></th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {impactViolations.slice(0, 10).map((v) => (
+                              <tr key={`${v.entity_id}::impact`}>
+                                <td>
+                                  <span className="badge badge-warning badge-sm">
+                                    warn
+                                  </span>
+                                </td>
+                                <td className="font-medium">
+                                  {v.parameter_name}
+                                </td>
+                                <td className="font-mono text-xs">
+                                  {v.qid || "-"}
+                                </td>
+                                <td className="hidden md:table-cell font-mono text-xs">
+                                  {formatValue(v.value)} {v.unit || ""}
+                                </td>
+                                <td className="text-sm">
+                                  {v.message || v.check_type}
+                                </td>
+                                <td>
+                                  <div className="flex gap-1 justify-end">
+                                    <Link
+                                      className="btn btn-xs btn-ghost"
+                                      href={`/provenance?tab=lineage&entity=${encodeURIComponent(
+                                        v.entity_id,
+                                      )}`}
+                                      title="Open lineage"
+                                    >
+                                      <GitBranch className="h-3 w-3" />
+                                    </Link>
+                                    <Link
+                                      className="btn btn-xs btn-ghost"
+                                      href={`/provenance?tab=history&parameter=${encodeURIComponent(
+                                        v.parameter_name,
+                                      )}&qid=${encodeURIComponent(v.qid || "")}`}
+                                      title="Open history"
+                                    >
+                                      <History className="h-3 w-3" />
+                                    </Link>
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+
+                        {impactViolations.length > 10 && (
+                          <div className="mt-3 flex justify-center">
+                            <Link
+                              className="btn btn-sm btn-ghost"
+                              href={`/provenance?tab=lineage&entity=${encodeURIComponent(
+                                expandedSelection.entityId,
+                              )}`}
+                            >
+                              View full impact in Provenance
+                            </Link>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                </div>
+              </div>
+            )}
+
+            <RecalibrationRecommendationsPanel
+              entityId={expandedSelection.entityId}
+            />
           </div>
         )}
       </div>

@@ -188,6 +188,18 @@ class ConfigLoader:
         return cls._load_with_local("backend.yaml")
 
     @classmethod
+    def load_policy(cls) -> dict[str, Any]:
+        """Load provenance policy configuration.
+
+        Returns
+        -------
+        dict
+            Policy from policy.yaml merged with policy.local.yaml
+
+        """
+        return cls._load_with_local("policy.yaml")
+
+    @classmethod
     def clear_cache(cls) -> None:
         """Clear all cached configurations.
 

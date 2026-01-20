@@ -24,6 +24,8 @@ import type {
   GetParameterHistoryParams,
   GetProvenanceImpactParams,
   GetProvenanceLineageParams,
+  GetProvenancePolicyImpactViolationsParams,
+  GetProvenancePolicyViolationsParams,
   GetRecalibrationRecommendationsParams,
   GetRecentChangesParams,
   GetRecentExecutionsParams,
@@ -32,6 +34,7 @@ import type {
   LineageResponse,
   ParameterHistoryResponse,
   ParameterVersionResponse,
+  PolicyViolationsResponse,
   ProvenanceStatsResponse,
   RecalibrationRecommendationResponse,
   RecentChangesResponse,
@@ -1706,6 +1709,364 @@ export function useGetRecalibrationRecommendations<
   queryClient?: QueryClient,
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
   const queryOptions = getGetRecalibrationRecommendationsQueryOptions(
+    entityId,
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Get policy violations evaluated on current (latest valid) parameter versions.
+ * @summary Get policy violations for current parameter versions
+ */
+export const getProvenancePolicyViolations = (
+  params?: GetProvenancePolicyViolationsParams,
+  options?: SecondParameter<typeof customInstance>,
+  signal?: AbortSignal,
+) => {
+  return customInstance<PolicyViolationsResponse>(
+    { url: `/provenance/policy/violations`, method: "GET", params, signal },
+    options,
+  );
+};
+
+export const getGetProvenancePolicyViolationsQueryKey = (
+  params?: GetProvenancePolicyViolationsParams,
+) => {
+  return [
+    `/provenance/policy/violations`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getGetProvenancePolicyViolationsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getProvenancePolicyViolations>>,
+  TError = HTTPValidationError,
+>(
+  params?: GetProvenancePolicyViolationsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof getProvenancePolicyViolations>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetProvenancePolicyViolationsQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getProvenancePolicyViolations>>
+  > = ({ signal }) =>
+    getProvenancePolicyViolations(params, requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getProvenancePolicyViolations>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData> };
+};
+
+export type GetProvenancePolicyViolationsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getProvenancePolicyViolations>>
+>;
+export type GetProvenancePolicyViolationsQueryError = HTTPValidationError;
+
+export function useGetProvenancePolicyViolations<
+  TData = Awaited<ReturnType<typeof getProvenancePolicyViolations>>,
+  TError = HTTPValidationError,
+>(
+  params: undefined | GetProvenancePolicyViolationsParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof getProvenancePolicyViolations>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getProvenancePolicyViolations>>,
+          TError,
+          Awaited<ReturnType<typeof getProvenancePolicyViolations>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData>;
+};
+export function useGetProvenancePolicyViolations<
+  TData = Awaited<ReturnType<typeof getProvenancePolicyViolations>>,
+  TError = HTTPValidationError,
+>(
+  params?: GetProvenancePolicyViolationsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof getProvenancePolicyViolations>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getProvenancePolicyViolations>>,
+          TError,
+          Awaited<ReturnType<typeof getProvenancePolicyViolations>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+export function useGetProvenancePolicyViolations<
+  TData = Awaited<ReturnType<typeof getProvenancePolicyViolations>>,
+  TError = HTTPValidationError,
+>(
+  params?: GetProvenancePolicyViolationsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof getProvenancePolicyViolations>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+/**
+ * @summary Get policy violations for current parameter versions
+ */
+
+export function useGetProvenancePolicyViolations<
+  TData = Awaited<ReturnType<typeof getProvenancePolicyViolations>>,
+  TError = HTTPValidationError,
+>(
+  params?: GetProvenancePolicyViolationsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof getProvenancePolicyViolations>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+  const queryOptions = getGetProvenancePolicyViolationsQueryOptions(
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Get policy violations for current versions within the impact graph of an entity.
+ * @summary Get policy violations for current versions in impact set
+ */
+export const getProvenancePolicyImpactViolations = (
+  entityId: string,
+  params?: GetProvenancePolicyImpactViolationsParams,
+  options?: SecondParameter<typeof customInstance>,
+  signal?: AbortSignal,
+) => {
+  return customInstance<PolicyViolationsResponse>(
+    {
+      url: `/provenance/policy/impact/${entityId}`,
+      method: "GET",
+      params,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getGetProvenancePolicyImpactViolationsQueryKey = (
+  entityId?: string,
+  params?: GetProvenancePolicyImpactViolationsParams,
+) => {
+  return [
+    `/provenance/policy/impact/${entityId}`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getGetProvenancePolicyImpactViolationsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getProvenancePolicyImpactViolations>>,
+  TError = HTTPValidationError,
+>(
+  entityId: string,
+  params?: GetProvenancePolicyImpactViolationsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof getProvenancePolicyImpactViolations>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getGetProvenancePolicyImpactViolationsQueryKey(entityId, params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getProvenancePolicyImpactViolations>>
+  > = ({ signal }) =>
+    getProvenancePolicyImpactViolations(
+      entityId,
+      params,
+      requestOptions,
+      signal,
+    );
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!entityId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getProvenancePolicyImpactViolations>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData> };
+};
+
+export type GetProvenancePolicyImpactViolationsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getProvenancePolicyImpactViolations>>
+>;
+export type GetProvenancePolicyImpactViolationsQueryError = HTTPValidationError;
+
+export function useGetProvenancePolicyImpactViolations<
+  TData = Awaited<ReturnType<typeof getProvenancePolicyImpactViolations>>,
+  TError = HTTPValidationError,
+>(
+  entityId: string,
+  params: undefined | GetProvenancePolicyImpactViolationsParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof getProvenancePolicyImpactViolations>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getProvenancePolicyImpactViolations>>,
+          TError,
+          Awaited<ReturnType<typeof getProvenancePolicyImpactViolations>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData>;
+};
+export function useGetProvenancePolicyImpactViolations<
+  TData = Awaited<ReturnType<typeof getProvenancePolicyImpactViolations>>,
+  TError = HTTPValidationError,
+>(
+  entityId: string,
+  params?: GetProvenancePolicyImpactViolationsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof getProvenancePolicyImpactViolations>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getProvenancePolicyImpactViolations>>,
+          TError,
+          Awaited<ReturnType<typeof getProvenancePolicyImpactViolations>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+export function useGetProvenancePolicyImpactViolations<
+  TData = Awaited<ReturnType<typeof getProvenancePolicyImpactViolations>>,
+  TError = HTTPValidationError,
+>(
+  entityId: string,
+  params?: GetProvenancePolicyImpactViolationsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof getProvenancePolicyImpactViolations>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+/**
+ * @summary Get policy violations for current versions in impact set
+ */
+
+export function useGetProvenancePolicyImpactViolations<
+  TData = Awaited<ReturnType<typeof getProvenancePolicyImpactViolations>>,
+  TError = HTTPValidationError,
+>(
+  entityId: string,
+  params?: GetProvenancePolicyImpactViolationsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof getProvenancePolicyImpactViolations>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+  const queryOptions = getGetProvenancePolicyImpactViolationsQueryOptions(
     entityId,
     params,
     options,

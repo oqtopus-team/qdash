@@ -282,6 +282,36 @@
         ]
       }
     },
+    "/admin/config/reload": {
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Reload configuration caches",
+        "description": "Reload cached YAML configuration (admin only).",
+        "operationId": "reloadConfigCaches",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfigReloadResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/admin/users": {
       "get": {
         "tags": [
@@ -6677,6 +6707,226 @@
           }
         }
       }
+    },
+    "/provenance/policy/violations": {
+      "get": {
+        "tags": [
+          "provenance"
+        ],
+        "summary": "Get policy violations for current parameter versions",
+        "description": "Get policy violations evaluated on current (latest valid) parameter versions.",
+        "operationId": "getProvenancePolicyViolations",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "severity",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by severity (warn)",
+              "title": "Severity"
+            },
+            "description": "Filter by severity (warn)"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "description": "Maximum number of violations to return",
+              "default": 200,
+              "title": "Limit"
+            },
+            "description": "Maximum number of violations to return"
+          },
+          {
+            "name": "parameter_names",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by parameter names",
+              "title": "Parameter Names"
+            },
+            "description": "Filter by parameter names"
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PolicyViolationsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/provenance/policy/impact/{entity_id}": {
+      "get": {
+        "tags": [
+          "provenance"
+        ],
+        "summary": "Get policy violations for current versions in impact set",
+        "description": "Get policy violations for current versions within the impact graph of an entity.",
+        "operationId": "getProvenancePolicyImpactViolations",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "entity_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Entity identifier",
+              "title": "Entity Id"
+            },
+            "description": "Entity identifier"
+          },
+          {
+            "name": "max_depth",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 20,
+              "minimum": 1,
+              "description": "Maximum traversal depth",
+              "default": 10,
+              "title": "Max Depth"
+            },
+            "description": "Maximum traversal depth"
+          },
+          {
+            "name": "severity",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by severity (warn)",
+              "title": "Severity"
+            },
+            "description": "Filter by severity (warn)"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "description": "Maximum number of violations to return",
+              "default": 200,
+              "title": "Limit"
+            },
+            "description": "Maximum number of violations to return"
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PolicyViolationsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -7083,6 +7333,20 @@
         ],
         "title": "Condition",
         "description": "Condition for filtering device topology."
+      },
+      "ConfigReloadResponse": {
+        "properties": {
+          "cleared": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Cleared"
+          }
+        },
+        "type": "object",
+        "title": "ConfigReloadResponse",
+        "description": "Response model for config cache reload."
       },
       "Coupling": {
         "properties": {
@@ -9513,6 +9777,126 @@
         ],
         "title": "PasswordReset",
         "description": "Password reset request model (admin only)."
+      },
+      "PolicyViolationResponse": {
+        "properties": {
+          "entity_id": {
+            "type": "string",
+            "title": "Entity Id"
+          },
+          "parameter_name": {
+            "type": "string",
+            "title": "Parameter Name"
+          },
+          "qid": {
+            "type": "string",
+            "title": "Qid",
+            "default": ""
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Value"
+          },
+          "unit": {
+            "type": "string",
+            "title": "Unit",
+            "default": ""
+          },
+          "error": {
+            "type": "number",
+            "title": "Error",
+            "default": 0
+          },
+          "valid_from": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valid From"
+          },
+          "severity": {
+            "type": "string",
+            "title": "Severity",
+            "description": "warn"
+          },
+          "check_type": {
+            "type": "string",
+            "title": "Check Type",
+            "description": "min|max|staleness_hours|uncertainty_ratio"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "default": ""
+          },
+          "warn_threshold": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Warn Threshold"
+          },
+          "measured": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Measured"
+          }
+        },
+        "type": "object",
+        "required": [
+          "entity_id",
+          "parameter_name",
+          "value",
+          "severity",
+          "check_type"
+        ],
+        "title": "PolicyViolationResponse",
+        "description": "Response model for a policy violation on a current parameter version."
+      },
+      "PolicyViolationsResponse": {
+        "properties": {
+          "violations": {
+            "items": {
+              "$ref": "#/components/schemas/PolicyViolationResponse"
+            },
+            "type": "array",
+            "title": "Violations"
+          },
+          "total_count": {
+            "type": "integer",
+            "title": "Total Count",
+            "description": "Total violations matching query",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "title": "PolicyViolationsResponse",
+        "description": "Response model for a list of policy violations."
       },
       "Position": {
         "properties": {

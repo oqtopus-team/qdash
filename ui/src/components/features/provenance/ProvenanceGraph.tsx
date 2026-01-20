@@ -11,6 +11,7 @@ import {
   type Node,
   type Edge,
   type NodeTypes,
+  type NodeProps,
   Handle,
   Position,
   MarkerType,
@@ -50,10 +51,8 @@ const getNodeStyles = (isOrigin: boolean, isEntity: boolean) => {
 };
 
 // Custom node for Entity (Parameter)
-function EntityNode({
-  data,
-}: {
-  data: {
+function EntityNode({ data, selected }: NodeProps) {
+  const typedData = data as {
     label: string;
     value?: string;
     isOrigin?: boolean;
@@ -61,16 +60,20 @@ function EntityNode({
     qid?: string;
     error?: string;
     lowConfidence?: boolean;
+    isMatch?: boolean;
+    dimmed?: boolean;
   };
-}) {
-  const styles = getNodeStyles(data.isOrigin ?? false, true);
+  const styles = getNodeStyles(typedData.isOrigin ?? false, true);
 
   return (
     <div
-      className="px-4 py-3 shadow-lg rounded-lg border-2 min-w-[160px] max-w-[200px]"
+      className={`px-4 py-3 shadow-lg rounded-lg border-2 min-w-[160px] max-w-[200px] ${
+        selected || typedData.isMatch ? "ring-2 ring-accent" : ""
+      } ${typedData.lowConfidence ? "border-warning" : ""}`}
       style={{
         backgroundColor: styles.background,
         borderColor: styles.borderColor,
+        opacity: typedData.dimmed ? 0.25 : 1,
       }}
     >
       <Handle
@@ -82,32 +85,34 @@ function EntityNode({
         <div className="flex items-center gap-2 min-w-0">
           <div
             className={`w-2 h-2 rounded-full flex-shrink-0 ${
-              data.isOrigin ? "bg-primary" : "bg-primary/50"
+              typedData.isOrigin ? "bg-primary" : "bg-primary/50"
             }`}
           />
-          <div className="font-semibold text-sm truncate">{data.label}</div>
+          <div className="font-semibold text-sm truncate">
+            {typedData.label}
+          </div>
         </div>
-        {data.qid && (
+        {typedData.qid && (
           <span className="badge badge-primary badge-sm flex-shrink-0">
-            {data.qid}
+            {typedData.qid}
           </span>
         )}
       </div>
-      {data.value && (
+      {typedData.value && (
         <div className="text-xs text-base-content/70 font-mono mt-1 bg-base-100/50 rounded px-2 py-1 text-center">
-          {data.value} {data.unit || ""}
+          {typedData.value} {typedData.unit || ""}
         </div>
       )}
-      {data.error && (
+      {typedData.error && (
         <div
           className={`text-[10px] font-mono mt-1 rounded px-2 py-1 text-center ${
-            data.lowConfidence
+            typedData.lowConfidence
               ? "bg-warning/10 text-warning"
               : "bg-base-100/50 text-base-content/60"
           }`}
           title="Measurement uncertainty (error)"
         >
-          ±{data.error}
+          ±{typedData.error}
         </div>
       )}
       <Handle
@@ -120,33 +125,36 @@ function EntityNode({
 }
 
 // Custom node for Activity (Task) with hover capability
-function ActivityNode({
-  data,
-}: {
-  data: {
+function ActivityNode({ data, selected }: NodeProps) {
+  const typedData = data as {
     label: string;
     status?: string;
     taskId?: string;
     qid?: string;
+    isMatch?: boolean;
+    dimmed?: boolean;
+    isPinned?: boolean;
   };
-}) {
   const styles = getNodeStyles(false, false);
 
   const statusClass =
-    data.status === "completed"
+    typedData.status === "completed"
       ? "text-success"
-      : data.status === "failed"
+      : typedData.status === "failed"
         ? "text-error"
-        : data.status === "running"
+        : typedData.status === "running"
           ? "text-info"
           : "text-warning";
 
   return (
     <div
-      className="px-4 py-3 shadow-lg rounded-lg border-2 min-w-[160px] max-w-[200px] cursor-pointer"
+      className={`px-4 py-3 shadow-lg rounded-lg border-2 min-w-[160px] max-w-[200px] cursor-pointer ${
+        selected || typedData.isMatch ? "ring-2 ring-accent" : ""
+      } ${typedData.isPinned ? "ring-2 ring-secondary" : ""}`}
       style={{
         backgroundColor: styles.background,
         borderColor: styles.borderColor,
+        opacity: typedData.dimmed ? 0.25 : 1,
       }}
     >
       <Handle
@@ -156,16 +164,16 @@ function ActivityNode({
       />
       <div className="flex items-center gap-2">
         <div className="w-2 h-2 rounded-sm bg-secondary/60 flex-shrink-0" />
-        <div className="font-semibold text-sm truncate">{data.label}</div>
+        <div className="font-semibold text-sm truncate">{typedData.label}</div>
       </div>
-      {data.status && (
+      {typedData.status && (
         <div className={`text-xs ${statusClass} mt-1 capitalize`}>
-          {data.status}
+          {typedData.status}
         </div>
       )}
-      {data.taskId && (
+      {typedData.taskId && (
         <div className="text-[10px] text-base-content/50 mt-1 truncate">
-          Hover for result
+          Click to pin preview
         </div>
       )}
       <Handle
@@ -190,8 +198,78 @@ const EDGE_COLORS = {
   default: "#64748b", // slate-500
 };
 
+function normalizeForSearch(value: unknown): string {
+  return String(value ?? "")
+    .toLowerCase()
+    .trim();
+}
+
+function nodeMatchesQuery(node: LineageNodeResponse, query: string): boolean {
+  const q = normalizeForSearch(query);
+  if (!q) return false;
+
+  const parts: string[] = [node.node_id, node.node_type];
+  if (node.node_type === "entity" && node.entity) {
+    parts.push(
+      node.entity.parameter_name ?? "",
+      node.entity.qid ?? "",
+      node.entity.unit ?? "",
+      String(node.entity.value ?? ""),
+    );
+  }
+  if (node.node_type === "activity" && node.activity) {
+    parts.push(
+      node.activity.task_name ?? "",
+      node.activity.status ?? "",
+      node.activity.task_id ?? "",
+      node.activity.qid ?? "",
+    );
+  }
+
+  return normalizeForSearch(parts.join(" ")).includes(q);
+}
+
+function buildUndirectedAdjacency(edges: LineageEdgeResponse[]) {
+  const adjacency = new Map<string, Set<string>>();
+  const add = (from: string, to: string) => {
+    if (!adjacency.has(from)) adjacency.set(from, new Set());
+    adjacency.get(from)!.add(to);
+  };
+  for (const edge of edges) {
+    add(edge.source_id, edge.target_id);
+    add(edge.target_id, edge.source_id);
+  }
+  return adjacency;
+}
+
+function computeHopDistances(
+  originId: string,
+  edges: LineageEdgeResponse[],
+): Map<string, number> {
+  const adjacency = buildUndirectedAdjacency(edges);
+  const distance = new Map<string, number>();
+  const queue: string[] = [];
+  distance.set(originId, 0);
+  queue.push(originId);
+
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+    const d = distance.get(current) ?? 0;
+    const neighbors = adjacency.get(current);
+    if (!neighbors) continue;
+    for (const next of neighbors) {
+      if (!distance.has(next)) {
+        distance.set(next, d + 1);
+        queue.push(next);
+      }
+    }
+  }
+
+  return distance;
+}
+
 // Helper to format value for display
-function formatValue(value: number | string | undefined): string {
+function formatValue(value: unknown): string {
   if (value === undefined || value === null) return "";
   if (typeof value === "number") {
     if (Math.abs(value) < 0.01 || Math.abs(value) > 10000) {
@@ -199,6 +277,7 @@ function formatValue(value: number | string | undefined): string {
     }
     return value.toFixed(4);
   }
+  if (typeof value === "boolean") return value ? "true" : "false";
   return String(value);
 }
 
@@ -346,7 +425,15 @@ export function ProvenanceGraph({
     taskId: string;
     qid: string;
   } | null>(null);
+  const [pinnedTask, setPinnedTask] = useState<{
+    taskId: string;
+    qid: string;
+    taskName?: string;
+  } | null>(null);
   const [showDerivedEdges, setShowDerivedEdges] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [focusHops, setFocusHops] = useState(4);
+  const [showAll, setShowAll] = useState(false);
 
   // Filter out wasDerivedFrom edges when toggle is off
   const filteredApiEdges = useMemo(() => {
@@ -354,10 +441,108 @@ export function ProvenanceGraph({
     return apiEdges.filter((edge) => edge.relation_type !== "wasDerivedFrom");
   }, [apiEdges, showDerivedEdges]);
 
-  const { nodes: initialNodes, edges: initialEdges } = useMemo(
-    () => convertToFlowElements(apiNodes, filteredApiEdges, originId),
-    [apiNodes, filteredApiEdges, originId],
+  const matchingNodeIds = useMemo(() => {
+    if (!searchQuery) return new Set<string>();
+    return new Set(
+      apiNodes
+        .filter((n) => nodeMatchesQuery(n, searchQuery))
+        .map((n) => n.node_id),
+    );
+  }, [apiNodes, searchQuery]);
+
+  const hopDistances = useMemo(() => {
+    if (!originId) return new Map<string, number>();
+    return computeHopDistances(originId, filteredApiEdges);
+  }, [originId, filteredApiEdges]);
+
+  const maxDistance = useMemo(() => {
+    let max = 0;
+    for (const d of hopDistances.values()) max = Math.max(max, d);
+    return max;
+  }, [hopDistances]);
+
+  useEffect(() => {
+    if (focusHops > maxDistance && maxDistance > 0) {
+      setFocusHops(maxDistance);
+    }
+  }, [focusHops, maxDistance]);
+
+  const effectiveShowAll =
+    showAll || (!!searchQuery && matchingNodeIds.size > 0);
+  const maxHopsToShow = effectiveShowAll ? Number.POSITIVE_INFINITY : focusHops;
+
+  const constrainedApiNodes = useMemo(() => {
+    if (!originId) return apiNodes;
+    return apiNodes.filter(
+      (n) => (hopDistances.get(n.node_id) ?? Infinity) <= maxHopsToShow,
+    );
+  }, [apiNodes, hopDistances, maxHopsToShow, originId]);
+
+  const constrainedNodeIds = useMemo(
+    () => new Set(constrainedApiNodes.map((n) => n.node_id)),
+    [constrainedApiNodes],
   );
+
+  const constrainedApiEdges = useMemo(() => {
+    return filteredApiEdges.filter(
+      (e) =>
+        constrainedNodeIds.has(e.source_id) &&
+        constrainedNodeIds.has(e.target_id),
+    );
+  }, [filteredApiEdges, constrainedNodeIds]);
+
+  const { nodes: baseNodes, edges: baseEdges } = useMemo(
+    () =>
+      convertToFlowElements(constrainedApiNodes, constrainedApiEdges, originId),
+    [constrainedApiNodes, constrainedApiEdges, originId],
+  );
+
+  const { nodes: initialNodes, edges: initialEdges } = useMemo(() => {
+    const hasSearch = !!searchQuery && matchingNodeIds.size > 0;
+    const matchNeighborhood = (() => {
+      if (!hasSearch) return new Set<string>();
+      const neighbors = new Set<string>(matchingNodeIds);
+      for (const edge of baseEdges) {
+        if (
+          matchingNodeIds.has(edge.source) ||
+          matchingNodeIds.has(edge.target)
+        ) {
+          neighbors.add(edge.source);
+          neighbors.add(edge.target);
+        }
+      }
+      return neighbors;
+    })();
+
+    const withDecorations = baseNodes.map((node) => {
+      const isMatch = matchingNodeIds.has(node.id);
+      const dimmed = hasSearch ? !matchNeighborhood.has(node.id) : false;
+      const isPinned =
+        node.type === "activity" &&
+        !!pinnedTask?.taskId &&
+        (node.data as any)?.taskId === pinnedTask.taskId;
+      return {
+        ...node,
+        data: { ...(node.data as any), isMatch, dimmed, isPinned },
+      };
+    });
+
+    const withEdgeDimming = baseEdges.map((edge) => {
+      const dimmed =
+        !!searchQuery &&
+        matchingNodeIds.size > 0 &&
+        !(
+          matchNeighborhood.has(edge.source) ||
+          matchNeighborhood.has(edge.target)
+        );
+      return {
+        ...edge,
+        style: { ...(edge.style as any), opacity: dimmed ? 0.15 : 1 },
+      };
+    });
+
+    return { nodes: withDecorations, edges: withEdgeDimming };
+  }, [baseNodes, baseEdges, matchingNodeIds, searchQuery, pinnedTask?.taskId]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
@@ -370,8 +555,22 @@ export function ProvenanceGraph({
 
   const handleNodeClick = useCallback(
     (_: React.MouseEvent, node: Node) => {
+      const apiNode = apiNodes.find((n) => n.node_id === node.id);
+      if (apiNode?.node_type === "activity" && (node.data as any)?.taskId) {
+        const taskId = (node.data as any).taskId as string;
+        const qid = ((node.data as any).qid as string) || "0";
+        const taskName =
+          typeof (node.data as any).label === "string"
+            ? ((node.data as any).label as string)
+            : undefined;
+        setPinnedTask((prev) => {
+          if (prev?.taskId === taskId && prev?.qid === qid) return null;
+          return { taskId, qid, taskName };
+        });
+        return;
+      }
+
       if (onNodeClick) {
-        const apiNode = apiNodes.find((n) => n.node_id === node.id);
         onNodeClick(node.id, apiNode?.node_type || "entity");
       }
     },
@@ -394,6 +593,18 @@ export function ProvenanceGraph({
     setHoveredTask(null);
   }, []);
 
+  const visibleCounts = useMemo(() => {
+    const entityCount = initialNodes.filter((n) => n.type === "entity").length;
+    const taskCount = initialNodes.filter((n) => n.type === "activity").length;
+    const failedTasks = initialNodes.filter(
+      (n) => n.type === "activity" && (n.data as any)?.status === "failed",
+    ).length;
+    const lowConfidenceParams = initialNodes.filter(
+      (n) => n.type === "entity" && (n.data as any)?.lowConfidence,
+    ).length;
+    return { entityCount, taskCount, failedTasks, lowConfidenceParams };
+  }, [initialNodes]);
+
   if (apiNodes.length === 0) {
     return (
       <div className="h-[500px] flex flex-col items-center justify-center text-base-content/50 bg-base-200 rounded-lg border border-base-300">
@@ -407,6 +618,8 @@ export function ProvenanceGraph({
       </div>
     );
   }
+
+  const taskToShow = pinnedTask ?? hoveredTask;
 
   return (
     <div className="h-[600px] bg-base-200 rounded-lg border border-base-300 overflow-hidden relative">
@@ -449,19 +662,123 @@ export function ProvenanceGraph({
         />
       </ReactFlow>
 
+      {/* Controls / Summary */}
+      <div className="absolute top-4 left-4 right-4 flex flex-col sm:flex-row gap-2 items-start sm:items-center z-20 pointer-events-none">
+        <div className="flex items-center gap-2 bg-base-100/90 border border-base-300 rounded-lg px-3 py-2 shadow-sm w-full sm:w-auto">
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Find parameter/task..."
+            className="input input-bordered input-sm w-full sm:w-56 pointer-events-auto"
+          />
+          {searchQuery && (
+            <button
+              className="btn btn-ghost btn-sm pointer-events-auto"
+              onClick={() => setSearchQuery("")}
+            >
+              Clear
+            </button>
+          )}
+        </div>
+
+        <div className="flex items-center gap-2 bg-base-100/90 border border-base-300 rounded-lg px-3 py-2 shadow-sm w-full sm:w-auto">
+          <div className="text-xs text-base-content/60 whitespace-nowrap">
+            Focus
+          </div>
+          <input
+            type="range"
+            min={1}
+            max={Math.max(1, Math.min(10, maxDistance || 10))}
+            value={Math.min(
+              focusHops,
+              Math.max(1, Math.min(10, maxDistance || 10)),
+            )}
+            onChange={(e) => setFocusHops(Number(e.target.value))}
+            className="range range-xs range-primary w-28 pointer-events-auto"
+            disabled={effectiveShowAll}
+          />
+          <div className="text-xs font-medium tabular-nums w-10 text-right">
+            {effectiveShowAll ? "All" : `${focusHops}h`}
+          </div>
+          <button
+            className={`btn btn-xs pointer-events-auto ${effectiveShowAll ? "btn-active" : ""}`}
+            onClick={() => setShowAll((v) => !v)}
+          >
+            All
+          </button>
+          <div className="flex items-center gap-2 ml-2">
+            <input
+              type="checkbox"
+              className="checkbox checkbox-xs checkbox-primary pointer-events-auto"
+              checked={showDerivedEdges}
+              onChange={(e) => setShowDerivedEdges(e.target.checked)}
+              id="show-derived"
+            />
+            <label
+              htmlFor="show-derived"
+              className="text-xs text-base-content/60 cursor-pointer pointer-events-auto"
+            >
+              derived
+            </label>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 bg-base-100/90 border border-base-300 rounded-lg px-3 py-2 shadow-sm ml-0 sm:ml-auto w-full sm:w-auto">
+          <span className="badge badge-primary badge-sm">
+            {initialNodes.length}/{apiNodes.length} shown
+          </span>
+          <span className="badge badge-ghost badge-sm">
+            params {visibleCounts.entityCount}
+          </span>
+          <span className="badge badge-ghost badge-sm">
+            tasks {visibleCounts.taskCount}
+          </span>
+          {visibleCounts.failedTasks > 0 && (
+            <span className="badge badge-error badge-sm">
+              failed {visibleCounts.failedTasks}
+            </span>
+          )}
+          {visibleCounts.lowConfidenceParams > 0 && (
+            <span className="badge badge-warning badge-sm">
+              uncertain {visibleCounts.lowConfidenceParams}
+            </span>
+          )}
+        </div>
+      </div>
+
       {/* Task Result Preview Panel */}
-      {hoveredTask && (
-        <div className="absolute top-4 right-4 w-80 bg-base-100 rounded-lg shadow-xl border border-base-300 overflow-hidden z-10">
+      {taskToShow && (
+        <div className="absolute top-20 right-4 w-80 bg-base-100 rounded-lg shadow-xl border border-base-300 overflow-hidden z-10">
           <div className="bg-secondary/10 px-4 py-2 border-b border-base-300">
-            <div className="text-sm font-medium">Task Result Preview</div>
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0">
+                <div className="text-sm font-medium truncate">
+                  {pinnedTask ? "Pinned Task Preview" : "Task Result Preview"}
+                </div>
+                {pinnedTask?.taskName && (
+                  <div className="text-xs text-base-content/60 truncate">
+                    {pinnedTask.taskName}
+                  </div>
+                )}
+              </div>
+              {pinnedTask && (
+                <button
+                  className="btn btn-ghost btn-xs"
+                  onClick={() => setPinnedTask(null)}
+                >
+                  Close
+                </button>
+              )}
+            </div>
             <div className="text-xs text-base-content/60">
-              Qubit: {hoveredTask.qid}
+              Qubit: {taskToShow.qid}
             </div>
           </div>
           <div className="p-2 max-h-[300px] overflow-auto">
             <TaskFigure
-              taskId={hoveredTask.taskId}
-              qid={hoveredTask.qid}
+              taskId={taskToShow.taskId}
+              qid={taskToShow.qid}
               className="w-full h-auto rounded"
             />
           </div>
@@ -491,28 +808,10 @@ export function ProvenanceGraph({
             <span className="text-base-content/60">used</span>
           </div>
         </div>
-        {/* Derived edges toggle */}
-        <div className="flex items-center gap-2 mt-2 pt-2 border-t border-base-300">
-          <input
-            type="checkbox"
-            className="checkbox checkbox-xs checkbox-primary"
-            checked={showDerivedEdges}
-            onChange={(e) => setShowDerivedEdges(e.target.checked)}
-            id="show-derived"
-          />
-          <label
-            htmlFor="show-derived"
-            className="flex items-center gap-1.5 cursor-pointer"
-          >
-            <div className="w-4 h-0.5 bg-blue-500 rounded" />
-            <span className="text-base-content/60">derived</span>
-          </label>
+        <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-base-300">
+          <div className="w-4 h-0.5 bg-blue-500 rounded" />
+          <span className="text-base-content/60">derived</span>
         </div>
-      </div>
-
-      {/* Hint */}
-      <div className="absolute top-4 left-4 bg-base-100 px-3 py-1.5 rounded text-xs text-base-content/60 border border-base-300">
-        Hover on tasks to preview results
       </div>
     </div>
   );

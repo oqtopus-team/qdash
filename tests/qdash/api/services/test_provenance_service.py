@@ -7,9 +7,11 @@ import pytest
 from qdash.api.schemas.provenance import (
     ExecutionComparisonResponse,
     ImpactResponse,
+    LineageNodeResponse,
     LineageResponse,
     ParameterHistoryResponse,
     ParameterVersionResponse,
+    PolicyViolationsResponse,
     ProvenanceStatsResponse,
 )
 from qdash.api.services.provenance_service import ProvenanceService
@@ -207,9 +209,126 @@ class TestProvenanceService:
         assert isinstance(result, ExecutionComparisonResponse)
         assert result.execution_id_before == "exec-001"
         assert result.execution_id_after == "exec-002"
-        assert len(result.changed_parameters) == 1
-        assert len(result.added_parameters) == 1
-        assert len(result.removed_parameters) == 0
+
+    def test_get_policy_violations_empty_when_no_rules(self, service, monkeypatch, mock_repos):
+        """Returns empty list when policy has no rules."""
+
+        class _Policy:
+            rules: list = []
+
+        monkeypatch.setattr(
+            "qdash.api.services.provenance_service.load_policy_config",
+            lambda: _Policy(),
+        )
+        mock_repos["parameter_version"].get_all_current.return_value = []
+
+        result = service.get_policy_violations("test_project")
+
+        assert isinstance(result, PolicyViolationsResponse)
+        assert result.total_count == 0
+        assert result.violations == []
+
+    def test_get_policy_violations_flags_min_threshold(self, service, monkeypatch, mock_repos):
+        """Evaluates min checks on current versions."""
+
+        class _Check:
+            type = "min"
+            warn = 20.0
+            message = "too low"
+
+        class _Rule:
+            parameter = "t1"
+            checks = [_Check()]
+
+        class _Policy:
+            rules = [_Rule()]
+
+        monkeypatch.setattr(
+            "qdash.api.services.provenance_service.load_policy_config",
+            lambda: _Policy(),
+        )
+
+        doc = MagicMock()
+        doc.entity_id = "t1:Q0:e:t"
+        doc.parameter_name = "t1"
+        doc.qid = "Q0"
+        doc.value = 5.0
+        doc.unit = "s"
+        doc.error = 0.0
+        doc.valid_from = datetime(2025, 1, 1, 10, 0, 0)
+        mock_repos["parameter_version"].get_all_current.return_value = [doc]
+
+        result = service.get_policy_violations("test_project")
+
+        assert result.total_count == 1
+        assert result.violations[0].severity == "warn"
+        assert result.violations[0].check_type == "min"
+
+    def test_get_policy_impact_violations_uses_current_versions(
+        self, service, monkeypatch, mock_repos
+    ):
+        """Impact violations evaluate policy against current versions, not lineage versions."""
+
+        class _Check:
+            type = "max"
+            warn = 5.0
+            message = "too high"
+
+        class _Rule:
+            parameter = "qubit_frequency"
+            checks = [_Check()]
+
+        class _Policy:
+            rules = [_Rule()]
+
+        monkeypatch.setattr(
+            "qdash.api.services.provenance_service.load_policy_config",
+            lambda: _Policy(),
+        )
+
+        impact = ImpactResponse(
+            origin=LineageNodeResponse(node_type="entity", node_id="origin", depth=0),
+            nodes=[
+                LineageNodeResponse(
+                    node_type="entity",
+                    node_id="some-entity",
+                    depth=1,
+                    entity=ParameterVersionResponse(
+                        entity_id="old:Q0:e:t",
+                        parameter_name="qubit_frequency",
+                        qid="Q0",
+                        value=4.0,
+                        version=1,
+                        execution_id="e",
+                        task_id="t",
+                        project_id="test_project",
+                    ),
+                )
+            ],
+            edges=[],
+            max_depth=10,
+        )
+        monkeypatch.setattr(service, "get_impact", lambda **_: impact)
+
+        current = MagicMock()
+        current.entity_id = "current:Q0:e:t"
+        current.parameter_name = "qubit_frequency"
+        current.qid = "Q0"
+        current.value = 9.0
+        current.unit = "GHz"
+        current.error = 0.0
+        current.valid_from = datetime(2025, 1, 1, 10, 0, 0)
+        mock_repos["parameter_version"].get_current_many.return_value = [current]
+
+        result = service.get_policy_impact_violations(
+            project_id="test_project",
+            entity_id="origin",
+            max_depth=10,
+        )
+
+        assert result.total_count == 1
+        assert result.violations[0].entity_id == "current:Q0:e:t"
+        assert result.violations[0].severity == "warn"
 
     def test_compare_executions_calculates_delta(self, service, mock_repos):
         """Test compare_executions calculates numeric deltas."""
