@@ -203,6 +203,7 @@ export * from "./muxTaskUpstreamId";
 export * from "./parameterChangeResponse";
 export * from "./parameterChangeResponseDelta";
 export * from "./parameterChangeResponseDeltaPercent";
+export * from "./parameterChangeResponsePreviousError";
 export * from "./parameterChangeResponsePreviousValue";
 export * from "./parameterChangeResponseValidFrom";
 export * from "./parameterChangeResponseValue";

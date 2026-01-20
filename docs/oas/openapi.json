@@ -9168,6 +9168,22 @@
             "type": "string",
             "title": "Execution Id",
             "default": ""
+          },
+          "error": {
+            "type": "number",
+            "title": "Error",
+            "default": 0
+          },
+          "previous_error": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous Error"
           }
         },
         "type": "object",
@@ -9178,7 +9194,7 @@
           "version"
         ],
         "title": "ParameterChangeResponse",
-        "description": "Response model for a parameter change (with delta from previous version).\n\nAttributes\n----------\nentity_id : str\n    Unique identifier for this parameter version\nparameter_name : str\n    Name of the parameter\nqid : str\n    Qubit or coupling identifier\nvalue : float | int | str\n    Current value\nprevious_value : float | int | str | None\n    Previous value (None if first version)\nunit : str\n    Physical unit\ndelta : float | None\n    Numeric difference (value - previous_value)\ndelta_percent : float | None\n    Percentage change ((value - previous) / previous * 100)\nversion : int\n    Version number\nvalid_from : datetime | None\n    When this version became valid\ntask_name : str\n    Name of the task that produced this value\nexecution_id : str\n    Execution that produced this value"
+        "description": "Response model for a parameter change (with delta from previous version).\n\nAttributes\n----------\nentity_id : str\n    Unique identifier for this parameter version\nparameter_name : str\n    Name of the parameter\nqid : str\n    Qubit or coupling identifier\nvalue : float | int | str\n    Current value\nprevious_value : float | int | str | None\n    Previous value (None if first version)\nunit : str\n    Physical unit\ndelta : float | None\n    Numeric difference (value - previous_value)\ndelta_percent : float | None\n    Percentage change ((value - previous) / previous * 100)\nversion : int\n    Version number\nvalid_from : datetime | None\n    When this version became valid\ntask_name : str\n    Name of the task that produced this value\nexecution_id : str\n    Execution that produced this value\nerror : float\n    Measurement error/uncertainty for current value\nprevious_error : float | None\n    Measurement error/uncertainty for previous value (if available)"
       },
       "ParameterDiffResponse": {
         "properties": {
@@ -9289,6 +9305,16 @@
       },
       "ParameterModel": {
         "properties": {
+          "parameter_name": {
+            "type": "string",
+            "title": "Parameter Name",
+            "default": ""
+          },
+          "qid_role": {
+            "type": "string",
+            "title": "Qid Role",
+            "default": ""
+          },
           "value": {
             "anyOf": [
               {
@@ -9340,7 +9366,7 @@
         },
         "type": "object",
         "title": "ParameterModel",
-        "description": "Calibration parameter model.\n\nUsed for both input_parameters (calibration dependencies) and\noutput_parameters (calibration outputs) in tasks.\n\nAttributes\n----------\n    value: The parameter value.\n    value_type: The type of the value (default: \"float\").\n    error: The error/uncertainty of the value.\n    unit: The unit of measurement.\n    description: Description of the parameter.\n    calibrated_at: When the calibration was performed.\n    execution_id: The execution that produced this value.\n    task_id: The task that produced this value."
+        "description": "Calibration parameter model.\n\nUsed for both input_parameters (calibration dependencies) and\noutput_parameters (calibration outputs) in tasks.\n\nAttributes\n----------\n    parameter_name: The actual DB parameter name. If empty, the dict key is used.\n    qid_role: The qid role for 2-qubit tasks. One of:\n        - \"\" or \"self\": Use task's qid as-is (default, for 1-qubit tasks)\n        - \"control\": Use control qubit's qid (for 2-qubit tasks)\n        - \"target\": Use target qubit's qid (for 2-qubit tasks)\n        - \"coupling\": Use coupling qid as-is (for 2-qubit tasks)\n    value: The parameter value.\n    value_type: The type of the value (default: \"float\").\n    error: The error/uncertainty of the value.\n    unit: The unit of measurement.\n    description: Description of the parameter.\n    calibrated_at: When the calibration was performed.\n    execution_id: The execution that produced this value.\n    task_id: The task that produced this value."
       },
       "ParameterVersionResponse": {
         "properties": {
@@ -10649,7 +10675,8 @@
           },
           "client_url": {
             "type": "string",
-            "title": "Client Url"
+            "title": "Client Url",
+            "default": ""
           },
           "prefect_api_url": {
             "type": "string",
@@ -10657,11 +10684,13 @@
           },
           "slack_bot_token": {
             "type": "string",
-            "title": "Slack Bot Token"
+            "title": "Slack Bot Token",
+            "default": ""
           },
           "slack_channel_id": {
             "type": "string",
-            "title": "Slack Channel Id"
+            "title": "Slack Channel Id",
+            "default": ""
           },
           "postgres_data_path": {
             "type": "string",
@@ -10725,10 +10754,7 @@
         "type": "object",
         "required": [
           "env",
-          "client_url",
           "prefect_api_url",
-          "slack_bot_token",
-          "slack_channel_id",
           "postgres_data_path",
           "mongo_data_path",
           "calib_data_path"
