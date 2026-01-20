@@ -16,11 +16,11 @@ import {
   ChevronDown,
 } from "lucide-react";
 
-import { useGetRecentChanges } from "@/client/provenance/provenance";
 import {
-  useGetPolicyImpactViolations,
-  useGetPolicyViolations,
-} from "@/client/provenance/policy";
+  useGetRecentChanges,
+  useGetProvenancePolicyImpactViolations,
+  useGetProvenancePolicyViolations,
+} from "@/client/provenance/provenance";
 import { RecalibrationRecommendationsPanel } from "@/components/features/provenance/RecalibrationRecommendationsPanel";
 import { PageContainer } from "@/components/ui/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -113,7 +113,7 @@ export function InboxPageContent() {
   );
 
   const { data: policyResponse, isLoading: isPolicyLoading } =
-    useGetPolicyViolations(
+    useGetProvenancePolicyViolations(
       {
         limit: 200,
         parameter_names: parameterNames.length > 0 ? parameterNames : undefined,
@@ -240,8 +240,8 @@ export function InboxPageContent() {
   const {
     data: impactViolationsResponse,
     isLoading: isImpactViolationsLoading,
-  } = useGetPolicyImpactViolations(
-    selectedPolicyEntityId,
+  } = useGetProvenancePolicyImpactViolations(
+    selectedPolicyEntityId ?? "",
     {
       max_depth: 10,
       limit: 200,
