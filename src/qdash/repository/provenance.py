@@ -443,6 +443,52 @@ class MongoParameterVersionRepository:
         ]
         return list(ParameterVersionDocument.aggregate(pipeline).run())
 
+    def get_all_current(
+        self,
+        project_id: str,
+        *,
+        parameter_names: list[str] | None = None,
+        limit: int | None = None,
+    ) -> list[ParameterVersionDocument]:
+        """Get all current (latest valid) parameter versions.
+
+        Parameters
+        ----------
+        project_id : str
+            Project identifier
+        parameter_names : list[str] | None
+            Optional filter by parameter name
+        limit : int | None
+            Optional maximum number of documents to return
+
+        Returns
+        -------
+        list[ParameterVersionDocument]
+            Current versions
+
+        """
+        query: dict[str, Any] = {"project_id": project_id, "valid_until": None}
+        if parameter_names:
+            query["parameter_name"] = {"$in": parameter_names}
+
+        find = ParameterVersionDocument.find(query).sort([("valid_from", SortDirection.DESCENDING)])
+        if limit is not None:
+            find = find.limit(limit)
+        return list(find.run())
+
+    def get_current_many(
+        self,
+        project_id: str,
+        *,
+        keys: list[tuple[str, str]],
+    ) -> list[ParameterVersionDocument]:
+        """Get current versions for many (parameter_name, qid) pairs."""
+        if not keys:
+            return []
+        or_clauses = [{"parameter_name": p, "qid": q} for (p, q) in keys]
+        query = {"project_id": project_id, "valid_until": None, "$or": or_clauses}
+        return list(ParameterVersionDocument.find(query).run())
+
 
 class MongoProvenanceRelationRepository:
     """MongoDB implementation for provenance relation persistence.

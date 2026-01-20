@@ -11,6 +11,7 @@ import math
 from collections import defaultdict, deque
 from typing import TYPE_CHECKING, Any, cast
 
+from qdash.api.lib.policy_config import load_policy_config
 from qdash.api.schemas.provenance import (
     ActivityResponse,
     ExecutionComparisonResponse,
@@ -23,6 +24,8 @@ from qdash.api.schemas.provenance import (
     ParameterDiffResponse,
     ParameterHistoryResponse,
     ParameterVersionResponse,
+    PolicyViolationResponse,
+    PolicyViolationsResponse,
     ProvenanceStatsResponse,
     RecalibrationRecommendationResponse,
     RecentChangesResponse,
@@ -576,10 +579,185 @@ class ProvenanceService:
                 changes=changes,
                 total_count=len(changes),
             )
-
         except Exception as e:
             logger.warning(f"Failed to get recent changes: {e}")
             return RecentChangesResponse(changes=[], total_count=0)
+
+    def get_policy_violations(
+        self,
+        project_id: str,
+        *,
+        severity: str | None = None,
+        limit: int = 100,
+        parameter_names: list[str] | None = None,
+    ) -> PolicyViolationsResponse:
+        """Evaluate policy rules against current parameter versions."""
+        policy = load_policy_config()
+        if not policy.rules:
+            return PolicyViolationsResponse(violations=[], total_count=0)
+
+        # Pre-index by parameter for fast lookup
+        rules_by_parameter: dict[str, list[Any]] = defaultdict(list)
+        for rule in policy.rules:
+            rules_by_parameter[rule.parameter].append(rule)
+
+        current_versions = self.parameter_version_repo.get_all_current(
+            project_id,
+            parameter_names=parameter_names,
+        )
+
+        violations: list[PolicyViolationResponse] = []
+        for doc in current_versions:
+            for rule in rules_by_parameter.get(doc.parameter_name, []):
+                violations.extend(self._evaluate_policy_rule(doc, rule))
+
+        if severity in {"warn", "error"}:
+            violations = [v for v in violations if v.severity == severity]
+
+        # Sort: newest first
+        violations.sort(
+            key=lambda v: (
+                -(v.valid_from.timestamp() if v.valid_from else 0),
+                v.parameter_name,
+                v.qid,
+                v.check_type,
+            )
+        )
+
+        return PolicyViolationsResponse(
+            violations=violations[:limit],
+            total_count=len(violations),
+        )
+
+    def get_policy_impact_violations(
+        self,
+        project_id: str,
+        *,
+        entity_id: str,
+        max_depth: int = 10,
+        severity: str | None = None,
+        limit: int = 200,
+    ) -> PolicyViolationsResponse:
+        """Evaluate policy rules for current versions within the impact set of an entity."""
+        impact = self.get_impact(project_id=project_id, entity_id=entity_id, max_depth=max_depth)
+
+        pairs: set[tuple[str, str]] = set()
+        for node in impact.nodes:
+            if node.node_type != "entity":
+                continue
+            if not node.entity:
+                continue
+            pairs.add((node.entity.parameter_name, node.entity.qid))
+
+        current_docs = self.parameter_version_repo.get_current_many(
+            project_id,
+            keys=sorted(pairs),
+        )
+
+        policy = load_policy_config()
+        if not policy.rules:
+            return PolicyViolationsResponse(violations=[], total_count=0)
+
+        rules_by_parameter: dict[str, list[Any]] = defaultdict(list)
+        for rule in policy.rules:
+            rules_by_parameter[rule.parameter].append(rule)
+
+        violations: list[PolicyViolationResponse] = []
+        for doc in current_docs:
+            for rule in rules_by_parameter.get(doc.parameter_name, []):
+                violations.extend(self._evaluate_policy_rule(doc, rule))
+
+        if severity in {"warn", "error"}:
+            violations = [v for v in violations if v.severity == severity]
+
+        violations.sort(
+            key=lambda v: (
+                -(v.valid_from.timestamp() if v.valid_from else 0),
+                v.parameter_name,
+                v.qid,
+                v.check_type,
+            )
+        )
+
+        return PolicyViolationsResponse(
+            violations=violations[:limit],
+            total_count=len(violations),
+        )
+
+    @staticmethod
+    def _safe_float(value: Any) -> float | None:
+        if isinstance(value, (int, float)):
+            return float(value)
+        return None
+
+    def _evaluate_policy_rule(self, doc: Any, rule: Any) -> list[PolicyViolationResponse]:
+        from datetime import datetime, timezone
+
+        from qdash.common.datetime_utils import ensure_timezone
+
+        results: list[PolicyViolationResponse] = []
+
+        value_num = self._safe_float(getattr(doc, "value", None))
+        error_num = self._safe_float(getattr(doc, "error", None)) or 0.0
+        valid_from = getattr(doc, "valid_from", None)
+        if valid_from:
+            valid_from = ensure_timezone(valid_from)
+
+        now = datetime.now(timezone.utc)
+
+        for check in getattr(rule, "checks", []):
+            check_type = check.type
+            measured: float | None = None
+            violates_warn = False
+
+            if check_type in {"min", "max"}:
+                if value_num is None:
+                    continue
+                measured = value_num
+                if check_type == "min":
+                    violates_warn = value_num < check.warn
+                elif check_type == "max":
+                    violates_warn = value_num > check.warn
+
+            elif check_type == "staleness_hours":
+                if not valid_from:
+                    continue
+                age_hours = (now - valid_from).total_seconds() / 3600.0
+                measured = age_hours
+                violates_warn = age_hours >= check.warn
+
+            elif check_type == "uncertainty_ratio":
+                if value_num is None or value_num == 0:
+                    continue
+                measured = abs(error_num / value_num)
+                violates_warn = measured >= check.warn
+
+            else:
+                continue
+
+            if not violates_warn:
+                continue
+
+            severity = "warn"
+
+            results.append(
+                PolicyViolationResponse(
+                    entity_id=getattr(doc, "entity_id", ""),
+                    parameter_name=getattr(doc, "parameter_name", ""),
+                    qid=getattr(doc, "qid", "") or "",
+                    value=getattr(doc, "value", ""),
+                    unit=getattr(doc, "unit", "") or "",
+                    error=float(error_num),
+                    valid_from=valid_from,
+                    severity=severity,
+                    check_type=check_type,
+                    message=check.message or "",
+                    warn_threshold=float(check.warn),
+                    measured=measured,
+                )
+            )
+
+        return results
 
     def get_entity(
         self,

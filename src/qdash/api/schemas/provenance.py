@@ -492,3 +492,27 @@ class RecalibrationRecommendationResponse(BaseModel):
     )
     total_affected_parameters: int = Field(0, description="Total downstream parameters affected")
     max_depth_reached: int = Field(0, description="Impact graph depth traversed")
+
+
+class PolicyViolationResponse(BaseModel):
+    """Response model for a policy violation on a current parameter version."""
+
+    entity_id: str
+    parameter_name: str
+    qid: str = ""
+    value: float | int | str
+    unit: str = ""
+    error: float = 0.0
+    valid_from: datetime | None = None
+    severity: str = Field(..., description="warn")
+    check_type: str = Field(..., description="min|max|staleness_hours|uncertainty_ratio")
+    message: str = ""
+    warn_threshold: float | None = None
+    measured: float | None = None
+
+
+class PolicyViolationsResponse(BaseModel):
+    """Response model for a list of policy violations."""
+
+    violations: list[PolicyViolationResponse] = Field(default_factory=list)
+    total_count: int = Field(0, description="Total violations matching query")

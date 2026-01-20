@@ -20,6 +20,7 @@ from qdash.api.schemas.provenance import (
     LineageResponse,
     ParameterHistoryResponse,
     ParameterVersionResponse,
+    PolicyViolationsResponse,
     ProvenanceStatsResponse,
     RecalibrationRecommendationResponse,
     RecentChangesResponse,
@@ -461,4 +462,68 @@ def get_recalibration_recommendations(
         project_id=ctx.project_id,
         entity_id=entity_id,
         max_depth=max_depth,
+    )
+
+
+@router.get(
+    "/policy/violations",
+    response_model=PolicyViolationsResponse,
+    summary="Get policy violations for current parameter versions",
+    operation_id="getProvenancePolicyViolations",
+)
+def get_policy_violations(
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    service: Annotated[ProvenanceService, Depends(get_provenance_service)],
+    severity: Annotated[
+        str | None,
+        Query(description="Filter by severity (warn)"),
+    ] = None,
+    limit: Annotated[
+        int,
+        Query(description="Maximum number of violations to return", ge=1, le=500),
+    ] = 200,
+    parameter_names: Annotated[
+        list[str] | None,
+        Query(description="Filter by parameter names"),
+    ] = None,
+) -> PolicyViolationsResponse:
+    """Get policy violations evaluated on current (latest valid) parameter versions."""
+    return service.get_policy_violations(
+        project_id=ctx.project_id,
+        severity=severity,
+        limit=limit,
+        parameter_names=parameter_names,
+    )
+
+
+@router.get(
+    "/policy/impact/{entity_id}",
+    response_model=PolicyViolationsResponse,
+    summary="Get policy violations for current versions in impact set",
+    operation_id="getProvenancePolicyImpactViolations",
+)
+def get_policy_impact_violations(
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    service: Annotated[ProvenanceService, Depends(get_provenance_service)],
+    entity_id: Annotated[str, Path(description="Entity identifier")],
+    max_depth: Annotated[
+        int,
+        Query(description="Maximum traversal depth", ge=1, le=20),
+    ] = 10,
+    severity: Annotated[
+        str | None,
+        Query(description="Filter by severity (warn)"),
+    ] = None,
+    limit: Annotated[
+        int,
+        Query(description="Maximum number of violations to return", ge=1, le=500),
+    ] = 200,
+) -> PolicyViolationsResponse:
+    """Get policy violations for current versions within the impact graph of an entity."""
+    return service.get_policy_impact_violations(
+        project_id=ctx.project_id,
+        entity_id=entity_id,
+        max_depth=max_depth,
+        severity=severity,
+        limit=limit,
     )
