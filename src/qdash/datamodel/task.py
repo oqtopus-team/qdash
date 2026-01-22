@@ -18,7 +18,7 @@ PENDING = "pending"
 SKIPPED = "skipped"
 
 # Task type definitions
-TaskType = Literal["qubit", "coupling", "global", "system"]
+TaskType = Literal["qubit", "coupling", "global", "system", "mux"]
 
 
 class TaskTypes:
@@ -28,6 +28,7 @@ class TaskTypes:
     COUPLING: Final[TaskType] = "coupling"
     GLOBAL: Final[TaskType] = "global"
     SYSTEM: Final[TaskType] = "system"
+    MUX: Final[TaskType] = "mux"
 
 
 class RunParameterModel(BaseModel):
@@ -371,6 +372,23 @@ class CouplingTaskModel(BaseTaskResultModel):
     qid: str
 
 
+class MuxTaskModel(BaseTaskResultModel):
+    """MUX task result class.
+
+    For tasks that operate on a MUX (multiplexer) unit,
+    typically affecting multiple qubits simultaneously.
+
+    Attributes
+    ----------
+        task_type (str): The type of the task. e.g. "mux".
+        mux_id (int): The MUX identifier.
+
+    """
+
+    task_type: Literal["mux"] = "mux"
+    mux_id: int
+
+
 class TaskResultModel(BaseModel):
     """Task result class.
 
@@ -379,6 +397,7 @@ class TaskResultModel(BaseModel):
         global_tasks (list[GlobalTask]): The global tasks.
         qubit_tasks (dict[str, list[QubitTask]]): The qubit tasks.
         coupling_tasks (dict[str, list[CouplingTask]]): The coupling tasks.
+        mux_tasks (dict[int, list[MuxTask]]): The MUX tasks keyed by mux_id.
 
     """
 
@@ -386,6 +405,7 @@ class TaskResultModel(BaseModel):
     global_tasks: list[GlobalTaskModel] = []
     qubit_tasks: dict[str, list[QubitTaskModel]] = {}
     coupling_tasks: dict[str, list[CouplingTaskModel]] = {}
+    mux_tasks: dict[int, list[MuxTaskModel]] = {}
 
 
 class TaskModel(BaseModel):

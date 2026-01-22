@@ -104,14 +104,25 @@ class CustomOneQubit(CalibrationStep):
         service: CalibService,
         qids: list[str],
     ) -> dict[str, Any]:
-        """Direct execution for QubitTargets."""
-        from qdash.workflow.service._internal.scheduling_tasks import calibrate_single_qubit
+        """Direct execution for QubitTargets using multiprocess parallelism."""
+        from qdash.workflow.service._internal.scheduling_tasks import (
+            run_qubit_calibrations_parallel,
+        )
 
-        results = {}
-        futures = [calibrate_single_qubit.submit(qid, self.tasks) for qid in qids]
-        for future in futures:
-            qid, result = future.result()
-            results[qid] = result
+        # Build session config for multiprocess execution
+        session_config = {
+            "username": service.username,
+            "chip_id": service.chip_id,
+            "backend_name": service.backend_name,
+            "execution_id": service.execution_id,
+            "project_id": service.project_id,
+        }
+
+        results = run_qubit_calibrations_parallel(
+            qids=qids,
+            tasks=self.tasks,
+            session_config=session_config,
+        )
         return {"direct": results}
 
     def _build_result(self, raw_results: dict[str, Any]) -> OneQubitResult:
@@ -210,14 +221,25 @@ class OneQubitCheck(CalibrationStep):
         qids: list[str],
         tasks: list[str],
     ) -> dict[str, Any]:
-        """Direct execution for QubitTargets."""
-        from qdash.workflow.service._internal.scheduling_tasks import calibrate_single_qubit
+        """Direct execution for QubitTargets using multiprocess parallelism."""
+        from qdash.workflow.service._internal.scheduling_tasks import (
+            run_qubit_calibrations_parallel,
+        )
 
-        results = {}
-        futures = [calibrate_single_qubit.submit(qid, tasks) for qid in qids]
-        for future in futures:
-            qid, result = future.result()
-            results[qid] = result
+        # Build session config for multiprocess execution
+        session_config = {
+            "username": service.username,
+            "chip_id": service.chip_id,
+            "backend_name": service.backend_name,
+            "execution_id": service.execution_id,
+            "project_id": service.project_id,
+        }
+
+        results = run_qubit_calibrations_parallel(
+            qids=qids,
+            tasks=tasks,
+            session_config=session_config,
+        )
         return {"direct": results}
 
     def _build_result(self, raw_results: dict[str, Any]) -> OneQubitResult:
@@ -346,14 +368,25 @@ class OneQubitFineTune(CalibrationStep):
         qids: list[str],
         tasks: list[str],
     ) -> dict[str, Any]:
-        """Direct execution for QubitTargets."""
-        from qdash.workflow.service._internal.scheduling_tasks import calibrate_single_qubit
+        """Direct execution for QubitTargets using multiprocess parallelism."""
+        from qdash.workflow.service._internal.scheduling_tasks import (
+            run_qubit_calibrations_parallel,
+        )
 
-        results = {}
-        futures = [calibrate_single_qubit.submit(qid, tasks) for qid in qids]
-        for future in futures:
-            qid, result = future.result()
-            results[qid] = result
+        # Build session config for multiprocess execution
+        session_config = {
+            "username": service.username,
+            "chip_id": service.chip_id,
+            "backend_name": service.backend_name,
+            "execution_id": service.execution_id,
+            "project_id": service.project_id,
+        }
+
+        results = run_qubit_calibrations_parallel(
+            qids=qids,
+            tasks=tasks,
+            session_config=session_config,
+        )
         return {"direct": results}
 
     def _build_result(self, raw_results: dict[str, Any]) -> OneQubitResult:

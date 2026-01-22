@@ -287,6 +287,10 @@ class BaseTask(ABC):
         """Return True if the task is a system task."""
         return bool(self.task_type == TaskTypes.SYSTEM)
 
+    def is_mux_task(self) -> bool:
+        """Return True if the task is a MUX task."""
+        return bool(self.task_type == TaskTypes.MUX)
+
     def attach_execution_id(self, execution_id: str) -> dict[str, ParameterModel]:
         """Attach the execution id to the output parameters."""
         for value in self.output_parameters.values():

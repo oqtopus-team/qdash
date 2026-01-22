@@ -1,5 +1,13 @@
 [
   {
+    "id": "bringup",
+    "name": "Bring-up",
+    "description": "MUX-level bring-up calibration (resonator spectroscopy). Runs once per MUX for initial characterization.",
+    "category": "production",
+    "filename": "bringup.py",
+    "function_name": "bringup"
+  },
+  {
     "id": "simple",
     "name": "Simple Calibration",
     "description": "Basic calibration for learning and simple tasks. Supports sequential and parallel group execution.",
