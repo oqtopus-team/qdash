@@ -213,8 +213,7 @@ def _execute_mux_qubits_with_session(
                 # Skip MUX tasks for non-representative qubits
                 if _should_skip_task_for_qid(task_name, qid, backend_name):
                     logger.info(
-                        f"Skipping MUX task {task_name} for qid={qid} "
-                        "(not MUX representative)"
+                        f"Skipping MUX task {task_name} for qid={qid} " "(not MUX representative)"
                     )
                     result[task_name] = {"skipped": True, "reason": "not_mux_representative"}
                     continue
@@ -290,8 +289,7 @@ def _execute_single_qubit_with_session(
             # Skip MUX tasks for non-representative qubits
             if _should_skip_task_for_qid(task_name, qid, backend_name):
                 logger.info(
-                    f"Skipping MUX task {task_name} for qid={qid} "
-                    "(not MUX representative)"
+                    f"Skipping MUX task {task_name} for qid={qid} " "(not MUX representative)"
                 )
                 result[task_name] = {"skipped": True, "reason": "not_mux_representative"}
                 continue
@@ -374,10 +372,7 @@ def calibrate_step_qubits_parallel(
         Dictionary mapping qid to results
     """
     # Submit all qubits in parallel
-    futures = [
-        calibrate_single_qubit.submit(qid, tasks, session_config)
-        for qid in parallel_qids
-    ]
+    futures = [calibrate_single_qubit.submit(qid, tasks, session_config) for qid in parallel_qids]
     pair_results = [f.result() for f in futures]
     return dict(pair_results)
 
@@ -470,10 +465,7 @@ def calibrate_parallel_group(
     Returns:
         Dictionary mapping coupling_qid to results
     """
-    futures = [
-        execute_coupling_pair.submit(cqid, tasks, session_config)
-        for cqid in coupling_qids
-    ]
+    futures = [execute_coupling_pair.submit(cqid, tasks, session_config) for cqid in coupling_qids]
     pair_results = [f.result() for f in futures]
     return dict(pair_results)
 
@@ -521,6 +513,7 @@ def run_mux_calibrations_parallel(
     Returns:
         Dictionary mapping qid to results (combined from all MUX groups)
     """
+
     # Define flow dynamically to avoid import errors when prefect-dask not installed
     @flow(task_runner=_get_dask_task_runner())
     def _run_mux_parallel_flow(
@@ -570,6 +563,7 @@ def run_qubit_calibrations_parallel(
     Returns:
         Dictionary mapping qid to results
     """
+
     # Define flow dynamically to avoid import errors when prefect-dask not installed
     @flow(task_runner=_get_dask_task_runner())
     def _run_qubit_parallel_flow(
@@ -649,7 +643,9 @@ def calibrate_group_with_retry(
                         if offset != 0:
                             task_details = {
                                 task_name: {
-                                    "input_parameters": {"qubit_frequency_offset": {"value": offset}}
+                                    "input_parameters": {
+                                        "qubit_frequency_offset": {"value": offset}
+                                    }
                                 }
                             }
                         result[task_name] = session.execute_task(
@@ -692,6 +688,7 @@ def run_groups_with_retry_parallel(
     Returns:
         Dictionary mapping qid to results (combined from all groups)
     """
+
     # Define flow dynamically to avoid import errors when prefect-dask not installed
     @flow(task_runner=_get_dask_task_runner())
     def _run_groups_retry_parallel_flow(
@@ -743,6 +740,7 @@ def run_coupling_calibrations_parallel(
     Returns:
         Dictionary mapping coupling_qid to results
     """
+
     # Define flow dynamically to avoid import errors when prefect-dask not installed
     @flow(task_runner=_get_dask_task_runner())
     def _run_coupling_parallel_flow(

@@ -623,7 +623,9 @@ class TaskExecutor:
 
                 # 5.5 For MUX tasks, process results for other qubits in the MUX
                 is_mux = getattr(task, "is_mux_level", False)
-                print(f"[MUX DEBUG] Checking MUX distribution: task={task_name}, is_mux_level={is_mux}, qid={qid}")
+                print(
+                    f"[MUX DEBUG] Checking MUX distribution: task={task_name}, is_mux_level={is_mux}, qid={qid}"
+                )
                 if is_mux:
                     print(f"[MUX DEBUG] Starting MUX distribution for task={task_name}, qid={qid}")
                     self._process_mux_other_qubits(
@@ -992,14 +994,18 @@ class TaskExecutor:
                 postprocess_result = task.postprocess(
                     backend, self.execution_id, run_result, target_qid
                 )
-                print(f"[MUX DEBUG] Postprocess result for qid={target_qid}: output_params={bool(postprocess_result.output_parameters) if postprocess_result else None}, figures={len(postprocess_result.figures) if postprocess_result and postprocess_result.figures else 0}")
+                print(
+                    f"[MUX DEBUG] Postprocess result for qid={target_qid}: output_params={bool(postprocess_result.output_parameters) if postprocess_result else None}, figures={len(postprocess_result.figures) if postprocess_result and postprocess_result.figures else 0}"
+                )
 
                 if postprocess_result:
                     # Process output parameters
                     if postprocess_result.output_parameters:
                         task_model = self.state_manager.get_task(task_name, task_type, target_qid)
                         task.attach_task_id(task_model.task_id)
-                        print(f"[MUX DEBUG] Processing output params for qid={target_qid}, task_id={task_model.task_id}")
+                        print(
+                            f"[MUX DEBUG] Processing output params for qid={target_qid}, task_id={task_model.task_id}"
+                        )
 
                         processed_params = self.result_processor.process_output_parameters(
                             postprocess_result.output_parameters,
@@ -1014,11 +1020,15 @@ class TaskExecutor:
 
                     # Save figures
                     if postprocess_result.figures:
-                        print(f"[MUX DEBUG] Saving {len(postprocess_result.figures)} figures for qid={target_qid}")
+                        print(
+                            f"[MUX DEBUG] Saving {len(postprocess_result.figures)} figures for qid={target_qid}"
+                        )
                         png_paths, json_paths = self.data_saver.save_figures(
                             postprocess_result.figures, task_name, task_type, target_qid
                         )
-                        print(f"[MUX DEBUG] Figures saved for qid={target_qid}: png_paths={png_paths}, json_paths={json_paths}")
+                        print(
+                            f"[MUX DEBUG] Figures saved for qid={target_qid}: png_paths={png_paths}, json_paths={json_paths}"
+                        )
                         self.state_manager.set_figure_paths(
                             task_name, task_type, target_qid, png_paths, json_paths
                         )
@@ -1026,9 +1036,7 @@ class TaskExecutor:
 
                     # Save to database
                     print(f"[MUX DEBUG] Saving to database for qid={target_qid}")
-                    self._save_mux_qid_to_database(
-                        task, execution_service, target_qid
-                    )
+                    self._save_mux_qid_to_database(task, execution_service, target_qid)
                     print(f"[MUX DEBUG] Database save completed for qid={target_qid}")
 
                 # Complete task for this qid

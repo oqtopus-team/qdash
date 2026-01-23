@@ -95,7 +95,8 @@ class BringUp(CalibrationStep):
 
         # Count actual executions (exclude skipped)
         executed_count = sum(
-            1 for qid, data in result.qubits.items()
+            1
+            for qid, data in result.qubits.items()
             if data.status == "success" and not data.raw.get("_skipped", False)
         )
         total_muxes = len(targets.mux_ids) if isinstance(targets, MuxTargets) else 0

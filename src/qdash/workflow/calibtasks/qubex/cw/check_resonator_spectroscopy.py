@@ -129,7 +129,9 @@ class CheckResonatorSpectroscopy(QubexTask):
                 id_in_mux = int(qid) % 4
                 resonance_index = PEAK_POSITIONS[id_in_mux]
                 estimated_frequency = frequencies[resonance_index]
-                print(f"[MUX DEBUG] qid={qid}, id_in_mux={id_in_mux}, resonance_index={resonance_index}, frequency={estimated_frequency}, all_frequencies={frequencies}")
+                print(
+                    f"[MUX DEBUG] qid={qid}, id_in_mux={id_in_mux}, resonance_index={resonance_index}, frequency={estimated_frequency}, all_frequencies={frequencies}"
+                )
         except Exception:
             logger.warning(
                 "Failed to estimate resonator frequency for qid=%s",
