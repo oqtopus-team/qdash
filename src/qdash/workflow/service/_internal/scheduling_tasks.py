@@ -34,7 +34,7 @@ try:
     _DASK_AVAILABLE = True
 except ImportError:
     _DASK_AVAILABLE = False
-    DaskTaskRunner = None  # type: ignore[misc, assignment]
+    DaskTaskRunner = None
 
 if TYPE_CHECKING:
     from qdash.workflow.service.calib_service import CalibService
@@ -259,6 +259,7 @@ def calibrate_mux_qubits(
     use_isolated = session_config is not None
 
     if use_isolated:
+        assert session_config is not None
         session = _create_isolated_session(session_config, qids)
         try:
             results = _execute_mux_qubits_with_session(session, qids, tasks, logger)
@@ -334,6 +335,7 @@ def calibrate_single_qubit(
     use_isolated = session_config is not None
 
     if use_isolated:
+        assert session_config is not None
         session = _create_isolated_session(session_config, [qid])
         try:
             result = _execute_single_qubit_with_session(session, qid, tasks, logger)
@@ -431,6 +433,7 @@ def execute_coupling_pair(
     use_isolated = session_config is not None
 
     if use_isolated:
+        assert session_config is not None
         session = _create_isolated_session(session_config, qids)
         try:
             result = _execute_coupling_pair_with_session(session, coupling_qid, tasks, logger)
@@ -542,7 +545,8 @@ def run_mux_calibrations_parallel(
 
         return all_results
 
-    return _run_mux_parallel_flow(mux_groups, tasks, session_config)
+    result: dict[str, Any] = _run_mux_parallel_flow(mux_groups, tasks, session_config)
+    return result
 
 
 def run_qubit_calibrations_parallel(
@@ -588,7 +592,8 @@ def run_qubit_calibrations_parallel(
         pair_results = [f.result() for f in futures]
         return dict(pair_results)
 
-    return _run_qubit_parallel_flow(qids, tasks, session_config)
+    result: dict[str, Any] = _run_qubit_parallel_flow(qids, tasks, session_config)
+    return result
 
 
 @task(task_run_name=_group_retry_task_run_name)
@@ -620,6 +625,7 @@ def calibrate_group_with_retry(
     use_isolated = session_config is not None
 
     if use_isolated:
+        assert session_config is not None
         session = _create_isolated_session(session_config, qids)
     else:
         session = _get_session()
@@ -712,14 +718,15 @@ def run_groups_with_retry_parallel(
         ]
 
         # Collect results
-        all_results = {}
+        all_results: dict[str, Any] = {}
         for future in futures:
             group_result = future.result()
             all_results.update(group_result)
 
         return all_results
 
-    return _run_groups_retry_parallel_flow(groups, tasks, offsets, session_config)
+    result: dict[str, Any] = _run_groups_retry_parallel_flow(groups, tasks, offsets, session_config)
+    return result
 
 
 def run_coupling_calibrations_parallel(
@@ -765,4 +772,5 @@ def run_coupling_calibrations_parallel(
         pair_results = [f.result() for f in futures]
         return dict(pair_results)
 
-    return _run_coupling_parallel_flow(coupling_qids, tasks, session_config)
+    result: dict[str, Any] = _run_coupling_parallel_flow(coupling_qids, tasks, session_config)
+    return result

@@ -124,7 +124,7 @@ class OneQubitScheduledStrategy(OneQubitStrategy):
 
         # Group stages by box_type to execute same-type stages in one session
         # This handles MIXED stages that are split by Box B module sharing
-        stages_by_box: dict[str, list] = {}
+        stages_by_box: dict[str, list[Any]] = {}
         for stage_info in schedule.stages:
             box_type = stage_info.box_type
             if box_type not in stages_by_box:
