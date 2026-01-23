@@ -37,6 +37,11 @@ from qdash.workflow.service.steps.base import (
     TransformStep,
 )
 
+# MUX-level bring-up steps
+from qdash.workflow.service.steps.bringup import (
+    BringUp,
+)
+
 # Filter steps
 from qdash.workflow.service.steps.filters import (
     FilterByMetric,
@@ -73,6 +78,8 @@ __all__ = [
     # Context and Pipeline
     "StepContext",
     "Pipeline",
+    # MUX-level bring-up steps
+    "BringUp",
     # 1-Qubit steps
     "CustomOneQubit",
     "OneQubitCheck",
