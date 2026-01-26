@@ -125,7 +125,7 @@ export function RecalibrationRecommendationsPanel({
                 depth: {rec.max_depth_reached ?? 0}
               </span>
               {rec.source_parameter_name && rec.source_qid && (
-                <span className="badge badge-primary badge-outline">
+                <span className="badge badge-primary">
                   {rec.source_parameter_name} ({rec.source_qid})
                 </span>
               )}
