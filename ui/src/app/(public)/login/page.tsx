@@ -32,7 +32,6 @@ export default function LoginPage() {
     try {
       await authLogin(userName, password);
       router.replace("/execution");
-      window.location.href = "/execution";
     } catch (err) {
       setError("Login failed. Please check your user ID and password.");
     }
