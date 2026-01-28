@@ -26,10 +26,12 @@ Example:
 # MUX-level Bring-up Task Lists
 # =============================================================================
 
-# Bring-up: MUX-level tasks that run once per MUX
-# These tasks are executed only for the representative qubit of each MUX
+# Bring-up: Tasks for initial qubit characterization
+# - MUX-level tasks (is_mux_level=True) run once per MUX for representative qubit
+# - Qubit-level tasks run for each qubit individually
 BRINGUP_TASKS: list[str] = [
-    "CheckResonatorSpectroscopy",
+    "CheckResonatorSpectroscopy",  # MUX-level: estimates resonator_frequency
+    "CheckQubitSpectroscopy",  # Qubit-level: estimates qubit_frequency, anharmonicity
 ]
 
 

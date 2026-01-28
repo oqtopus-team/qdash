@@ -23,6 +23,7 @@ Multiprocess Parallel Execution (using Dask):
 from __future__ import annotations
 
 import logging
+import traceback
 from typing import TYPE_CHECKING, Any
 
 from prefect import flow, get_run_logger, task
@@ -52,6 +53,85 @@ def _get_session() -> CalibService:
         msg = "No active calibration session."
         raise RuntimeError(msg)
     return session
+
+
+def _ensure_prefect_logging() -> None:
+    """Ensure Prefect logging is configured in Dask worker processes.
+
+    When using DaskTaskRunner with processes=True or remote clusters,
+    the APILogHandler is not automatically attached to loggers in worker
+    processes. This function manually sets up logging so that task logs
+    appear in the Prefect UI.
+
+    See: https://github.com/PrefectHQ/prefect/issues/18067
+    """
+    try:
+        from prefect.logging.configuration import setup_logging
+        from prefect.logging.handlers import APILogHandler
+
+        # First try the standard setup
+        setup_logging()
+
+        # Check if APILogHandler is attached to the task_runs logger
+        # If not, manually add it (workaround for Dask worker processes)
+        task_logger = logging.getLogger("prefect.task_runs")
+        has_api_handler = any(isinstance(h, APILogHandler) for h in task_logger.handlers)
+
+        if not has_api_handler:
+            handler = APILogHandler()
+            task_logger.addHandler(handler)
+            # Also add to root prefect logger
+            prefect_logger = logging.getLogger("prefect")
+            if not any(isinstance(h, APILogHandler) for h in prefect_logger.handlers):
+                prefect_logger.addHandler(APILogHandler())
+
+    except Exception:  # noqa: S110
+        # Silently ignore if setup fails - logging is best-effort
+        pass
+
+
+def _flush_prefect_logs() -> None:
+    """Flush all Prefect log handlers to ensure logs are sent to the API.
+
+    This is critical for Dask worker processes where logs might not be
+    flushed before the process exits. Must be called before task completion.
+
+    See: https://github.com/PrefectHQ/prefect/issues/18067
+    """
+    try:
+        from prefect.logging.handlers import APILogHandler
+
+        # Flush all APILogHandler instances
+        for handler in logging.root.handlers:
+            if isinstance(handler, APILogHandler):
+                handler.flush()
+
+        # Also check prefect loggers
+        for name in ["prefect", "prefect.task_runs", "prefect.flow_runs"]:
+            logger = logging.getLogger(name)
+            for handler in logger.handlers:
+                if isinstance(handler, APILogHandler):
+                    handler.flush()
+    except Exception:  # noqa: S110
+        # Silently ignore flush errors
+        pass
+
+
+def _format_exception_details(e: Exception) -> str:
+    """Format exception details, including sub-exceptions for ExceptionGroup.
+
+    For ExceptionGroup (from asyncio.TaskGroup), this extracts and formats
+    all sub-exceptions with their tracebacks for better debugging.
+    """
+    if isinstance(e, ExceptionGroup):
+        parts = [f"{e}"]
+        for i, sub_exc in enumerate(e.exceptions, 1):
+            tb_str = "".join(
+                traceback.format_exception(type(sub_exc), sub_exc, sub_exc.__traceback__)
+            )
+            parts.append(f"\n--- Sub-exception {i} ---\n{tb_str}")
+        return "".join(parts)
+    return "".join(traceback.format_exception(type(e), e, e.__traceback__))
 
 
 def _create_isolated_session(
@@ -221,14 +301,15 @@ def _execute_mux_qubits_with_session(
                 result[task_name] = task_result
             result["status"] = "success"
         except Exception as e:
-            logger.error(f"Failed to calibrate qubit {qid}: {e}")
-            result = {"status": "failed", "error": str(e)}
+            error_details = _format_exception_details(e)
+            logger.error(f"Failed to calibrate qubit {qid}:\n{error_details}")
+            result = {"status": "failed", "error": str(e), "error_details": error_details}
         results[qid] = result
 
     return results
 
 
-@task(task_run_name=_mux_task_run_name)
+@task(task_run_name=_mux_task_run_name, log_prints=True)
 def calibrate_mux_qubits(
     qids: list[str],
     tasks: list[str],
@@ -253,6 +334,9 @@ def calibrate_mux_qubits(
     Returns:
         Dictionary mapping qid to results
     """
+    # Ensure Prefect logging is configured in Dask worker processes
+    _ensure_prefect_logging()
+
     logger = get_run_logger()
 
     # Create isolated session or use global session
@@ -269,6 +353,8 @@ def calibrate_mux_qubits(
         session = _get_session()
         results = _execute_mux_qubits_with_session(session, qids, tasks, logger)
 
+    # Flush logs before returning (critical for Dask worker processes)
+    _flush_prefect_logs()
     return results
 
 
@@ -298,13 +384,14 @@ def _execute_single_qubit_with_session(
             result[task_name] = task_result
         result["status"] = "success"
     except Exception as e:
-        logger.error(f"Failed to calibrate qubit {qid}: {e}")
-        result = {"status": "failed", "error": str(e)}
+        error_details = _format_exception_details(e)
+        logger.error(f"Failed to calibrate qubit {qid}:\n{error_details}")
+        result = {"status": "failed", "error": str(e), "error_details": error_details}
 
     return result
 
 
-@task(task_run_name=_single_qubit_task_run_name)
+@task(task_run_name=_single_qubit_task_run_name, log_prints=True)
 def calibrate_single_qubit(
     qid: str,
     tasks: list[str],
@@ -329,6 +416,9 @@ def calibrate_single_qubit(
     Returns:
         Tuple of (qid, results)
     """
+    # Ensure Prefect logging is configured in Dask worker processes
+    _ensure_prefect_logging()
+
     logger = get_run_logger()
 
     # Create isolated session or use global session
@@ -345,10 +435,12 @@ def calibrate_single_qubit(
         session = _get_session()
         result = _execute_single_qubit_with_session(session, qid, tasks, logger)
 
+    # Flush logs before returning (critical for Dask worker processes)
+    _flush_prefect_logs()
     return qid, result
 
 
-@task
+@task(log_prints=True)
 def calibrate_step_qubits_parallel(
     parallel_qids: list[str],
     tasks: list[str],
@@ -401,12 +493,13 @@ def _execute_coupling_pair_with_session(
             result[task_name] = task_result
         result["status"] = "success"
     except Exception as e:
-        logger.error(f"Failed to calibrate coupling {coupling_qid}: {e}")
-        result = {"status": "failed", "error": str(e)}
+        error_details = _format_exception_details(e)
+        logger.error(f"Failed to calibrate coupling {coupling_qid}:\n{error_details}")
+        result = {"status": "failed", "error": str(e), "error_details": error_details}
     return result
 
 
-@task(task_run_name=_coupling_task_run_name)
+@task(task_run_name=_coupling_task_run_name, log_prints=True)
 def execute_coupling_pair(
     coupling_qid: str,
     tasks: list[str],
@@ -424,6 +517,9 @@ def execute_coupling_pair(
     Returns:
         Tuple of (coupling_qid, results)
     """
+    # Ensure Prefect logging is configured in Dask worker processes
+    _ensure_prefect_logging()
+
     logger = get_run_logger()
 
     # Parse coupling_qid to get involved qubit IDs
@@ -443,10 +539,12 @@ def execute_coupling_pair(
         session = _get_session()
         result = _execute_coupling_pair_with_session(session, coupling_qid, tasks, logger)
 
+    # Flush logs before returning (critical for Dask worker processes)
+    _flush_prefect_logs()
     return coupling_qid, result
 
 
-@task
+@task(log_prints=True)
 def calibrate_parallel_group(
     coupling_qids: list[str],
     tasks: list[str],
@@ -537,10 +635,16 @@ def run_mux_calibrations_parallel(
             for group in mux_groups
         ]
 
-        # Collect results
+        # Collect results and log any errors from subprocesses
         all_results = {}
         for future in futures:
             mux_result = future.result()
+            # Log error details from subprocess (since subprocess logs don't propagate)
+            for qid, qid_result in mux_result.items():
+                if qid_result.get("status") == "failed" and "error_details" in qid_result:
+                    logger.error(
+                        f"[From subprocess] Failed to calibrate qubit {qid}:\n{qid_result['error_details']}"
+                    )
             all_results.update(mux_result)
 
         return all_results
@@ -588,15 +692,23 @@ def run_qubit_calibrations_parallel(
             for qid in qids
         ]
 
-        # Collect results
-        pair_results = [f.result() for f in futures]
+        # Collect results and log any errors from subprocesses
+        pair_results = []
+        for f in futures:
+            qid, qid_result = f.result()
+            # Log error details from subprocess (since subprocess logs don't propagate)
+            if qid_result.get("status") == "failed" and "error_details" in qid_result:
+                logger.error(
+                    f"[From subprocess] Failed to calibrate qubit {qid}:\n{qid_result['error_details']}"
+                )
+            pair_results.append((qid, qid_result))
         return dict(pair_results)
 
     result: dict[str, Any] = _run_qubit_parallel_flow(qids, tasks, session_config)
     return result
 
 
-@task(task_run_name=_group_retry_task_run_name)
+@task(task_run_name=_group_retry_task_run_name, log_prints=True)
 def calibrate_group_with_retry(
     qids: list[str],
     tasks: list[str],
@@ -619,6 +731,9 @@ def calibrate_group_with_retry(
     Returns:
         Results dict keyed by qubit ID
     """
+    # Ensure Prefect logging is configured in Dask worker processes
+    _ensure_prefect_logging()
+
     logger = get_run_logger()
 
     # Create isolated session or use global session
@@ -664,13 +779,21 @@ def calibrate_group_with_retry(
                     break  # Success, move to next qubit
 
                 except Exception as e:
-                    logger.warning(f"Q{qid}: Attempt {attempt + 1} failed: {e}")
+                    error_details = _format_exception_details(e)
+                    logger.warning(f"Q{qid}: Attempt {attempt + 1} failed:\n{error_details}")
                     if attempt == len(offsets) - 1:
-                        results[qid] = {"status": "failed", "error": str(e), "attempt": attempt + 1}
+                        results[qid] = {
+                            "status": "failed",
+                            "error": str(e),
+                            "error_details": error_details,
+                            "attempt": attempt + 1,
+                        }
     finally:
         if use_isolated:
             session.finish_calibration(update_chip_history=False, push_to_github=False)
 
+    # Flush logs before returning (critical for Dask worker processes)
+    _flush_prefect_logs()
     return results
 
 
@@ -717,10 +840,16 @@ def run_groups_with_retry_parallel(
             for group in groups
         ]
 
-        # Collect results
+        # Collect results and log any errors from subprocesses
         all_results: dict[str, Any] = {}
         for future in futures:
             group_result = future.result()
+            # Log error details from subprocess (since subprocess logs don't propagate)
+            for qid, qid_result in group_result.items():
+                if qid_result.get("status") == "failed" and "error_details" in qid_result:
+                    logger.error(
+                        f"[From subprocess] Failed to calibrate qubit {qid}:\n{qid_result['error_details']}"
+                    )
             all_results.update(group_result)
 
         return all_results
@@ -768,8 +897,16 @@ def run_coupling_calibrations_parallel(
             for cqid in coupling_qids
         ]
 
-        # Collect results
-        pair_results = [f.result() for f in futures]
+        # Collect results and log any errors from subprocesses
+        pair_results = []
+        for f in futures:
+            cqid, cqid_result = f.result()
+            # Log error details from subprocess (since subprocess logs don't propagate)
+            if cqid_result.get("status") == "failed" and "error_details" in cqid_result:
+                logger.error(
+                    f"[From subprocess] Failed to calibrate coupling {cqid}:\n{cqid_result['error_details']}"
+                )
+            pair_results.append((cqid, cqid_result))
         return dict(pair_results)
 
     result: dict[str, Any] = _run_coupling_parallel_flow(coupling_qids, tasks, session_config)

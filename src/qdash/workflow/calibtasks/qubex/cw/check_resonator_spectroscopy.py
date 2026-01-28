@@ -92,7 +92,7 @@ class CheckResonatorSpectroscopy(QubexTask):
         ),
     }
     output_parameters: ClassVar[dict[str, ParameterModel]] = {
-        "resonator_frequency": ParameterModel(
+        "readout_frequency": ParameterModel(
             unit="GHz", description="Estimated resonator frequency from spectroscopy"
         ),
     }
@@ -129,8 +129,16 @@ class CheckResonatorSpectroscopy(QubexTask):
                 id_in_mux = int(qid) % 4
                 resonance_index = PEAK_POSITIONS[id_in_mux]
                 estimated_frequency = frequencies[resonance_index]
+                # Use print for Prefect UI visibility (log_prints=True captures these)
                 print(
-                    f"[MUX DEBUG] qid={qid}, id_in_mux={id_in_mux}, resonance_index={resonance_index}, frequency={estimated_frequency}, all_frequencies={frequencies}"
+                    f"Estimated resonator frequency for qid={qid}: "
+                    f"{estimated_frequency:.6f} GHz (id_in_mux={id_in_mux}, "
+                    f"all={[f'{f:.6f}' for f in frequencies]})"
+                )
+            else:
+                print(
+                    f"[WARNING] Failed to detect resonator frequency for qid={qid}: "
+                    f"expected {NUM_RESONATORS} peaks, found {len(frequencies)}"
                 )
         except Exception:
             logger.warning(
@@ -147,7 +155,7 @@ class CheckResonatorSpectroscopy(QubexTask):
         # Create a deep copy of output_parameters to avoid sharing state
         # between multiple qids (output_parameters is a ClassVar)
         output_params_copy = copy.deepcopy(self.output_parameters)
-        output_params_copy["resonator_frequency"].value = estimated_frequency
+        output_params_copy["readout_frequency"].value = estimated_frequency
         for value in output_params_copy.values():
             value.execution_id = execution_id
 
