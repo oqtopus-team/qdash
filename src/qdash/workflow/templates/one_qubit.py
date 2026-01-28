@@ -70,5 +70,11 @@ def one_qubit(
             OneQubitFineTune(mode="synchronized"),
         ]
 
-    cal = CalibService(username, chip_id, flow_name=flow_name, project_id=project_id)
+    cal = CalibService(
+        username,
+        chip_id,
+        flow_name=flow_name,
+        project_id=project_id,
+        skip_execution=True,  # Child sessions create their own Executions
+    )
     return cal.run(targets, steps=steps)

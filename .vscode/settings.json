@@ -39,5 +39,15 @@
   "terminal.integrated.env.linux": {
     "PYTHONPATH": "/workspace/qdash/src"
   },
-  "workbench.panel.defaultLocation": "right"
+  "workbench.panel.defaultLocation": "right",
+  "github.copilot.chat.commitMessageGeneration.instructions": [
+    {
+      "file": ".github/instructions/commit-message-instructions.md"
+    }
+  ],
+  "github.copilot.chat.pullRequestDescriptionGeneration.instructions": [
+    {
+      "file": ".github/instructions/pull-request-description-instructions.md"
+    }
+  ]
 }

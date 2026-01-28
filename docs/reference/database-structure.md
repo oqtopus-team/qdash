@@ -202,13 +202,15 @@ class TaskStatusModel(str, Enum):
     PENDING = "pending"
     SKIPPED = "skipped"
 
-class InputParameterModel(BaseModel):
+class RunParameterModel(BaseModel):
+    """Experiment configuration parameters (shots, ranges, etc.)."""
     unit: str              # Unit
     value_type: str        # Value type ("float", "int", "np.linspace", etc.)
     value: tuple | int | float | None
     description: str       # Description
 
-class OutputParameterModel(BaseModel):
+class ParameterModel(BaseModel):
+    """Calibration parameter model (for both input and output parameters)."""
     value: float | int     # Value
     value_type: str        # Value type
     error: float           # Error
@@ -219,8 +221,8 @@ class OutputParameterModel(BaseModel):
     task_id: str           # Task ID
 
 class CalibDataModel(BaseModel):
-    qubit: dict[str, dict[str, OutputParameterModel]]     # Per-qubit data
-    coupling: dict[str, dict[str, OutputParameterModel]]  # Per-coupling data
+    qubit: dict[str, dict[str, ParameterModel]]     # Per-qubit data
+    coupling: dict[str, dict[str, ParameterModel]]  # Per-coupling data
 
 class BaseTaskResultModel(BaseModel):
     project_id: str

@@ -5,13 +5,7 @@ import { useEffect, useState, useCallback } from "react";
 import { Toast } from "../Toast";
 
 import { useGetSettings } from "@/client/settings/settings";
-
-interface Settings {
-  env: string;
-  prefect_api_url: string;
-  client_url: string;
-  slack_bot_token: string;
-}
+import { Settings } from "@/schemas/settings";
 
 export function SettingsCard() {
   const [setting, setSetting] = useState<Settings | null>(null);

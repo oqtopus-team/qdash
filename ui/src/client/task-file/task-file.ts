@@ -22,6 +22,7 @@ import type {
 } from "@tanstack/react-query";
 
 import type {
+  BackendConfigResponse,
   GetTaskFileContent200,
   GetTaskFileContentParams,
   GetTaskFileTreeParams,
@@ -779,6 +780,157 @@ export const useSaveTaskFileContent = <
   return useMutation(mutationOptions, queryClient);
 };
 /**
+ * Get backend configuration from backend.yaml.
+
+Returns backend definitions, tasks, and categories.
+
+Returns
+-------
+    Backend configuration
+ * @summary Get backend configuration
+ */
+export const getBackendConfig = (
+  options?: SecondParameter<typeof customInstance>,
+  signal?: AbortSignal,
+) => {
+  return customInstance<BackendConfigResponse>(
+    { url: `/task-files/backend-config`, method: "GET", signal },
+    options,
+  );
+};
+
+export const getGetBackendConfigQueryKey = () => {
+  return [`/task-files/backend-config`] as const;
+};
+
+export const getGetBackendConfigQueryOptions = <
+  TData = Awaited<ReturnType<typeof getBackendConfig>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<Awaited<ReturnType<typeof getBackendConfig>>, TError, TData>
+  >;
+  request?: SecondParameter<typeof customInstance>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetBackendConfigQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getBackendConfig>>
+  > = ({ signal }) => getBackendConfig(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getBackendConfig>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData> };
+};
+
+export type GetBackendConfigQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getBackendConfig>>
+>;
+export type GetBackendConfigQueryError = unknown;
+
+export function useGetBackendConfig<
+  TData = Awaited<ReturnType<typeof getBackendConfig>>,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof getBackendConfig>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getBackendConfig>>,
+          TError,
+          Awaited<ReturnType<typeof getBackendConfig>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData>;
+};
+export function useGetBackendConfig<
+  TData = Awaited<ReturnType<typeof getBackendConfig>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof getBackendConfig>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getBackendConfig>>,
+          TError,
+          Awaited<ReturnType<typeof getBackendConfig>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+export function useGetBackendConfig<
+  TData = Awaited<ReturnType<typeof getBackendConfig>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof getBackendConfig>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+/**
+ * @summary Get backend configuration
+ */
+
+export function useGetBackendConfig<
+  TData = Awaited<ReturnType<typeof getBackendConfig>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof getBackendConfig>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+  const queryOptions = getGetBackendConfigQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
  * List all task definitions found in a backend directory.
 
 Parses Python files to extract task names, types, and descriptions.
@@ -788,6 +940,7 @@ Args:
 ----
     backend: Backend name (e.g., "qubex", "fake")
     sort_order: Sort order for tasks ("type_then_name", "name_only", "file_path")
+    enabled_only: If True, only return tasks that are enabled in backend.yaml
 
 Returns:
 -------

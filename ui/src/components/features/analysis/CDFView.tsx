@@ -723,7 +723,7 @@ export function CDFView() {
                 </button>
               </div>
 
-              <div className="w-28 sm:w-36">
+              <div className="w-28 sm:w-48">
                 <ChipSelector
                   selectedChip={selectedChip}
                   onChipSelect={setSelectedChip}

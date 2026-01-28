@@ -7,7 +7,7 @@ from qdash.datamodel.execution import (
     ExecutionModel,
     ExecutionStatusModel,
 )
-from qdash.datamodel.task import CalibDataModel, OutputParameterModel
+from qdash.datamodel.task import CalibDataModel, ParameterModel
 from qdash.workflow.engine.execution.service import ExecutionService
 
 
@@ -170,7 +170,7 @@ class TestExecutionServiceMerge:
         service.save()
 
         calib_data = CalibDataModel(
-            qubit={"0": {"freq": OutputParameterModel(value=5.0)}},
+            qubit={"0": {"freq": ParameterModel(value=5.0)}},
             coupling={},
         )
         result = service.merge_calib_data(calib_data)

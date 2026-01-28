@@ -1,7 +1,7 @@
 """Tests for TaskStateManager."""
 
 import pytest
-from qdash.datamodel.task import OutputParameterModel, TaskStatusModel
+from qdash.datamodel.task import ParameterModel, TaskStatusModel
 from qdash.workflow.engine.task.state_manager import TaskStateManager
 
 
@@ -159,7 +159,7 @@ class TestParameterManagement:
         tsm = TaskStateManager(qids=["0"])
         tsm._ensure_task_exists("CheckRabi", "qubit", "0")
 
-        output_param = OutputParameterModel(value=5.123, unit="GHz")
+        output_param = ParameterModel(value=5.123, unit="GHz")
         tsm.put_output_parameters("CheckRabi", {"qubit_frequency": output_param}, "qubit", "0")
 
         task = tsm.get_task("CheckRabi", "qubit", "0")
@@ -172,7 +172,7 @@ class TestParameterManagement:
         tsm.task_result.coupling_tasks["0-1"] = []
         tsm.calib_data.coupling["0-1"] = {}
 
-        output_param = OutputParameterModel(value=0.05, unit="GHz")
+        output_param = ParameterModel(value=0.05, unit="GHz")
         tsm.put_output_parameters(
             "CheckCoupling", {"coupling_strength": output_param}, "coupling", "0-1"
         )
@@ -182,7 +182,7 @@ class TestParameterManagement:
     def test_get_output_parameter_by_task_name(self):
         """Test get_output_parameter_by_task_name."""
         tsm = TaskStateManager(qids=["0"])
-        output_param = OutputParameterModel(value=5.0)
+        output_param = ParameterModel(value=5.0)
         tsm.put_output_parameters("CheckRabi", {"freq": output_param}, "qubit", "0")
 
         result = tsm.get_output_parameter_by_task_name("CheckRabi", "qubit", "0")
@@ -193,8 +193,8 @@ class TestParameterManagement:
         """Test _clear_qubit_calib_data removes parameters."""
         tsm = TaskStateManager(qids=["0"])
         tsm.calib_data.qubit["0"] = {
-            "qubit_frequency": OutputParameterModel(value=5.0),
-            "t1": OutputParameterModel(value=100.0),
+            "qubit_frequency": ParameterModel(value=5.0),
+            "t1": ParameterModel(value=100.0),
         }
 
         tsm._clear_qubit_calib_data("0", ["qubit_frequency"])
@@ -240,7 +240,7 @@ class TestCalibDataRetrieval:
     def test_get_qubit_calib_data(self):
         """Test get_qubit_calib_data."""
         tsm = TaskStateManager(qids=["0"])
-        tsm.calib_data.qubit["0"]["freq"] = OutputParameterModel(value=5.0)
+        tsm.calib_data.qubit["0"]["freq"] = ParameterModel(value=5.0)
 
         data = tsm.get_qubit_calib_data("0")
 
@@ -249,7 +249,7 @@ class TestCalibDataRetrieval:
     def test_get_coupling_calib_data(self):
         """Test get_coupling_calib_data."""
         tsm = TaskStateManager()
-        tsm.calib_data.coupling["0-1"] = {"coupling": OutputParameterModel(value=0.05)}
+        tsm.calib_data.coupling["0-1"] = {"coupling": ParameterModel(value=0.05)}
 
         data = tsm.get_coupling_calib_data("0-1")
 

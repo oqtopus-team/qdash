@@ -1,6 +1,9 @@
 "use client";
 
 import React, { useState } from "react";
+import Link from "next/link";
+
+import { GitBranch } from "lucide-react";
 
 import { useGetQubitMetricHistory } from "@/client/metrics/metrics";
 import { TaskFigure } from "@/components/charts/TaskFigure";
@@ -169,6 +172,16 @@ export function QubitMetricHistoryModal({
               <span>{formatDateTime(selectedItem.calibrated_at)}</span>
             </div>
           )}
+          {/* Provenance link */}
+          <div className="pt-2 mt-2 border-t border-base-300">
+            <Link
+              href={`/provenance?parameter=${encodeURIComponent(metricName)}&qid=${encodeURIComponent(qid)}&tab=lineage`}
+              className="btn btn-xs btn-outline gap-1"
+            >
+              <GitBranch className="h-3 w-3" />
+              View Provenance Lineage
+            </Link>
+          </div>
         </div>
       </div>
 

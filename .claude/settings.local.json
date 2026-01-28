@@ -22,7 +22,10 @@
       "Bash(task lint-mypy:workflow:*)",
       "Bash(grep:*)",
       "Bash(cut:*)",
-      "mcp__serena__replace_content"
+      "mcp__serena__replace_content",
+      "Bash(ruff check:*)",
+      "Bash(python -m mypy:*)",
+      "Bash(python:*)"
     ],
     "deny": []
   },

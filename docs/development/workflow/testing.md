@@ -314,14 +314,14 @@ class MockTask:
         return self._task_type
 
     def preprocess(self, session, qid):
-        return PreProcessResult(input_parameters={"param1": 1.0})
+        return PreProcessResult(input_parameters={"param1": ParameterModel(value=1.0)})
 
     def run(self, session, qid):
         return RunResult(raw_result={"data": [1, 2, 3]}, r2={"0": 0.95})
 
     def postprocess(self, session, execution_id, run_result, qid):
         return PostProcessResult(
-            output_parameters={"qubit_frequency": OutputParameterModel(value=5.0)},
+            output_parameters={"qubit_frequency": ParameterModel(value=5.0)},
             figures=[],
             raw_data=[],
         )
@@ -420,7 +420,7 @@ def mock_result_processor(self):
     processor = MagicMock()
     processor.validate_r2.return_value = True
     processor.process_output_parameters.return_value = {
-        "qubit_frequency": OutputParameterModel(
+        "qubit_frequency": ParameterModel(
             value=5.0, execution_id="exec-001", task_id="task-001"
         )
     }

@@ -38,11 +38,13 @@ export function useSelectStyles<
       ...baseStyles,
       container: (provided) => ({
         ...provided,
-        minWidth,
+        width: "100%",
+        minWidth: "100%",
       }),
       menu: (provided, state) => ({
         ...(baseStyles.menu?.(provided, state) || provided),
-        minWidth,
+        width: "100%",
+        minWidth: "100%",
       }),
     };
   }, [minWidth]);

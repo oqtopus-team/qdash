@@ -705,17 +705,39 @@ class OneQubitScheduler:
             )
 
         # Mixed qubits need to run separately (conflict with both box types)
+        # Additionally, MUXes sharing the same Box B module cannot run in parallel
         if mixed_qids:
             mux_ids = {qid_to_mux[qid] for qid in mixed_qids if qid in qid_to_mux}
-            parallel_groups = self._group_qids_by_mux(mixed_qids, qid_to_mux, ordering_strategy)
-            stages.append(
-                OneQubitStageInfo(
-                    box_type=BOX_MIXED,
-                    qids=mixed_qids,
-                    mux_ids=mux_ids,
-                    parallel_groups=parallel_groups,
-                )
-            )
+
+            # Build Box B module map to detect sharing
+            box_b_module_map = self._build_box_b_module_map(wiring_config)
+            mixed_mux_ids = sorted(mux_ids)
+
+            # Group MIXED MUXes by Box B module sharing
+            mux_groups = self._group_mixed_muxes_by_box_b(mixed_mux_ids, box_b_module_map)
+
+            logger.info(f"  MIXED MUX groups (Box B sharing): {mux_groups}")
+
+            # Create separate stages for each Box B sharing group
+            for group_idx, mux_group in enumerate(mux_groups):
+                # Get qubits for this MUX group
+                group_qids = [
+                    qid for qid in mixed_qids if qid in qid_to_mux and qid_to_mux[qid] in mux_group
+                ]
+
+                if group_qids:
+                    group_mux_ids = set(mux_group)
+                    parallel_groups = self._group_qids_by_mux(
+                        group_qids, qid_to_mux, ordering_strategy
+                    )
+                    stages.append(
+                        OneQubitStageInfo(
+                            box_type=BOX_MIXED,
+                            qids=group_qids,
+                            mux_ids=group_mux_ids,
+                            parallel_groups=parallel_groups,
+                        )
+                    )
 
         logger.info(f"Generated {len(stages)} stages")
         for i, stage in enumerate(stages, 1):

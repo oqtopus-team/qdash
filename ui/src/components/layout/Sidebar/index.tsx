@@ -14,6 +14,8 @@ import {
   Cpu,
   FileJson2,
   Files,
+  GitBranch,
+  Inbox,
   LayoutGrid,
   ListTodo,
   LogOut,
@@ -153,6 +155,21 @@ function Sidebar() {
         <SectionHeader label="Data" />
         <li>
           <Link
+            href="/inbox"
+            className={
+              isMobileOpen
+                ? linkClass(isActive("/inbox"))
+                : desktopLinkClass(isActive("/inbox"))
+            }
+            title="Inbox"
+            onClick={handleLinkClick}
+          >
+            <Inbox size={18} />
+            {(isOpen || isMobileOpen) && <span className="ml-2">Inbox</span>}
+          </Link>
+        </li>
+        <li>
+          <Link
             href="/metrics"
             className={
               isMobileOpen
@@ -194,6 +211,23 @@ function Sidebar() {
           >
             <BarChart3 size={18} />
             {(isOpen || isMobileOpen) && <span className="ml-2">Analysis</span>}
+          </Link>
+        </li>
+        <li>
+          <Link
+            href="/provenance"
+            className={
+              isMobileOpen
+                ? linkClass(isActive("/provenance"))
+                : desktopLinkClass(isActive("/provenance"))
+            }
+            title="Provenance"
+            onClick={handleLinkClick}
+          >
+            <GitBranch size={18} />
+            {(isOpen || isMobileOpen) && (
+              <span className="ml-2">Provenance</span>
+            )}
           </Link>
         </li>
 

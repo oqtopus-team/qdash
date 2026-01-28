@@ -761,7 +761,7 @@ export function HistogramView() {
                 </button>
               </div>
 
-              <div className="w-28 sm:w-36">
+              <div className="w-28 sm:w-48">
                 <ChipSelector
                   selectedChip={selectedChip}
                   onChipSelect={setSelectedChip}
@@ -859,7 +859,7 @@ export function HistogramView() {
 
           {/* Row 2: Threshold Slider */}
           <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-            <span className="text-xs sm:text-sm font-medium shrink-0">
+            <span className="text-xs sm:text-sm font-medium shrink-0 w-40">
               Threshold: {thresholdDisplayText}
             </span>
             <div className="flex items-center gap-2 flex-1 min-w-0">

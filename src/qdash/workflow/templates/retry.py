@@ -1,20 +1,21 @@
 """Parallel calibration with retry template.
 
-Demonstrates @task + submit() pattern for custom parallel logic.
+Demonstrates multiprocess parallel execution with retry logic.
 
 Execution pattern:
     groups = [["0", "1"], ["2", "3"]]
 
     ┌─────────────────────────────────────────────────────────────┐
-    │  PARALLEL: Groups submitted simultaneously                  │
+    │  PARALLEL PROCESSES: Groups run in separate processes       │
     ├─────────────────────────────────────────────────────────────┤
-    │  Group0: Q0 → Q1 with retry (SEQUENTIAL)                   │
+    │  Process0: Q0 → Q1 with retry (SEQUENTIAL)                 │
     │                    ↓                         PARALLEL       │
-    │  Group1: Q2 → Q3 with retry (SEQUENTIAL)                   │
+    │  Process1: Q2 → Q3 with retry (SEQUENTIAL)                 │
     └─────────────────────────────────────────────────────────────┘
 
-    Groups run in PARALLEL, qubits within group run SEQUENTIALLY.
-    Each qubit has retry logic with frequency offset on failure.
+    Groups run in PARALLEL using separate processes (DaskTaskRunner).
+    Qubits within each group run SEQUENTIALLY with retry logic.
+    Each process has isolated memory space, avoiding qubex state conflicts.
 
 Example:
     parallel_retry_calibration(
@@ -25,66 +26,8 @@ Example:
 
 from typing import Any
 
-from prefect import flow, get_run_logger, task
+from prefect import flow, get_run_logger
 from qdash.workflow.service import CalibService
-
-
-@task
-def calibrate_group_with_retry(
-    cal: CalibService,
-    qids: list[str],
-    tasks: list[str],
-    offsets: list[float],
-) -> dict[str, Any]:
-    """Calibrate a group of qubits sequentially with retry logic.
-
-    Runs in PARALLEL with other groups via submit().
-    Qubits within the group run SEQUENTIALLY.
-
-    Args:
-        cal: CalibService instance (shared)
-        qids: Qubit IDs in this group (run sequentially)
-        tasks: Task names (run sequentially per qubit)
-        offsets: Frequency offsets to try on failure
-
-    Returns:
-        Results dict keyed by qubit ID
-    """
-    logger = get_run_logger()
-    results = {}
-
-    for qid in qids:
-        # Retry loop for each qubit
-        for attempt, offset in enumerate(offsets):
-            try:
-                if offset != 0:
-                    logger.info(
-                        f"Q{qid}: Attempt {attempt + 1} with {offset * 1000:+.0f} MHz offset"
-                    )
-
-                # Tasks run SEQUENTIALLY within qubit
-                result: dict[str, Any] = {}
-                for task_name in tasks:
-                    task_details = None
-                    if offset != 0:
-                        task_details = {
-                            task_name: {
-                                "input_parameters": {"qubit_frequency_offset": {"value": offset}}
-                            }
-                        }
-                    result[task_name] = cal.execute_task(task_name, qid, task_details=task_details)
-
-                result["status"] = "success"
-                result["attempt"] = attempt + 1
-                results[qid] = result
-                break  # Success, move to next qubit
-
-            except Exception as e:
-                logger.warning(f"Q{qid}: Attempt {attempt + 1} failed: {e}")
-                if attempt == len(offsets) - 1:
-                    results[qid] = {"status": "failed", "error": str(e), "attempt": attempt + 1}
-
-    return results
 
 
 @flow
@@ -96,6 +39,9 @@ def parallel_retry_calibration(
     project_id: str | None = None,
 ) -> Any:
     """Parallel calibration with retry on failure.
+
+    Uses multiprocess execution via DaskTaskRunner for true parallel
+    execution with isolated memory space per group.
 
     Args:
         username: User name (from UI)
@@ -111,7 +57,7 @@ def parallel_retry_calibration(
     # =========================================================================
 
     # Qubit groups
-    # - Groups run in PARALLEL (submitted simultaneously)
+    # - Groups run in PARALLEL PROCESSES (using DaskTaskRunner)
     # - Qubits within each group run SEQUENTIALLY
     groups = [
         ["0", "1"],  # Group 0: Q0 → Q1 sequential
@@ -138,7 +84,7 @@ def parallel_retry_calibration(
 
     logger.info(f"Starting parallel calibration: {len(groups)} groups, {len(all_qids)} qubits")
 
-    # Initialize with all qids
+    # Initialize parent session
     cal = CalibService(
         username,
         chip_id,
@@ -148,19 +94,26 @@ def parallel_retry_calibration(
     )
 
     try:
-        # === PARALLEL: submit each group ===
-        futures = [
-            calibrate_group_with_retry.submit(cal, group, tasks, frequency_offsets)
-            for group in groups
-        ]
+        # Build session config for multiprocess execution
+        session_config = {
+            "username": cal.username,
+            "chip_id": cal.chip_id,
+            "backend_name": cal.backend_name,
+            "execution_id": cal.execution_id,
+            "project_id": cal.project_id,
+        }
 
-        # Wait for all groups to complete
-        group_results = [f.result() for f in futures]
+        # === PARALLEL PROCESSES: Run groups using DaskTaskRunner ===
+        from qdash.workflow.service._internal.scheduling_tasks import (
+            run_groups_with_retry_parallel,
+        )
 
-        # Merge results
-        results = {}
-        for group_result in group_results:
-            results.update(group_result)
+        results = run_groups_with_retry_parallel(
+            groups=groups,
+            tasks=tasks,
+            offsets=frequency_offsets,
+            session_config=session_config,
+        )
 
         # Summary
         success = [q for q, r in results.items() if r["status"] == "success"]

@@ -24,6 +24,7 @@ import type {
 import type {
   AddMemberRequest,
   AdminDeleteProject200,
+  ConfigReloadResponse,
   DeleteUser200,
   HTTPValidationError,
   ListAllProjectsParams,
@@ -41,6 +42,86 @@ import { customInstance } from "../../lib/custom-instance";
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
+/**
+ * Reload cached YAML configuration (admin only).
+ * @summary Reload configuration caches
+ */
+export const reloadConfigCaches = (
+  options?: SecondParameter<typeof customInstance>,
+  signal?: AbortSignal,
+) => {
+  return customInstance<ConfigReloadResponse>(
+    { url: `/admin/config/reload`, method: "POST", signal },
+    options,
+  );
+};
+
+export const getReloadConfigCachesMutationOptions = <
+  TError = void,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof reloadConfigCaches>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customInstance>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof reloadConfigCaches>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationKey = ["reloadConfigCaches"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof reloadConfigCaches>>,
+    void
+  > = () => {
+    return reloadConfigCaches(requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ReloadConfigCachesMutationResult = NonNullable<
+  Awaited<ReturnType<typeof reloadConfigCaches>>
+>;
+
+export type ReloadConfigCachesMutationError = void;
+
+/**
+ * @summary Reload configuration caches
+ */
+export const useReloadConfigCaches = <TError = void, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof reloadConfigCaches>>,
+      TError,
+      void,
+      TContext
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof reloadConfigCaches>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationOptions = getReloadConfigCachesMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
 /**
  * List all users in the system (admin only).
 

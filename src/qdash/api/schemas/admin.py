@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from qdash.datamodel.project import ProjectRole
 from qdash.datamodel.user import SystemRole
 
@@ -60,6 +60,12 @@ class UserDetailResponse(BaseModel):
     default_project_id: str | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None
+
+
+class ConfigReloadResponse(BaseModel):
+    """Response model for config cache reload."""
+
+    cleared: list[str] = Field(default_factory=list)
 
 
 # --- Member Management ---

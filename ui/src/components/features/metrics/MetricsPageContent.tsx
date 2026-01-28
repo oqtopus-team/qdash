@@ -195,12 +195,12 @@ export function MetricsPageContent() {
       };
     } = {};
     Object.entries(rawData).forEach(([key, metricValue]: [string, any]) => {
-      // For qubit metrics, format as "Q00", for coupling metrics keep "0-1" format
+      // Use simple numeric format for qubit metrics (e.g., "0", "1"), keep "0-1" format for coupling
       const formattedKey =
         metricType === "qubit"
           ? key.startsWith("Q")
-            ? key
-            : `Q${key.padStart(2, "0")}`
+            ? String(parseInt(key.slice(1), 10))
+            : String(parseInt(key, 10))
           : key;
       const value = metricValue?.value;
       scaledData[formattedKey] = {
@@ -242,8 +242,8 @@ export function MetricsPageContent() {
         const formattedKey =
           metricType === "qubit"
             ? key.startsWith("Q")
-              ? key
-              : `Q${key.padStart(2, "0")}`
+              ? String(parseInt(key.slice(1), 10))
+              : String(parseInt(key, 10))
             : key;
         const value = metricValue?.value;
         scaledData[formattedKey] = {

@@ -75,6 +75,26 @@ class TestAdminUsersEndpoints:
         response = test_client.get("/admin/users")
         assert response.status_code == 401
 
+    def test_reload_config_caches_as_admin(self, test_client, admin_user, admin_headers):
+        """Admin can reload cached configuration."""
+        response = test_client.post("/admin/config/reload", headers=admin_headers)
+        assert response.status_code == 200
+        data = response.json()
+        assert "cleared" in data
+        assert "policy.yaml" in data["cleared"]
+
+    def test_reload_config_caches_requires_admin(
+        self, test_client, admin_user, regular_user, user_headers
+    ):
+        """Regular users cannot reload cached configuration."""
+        response = test_client.post("/admin/config/reload", headers=user_headers)
+        assert response.status_code == 403
+
+    def test_reload_config_caches_requires_auth(self, test_client, admin_user):
+        """Unauthenticated requests are rejected."""
+        response = test_client.post("/admin/config/reload")
+        assert response.status_code == 401
+
     def test_get_user_details(self, test_client, admin_user, regular_user, admin_headers):
         """Admin can get user details."""
         response = test_client.get("/admin/users/regularuser", headers=admin_headers)

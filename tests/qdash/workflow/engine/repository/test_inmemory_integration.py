@@ -10,7 +10,6 @@ from qdash.workflow.engine.repository import (
     InMemoryExecutionCounterRepository,
     InMemoryExecutionLockRepository,
     InMemoryExecutionRepository,
-    InMemoryTaskRepository,
     InMemoryUserRepository,
 )
 
@@ -110,37 +109,50 @@ class TestUserRepositoryWithInMemory:
         assert user_repo.get_default_project_id("alice") == "proj-1"
 
 
-class TestTaskValidationWithInMemory:
-    """Test task validation with InMemory task repository."""
+class TestTaskValidationWithBackendConfig:
+    """Test task validation with backend.yaml configuration."""
 
-    def test_validate_task_name_success(self):
-        """Test successful task name validation."""
+    def test_validate_task_name_success_fake_backend(self):
+        """Test successful task name validation for fake backend."""
         from qdash.workflow.engine.task_runner import validate_task_name
 
-        task_repo = InMemoryTaskRepository()
-        task_repo.add_tasks("alice", ["CheckFreq", "CheckRabi", "CheckT1"])
-
-        # Should not raise for valid tasks
+        # Tasks available in fake backend (from backend.yaml)
         result = validate_task_name(
-            task_names=["CheckFreq", "CheckRabi"],
-            username="alice",
-            task_repo=task_repo,
+            task_names=["ChevronPattern", "CheckRabi", "CheckT1"],
+            backend="fake",
         )
-        assert result == ["CheckFreq", "CheckRabi"]
+        assert result == ["ChevronPattern", "CheckRabi", "CheckT1"]
+
+    def test_validate_task_name_success_qubex_backend(self):
+        """Test successful task name validation for qubex backend."""
+        from qdash.workflow.engine.task_runner import validate_task_name
+
+        # Tasks available in qubex backend (from backend.yaml)
+        result = validate_task_name(
+            task_names=["ChevronPattern", "CheckRabi"],
+            backend="qubex",
+        )
+        assert result == ["ChevronPattern", "CheckRabi"]
 
     def test_validate_task_name_fails_for_invalid(self):
         """Test that validation fails for invalid task names."""
         from qdash.workflow.engine.task_runner import validate_task_name
 
-        task_repo = InMemoryTaskRepository()
-        task_repo.add_tasks("alice", ["CheckFreq"])
-
         with pytest.raises(ValueError, match="Invalid task name"):
             validate_task_name(
-                task_names=["InvalidTask"],
-                username="alice",
-                task_repo=task_repo,
+                task_names=["NonExistentTask"],
+                backend="fake",
             )
+
+    def test_validate_task_name_uses_default_backend(self):
+        """Test that validation uses default backend when not specified."""
+        from qdash.workflow.engine.task_runner import validate_task_name
+
+        # Should use default backend (qubex) from backend.yaml
+        result = validate_task_name(
+            task_names=["ChevronPattern"],
+        )
+        assert result == ["ChevronPattern"]
 
 
 class TestExecutionRepositoryWithInMemory:

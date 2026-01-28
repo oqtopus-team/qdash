@@ -7,14 +7,13 @@ class Settings(BaseSettings):
     """Settings for the QDash application."""
 
     env: str
-    client_url: str
+    client_url: str = ""
     prefect_api_url: str
-    slack_bot_token: str
-    slack_channel_id: str
+    slack_bot_token: str = ""
+    slack_channel_id: str = ""
     postgres_data_path: str
     mongo_data_path: str
     calib_data_path: str
-    backend: str = "qubex"  # Default backend is 'qubex'
     # MongoDB
     mongo_db_name: str = "qdash"  # MongoDB database name
     # Ports

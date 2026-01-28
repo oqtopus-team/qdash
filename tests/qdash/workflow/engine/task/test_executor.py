@@ -3,7 +3,7 @@
 from unittest.mock import MagicMock
 
 import pytest
-from qdash.datamodel.task import OutputParameterModel, QubitTaskModel, TaskStatusModel
+from qdash.datamodel.task import ParameterModel, QubitTaskModel, TaskStatusModel
 from qdash.workflow.calibtasks.base import PostProcessResult, PreProcessResult, RunResult
 from qdash.workflow.engine.task.executor import (
     TaskExecutionError,
@@ -44,14 +44,14 @@ class MockTask:
         return self._task_type == "coupling"
 
     def preprocess(self, session, qid):
-        return PreProcessResult(input_parameters={"param1": 1.0})
+        return PreProcessResult(input_parameters={"param1": ParameterModel(value=1.0)})
 
     def run(self, session, qid):
         return RunResult(raw_result={"data": [1, 2, 3]}, r2={"0": 0.95})
 
     def postprocess(self, session, execution_id, run_result, qid):
         return PostProcessResult(
-            output_parameters={"qubit_frequency": OutputParameterModel(value=5.0)},
+            output_parameters={"qubit_frequency": ParameterModel(value=5.0)},
             figures=[],
             raw_data=[],
         )
@@ -126,7 +126,7 @@ class TestTaskExecutorExecuteTask:
         processor = MagicMock()
         processor.validate_r2.return_value = True
         processor.process_output_parameters.return_value = {
-            "qubit_frequency": OutputParameterModel(
+            "qubit_frequency": ParameterModel(
                 value=5.0, execution_id="exec-001", task_id="task-001"
             )
         }
@@ -175,7 +175,8 @@ class TestTaskExecutorExecuteTask:
         mock_state_manager.put_input_parameters.assert_called_once()
         call_args = mock_state_manager.put_input_parameters.call_args
         assert call_args[0][0] == "CheckRabi"
-        assert call_args[0][1] == {"param1": 1.0}
+        assert "param1" in call_args[0][1]
+        assert call_args[0][1]["param1"].value == 1.0
 
     def test_execute_task_handles_no_run_result(self, executor, mock_state_manager):
         """Test execute_task handles task with no run result."""
@@ -341,7 +342,8 @@ class TestTaskExecutorHelperMethods:
         result = executor._run_preprocess(task, session, "0")
 
         assert result is not None
-        assert result.input_parameters == {"param1": 1.0}
+        assert "param1" in result.input_parameters
+        assert result.input_parameters["param1"].value == 1.0
 
     def test_run_preprocess_handles_exception(self, executor):
         """Test _run_preprocess handles exception gracefully."""

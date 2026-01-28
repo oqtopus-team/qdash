@@ -700,67 +700,91 @@ export function TimeSeriesView() {
             Refresh
           </button>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
-          <div>
-            <ChipSelector
-              selectedChip={selectedChip}
-              onChipSelect={setSelectedChip}
-            />
-          </div>
-          <div className="space-y-1">
-            <label className="text-sm font-medium text-base-content/70">
-              Parameter
-              <span className="ml-1 text-xs text-primary">(Left Y)</span>
-            </label>
-            <Select<{ value: string; label: string }, false>
-              options={availableParameters}
-              value={
-                currentMetricConfig
-                  ? {
-                      value: currentMetricConfig.key,
-                      label: currentMetricConfig.title,
+        <div className="child w-full">
+          <table className="w-full table-auto">
+            <tr>
+              <th className="px-4 text-left">
+                <label className="text-sm font-medium text-base-content/70">
+                  Chip
+                </label>
+              </th>
+              <th className="px-4 text-left">
+                <label className="text-sm font-medium text-base-content/70">
+                  Parameter
+                  <span className="ml-1 text-xs text-primary">(Left Y)</span>
+                </label>
+              </th>
+              <th className="px-4 text-left">
+                <label className="text-sm font-medium text-base-content/70">
+                  Tag
+                </label>
+              </th>
+            </tr>
+            <tr>
+              <td className="px-4">
+                <div>
+                  <ChipSelector
+                    selectedChip={selectedChip}
+                    onChipSelect={setSelectedChip}
+                  />
+                </div>
+              </td>
+              <td className="px-4">
+                <div className="space-y-1">
+                  <Select<{ value: string; label: string }, false>
+                    options={availableParameters}
+                    value={
+                      currentMetricConfig
+                        ? {
+                            value: currentMetricConfig.key,
+                            label: currentMetricConfig.title,
+                          }
+                        : null
                     }
-                  : null
-              }
-              onChange={(option) => {
-                if (option) {
-                  setSelectedParameter(option.value);
-                  // Clear secondary if it's the same as new primary
-                  if (secondaryParameter === option.value) {
-                    handleRemoveSecondaryAxis();
-                  }
-                }
-              }}
-              placeholder="Select parameter"
-              className="text-base-content"
-              styles={{
-                control: (base) => ({
-                  ...base,
-                  minHeight: "38px",
-                  height: "auto",
-                  borderRadius: "0.5rem",
-                  borderColor: "#1f77b4",
-                  borderWidth: "2px",
-                }),
-                valueContainer: (base) => ({
-                  ...base,
-                  padding: "2px 8px",
-                }),
-                menu: (base) => ({
-                  ...base,
-                  zIndex: 50,
-                }),
-              }}
-            />
-          </div>
-          <div>
-            <TagSelector
-              tags={tags}
-              selectedTag={selectedTag}
-              onTagSelect={setSelectedTag}
-              disabled={isLoadingTags}
-            />
-          </div>
+                    onChange={(option) => {
+                      if (option) {
+                        setSelectedParameter(option.value);
+                        // Clear secondary if it's the same as new primary
+                        if (secondaryParameter === option.value) {
+                          handleRemoveSecondaryAxis();
+                        }
+                      }
+                    }}
+                    placeholder="Select parameter"
+                    className="text-base-content"
+                    styles={{
+                      control: (base) => ({
+                        ...base,
+                        minHeight: "38px",
+                        height: "auto",
+                        borderRadius: "0.5rem",
+                        borderColor: "#1f77b4",
+                        borderWidth: "2px",
+                      }),
+                      valueContainer: (base) => ({
+                        ...base,
+                        padding: "2px 8px",
+                      }),
+                      menu: (base) => ({
+                        ...base,
+                        zIndex: 50,
+                      }),
+                    }}
+                  />
+                </div>
+              </td>
+              <td className="px-4">
+                <div>
+                  <TagSelector
+                    tags={tags}
+                    selectedTag={selectedTag}
+                    onTagSelect={setSelectedTag}
+                    disabled={isLoadingTags}
+                  />
+                </div>
+              </td>
+            </tr>
+          </table>
         </div>
 
         {/* Secondary Axis Section */}

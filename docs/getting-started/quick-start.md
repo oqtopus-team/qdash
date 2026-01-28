@@ -16,6 +16,7 @@ Create the environment file from the example.
 
 ```bash
 cp .env.example .env
+cp -r config/qubex/qubex.example/* config/qubex/
 ```
 
 ## Start the Application
@@ -26,30 +27,11 @@ docker compose up -d
 
 You can now access the application at <a href="http://localhost:5714/signup"> localhost:5714 </a>.
 
-## Create account
+## Sign in
 
-![create account](/images/create_account.png)
+![login](/images/login.png)
 
-Now, your data is not setup yet. You need to initialize the database with your data.
-
-## Setup devcontainer
-
-```bash
-docker compose -f compose.devcontainer.yaml up -d
-```
-
-## Install QDash CLI
-
-```bash
-docker compose -f compose.devcontainer.yaml exec devcontainer sh -c "pip install -e ."
-```
-
-## Initialize the Database
-
-```bash
-docker compose -f compose.devcontainer.yaml exec devcontainer sh -c "qdash init-all-data --username <your-username> --chip-id <your-chip-id>"
-```
-
+Default admin password is written in the `.env` file under `ADMIN_PASSWORD` variable.
 You can now access the application at <a href="http://localhost:5714/execution"> localhost:5714 </a>.
 
 ## Remote access (Cloudflare Tunnel)

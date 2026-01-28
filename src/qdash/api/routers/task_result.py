@@ -30,7 +30,7 @@ from qdash.common.datetime_utils import (
     parse_elapsed_time,
     start_of_day,
 )
-from qdash.datamodel.task import OutputParameterModel
+from qdash.datamodel.task import ParameterModel
 from qdash.repository.chip import MongoChipRepository
 from qdash.repository.task_result_history import MongoTaskResultHistoryRepository
 from starlette.exceptions import HTTPException
@@ -685,7 +685,7 @@ def _fetch_timeseries_data(
     )
 
     # Create a dictionary to store time series data for each qid
-    timeseries_by_qid: dict[str, list[OutputParameterModel]] = {}
+    timeseries_by_qid: dict[str, list[ParameterModel]] = {}
 
     # Process task results
     for task_result in task_results:
@@ -707,7 +707,7 @@ def _fetch_timeseries_data(
 
         param_data = task_result.output_parameters[parameter]
         if isinstance(param_data, dict):
-            timeseries_by_qid[qid].append(OutputParameterModel(**param_data))
+            timeseries_by_qid[qid].append(ParameterModel(**param_data))
         else:
             timeseries_by_qid[qid].append(param_data)
 

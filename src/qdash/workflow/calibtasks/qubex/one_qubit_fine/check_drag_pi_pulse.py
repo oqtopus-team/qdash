@@ -1,12 +1,13 @@
 from typing import ClassVar
 
-from qdash.datamodel.task import InputParameterModel, OutputParameterModel
+from qdash.datamodel.task import ParameterModel, RunParameterModel
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
     RunResult,
 )
 from qdash.workflow.calibtasks.qubex.base import QubexTask
 from qdash.workflow.engine.backend.qubex import QubexBackend
+from qubex.measurement.measurement import DEFAULT_READOUT_DURATION
 
 
 class CheckDRAGPIPulse(QubexTask):
@@ -14,15 +15,26 @@ class CheckDRAGPIPulse(QubexTask):
 
     name: str = "CheckDRAGPIPulse"
     task_type: str = "qubit"
-    input_parameters: ClassVar[dict[str, InputParameterModel]] = {
-        "repetitions": InputParameterModel(
+    input_parameters: ClassVar[dict[str, ParameterModel | None]] = {
+        "qubit_frequency": None,  # Load from DB
+        "drag_pi_amplitude": None,  # Load from DB
+        "drag_pi_length": None,  # Load from DB
+        "drag_pi_beta": None,  # Load from DB
+        "readout_amplitude": None,  # Load from DB
+        "readout_frequency": None,  # Load from DB
+        "readout_length": ParameterModel(
+            value=DEFAULT_READOUT_DURATION, unit="ns", description="Readout pulse length"
+        ),
+    }
+    run_parameters: ClassVar[dict[str, RunParameterModel]] = {
+        "repetitions": RunParameterModel(
             unit="a.u.",
             value_type="int",
             value=20,
             description="Number of repetitions for the PI pulse",
         )
     }
-    output_parameters: ClassVar[dict[str, OutputParameterModel]] = {}
+    output_parameters: ClassVar[dict[str, ParameterModel]] = {}
 
     def postprocess(
         self, backend: QubexBackend, execution_id: str, run_result: RunResult, qid: str
@@ -41,7 +53,7 @@ class CheckDRAGPIPulse(QubexTask):
         drag_pi_pulse = {qubit: exp.drag_pi_pulse[qubit] for qubit in labels}
         result = exp.repeat_sequence(
             sequence=drag_pi_pulse,
-            repetitions=self.input_parameters["repetitions"].get_value(),
+            repetitions=self.run_parameters["repetitions"].get_value(),
         )
         self.save_calibration(backend)
         return RunResult(raw_result=result)

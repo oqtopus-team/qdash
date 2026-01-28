@@ -5,22 +5,29 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import type {
   DataTag,
   DefinedInitialDataOptions,
   DefinedUseQueryResult,
+  MutationFunction,
   QueryClient,
   QueryFunction,
   QueryKey,
   UndefinedInitialDataOptions,
+  UseMutationOptions,
+  UseMutationResult,
   UseQueryOptions,
   UseQueryResult,
 } from "@tanstack/react-query";
 
 import type {
   CalibrationNoteResponse,
+  CompareSeedValues200,
+  CompareSeedValuesParams,
   HTTPValidationError,
+  SeedImportRequest,
+  SeedImportResponse,
 } from "../../schemas";
 
 import { customInstance } from "../../lib/custom-instance";
@@ -187,6 +194,537 @@ export function useGetCalibrationNote<
   queryClient?: QueryClient,
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
   const queryOptions = getGetCalibrationNoteQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Import initial calibration parameters from qubex params or manual input.
+
+This endpoint allows importing seed parameters that are typically loaded
+from qubex's params directory (e.g., qubit_frequency, readout_amplitude)
+into QDash's calibration database for tracking and provenance.
+
+Parameters
+----------
+ctx : ProjectContext
+    Project context with user and project information
+service : SeedImportService
+    Service for seed import operations
+request : SeedImportRequest
+    Import request specifying source, chip_id, and parameters
+
+Returns
+-------
+SeedImportResponse
+    Results of the import operation including counts and individual results
+
+Examples
+--------
+Import from qubex params:
+```json
+{
+    "chip_id": "64Qv3",
+    "source": "qubex_params",
+    "parameters": ["qubit_frequency", "readout_amplitude"]
+}
+```
+
+Manual import:
+```json
+{
+    "chip_id": "64Qv3",
+    "source": "manual",
+    "manual_data": {
+        "qubit_frequency": {"Q00": 7.9, "Q01": 8.6}
+    }
+}
+```
+ * @summary Import seed parameters from qubex or manual input
+ */
+export const importSeedParameters = (
+  seedImportRequest: SeedImportRequest,
+  options?: SecondParameter<typeof customInstance>,
+  signal?: AbortSignal,
+) => {
+  return customInstance<SeedImportResponse>(
+    {
+      url: `/calibrations/seed-import`,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      data: seedImportRequest,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getImportSeedParametersMutationOptions = <
+  TError = HTTPValidationError,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof importSeedParameters>>,
+    TError,
+    { data: SeedImportRequest },
+    TContext
+  >;
+  request?: SecondParameter<typeof customInstance>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof importSeedParameters>>,
+  TError,
+  { data: SeedImportRequest },
+  TContext
+> => {
+  const mutationKey = ["importSeedParameters"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof importSeedParameters>>,
+    { data: SeedImportRequest }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return importSeedParameters(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ImportSeedParametersMutationResult = NonNullable<
+  Awaited<ReturnType<typeof importSeedParameters>>
+>;
+export type ImportSeedParametersMutationBody = SeedImportRequest;
+export type ImportSeedParametersMutationError = HTTPValidationError;
+
+/**
+ * @summary Import seed parameters from qubex or manual input
+ */
+export const useImportSeedParameters = <
+  TError = HTTPValidationError,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof importSeedParameters>>,
+      TError,
+      { data: SeedImportRequest },
+      TContext
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof importSeedParameters>>,
+  TError,
+  { data: SeedImportRequest },
+  TContext
+> => {
+  const mutationOptions = getImportSeedParametersMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+/**
+ * Get list of available parameter files in qubex params directory.
+
+Parameters
+----------
+ctx : ProjectContext
+    Project context with user and project information
+service : SeedImportService
+    Service for seed import operations
+chip_id : str
+    Chip ID to check parameters for
+
+Returns
+-------
+list[str]
+    List of available parameter names (e.g., ["qubit_frequency", "readout_amplitude"])
+ * @summary Get available seed parameters for a chip
+ */
+export const getAvailableSeedParameters = (
+  chipId: string,
+  options?: SecondParameter<typeof customInstance>,
+  signal?: AbortSignal,
+) => {
+  return customInstance<string[]>(
+    { url: `/calibrations/seed-parameters/${chipId}`, method: "GET", signal },
+    options,
+  );
+};
+
+export const getGetAvailableSeedParametersQueryKey = (chipId?: string) => {
+  return [`/calibrations/seed-parameters/${chipId}`] as const;
+};
+
+export const getGetAvailableSeedParametersQueryOptions = <
+  TData = Awaited<ReturnType<typeof getAvailableSeedParameters>>,
+  TError = HTTPValidationError,
+>(
+  chipId: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof getAvailableSeedParameters>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetAvailableSeedParametersQueryKey(chipId);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getAvailableSeedParameters>>
+  > = ({ signal }) =>
+    getAvailableSeedParameters(chipId, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!chipId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getAvailableSeedParameters>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData> };
+};
+
+export type GetAvailableSeedParametersQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getAvailableSeedParameters>>
+>;
+export type GetAvailableSeedParametersQueryError = HTTPValidationError;
+
+export function useGetAvailableSeedParameters<
+  TData = Awaited<ReturnType<typeof getAvailableSeedParameters>>,
+  TError = HTTPValidationError,
+>(
+  chipId: string,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof getAvailableSeedParameters>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getAvailableSeedParameters>>,
+          TError,
+          Awaited<ReturnType<typeof getAvailableSeedParameters>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData>;
+};
+export function useGetAvailableSeedParameters<
+  TData = Awaited<ReturnType<typeof getAvailableSeedParameters>>,
+  TError = HTTPValidationError,
+>(
+  chipId: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof getAvailableSeedParameters>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getAvailableSeedParameters>>,
+          TError,
+          Awaited<ReturnType<typeof getAvailableSeedParameters>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+export function useGetAvailableSeedParameters<
+  TData = Awaited<ReturnType<typeof getAvailableSeedParameters>>,
+  TError = HTTPValidationError,
+>(
+  chipId: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof getAvailableSeedParameters>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+/**
+ * @summary Get available seed parameters for a chip
+ */
+
+export function useGetAvailableSeedParameters<
+  TData = Awaited<ReturnType<typeof getAvailableSeedParameters>>,
+  TError = HTTPValidationError,
+>(
+  chipId: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof getAvailableSeedParameters>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+  const queryOptions = getGetAvailableSeedParametersQueryOptions(
+    chipId,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Compare seed parameter values from YAML files with current QDash values.
+
+This endpoint allows users to preview what will be imported and see
+the difference between YAML source values and current QDash values.
+
+Parameters
+----------
+ctx : ProjectContext
+    Project context with user and project information
+service : SeedImportService
+    Service for seed import operations
+chip_id : str
+    Chip ID to compare parameters for
+parameters : str | None
+    Comma-separated list of parameters to compare (None = all available)
+
+Returns
+-------
+dict
+    Comparison data with structure:
+    {
+        "chip_id": str,
+        "parameters": {
+            "param_name": {
+                "unit": str,
+                "qubits": {
+                    "Q0": {
+                        "yaml_value": float | None,
+                        "qdash_value": float | None,
+                        "status": "new" | "same" | "different"
+                    }
+                }
+            }
+        }
+    }
+ * @summary Compare YAML seed values with QDash values
+ */
+export const compareSeedValues = (
+  chipId: string,
+  params?: CompareSeedValuesParams,
+  options?: SecondParameter<typeof customInstance>,
+  signal?: AbortSignal,
+) => {
+  return customInstance<CompareSeedValues200>(
+    {
+      url: `/calibrations/seed-compare/${chipId}`,
+      method: "GET",
+      params,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getCompareSeedValuesQueryKey = (
+  chipId?: string,
+  params?: CompareSeedValuesParams,
+) => {
+  return [
+    `/calibrations/seed-compare/${chipId}`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getCompareSeedValuesQueryOptions = <
+  TData = Awaited<ReturnType<typeof compareSeedValues>>,
+  TError = HTTPValidationError,
+>(
+  chipId: string,
+  params?: CompareSeedValuesParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof compareSeedValues>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getCompareSeedValuesQueryKey(chipId, params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof compareSeedValues>>
+  > = ({ signal }) => compareSeedValues(chipId, params, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!chipId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof compareSeedValues>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData> };
+};
+
+export type CompareSeedValuesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof compareSeedValues>>
+>;
+export type CompareSeedValuesQueryError = HTTPValidationError;
+
+export function useCompareSeedValues<
+  TData = Awaited<ReturnType<typeof compareSeedValues>>,
+  TError = HTTPValidationError,
+>(
+  chipId: string,
+  params: undefined | CompareSeedValuesParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof compareSeedValues>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof compareSeedValues>>,
+          TError,
+          Awaited<ReturnType<typeof compareSeedValues>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData>;
+};
+export function useCompareSeedValues<
+  TData = Awaited<ReturnType<typeof compareSeedValues>>,
+  TError = HTTPValidationError,
+>(
+  chipId: string,
+  params?: CompareSeedValuesParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof compareSeedValues>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof compareSeedValues>>,
+          TError,
+          Awaited<ReturnType<typeof compareSeedValues>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+export function useCompareSeedValues<
+  TData = Awaited<ReturnType<typeof compareSeedValues>>,
+  TError = HTTPValidationError,
+>(
+  chipId: string,
+  params?: CompareSeedValuesParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof compareSeedValues>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+/**
+ * @summary Compare YAML seed values with QDash values
+ */
+
+export function useCompareSeedValues<
+  TData = Awaited<ReturnType<typeof compareSeedValues>>,
+  TError = HTTPValidationError,
+>(
+  chipId: string,
+  params?: CompareSeedValuesParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof compareSeedValues>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+  const queryOptions = getCompareSeedValuesQueryOptions(
+    chipId,
+    params,
+    options,
+  );
 
   const query = useQuery(queryOptions, queryClient) as UseQueryResult<
     TData,

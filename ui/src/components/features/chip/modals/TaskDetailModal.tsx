@@ -2,6 +2,13 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useEffect, useRef, useCallback } from "react";
+import {
+  CheckCircle,
+  AlertTriangle,
+  Clock,
+  HelpCircle,
+  GitBranch,
+} from "lucide-react";
 
 import type { Task } from "@/schemas";
 
@@ -55,6 +62,23 @@ export function TaskDetailModal({
   const [subIndex, setSubIndex] = useState(initialSubIndex);
   const modalRef = useRef<HTMLDialogElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
+
+  const resolveQid = (taskQid: string, qidRole?: string): string => {
+    if (!qidRole || qidRole === "self" || qidRole === "coupling")
+      return taskQid;
+    const match = taskQid.match(/^(\d+)-(\d+)$/);
+    if (!match) return taskQid;
+    const [, control, target] = match;
+    if (qidRole === "control") return control;
+    if (qidRole === "target") return target;
+    return taskQid;
+  };
+
+  const buildProvenanceUrl = (parameterName: string, qidValue: string) => {
+    const p = encodeURIComponent(parameterName);
+    const q = encodeURIComponent(qidValue);
+    return `/provenance?tab=lineage&parameter=${p}&qid=${q}`;
+  };
 
   // Handle keyboard navigation
   const handleKeyDown = useCallback(
@@ -474,6 +498,7 @@ export function TaskDetailModal({
                           <tr>
                             <th>Parameter</th>
                             <th>Value</th>
+                            <th>Error</th>
                             <th>Unit</th>
                           </tr>
                         </thead>
@@ -489,14 +514,25 @@ export function TaskDetailModal({
                               ) as {
                                 value: number | string;
                                 unit?: string;
+                                error?: number;
+                                description?: string;
                               };
                               return (
-                                <tr key={key}>
+                                <tr
+                                  key={key}
+                                  title={paramValue.description || undefined}
+                                >
                                   <td className="font-medium">{key}</td>
                                   <td className="font-mono">
                                     {typeof paramValue.value === "number"
                                       ? paramValue.value.toFixed(precision)
                                       : String(paramValue.value)}
+                                  </td>
+                                  <td className="font-mono text-base-content/70">
+                                    {paramValue.error !== undefined &&
+                                    paramValue.error !== 0
+                                      ? `±${paramValue.error.toFixed(precision)}`
+                                      : "-"}
                                   </td>
                                   <td>{paramValue.unit || "-"}</td>
                                 </tr>
@@ -509,54 +545,270 @@ export function TaskDetailModal({
                   </div>
                 )}
 
-                {/* Input Parameters */}
-                {task.input_parameters && (
-                  <div className="mb-6">
-                    <h4 className="text-lg font-semibold mb-3">
-                      Input Parameters
-                    </h4>
-                    <div className="overflow-x-auto">
-                      <table className="table table-zebra table-sm">
-                        <thead>
-                          <tr>
-                            <th>Parameter</th>
-                            <th>Value</th>
-                            <th>Unit</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {Object.entries(task.input_parameters).map(
-                            ([key, value]) => {
-                              const paramValue = (
-                                typeof value === "object" &&
-                                value !== null &&
-                                "value" in value
-                                  ? value
-                                  : { value }
-                              ) as {
-                                value: number | string | object;
-                                unit?: string;
-                              };
-                              return (
-                                <tr key={key}>
-                                  <td className="font-medium">{key}</td>
-                                  <td className="font-mono">
-                                    {typeof paramValue.value === "number"
-                                      ? paramValue.value.toFixed(precision)
-                                      : typeof paramValue.value === "object"
-                                        ? JSON.stringify(paramValue.value)
-                                        : String(paramValue.value)}
-                                  </td>
-                                  <td>{paramValue.unit || "-"}</td>
-                                </tr>
+                {/* Input Parameters (Calibration Dependencies) - Card View */}
+                {task.input_parameters &&
+                  Object.keys(task.input_parameters).length > 0 && (
+                    <div className="mb-6">
+                      <h4 className="text-lg font-semibold mb-3">
+                        Calibration Inputs
+                      </h4>
+                      <div className="space-y-2">
+                        {Object.entries(task.input_parameters).map(
+                          ([key, value]) => {
+                            const paramValue = (
+                              typeof value === "object" &&
+                              value !== null &&
+                              "value" in value
+                                ? value
+                                : { value }
+                            ) as {
+                              value: number | string | object;
+                              unit?: string;
+                              error?: number;
+                              description?: string;
+                              execution_id?: string;
+                              calibrated_at?: string;
+                              task_name?: string;
+                            };
+
+                            // Calculate freshness status
+                            const getFreshnessStatus = () => {
+                              if (!paramValue.calibrated_at) {
+                                return {
+                                  status: "unknown",
+                                  icon: <HelpCircle size={16} />,
+                                  label: "Unknown",
+                                  className: "text-base-content/50",
+                                };
+                              }
+                              const calibratedDate = new Date(
+                                paramValue.calibrated_at,
                               );
-                            },
-                          )}
-                        </tbody>
-                      </table>
+                              const now = new Date();
+                              const hoursDiff =
+                                (now.getTime() - calibratedDate.getTime()) /
+                                (1000 * 60 * 60);
+
+                              if (hoursDiff < 24) {
+                                return {
+                                  status: "fresh",
+                                  icon: <CheckCircle size={16} />,
+                                  label: "Fresh",
+                                  className: "text-success",
+                                };
+                              } else if (hoursDiff < 72) {
+                                return {
+                                  status: "recent",
+                                  icon: <Clock size={16} />,
+                                  label: "Recent",
+                                  className: "text-warning",
+                                };
+                              } else {
+                                return {
+                                  status: "stale",
+                                  icon: <AlertTriangle size={16} />,
+                                  label: "Stale",
+                                  className: "text-error",
+                                };
+                              }
+                            };
+
+                            const freshness = getFreshnessStatus();
+
+                            // Format relative time
+                            const getRelativeTime = () => {
+                              if (!paramValue.calibrated_at) return null;
+                              const calibratedDate = new Date(
+                                paramValue.calibrated_at,
+                              );
+                              const now = new Date();
+                              const diffMs =
+                                now.getTime() - calibratedDate.getTime();
+                              const diffMins = Math.floor(diffMs / (1000 * 60));
+                              const diffHours = Math.floor(
+                                diffMs / (1000 * 60 * 60),
+                              );
+                              const diffDays = Math.floor(
+                                diffMs / (1000 * 60 * 60 * 24),
+                              );
+
+                              if (diffMins < 60) return `${diffMins}m ago`;
+                              if (diffHours < 24) return `${diffHours}h ago`;
+                              return `${diffDays}d ago`;
+                            };
+
+                            const relativeTime = getRelativeTime();
+
+                            return (
+                              <div
+                                key={key}
+                                className="card card-compact bg-base-200 hover:bg-base-300 transition-colors"
+                              >
+                                <div className="card-body py-3 px-4">
+                                  <div className="flex items-center justify-between">
+                                    {/* Left: Parameter info */}
+                                    <div className="flex items-center gap-3">
+                                      <span
+                                        className={freshness.className}
+                                        title={freshness.label}
+                                      >
+                                        {freshness.icon}
+                                      </span>
+                                      <div>
+                                        <div className="font-semibold text-sm">
+                                          {key}
+                                        </div>
+                                        <div className="text-xs text-base-content/60">
+                                          {paramValue.description ||
+                                            "Calibration parameter"}
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    {/* Right: Value */}
+                                    <div className="text-right">
+                                      <div className="font-mono font-semibold">
+                                        {typeof paramValue.value === "number"
+                                          ? paramValue.value.toFixed(precision)
+                                          : typeof paramValue.value === "object"
+                                            ? JSON.stringify(paramValue.value)
+                                            : String(paramValue.value)}{" "}
+                                        <span className="text-base-content/70 font-normal">
+                                          {paramValue.unit || ""}
+                                        </span>
+                                      </div>
+                                      {paramValue.error !== undefined &&
+                                        paramValue.error !== 0 && (
+                                          <div className="text-xs text-base-content/50 font-mono">
+                                            ±
+                                            {paramValue.error.toFixed(
+                                              precision,
+                                            )}
+                                          </div>
+                                        )}
+                                    </div>
+                                  </div>
+
+                                  {/* Source info */}
+                                  {(paramValue.execution_id ||
+                                    relativeTime) && (
+                                    <div className="flex items-center justify-between mt-2 pt-2 border-t border-base-300">
+                                      <div className="flex items-center gap-2 text-xs text-base-content/60">
+                                        <span>↳ from</span>
+                                        {paramValue.execution_id ? (
+                                          <div className="dropdown dropdown-top">
+                                            <button
+                                              tabIndex={0}
+                                              className="link link-primary"
+                                            >
+                                              {paramValue.task_name ||
+                                                `Execution ${paramValue.execution_id.slice(0, 8)}`}
+                                            </button>
+                                            <ul
+                                              tabIndex={0}
+                                              className="dropdown-content z-[1] menu p-2 shadow-lg bg-base-100 rounded-box w-48 border border-base-300"
+                                            >
+                                              <li>
+                                                <button
+                                                  onClick={() => {
+                                                    router.push(
+                                                      `/executions/${paramValue.execution_id}`,
+                                                    );
+                                                  }}
+                                                >
+                                                  View Execution
+                                                </button>
+                                              </li>
+                                              <li>
+                                                <button
+                                                  onClick={() => {
+                                                    const parameterName =
+                                                      (paramValue as any)
+                                                        ?.parameter_name || key;
+                                                    const resolvedQid =
+                                                      resolveQid(
+                                                        qid,
+                                                        (paramValue as any)
+                                                          ?.qid_role,
+                                                      );
+                                                    router.push(
+                                                      buildProvenanceUrl(
+                                                        parameterName,
+                                                        resolvedQid,
+                                                      ),
+                                                    );
+                                                    onClose();
+                                                  }}
+                                                >
+                                                  View Lineage
+                                                </button>
+                                              </li>
+                                            </ul>
+                                          </div>
+                                        ) : (
+                                          <span>Unknown source</span>
+                                        )}
+                                      </div>
+                                      {relativeTime && (
+                                        <span
+                                          className={`text-xs ${freshness.className}`}
+                                        >
+                                          {relativeTime}
+                                        </span>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          },
+                        )}
+                      </div>
+
+                      {/* Lineage Graph Button */}
+                      <div className="mt-4 text-center">
+                        <button
+                          className="btn btn-ghost btn-sm gap-2 hover:btn-primary"
+                          onClick={() => {
+                            const outputs =
+                              (task as any)?.output_parameters &&
+                              typeof (task as any).output_parameters ===
+                                "object"
+                                ? Object.entries(
+                                    (task as any).output_parameters,
+                                  )
+                                : [];
+                            const inputs =
+                              (task as any)?.input_parameters &&
+                              typeof (task as any).input_parameters === "object"
+                                ? Object.entries((task as any).input_parameters)
+                                : [];
+
+                            const [key, paramValue] =
+                              (outputs[0] as any) ?? (inputs[0] as any) ?? [];
+
+                            if (key && paramValue) {
+                              const parameterName =
+                                (paramValue as any)?.parameter_name || key;
+                              const resolvedQid = resolveQid(
+                                qid,
+                                (paramValue as any)?.qid_role,
+                              );
+                              router.push(
+                                buildProvenanceUrl(parameterName, resolvedQid),
+                              );
+                            } else {
+                              router.push("/provenance");
+                            }
+                            onClose();
+                          }}
+                        >
+                          <GitBranch size={16} />
+                          Explore Provenance
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
 
                 {/* Message */}
                 {task.message && (
