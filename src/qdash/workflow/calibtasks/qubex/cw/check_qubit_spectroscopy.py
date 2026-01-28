@@ -183,10 +183,14 @@ class CheckQubitSpectroscopy(QubexTask):
         exp = self.get_experiment(backend)
         label = self.get_qubit_label(backend, qid)
 
+        readout_freq_param = self.input_parameters["readout_frequency"]
+        if readout_freq_param is None:
+            raise ValueError("readout_frequency input parameter is required")
+
         result = exp.qubit_spectroscopy(
             label,
             readout_amplitude=0.01,
-            readout_frequency=self.input_parameters["readout_frequency"].value,
+            readout_frequency=readout_freq_param.value,
         )
 
         self.save_calibration(backend)

@@ -143,13 +143,13 @@ class QubitResponse:
     @functools.cached_property
     def zs_labeled(self) -> npt.NDArray[np.int32]:
         """Get the labeled and binarized data."""
-        _zs = self.standardize(self.zs)
-        _zs = self.binarize(
-            _zs,
+        zs_standardized = self.standardize(self.zs)
+        zs_binarized = self.binarize(
+            zs_standardized,
             self.config.binarize_threshold_sigma_plus,
             self.config.binarize_threshold_sigma_minus,
         )
-        return self.remove_noise(_zs)
+        return self.remove_noise(zs_binarized)
 
     @functools.cached_property
     def f01(self) -> F01Result | None:
@@ -170,15 +170,14 @@ class QubitResponse:
         frequency = cast(float, self.xs[idx_x])
         label = cast(int, self.zs_labeled[idx_y, idx_x])
         moment = self.compute_moment(self.zs, self.zs_labeled, self.levers, self.y_diffs, label)
-        quality_level = np.searchsorted(self.config.f01_moment_thresholds, moment, side="left")
-        quality_level = int(quality_level)
+        quality_level_idx = np.searchsorted(self.config.f01_moment_thresholds, moment, side="left")
         return F01Result(
             idx_x=int(idx_x),
             idx_y=idx_y,
             frequency=frequency,
             label=label,
             moment=moment,
-            quality_level=quality_level,
+            quality_level=int(quality_level_idx),
         )
 
     @functools.cached_property
@@ -219,10 +218,10 @@ class QubitResponse:
         _peaks: list[Peak] = []
         x_start: int | None = None
 
-        heights = zip(self.heights, self.heights_db, strict=False)
-        heights = itertools.chain([(0, 0.0)], heights, [(0, 0.0)])
+        heights_zipped = zip(self.heights, self.heights_db, strict=False)
+        heights_chained = itertools.chain([(0, 0.0)], heights_zipped, [(0, 0.0)])
         for x, ((height_prev, height_db_prev), (height, _)) in enumerate(
-            itertools.pairwise(heights)
+            itertools.pairwise(heights_chained)
         ):
             if height > height_prev:
                 x_start = x
@@ -248,7 +247,8 @@ class QubitResponse:
         first = np.argmax(m, axis=0)
         all_false = ~m.any(axis=0)
         first[all_false] = self.zs_labeled.shape[0]
-        return self.zs_labeled.shape[0] - first
+        result: npt.NDArray[np.int64] = self.zs_labeled.shape[0] - first
+        return result
 
     @functools.cached_property
     def heights_db(self) -> npt.NDArray[np.float64]:
@@ -310,7 +310,8 @@ class QubitResponse:
         std = zs.std()
         if std < 1e-12:
             raise ValueError("degenerate std")
-        return (zs - zs.mean()) / std
+        result: npt.NDArray[np.float64] = (zs - zs.mean()) / std
+        return result
 
     @staticmethod
     def binarize(

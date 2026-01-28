@@ -123,7 +123,8 @@ def _format_exception_details(e: Exception) -> str:
     For ExceptionGroup (from asyncio.TaskGroup), this extracts and formats
     all sub-exceptions with their tracebacks for better debugging.
     """
-    if isinstance(e, ExceptionGroup):
+    # Check for ExceptionGroup (Python 3.11+) or exceptiongroup backport
+    if hasattr(e, "exceptions"):
         parts = [f"{e}"]
         for i, sub_exc in enumerate(e.exceptions, 1):
             tb_str = "".join(
