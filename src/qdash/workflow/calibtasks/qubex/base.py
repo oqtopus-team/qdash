@@ -257,11 +257,15 @@ class QubexTask(BaseTask):
     ) -> Generator[None, None, None]:
         """Context manager to apply multiple parameter overrides.
 
-        This unified method handles all parameter types that can be overridden:
+        This unified method handles parameter types that can be overridden:
         - qubit_frequency: Uses exp.modified_frequencies() context manager
         - readout_amplitude: Direct modification with restoration
         - control_amplitude: Direct modification with restoration
-        - readout_frequency: Direct modification with restoration
+
+        Note: readout_frequency is NOT handled here. Tasks that need to override
+        readout_frequency should pass it as a method argument (e.g.,
+        exp.qubit_spectroscopy(readout_frequency=...)) because resonator.frequency
+        is a read-only property in qubex.
 
         All modified parameters are automatically restored when exiting the context,
         even if an exception occurs.
@@ -329,16 +333,10 @@ class QubexTask(BaseTask):
                     original_values["control_amplitude"] = exp.params.control_amplitude[label]
                     exp.params.control_amplitude[label] = override_value
 
-            # Check and apply readout_frequency override
-            if "readout_frequency" in self.input_parameters:
-                resonator_label = exp.get_resonator_label(int(qid))
-                resonator = exp.experiment_system.quantum_system.get_resonator(resonator_label)
-                override_value = self._get_calibration_value("readout_frequency")
-                default_value = resonator.frequency
-                # Only override if different from default
-                if abs(override_value - default_value) > 1e-9:
-                    original_values["readout_frequency"] = resonator.frequency
-                    resonator.frequency = override_value
+            # Note: readout_frequency override is NOT handled here.
+            # Tasks that need to override readout_frequency should pass it as
+            # a method argument (e.g., exp.qubit_spectroscopy(readout_frequency=...))
+            # because resonator.frequency is a read-only property in qubex.
 
             # Check qubit_frequency override (handled specially via modified_frequencies)
             if self._is_frequency_overridden(backend, qid):
@@ -357,10 +355,6 @@ class QubexTask(BaseTask):
                 exp.params.readout_amplitude[label] = original_values["readout_amplitude"]
             if "control_amplitude" in original_values:
                 exp.params.control_amplitude[label] = original_values["control_amplitude"]
-            if "readout_frequency" in original_values:
-                resonator_label = exp.get_resonator_label(int(qid))
-                resonator = exp.experiment_system.quantum_system.get_resonator(resonator_label)
-                resonator.frequency = original_values["readout_frequency"]
 
     @contextmanager
     def _apply_frequency_override(

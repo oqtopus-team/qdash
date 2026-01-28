@@ -1,10 +1,11 @@
-"""MUX-level bring-up calibration steps.
+"""Bring-up calibration steps.
 
-This module defines steps for MUX-level bring-up calibration:
-- BringUp: Initial MUX characterization (resonator spectroscopy, etc.)
+This module defines steps for initial qubit characterization:
+- BringUp: Resonator and qubit spectroscopy for frequency estimation
 
-MUX-level tasks are executed only once per MUX, for the representative
-qubit (qid % 4 == 0). Other qubits in the MUX are automatically skipped.
+Tasks include:
+- MUX-level tasks: Executed once per MUX for representative qubit (qid % 4 == 0)
+- Qubit-level tasks: Executed for each qubit individually
 """
 
 from __future__ import annotations
@@ -25,22 +26,28 @@ if TYPE_CHECKING:
 
 @dataclass
 class BringUp(CalibrationStep):
-    """MUX-level bring-up calibration step.
+    """Bring-up calibration step for initial qubit characterization.
 
-    Executes BRINGUP_TASKS: CheckResonatorSpectroscopy.
+    Executes BRINGUP_TASKS:
+    - CheckResonatorSpectroscopy (MUX-level): Estimates resonator_frequency
+    - CheckQubitSpectroscopy (Qubit-level): Estimates qubit_frequency, anharmonicity
 
-    These tasks are MUX-level tasks that run once per MUX. The scheduler
-    automatically executes them only for the representative qubit (qid % 4 == 0)
-    of each MUX.
+    MUX-level tasks run once per MUX for the representative qubit (qid % 4 == 0).
+    Qubit-level tasks run for each qubit individually.
 
     Provides: bringup
+
+    Metrics extracted:
+    - estimated_resonator_frequency (GHz): From resonator spectroscopy
+    - qubit_frequency (GHz): f01 transition frequency from qubit spectroscopy
+    - anharmonicity (GHz): alpha = f12 - f01 (typically negative for transmon)
 
     Example:
         # Basic usage
         BringUp()
 
         # With custom tasks
-        BringUp(tasks=["CheckResonatorSpectroscopy"])
+        BringUp(tasks=["CheckResonatorSpectroscopy", "CheckQubitSpectroscopy"])
     """
 
     mode: str = "scheduled"
@@ -170,7 +177,8 @@ class BringUp(CalibrationStep):
 
     def _extract_metrics(self, raw: dict[str, Any]) -> dict[str, float]:
         """Extract metrics from raw result."""
-        metrics = {}
+        metrics: dict[str, float] = {}
+
         # Resonator frequency from CheckResonatorSpectroscopy
         reso_result = raw.get("CheckResonatorSpectroscopy", {})
         if reso_result and not reso_result.get("skipped", False):
@@ -179,4 +187,24 @@ class BringUp(CalibrationStep):
                 metrics["estimated_resonator_frequency"] = (
                     freq_param.value if hasattr(freq_param, "value") else freq_param
                 )
+
+        # Qubit frequency and anharmonicity from CheckQubitSpectroscopy
+        qubit_result = raw.get("CheckQubitSpectroscopy", {})
+        if qubit_result and not qubit_result.get("skipped", False):
+            # Qubit frequency (f01)
+            qubit_freq_param = qubit_result.get("qubit_frequency")
+            if qubit_freq_param is not None:
+                metrics["qubit_frequency"] = (
+                    qubit_freq_param.value
+                    if hasattr(qubit_freq_param, "value")
+                    else qubit_freq_param
+                )
+
+            # Anharmonicity (α = f12 - f01)
+            anharm_param = qubit_result.get("anharmonicity")
+            if anharm_param is not None:
+                value = anharm_param.value if hasattr(anharm_param, "value") else anharm_param
+                if value is not None:
+                    metrics["anharmonicity"] = value
+
         return metrics
