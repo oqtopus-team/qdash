@@ -416,9 +416,9 @@ export function InboxPageContent() {
               </div>
 
               <div className="flex flex-wrap items-center gap-2 justify-end">
-                <div className="join">
+                <div className="join gap-1">
                   <select
-                    className="select select-sm select-bordered join-item"
+                    className="select select-sm select-bordered join-item w-24"
                     value={qidType}
                     onChange={(e) =>
                       setQidType(e.target.value as "all" | "qubit" | "coupling")
@@ -439,7 +439,7 @@ export function InboxPageContent() {
                     significant
                   </label>
                   <select
-                    className="select select-sm select-bordered join-item"
+                    className="select select-sm select-bordered join-item w-24"
                     value={minAbsDeltaPercent}
                     onChange={(e) =>
                       setMinAbsDeltaPercent(Number(e.target.value))
