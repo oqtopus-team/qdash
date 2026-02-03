@@ -1,6 +1,9 @@
 "use client";
 
 import React, { useLayoutEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
+
+import { GitBranch } from "lucide-react";
 
 import { RegionZoomToggle } from "@/components/ui/RegionZoomToggle";
 import { useGridLayout } from "@/hooks/useGridLayout";
@@ -625,13 +628,22 @@ export function CouplingMetricsGrid({
               </div>
 
               {/* Modal Footer */}
-              <div className="px-4 sm:px-6 py-3 sm:py-4 border-t border-base-300 flex justify-end gap-2">
-                <button
-                  onClick={() => setSelectedCouplingInfo(null)}
-                  className="btn btn-ghost btn-sm sm:btn-md"
+              <div className="px-4 sm:px-6 py-3 sm:py-4 border-t border-base-300 flex justify-between items-center">
+                <Link
+                  href={`/provenance?parameter=${encodeURIComponent(metricKey)}&qid=${encodeURIComponent(selectedCouplingInfo.couplingId)}&tab=lineage`}
+                  className="btn btn-ghost btn-sm sm:btn-md gap-1"
                 >
-                  Close
-                </button>
+                  <GitBranch className="h-4 w-4" />
+                  <span className="hidden sm:inline">Lineage</span>
+                </Link>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setSelectedCouplingInfo(null)}
+                    className="btn btn-ghost btn-sm sm:btn-md"
+                  >
+                    Close
+                  </button>
+                </div>
               </div>
             </>
           )}
