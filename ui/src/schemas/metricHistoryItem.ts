@@ -8,6 +8,9 @@
 import type { MetricHistoryItemValue } from "./metricHistoryItemValue";
 import type { MetricHistoryItemTaskId } from "./metricHistoryItemTaskId";
 import type { MetricHistoryItemCalibratedAt } from "./metricHistoryItemCalibratedAt";
+import type { MetricHistoryItemName } from "./metricHistoryItemName";
+import type { MetricHistoryItemInputParameters } from "./metricHistoryItemInputParameters";
+import type { MetricHistoryItemOutputParameters } from "./metricHistoryItemOutputParameters";
 
 /**
  * Single historical metric data point.
@@ -18,4 +21,7 @@ export interface MetricHistoryItem {
   task_id?: MetricHistoryItemTaskId;
   timestamp: string;
   calibrated_at?: MetricHistoryItemCalibratedAt;
+  name?: MetricHistoryItemName;
+  input_parameters?: MetricHistoryItemInputParameters;
+  output_parameters?: MetricHistoryItemOutputParameters;
 }

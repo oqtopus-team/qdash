@@ -509,6 +509,9 @@ async def get_qubit_metric_history(
                 task_id=metric_task_id or task_doc.task_id,
                 timestamp=_get_task_timestamp(task_doc),
                 calibrated_at=calibrated_at,
+                name=task_doc.name,
+                input_parameters=task_doc.input_parameters or None,
+                output_parameters=task_doc.output_parameters or None,
             )
         )
 
@@ -606,6 +609,9 @@ async def get_coupling_metric_history(
                 task_id=metric_task_id or task_doc.task_id,
                 timestamp=_get_task_timestamp(task_doc),
                 calibrated_at=calibrated_at,
+                name=task_doc.name,
+                input_parameters=task_doc.input_parameters or None,
+                output_parameters=task_doc.output_parameters or None,
             )
         )
 

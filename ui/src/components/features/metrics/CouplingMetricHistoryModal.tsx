@@ -12,6 +12,67 @@ interface MetricHistoryItem {
   task_id: string | null;
   timestamp: string;
   calibrated_at: string | null;
+  name: string | null;
+  input_parameters: Record<string, unknown> | null;
+  output_parameters: Record<string, unknown> | null;
+}
+
+/** Render a collapsible parameters table (matching ExecutionClient pattern). */
+function ParametersTable({
+  title,
+  parameters,
+}: {
+  title: string;
+  parameters: Record<string, unknown>;
+}) {
+  const entries = Object.entries(parameters);
+  if (entries.length === 0) return null;
+
+  return (
+    <div className="collapse collapse-arrow border border-base-300 bg-base-100">
+      <input type="checkbox" />
+      <div className="collapse-title text-sm font-semibold min-h-0 py-2">
+        {title}
+        <span className="badge badge-xs badge-ghost ml-2">
+          {entries.length}
+        </span>
+      </div>
+      <div className="collapse-content">
+        <div className="overflow-x-auto">
+          <table className="table table-zebra table-sm">
+            <thead>
+              <tr>
+                <th>Parameter</th>
+                <th>Value</th>
+                <th>Unit</th>
+              </tr>
+            </thead>
+            <tbody>
+              {entries.map(([key, val]) => {
+                const paramValue =
+                  typeof val === "object" && val !== null && "value" in val
+                    ? (val as Record<string, unknown>)
+                    : { value: val };
+                return (
+                  <tr key={key}>
+                    <td className="font-medium">{key}</td>
+                    <td className="font-mono">
+                      {typeof paramValue.value === "number"
+                        ? paramValue.value.toFixed(6)
+                        : typeof paramValue.value === "object"
+                          ? JSON.stringify(paramValue.value)
+                          : String(paramValue.value ?? "N/A")}
+                    </td>
+                    <td>{(paramValue.unit as string) || "-"}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 interface CouplingMetricHistoryModalProps {
@@ -147,6 +208,12 @@ export function CouplingMetricHistoryModal({
 
         {/* Metadata - hidden on mobile */}
         <div className="hidden sm:block mt-3 text-xs text-base-content/60 space-y-1 bg-base-200 p-3 rounded-lg">
+          {selectedItem.name && (
+            <div className="flex items-center gap-2">
+              <span className="font-semibold">Task Name:</span>
+              <span className="font-mono">{selectedItem.name}</span>
+            </div>
+          )}
           <div className="flex items-center gap-2">
             <span className="font-semibold">Execution ID:</span>
             <span className="font-mono truncate">
@@ -169,6 +236,24 @@ export function CouplingMetricHistoryModal({
               <span>{formatDateTime(selectedItem.calibrated_at)}</span>
             </div>
           )}
+        </div>
+
+        {/* Input/Output Parameters - hidden on mobile */}
+        <div className="hidden sm:flex flex-col gap-2 mt-2">
+          {selectedItem.input_parameters &&
+            Object.keys(selectedItem.input_parameters).length > 0 && (
+              <ParametersTable
+                title="Input Parameters"
+                parameters={selectedItem.input_parameters}
+              />
+            )}
+          {selectedItem.output_parameters &&
+            Object.keys(selectedItem.output_parameters).length > 0 && (
+              <ParametersTable
+                title="Output Parameters"
+                parameters={selectedItem.output_parameters}
+              />
+            )}
         </div>
       </div>
 
