@@ -32,6 +32,7 @@ Example:
 BRINGUP_TASKS: list[str] = [
     "CheckResonatorSpectroscopy",  # MUX-level: estimates resonator_frequency
     "CheckQubitSpectroscopy",  # Qubit-level: estimates qubit_frequency, anharmonicity
+    "ChevronPattern",  # Qubit-level: estimates readout_amplitude
 ]
 
 
