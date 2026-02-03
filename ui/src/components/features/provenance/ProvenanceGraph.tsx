@@ -607,7 +607,7 @@ export function ProvenanceGraph({
 
   if (apiNodes.length === 0) {
     return (
-      <div className="h-[500px] flex flex-col items-center justify-center text-base-content/50 bg-base-200 rounded-lg border border-base-300">
+      <div className="h-[calc(100vh-16rem)] min-h-[500px] flex flex-col items-center justify-center text-base-content/50 bg-base-200 rounded-lg border border-base-300">
         <div className="mb-4">
           <FluentEmoji name="empty" size={64} />
         </div>
@@ -622,7 +622,7 @@ export function ProvenanceGraph({
   const taskToShow = pinnedTask ?? hoveredTask;
 
   return (
-    <div className="h-[600px] bg-base-200 rounded-lg border border-base-300 overflow-hidden relative">
+    <div className="h-[calc(100vh-16rem)] min-h-[500px] bg-base-200 rounded-lg border border-base-300 overflow-hidden relative">
       <ReactFlow
         nodes={nodes}
         edges={edges}

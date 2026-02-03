@@ -54,6 +54,24 @@ class CreateZX90(QubexTask):
         "target_readout_length": ParameterModel(
             parameter_name="readout_length", qid_role="target", unit="ns"
         ),
+        # CR parameters (from CheckCrossResonance)
+        "cr_amplitude": ParameterModel(
+            parameter_name="cr_amplitude", qid_role="control", unit="a.u."
+        ),
+        "cr_phase": ParameterModel(parameter_name="cr_phase", qid_role="control", unit="a.u."),
+        "cancel_amplitude": ParameterModel(
+            parameter_name="cancel_amplitude", qid_role="target", unit="a.u."
+        ),
+        "cancel_phase": ParameterModel(
+            parameter_name="cancel_phase", qid_role="target", unit="a.u."
+        ),
+        "cancel_beta": ParameterModel(parameter_name="cancel_beta", qid_role="target", unit="a.u."),
+        "rotary_amplitude": ParameterModel(
+            parameter_name="rotary_amplitude", qid_role="control", unit="a.u."
+        ),
+        "zx_rotation_rate": ParameterModel(
+            parameter_name="zx_rotation_rate", qid_role="coupling", unit="a.u."
+        ),
     }
 
     # Output parameters with qid_role specifying where each is stored
