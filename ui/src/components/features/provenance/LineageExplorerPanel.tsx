@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 
 import {
   Circle,
@@ -8,6 +8,7 @@ import {
   ChevronRight,
   LayoutGrid,
   GitBranch as GraphIcon,
+  History,
 } from "lucide-react";
 
 import {
@@ -88,6 +89,36 @@ export function LineageExplorerPanel({
 
   const data = lineageResponse?.data;
 
+  // Derive parameter_name and qid from the current origin entity
+  const originEntity = useMemo(() => {
+    if (!data || !entityId) return null;
+    const node = data.nodes.find((n) => n.node_id === entityId);
+    if (node?.node_type === "entity" && node.entity) {
+      return {
+        parameterName: node.entity.parameter_name,
+        qid: node.entity.qid,
+      };
+    }
+    return null;
+  }, [data, entityId]);
+
+  // Fetch version history for the current parameter to enable version switching
+  const canFetchVersions = !!(originEntity?.parameterName && originEntity?.qid);
+  const { data: versionHistoryResponse } = useGetParameterHistory(
+    {
+      parameter_name: originEntity?.parameterName || "",
+      qid: originEntity?.qid || "",
+      limit: 100,
+    },
+    { query: { enabled: canFetchVersions } },
+  );
+  const versions = versionHistoryResponse?.data?.versions ?? [];
+
+  const handleVersionChange = (newEntityId: string) => {
+    setEntityId(newEntityId);
+    onEntityChange?.(newEntityId);
+  };
+
   const getNodeIcon = (nodeType: string) => {
     if (nodeType === "activity") {
       return <Activity className="h-4 w-4 text-secondary" />;
@@ -132,14 +163,6 @@ export function LineageExplorerPanel({
     return "";
   };
 
-  const handleNodeClick = (nodeId: string, nodeType: string) => {
-    // Navigate to clicked entity
-    if (nodeType === "entity" && nodeId !== entityId) {
-      setEntityId(nodeId);
-      onEntityChange?.(nodeId);
-    }
-  };
-
   return (
     <div className="space-y-4 sm:space-y-6">
       {/* Loading */}
@@ -157,14 +180,35 @@ export function LineageExplorerPanel({
 
       {data && (
         <div className="space-y-4">
-          {/* View Mode Toggle */}
+          {/* View Mode Toggle & Version Selector */}
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-            <h3 className="text-base sm:text-lg font-medium">
-              Lineage Graph
-              <span className="badge badge-primary badge-sm sm:badge-md ml-2">
-                {data.nodes.length} nodes
-              </span>
-            </h3>
+            <div className="flex items-center gap-3 flex-wrap">
+              <h3 className="text-base sm:text-lg font-medium">
+                Lineage Graph
+                <span className="badge badge-primary badge-sm sm:badge-md ml-2">
+                  {data.nodes.length} nodes
+                </span>
+              </h3>
+              {versions.length > 1 && (
+                <div className="flex items-center gap-1.5">
+                  <History className="h-3.5 w-3.5 text-base-content/50" />
+                  <select
+                    className="select select-bordered select-xs sm:select-sm font-mono"
+                    value={entityId}
+                    onChange={(e) => handleVersionChange(e.target.value)}
+                  >
+                    {versions.map((v) => (
+                      <option key={v.entity_id} value={v.entity_id}>
+                        v{v.version}
+                        {v.valid_from
+                          ? ` — ${new Date(v.valid_from).toLocaleDateString()}`
+                          : ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
             <div className="join">
               <button
                 className={`btn btn-xs sm:btn-sm join-item ${viewMode === "graph" ? "btn-active" : ""}`}
@@ -189,7 +233,6 @@ export function LineageExplorerPanel({
               nodes={data.nodes}
               edges={data.edges}
               originId={entityId}
-              onNodeClick={handleNodeClick}
             />
           )}
 
@@ -214,14 +257,11 @@ export function LineageExplorerPanel({
                       data.nodes.map((node) => (
                         <div
                           key={node.node_id}
-                          className={`p-3 rounded-lg border cursor-pointer hover:bg-base-300/50 ${
+                          className={`p-3 rounded-lg border ${
                             node.node_type === "entity"
                               ? "border-primary/30 bg-primary/5"
                               : "border-secondary/30 bg-secondary/5"
                           }`}
-                          onClick={() =>
-                            handleNodeClick(node.node_id, node.node_type)
-                          }
                         >
                           <div className="flex items-start gap-2">
                             {getNodeIcon(node.node_type)}

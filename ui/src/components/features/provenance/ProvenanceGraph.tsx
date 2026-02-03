@@ -19,15 +19,14 @@ import {
 import "@xyflow/react/dist/style.css";
 import dagre from "dagre";
 
-import { TaskFigure } from "@/components/charts/TaskFigure";
 import { FluentEmoji } from "@/components/ui/FluentEmoji";
 import type { LineageNodeResponse, LineageEdgeResponse } from "@/schemas";
+import { TaskDetailPanel } from "./TaskDetailPanel";
 
 interface ProvenanceGraphProps {
   nodes: LineageNodeResponse[];
   edges: LineageEdgeResponse[];
   originId?: string;
-  onNodeClick?: (nodeId: string, nodeType: string) => void;
 }
 
 // Status-based styling following ExecutionDAG pattern
@@ -173,7 +172,7 @@ function ActivityNode({ data, selected }: NodeProps) {
       )}
       {typedData.taskId && (
         <div className="text-[10px] text-base-content/50 mt-1 truncate">
-          Click to pin preview
+          Click to view details
         </div>
       )}
       <Handle
@@ -419,16 +418,12 @@ export function ProvenanceGraph({
   nodes: apiNodes,
   edges: apiEdges,
   originId,
-  onNodeClick,
 }: ProvenanceGraphProps) {
-  const [hoveredTask, setHoveredTask] = useState<{
-    taskId: string;
-    qid: string;
-  } | null>(null);
   const [pinnedTask, setPinnedTask] = useState<{
     taskId: string;
     qid: string;
     taskName?: string;
+    nodeId: string;
   } | null>(null);
   const [showDerivedEdges, setShowDerivedEdges] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -519,8 +514,8 @@ export function ProvenanceGraph({
       const dimmed = hasSearch ? !matchNeighborhood.has(node.id) : false;
       const isPinned =
         node.type === "activity" &&
-        !!pinnedTask?.taskId &&
-        (node.data as any)?.taskId === pinnedTask.taskId;
+        !!pinnedTask?.nodeId &&
+        node.id === pinnedTask.nodeId;
       return {
         ...node,
         data: { ...(node.data as any), isMatch, dimmed, isPinned },
@@ -542,7 +537,7 @@ export function ProvenanceGraph({
     });
 
     return { nodes: withDecorations, edges: withEdgeDimming };
-  }, [baseNodes, baseEdges, matchingNodeIds, searchQuery, pinnedTask?.taskId]);
+  }, [baseNodes, baseEdges, matchingNodeIds, searchQuery, pinnedTask?.nodeId]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
@@ -556,42 +551,21 @@ export function ProvenanceGraph({
   const handleNodeClick = useCallback(
     (_: React.MouseEvent, node: Node) => {
       const apiNode = apiNodes.find((n) => n.node_id === node.id);
-      if (apiNode?.node_type === "activity" && (node.data as any)?.taskId) {
-        const taskId = (node.data as any).taskId as string;
+      if (apiNode?.node_type === "activity") {
+        const taskId = ((node.data as any)?.taskId as string) || "";
         const qid = ((node.data as any).qid as string) || "0";
         const taskName =
           typeof (node.data as any).label === "string"
             ? ((node.data as any).label as string)
             : undefined;
         setPinnedTask((prev) => {
-          if (prev?.taskId === taskId && prev?.qid === qid) return null;
-          return { taskId, qid, taskName };
-        });
-        return;
-      }
-
-      if (onNodeClick) {
-        onNodeClick(node.id, apiNode?.node_type || "entity");
-      }
-    },
-    [apiNodes, onNodeClick],
-  );
-
-  const handleNodeMouseEnter = useCallback(
-    (_: React.MouseEvent, node: Node) => {
-      if (node.type === "activity" && node.data.taskId) {
-        setHoveredTask({
-          taskId: node.data.taskId as string,
-          qid: (node.data.qid as string) || "0",
+          if (prev?.nodeId === node.id) return null;
+          return { taskId, qid, taskName, nodeId: node.id };
         });
       }
     },
-    [],
+    [apiNodes],
   );
-
-  const handleNodeMouseLeave = useCallback(() => {
-    setHoveredTask(null);
-  }, []);
 
   const visibleCounts = useMemo(() => {
     const entityCount = initialNodes.filter((n) => n.type === "entity").length;
@@ -619,200 +593,171 @@ export function ProvenanceGraph({
     );
   }
 
-  const taskToShow = pinnedTask ?? hoveredTask;
-
   return (
-    <div className="h-[calc(100vh-16rem)] min-h-[500px] bg-base-200 rounded-lg border border-base-300 overflow-hidden relative">
-      <ReactFlow
-        nodes={nodes}
-        edges={edges}
-        onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
-        onNodeClick={handleNodeClick}
-        onNodeMouseEnter={handleNodeMouseEnter}
-        onNodeMouseLeave={handleNodeMouseLeave}
-        nodeTypes={nodeTypes}
-        fitView
-        fitViewOptions={{ padding: 0.3 }}
-        minZoom={0.1}
-        maxZoom={2}
-        defaultEdgeOptions={{
-          type: "smoothstep",
-        }}
-        proOptions={{ hideAttribution: true }}
-      >
-        <Background
-          color="currentColor"
-          className="text-base-content/10"
-          gap={20}
-          size={1}
-        />
-        <Controls
-          className="!bg-base-100 !border-base-300 !rounded-lg !shadow"
-          showInteractive={false}
-        />
-        <MiniMap
-          nodeColor={(node) =>
-            node.type === "entity" ? "oklch(var(--p))" : "oklch(var(--s))"
-          }
-          maskColor="rgba(0,0,0,0.1)"
-          className="!bg-base-100/80 !border-base-300 !rounded-lg"
-          pannable
-          zoomable
-        />
-      </ReactFlow>
-
-      {/* Controls / Summary */}
-      <div className="absolute top-4 left-4 right-4 flex flex-col sm:flex-row gap-2 items-start sm:items-center z-20 pointer-events-none">
-        <div className="flex items-center gap-2 bg-base-100/90 border border-base-300 rounded-lg px-3 py-2 shadow-sm w-full sm:w-auto">
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Find parameter/task..."
-            className="input input-bordered input-sm w-full sm:w-56 pointer-events-auto"
+    <div className="h-[calc(100vh-16rem)] min-h-[500px] flex bg-base-200 rounded-lg border border-base-300 overflow-hidden">
+      {/* Graph canvas */}
+      <div className="flex-1 relative">
+        <ReactFlow
+          nodes={nodes}
+          edges={edges}
+          onNodesChange={onNodesChange}
+          onEdgesChange={onEdgesChange}
+          onNodeClick={handleNodeClick}
+          nodeTypes={nodeTypes}
+          fitView
+          fitViewOptions={{ padding: 0.3 }}
+          minZoom={0.1}
+          maxZoom={2}
+          defaultEdgeOptions={{
+            type: "smoothstep",
+          }}
+          proOptions={{ hideAttribution: true }}
+        >
+          <Background
+            color="currentColor"
+            className="text-base-content/10"
+            gap={20}
+            size={1}
           />
-          {searchQuery && (
-            <button
-              className="btn btn-ghost btn-sm pointer-events-auto"
-              onClick={() => setSearchQuery("")}
-            >
-              Clear
-            </button>
-          )}
-        </div>
-
-        <div className="flex items-center gap-2 bg-base-100/90 border border-base-300 rounded-lg px-3 py-2 shadow-sm w-full sm:w-auto">
-          <div className="text-xs text-base-content/60 whitespace-nowrap">
-            Focus
-          </div>
-          <input
-            type="range"
-            min={1}
-            max={Math.max(1, Math.min(10, maxDistance || 10))}
-            value={Math.min(
-              focusHops,
-              Math.max(1, Math.min(10, maxDistance || 10)),
-            )}
-            onChange={(e) => setFocusHops(Number(e.target.value))}
-            className="range range-xs range-primary w-28 pointer-events-auto"
-            disabled={effectiveShowAll}
+          <Controls
+            className="!bg-base-100 !border-base-300 !rounded-lg !shadow"
+            showInteractive={false}
           />
-          <div className="text-xs font-medium tabular-nums w-10 text-right">
-            {effectiveShowAll ? "All" : `${focusHops}h`}
-          </div>
-          <button
-            className={`btn btn-xs pointer-events-auto ${effectiveShowAll ? "btn-active" : ""}`}
-            onClick={() => setShowAll((v) => !v)}
-          >
-            All
-          </button>
-          <div className="flex items-center gap-2 ml-2">
+          <MiniMap
+            nodeColor={(node) =>
+              node.type === "entity" ? "oklch(var(--p))" : "oklch(var(--s))"
+            }
+            maskColor="rgba(0,0,0,0.1)"
+            className="!bg-base-100/80 !border-base-300 !rounded-lg"
+            pannable
+            zoomable
+          />
+        </ReactFlow>
+
+        {/* Controls / Summary */}
+        <div className="absolute top-4 left-4 right-4 flex flex-col sm:flex-row gap-2 items-start sm:items-center z-20 pointer-events-none">
+          <div className="flex items-center gap-2 bg-base-100/90 border border-base-300 rounded-lg px-3 py-2 shadow-sm w-full sm:w-auto">
             <input
-              type="checkbox"
-              className="checkbox checkbox-xs checkbox-primary pointer-events-auto"
-              checked={showDerivedEdges}
-              onChange={(e) => setShowDerivedEdges(e.target.checked)}
-              id="show-derived"
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Find parameter/task..."
+              className="input input-bordered input-sm w-full sm:w-56 pointer-events-auto"
             />
-            <label
-              htmlFor="show-derived"
-              className="text-xs text-base-content/60 cursor-pointer pointer-events-auto"
-            >
-              derived
-            </label>
+            {searchQuery && (
+              <button
+                className="btn btn-ghost btn-sm pointer-events-auto"
+                onClick={() => setSearchQuery("")}
+              >
+                Clear
+              </button>
+            )}
           </div>
-        </div>
 
-        <div className="flex items-center gap-2 bg-base-100/90 border border-base-300 rounded-lg px-3 py-2 shadow-sm ml-0 sm:ml-auto w-full sm:w-auto">
-          <span className="badge badge-primary badge-sm">
-            {initialNodes.length}/{apiNodes.length} shown
-          </span>
-          <span className="badge badge-ghost badge-sm">
-            params {visibleCounts.entityCount}
-          </span>
-          <span className="badge badge-ghost badge-sm">
-            tasks {visibleCounts.taskCount}
-          </span>
-          {visibleCounts.failedTasks > 0 && (
-            <span className="badge badge-error badge-sm">
-              failed {visibleCounts.failedTasks}
-            </span>
-          )}
-          {visibleCounts.lowConfidenceParams > 0 && (
-            <span className="badge badge-warning badge-sm">
-              uncertain {visibleCounts.lowConfidenceParams}
-            </span>
-          )}
-        </div>
-      </div>
-
-      {/* Task Result Preview Panel */}
-      {taskToShow && (
-        <div className="absolute top-20 right-4 w-80 bg-base-100 rounded-lg shadow-xl border border-base-300 overflow-hidden z-10">
-          <div className="bg-secondary/10 px-4 py-2 border-b border-base-300">
-            <div className="flex items-center justify-between gap-2">
-              <div className="min-w-0">
-                <div className="text-sm font-medium truncate">
-                  {pinnedTask ? "Pinned Task Preview" : "Task Result Preview"}
-                </div>
-                {pinnedTask?.taskName && (
-                  <div className="text-xs text-base-content/60 truncate">
-                    {pinnedTask.taskName}
-                  </div>
-                )}
-              </div>
-              {pinnedTask && (
-                <button
-                  className="btn btn-ghost btn-xs"
-                  onClick={() => setPinnedTask(null)}
-                >
-                  Close
-                </button>
+          <div className="flex items-center gap-2 bg-base-100/90 border border-base-300 rounded-lg px-3 py-2 shadow-sm w-full sm:w-auto">
+            <div className="text-xs text-base-content/60 whitespace-nowrap">
+              Focus
+            </div>
+            <input
+              type="range"
+              min={1}
+              max={Math.max(1, Math.min(10, maxDistance || 10))}
+              value={Math.min(
+                focusHops,
+                Math.max(1, Math.min(10, maxDistance || 10)),
               )}
-            </div>
-            <div className="text-xs text-base-content/60">
-              Qubit: {taskToShow.qid}
-            </div>
-          </div>
-          <div className="p-2 max-h-[300px] overflow-auto">
-            <TaskFigure
-              taskId={taskToShow.taskId}
-              qid={taskToShow.qid}
-              className="w-full h-auto rounded"
+              onChange={(e) => setFocusHops(Number(e.target.value))}
+              className="range range-xs range-primary w-28 pointer-events-auto"
+              disabled={effectiveShowAll}
             />
+            <div className="text-xs font-medium tabular-nums w-10 text-right">
+              {effectiveShowAll ? "All" : `${focusHops}h`}
+            </div>
+            <button
+              className={`btn btn-xs pointer-events-auto ${effectiveShowAll ? "btn-active" : ""}`}
+              onClick={() => setShowAll((v) => !v)}
+            >
+              All
+            </button>
+            <div className="flex items-center gap-2 ml-2">
+              <input
+                type="checkbox"
+                className="checkbox checkbox-xs checkbox-primary pointer-events-auto"
+                checked={showDerivedEdges}
+                onChange={(e) => setShowDerivedEdges(e.target.checked)}
+                id="show-derived"
+              />
+              <label
+                htmlFor="show-derived"
+                className="text-xs text-base-content/60 cursor-pointer pointer-events-auto"
+              >
+                derived
+              </label>
+            </div>
           </div>
-        </div>
-      )}
 
-      {/* Legend */}
-      <div className="absolute bottom-4 left-4 bg-base-100 p-3 rounded-lg shadow border border-base-300 text-xs">
-        <div className="font-medium mb-2">Legend</div>
-        <div className="flex gap-4">
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded bg-primary/20 border border-primary/50" />
-            <span className="text-base-content/70">Parameter</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded bg-secondary/20 border border-secondary/50" />
-            <span className="text-base-content/70">Task</span>
+          <div className="flex items-center gap-2 bg-base-100/90 border border-base-300 rounded-lg px-3 py-2 shadow-sm ml-0 sm:ml-auto w-full sm:w-auto">
+            <span className="badge badge-primary badge-sm">
+              {initialNodes.length}/{apiNodes.length} shown
+            </span>
+            <span className="badge badge-ghost badge-sm">
+              params {visibleCounts.entityCount}
+            </span>
+            <span className="badge badge-ghost badge-sm">
+              tasks {visibleCounts.taskCount}
+            </span>
+            {visibleCounts.failedTasks > 0 && (
+              <span className="badge badge-error badge-sm">
+                failed {visibleCounts.failedTasks}
+              </span>
+            )}
+            {visibleCounts.lowConfidenceParams > 0 && (
+              <span className="badge badge-warning badge-sm">
+                uncertain {visibleCounts.lowConfidenceParams}
+              </span>
+            )}
           </div>
         </div>
-        <div className="flex gap-4 mt-2 pt-2 border-t border-base-300">
-          <div className="flex items-center gap-1.5">
-            <div className="w-4 h-0.5 bg-green-500 rounded" />
-            <span className="text-base-content/60">generated</span>
+
+        {/* Legend */}
+        <div className="absolute bottom-4 left-4 bg-base-100 p-3 rounded-lg shadow border border-base-300 text-xs">
+          <div className="font-medium mb-2">Legend</div>
+          <div className="flex gap-4">
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded bg-primary/20 border border-primary/50" />
+              <span className="text-base-content/70">Parameter</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded bg-secondary/20 border border-secondary/50" />
+              <span className="text-base-content/70">Task</span>
+            </div>
           </div>
-          <div className="flex items-center gap-1.5">
-            <div className="w-4 h-0.5 bg-amber-500 rounded" />
-            <span className="text-base-content/60">used</span>
+          <div className="flex gap-4 mt-2 pt-2 border-t border-base-300">
+            <div className="flex items-center gap-1.5">
+              <div className="w-4 h-0.5 bg-green-500 rounded" />
+              <span className="text-base-content/60">generated</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-4 h-0.5 bg-amber-500 rounded" />
+              <span className="text-base-content/60">used</span>
+            </div>
           </div>
-        </div>
-        <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-base-300">
-          <div className="w-4 h-0.5 bg-blue-500 rounded" />
-          <span className="text-base-content/60">derived</span>
+          <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-base-300">
+            <div className="w-4 h-0.5 bg-blue-500 rounded" />
+            <span className="text-base-content/60">derived</span>
+          </div>
         </div>
       </div>
+
+      {/* Task Detail Panel */}
+      {pinnedTask && (
+        <TaskDetailPanel
+          activityNodeId={pinnedTask.nodeId}
+          nodes={apiNodes}
+          edges={apiEdges}
+          onClose={() => setPinnedTask(null)}
+        />
+      )}
     </div>
   );
 }
