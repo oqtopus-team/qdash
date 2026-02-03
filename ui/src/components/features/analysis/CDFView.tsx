@@ -583,7 +583,7 @@ export function CDFView() {
       annotations: primaryData.tableData
         ? [
             {
-              text: `Time range: ${timeRange === "1d" ? "Last 1 Day" : timeRange === "7d" ? "Last 7 Days" : "Last 30 Days"} | Mode: ${selectionMode === "latest" ? "Latest" : "Best"}<br>Sample size: ${primaryData.tableData.length} ${isCoupling ? "coupling pairs" : "qubits"}`,
+              text: `Time range: ${timeRange === "1d" ? "Last 1 Day" : timeRange === "7d" ? "Last 7 Days" : "Last 30 Days"} | Mode: ${selectionMode === "latest" ? "Latest" : selectionMode === "best" ? "Best" : "Average"}<br>Sample size: ${primaryData.tableData.length} ${isCoupling ? "coupling pairs" : "qubits"}`,
               showarrow: false,
               xref: "paper" as const,
               yref: "paper" as const,
@@ -813,6 +813,13 @@ export function CDFView() {
                   }
                 >
                   Best
+                </button>
+                <button
+                  className={`join-item btn btn-xs sm:btn-sm h-full ${selectionMode === "average" ? "btn-active" : ""}`}
+                  onClick={() => setSelectionMode("average")}
+                  title="Show average values"
+                >
+                  Average
                 </button>
               </div>
 

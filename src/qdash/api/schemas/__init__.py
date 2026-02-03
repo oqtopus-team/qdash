@@ -67,11 +67,9 @@ from qdash.api.schemas.flow import (
 )
 from qdash.api.schemas.metrics import (
     ChipMetricsResponse,
-    CouplingMetrics,
     MetricHistoryItem,
     MetricValue,
     QubitMetricHistoryResponse,
-    QubitMetrics,
 )
 from qdash.api.schemas.success import SuccessResponse
 from qdash.api.schemas.tag import ListTagResponse, Tag
@@ -148,11 +146,9 @@ __all__ = [
     "UpdateScheduleResponse",
     # metrics
     "ChipMetricsResponse",
-    "CouplingMetrics",
     "MetricHistoryItem",
     "MetricValue",
     "QubitMetricHistoryResponse",
-    "QubitMetrics",
     # success
     "SuccessResponse",
     # tag

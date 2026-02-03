@@ -25,7 +25,8 @@
       "mcp__serena__replace_content",
       "Bash(ruff check:*)",
       "Bash(python -m mypy:*)",
-      "Bash(python:*)"
+      "Bash(python:*)",
+      "mcp__serena__think_about_whether_you_are_done"
     ],
     "deny": []
   },

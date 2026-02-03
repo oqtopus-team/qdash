@@ -8,6 +8,7 @@
 import type { MetricValueValue } from "./metricValueValue";
 import type { MetricValueTaskId } from "./metricValueTaskId";
 import type { MetricValueExecutionId } from "./metricValueExecutionId";
+import type { MetricValueStddev } from "./metricValueStddev";
 
 /**
  * Single metric value with metadata.
@@ -16,4 +17,5 @@ export interface MetricValue {
   value?: MetricValueValue;
   task_id?: MetricValueTaskId;
   execution_id?: MetricValueExecutionId;
+  stddev?: MetricValueStddev;
 }

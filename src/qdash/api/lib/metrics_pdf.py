@@ -42,7 +42,7 @@ class MetricsPDFGenerator:
         self,
         metrics_response: ChipMetricsResponse,
         within_hours: int | None = None,
-        selection_mode: Literal["latest", "best"] = "latest",
+        selection_mode: Literal["latest", "best", "average"] = "latest",
         topology_id: str | None = None,
     ):
         """Initialize the PDF generator.
@@ -95,7 +95,7 @@ class MetricsPDFGenerator:
         qubit_metrics = self.metrics_response.qubit_metrics
         for metric_key, metric_meta in self.config.qubit_metrics.items():
             schema_key = self._map_config_to_schema_key(metric_key, "qubit")
-            metric_data = getattr(qubit_metrics, schema_key, None)
+            metric_data = qubit_metrics.get(schema_key)
             if metric_data:
                 self._draw_metric_page(
                     c,
@@ -113,7 +113,7 @@ class MetricsPDFGenerator:
         # Coupling metrics pages
         coupling_metrics = self.metrics_response.coupling_metrics
         for metric_key, metric_meta in self.config.coupling_metrics.items():
-            metric_data = getattr(coupling_metrics, metric_key, None)
+            metric_data = coupling_metrics.get(metric_key)
             if metric_data:
                 self._draw_metric_page(
                     c,
@@ -276,7 +276,7 @@ class MetricsPDFGenerator:
         qubit_metrics = self.metrics_response.qubit_metrics
         for metric_key, metric_meta in self.config.qubit_metrics.items():
             schema_key = self._map_config_to_schema_key(metric_key, "qubit")
-            metric_data = getattr(qubit_metrics, schema_key, None)
+            metric_data = qubit_metrics.get(schema_key)
             if metric_data:
                 stats = self._calculate_statistics(metric_data, metric_meta.scale, "qubit")
                 all_metrics.append(
@@ -291,7 +291,7 @@ class MetricsPDFGenerator:
         # Coupling metrics
         coupling_metrics = self.metrics_response.coupling_metrics
         for metric_key, metric_meta in self.config.coupling_metrics.items():
-            metric_data = getattr(coupling_metrics, metric_key, None)
+            metric_data = coupling_metrics.get(metric_key)
             if metric_data:
                 stats = self._calculate_statistics(metric_data, metric_meta.scale, "coupling")
                 all_metrics.append(
@@ -977,7 +977,7 @@ class MetricsPDFGenerator:
             if not metric_meta:
                 continue
             schema_key = self._map_config_to_schema_key(metric_key, metric_type)
-            metric_data = getattr(metrics_source, schema_key, None)
+            metric_data = metrics_source.get(schema_key)
             if metric_data:
                 for metric_value in metric_data.values():
                     if metric_value and metric_value.value is not None:
@@ -1106,7 +1106,7 @@ class MetricsPDFGenerator:
 
             # Map config key to schema key for qubit metrics
             schema_key = self._map_config_to_schema_key(metric_key, metric_type)
-            metric_data = getattr(metrics_source, schema_key, None)
+            metric_data = metrics_source.get(schema_key)
             if not metric_data:
                 continue
 
