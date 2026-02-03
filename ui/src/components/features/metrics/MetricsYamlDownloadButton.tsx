@@ -71,7 +71,7 @@ function buildYaml(
       lines.push(`  ${escapeYamlString(entityId)}:`);
       lines.push(`    value: ${value}`);
       lines.push(
-        `    stddev: ${stddev !== null && stddev !== undefined ? stddev : "null"}`,
+        `    stddev: ${stddev != null && isFinite(stddev) ? stddev : "null"}`,
       );
     }
   } else {
