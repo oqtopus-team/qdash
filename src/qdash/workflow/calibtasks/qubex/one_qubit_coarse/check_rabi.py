@@ -3,12 +3,17 @@ from typing import ClassVar
 from qdash.datamodel.task import ParameterModel, RunParameterModel
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
+    PreProcessResult,
     RunResult,
 )
 from qdash.workflow.calibtasks.qubex.base import QubexTask
 from qdash.workflow.engine.backend.qubex import QubexBackend
 from qubex.experiment.experiment_constants import CALIBRATION_SHOTS
 from qubex.measurement.measurement import DEFAULT_INTERVAL, DEFAULT_READOUT_DURATION
+
+DEFAULT_CONTROL_AMPLITUDE = 0.0125
+CONTROL_AMPLITUDE_MIN = 1e-4
+CONTROL_AMPLITUDE_MAX = 1.0
 
 
 class CheckRabi(QubexTask):
@@ -17,10 +22,10 @@ class CheckRabi(QubexTask):
     name: str = "CheckRabi"
     task_type: str = "qubit"
     input_parameters: ClassVar[dict[str, ParameterModel | None]] = {
-        "qubit_frequency": None,  # Load from DB
-        "control_amplitude": None,  # Load from DB
-        "readout_amplitude": None,  # Load from DB
-        "readout_frequency": None,  # Load from DB
+        "qubit_frequency": None,
+        "control_amplitude": None,
+        "readout_amplitude": None,
+        "readout_frequency": None,
         "readout_length": ParameterModel(
             value=DEFAULT_READOUT_DURATION, unit="ns", description="Readout pulse length"
         ),
@@ -54,7 +59,29 @@ class CheckRabi(QubexTask):
         "rabi_noise": ParameterModel(unit="a.u.", description="Rabi oscillation noise"),
         "rabi_distance": ParameterModel(unit="a.u.", description="Rabi distance"),
         "rabi_reference_phase": ParameterModel(unit="a.u.", description="Rabi reference phase"),
+        "control_amplitude": ParameterModel(unit="a.u.", description="Control pulse amplitude"),
     }
+
+    def preprocess(self, backend: QubexBackend, qid: str) -> PreProcessResult:
+        """Preprocess with control_amplitude validation."""
+        result = super().preprocess(backend, qid)
+        param = self.input_parameters.get("control_amplitude")
+        value = param.value if param is not None else None
+        if value is None or value <= CONTROL_AMPLITUDE_MIN or value >= CONTROL_AMPLITUDE_MAX:
+            print(
+                f"control_amplitude={value} is out of range "
+                f"({CONTROL_AMPLITUDE_MIN}, {CONTROL_AMPLITUDE_MAX}), "
+                f"using default={DEFAULT_CONTROL_AMPLITUDE}"
+            )
+            if param is None:
+                self.input_parameters["control_amplitude"] = ParameterModel(
+                    value=DEFAULT_CONTROL_AMPLITUDE,
+                    unit="a.u.",
+                    description="Control pulse amplitude (default)",
+                )
+            else:
+                param.value = DEFAULT_CONTROL_AMPLITUDE
+        return result
 
     def postprocess(
         self, backend: QubexBackend, execution_id: str, run_result: RunResult, qid: str
@@ -80,6 +107,12 @@ class CheckRabi(QubexTask):
         self.output_parameters["rabi_reference_phase"].value = result.rabi_params[
             label
         ].reference_phase
+        default_amp = self.input_parameters["control_amplitude"].value
+        rabi_frequency = self.output_parameters["rabi_frequency"].value
+        print("rabi frequency (MHz): ", self.output_parameters["rabi_frequency"].value)
+        print("default amplitude (a.u.): ", self.input_parameters["control_amplitude"].value)
+        ratio = (rabi_frequency / default_amp) / 1000
+        self.output_parameters["control_amplitude"].value = 0.0125 / ratio
         output_parameters = self.attach_execution_id(execution_id)
         figures = [result.data[label].fit()["fig"]]
         raw_data = [result.data[label].data]
@@ -93,13 +126,15 @@ class CheckRabi(QubexTask):
         label = self.get_qubit_label(backend, qid)
 
         # Apply frequency override if qubit_frequency was explicitly provided
-        with self._apply_frequency_override(backend, qid):
-            result = exp.obtain_rabi_params(
-                time_range=self.run_parameters["time_range"].get_value(),
-                shots=self.run_parameters["shots"].get_value(),
-                interval=self.run_parameters["interval"].get_value(),
-                targets=label,
-            )
+        # with self._apply_frequency_override(backend, qid):
+        result = exp.obtain_rabi_params(
+            amplitudes={label: self.input_parameters["control_amplitude"].value},
+            frequencies={label: self.input_parameters["qubit_frequency"].value},
+            time_range=self.run_parameters["time_range"].get_value(),
+            shots=self.run_parameters["shots"].get_value(),
+            interval=self.run_parameters["interval"].get_value(),
+            targets=label,
+        )
 
         self.save_calibration(backend)
         r2 = result.rabi_params[label].r2 if result.rabi_params else None
