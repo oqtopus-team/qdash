@@ -10,6 +10,7 @@ from qdash.workflow.calibtasks.base import (
     PreProcessResult,
     RunResult,
 )
+from qdash.workflow.engine.task.provenance_recorder import resolve_qid
 
 if TYPE_CHECKING:
     from qdash.workflow.engine.backend.qubex import QubexBackend
@@ -64,8 +65,15 @@ class QubexTask(BaseTask):
     def _load_parameters_from_db(self, backend: "QubexBackend", qid: str) -> None:
         """Load declared parameter values from QDash database.
 
-        This method fetches calibration data from QubitDocument or CouplingDocument
+        This method fetches calibration data from QubitDocument and/or CouplingDocument
         and populates the declared input_parameters with actual values.
+
+        For coupling tasks (qid like "0-1"), data is fetched from three sources:
+        - Control qubit's QubitDocument (for qid_role="control")
+        - Target qubit's QubitDocument (for qid_role="target")
+        - CouplingDocument (for qid_role="coupling", and as fallback)
+
+        For qubit tasks, data is fetched from a single QubitDocument.
 
         Behavior for each parameter:
         - If value is None: Create ParameterModel entirely from DB data
@@ -86,22 +94,83 @@ class QubexTask(BaseTask):
 
         # Fetch calibration data based on task type
         if "-" in qid:
-            # Coupling task
+            # Coupling task: fetch from all three sources
+            control_qid = resolve_qid(qid, "control")
+            target_qid = resolve_qid(qid, "target")
+
+            qubit_repo = MongoQubitCalibrationRepository()
             coupling_repo = MongoCouplingCalibrationRepository()
-            calib_data = coupling_repo.get_calibration_data(
+
+            control_data = qubit_repo.get_calibration_data(
+                project_id=project_id, chip_id=chip_id, qid=control_qid
+            )
+            target_data = qubit_repo.get_calibration_data(
+                project_id=project_id, chip_id=chip_id, qid=target_qid
+            )
+            coupling_data = coupling_repo.get_calibration_data(
                 project_id=project_id, chip_id=chip_id, qid=qid
             )
+
+            # Map qid_role to [primary_source, fallback_source]
+            role_data_sources: dict[str, list[dict[str, Any]]] = {
+                "control": [control_data, coupling_data],
+                "target": [target_data, coupling_data],
+                "coupling": [coupling_data],
+                "": [coupling_data],
+                "self": [coupling_data],
+            }
+
+            self._populate_parameters(role_data_sources)
         else:
-            # Qubit task
+            # Qubit task: single source
             qubit_repo = MongoQubitCalibrationRepository()
             calib_data = qubit_repo.get_calibration_data(
                 project_id=project_id, chip_id=chip_id, qid=qid
             )
 
-        # Populate declared parameters with values from DB
+            role_data_sources = {
+                "": [calib_data],
+                "self": [calib_data],
+            }
+
+            self._populate_parameters(role_data_sources)
+
+    def _populate_parameters(self, role_data_sources: dict[str, list[dict[str, Any]]]) -> None:
+        """Populate input_parameters from data sources based on qid_role.
+
+        For each declared parameter, determines the lookup key from parameter_name
+        (falling back to the dict key), then searches the data sources associated
+        with the parameter's qid_role in order.
+
+        Args:
+        ----
+            role_data_sources: Mapping of qid_role to list of data source dicts
+                to search (in priority order).
+
+        """
         for param_name, param in list(self.input_parameters.items()):
-            if param_name in calib_data:
-                db_value = calib_data[param_name]
+            # Determine the DB lookup key
+            if isinstance(param, ParameterModel) and param.parameter_name:
+                lookup_key = param.parameter_name
+            else:
+                lookup_key = param_name
+
+            # Determine the qid_role for source selection
+            qid_role = ""
+            if isinstance(param, ParameterModel):
+                qid_role = param.qid_role
+
+            # Get the ordered list of data sources for this role
+            sources = role_data_sources.get(qid_role, role_data_sources.get("", []))
+
+            # Search sources in order for the lookup key
+            db_value = None
+            for source in sources:
+                if lookup_key in source:
+                    db_value = source[lookup_key]
+                    break
+
+            if db_value is not None:
                 if isinstance(db_value, dict):
                     if param is None:
                         # Create ParameterModel entirely from DB
@@ -115,7 +184,7 @@ class QubexTask(BaseTask):
                         if "value" in db_value:
                             param.value = db_value["value"]
             elif param is None:
-                # Parameter not in DB and no fallback - leave as None or create empty
+                # Parameter not in any source and no fallback - create empty
                 self.input_parameters[param_name] = ParameterModel(
                     unit="",
                     description=f"Parameter {param_name} not found in DB",

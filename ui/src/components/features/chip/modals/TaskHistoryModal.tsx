@@ -1,6 +1,8 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import React, { useState, useRef, useLayoutEffect } from "react";
+import { GitBranch } from "lucide-react";
 
 import type { Task } from "@/schemas";
 
@@ -24,10 +26,17 @@ export function TaskHistoryModal({
   isOpen,
   onClose,
 }: TaskHistoryModalProps) {
+  const router = useRouter();
   const modalRef = useRef<HTMLDialogElement>(null);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [subIndex, setSubIndex] = useState(0);
   const [showParams, setShowParams] = useState(false);
+
+  const buildProvenanceUrl = (parameterName: string, qidValue: string) => {
+    const p = encodeURIComponent(parameterName);
+    const q = encodeURIComponent(qidValue);
+    return `/provenance?tab=lineage&parameter=${p}&qid=${q}`;
+  };
 
   // Use useLayoutEffect for immediate modal open/close (before paint)
   useLayoutEffect(() => {
@@ -474,6 +483,36 @@ export function TaskHistoryModal({
                         <p>{selectedTask.message}</p>
                       </div>
                     )}
+
+                    {/* Explore Provenance */}
+                    <div className="text-center">
+                      <button
+                        className="btn btn-ghost btn-xs gap-1 hover:btn-primary"
+                        onClick={() => {
+                          const outputs = selectedTask.output_parameters
+                            ? Object.entries(selectedTask.output_parameters)
+                            : [];
+                          const inputs = selectedTask.input_parameters
+                            ? Object.entries(selectedTask.input_parameters)
+                            : [];
+                          const [key, paramValue] =
+                            (outputs[0] as [string, any]) ??
+                            (inputs[0] as [string, any]) ??
+                            [];
+                          if (key && paramValue) {
+                            const parameterName =
+                              paramValue?.parameter_name || key;
+                            router.push(buildProvenanceUrl(parameterName, qid));
+                          } else {
+                            router.push("/provenance");
+                          }
+                          onClose();
+                        }}
+                      >
+                        <GitBranch size={14} />
+                        Explore Provenance
+                      </button>
+                    </div>
                   </div>
                 </>
               )}
