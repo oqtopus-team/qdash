@@ -13,7 +13,7 @@ export type GetChipMetricsParams = {
    */
   within_hours?: number | null;
   /**
-   * Selection mode: 'latest' for most recent, 'best' for optimal values
+   * Selection mode: 'latest' for most recent, 'best' for optimal, 'average' for mean values
    */
   selection_mode?: GetChipMetricsSelectionMode;
 };

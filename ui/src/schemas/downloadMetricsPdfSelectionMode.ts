@@ -13,4 +13,5 @@ export type DownloadMetricsPdfSelectionMode =
 export const DownloadMetricsPdfSelectionMode = {
   latest: "latest",
   best: "best",
+  average: "average",
 } as const;

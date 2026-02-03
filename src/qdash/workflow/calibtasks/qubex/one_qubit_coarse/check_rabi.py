@@ -60,6 +60,9 @@ class CheckRabi(QubexTask):
         "rabi_distance": ParameterModel(unit="a.u.", description="Rabi distance"),
         "rabi_reference_phase": ParameterModel(unit="a.u.", description="Rabi reference phase"),
         "control_amplitude": ParameterModel(unit="a.u.", description="Control pulse amplitude"),
+        "maximum_rabi_frequency": ParameterModel(
+            unit="MHz/a.u.", description="Maximum Rabi frequency per unit control amplitude"
+        ),
     }
 
     def preprocess(self, backend: QubexBackend, qid: str) -> PreProcessResult:
@@ -113,8 +116,10 @@ class CheckRabi(QubexTask):
         rabi_frequency = self.output_parameters["rabi_frequency"].value
         print("rabi frequency (MHz): ", self.output_parameters["rabi_frequency"].value)
         print("default amplitude (a.u.): ", control_amplitude_param.value)
-        ratio = (rabi_frequency / default_amp) / 1000
+        maximum_rabi_frequency = rabi_frequency / default_amp
+        ratio = maximum_rabi_frequency / 1000
         self.output_parameters["control_amplitude"].value = 0.0125 / ratio
+        self.output_parameters["maximum_rabi_frequency"].value = maximum_rabi_frequency
         output_parameters = self.attach_execution_id(execution_id)
         figures = [result.data[label].fit()["fig"]]
         raw_data = [result.data[label].data]

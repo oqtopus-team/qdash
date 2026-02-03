@@ -3,8 +3,8 @@
 # Backend Pydantic models define the actual fields, this file only provides UI metadata.
 
 qubit_metrics:
-  resonator_frequency:
-    title: Resonator Frequency
+  readout_frequency:
+    title: Readout Frequency
     unit: GHz
     scale: 1
     description: Resonance frequency of the readout resonator
@@ -14,7 +14,7 @@ qubit_metrics:
       value: 7.0
       range:
         min: 6.0
-        max: 8.0
+        max: 10.0
         step: 0.01
   qubit_frequency:
     title: Qubit Frequency
@@ -157,6 +157,14 @@ qubit_metrics:
       min: 0.001
       max: 0.1
       step: 0.001
+
+  maximum_rabi_frequency:
+    title: Maximum Rabi Frequency
+    unit: MHz/a.u.
+    scale: 1
+    description: Maximum Rabi frequency per unit control amplitude
+    evaluation:
+      mode: none
 
   hpi_amplitude:
     title: HPI Amplitude

@@ -5,6 +5,5 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { MetricValue } from "./metricValue";
 
-export type QubitMetricsX90GateFidelityAnyOf = { [key: string]: MetricValue };
+export type MetricValueStddev = number | null;

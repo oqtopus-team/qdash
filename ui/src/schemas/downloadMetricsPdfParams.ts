@@ -13,7 +13,7 @@ export type DownloadMetricsPdfParams = {
    */
   within_hours?: number | null;
   /**
-   * Selection mode: 'latest' or 'best'
+   * Selection mode: 'latest', 'best', or 'average'
    */
   selection_mode?: DownloadMetricsPdfSelectionMode;
 };

@@ -74,7 +74,7 @@ interface UseCDFUrlStateResult {
 }
 
 type TimeRange = "1d" | "7d" | "30d";
-type SelectionMode = "latest" | "best";
+type SelectionMode = "latest" | "best" | "average";
 
 interface UseHistogramUrlStateResult {
   selectedChip: string;

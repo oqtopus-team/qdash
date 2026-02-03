@@ -7,6 +7,6 @@
  */
 import type { MetricValue } from "./metricValue";
 
-export type CouplingMetricsBellStateFidelityAnyOf = {
-  [key: string]: MetricValue;
+export type ChipMetricsResponseQubitMetrics = {
+  [key: string]: { [key: string]: MetricValue };
 };

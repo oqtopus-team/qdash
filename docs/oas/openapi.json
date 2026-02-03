@@ -5478,14 +5478,15 @@
             "schema": {
               "enum": [
                 "latest",
-                "best"
+                "best",
+                "average"
               ],
               "type": "string",
-              "description": "Selection mode: 'latest' for most recent, 'best' for optimal values",
+              "description": "Selection mode: 'latest' for most recent, 'best' for optimal, 'average' for mean values",
               "default": "latest",
               "title": "Selection Mode"
             },
-            "description": "Selection mode: 'latest' for most recent, 'best' for optimal values"
+            "description": "Selection mode: 'latest' for most recent, 'best' for optimal, 'average' for mean values"
           },
           {
             "name": "X-Project-Id",
@@ -5822,14 +5823,15 @@
             "schema": {
               "enum": [
                 "latest",
-                "best"
+                "best",
+                "average"
               ],
               "type": "string",
-              "description": "Selection mode: 'latest' or 'best'",
+              "description": "Selection mode: 'latest', 'best', or 'average'",
               "default": "latest",
               "title": "Selection Mode"
             },
-            "description": "Selection mode: 'latest' or 'best'"
+            "description": "Selection mode: 'latest', 'best', or 'average'"
           },
           {
             "name": "X-Project-Id",
@@ -7239,10 +7241,24 @@
             "title": "Within Hours"
           },
           "qubit_metrics": {
-            "$ref": "#/components/schemas/QubitMetrics"
+            "additionalProperties": {
+              "additionalProperties": {
+                "$ref": "#/components/schemas/MetricValue"
+              },
+              "type": "object"
+            },
+            "type": "object",
+            "title": "Qubit Metrics"
           },
           "coupling_metrics": {
-            "$ref": "#/components/schemas/CouplingMetrics"
+            "additionalProperties": {
+              "additionalProperties": {
+                "$ref": "#/components/schemas/MetricValue"
+              },
+              "type": "object"
+            },
+            "type": "object",
+            "title": "Coupling Metrics"
           }
         },
         "type": "object",
@@ -7389,55 +7405,6 @@
         ],
         "title": "CouplingGateDuration",
         "description": "Gate duration of the coupling."
-      },
-      "CouplingMetrics": {
-        "properties": {
-          "zx90_gate_fidelity": {
-            "anyOf": [
-              {
-                "additionalProperties": {
-                  "$ref": "#/components/schemas/MetricValue"
-                },
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Zx90 Gate Fidelity"
-          },
-          "bell_state_fidelity": {
-            "anyOf": [
-              {
-                "additionalProperties": {
-                  "$ref": "#/components/schemas/MetricValue"
-                },
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Bell State Fidelity"
-          },
-          "static_zz_interaction": {
-            "anyOf": [
-              {
-                "additionalProperties": {
-                  "$ref": "#/components/schemas/MetricValue"
-                },
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Static Zz Interaction"
-          }
-        },
-        "type": "object",
-        "title": "CouplingMetrics",
-        "description": "Two-qubit coupling metrics data."
       },
       "CouplingResponse": {
         "properties": {
@@ -9104,6 +9071,17 @@
               }
             ],
             "title": "Execution Id"
+          },
+          "stddev": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stddev"
           }
         },
         "type": "object",
@@ -10333,125 +10311,6 @@
         ],
         "title": "QubitMetricHistoryResponse",
         "description": "Historical metric data for a single qubit."
-      },
-      "QubitMetrics": {
-        "properties": {
-          "qubit_frequency": {
-            "anyOf": [
-              {
-                "additionalProperties": {
-                  "$ref": "#/components/schemas/MetricValue"
-                },
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Qubit Frequency"
-          },
-          "anharmonicity": {
-            "anyOf": [
-              {
-                "additionalProperties": {
-                  "$ref": "#/components/schemas/MetricValue"
-                },
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Anharmonicity"
-          },
-          "t1": {
-            "anyOf": [
-              {
-                "additionalProperties": {
-                  "$ref": "#/components/schemas/MetricValue"
-                },
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "T1"
-          },
-          "t2_echo": {
-            "anyOf": [
-              {
-                "additionalProperties": {
-                  "$ref": "#/components/schemas/MetricValue"
-                },
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "T2 Echo"
-          },
-          "t2_star": {
-            "anyOf": [
-              {
-                "additionalProperties": {
-                  "$ref": "#/components/schemas/MetricValue"
-                },
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "T2 Star"
-          },
-          "average_readout_fidelity": {
-            "anyOf": [
-              {
-                "additionalProperties": {
-                  "$ref": "#/components/schemas/MetricValue"
-                },
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Average Readout Fidelity"
-          },
-          "x90_gate_fidelity": {
-            "anyOf": [
-              {
-                "additionalProperties": {
-                  "$ref": "#/components/schemas/MetricValue"
-                },
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "X90 Gate Fidelity"
-          },
-          "x180_gate_fidelity": {
-            "anyOf": [
-              {
-                "additionalProperties": {
-                  "$ref": "#/components/schemas/MetricValue"
-                },
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "X180 Gate Fidelity"
-          }
-        },
-        "type": "object",
-        "title": "QubitMetrics",
-        "description": "Single qubit metrics data."
       },
       "QubitResponse": {
         "properties": {

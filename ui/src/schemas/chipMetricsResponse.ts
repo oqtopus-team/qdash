@@ -6,8 +6,8 @@
  * OpenAPI spec version: 0.0.1
  */
 import type { ChipMetricsResponseWithinHours } from "./chipMetricsResponseWithinHours";
-import type { QubitMetrics } from "./qubitMetrics";
-import type { CouplingMetrics } from "./couplingMetrics";
+import type { ChipMetricsResponseQubitMetrics } from "./chipMetricsResponseQubitMetrics";
+import type { ChipMetricsResponseCouplingMetrics } from "./chipMetricsResponseCouplingMetrics";
 
 /**
  * Complete chip metrics response.
@@ -17,6 +17,6 @@ export interface ChipMetricsResponse {
   username: string;
   qubit_count: number;
   within_hours?: ChipMetricsResponseWithinHours;
-  qubit_metrics: QubitMetrics;
-  coupling_metrics: CouplingMetrics;
+  qubit_metrics: ChipMetricsResponseQubitMetrics;
+  coupling_metrics: ChipMetricsResponseCouplingMetrics;
 }

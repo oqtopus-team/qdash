@@ -13,4 +13,5 @@ export type GetChipMetricsSelectionMode =
 export const GetChipMetricsSelectionMode = {
   latest: "latest",
   best: "best",
+  average: "average",
 } as const;
