@@ -74,7 +74,9 @@ class ChevronPattern(QubexTask):
                 optimal_amp = float(x1 + (threshold - y1) * (x2 - x1) / (y2 - y1))
             else:
                 optimal_amp = float(amplitude_range[i])
-            self.input_parameters["readout_amplitude"].value = optimal_amp
+            readout_amp_param = self.input_parameters["readout_amplitude"]
+            assert readout_amp_param is not None
+            readout_amp_param.value = optimal_amp
             self.output_parameters["readout_amplitude"].value = optimal_amp
             print(f"readout_amplitude={optimal_amp:.6f} (from SNR sweep, threshold={threshold})")
         else:
@@ -97,13 +99,20 @@ class ChevronPattern(QubexTask):
         exp = self.get_experiment(backend)
         labels = [exp.get_qubit_label(int(qid))]
 
-        exp.params.readout_amplitude[labels[0]] = self.input_parameters["readout_amplitude"].value
+        readout_amplitude = self.input_parameters["readout_amplitude"]
+        readout_frequency = self.input_parameters["readout_frequency"]
+        qubit_frequency = self.input_parameters["qubit_frequency"]
+        assert readout_amplitude is not None
+        assert readout_frequency is not None
+        assert qubit_frequency is not None
+
+        exp.params.readout_amplitude[labels[0]] = readout_amplitude.value
         with exp.modified_frequencies(
-            {"R" + labels[0]: self.input_parameters["readout_frequency"].value}
+            {"R" + labels[0]: readout_frequency.value}
         ):
             result = exp.chevron_pattern(
                 amplitudes={labels[0]: self.run_parameters["control_amplitude"].value},
-                frequencies={labels[0]: self.input_parameters["qubit_frequency"].value},
+                frequencies={labels[0]: qubit_frequency.value},
                 targets=labels,
                 detuning_range=np.linspace(-0.05, 0.05, 51),
                 time_range=np.arange(0, 201, 4),

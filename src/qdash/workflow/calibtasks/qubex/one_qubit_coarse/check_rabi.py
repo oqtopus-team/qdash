@@ -107,10 +107,12 @@ class CheckRabi(QubexTask):
         self.output_parameters["rabi_reference_phase"].value = result.rabi_params[
             label
         ].reference_phase
-        default_amp = self.input_parameters["control_amplitude"].value
+        control_amplitude_param = self.input_parameters["control_amplitude"]
+        assert control_amplitude_param is not None
+        default_amp = control_amplitude_param.value
         rabi_frequency = self.output_parameters["rabi_frequency"].value
         print("rabi frequency (MHz): ", self.output_parameters["rabi_frequency"].value)
-        print("default amplitude (a.u.): ", self.input_parameters["control_amplitude"].value)
+        print("default amplitude (a.u.): ", control_amplitude_param.value)
         ratio = (rabi_frequency / default_amp) / 1000
         self.output_parameters["control_amplitude"].value = 0.0125 / ratio
         output_parameters = self.attach_execution_id(execution_id)
@@ -126,10 +128,14 @@ class CheckRabi(QubexTask):
         label = self.get_qubit_label(backend, qid)
 
         # Apply frequency override if qubit_frequency was explicitly provided
+        control_amplitude_param = self.input_parameters["control_amplitude"]
+        qubit_frequency_param = self.input_parameters["qubit_frequency"]
+        assert control_amplitude_param is not None
+        assert qubit_frequency_param is not None
         # with self._apply_frequency_override(backend, qid):
         result = exp.obtain_rabi_params(
-            amplitudes={label: self.input_parameters["control_amplitude"].value},
-            frequencies={label: self.input_parameters["qubit_frequency"].value},
+            amplitudes={label: control_amplitude_param.value},
+            frequencies={label: qubit_frequency_param.value},
             time_range=self.run_parameters["time_range"].get_value(),
             shots=self.run_parameters["shots"].get_value(),
             interval=self.run_parameters["interval"].get_value(),
