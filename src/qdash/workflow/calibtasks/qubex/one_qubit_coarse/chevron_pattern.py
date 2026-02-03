@@ -107,9 +107,7 @@ class ChevronPattern(QubexTask):
         assert qubit_frequency is not None
 
         exp.params.readout_amplitude[labels[0]] = readout_amplitude.value
-        with exp.modified_frequencies(
-            {"R" + labels[0]: readout_frequency.value}
-        ):
+        with exp.modified_frequencies({"R" + labels[0]: readout_frequency.value}):
             result = exp.chevron_pattern(
                 amplitudes={labels[0]: self.run_parameters["control_amplitude"].value},
                 frequencies={labels[0]: qubit_frequency.value},
