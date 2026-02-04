@@ -967,7 +967,7 @@ class ProvenanceService:
             value=self._sanitize_value(metadata.get("value", 0)),
             value_type=str(metadata.get("value_type", "float") or "float"),
             unit=metadata.get("unit", ""),
-            error=float(metadata.get("error", 0.0) or 0.0),
+            error=self._sanitize_error(metadata.get("error", 0.0)),
             version=metadata.get("version", 1),
             valid_from=now(),
             valid_until=None,

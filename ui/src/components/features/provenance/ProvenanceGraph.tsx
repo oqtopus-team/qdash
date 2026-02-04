@@ -133,6 +133,7 @@ function ActivityNode({ data, selected }: NodeProps) {
     isMatch?: boolean;
     dimmed?: boolean;
     isPinned?: boolean;
+    isTaskFlow?: boolean;
   };
   const styles = getNodeStyles(false, false);
 
@@ -145,9 +146,13 @@ function ActivityNode({ data, selected }: NodeProps) {
           ? "text-info"
           : "text-warning";
 
+  const sizeClass = typedData.isTaskFlow
+    ? "px-5 py-4 min-w-[240px] max-w-[280px]"
+    : "px-4 py-3 min-w-[160px] max-w-[200px]";
+
   return (
     <div
-      className={`px-4 py-3 shadow-lg rounded-lg border-2 min-w-[160px] max-w-[200px] cursor-pointer ${
+      className={`${sizeClass} shadow-lg rounded-lg border-2 cursor-pointer ${
         selected || typedData.isMatch ? "ring-2 ring-accent" : ""
       } ${typedData.isPinned ? "ring-2 ring-secondary" : ""}`}
       style={{
@@ -161,9 +166,20 @@ function ActivityNode({ data, selected }: NodeProps) {
         position={Position.Top}
         className="!bg-secondary !w-2 !h-2"
       />
-      <div className="flex items-center gap-2">
-        <div className="w-2 h-2 rounded-sm bg-secondary/60 flex-shrink-0" />
-        <div className="font-semibold text-sm truncate">{typedData.label}</div>
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="w-2 h-2 rounded-sm bg-secondary/60 flex-shrink-0" />
+          <div
+            className={`font-semibold truncate ${typedData.isTaskFlow ? "text-base" : "text-sm"}`}
+          >
+            {typedData.label}
+          </div>
+        </div>
+        {typedData.isTaskFlow && typedData.qid && (
+          <span className="badge badge-secondary badge-sm flex-shrink-0">
+            {typedData.qid}
+          </span>
+        )}
       </div>
       {typedData.status && (
         <div className={`text-xs ${statusClass} mt-1 capitalize`}>
@@ -194,8 +210,60 @@ const EDGE_COLORS = {
   wasGeneratedBy: "#22c55e", // green-500
   wasDerivedFrom: "#3b82f6", // blue-500
   used: "#f59e0b", // amber-500
+  taskFlow: "#d946ef", // fuchsia-500 (task dependency)
   default: "#64748b", // slate-500
 };
+
+type ViewDetail = "full" | "taskFlow";
+
+/**
+ * Collapse entity nodes, keeping only activity nodes with direct
+ * activity-to-activity edges inferred via shared entities.
+ */
+function collapseToTaskFlow(
+  apiNodes: LineageNodeResponse[],
+  apiEdges: LineageEdgeResponse[],
+): { nodes: LineageNodeResponse[]; edges: LineageEdgeResponse[] } {
+  // Keep only activity nodes
+  const activityNodes = apiNodes.filter((n) => n.node_type === "activity");
+
+  // Build maps: entity → generating activity, entity → consuming activities
+  const entityToGenerator = new Map<string, string>();
+  const entityToConsumers = new Map<string, string[]>();
+
+  for (const edge of apiEdges) {
+    if (edge.relation_type === "wasGeneratedBy") {
+      // source = entity, target = activity that generated it
+      entityToGenerator.set(edge.source_id, edge.target_id);
+    } else if (edge.relation_type === "used") {
+      // source = activity, target = entity it consumed
+      const consumers = entityToConsumers.get(edge.target_id) ?? [];
+      consumers.push(edge.source_id);
+      entityToConsumers.set(edge.target_id, consumers);
+    }
+  }
+
+  // For each entity, create edges from the generator activity to each consumer activity
+  const edgeSet = new Set<string>();
+  const directEdges: LineageEdgeResponse[] = [];
+
+  for (const [entityId, generatorId] of entityToGenerator) {
+    const consumers = entityToConsumers.get(entityId) ?? [];
+    for (const consumerId of consumers) {
+      if (generatorId === consumerId) continue;
+      const key = `${generatorId}->${consumerId}`;
+      if (edgeSet.has(key)) continue;
+      edgeSet.add(key);
+      directEdges.push({
+        source_id: consumerId,
+        target_id: generatorId,
+        relation_type: "taskFlow",
+      });
+    }
+  }
+
+  return { nodes: activityNodes, edges: directEdges };
+}
 
 function normalizeForSearch(value: unknown): string {
   return String(value ?? "")
@@ -285,22 +353,34 @@ function getLayoutedElements(
   nodes: Node[],
   edges: Edge[],
   direction: "TB" | "BT" | "LR" | "RL" = "TB",
+  opts?: {
+    nodeWidth?: number;
+    nodeHeight?: number;
+    nodesep?: number;
+    ranksep?: number;
+    ranker?: string;
+  },
 ): { nodes: Node[]; edges: Edge[] } {
+  const nodeWidth = opts?.nodeWidth ?? 180;
+  const nodeHeight = opts?.nodeHeight ?? 70;
+
   const dagreGraph = new dagre.graphlib.Graph();
   dagreGraph.setDefaultEdgeLabel(() => ({}));
 
   const isHorizontal = direction === "LR" || direction === "RL";
   dagreGraph.setGraph({
     rankdir: direction,
-    nodesep: 60,
-    ranksep: 80,
+    nodesep: opts?.nodesep ?? 60,
+    ranksep: opts?.ranksep ?? 80,
+    edgesep: opts?.nodesep ? Math.round(opts.nodesep / 2) : 20,
     marginx: 40,
     marginy: 40,
+    ...(opts?.ranker && { ranker: opts.ranker }),
   });
 
   // Add nodes to dagre
   nodes.forEach((node) => {
-    dagreGraph.setNode(node.id, { width: 180, height: 70 });
+    dagreGraph.setNode(node.id, { width: nodeWidth, height: nodeHeight });
   });
 
   // Add edges to dagre
@@ -317,8 +397,8 @@ function getLayoutedElements(
     return {
       ...node,
       position: {
-        x: dagreNode.x - 90,
-        y: dagreNode.y - 35,
+        x: dagreNode.x - nodeWidth / 2,
+        y: dagreNode.y - nodeHeight / 2,
       },
       targetPosition: isHorizontal ? Position.Left : Position.Top,
       sourcePosition: isHorizontal ? Position.Right : Position.Bottom,
@@ -333,6 +413,7 @@ function convertToFlowElements(
   apiNodes: LineageNodeResponse[],
   apiEdges: LineageEdgeResponse[],
   originId?: string,
+  isTaskFlow?: boolean,
 ): { nodes: Node[]; edges: Edge[] } {
   // Convert nodes
   const flowNodes: Node[] = apiNodes.map((node) => {
@@ -398,20 +479,36 @@ function convertToFlowElements(
       id: `edge-${index}`,
       source: edge.source_id,
       target: edge.target_id,
-      type: "smoothstep",
-      style: { stroke: strokeColor, strokeWidth: 2 },
+      type: isTaskFlow ? "default" : "smoothstep",
+      style: {
+        stroke: strokeColor,
+        strokeWidth: isTaskFlow ? 2.5 : 2,
+      },
       markerEnd: {
         type: MarkerType.ArrowClosed,
         color: strokeColor,
-        width: 16,
-        height: 16,
+        width: isTaskFlow ? 20 : 16,
+        height: isTaskFlow ? 20 : 16,
       },
       animated: edge.relation_type === "wasDerivedFrom",
     };
   });
 
   // Apply dagre layout
-  return getLayoutedElements(flowNodes, flowEdges, "TB");
+  return getLayoutedElements(
+    flowNodes,
+    flowEdges,
+    "TB",
+    isTaskFlow
+      ? {
+          nodeWidth: 260,
+          nodeHeight: 90,
+          nodesep: 100,
+          ranksep: 120,
+          ranker: "tight-tree",
+        }
+      : undefined,
+  );
 }
 
 export function ProvenanceGraph({
@@ -429,6 +526,7 @@ export function ProvenanceGraph({
   const [searchQuery, setSearchQuery] = useState("");
   const [focusHops, setFocusHops] = useState(4);
   const [showAll, setShowAll] = useState(false);
+  const [viewDetail, setViewDetail] = useState<ViewDetail>("full");
 
   // Filter out wasDerivedFrom edges when toggle is off
   const filteredApiEdges = useMemo(() => {
@@ -486,10 +584,20 @@ export function ProvenanceGraph({
     );
   }, [filteredApiEdges, constrainedNodeIds]);
 
+  // Apply Task Flow collapse when in taskFlow mode
+  const { nodes: flowApiNodes, edges: flowApiEdges } = useMemo(() => {
+    if (viewDetail === "taskFlow") {
+      return collapseToTaskFlow(constrainedApiNodes, constrainedApiEdges);
+    }
+    return { nodes: constrainedApiNodes, edges: constrainedApiEdges };
+  }, [viewDetail, constrainedApiNodes, constrainedApiEdges]);
+
+  const isTaskFlow = viewDetail === "taskFlow";
+
   const { nodes: baseNodes, edges: baseEdges } = useMemo(
     () =>
-      convertToFlowElements(constrainedApiNodes, constrainedApiEdges, originId),
-    [constrainedApiNodes, constrainedApiEdges, originId],
+      convertToFlowElements(flowApiNodes, flowApiEdges, originId, isTaskFlow),
+    [flowApiNodes, flowApiEdges, originId, isTaskFlow],
   );
 
   const { nodes: initialNodes, edges: initialEdges } = useMemo(() => {
@@ -518,7 +626,13 @@ export function ProvenanceGraph({
         node.id === pinnedTask.nodeId;
       return {
         ...node,
-        data: { ...(node.data as any), isMatch, dimmed, isPinned },
+        data: {
+          ...(node.data as any),
+          isMatch,
+          dimmed,
+          isPinned,
+          ...(node.type === "activity" && { isTaskFlow }),
+        },
       };
     });
 
@@ -537,7 +651,14 @@ export function ProvenanceGraph({
     });
 
     return { nodes: withDecorations, edges: withEdgeDimming };
-  }, [baseNodes, baseEdges, matchingNodeIds, searchQuery, pinnedTask?.nodeId]);
+  }, [
+    baseNodes,
+    baseEdges,
+    matchingNodeIds,
+    searchQuery,
+    pinnedTask?.nodeId,
+    isTaskFlow,
+  ]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
@@ -694,6 +815,20 @@ export function ProvenanceGraph({
                 derived
               </label>
             </div>
+            <div className="join ml-2">
+              <button
+                className={`btn btn-xs join-item pointer-events-auto ${viewDetail === "full" ? "btn-active" : ""}`}
+                onClick={() => setViewDetail("full")}
+              >
+                Detail
+              </button>
+              <button
+                className={`btn btn-xs join-item pointer-events-auto ${viewDetail === "taskFlow" ? "btn-active" : ""}`}
+                onClick={() => setViewDetail("taskFlow")}
+              >
+                Task Flow
+              </button>
+            </div>
           </div>
 
           <div className="flex items-center gap-2 bg-base-100/90 border border-base-300 rounded-lg px-3 py-2 shadow-sm ml-0 sm:ml-auto w-full sm:w-auto">
@@ -723,29 +858,40 @@ export function ProvenanceGraph({
         <div className="absolute bottom-4 left-4 bg-base-100 p-3 rounded-lg shadow border border-base-300 text-xs">
           <div className="font-medium mb-2">Legend</div>
           <div className="flex gap-4">
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded bg-primary/20 border border-primary/50" />
-              <span className="text-base-content/70">Parameter</span>
-            </div>
+            {viewDetail === "full" && (
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded bg-primary/20 border border-primary/50" />
+                <span className="text-base-content/70">Parameter</span>
+              </div>
+            )}
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 rounded bg-secondary/20 border border-secondary/50" />
               <span className="text-base-content/70">Task</span>
             </div>
           </div>
-          <div className="flex gap-4 mt-2 pt-2 border-t border-base-300">
-            <div className="flex items-center gap-1.5">
-              <div className="w-4 h-0.5 bg-green-500 rounded" />
-              <span className="text-base-content/60">generated</span>
+          {viewDetail === "full" ? (
+            <>
+              <div className="flex gap-4 mt-2 pt-2 border-t border-base-300">
+                <div className="flex items-center gap-1.5">
+                  <div className="w-4 h-0.5 bg-green-500 rounded" />
+                  <span className="text-base-content/60">generated</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-4 h-0.5 bg-amber-500 rounded" />
+                  <span className="text-base-content/60">used</span>
+                </div>
+              </div>
+              <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-base-300">
+                <div className="w-4 h-0.5 bg-blue-500 rounded" />
+                <span className="text-base-content/60">derived</span>
+              </div>
+            </>
+          ) : (
+            <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-base-300">
+              <div className="w-4 h-0.5 bg-fuchsia-500 rounded" />
+              <span className="text-base-content/60">task flow</span>
             </div>
-            <div className="flex items-center gap-1.5">
-              <div className="w-4 h-0.5 bg-amber-500 rounded" />
-              <span className="text-base-content/60">used</span>
-            </div>
-          </div>
-          <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-base-300">
-            <div className="w-4 h-0.5 bg-blue-500 rounded" />
-            <span className="text-base-content/60">derived</span>
-          </div>
+          )}
         </div>
       </div>
 

@@ -144,9 +144,9 @@ export function TaskDetailPanel({
         </div>
       </div>
 
-      {/* Result Figure (top, full width) */}
+      {/* Result Figure (top, scrollable) */}
       {hasFigure && (
-        <div className="flex-shrink-0 border-b border-base-300 p-2">
+        <div className="min-h-0 max-h-[50%] overflow-y-auto border-b border-base-300 p-2">
           <div className="rounded-lg border border-base-300 overflow-hidden">
             <TaskFigure
               taskId={activity!.task_id}

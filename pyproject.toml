@@ -205,4 +205,4 @@ dev = [
     "setuptools>=80.9.0",
 ]
 [tool.uv.sources]
-qubex = { git = "https://github.com/amachino/qubex.git", tag = "v1.4.6" }
+qubex = { git = "https://github.com/amachino/qubex.git", branch = "develop" }
