@@ -1,28 +1,29 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 
 import {
-  Search,
   Circle,
   Activity,
   ChevronRight,
   LayoutGrid,
   GitBranch as GraphIcon,
-  Clock,
+  History,
 } from "lucide-react";
 
 import {
   useGetProvenanceLineage,
-  useGetProvenanceStats,
   useGetParameterHistory,
 } from "@/client/provenance/provenance";
-import { useMetricsConfig } from "@/hooks/useMetricsConfig";
 
 import { ProvenanceGraph } from "./ProvenanceGraph";
 import { RecalibrationRecommendationsPanel } from "./RecalibrationRecommendationsPanel";
 
 type ViewMode = "graph" | "list";
+
+/** Maximum graph traversal depth for lineage queries.
+ *  Set high enough to capture full calibration chains (typically 10-15 hops). */
+const LINEAGE_MAX_DEPTH = 20;
 
 interface LineageExplorerPanelProps {
   initialEntityId?: string;
@@ -39,32 +40,6 @@ export function LineageExplorerPanel({
 }: LineageExplorerPanelProps) {
   const [entityId, setEntityId] = useState(initialEntityId);
   const [viewMode, setViewMode] = useState<ViewMode>("graph");
-  const [searchFilter, setSearchFilter] = useState("");
-
-  // Get metrics config for parameter filtering
-  const { allMetrics, isLoading: isLoadingConfig } = useMetricsConfig();
-  const validParameterNames = useMemo(
-    () => new Set(allMetrics.map((m) => m.key)),
-    [allMetrics],
-  );
-
-  // Get recent entities for quick selection (filtered by metrics config)
-  const { data: statsResponse, isLoading: isLoadingStats } =
-    useGetProvenanceStats();
-  const recentEntities = useMemo(() => {
-    // Wait for both stats and config to be loaded before showing entities
-    if (isLoadingConfig || isLoadingStats) return [];
-    const entities = statsResponse?.data?.recent_entities || [];
-    // Filter to only show parameters defined in metrics.yaml
-    // If config is loaded but empty, show nothing (not unfiltered)
-    if (validParameterNames.size === 0) return [];
-    return entities.filter((e) => validParameterNames.has(e.parameter_name));
-  }, [
-    statsResponse?.data?.recent_entities,
-    validParameterNames,
-    isLoadingConfig,
-    isLoadingStats,
-  ]);
 
   // Fetch parameter history when parameter and qid are provided via URL
   // This enables navigation from Metrics page with ?parameter=t1&qid=5&tab=lineage
@@ -104,47 +79,6 @@ export function LineageExplorerPanel({
     }
   }, [historyResponse, entityId, onEntityChange]);
 
-  // Fallback: Auto-select entity from recentEntities when parameter and qid provided
-  useEffect(() => {
-    if (
-      !entityId &&
-      initialParameter &&
-      initialQid &&
-      !shouldFetchHistory &&
-      recentEntities.length > 0
-    ) {
-      // Find matching entity from recent entities
-      const matchingEntity = recentEntities.find(
-        (e) => e.parameter_name === initialParameter && e.qid === initialQid,
-      );
-      if (matchingEntity) {
-        setEntityId(matchingEntity.entity_id);
-        onEntityChange?.(matchingEntity.entity_id);
-      }
-    }
-  }, [
-    entityId,
-    initialParameter,
-    initialQid,
-    shouldFetchHistory,
-    recentEntities,
-    onEntityChange,
-  ]);
-
-  // Filter recent entities based on search
-  const filteredEntities = useMemo(() => {
-    if (!searchFilter) return recentEntities.slice(0, 8);
-    const lower = searchFilter.toLowerCase();
-    return recentEntities
-      .filter(
-        (e) =>
-          e.parameter_name?.toLowerCase().includes(lower) ||
-          e.qid?.toLowerCase().includes(lower) ||
-          e.task_name?.toLowerCase().includes(lower),
-      )
-      .slice(0, 8);
-  }, [recentEntities, searchFilter]);
-
   // Use maximum depth (20) to capture full lineage
   // Auto-search when entityId is available
   const {
@@ -153,36 +87,40 @@ export function LineageExplorerPanel({
     error,
   } = useGetProvenanceLineage(
     entityId,
-    { max_depth: 20 },
+    { max_depth: LINEAGE_MAX_DEPTH },
     { query: { enabled: !!entityId } },
   );
 
   const data = lineageResponse?.data;
 
-  const handleQuickSelect = (selectedEntityId: string) => {
-    setEntityId(selectedEntityId);
-    setSearchFilter("");
-    onEntityChange?.(selectedEntityId);
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && entityId) {
-      onEntityChange?.(entityId);
+  // Derive parameter_name and qid from the current origin entity
+  const originEntity = useMemo(() => {
+    if (!data || !entityId) return null;
+    const node = data.nodes.find((n) => n.node_id === entityId);
+    if (node?.node_type === "entity" && node.entity) {
+      return {
+        parameterName: node.entity.parameter_name,
+        qid: node.entity.qid,
+      };
     }
-  };
+    return null;
+  }, [data, entityId]);
 
-  const formatRelativeTime = (dateString: string | null | undefined) => {
-    if (!dateString) return "";
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / (1000 * 60));
-    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  // Fetch version history for the current parameter to enable version switching
+  const canFetchVersions = !!(originEntity?.parameterName && originEntity?.qid);
+  const { data: versionHistoryResponse } = useGetParameterHistory(
+    {
+      parameter_name: originEntity?.parameterName || "",
+      qid: originEntity?.qid || "",
+      limit: 100,
+    },
+    { query: { enabled: canFetchVersions } },
+  );
+  const versions = versionHistoryResponse?.data?.versions ?? [];
 
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    return `${diffDays}d ago`;
+  const handleVersionChange = (newEntityId: string) => {
+    setEntityId(newEntityId);
+    onEntityChange?.(newEntityId);
   };
 
   const getNodeIcon = (nodeType: string) => {
@@ -229,110 +167,9 @@ export function LineageExplorerPanel({
     return "";
   };
 
-  const handleNodeClick = (nodeId: string, nodeType: string) => {
-    // Navigate to clicked entity
-    if (nodeType === "entity" && nodeId !== entityId) {
-      setEntityId(nodeId);
-      onEntityChange?.(nodeId);
-    }
-  };
-
   return (
     <div className="space-y-4 sm:space-y-6">
-      {/* Quick Select */}
-      <div className="card bg-base-200">
-        <div className="card-body p-4 sm:p-6">
-          <h3 className="card-title text-base sm:text-lg">
-            Select a Parameter to Explore
-          </h3>
-          <p className="text-sm text-base-content/70 mb-4">
-            Click a parameter to trace its origins (what tasks produced it and
-            what inputs were used).
-          </p>
-
-          {/* Quick Select Grid */}
-          {(isLoadingConfig || isLoadingStats) && (
-            <div className="flex items-center gap-2 py-4">
-              <span className="loading loading-spinner loading-sm"></span>
-              <span className="text-sm text-base-content/60">
-                Loading parameters...
-              </span>
-            </div>
-          )}
-          {!isLoadingConfig && !isLoadingStats && recentEntities.length > 0 && (
-            <div>
-              <div className="flex items-center gap-2 mb-3">
-                <Clock className="h-4 w-4 text-base-content/60" />
-                <span className="text-sm font-medium text-base-content/80">
-                  Recent Parameters
-                </span>
-                <input
-                  type="text"
-                  placeholder="Filter..."
-                  className="input input-bordered input-sm ml-auto w-32 sm:w-40"
-                  value={searchFilter}
-                  onChange={(e) => setSearchFilter(e.target.value)}
-                />
-              </div>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-                {filteredEntities.map((entity) => (
-                  <button
-                    key={entity.entity_id}
-                    className={`
-                      p-2 sm:p-3 rounded-lg text-left transition-colors
-                      border
-                      ${
-                        entityId === entity.entity_id
-                          ? "bg-primary/20 border-primary"
-                          : "bg-base-100 border-base-300 hover:border-primary/50 hover:bg-base-100/80"
-                      }
-                    `}
-                    onClick={() => handleQuickSelect(entity.entity_id)}
-                  >
-                    <div className="flex items-center gap-2 mb-1">
-                      <div className="w-2 h-2 rounded-full bg-primary/60 flex-shrink-0" />
-                      <span className="font-medium text-xs sm:text-sm truncate">
-                        {entity.parameter_name}
-                      </span>
-                    </div>
-                    <div className="text-[10px] sm:text-xs text-base-content/60 truncate">
-                      {entity.qid} • {formatRelativeTime(entity.valid_from)}
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Advanced: Manual Entity ID Input */}
-          <details className="collapse collapse-arrow bg-base-100 rounded-lg mt-4">
-            <summary className="collapse-title text-sm font-medium py-2 min-h-0">
-              Advanced: Enter Entity ID manually
-            </summary>
-            <div className="collapse-content pb-2">
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  placeholder="e.g., qubit_frequency:0:exec-001:task-001"
-                  className="input input-bordered input-sm flex-1 font-mono text-xs"
-                  value={entityId}
-                  onChange={(e) => setEntityId(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                />
-                <button
-                  className="btn btn-primary btn-sm"
-                  onClick={() => entityId && onEntityChange?.(entityId)}
-                  disabled={!entityId}
-                >
-                  <Search className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
-          </details>
-        </div>
-      </div>
-
-      {/* Results */}
+      {/* Loading */}
       {(isLoading || isHistoryLoading) && (
         <div className="flex justify-center py-12">
           <span className="loading loading-spinner loading-lg"></span>
@@ -347,14 +184,35 @@ export function LineageExplorerPanel({
 
       {data && (
         <div className="space-y-4">
-          {/* View Mode Toggle */}
+          {/* View Mode Toggle & Version Selector */}
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-            <h3 className="text-base sm:text-lg font-medium">
-              Lineage Graph
-              <span className="badge badge-primary badge-sm sm:badge-md ml-2">
-                {data.nodes.length} nodes
-              </span>
-            </h3>
+            <div className="flex items-center gap-3 flex-wrap">
+              <h3 className="text-base sm:text-lg font-medium">
+                Lineage Graph
+                <span className="badge badge-primary badge-sm sm:badge-md ml-2">
+                  {data.nodes.length} nodes
+                </span>
+              </h3>
+              {versions.length > 1 && (
+                <div className="flex items-center gap-1.5">
+                  <History className="h-3.5 w-3.5 text-base-content/50" />
+                  <select
+                    className="select select-bordered select-xs sm:select-sm font-mono"
+                    value={entityId}
+                    onChange={(e) => handleVersionChange(e.target.value)}
+                  >
+                    {versions.map((v) => (
+                      <option key={v.entity_id} value={v.entity_id}>
+                        v{v.version}
+                        {v.valid_from
+                          ? ` — ${new Date(v.valid_from).toLocaleDateString()}`
+                          : ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
             <div className="join">
               <button
                 className={`btn btn-xs sm:btn-sm join-item ${viewMode === "graph" ? "btn-active" : ""}`}
@@ -373,139 +231,113 @@ export function LineageExplorerPanel({
             </div>
           </div>
 
-          <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-            <div className="xl:col-span-2 space-y-4">
-              {/* Graph View */}
-              {viewMode === "graph" && (
-                <ProvenanceGraph
-                  nodes={data.nodes}
-                  edges={data.edges}
-                  originId={entityId}
-                  onNodeClick={handleNodeClick}
-                />
-              )}
+          {/* Graph View - full width for maximum visibility */}
+          {viewMode === "graph" && (
+            <ProvenanceGraph
+              nodes={data.nodes}
+              edges={data.edges}
+              originId={entityId}
+            />
+          )}
 
-              {/* List View */}
-              {viewMode === "list" && (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  {/* Nodes List */}
-                  <div className="card bg-base-200">
-                    <div className="card-body p-4 sm:p-6">
-                      <h3 className="card-title text-base sm:text-lg">
-                        Nodes
-                        <span className="badge badge-primary badge-sm ml-2">
-                          {data.nodes.length}
-                        </span>
-                      </h3>
-                      <div className="space-y-2 max-h-80 overflow-y-auto">
-                        {data.nodes.length === 0 ? (
-                          <div className="text-center py-8 text-base-content/50">
-                            No nodes found
-                          </div>
-                        ) : (
-                          data.nodes.map((node) => (
-                            <div
-                              key={node.node_id}
-                              className={`p-3 rounded-lg border cursor-pointer hover:bg-base-300/50 ${
+          {/* List View */}
+          {viewMode === "list" && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {/* Nodes List */}
+              <div className="card bg-base-200">
+                <div className="card-body p-4 sm:p-6">
+                  <h3 className="card-title text-base sm:text-lg">
+                    Nodes
+                    <span className="badge badge-primary badge-sm ml-2">
+                      {data.nodes.length}
+                    </span>
+                  </h3>
+                  <div className="space-y-2 max-h-80 overflow-y-auto">
+                    {data.nodes.length === 0 ? (
+                      <div className="text-center py-8 text-base-content/50">
+                        No nodes found
+                      </div>
+                    ) : (
+                      data.nodes.map((node) => (
+                        <div
+                          key={node.node_id}
+                          className={`p-3 rounded-lg border ${
+                            node.node_type === "entity"
+                              ? "border-primary/30 bg-primary/5"
+                              : "border-secondary/30 bg-secondary/5"
+                          }`}
+                        >
+                          <div className="flex items-start gap-2">
+                            {getNodeIcon(node.node_type)}
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium text-sm truncate">
+                                {formatNodeLabel(node)}
+                              </div>
+                              <div className="text-xs text-base-content/70">
+                                {formatNodeValue(node)}
+                              </div>
+                            </div>
+                            <span
+                              className={`badge badge-xs ${
                                 node.node_type === "entity"
-                                  ? "border-primary/30 bg-primary/5"
-                                  : "border-secondary/30 bg-secondary/5"
+                                  ? "badge-primary"
+                                  : "badge-secondary"
                               }`}
-                              onClick={() =>
-                                handleNodeClick(node.node_id, node.node_type)
-                              }
                             >
-                              <div className="flex items-start gap-2">
-                                {getNodeIcon(node.node_type)}
-                                <div className="flex-1 min-w-0">
-                                  <div className="font-medium text-sm truncate">
-                                    {formatNodeLabel(node)}
-                                  </div>
-                                  <div className="text-xs text-base-content/70">
-                                    {formatNodeValue(node)}
-                                  </div>
-                                </div>
-                                <span
-                                  className={`badge badge-xs ${
-                                    node.node_type === "entity"
-                                      ? "badge-primary"
-                                      : "badge-secondary"
-                                  }`}
-                                >
-                                  {node.node_type === "entity"
-                                    ? "param"
-                                    : "task"}
-                                </span>
-                              </div>
-                            </div>
-                          ))
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Edges List */}
-                  <div className="card bg-base-200">
-                    <div className="card-body p-4 sm:p-6">
-                      <h3 className="card-title text-base sm:text-lg">
-                        Relations
-                        <span className="badge badge-accent badge-sm ml-2">
-                          {data.edges.length}
-                        </span>
-                      </h3>
-                      <div className="space-y-2 max-h-80 overflow-y-auto">
-                        {data.edges.length === 0 ? (
-                          <div className="text-center py-8 text-base-content/50">
-                            No relations found
+                              {node.node_type === "entity" ? "param" : "task"}
+                            </span>
                           </div>
-                        ) : (
-                          data.edges.map((edge, index) => (
-                            <div
-                              key={index}
-                              className="p-2 rounded-lg border border-accent/30 bg-accent/5"
-                            >
-                              <div className="flex items-center gap-1 text-xs">
-                                <span className="font-mono truncate max-w-[100px]">
-                                  {edge.source_id
-                                    .split(":")
-                                    .slice(0, 2)
-                                    .join(":")}
-                                </span>
-                                <ChevronRight className="h-3 w-3 text-accent flex-shrink-0" />
-                                <span className="badge badge-accent badge-xs">
-                                  {edge.relation_type}
-                                </span>
-                                <ChevronRight className="h-3 w-3 text-accent flex-shrink-0" />
-                                <span className="font-mono truncate max-w-[100px]">
-                                  {edge.target_id
-                                    .split(":")
-                                    .slice(0, 2)
-                                    .join(":")}
-                                </span>
-                              </div>
-                            </div>
-                          ))
-                        )}
-                      </div>
-                    </div>
+                        </div>
+                      ))
+                    )}
                   </div>
                 </div>
-              )}
-            </div>
+              </div>
 
-            <div className="xl:col-span-1">
-              <RecalibrationRecommendationsPanel entityId={entityId} />
+              {/* Edges List */}
+              <div className="card bg-base-200">
+                <div className="card-body p-4 sm:p-6">
+                  <h3 className="card-title text-base sm:text-lg">
+                    Relations
+                    <span className="badge badge-accent badge-sm ml-2">
+                      {data.edges.length}
+                    </span>
+                  </h3>
+                  <div className="space-y-2 max-h-80 overflow-y-auto">
+                    {data.edges.length === 0 ? (
+                      <div className="text-center py-8 text-base-content/50">
+                        No relations found
+                      </div>
+                    ) : (
+                      data.edges.map((edge, index) => (
+                        <div
+                          key={index}
+                          className="p-2 rounded-lg border border-accent/30 bg-accent/5"
+                        >
+                          <div className="flex items-center gap-1 text-xs">
+                            <span className="font-mono truncate max-w-[100px]">
+                              {edge.source_id.split(":").slice(0, 2).join(":")}
+                            </span>
+                            <ChevronRight className="h-3 w-3 text-accent flex-shrink-0" />
+                            <span className="badge badge-accent badge-xs">
+                              {edge.relation_type}
+                            </span>
+                            <ChevronRight className="h-3 w-3 text-accent flex-shrink-0" />
+                            <span className="font-mono truncate max-w-[100px]">
+                              {edge.target_id.split(":").slice(0, 2).join(":")}
+                            </span>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
-      )}
+          )}
 
-      {!entityId && !data && (
-        <div className="text-center py-12 text-base-content/50">
-          <Search className="h-10 w-10 sm:h-12 sm:w-12 mx-auto mb-4 opacity-50" />
-          <p className="text-sm sm:text-base">
-            Select a parameter above to explore its lineage
-          </p>
+          {/* Recalibration Recommendations - below the graph */}
+          <RecalibrationRecommendationsPanel entityId={entityId} />
         </div>
       )}
     </div>

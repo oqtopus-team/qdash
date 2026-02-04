@@ -121,6 +121,9 @@ class CheckCrossResonance(QubexTask):
         output_parameters = self.attach_execution_id(execution_id)
         fig = self._plot_coeffs_history(result["coeffs_history"], label=label)
         figures: list[Any] = [fig]
+        for figs in result["figs_history"]:
+            figures.append(figs["fig_c"])
+            figures.append(figs["fig_t"])
         raw_data: list[Any] = []
         return PostProcessResult(
             output_parameters=output_parameters, figures=figures, raw_data=raw_data
@@ -152,6 +155,7 @@ class CheckCrossResonance(QubexTask):
             "rotary_amplitude": fit_result["rotary_amplitude"],
             "zx_rotation_rate": fit_result["zx_rotation_rate"],
             "coeffs_history": raw_result["coeffs_history"],
+            "figs_history": raw_result.data["figs_history"],
         }
         self.save_calibration(backend)
         return RunResult(raw_result=result)
