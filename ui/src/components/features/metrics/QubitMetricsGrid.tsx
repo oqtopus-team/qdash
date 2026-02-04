@@ -542,7 +542,7 @@ export function QubitMetricsGrid({
         className="modal modal-bottom sm:modal-middle"
         onClose={() => setSelectedQubitInfo(null)}
       >
-        <div className="modal-box w-full sm:w-11/12 max-w-5xl bg-base-100 p-0 max-h-[85vh] sm:max-h-[90vh] overflow-hidden flex flex-col">
+        <div className="modal-box w-full sm:w-11/12 max-w-5xl bg-base-100 p-0 h-[85vh] sm:h-[90vh] overflow-hidden flex flex-col">
           {selectedQubitInfo && (
             <>
               {/* Modal Header */}
