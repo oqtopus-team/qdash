@@ -131,76 +131,77 @@ class OneQubitScheduledStrategy(OneQubitStrategy):
                 stages_by_box[box_type] = []
             stages_by_box[box_type].append(stage_info)
 
-        # Execute stages grouped by box type
-        for box_type, stages in stages_by_box.items():
-            stage_name = f"Box_{box_type}"
+        # Collect ALL qids across all box types for a single execution
+        all_qids: list[str] = []
+        box_sequential_groups: dict[str, list[list[list[str]]]] = {}
 
-            # Collect all qids and parallel groups for this box type
-            all_stage_qids = []
-            all_sequential_groups = []  # Groups that must run sequentially
+        for box_type, stages in stages_by_box.items():
+            sequential_groups: list[list[list[str]]] = []
 
             for stage_info in stages:
-                # Filter parallel groups by allowed qids (if config.qids is set)
                 filtered_groups = [
                     self._filter_qids(group, config.qids) for group in stage_info.parallel_groups
                 ]
-                # Remove empty groups
                 parallel_groups = [g for g in filtered_groups if g]
 
                 if parallel_groups:
-                    all_sequential_groups.append(parallel_groups)
+                    sequential_groups.append(parallel_groups)
                     for group in parallel_groups:
-                        all_stage_qids.extend(group)
+                        all_qids.extend(group)
 
-            # Skip if no qubits remain after filtering
-            if not all_stage_qids:
-                continue
+            if sequential_groups:
+                box_sequential_groups[box_type] = sequential_groups
 
-            # Determine flow name for this stage
-            stage_flow_name = f"{config.flow_name}_{stage_name}" if config.flow_name else stage_name
+        # Skip if no qubits remain after filtering
+        if not all_qids:
+            return {}
 
-            init_calibration(
-                cal_service.username,
-                cal_service.chip_id,
-                all_stage_qids,
-                flow_name=stage_flow_name,
-                backend_name=cal_service.backend_name,  # Inherit backend from parent
-                tags=[config.flow_name] if config.flow_name else None,
-                project_id=config.project_id,
-                use_lock=False,  # Parent session already holds the lock
-                enable_github_pull=True,
-                github_push_config=GitHubPushConfig(
-                    enabled=True,
-                    file_types=[ConfigFileType.CALIB_NOTE, ConfigFileType.ALL_PARAMS],
-                ),
-                note={
-                    "type": "1-qubit-scheduled",
-                    "box": box_type,
-                    "sequential_groups": len(all_sequential_groups),
-                    "total_qubits": len(all_stage_qids),
-                },
-            )
+        # Deduplicate while preserving order
+        all_qids = list(dict.fromkeys(all_qids))
 
-            # Get parent session's execution_id for child sessions
-            parent_session = get_session()
-            parent_execution_id = parent_session.execution_id
+        # Create a SINGLE execution for the entire strategy
+        # This ensures the execution only completes after ALL box types finish
+        stage_flow_name = config.flow_name or "1q_scheduled"
 
-            # Build session config for isolated parallel execution
-            session_config = {
-                "username": cal_service.username,
-                "chip_id": cal_service.chip_id,
-                "backend_name": cal_service.backend_name,
-                "project_id": config.project_id,
-                "muxes": None,  # MUX info not needed for qubit-level tasks
-                "execution_id": parent_execution_id,  # Share parent's execution_id
-            }
+        init_calibration(
+            cal_service.username,
+            cal_service.chip_id,
+            all_qids,
+            flow_name=stage_flow_name,
+            backend_name=cal_service.backend_name,
+            tags=[config.flow_name] if config.flow_name else None,
+            project_id=config.project_id,
+            use_lock=False,
+            enable_github_pull=True,
+            github_push_config=GitHubPushConfig(
+                enabled=True,
+                file_types=[ConfigFileType.CALIB_NOTE, ConfigFileType.ALL_PARAMS],
+            ),
+            note={
+                "type": "1-qubit-scheduled",
+                "box_types": list(box_sequential_groups.keys()),
+                "total_qubits": len(all_qids),
+            },
+        )
 
-            # Execute sequential groups (for Box B module sharing constraint)
-            # Within each sequential group, MUX groups run in parallel (multiprocess)
+        parent_session = get_session()
+        parent_execution_id = parent_session.execution_id
+
+        session_config = {
+            "username": cal_service.username,
+            "chip_id": cal_service.chip_id,
+            "backend_name": cal_service.backend_name,
+            "project_id": config.project_id,
+            "muxes": None,
+            "execution_id": parent_execution_id,
+        }
+
+        # Execute stages grouped by box type (sequentially between box types)
+        for box_type, sequential_groups in box_sequential_groups.items():
+            stage_name = f"Box_{box_type}"
             stage_results = {}
-            for seq_idx, parallel_groups in enumerate(all_sequential_groups):
-                # Execute MUX groups in parallel using separate processes
-                # Each process has isolated memory, avoiding qubex global state issues
+
+            for seq_idx, parallel_groups in enumerate(sequential_groups):
                 mux_results = run_mux_calibrations_parallel(
                     mux_groups=parallel_groups,
                     tasks=config.tasks,
@@ -208,11 +209,12 @@ class OneQubitScheduledStrategy(OneQubitStrategy):
                 )
                 stage_results.update(mux_results)
 
-            session = get_session()
-            session.record_stage_result(f"1q_{stage_name}", stage_results)
-            finish_calibration()
-
             all_results[stage_name] = stage_results
+
+        # Record results and finish the single execution after ALL box types complete
+        session = get_session()
+        session.record_stage_result("1q_scheduled", all_results)
+        finish_calibration()
 
         return all_results
 
@@ -249,101 +251,77 @@ class OneQubitSynchronizedStrategy(OneQubitStrategy):
 
         logger.info(f"Synchronized schedule: {schedule.total_steps} steps")
 
-        all_results = {}
-        current_box_type = None
-        box_session_results = {}
+        # Collect ALL qids across all steps for a single execution
+        all_qids: list[str] = []
+        for step in schedule.steps:
+            filtered_qids = self._filter_qids(step.parallel_qids, config.qids)
+            all_qids.extend(filtered_qids)
+
+        # Deduplicate while preserving order
+        all_qids = list(dict.fromkeys(all_qids))
+
+        if not all_qids:
+            return {}
+
+        # Create a SINGLE execution for the entire strategy
+        # This ensures the execution only completes after ALL box types finish
+        stage_flow_name = config.flow_name or "1q_synchronized"
+
+        init_calibration(
+            cal_service.username,
+            cal_service.chip_id,
+            all_qids,
+            flow_name=stage_flow_name,
+            backend_name=cal_service.backend_name,
+            tags=[config.flow_name] if config.flow_name else None,
+            project_id=config.project_id,
+            use_lock=False,
+            enable_github_pull=True,
+            github_push_config=GitHubPushConfig(
+                enabled=True,
+                file_types=[ConfigFileType.CALIB_NOTE, ConfigFileType.ALL_PARAMS],
+            ),
+            note={
+                "type": "1-qubit-synchronized",
+                "total_steps": schedule.total_steps,
+                "total_qubits": len(all_qids),
+            },
+        )
+
+        parent_session = get_session()
+        parent_execution_id = parent_session.execution_id
+
+        session_config = {
+            "username": cal_service.username,
+            "chip_id": cal_service.chip_id,
+            "backend_name": cal_service.backend_name,
+            "project_id": config.project_id,
+            "muxes": None,
+            "execution_id": parent_execution_id,
+        }
+
+        all_results: dict[str, Any] = {}
 
         for step in schedule.steps:
-            # Filter parallel_qids by allowed qids (if config.qids is set)
             filtered_qids = self._filter_qids(step.parallel_qids, config.qids)
-
-            # Skip step if no qubits remain after filtering
             if not filtered_qids:
                 continue
 
-            # Start new session when box type changes
-            if step.box_type != current_box_type:
-                # Finish previous session
-                if current_box_type is not None:
-                    session = get_session()
-                    session.record_stage_result(f"1q_Box_{current_box_type}", box_session_results)
-                    finish_calibration()
-                    all_results[f"Box_{current_box_type}"] = box_session_results
-                    box_session_results = {}
-
-                # Start new session
-                current_box_type = step.box_type
-                box_steps = schedule.get_steps_by_box(current_box_type)
-
-                # Filter box_qids by allowed qids
-                box_qids = self._filter_qids(
-                    [qid for s in box_steps for qid in s.parallel_qids],
-                    config.qids,
-                )
-
-                # Build schedule info: list of filtered parallel qid groups per step
-                schedule_steps = [
-                    self._filter_qids(s.parallel_qids, config.qids) for s in box_steps
-                ]
-                # Remove empty steps from schedule info
-                schedule_steps = [s for s in schedule_steps if s]
-
-                stage_name = f"Box_{current_box_type}"
-                stage_flow_name = (
-                    f"{config.flow_name}_{stage_name}" if config.flow_name else stage_name
-                )
-
-                init_calibration(
-                    cal_service.username,
-                    cal_service.chip_id,
-                    box_qids,
-                    flow_name=stage_flow_name,
-                    backend_name=cal_service.backend_name,  # Inherit backend from parent
-                    tags=[config.flow_name] if config.flow_name else None,
-                    project_id=config.project_id,
-                    use_lock=False,  # Parent session already holds the lock
-                    enable_github_pull=True,
-                    github_push_config=GitHubPushConfig(
-                        enabled=True,
-                        file_types=[ConfigFileType.CALIB_NOTE, ConfigFileType.ALL_PARAMS],
-                    ),
-                    note={
-                        "type": "1-qubit-synchronized",
-                        "box": current_box_type,
-                        "total_steps": len(schedule_steps),
-                        "schedule": schedule_steps,
-                    },
-                )
-
-            # Get parent session's execution_id for child sessions
-            parent_session = get_session()
-            parent_execution_id = parent_session.execution_id
-
-            # Build session config for isolated parallel execution
-            session_config = {
-                "username": cal_service.username,
-                "chip_id": cal_service.chip_id,
-                "backend_name": cal_service.backend_name,
-                "project_id": config.project_id,
-                "muxes": None,  # MUX info not needed for qubit-level tasks
-                "execution_id": parent_execution_id,  # Share parent's execution_id
-            }
-
-            # Execute synchronized step (all qubits in parallel using separate processes)
-            # Each process has isolated memory, avoiding qubex global state issues
             step_results = run_qubit_calibrations_parallel(
                 qids=filtered_qids,
                 tasks=config.tasks,
                 session_config=session_config,
             )
-            box_session_results.update(step_results)
+            # Group results by box type for organized output
+            box_key = f"Box_{step.box_type}"
+            if box_key not in all_results:
+                all_results[box_key] = {}
+            all_results[box_key].update(step_results)
 
-        # Finish final session
-        if current_box_type is not None:
-            session = get_session()
-            session.record_stage_result(f"1q_Box_{current_box_type}", box_session_results)
-            finish_calibration()
-            all_results[f"Box_{current_box_type}"] = box_session_results
+        # Record results and finish the single execution after ALL steps complete
+        session = get_session()
+        session.record_stage_result("1q_synchronized", all_results)
+        finish_calibration()
 
         return all_results
 
