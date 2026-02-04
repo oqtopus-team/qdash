@@ -21,6 +21,10 @@ import { RecalibrationRecommendationsPanel } from "./RecalibrationRecommendation
 
 type ViewMode = "graph" | "list";
 
+/** Maximum graph traversal depth for lineage queries.
+ *  Set high enough to capture full calibration chains (typically 10-15 hops). */
+const LINEAGE_MAX_DEPTH = 20;
+
 interface LineageExplorerPanelProps {
   initialEntityId?: string;
   initialParameter?: string;
@@ -83,7 +87,7 @@ export function LineageExplorerPanel({
     error,
   } = useGetProvenanceLineage(
     entityId,
-    { max_depth: 20 },
+    { max_depth: LINEAGE_MAX_DEPTH },
     { query: { enabled: !!entityId } },
   );
 

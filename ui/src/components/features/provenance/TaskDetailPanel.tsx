@@ -24,13 +24,21 @@ interface ParameterInfo {
   qid: string;
 }
 
+const EXPONENTIAL_THRESHOLD_LOW = 0.01;
+const EXPONENTIAL_THRESHOLD_HIGH = 10000;
+const DECIMAL_PLACES = 4;
+const EXPONENTIAL_DIGITS = 2;
+
 function formatValue(value: unknown): string {
   if (value === undefined || value === null) return "";
   if (typeof value === "number") {
-    if (Math.abs(value) < 0.01 || Math.abs(value) > 10000) {
-      return value.toExponential(2);
+    if (
+      Math.abs(value) < EXPONENTIAL_THRESHOLD_LOW ||
+      Math.abs(value) > EXPONENTIAL_THRESHOLD_HIGH
+    ) {
+      return value.toExponential(EXPONENTIAL_DIGITS);
     }
-    return value.toFixed(4);
+    return value.toFixed(DECIMAL_PLACES);
   }
   if (typeof value === "boolean") return value ? "true" : "false";
   return String(value);
