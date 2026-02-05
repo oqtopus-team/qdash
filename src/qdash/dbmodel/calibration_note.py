@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Any, ClassVar
+from typing import Any, ClassVar, cast
 
 from bunnet import Document
 from pydantic import ConfigDict, Field
@@ -123,7 +123,7 @@ class CalibrationNoteDocument(Document):
             return_document=ReturnDocument.AFTER,
         )
 
-        return cls.model_validate(result)
+        return cast("CalibrationNoteDocument", cls.model_validate(result))
 
     model_config = ConfigDict(
         from_attributes=True,

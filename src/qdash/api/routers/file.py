@@ -488,10 +488,13 @@ def git_pull_config(
                 detail="Missing required environment variables: GITHUB_USER, GITHUB_TOKEN, CONFIG_REPO_URL",
             )
 
+        # Type narrowing for mypy after the all() check
+        assert repo_url is not None
+
         # Parse and reconstruct URL with authentication
         parsed = urlparse(repo_url)
         auth_netloc = f"{github_user}:{github_token}@{parsed.netloc}"
-        auth_url = urlunparse((parsed.scheme, auth_netloc, parsed.path, "", "", ""))
+        auth_url: str = urlunparse((parsed.scheme, auth_netloc, parsed.path, "", "", ""))
 
         if (CONFIG_BASE_PATH / ".git").exists():
             # Already a git repo - fetch and reset to match remote exactly
@@ -529,8 +532,8 @@ def git_pull_config(
     except GitCommandError as e:
         # Mask credentials in error message
         error_msg = str(e.stderr)
-        parsed_err = urlparse(repo_url)
-        masked_url = urlunparse(
+        parsed_err = urlparse(repo_url or "")
+        masked_url: str = urlunparse(
             (parsed_err.scheme, str(parsed_err.netloc).split("@")[-1], parsed_err.path, "", "", "")
         )
         logger.error(f"Git pull failed for {masked_url}: {error_msg}")
@@ -579,6 +582,9 @@ def git_push_config(
                 detail="Missing required environment variables: GITHUB_USER, GITHUB_TOKEN, CONFIG_REPO_URL",
             )
 
+        # Type narrowing for mypy after the all() check
+        assert repo_url is not None
+
         # Parse owner/repo from URL for GitHub API
         match = re.match(r"https?://[^/]+/([^/]+)/([^/]+?)(?:\.git)?$", repo_url)
         if not match:
@@ -589,7 +595,7 @@ def git_push_config(
         # Parse and reconstruct URL with authentication
         parsed = urlparse(repo_url)
         auth_netloc = f"{github_user}:{github_token}@{parsed.netloc}"
-        auth_url = urlunparse((parsed.scheme, auth_netloc, parsed.path, "", "", ""))
+        auth_url: str = urlunparse((parsed.scheme, auth_netloc, parsed.path, "", "", ""))
 
         # Create temporary directory and clone repository (shallow clone for efficiency)
         temp_dir = tempfile.mkdtemp()
@@ -694,8 +700,8 @@ def git_push_config(
     except GitCommandError as e:
         # Mask credentials in error message
         error_msg = str(e.stderr)
-        parsed_err = urlparse(repo_url)
-        masked_url = urlunparse(
+        parsed_err = urlparse(repo_url or "")
+        masked_url: str = urlunparse(
             (parsed_err.scheme, str(parsed_err.netloc).split("@")[-1], parsed_err.path, "", "", "")
         )
         logger.error(f"Git push failed for {masked_url}: {error_msg}")
