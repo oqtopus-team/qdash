@@ -3,7 +3,13 @@
 import React, { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 
-import { ChevronRight, GitBranch, History, ListTodo, FileText } from "lucide-react";
+import {
+  ChevronRight,
+  GitBranch,
+  History,
+  ListTodo,
+  FileText,
+} from "lucide-react";
 
 import { useGetCouplingMetricHistory } from "@/client/metrics/metrics";
 import { useGetExecution } from "@/client/execution/execution";
@@ -138,7 +144,10 @@ export function CouplingMetricHistoryModal({
 
   // Ensure task index is valid
   useEffect(() => {
-    if (selectedTaskIndex >= executionTasks.length && executionTasks.length > 0) {
+    if (
+      selectedTaskIndex >= executionTasks.length &&
+      executionTasks.length > 0
+    ) {
       setSelectedTaskIndex(0);
     }
   }, [executionTasks.length, selectedTaskIndex]);
@@ -277,7 +286,9 @@ export function CouplingMetricHistoryModal({
             <span className="loading loading-spinner loading-md"></span>
           </div>
         ) : isExecutionError ? (
-          <div className="text-sm text-error py-4">Failed to load execution</div>
+          <div className="text-sm text-error py-4">
+            Failed to load execution
+          </div>
         ) : executionTasks.length === 0 ? (
           <div className="text-center py-8">
             <ListTodo className="h-8 w-8 mx-auto text-base-content/30 mb-2" />
@@ -318,7 +329,9 @@ export function CouplingMetricHistoryModal({
                         {isMatchingMetric && (
                           <span
                             className={`badge badge-xs ${
-                              isSelected ? "badge-secondary-content" : "badge-accent"
+                              isSelected
+                                ? "badge-secondary-content"
+                                : "badge-accent"
                             }`}
                           >
                             {metricName}
@@ -379,7 +392,9 @@ export function CouplingMetricHistoryModal({
           <button
             className="btn btn-xs btn-ghost"
             disabled={selectedTaskIndex === 0}
-            onClick={() => setSelectedTaskIndex((prev) => Math.max(0, prev - 1))}
+            onClick={() =>
+              setSelectedTaskIndex((prev) => Math.max(0, prev - 1))
+            }
           >
             ← Prev
           </button>
@@ -397,14 +412,12 @@ export function CouplingMetricHistoryModal({
         </div>
       )}
 
-      {/* Figure Display */}
-      <div className="flex-1 bg-base-200 rounded-lg p-3 overflow-auto min-h-[250px]">
+      {/* Figure Display - Fixed height with horizontal scroll */}
+      <div className="h-[280px] bg-base-200 rounded-lg p-3 overflow-x-auto overflow-y-hidden flex items-center justify-start">
         {isExecutionLoading ? (
-          <div className="flex items-center justify-center h-full">
-            <span className="loading loading-spinner loading-lg"></span>
-          </div>
+          <span className="loading loading-spinner loading-lg"></span>
         ) : !selectedTask ? (
-          <div className="flex flex-col items-center justify-center h-full text-base-content/40">
+          <div className="flex flex-col items-center justify-center text-base-content/40">
             <FileText className="h-12 w-12 mb-3 opacity-30" />
             <p className="text-sm">
               {selectedExecutionId
@@ -416,16 +429,16 @@ export function CouplingMetricHistoryModal({
           <TaskFigure
             path={selectedTask.figure_path}
             qid={couplingId}
-            className="w-full h-auto"
+            className="h-full w-auto object-contain"
           />
         ) : selectedTask.task_id ? (
           <TaskFigure
             taskId={selectedTask.task_id}
             qid={couplingId}
-            className="w-full h-auto"
+            className="h-full w-auto object-contain"
           />
         ) : (
-          <div className="flex flex-col items-center justify-center h-full text-base-content/40">
+          <div className="flex flex-col items-center justify-center text-base-content/40">
             <FileText className="h-12 w-12 mb-3 opacity-30" />
             <p className="text-sm">No figure available for this task</p>
           </div>
@@ -488,7 +501,7 @@ export function CouplingMetricHistoryModal({
 
       {/* Input/Output Parameters */}
       {selectedTask && (
-        <div className="flex flex-col gap-2 mt-2 max-h-[200px] overflow-y-auto">
+        <div className="flex flex-col gap-2 mt-2 overflow-auto">
           {selectedTask.input_parameters &&
             Object.keys(selectedTask.input_parameters).length > 0 && (
               <ParametersTable
