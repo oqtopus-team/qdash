@@ -480,28 +480,16 @@ def git_pull_config(
 
         # Parse and reconstruct URL with authentication
         parsed = urlparse(repo_url)
-        scheme = parsed.scheme if isinstance(parsed.scheme, str) else parsed.scheme.decode()
-        netloc = parsed.netloc if isinstance(parsed.netloc, str) else parsed.netloc.decode()
-        path = parsed.path if isinstance(parsed.path, str) else parsed.path.decode()
-        auth_netloc = f"{github_user}:{github_token}@{netloc}"
-        auth_url = urlunparse((scheme, auth_netloc, path, "", "", ""))
+        auth_netloc = f"{github_user}:{github_token}@{parsed.netloc}"
+        auth_url = urlunparse((parsed.scheme, auth_netloc, parsed.path, "", "", ""))
 
-        # Create temporary directory and clone repository
+        # Create temporary directory and clone repository (shallow clone for efficiency)
         temp_dir = tempfile.mkdtemp()
         temp_dir_path = Path(temp_dir)
 
         try:
             logger.info("Cloning repository to temporary directory")
-            repo = Repo.clone_from(auth_url, temp_dir)
-
-            # Create backup of current config if it exists
-            if CONFIG_BASE_PATH.exists():
-                backup_dir = (
-                    CONFIG_BASE_PATH.parent
-                    / f"config_backup_{datetime.now(tz=timezone.utc).strftime('%Y%m%d_%H%M%S')}"
-                )
-                shutil.copytree(CONFIG_BASE_PATH, backup_dir)
-                logger.info(f"Created backup at: {backup_dir}")
+            repo = Repo.clone_from(auth_url, temp_dir, depth=1)
 
             # Get latest changes
             logger.info("Fetching latest changes")
@@ -526,7 +514,11 @@ def git_pull_config(
             # Log success with commit information
             current = repo.head.commit
             commit_sha = current.hexsha[:8]
-            commit_msg = str(current.message).strip()
+            commit_msg = (
+                current.message
+                if isinstance(current.message, str)
+                else current.message.decode("utf-8")
+            ).strip()
 
             logger.info(f"Updated to commit: {commit_sha} - {commit_msg}")
             logger.info(f"Config files updated successfully in: {CONFIG_BASE_PATH}")
@@ -543,8 +535,14 @@ def git_pull_config(
                 shutil.rmtree(temp_dir)
 
     except GitCommandError as e:
-        logger.error(f"Git pull failed: {e.stderr}")
-        raise HTTPException(status_code=500, detail=f"Git pull failed: {e.stderr}")
+        # Mask credentials in error message
+        error_msg = str(e.stderr)
+        parsed_err = urlparse(repo_url)
+        masked_url = urlunparse(
+            (parsed_err.scheme, str(parsed_err.netloc).split("@")[-1], parsed_err.path, "", "", "")
+        )
+        logger.error(f"Git pull failed for {masked_url}: {error_msg}")
+        raise HTTPException(status_code=500, detail=f"Git pull failed: {error_msg}")
     except Exception as e:
         logger.error(f"Error pulling from Git: {e}")
         raise HTTPException(status_code=500, detail=f"Error pulling from Git: {e!s}")
@@ -588,37 +586,44 @@ def git_push_config(
 
         # Parse and reconstruct URL with authentication
         parsed = urlparse(repo_url)
-        scheme = parsed.scheme if isinstance(parsed.scheme, str) else parsed.scheme.decode()
-        netloc = parsed.netloc if isinstance(parsed.netloc, str) else parsed.netloc.decode()
-        path = parsed.path if isinstance(parsed.path, str) else parsed.path.decode()
-        auth_netloc = f"{github_user}:{github_token}@{netloc}"
-        auth_url = urlunparse((scheme, auth_netloc, path, "", "", ""))
+        auth_netloc = f"{github_user}:{github_token}@{parsed.netloc}"
+        auth_url = urlunparse((parsed.scheme, auth_netloc, parsed.path, "", "", ""))
 
-        # Create temporary directory and clone repository
+        # Create temporary directory and clone repository (shallow clone for efficiency)
         temp_dir = tempfile.mkdtemp()
         temp_dir_path = Path(temp_dir)
 
         try:
             logger.info("Cloning repository to temporary directory")
-            repo = Repo.clone_from(auth_url, temp_dir, branch="main")
+            repo = Repo.clone_from(auth_url, temp_dir, branch="main", depth=1)
 
             # Copy all files from CONFIG_BASE_PATH to temp repo (excluding .git)
-            for item in CONFIG_BASE_PATH.glob("*"):
-                if item.name == ".git":
+            # Track copied files for specific staging (not git add -A)
+            added_files = []
+            for item in CONFIG_BASE_PATH.rglob("*"):
+                if ".git" in item.parts:
                     continue
-
-                destination = temp_dir_path / item.name
                 if item.is_file():
+                    rel_path = item.relative_to(CONFIG_BASE_PATH)
+                    destination = temp_dir_path / rel_path
+                    destination.parent.mkdir(parents=True, exist_ok=True)
                     shutil.copy2(item, destination)
-                else:
-                    shutil.copytree(item, destination, dirs_exist_ok=True)
+                    added_files.append(str(rel_path))
 
-            # Git operations
-            repo.git.add(A=True)  # Add all files
+            if not added_files:
+                logger.info("No files to commit")
+                return {
+                    "success": True,
+                    "message": "No files to commit",
+                    "commit": None,
+                }
+
+            # Stage only the files we copied (matching workflow behavior)
+            repo.index.add(added_files)
 
             # Check if there are changes to commit
             diff = repo.index.diff("HEAD")
-            if not diff and not repo.untracked_files:
+            if not diff:
                 logger.info("No changes to commit")
                 return {
                     "success": True,
@@ -626,9 +631,9 @@ def git_push_config(
                     "commit": None,
                 }
 
-            # Configure git user
-            repo.git.config("user.name", "qdash-ui")
-            repo.git.config("user.email", "qdash-ui@users.noreply.github.com")
+            # Configure git user (matching workflow)
+            repo.git.config("user.name", "github-actions[bot]")
+            repo.git.config("user.email", "github-actions[bot]@users.noreply.github.com")
 
             # Commit with timestamp
             now_jst = now_iso()
@@ -654,8 +659,14 @@ def git_push_config(
                 shutil.rmtree(temp_dir)
 
     except GitCommandError as e:
-        logger.error(f"Git push failed: {e.stderr}")
-        raise HTTPException(status_code=500, detail=f"Git push failed: {e.stderr}")
+        # Mask credentials in error message
+        error_msg = str(e.stderr)
+        parsed_err = urlparse(repo_url)
+        masked_url = urlunparse(
+            (parsed_err.scheme, str(parsed_err.netloc).split("@")[-1], parsed_err.path, "", "", "")
+        )
+        logger.error(f"Git push failed for {masked_url}: {error_msg}")
+        raise HTTPException(status_code=500, detail=f"Git push failed: {error_msg}")
     except Exception as e:
         logger.error(f"Error pushing to Git: {e}")
         raise HTTPException(status_code=500, detail=f"Error pushing to Git: {e!s}")
