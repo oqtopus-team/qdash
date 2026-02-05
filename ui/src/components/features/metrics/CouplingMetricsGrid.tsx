@@ -1,9 +1,20 @@
 "use client";
 
-import React, { useLayoutEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  useCallback,
+} from "react";
 import Link from "next/link";
+import {
+  TransformWrapper,
+  TransformComponent,
+  useControls,
+} from "react-zoom-pan-pinch";
 
-import { GitBranch } from "lucide-react";
+import { GitBranch, ZoomIn, ZoomOut, Maximize2, Move } from "lucide-react";
 
 import { RegionZoomToggle } from "@/components/ui/RegionZoomToggle";
 import { useGridLayout } from "@/hooks/useGridLayout";
@@ -41,6 +52,36 @@ interface CouplingMetricsGridProps {
 interface SelectedCouplingInfo {
   couplingId: string;
   metric: MetricValue;
+}
+
+// Zoom control buttons component
+function ZoomControls() {
+  const { zoomIn, zoomOut, resetTransform } = useControls();
+  return (
+    <div className="absolute top-2 right-2 z-30 flex flex-col gap-1">
+      <button
+        onClick={() => zoomIn()}
+        className="btn btn-sm btn-square btn-ghost bg-base-100/90 shadow-md hover:bg-base-200"
+        title="Zoom in"
+      >
+        <ZoomIn className="h-4 w-4" />
+      </button>
+      <button
+        onClick={() => zoomOut()}
+        className="btn btn-sm btn-square btn-ghost bg-base-100/90 shadow-md hover:bg-base-200"
+        title="Zoom out"
+      >
+        <ZoomOut className="h-4 w-4" />
+      </button>
+      <button
+        onClick={() => resetTransform()}
+        className="btn btn-sm btn-square btn-ghost bg-base-100/90 shadow-md hover:bg-base-200"
+        title="Reset view"
+      >
+        <Maximize2 className="h-4 w-4" />
+      </button>
+    </div>
+  );
 }
 
 export function CouplingMetricsGrid({
@@ -97,9 +138,32 @@ export function CouplingMetricsGrid({
     [hasMux, muxSize, effectiveGridSize, layoutType],
   );
 
+  // View mode state: 'pan-zoom' for DOM with pan/zoom, 'region' for region zoom
+  const [viewMode, setViewMode] = useState<"pan-zoom" | "region">("pan-zoom");
+
   // Region selection state
   const [regionSelectionEnabled, setRegionSelectionEnabled] = useState(false);
   const [zoomMode, setZoomMode] = useState<"full" | "region">("full");
+
+  // LOD (Level of Detail) state for pan-zoom mode
+  const [lodLevel, setLodLevel] = useState<"high" | "medium" | "low">("high");
+  const lodTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Handle transform changes for LOD (debounced)
+  const handleTransform = useCallback((ref: { state: { scale: number } }) => {
+    if (lodTimeoutRef.current) {
+      clearTimeout(lodTimeoutRef.current);
+    }
+    lodTimeoutRef.current = setTimeout(() => {
+      const scale = ref.state.scale;
+      const newLod = scale >= 0.9 ? "high" : scale >= 0.6 ? "medium" : "low";
+      setLodLevel((prev) => (prev !== newLod ? newLod : prev));
+    }, 100);
+  }, []);
+
+  // LOD-based visibility flags
+  const showValues = lodLevel !== "low" || viewMode === "region";
+  const showUnits = lodLevel === "high" || viewMode === "region";
   const [selectedRegion, setSelectedRegion] = useState<{
     row: number;
     col: number;
@@ -277,19 +341,296 @@ export function CouplingMetricsGrid({
       }
     : { row: 0, col: 0 };
 
-  return (
-    <div className="flex flex-col h-full space-y-4" ref={containerRef}>
-      {/* Zoom mode toggle - only show in full view mode for square grids */}
-      {zoomMode === "full" && isSquareGrid && (
-        <RegionZoomToggle
-          enabled={regionSelectionEnabled}
-          onToggle={setRegionSelectionEnabled}
-        />
+  // Grid content to be rendered (extracted for reuse)
+  const gridContent = (
+    <div
+      className="relative flex-shrink-0"
+      style={{
+        width: calculateGridDimension(
+          displayGridSize,
+          displayCellSize,
+          isMobile,
+        ),
+        height: calculateGridDimension(
+          displayGridSize,
+          displayCellSize,
+          isMobile,
+        ),
+        maxWidth: viewMode === "pan-zoom" ? "none" : "100%",
+        willChange: viewMode === "pan-zoom" ? "transform" : "auto",
+      }}
+    >
+      {/* Qubit cells (background) with MUX styling */}
+      {(() => {
+        // Use topology qubits if available, otherwise fall back to computed positions
+        const qubitList = topologyQubits
+          ? Object.keys(topologyQubits).map(Number)
+          : Array.from(
+              { length: effectiveGridSize * effectiveGridSize },
+              (_, i) => i,
+            );
+
+        return qubitList
+          .filter((qid) => isQubitInRegion(qid))
+          .map((qid) => {
+            const pos = getQubitPosition(qid);
+
+            const displayRow = pos.row - displayGridStart.row;
+            const displayCol = pos.col - displayGridStart.col;
+            const x = displayCol * (displayCellSize + gap);
+            const y = displayRow * (displayCellSize + gap);
+
+            // Calculate MUX index for this cell (using actual position, not display position)
+            const muxRow = Math.floor(pos.row / muxSize);
+            const muxCol = Math.floor(pos.col / muxSize);
+            const isEvenMux = (muxRow + muxCol) % 2 === 0;
+
+            // MUX styling class
+            const muxBgClass =
+              hasMux && showMuxBoundaries
+                ? isEvenMux
+                  ? "ring-2 ring-inset ring-primary/20"
+                  : "ring-2 ring-inset ring-secondary/20"
+                : "";
+
+            return (
+              <div
+                key={qid}
+                className={`absolute bg-base-300/30 rounded-lg flex items-center justify-center text-sm text-base-content/30 ${muxBgClass}`}
+                style={{
+                  top: y,
+                  left: x,
+                  width: displayCellSize,
+                  height: displayCellSize,
+                }}
+              >
+                {qid}
+              </div>
+            );
+          });
+      })()}
+
+      {/* MUX labels - centered in each MUX group */}
+      {hasMux && showMuxBoundaries && (
+        <>
+          {Array.from({
+            length: Math.pow(Math.ceil(displayGridSize / muxSize), 2),
+          }).map((_, idx) => {
+            const numMuxCols = Math.ceil(displayGridSize / muxSize);
+            const muxLocalRow = Math.floor(idx / numMuxCols);
+            const muxLocalCol = idx % numMuxCols;
+
+            // Calculate actual MUX position considering zoom offset
+            const muxActualRow =
+              Math.floor(displayGridStart.row / muxSize) + muxLocalRow;
+            const muxActualCol =
+              Math.floor(displayGridStart.col / muxSize) + muxLocalCol;
+            const muxIndex =
+              muxActualRow * Math.floor(effectiveGridSize / muxSize) +
+              muxActualCol;
+
+            // Calculate center position of MUX group
+            const muxCenterX =
+              (muxLocalCol * muxSize + muxSize / 2) * (displayCellSize + gap) -
+              gap / 2;
+            const muxCenterY =
+              (muxLocalRow * muxSize + muxSize / 2) * (displayCellSize + gap) -
+              gap / 2;
+
+            return (
+              <div
+                key={`mux-label-${idx}`}
+                className={`absolute z-10 pointer-events-none ${
+                  zoomMode === "full" ? "hidden md:flex" : "flex"
+                }`}
+                style={{
+                  top: muxCenterY,
+                  left: muxCenterX,
+                  transform: "translate(-50%, -50%)",
+                }}
+              >
+                <div className="text-[0.5rem] md:text-xs font-bold text-base-content/60 bg-base-100/90 backdrop-blur-sm px-1.5 py-0.5 rounded shadow-sm border border-base-content/10">
+                  MUX{muxIndex}
+                </div>
+              </div>
+            );
+          })}
+        </>
       )}
 
+      {/* Coupling cells (overlay) - render all topology couplings */}
+      {(() => {
+        // Use topology couplings if available, otherwise use data keys
+        const couplingList: [number, number][] = topologyCouplings
+          ? topologyCouplings
+          : Object.keys(displayData).map((key) => {
+              const [a, b] = key.split("-").map(Number);
+              return [a, b] as [number, number];
+            });
+
+        return couplingList
+          .filter(([qid1, qid2]) => isCouplingInRegion(qid1, qid2))
+          .map(([qid1, qid2]) => {
+            const couplingId = `${qid1}-${qid2}`;
+            const metric =
+              displayData[couplingId] || displayData[`${qid2}-${qid1}`];
+
+            // Use explicit positions from topology
+            const pos1 = getQubitPosition(qid1);
+            const pos2 = getQubitPosition(qid2);
+            const row1 = pos1.row;
+            const col1 = pos1.col;
+            const row2 = pos2.row;
+            const col2 = pos2.col;
+
+            const displayRow1 = row1 - displayGridStart.row;
+            const displayCol1 = col1 - displayGridStart.col;
+            const displayRow2 = row2 - displayGridStart.row;
+            const displayCol2 = col2 - displayGridStart.col;
+            const centerX =
+              ((displayCol1 + displayCol2) / 2) * (displayCellSize + gap) +
+              displayCellSize / 2;
+            const centerY =
+              ((displayRow1 + displayRow2) / 2) * (displayCellSize + gap) +
+              displayCellSize / 2;
+
+            const value = metric?.value ?? null;
+            const bgColor = stats
+              ? getColor(value, stats.min, stats.max)
+              : null;
+
+            return (
+              <button
+                key={couplingId}
+                onClick={() =>
+                  metric && setSelectedCouplingInfo({ couplingId, metric })
+                }
+                style={{
+                  position: "absolute",
+                  top: centerY,
+                  left: centerX,
+                  width: displayCellSize * 0.75,
+                  height: displayCellSize * 0.5,
+                  backgroundColor: bgColor || undefined,
+                }}
+                className={`rounded-md shadow-md flex items-center justify-center transition-all hover:shadow-xl hover:scale-110 -translate-x-1/2 -translate-y-1/2 relative group cursor-pointer ${
+                  !bgColor ? "bg-base-300/50" : ""
+                }`}
+              >
+                {/* Value Display - LOD controlled */}
+                {value !== null && value !== undefined && showValues && (
+                  <div className="text-xs sm:text-sm md:text-base font-bold text-white drop-shadow-md">
+                    {value.toFixed(showUnits ? 2 : 1)}
+                  </div>
+                )}
+
+                {/* No data indicator - LOD controlled */}
+                {(value === null || value === undefined) && showValues && (
+                  <div className="text-xs text-base-content/40 font-medium">
+                    —
+                  </div>
+                )}
+
+                {/* Hover tooltip - always show on hover */}
+                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-base-100 text-base-content text-sm rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
+                  {value !== null && value !== undefined
+                    ? `${couplingId}: ${value.toFixed(4)} ${unit}`
+                    : `${couplingId}: No data`}
+                </div>
+              </button>
+            );
+          });
+      })()}
+
+      {/* Region selection overlay - only for square grids */}
+      {zoomMode === "full" && regionSelectionEnabled && isSquareGrid && (
+        <>
+          {Array.from({ length: numRegions * numRegions }).map((_, index) => {
+            const regionRow = Math.floor(index / numRegions);
+            const regionCol = index % numRegions;
+            const isHovered =
+              hoveredRegion?.row === regionRow &&
+              hoveredRegion?.col === regionCol;
+
+            const regionX = regionCol * regionSize * (displayCellSize + gap);
+            const regionY = regionRow * regionSize * (displayCellSize + gap);
+            const regionWidth = regionSize * (displayCellSize + gap) - gap;
+            const regionHeight = regionSize * (displayCellSize + gap) - gap;
+
+            return (
+              <button
+                key={index}
+                className={`absolute transition-colors duration-200 rounded-lg flex items-center justify-center z-20 ${
+                  isHovered
+                    ? "bg-primary/30 border-2 border-primary shadow-lg"
+                    : "bg-primary/5 border-2 border-primary/20 hover:border-primary/40 hover:bg-primary/10"
+                }`}
+                style={{
+                  top: regionY,
+                  left: regionX,
+                  width: regionWidth,
+                  height: regionHeight,
+                }}
+                onMouseEnter={() =>
+                  setHoveredRegion({ row: regionRow, col: regionCol })
+                }
+                onMouseLeave={() => setHoveredRegion(null)}
+                onClick={() => {
+                  setSelectedRegion({ row: regionRow, col: regionCol });
+                  setZoomMode("region");
+                }}
+                title={`Zoom to region (${regionRow + 1}, ${regionCol + 1})`}
+              >
+                <span className="text-xs font-bold text-white bg-black/50 px-2 py-1 rounded">
+                  {regionRow},{regionCol}
+                </span>
+              </button>
+            );
+          })}
+        </>
+      )}
+    </div>
+  );
+
+  return (
+    <div className="flex flex-col h-full" ref={containerRef}>
+      {/* View mode toggle */}
+      <div className="flex items-center justify-between px-1 md:px-4 py-2">
+        <div className="tabs tabs-boxed bg-base-200/50 p-1">
+          <button
+            className={`tab gap-2 ${viewMode === "pan-zoom" ? "tab-active" : ""}`}
+            onClick={() => {
+              setViewMode("pan-zoom");
+              setZoomMode("full");
+              setSelectedRegion(null);
+              setRegionSelectionEnabled(false);
+            }}
+          >
+            <Move className="h-4 w-4" />
+            <span className="hidden sm:inline">DOM</span>
+          </button>
+          {isSquareGrid && (
+            <button
+              className={`tab gap-2 ${viewMode === "region" ? "tab-active" : ""}`}
+              onClick={() => setViewMode("region")}
+            >
+              <Maximize2 className="h-4 w-4" />
+              <span className="hidden sm:inline">Region</span>
+            </button>
+          )}
+        </div>
+
+        {viewMode === "region" && zoomMode === "full" && isSquareGrid && (
+          <RegionZoomToggle
+            enabled={regionSelectionEnabled}
+            onToggle={setRegionSelectionEnabled}
+          />
+        )}
+      </div>
+
       {/* Back button when in region mode */}
-      {zoomMode === "region" && selectedRegion && (
-        <div className="flex items-center gap-4">
+      {viewMode === "region" && zoomMode === "region" && selectedRegion && (
+        <div className="flex items-center gap-4 px-1 md:px-4 py-2">
           <button
             onClick={() => {
               setZoomMode("full");
@@ -305,287 +646,35 @@ export function CouplingMetricsGrid({
         </div>
       )}
 
-      {/* Grid Container */}
-      <div className="relative w-full flex justify-center overflow-x-auto p-1 md:p-4">
-        <div
-          className="relative flex-shrink-0"
-          style={{
-            width: calculateGridDimension(
-              displayGridSize,
-              displayCellSize,
-              isMobile,
-            ),
-            height: calculateGridDimension(
-              displayGridSize,
-              displayCellSize,
-              isMobile,
-            ),
-            maxWidth: "100%",
-          }}
-        >
-          {/* Qubit cells (background) with MUX styling */}
-          {(() => {
-            // Use topology qubits if available, otherwise fall back to computed positions
-            const qubitList = topologyQubits
-              ? Object.keys(topologyQubits).map(Number)
-              : Array.from(
-                  { length: effectiveGridSize * effectiveGridSize },
-                  (_, i) => i,
-                );
-
-            return qubitList
-              .filter((qid) => isQubitInRegion(qid))
-              .map((qid) => {
-                const pos = getQubitPosition(qid);
-
-                const displayRow = pos.row - displayGridStart.row;
-                const displayCol = pos.col - displayGridStart.col;
-                const x = displayCol * (displayCellSize + gap);
-                const y = displayRow * (displayCellSize + gap);
-
-                // Calculate MUX index for this cell (using actual position, not display position)
-                const muxRow = Math.floor(pos.row / muxSize);
-                const muxCol = Math.floor(pos.col / muxSize);
-                const isEvenMux = (muxRow + muxCol) % 2 === 0;
-
-                // MUX styling class
-                const muxBgClass =
-                  hasMux && showMuxBoundaries
-                    ? isEvenMux
-                      ? "ring-2 ring-inset ring-primary/20"
-                      : "ring-2 ring-inset ring-secondary/20"
-                    : "";
-
-                return (
-                  <div
-                    key={qid}
-                    className={`absolute bg-base-300/30 rounded-lg flex items-center justify-center text-sm text-base-content/30 ${muxBgClass}`}
-                    style={{
-                      top: y,
-                      left: x,
-                      width: displayCellSize,
-                      height: displayCellSize,
-                    }}
-                  >
-                    {qid}
-                  </div>
-                );
-              });
-          })()}
-
-          {/* MUX labels - centered in each MUX group */}
-          {hasMux && showMuxBoundaries && (
-            <>
-              {Array.from({
-                length: Math.pow(Math.ceil(displayGridSize / muxSize), 2),
-              }).map((_, idx) => {
-                const numMuxCols = Math.ceil(displayGridSize / muxSize);
-                const muxLocalRow = Math.floor(idx / numMuxCols);
-                const muxLocalCol = idx % numMuxCols;
-
-                // Calculate actual MUX position considering zoom offset
-                const muxActualRow =
-                  Math.floor(displayGridStart.row / muxSize) + muxLocalRow;
-                const muxActualCol =
-                  Math.floor(displayGridStart.col / muxSize) + muxLocalCol;
-                const muxIndex =
-                  muxActualRow * Math.floor(effectiveGridSize / muxSize) +
-                  muxActualCol;
-
-                // Calculate center position of MUX group
-                const muxCenterX =
-                  (muxLocalCol * muxSize + muxSize / 2) *
-                    (displayCellSize + gap) -
-                  gap / 2;
-                const muxCenterY =
-                  (muxLocalRow * muxSize + muxSize / 2) *
-                    (displayCellSize + gap) -
-                  gap / 2;
-
-                return (
-                  <div
-                    key={`mux-label-${idx}`}
-                    className={`absolute z-10 pointer-events-none ${
-                      zoomMode === "full" ? "hidden md:flex" : "flex"
-                    }`}
-                    style={{
-                      top: muxCenterY,
-                      left: muxCenterX,
-                      transform: "translate(-50%, -50%)",
-                    }}
-                  >
-                    <div className="text-[0.5rem] md:text-xs font-bold text-base-content/60 bg-base-100/90 backdrop-blur-sm px-1.5 py-0.5 rounded shadow-sm border border-base-content/10">
-                      MUX{muxIndex}
-                    </div>
-                  </div>
-                );
-              })}
-            </>
-          )}
-
-          {/* Coupling cells (overlay) - render all topology couplings */}
-          {(() => {
-            // Use topology couplings if available, otherwise use data keys
-            const couplingList: [number, number][] = topologyCouplings
-              ? topologyCouplings
-              : Object.keys(displayData).map((key) => {
-                  const [a, b] = key.split("-").map(Number);
-                  return [a, b] as [number, number];
-                });
-
-            return couplingList
-              .filter(([qid1, qid2]) => isCouplingInRegion(qid1, qid2))
-              .map(([qid1, qid2]) => {
-                const couplingId = `${qid1}-${qid2}`;
-                const metric =
-                  displayData[couplingId] || displayData[`${qid2}-${qid1}`];
-
-                // Use explicit positions from topology
-                const pos1 = getQubitPosition(qid1);
-                const pos2 = getQubitPosition(qid2);
-                const row1 = pos1.row;
-                const col1 = pos1.col;
-                const row2 = pos2.row;
-                const col2 = pos2.col;
-
-                const displayRow1 = row1 - displayGridStart.row;
-                const displayCol1 = col1 - displayGridStart.col;
-                const displayRow2 = row2 - displayGridStart.row;
-                const displayCol2 = col2 - displayGridStart.col;
-                const centerX =
-                  ((displayCol1 + displayCol2) / 2) * (displayCellSize + gap) +
-                  displayCellSize / 2;
-                const centerY =
-                  ((displayRow1 + displayRow2) / 2) * (displayCellSize + gap) +
-                  displayCellSize / 2;
-
-                const value = metric?.value ?? null;
-                const bgColor = stats
-                  ? getColor(value, stats.min, stats.max)
-                  : null;
-
-                return (
-                  <button
-                    key={couplingId}
-                    onClick={() =>
-                      metric && setSelectedCouplingInfo({ couplingId, metric })
-                    }
-                    style={{
-                      position: "absolute",
-                      top: centerY,
-                      left: centerX,
-                      width: displayCellSize * 0.6,
-                      height: displayCellSize * 0.6,
-                      backgroundColor: bgColor || undefined,
-                    }}
-                    className={`rounded-lg shadow-md flex flex-col items-center justify-center transition-all hover:shadow-xl hover:scale-105 -translate-x-1/2 -translate-y-1/2 relative group cursor-pointer ${
-                      !bgColor ? "bg-base-300/50" : ""
-                    }`}
-                  >
-                    {/* Coupling ID Label - hidden on mobile in full view */}
-                    <div
-                      className={`absolute top-0.5 left-0.5 md:top-1 md:left-1 backdrop-blur-sm px-1 py-0.5 md:px-2 rounded text-[0.5rem] md:text-xs font-bold shadow-sm ${
-                        zoomMode === "full" ? "hidden md:block" : ""
-                      } ${
-                        value !== null && value !== undefined
-                          ? "bg-black/30 text-white"
-                          : "bg-base-content/20 text-base-content"
-                      }`}
-                    >
-                      {couplingId}
-                    </div>
-
-                    {/* Value Display */}
-                    {value !== null && value !== undefined && (
-                      <div className="flex flex-col items-center justify-center h-full">
-                        <div className="text-[0.5rem] sm:text-xs md:text-sm lg:text-base font-bold text-white drop-shadow-md">
-                          {value.toFixed(2)}
-                        </div>
-                        {/* Unit - hidden on mobile in full view */}
-                        <div
-                          className={`text-[0.4rem] md:text-xs text-white/90 font-medium drop-shadow ${
-                            zoomMode === "full" ? "hidden md:block" : ""
-                          }`}
-                        >
-                          {unit}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* No data indicator */}
-                    {(value === null || value === undefined) && (
-                      <div className="flex flex-col items-center justify-center h-full">
-                        <div className="text-[0.5rem] sm:text-xs text-base-content/40 font-medium">
-                          N/A
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Hover tooltip */}
-                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-base-100 text-base-content text-sm rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
-                      {value !== null && value !== undefined
-                        ? `${couplingId}: ${value.toFixed(4)} ${unit}`
-                        : `${couplingId}: No data`}
-                    </div>
-                  </button>
-                );
-              });
-          })()}
-
-          {/* Region selection overlay - only for square grids */}
-          {zoomMode === "full" && regionSelectionEnabled && isSquareGrid && (
-            <>
-              {Array.from({ length: numRegions * numRegions }).map(
-                (_, index) => {
-                  const regionRow = Math.floor(index / numRegions);
-                  const regionCol = index % numRegions;
-                  const isHovered =
-                    hoveredRegion?.row === regionRow &&
-                    hoveredRegion?.col === regionCol;
-
-                  const regionX =
-                    regionCol * regionSize * (displayCellSize + gap);
-                  const regionY =
-                    regionRow * regionSize * (displayCellSize + gap);
-                  const regionWidth =
-                    regionSize * (displayCellSize + gap) - gap;
-                  const regionHeight =
-                    regionSize * (displayCellSize + gap) - gap;
-
-                  return (
-                    <button
-                      key={index}
-                      className={`absolute transition-colors duration-200 rounded-lg flex items-center justify-center z-20 ${
-                        isHovered
-                          ? "bg-primary/30 border-2 border-primary shadow-lg"
-                          : "bg-primary/5 border-2 border-primary/20 hover:border-primary/40 hover:bg-primary/10"
-                      }`}
-                      style={{
-                        top: regionY,
-                        left: regionX,
-                        width: regionWidth,
-                        height: regionHeight,
-                      }}
-                      onMouseEnter={() =>
-                        setHoveredRegion({ row: regionRow, col: regionCol })
-                      }
-                      onMouseLeave={() => setHoveredRegion(null)}
-                      onClick={() => {
-                        setSelectedRegion({ row: regionRow, col: regionCol });
-                        setZoomMode("region");
-                      }}
-                      title={`Zoom to region (${regionRow + 1}, ${regionCol + 1})`}
-                    >
-                      <span className="text-xs font-bold text-white bg-black/50 px-2 py-1 rounded">
-                        {regionRow},{regionCol}
-                      </span>
-                    </button>
-                  );
-                },
-              )}
-            </>
-          )}
-        </div>
+      {/* Grid display */}
+      <div className="flex-1 p-1 md:p-4 relative overflow-hidden flex justify-center">
+        {viewMode === "pan-zoom" ? (
+          <TransformWrapper
+            initialScale={1}
+            minScale={0.3}
+            maxScale={4}
+            wheel={{ step: 0.08, smoothStep: 0.004 }}
+            pinch={{ step: 5 }}
+            doubleClick={{ mode: "reset" }}
+            panning={{ velocityDisabled: false }}
+            smooth={true}
+            onTransformed={handleTransform}
+          >
+            <ZoomControls />
+            <TransformComponent
+              wrapperStyle={{ width: "100%", height: "100%" }}
+              contentStyle={{
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
+              }}
+            >
+              {gridContent}
+            </TransformComponent>
+          </TransformWrapper>
+        ) : (
+          gridContent
+        )}
       </div>
 
       {/* Coupling Detail Modal with History */}

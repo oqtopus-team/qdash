@@ -42,6 +42,7 @@
     "react-markdown": "^10.1.0",
     "react-plotly.js": "^2.6.0",
     "react-select": "^5.8.2",
+    "react-zoom-pan-pinch": "^3.7.0",
     "react18-json-view": "0.2.9-canary.8",
     "remark-gfm": "^4.0.1",
     "sharp": "^0.34.1",
