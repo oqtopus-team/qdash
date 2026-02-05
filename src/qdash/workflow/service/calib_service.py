@@ -30,6 +30,7 @@ from __future__ import annotations
 import contextlib
 import json
 import logging
+import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -535,17 +536,15 @@ class CalibService:
         - A Dask worker process crashes
         - There is latency between Dask future resolution and MongoDB write completion
 
-        This method retries several times with short delays to handle the latency
-        case, then marks any remaining running tasks as FAILED before the execution
-        status is updated, ensuring data consistency.
+        This method retries several times with progressive backoff delays to handle
+        the latency case, then marks any remaining running tasks as FAILED before
+        the execution status is updated, ensuring data consistency.
 
         Args:
             logger: Logger instance for output
             message: Failure message to set on stale tasks
 
         """
-        import time
-
         if self.execution_service is None or self.execution_id is None:
             return
 
@@ -558,12 +557,12 @@ class CalibService:
 
             repo = MongoTaskResultHistoryRepository()
 
-            # Retry loop: check for running tasks with delays to allow
-            # late MongoDB writes from Dask workers to complete
-            max_retries = 5
-            retry_delay = 2  # seconds
+            # Progressive backoff delays (in seconds) to handle MongoDB write latency
+            # from Dask workers. Starts short to minimize latency in the common case,
+            # then increases to handle slower edge cases.
+            retry_delays = [0.5, 1, 2, 3, 5]
 
-            for attempt in range(max_retries):
+            for attempt, delay in enumerate(retry_delays):
                 count = repo.finalize_running_tasks(
                     project_id=project_id,
                     execution_id=self.execution_id,
@@ -571,14 +570,14 @@ class CalibService:
                 )
                 if count > 0:
                     logger.warning(
-                        f"[attempt {attempt + 1}/{max_retries}] "
+                        f"[attempt {attempt + 1}/{len(retry_delays)}] "
                         f"Finalized {count} stale task(s) still in RUNNING status "
                         f"for execution {self.execution_id}"
                     )
-                    if attempt < max_retries - 1:
+                    if attempt < len(retry_delays) - 1:
                         # Wait before re-checking in case more tasks
                         # are still being written by Dask workers
-                        time.sleep(retry_delay)
+                        time.sleep(delay)
                 else:
                     if attempt == 0:
                         logger.info(
@@ -769,6 +768,7 @@ class CalibService:
             ```
 
         """
+        run_logger = get_run_logger()
         try:
             # Skip if this session doesn't own the execution
             if self.skip_execution:
@@ -777,7 +777,7 @@ class CalibService:
             # Finalize any tasks still in RUNNING status before failing execution
             if self.execution_service:
                 self._finalize_stale_running_tasks(
-                    logger,
+                    run_logger,
                     message="Task was still running when execution failed",
                 )
             # Reload and mark as failed

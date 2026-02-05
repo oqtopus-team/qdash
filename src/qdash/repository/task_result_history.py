@@ -189,26 +189,32 @@ class MongoTaskResultHistoryRepository:
         """
         from qdash.common.datetime_utils import now
 
-        stale_tasks: list[TaskResultHistoryDocument] = TaskResultHistoryDocument.find(
-            {
-                "project_id": project_id,
-                "execution_id": execution_id,
-                "status": "running",
-            }
-        ).run()
-
-        if not stale_tasks:
-            return 0
-
         end_time = now()
-        for doc in stale_tasks:
-            doc.status = "failed"
-            doc.message = message
-            if doc.end_at is None:
-                doc.end_at = end_time
-            doc.save()
 
-        return len(stale_tasks)
+        # Use bulk update for better performance instead of individual saves
+        # This updates all matching documents in a single database operation
+        result = (
+            TaskResultHistoryDocument.find(
+                {
+                    "project_id": project_id,
+                    "execution_id": execution_id,
+                    "status": "running",
+                }
+            )
+            .update_many(
+                {
+                    "$set": {
+                        "status": "failed",
+                        "message": message,
+                        "end_at": end_time,
+                    }
+                }
+            )
+            .run()
+        )
+
+        # Return the number of documents modified
+        return result.modified_count if result else 0
 
     def aggregate_latest_metrics(
         self,
