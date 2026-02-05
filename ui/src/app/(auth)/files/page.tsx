@@ -8,13 +8,14 @@ import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowDown,
-  ArrowUp,
   Check,
   Database,
+  ExternalLink,
   File,
   FileJson,
   Folder,
   FolderOpen,
+  GitPullRequestArrow,
   Pencil,
   Plus,
   Save,
@@ -81,6 +82,11 @@ export default function FilesEditorPage() {
   const [importResult, setImportResult] = useState<SeedImportResponse | null>(
     null,
   );
+  const [prResult, setPrResult] = useState<{
+    pr_url: string;
+    pr_number: number;
+    branch: string;
+  } | null>(null);
 
   // Check if selected file is a params YAML that can be imported
   const paramsFileInfo = useMemo(() => {
@@ -154,10 +160,18 @@ export default function FilesEditorPage() {
         (res: AxiosResponse<GitPushConfig200>) => res.data,
       ),
     onSuccess: (data: GitPushConfig200) => {
-      if (data.commit) {
-        toast.success(`Git push successful! Commit: ${data.commit}`);
+      const result = data as any;
+      if (result.pr_url) {
+        toast.success(`Pull request #${result.pr_number} created!`);
+        setPrResult({
+          pr_url: result.pr_url,
+          pr_number: result.pr_number,
+          branch: result.branch,
+        });
+      } else if (result.commit) {
+        toast.success(`Pushed commit: ${result.commit}`);
       } else {
-        toast.info(String(data.message) || "No changes to commit");
+        toast.info(String(result.message) || "No changes to commit");
       }
       setCommitMessage("");
       refetchGitStatus();
@@ -410,9 +424,13 @@ export default function FilesEditorPage() {
             )}
             <button
               onClick={handlePull}
-              className="btn btn-sm btn-info hidden sm:flex"
+              className={`btn btn-sm hidden sm:flex ${(gitStatusData as any)?.has_remote_updates ? "btn-warning" : "btn-info"}`}
               disabled={pullMutation.isPending}
-              title="Pull latest changes from Git repository"
+              title={
+                (gitStatusData as any)?.has_remote_updates
+                  ? "Remote has new changes - click to pull"
+                  : "Pull latest changes from Git repository"
+              }
             >
               {pullMutation.isPending ? (
                 <span className="loading loading-spinner loading-xs"></span>
@@ -420,19 +438,22 @@ export default function FilesEditorPage() {
                 <ArrowDown size={16} />
               )}
               <span className="ml-1">Pull</span>
+              {(gitStatusData as any)?.has_remote_updates && (
+                <span className="inline-flex h-2 w-2 rounded-full bg-warning-content animate-ping"></span>
+              )}
             </button>
             <button
               onClick={handlePush}
               className="btn btn-sm btn-secondary hidden sm:flex"
               disabled={pushMutation.isPending}
-              title="Push changes to Git repository"
+              title="Create a pull request with config changes"
             >
               {pushMutation.isPending ? (
                 <span className="loading loading-spinner loading-xs"></span>
               ) : (
-                <ArrowUp size={16} />
+                <GitPullRequestArrow size={16} />
               )}
-              <span className="ml-1">Push</span>
+              <span className="ml-1">Create PR</span>
             </button>
             <button
               onClick={handleSave}
@@ -473,6 +494,37 @@ export default function FilesEditorPage() {
             )}
           </div>
         </div>
+
+        {/* PR created banner */}
+        {prResult && (
+          <div className="px-4 py-2 bg-secondary/20 border-b border-secondary/30 flex items-center justify-between">
+            <div className="flex items-center gap-2 text-sm">
+              <GitPullRequestArrow size={16} className="text-secondary" />
+              <span>
+                Pull request{" "}
+                <strong>#{prResult.pr_number}</strong>{" "}
+                created on branch{" "}
+                <strong>{prResult.branch}</strong>
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <a
+                href={prResult.pr_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn btn-xs btn-ghost gap-1"
+              >
+                Open PR <ExternalLink size={12} />
+              </a>
+              <button
+                onClick={() => setPrResult(null)}
+                className="btn btn-xs btn-ghost"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Import success banner */}
         {importResult && (
@@ -630,7 +682,7 @@ export default function FilesEditorPage() {
             </span>
             <button
               onClick={handlePull}
-              className="btn btn-circle btn-info shadow-lg"
+              className={`btn btn-circle shadow-lg ${(gitStatusData as any)?.has_remote_updates ? "btn-warning" : "btn-info"}`}
               disabled={pullMutation.isPending}
             >
               {pullMutation.isPending ? (
@@ -642,7 +694,7 @@ export default function FilesEditorPage() {
           </div>
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium bg-base-100 px-2 py-1 rounded shadow">
-              Push
+              Create PR
             </span>
             <button
               onClick={handlePush}
@@ -652,7 +704,7 @@ export default function FilesEditorPage() {
               {pushMutation.isPending ? (
                 <span className="loading loading-spinner loading-xs"></span>
               ) : (
-                <ArrowUp size={20} />
+                <GitPullRequestArrow size={20} />
               )}
             </button>
           </div>
