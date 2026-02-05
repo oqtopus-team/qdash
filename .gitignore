@@ -236,6 +236,7 @@ config/qubex/*
 !config/copilot.yaml
 !config/topologies/
 !config/qubex/qubex.example/
+config/qubex-config/*
 # Local settings overrides (not committed)
 # These allow per-developer customization without modifying committed files
 config/*.local.yaml

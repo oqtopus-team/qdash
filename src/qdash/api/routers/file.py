@@ -477,8 +477,6 @@ def git_pull_config(
     import tempfile
     from urllib.parse import urlparse, urlunparse
 
-    import shutil
-    from urllib.parse import urlparse, urlunparse
 
     try:
         # Get authentication details from environment

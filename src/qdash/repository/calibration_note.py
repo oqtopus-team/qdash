@@ -146,7 +146,10 @@ class MongoCalibrationNoteRepository:
         return self.find_latest_master(project_id=project_id)
 
     def upsert(self, note: CalibrationNoteModel) -> CalibrationNoteModel:
-        """Create or update a calibration note.
+        """Create or update a calibration note atomically.
+
+        Uses MongoDB's find_one_and_update with upsert=True to ensure
+        thread-safe operations during parallel calibration task execution.
 
         Parameters
         ----------
@@ -159,6 +162,8 @@ class MongoCalibrationNoteRepository:
             The saved note with updated timestamp
 
         """
+        from pymongo import ReturnDocument
+
         query = {
             "project_id": note.project_id,
             "execution_id": note.execution_id,
@@ -167,27 +172,35 @@ class MongoCalibrationNoteRepository:
             "chip_id": note.chip_id,
         }
 
-        doc = CalibrationNoteDocument.find_one(query).run()
         timestamp = now()
 
-        if doc is None:
-            # Create new document
-            doc = CalibrationNoteDocument(
-                project_id=note.project_id,
-                username=note.username,
-                chip_id=note.chip_id,
-                execution_id=note.execution_id,
-                task_id=note.task_id,
-                note=note.note,
-                timestamp=timestamp,
-            )
-            doc.save()
-        else:
-            # Update existing document
-            doc.note = note.note
-            doc.timestamp = timestamp
-            doc.save()
+        # Atomic upsert using find_one_and_update
+        # $set: always update these fields
+        # $setOnInsert: only set these fields on insert (not on update)
+        update = {
+            "$set": {
+                "note": note.note,
+                "timestamp": timestamp,
+            },
+            "$setOnInsert": {
+                "project_id": note.project_id,
+                "execution_id": note.execution_id,
+                "task_id": note.task_id,
+                "username": note.username,
+                "chip_id": note.chip_id,
+            },
+        }
 
+        collection = CalibrationNoteDocument.get_motor_collection()
+        result = collection.find_one_and_update(
+            query,
+            update,
+            upsert=True,
+            return_document=ReturnDocument.AFTER,
+        )
+
+        # Convert raw document to CalibrationNoteDocument then to model
+        doc = CalibrationNoteDocument.model_validate(result)
         return self._to_model(doc)
 
     def _to_model(self, doc: CalibrationNoteDocument) -> CalibrationNoteModel:
