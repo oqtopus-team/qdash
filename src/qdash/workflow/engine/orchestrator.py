@@ -449,8 +449,15 @@ class CalibOrchestrator:
         )
         execution_service, executed_context = result
 
-        # Update execution service reference
-        self._execution_service = execution_service
+        # Update execution service reference ONLY if this orchestrator owns
+        # the execution (i.e., it created the ExecutionService).
+        # When skip_execution=True (isolated Dask worker sessions), the
+        # orchestrator borrows the parent's ExecutionService temporarily for
+        # task execution but must NOT store it back — otherwise
+        # finish_calibration() would inadvertently complete the parent's
+        # execution while other workers are still running.
+        if not self.config.skip_execution:
+            self._execution_service = execution_service
 
         return cast(TaskContext, executed_context)
 

@@ -30,6 +30,7 @@ from __future__ import annotations
 import contextlib
 import json
 import logging
+import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -522,6 +523,70 @@ class CalibService:
             return dict(stage_result.result)
         return None
 
+    def _finalize_stale_running_tasks(
+        self,
+        logger: Any,
+        message: str = "Task was still running when execution completed",
+    ) -> None:
+        """Finalize any tasks still in RUNNING status for this execution.
+
+        During Dask parallel execution, tasks may remain in RUNNING status if:
+        - The MongoDB write for final status fails
+        - Prefect task timeout prevents the finally block from completing
+        - A Dask worker process crashes
+        - There is latency between Dask future resolution and MongoDB write completion
+
+        This method retries several times with progressive backoff delays to handle
+        the latency case, then marks any remaining running tasks as FAILED before
+        the execution status is updated, ensuring data consistency.
+
+        Args:
+            logger: Logger instance for output
+            message: Failure message to set on stale tasks
+
+        """
+        if self.execution_service is None or self.execution_id is None:
+            return
+
+        project_id = self.execution_service.project_id
+        if project_id is None:
+            return
+
+        try:
+            from qdash.repository import MongoTaskResultHistoryRepository
+
+            repo = MongoTaskResultHistoryRepository()
+
+            # Progressive backoff delays (in seconds) to handle MongoDB write latency
+            # from Dask workers. Starts short to minimize latency in the common case,
+            # then increases to handle slower edge cases.
+            retry_delays = [0.5, 1, 2, 3, 5]
+
+            for attempt, delay in enumerate(retry_delays):
+                count = repo.finalize_running_tasks(
+                    project_id=project_id,
+                    execution_id=self.execution_id,
+                    message=message,
+                )
+                if count > 0:
+                    logger.warning(
+                        f"[attempt {attempt + 1}/{len(retry_delays)}] "
+                        f"Finalized {count} stale task(s) still in RUNNING status "
+                        f"for execution {self.execution_id}"
+                    )
+                    if attempt < len(retry_delays) - 1:
+                        # Wait before re-checking in case more tasks
+                        # are still being written by Dask workers
+                        time.sleep(delay)
+                else:
+                    if attempt == 0:
+                        logger.info(
+                            f"All tasks in terminal state for execution {self.execution_id}"
+                        )
+                    break
+        except Exception as e:
+            logger.warning(f"Failed to finalize stale running tasks: {e}")
+
     def _sync_backend_params_before_push(self, logger: Any) -> None:
         """Sync recent calibration results into backend YAML params prior to GitHub push."""
         assert self.execution_service is not None, "ExecutionService not initialized"
@@ -580,13 +645,23 @@ class CalibService:
         push_results = None
 
         try:
-            # Skip most finalization if in wrapper mode (no ExecutionService)
-            if self.execution_service is None:
-                logger.info("Skipping finalization (wrapper mode - no Execution)")
+            # Skip finalization if this session doesn't own the execution.
+            # This covers two cases:
+            # 1. Wrapper mode (no ExecutionService was created)
+            # 2. Isolated Dask worker sessions (skip_execution=True) that
+            #    may have borrowed the parent's ExecutionService via
+            #    _run_prefect_task — they must NOT complete/modify it.
+            if self.execution_service is None or self.skip_execution:
+                logger.info("Skipping finalization (no owned Execution)")
                 return None
 
             assert self.task_context is not None, "TaskContext not initialized"
             assert self.github_push_config is not None, "GitHubPushConfig not initialized"
+
+            # Finalize any tasks still in RUNNING status before completing execution.
+            # This can happen when task recording fails during Dask parallel execution
+            # (e.g., MongoDB write failure, Prefect task timeout, or worker crash).
+            self._finalize_stale_running_tasks(logger)
 
             # Reload and complete execution
             self.execution_service = self.execution_service.reload().complete_execution()
@@ -693,7 +768,18 @@ class CalibService:
             ```
 
         """
+        run_logger = get_run_logger()
         try:
+            # Skip if this session doesn't own the execution
+            if self.skip_execution:
+                return
+
+            # Finalize any tasks still in RUNNING status before failing execution
+            if self.execution_service:
+                self._finalize_stale_running_tasks(
+                    run_logger,
+                    message="Task was still running when execution failed",
+                )
             # Reload and mark as failed
             if self.execution_service:
                 self.execution_service = self.execution_service.reload().fail_execution()

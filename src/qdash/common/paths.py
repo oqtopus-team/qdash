@@ -5,12 +5,12 @@ Host-side paths should be configured via .env and docker-compose.yaml volume mou
 
 Example .env:
     CALIB_DATA_PATH=./my-custom-path/calib_data
-    CONFIG_PATH=./config/qubex
+    CONFIG_PATH=./config/qubex-config
 
 Example docker-compose.yaml:
     volumes:
       - ${CALIB_DATA_PATH}:/app/calib_data
-      - ${CONFIG_PATH}:/app/config/qubex
+      - ${CONFIG_PATH}:/app/config/qubex-config
 """
 
 from __future__ import annotations
@@ -50,5 +50,5 @@ SERVICE_DIR: Path = WORKFLOW_DIR / "service"
 # Qubex backend paths
 # =============================================================================
 
-QUBEX_CONFIG_BASE: Path = CONFIG_DIR / "qubex"
+QUBEX_CONFIG_BASE: Path = CONFIG_DIR / "qubex-config"
 """Base directory for Qubex backend configuration files."""

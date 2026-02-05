@@ -158,6 +158,64 @@ class MongoTaskResultHistoryRepository:
             finder = finder.sort(sort)
         return list(finder.project(projection_model).run())
 
+    def finalize_running_tasks(
+        self,
+        *,
+        project_id: str,
+        execution_id: str,
+        message: str = "Task was still running when execution completed",
+    ) -> int:
+        """Finalize any tasks still in RUNNING status for the given execution.
+
+        When an execution completes or fails, there may be tasks that remain
+        in RUNNING status due to recording failures, timeouts, or process
+        crashes during Dask parallel execution. This method marks those
+        stale tasks as FAILED to maintain data consistency.
+
+        Parameters
+        ----------
+        project_id : str
+            The project identifier
+        execution_id : str
+            The execution identifier
+        message : str
+            The failure message to set on stale tasks
+
+        Returns
+        -------
+        int
+            Number of tasks that were finalized
+
+        """
+        from qdash.common.datetime_utils import now
+
+        end_time = now()
+
+        # Use bulk update for better performance instead of individual saves
+        # This updates all matching documents in a single database operation
+        result = (
+            TaskResultHistoryDocument.find(
+                {
+                    "project_id": project_id,
+                    "execution_id": execution_id,
+                    "status": "running",
+                }
+            )
+            .update_many(
+                {
+                    "$set": {
+                        "status": "failed",
+                        "message": message,
+                        "end_at": end_time,
+                    }
+                }
+            )
+            .run()
+        )
+
+        # Return the number of documents modified
+        return result.modified_count if result else 0
+
     def aggregate_latest_metrics(
         self,
         *,

@@ -24,6 +24,7 @@ class MockExecutionService:
         self.calib_data_path = kwargs.get("calib_data_path", "")
         self.calib_data = type("obj", (object,), {"qubit": {}, "coupling": {}})()
         self.tags = kwargs.get("tags", [])
+        self.project_id = kwargs.get("project_id", "test_project")
         self.completed = False
 
     def save(self):

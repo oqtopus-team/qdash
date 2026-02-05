@@ -25,10 +25,10 @@ class QubexPaths:
     --------
     >>> paths = QubexPaths()
     >>> paths.config_dir("64Q")
-    PosixPath('/app/config/qubex/64Q/config')
+    PosixPath('/app/config/qubex-config/64Q/config')
 
     >>> paths.wiring_yaml("64Q")
-    PosixPath('/app/config/qubex/64Q/config/wiring.yaml')
+    PosixPath('/app/config/qubex-config/64Q/config/wiring.yaml')
 
     """
 

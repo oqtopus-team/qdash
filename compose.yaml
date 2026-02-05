@@ -107,7 +107,7 @@ services:
       - ./src/qdash/repository:/app/qdash/repository
       - ./src/qdash/config.py:/app/qdash/config.py
       - ${CALIB_DATA_PATH:-./calib_data}:/app/calib_data
-      - ${CONFIG_PATH:-./config/qubex}:/app/config/qubex
+      - ${CONFIG_PATH:-./config/qubex-config}:/app/config/qubex-config
     working_dir: /app/qdash/workflow
     command: >
       sh -c "python setup_work_pool.py &&
@@ -141,7 +141,7 @@ services:
       - ${CALIBTASKS_PATH:-./src/qdash/workflow/calibtasks}:/app/qdash/workflow/calibtasks # Calibration tasks
       - ./config:/app/config # Metrics metadata and other config files
       - ${CALIB_DATA_PATH:-./calib_data}:/app/calib_data
-      - ${CONFIG_PATH:-./config/qubex}:/app/config/qubex
+      - ${CONFIG_PATH:-./config/qubex-config}:/app/config/qubex-config
     working_dir: /app/qdash/api
     command: gunicorn main:app --workers 4 --worker-class uvicorn.workers.UvicornWorker --reload --bind :${API_PORT:-5715} --log-level debug
     develop:
