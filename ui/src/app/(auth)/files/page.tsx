@@ -501,10 +501,8 @@ export default function FilesEditorPage() {
             <div className="flex items-center gap-2 text-sm">
               <GitPullRequestArrow size={16} className="text-secondary" />
               <span>
-                Pull request{" "}
-                <strong>#{prResult.pr_number}</strong>{" "}
-                created on branch{" "}
-                <strong>{prResult.branch}</strong>
+                Pull request <strong>#{prResult.pr_number}</strong> created on
+                branch <strong>{prResult.branch}</strong>
               </span>
             </div>
             <div className="flex items-center gap-2">

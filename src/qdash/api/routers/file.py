@@ -474,9 +474,7 @@ def git_pull_config(
 
     """
     import shutil
-    import tempfile
     from urllib.parse import urlparse, urlunparse
-
 
     try:
         # Get authentication details from environment
@@ -515,9 +513,7 @@ def git_pull_config(
         current = repo.head.commit
         commit_sha = current.hexsha[:8]
         commit_msg = (
-            current.message
-            if isinstance(current.message, str)
-            else current.message.decode("utf-8")
+            current.message if isinstance(current.message, str) else current.message.decode("utf-8")
         ).strip()
 
         logger.info(f"Updated to commit: {commit_sha} - {commit_msg}")
@@ -604,9 +600,7 @@ def git_push_config(
             repo = Repo.clone_from(auth_url, temp_dir, branch="main", depth=1)
 
             # Create a new branch for the PR
-            branch_name = (
-                f"config-update/{datetime.now(tz=timezone.utc).strftime('%Y%m%d-%H%M%S')}"
-            )
+            branch_name = f"config-update/{datetime.now(tz=timezone.utc).strftime('%Y%m%d-%H%M%S')}"
             repo.git.checkout("-b", branch_name)
 
             # Copy all files from CONFIG_BASE_PATH to temp repo (excluding .git)
