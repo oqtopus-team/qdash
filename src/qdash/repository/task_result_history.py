@@ -16,12 +16,13 @@ from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
 logger = logging.getLogger(__name__)
 
 
-class MetricAggregateResult(TypedDict):
+class MetricAggregateResult(TypedDict, total=False):
     """Result type for metric aggregation."""
 
     value: float
     task_id: str | None
     execution_id: str
+    stddev: float | None
 
 
 class MongoTaskResultHistoryRepository:
@@ -156,6 +157,64 @@ class MongoTaskResultHistoryRepository:
         if sort:
             finder = finder.sort(sort)
         return list(finder.project(projection_model).run())
+
+    def finalize_running_tasks(
+        self,
+        *,
+        project_id: str,
+        execution_id: str,
+        message: str = "Task was still running when execution completed",
+    ) -> int:
+        """Finalize any tasks still in RUNNING status for the given execution.
+
+        When an execution completes or fails, there may be tasks that remain
+        in RUNNING status due to recording failures, timeouts, or process
+        crashes during Dask parallel execution. This method marks those
+        stale tasks as FAILED to maintain data consistency.
+
+        Parameters
+        ----------
+        project_id : str
+            The project identifier
+        execution_id : str
+            The execution identifier
+        message : str
+            The failure message to set on stale tasks
+
+        Returns
+        -------
+        int
+            Number of tasks that were finalized
+
+        """
+        from qdash.common.datetime_utils import now
+
+        end_time = now()
+
+        # Use bulk update for better performance instead of individual saves
+        # This updates all matching documents in a single database operation
+        result = (
+            TaskResultHistoryDocument.find(
+                {
+                    "project_id": project_id,
+                    "execution_id": execution_id,
+                    "status": "running",
+                }
+            )
+            .update_many(
+                {
+                    "$set": {
+                        "status": "failed",
+                        "message": message,
+                        "end_at": end_time,
+                    }
+                }
+            )
+            .run()
+        )
+
+        # Return the number of documents modified
+        return result.modified_count if result else 0
 
     def aggregate_latest_metrics(
         self,
@@ -318,6 +377,99 @@ class MongoTaskResultHistoryRepository:
         # Run aggregation for minimize metrics
         if minimize_metrics:
             self._aggregate_best_by_mode(match_stage, minimize_metrics, "min", metrics_data)
+
+        return metrics_data
+
+    def aggregate_average_metrics(
+        self,
+        *,
+        chip_id: str,
+        project_id: str,
+        entity_type: Literal["qubit", "coupling"],
+        metric_keys: set[str],
+        cutoff_time: datetime | None = None,
+    ) -> dict[str, dict[str, MetricAggregateResult]]:
+        """Aggregate average metric values for each entity using MongoDB aggregation.
+
+        Uses a single aggregation pipeline to efficiently compute the mean
+        value for each (qid, metric) combination. Null values are excluded
+        before averaging.
+
+        Parameters
+        ----------
+        chip_id : str
+            The chip identifier
+        project_id : str
+            The project identifier for filtering
+        entity_type : Literal["qubit", "coupling"]
+            Type of entity to query
+        metric_keys : set[str]
+            Set of metric keys to extract
+        cutoff_time : datetime | None
+            Optional datetime for filtering tasks (only include tasks after this time)
+
+        Returns
+        -------
+        dict[str, dict[str, MetricAggregateResult]]
+            Nested dict: metric_name -> entity_id -> {value, task_id, execution_id}
+            task_id and execution_id are None since the average is not tied to a single task.
+
+        """
+        if not metric_keys:
+            return {}
+
+        # Build match stage
+        match_stage: dict[str, Any] = {
+            "chip_id": chip_id,
+            "project_id": project_id,
+            "task_type": entity_type,
+            "status": "completed",
+            "$or": [{f"output_parameters.{m}": {"$exists": True}} for m in metric_keys],
+        }
+        if cutoff_time:
+            match_stage["start_at"] = {"$gte": cutoff_time}
+
+        pipeline: list[dict[str, Any]] = [
+            {"$match": match_stage},
+            {
+                "$project": {
+                    "qid": 1,
+                    "metrics": {"$objectToArray": "$output_parameters"},
+                }
+            },
+            {"$unwind": "$metrics"},
+            {"$match": {"metrics.k": {"$in": list(metric_keys)}}},
+            # Filter out null values before averaging
+            {"$match": {"metrics.v.value": {"$ne": None}}},
+            {
+                "$group": {
+                    "_id": {"qid": "$qid", "metric": "$metrics.k"},
+                    "value": {"$avg": "$metrics.v.value"},
+                    "stddev": {"$stdDevSamp": "$metrics.v.value"},
+                }
+            },
+        ]
+
+        results = list(TaskResultHistoryDocument.aggregate(pipeline).run())
+
+        # Transform results to nested dict structure
+        metrics_data: dict[str, dict[str, MetricAggregateResult]] = {key: {} for key in metric_keys}
+
+        for doc in results:
+            metric_name = doc["_id"]["metric"]
+            qid = doc["_id"]["qid"]
+            value = doc.get("value")
+
+            if value is not None and isinstance(value, (int, float)):
+                stddev = doc.get("stddev")
+                metrics_data[metric_name][qid] = MetricAggregateResult(
+                    value=float(value),
+                    task_id=None,
+                    execution_id="",
+                    stddev=float(stddev)
+                    if stddev is not None and isinstance(stddev, (int, float))
+                    else None,
+                )
 
         return metrics_data
 

@@ -1,6 +1,6 @@
 from typing import ClassVar
 
-from qdash.datamodel.task import InputParameterModel, OutputParameterModel
+from qdash.datamodel.task import ParameterModel, RunParameterModel
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
     RunResult,
@@ -17,32 +17,33 @@ class X180InterleavedRandomizedBenchmarking(QubexTask):
     name: str = "X180InterleavedRandomizedBenchmarking"
     task_type: str = "qubit"
     timeout: int = 60 * 30
-    input_parameters: ClassVar[dict[str, InputParameterModel]] = {
-        "n_trials": InputParameterModel(
+    input_parameters: ClassVar[dict[str, ParameterModel | None]] = {}
+    run_parameters: ClassVar[dict[str, RunParameterModel]] = {
+        "n_trials": RunParameterModel(
             unit="a.u.",
             value_type="int",
             value=10,
             description="Number of trials",
         ),
-        "shots": InputParameterModel(
+        "shots": RunParameterModel(
             unit="a.u.",
             value_type="int",
             value=CALIBRATION_SHOTS,
             description="Number of shots",
         ),
-        "interval": InputParameterModel(
+        "interval": RunParameterModel(
             unit="ns",
             value_type="int",
             value=DEFAULT_INTERVAL,
             description="Time interval",
         ),
     }
-    output_parameters: ClassVar[dict[str, OutputParameterModel]] = {
-        "x180_gate_fidelity": OutputParameterModel(
+    output_parameters: ClassVar[dict[str, ParameterModel]] = {
+        "x180_gate_fidelity": ParameterModel(
             unit="a.u.",
             description="X180 gate fidelity",
         ),
-        "x180_depolarizing_rate": OutputParameterModel(
+        "x180_depolarizing_rate": ParameterModel(
             unit="a.u.",
             description="Depolarization error of the X180 gate",
         ),
@@ -69,10 +70,10 @@ class X180InterleavedRandomizedBenchmarking(QubexTask):
         result = exp.interleaved_randomized_benchmarking(
             targets=label,
             interleaved_clifford="X180",
-            n_trials=self.input_parameters["n_trials"].get_value(),
+            n_trials=self.run_parameters["n_trials"].get_value(),
             save_image=False,
-            shots=self.input_parameters["shots"].get_value(),
-            interval=self.input_parameters["interval"].get_value(),
+            shots=self.run_parameters["shots"].get_value(),
+            interval=self.run_parameters["interval"].get_value(),
         )
         self.save_calibration(backend)
         r2 = result[label]["rb_fit_result"]["r2"]

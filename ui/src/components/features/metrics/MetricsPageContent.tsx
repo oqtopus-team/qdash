@@ -7,6 +7,7 @@ import Select, { type GroupBase, type SingleValue } from "react-select";
 import { CouplingMetricsGrid } from "./CouplingMetricsGrid";
 import { MetricsCdfChart } from "./MetricsCdfChart";
 import { MetricsPdfDownloadButton } from "./MetricsPdfDownloadButton";
+import { MetricsYamlDownloadButton } from "./MetricsYamlDownloadButton";
 import { MetricsStatsCards, useMetricStats } from "./MetricsStatsCards";
 import { QubitMetricsGrid } from "./QubitMetricsGrid";
 import { LinearGauge } from "@/components/ui/LinearGauge";
@@ -26,7 +27,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { PageFiltersBar } from "@/components/ui/PageFiltersBar";
 
 type TimeRange = "1d" | "7d" | "30d";
-type SelectionMode = "latest" | "best";
+type SelectionMode = "latest" | "best" | "average";
 
 type MetricOption = {
   value: string;
@@ -192,17 +193,19 @@ export function MetricsPageContent() {
         value: number | null;
         task_id?: string | null;
         execution_id?: string | null;
+        stddev?: number | null;
       };
     } = {};
     Object.entries(rawData).forEach(([key, metricValue]: [string, any]) => {
-      // For qubit metrics, format as "Q00", for coupling metrics keep "0-1" format
+      // Use simple numeric format for qubit metrics (e.g., "0", "1"), keep "0-1" format for coupling
       const formattedKey =
         metricType === "qubit"
           ? key.startsWith("Q")
-            ? key
-            : `Q${key.padStart(2, "0")}`
+            ? String(parseInt(key.slice(1), 10))
+            : String(parseInt(key, 10))
           : key;
       const value = metricValue?.value;
+      const stddev = metricValue?.stddev;
       scaledData[formattedKey] = {
         value:
           value !== null && value !== undefined && typeof value === "number"
@@ -210,6 +213,10 @@ export function MetricsPageContent() {
             : null,
         task_id: metricValue?.task_id,
         execution_id: metricValue?.execution_id,
+        stddev:
+          stddev !== null && stddev !== undefined && typeof stddev === "number"
+            ? stddev * currentMetricConfig.scale
+            : null,
       };
     });
 
@@ -242,8 +249,8 @@ export function MetricsPageContent() {
         const formattedKey =
           metricType === "qubit"
             ? key.startsWith("Q")
-              ? key
-              : `Q${key.padStart(2, "0")}`
+              ? String(parseInt(key.slice(1), 10))
+              : String(parseInt(key, 10))
             : key;
         const value = metricValue?.value;
         scaledData[formattedKey] = {
@@ -296,12 +303,22 @@ export function MetricsPageContent() {
               description="View and compare qubit performance metrics"
               className="mb-0"
             />
-            <MetricsPdfDownloadButton
-              chipId={selectedChip}
-              withinHours={withinHours}
-              selectionMode={selectionMode}
-              disabled={!selectedChip || isLoading}
-            />
+            <div className="flex items-start gap-2">
+              <MetricsYamlDownloadButton
+                chipId={selectedChip}
+                metricData={metricData}
+                metricConfig={currentMetricConfig}
+                selectionMode={selectionMode}
+                timeRange={timeRange}
+                disabled={!selectedChip || isLoading}
+              />
+              <MetricsPdfDownloadButton
+                chipId={selectedChip}
+                withinHours={withinHours}
+                selectionMode={selectionMode}
+                disabled={!selectedChip || isLoading}
+              />
+            </div>
           </div>
 
           {/* Metric Type Tabs */}
@@ -386,6 +403,15 @@ export function MetricsPageContent() {
                     }
                   >
                     <span>Best</span>
+                  </button>
+                  <button
+                    className={`join-item btn btn-sm ${
+                      selectionMode === "average" ? "btn-active" : ""
+                    }`}
+                    onClick={() => setSelectionMode("average")}
+                    title="Show average values within time range"
+                  >
+                    <span>Average</span>
                   </button>
                 </div>
               </PageFiltersBar.Item>

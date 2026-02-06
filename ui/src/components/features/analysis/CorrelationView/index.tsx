@@ -429,9 +429,9 @@ export function CorrelationView() {
           text: statistics
             ? `Correlation: r = ${statistics.correlation.toFixed(3)} (n = ${statistics.sampleSize})<br>` +
               `Time range: ${timeRange === "1d" ? "Last 1 Day" : timeRange === "7d" ? "Last 7 Days" : "Last 30 Days"} | ` +
-              `Mode: ${selectionMode === "latest" ? "Latest" : "Best"}`
+              `Mode: ${selectionMode === "latest" ? "Latest" : selectionMode === "best" ? "Best" : "Average"}`
             : `Time range: ${timeRange === "1d" ? "Last 1 Day" : timeRange === "7d" ? "Last 7 Days" : "Last 30 Days"} | ` +
-              `Mode: ${selectionMode === "latest" ? "Latest" : "Best"}`,
+              `Mode: ${selectionMode === "latest" ? "Latest" : selectionMode === "best" ? "Best" : "Average"}`,
           showarrow: false,
           xref: "paper" as const,
           yref: "paper" as const,
@@ -579,7 +579,7 @@ export function CorrelationView() {
                 </button>
               </div>
 
-              <div className="w-28 sm:w-36">
+              <div className="w-28 sm:w-48">
                 <ChipSelector
                   selectedChip={selectedChip}
                   onChipSelect={setSelectedChip}
@@ -674,6 +674,13 @@ export function CorrelationView() {
                   }
                 >
                   Best
+                </button>
+                <button
+                  className={`join-item btn btn-xs sm:btn-sm h-full ${selectionMode === "average" ? "btn-active" : ""}`}
+                  onClick={() => setSelectionMode("average")}
+                  title="Show average values"
+                >
+                  Average
                 </button>
               </div>
 

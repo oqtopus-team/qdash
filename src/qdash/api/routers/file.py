@@ -432,6 +432,16 @@ def get_git_status() -> dict[str, Any]:
         untracked_files = repo.untracked_files
         changed_files = [item.a_path for item in repo.index.diff(None)]
 
+        # Check if local is behind remote
+        has_remote_updates = False
+        try:
+            repo.remotes.origin.fetch()
+            local_sha = repo.head.commit.hexsha
+            remote_sha = repo.remotes.origin.refs.main.commit.hexsha
+            has_remote_updates = local_sha != remote_sha
+        except Exception:
+            logger.debug("Failed to fetch remote for update check")
+
         return {
             "is_git_repo": True,
             "branch": current_branch,
@@ -440,6 +450,7 @@ def get_git_status() -> dict[str, Any]:
             "is_dirty": is_dirty,
             "changed_files": changed_files,
             "untracked_files": untracked_files,
+            "has_remote_updates": has_remote_updates,
         }
 
     except Exception as e:
@@ -463,7 +474,6 @@ def git_pull_config(
 
     """
     import shutil
-    import tempfile
     from urllib.parse import urlparse, urlunparse
 
     try:
@@ -478,73 +488,56 @@ def git_pull_config(
                 detail="Missing required environment variables: GITHUB_USER, GITHUB_TOKEN, CONFIG_REPO_URL",
             )
 
+        # Type narrowing for mypy after the all() check
+        assert repo_url is not None
+
         # Parse and reconstruct URL with authentication
         parsed = urlparse(repo_url)
-        scheme = parsed.scheme if isinstance(parsed.scheme, str) else parsed.scheme.decode()
-        netloc = parsed.netloc if isinstance(parsed.netloc, str) else parsed.netloc.decode()
-        path = parsed.path if isinstance(parsed.path, str) else parsed.path.decode()
-        auth_netloc = f"{github_user}:{github_token}@{netloc}"
-        auth_url = urlunparse((scheme, auth_netloc, path, "", "", ""))
+        auth_netloc = f"{github_user}:{github_token}@{parsed.netloc}"
+        auth_url: str = urlunparse((parsed.scheme, auth_netloc, parsed.path, "", "", ""))
 
-        # Create temporary directory and clone repository
-        temp_dir = tempfile.mkdtemp()
-        temp_dir_path = Path(temp_dir)
-
-        try:
-            logger.info("Cloning repository to temporary directory")
-            repo = Repo.clone_from(auth_url, temp_dir)
-
-            # Create backup of current config if it exists
-            if CONFIG_BASE_PATH.exists():
-                backup_dir = (
-                    CONFIG_BASE_PATH.parent
-                    / f"config_backup_{datetime.now(tz=timezone.utc).strftime('%Y%m%d_%H%M%S')}"
-                )
-                shutil.copytree(CONFIG_BASE_PATH, backup_dir)
-                logger.info(f"Created backup at: {backup_dir}")
-
-            # Get latest changes
-            logger.info("Fetching latest changes")
+        if (CONFIG_BASE_PATH / ".git").exists():
+            # Already a git repo - fetch and reset to match remote exactly
+            logger.info("Fetching latest changes from remote")
+            repo = Repo(CONFIG_BASE_PATH)
+            repo.remotes.origin.set_url(auth_url)
             repo.remotes.origin.fetch()
             repo.git.reset("--hard", "origin/main")
+            repo.git.clean("-fd")
+        else:
+            # Not a git repo - clone directly
+            logger.info("Cloning repository to config directory")
+            if CONFIG_BASE_PATH.exists():
+                shutil.rmtree(CONFIG_BASE_PATH)
+            CONFIG_BASE_PATH.parent.mkdir(parents=True, exist_ok=True)
+            repo = Repo.clone_from(auth_url, str(CONFIG_BASE_PATH), depth=1)
 
-            # Create target directory if it doesn't exist
-            CONFIG_BASE_PATH.mkdir(parents=True, exist_ok=True)
+        # Log success with commit information
+        current = repo.head.commit
+        commit_sha = current.hexsha[:8]
+        commit_msg = (
+            current.message if isinstance(current.message, str) else current.message.decode("utf-8")
+        ).strip()
 
-            # Copy files
-            config_source = Path(temp_dir)
-            for item in config_source.glob("*"):
-                if item.name == ".git":
-                    continue
+        logger.info(f"Updated to commit: {commit_sha} - {commit_msg}")
+        logger.info(f"Config files updated successfully in: {CONFIG_BASE_PATH}")
 
-                destination = CONFIG_BASE_PATH / item.name
-                if item.is_file():
-                    shutil.copy2(item, destination)
-                else:
-                    shutil.copytree(item, destination, dirs_exist_ok=True)
-
-            # Log success with commit information
-            current = repo.head.commit
-            commit_sha = current.hexsha[:8]
-            commit_msg = str(current.message).strip()
-
-            logger.info(f"Updated to commit: {commit_sha} - {commit_msg}")
-            logger.info(f"Config files updated successfully in: {CONFIG_BASE_PATH}")
-
-            return {
-                "success": True,
-                "commit": commit_sha,
-                "commit_message": commit_msg,
-                "message": "Config files updated successfully",
-            }
-
-        finally:
-            if temp_dir_path.exists():
-                shutil.rmtree(temp_dir)
+        return {
+            "success": True,
+            "commit": commit_sha,
+            "commit_message": commit_msg,
+            "message": "Config files updated successfully",
+        }
 
     except GitCommandError as e:
-        logger.error(f"Git pull failed: {e.stderr}")
-        raise HTTPException(status_code=500, detail=f"Git pull failed: {e.stderr}")
+        # Mask credentials in error message
+        error_msg = str(e.stderr)
+        parsed_err = urlparse(repo_url or "")
+        masked_url: str = urlunparse(
+            (parsed_err.scheme, str(parsed_err.netloc).split("@")[-1], parsed_err.path, "", "", "")
+        )
+        logger.error(f"Git pull failed for {masked_url}: {error_msg}")
+        raise HTTPException(status_code=500, detail=f"Git pull failed: {error_msg}")
     except Exception as e:
         logger.error(f"Error pulling from Git: {e}")
         raise HTTPException(status_code=500, detail=f"Error pulling from Git: {e!s}")
@@ -570,9 +563,12 @@ def git_push_config(
         Push operation result
 
     """
+    import re
     import shutil
     import tempfile
     from urllib.parse import urlparse, urlunparse
+
+    import httpx
 
     try:
         # Get authentication details from environment
@@ -586,39 +582,60 @@ def git_push_config(
                 detail="Missing required environment variables: GITHUB_USER, GITHUB_TOKEN, CONFIG_REPO_URL",
             )
 
+        # Type narrowing for mypy after the all() check
+        assert repo_url is not None
+
+        # Parse owner/repo from URL for GitHub API
+        match = re.match(r"https?://[^/]+/([^/]+)/([^/]+?)(?:\.git)?$", repo_url)
+        if not match:
+            raise HTTPException(status_code=500, detail="Invalid CONFIG_REPO_URL format")
+        owner = match.group(1)
+        repo_name = match.group(2)
+
         # Parse and reconstruct URL with authentication
         parsed = urlparse(repo_url)
-        scheme = parsed.scheme if isinstance(parsed.scheme, str) else parsed.scheme.decode()
-        netloc = parsed.netloc if isinstance(parsed.netloc, str) else parsed.netloc.decode()
-        path = parsed.path if isinstance(parsed.path, str) else parsed.path.decode()
-        auth_netloc = f"{github_user}:{github_token}@{netloc}"
-        auth_url = urlunparse((scheme, auth_netloc, path, "", "", ""))
+        auth_netloc = f"{github_user}:{github_token}@{parsed.netloc}"
+        auth_url: str = urlunparse((parsed.scheme, auth_netloc, parsed.path, "", "", ""))
 
-        # Create temporary directory and clone repository
+        # Create temporary directory and clone repository (shallow clone for efficiency)
         temp_dir = tempfile.mkdtemp()
         temp_dir_path = Path(temp_dir)
 
         try:
             logger.info("Cloning repository to temporary directory")
-            repo = Repo.clone_from(auth_url, temp_dir, branch="main")
+            repo = Repo.clone_from(auth_url, temp_dir, branch="main", depth=1)
+
+            # Create a new branch for the PR
+            branch_name = f"config-update/{datetime.now(tz=timezone.utc).strftime('%Y%m%d-%H%M%S')}"
+            repo.git.checkout("-b", branch_name)
 
             # Copy all files from CONFIG_BASE_PATH to temp repo (excluding .git)
-            for item in CONFIG_BASE_PATH.glob("*"):
-                if item.name == ".git":
+            # Track copied files for specific staging (not git add -A)
+            added_files = []
+            for item in CONFIG_BASE_PATH.rglob("*"):
+                if ".git" in item.parts:
                     continue
-
-                destination = temp_dir_path / item.name
                 if item.is_file():
+                    rel_path = item.relative_to(CONFIG_BASE_PATH)
+                    destination = temp_dir_path / rel_path
+                    destination.parent.mkdir(parents=True, exist_ok=True)
                     shutil.copy2(item, destination)
-                else:
-                    shutil.copytree(item, destination, dirs_exist_ok=True)
+                    added_files.append(str(rel_path))
 
-            # Git operations
-            repo.git.add(A=True)  # Add all files
+            if not added_files:
+                logger.info("No files to commit")
+                return {
+                    "success": True,
+                    "message": "No files to commit",
+                    "commit": None,
+                }
+
+            # Stage only the files we copied (matching workflow behavior)
+            repo.index.add(added_files)
 
             # Check if there are changes to commit
             diff = repo.index.diff("HEAD")
-            if not diff and not repo.untracked_files:
+            if not diff:
                 logger.info("No changes to commit")
                 return {
                     "success": True,
@@ -626,27 +643,54 @@ def git_push_config(
                     "commit": None,
                 }
 
-            # Configure git user
-            repo.git.config("user.name", "qdash-ui")
-            repo.git.config("user.email", "qdash-ui@users.noreply.github.com")
+            # Configure git user (matching workflow)
+            repo.git.config("user.name", "github-actions[bot]")
+            repo.git.config("user.email", "github-actions[bot]@users.noreply.github.com")
 
             # Commit with timestamp
             now_jst = now_iso()
             commit_msg = f"{request.commit_message} at {now_jst}"
             repo.index.commit(commit_msg)
 
-            # Push to remote
-            logger.info("Pushing to remote repository")
-            repo.remotes.origin.push()
+            # Push the new branch to remote
+            logger.info(f"Pushing branch {branch_name} to remote")
+            repo.remotes.origin.push(refspec=f"{branch_name}:{branch_name}")
 
             commit_sha = repo.head.commit.hexsha[:8]
-            logger.info(f"Pushed commit: {commit_sha}")
+
+            # Create Pull Request via GitHub API
+            logger.info("Creating pull request")
+            pr_response = httpx.post(
+                f"https://api.github.com/repos/{owner}/{repo_name}/pulls",
+                headers={
+                    "Authorization": f"token {github_token}",
+                    "Accept": "application/vnd.github.v3+json",
+                },
+                json={
+                    "title": request.commit_message,
+                    "head": branch_name,
+                    "base": "main",
+                    "body": (
+                        f"Config update from QDash UI\n\n"
+                        f"- Commit: `{commit_sha}`\n"
+                        f"- Timestamp: {now_jst}\n"
+                    ),
+                },
+                timeout=30,
+            )
+            pr_response.raise_for_status()
+            pr_data = pr_response.json()
+
+            logger.info(f"Pull request created: {pr_data['html_url']}")
 
             return {
                 "success": True,
                 "commit": commit_sha,
                 "commit_message": commit_msg,
-                "message": "Config files pushed successfully",
+                "message": "Pull request created successfully",
+                "pr_url": pr_data["html_url"],
+                "pr_number": pr_data["number"],
+                "branch": branch_name,
             }
 
         finally:
@@ -654,8 +698,19 @@ def git_push_config(
                 shutil.rmtree(temp_dir)
 
     except GitCommandError as e:
-        logger.error(f"Git push failed: {e.stderr}")
-        raise HTTPException(status_code=500, detail=f"Git push failed: {e.stderr}")
+        # Mask credentials in error message
+        error_msg = str(e.stderr)
+        parsed_err = urlparse(repo_url or "")
+        masked_url: str = urlunparse(
+            (parsed_err.scheme, str(parsed_err.netloc).split("@")[-1], parsed_err.path, "", "", "")
+        )
+        logger.error(f"Git push failed for {masked_url}: {error_msg}")
+        raise HTTPException(status_code=500, detail=f"Git push failed: {error_msg}")
+    except httpx.HTTPStatusError as e:
+        logger.error(f"GitHub API error: {e.response.text}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to create pull request: {e.response.text}"
+        )
     except Exception as e:
         logger.error(f"Error pushing to Git: {e}")
         raise HTTPException(status_code=500, detail=f"Error pushing to Git: {e!s}")

@@ -27,8 +27,10 @@ Example:
 
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
+import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -47,6 +49,7 @@ if TYPE_CHECKING:
     from qdash.workflow.service.targets import Target
 
 from prefect import get_run_logger
+from qdash.common.backend_config import get_default_backend
 from qdash.common.datetime_utils import now
 
 logger = logging.getLogger(__name__)
@@ -133,7 +136,7 @@ class CalibService:
         chip_id: str,
         qids: list[str] | None = None,
         execution_id: str | None = None,
-        backend_name: str = "qubex",
+        backend_name: str | None = None,
         name: str | None = None,
         flow_name: str | None = None,
         tags: list[str] | None = None,
@@ -144,6 +147,7 @@ class CalibService:
         github_push_config: GitHubPushConfig | None = None,
         muxes: list[int] | None = None,
         project_id: str | None = None,
+        skip_execution: bool = False,
         *,
         user_repo: UserRepository | None = None,
         lock_repo: ExecutionLockRepository | None = None,
@@ -172,7 +176,7 @@ class CalibService:
             qids: List of qubit IDs to calibrate. If None, session is lazily initialized.
             execution_id: Unique execution identifier (e.g., "20240101-001").
                 If None, auto-generates using current date and counter.
-            backend_name: Backend type, either 'qubex' or 'fake' (default: 'qubex')
+            backend_name: Backend type, either 'qubex' or 'fake' (default: from backend.yaml)
             name: Human-readable name for the execution (deprecated, use flow_name)
             flow_name: Flow name for display in execution list (auto-injected by API)
             tags: List of tags for categorization
@@ -184,6 +188,8 @@ class CalibService:
             muxes: List of MUX IDs for system-level tasks like CheckSkew (default: None)
             project_id: Project ID for multi-tenancy support. If None, auto-resolved
                 from username's default_project_id.
+            skip_execution: Skip Execution document creation (for wrapper/parent sessions
+                where child sessions will create their own Executions). Default: False.
             user_repo: Repository for user lookup (DI). If None, uses MongoUserRepository.
             lock_repo: Repository for lock operations (DI). If None, uses MongoExecutionLockRepository.
             counter_repo: Repository for counter operations (DI). If None, uses MongoExecutionCounterRepository.
@@ -196,8 +202,9 @@ class CalibService:
         self.chip_id = chip_id
         self.qids = qids
         self.muxes = muxes
-        self.backend_name = backend_name
+        self.backend_name = backend_name or get_default_backend()
         self.use_lock = use_lock
+        self.skip_execution = skip_execution
         self._lock_acquired = False
 
         # Store injected repositories for later use
@@ -320,6 +327,7 @@ class CalibService:
                 muxes=self.muxes,
                 project_id=self.project_id,
                 enable_github_pull=self._enable_github_pull,
+                skip_execution=self.skip_execution,
             )
 
             # Create and initialize CalibOrchestrator
@@ -341,7 +349,8 @@ class CalibService:
         """Get the ExecutionService from CalibOrchestrator."""
         if self._orchestrator is None:
             return None
-        return self._orchestrator.execution_service
+        # Access private attribute to avoid RuntimeError from property
+        return self._orchestrator._execution_service
 
     @execution_service.setter
     def execution_service(self, value: ExecutionService | None) -> None:
@@ -354,14 +363,16 @@ class CalibService:
         """Get the TaskContext from CalibOrchestrator."""
         if self._orchestrator is None:
             return None
-        return self._orchestrator.task_context
+        # Access private attribute to avoid RuntimeError from property
+        return self._orchestrator._task_context
 
     @property
     def backend(self) -> BaseBackend | None:
         """Get the Backend from CalibOrchestrator."""
         if self._orchestrator is None:
             return None
-        return self._orchestrator.backend
+        # Access private attribute to avoid RuntimeError from property
+        return self._orchestrator._backend
 
     def execute_task(
         self,
@@ -512,6 +523,70 @@ class CalibService:
             return dict(stage_result.result)
         return None
 
+    def _finalize_stale_running_tasks(
+        self,
+        logger: Any,
+        message: str = "Task was still running when execution completed",
+    ) -> None:
+        """Finalize any tasks still in RUNNING status for this execution.
+
+        During Dask parallel execution, tasks may remain in RUNNING status if:
+        - The MongoDB write for final status fails
+        - Prefect task timeout prevents the finally block from completing
+        - A Dask worker process crashes
+        - There is latency between Dask future resolution and MongoDB write completion
+
+        This method retries several times with progressive backoff delays to handle
+        the latency case, then marks any remaining running tasks as FAILED before
+        the execution status is updated, ensuring data consistency.
+
+        Args:
+            logger: Logger instance for output
+            message: Failure message to set on stale tasks
+
+        """
+        if self.execution_service is None or self.execution_id is None:
+            return
+
+        project_id = self.execution_service.project_id
+        if project_id is None:
+            return
+
+        try:
+            from qdash.repository import MongoTaskResultHistoryRepository
+
+            repo = MongoTaskResultHistoryRepository()
+
+            # Progressive backoff delays (in seconds) to handle MongoDB write latency
+            # from Dask workers. Starts short to minimize latency in the common case,
+            # then increases to handle slower edge cases.
+            retry_delays = [0.5, 1, 2, 3, 5]
+
+            for attempt, delay in enumerate(retry_delays):
+                count = repo.finalize_running_tasks(
+                    project_id=project_id,
+                    execution_id=self.execution_id,
+                    message=message,
+                )
+                if count > 0:
+                    logger.warning(
+                        f"[attempt {attempt + 1}/{len(retry_delays)}] "
+                        f"Finalized {count} stale task(s) still in RUNNING status "
+                        f"for execution {self.execution_id}"
+                    )
+                    if attempt < len(retry_delays) - 1:
+                        # Wait before re-checking in case more tasks
+                        # are still being written by Dask workers
+                        time.sleep(delay)
+                else:
+                    if attempt == 0:
+                        logger.info(
+                            f"All tasks in terminal state for execution {self.execution_id}"
+                        )
+                    break
+        except Exception as e:
+            logger.warning(f"Failed to finalize stale running tasks: {e}")
+
     def _sync_backend_params_before_push(self, logger: Any) -> None:
         """Sync recent calibration results into backend YAML params prior to GitHub push."""
         assert self.execution_service is not None, "ExecutionService not initialized"
@@ -566,13 +641,28 @@ class CalibService:
             ```
 
         """
-        assert self.execution_service is not None, "ExecutionService not initialized"
-        assert self.task_context is not None, "TaskContext not initialized"
-        assert self.github_push_config is not None, "GitHubPushConfig not initialized"
         logger = get_run_logger()
         push_results = None
 
         try:
+            # Skip finalization if this session doesn't own the execution.
+            # This covers two cases:
+            # 1. Wrapper mode (no ExecutionService was created)
+            # 2. Isolated Dask worker sessions (skip_execution=True) that
+            #    may have borrowed the parent's ExecutionService via
+            #    _run_prefect_task — they must NOT complete/modify it.
+            if self.execution_service is None or self.skip_execution:
+                logger.info("Skipping finalization (no owned Execution)")
+                return None
+
+            assert self.task_context is not None, "TaskContext not initialized"
+            assert self.github_push_config is not None, "GitHubPushConfig not initialized"
+
+            # Finalize any tasks still in RUNNING status before completing execution.
+            # This can happen when task recording fails during Dask parallel execution
+            # (e.g., MongoDB write failure, Prefect task timeout, or worker crash).
+            self._finalize_stale_running_tasks(logger)
+
             # Reload and complete execution
             self.execution_service = self.execution_service.reload().complete_execution()
 
@@ -678,7 +768,18 @@ class CalibService:
             ```
 
         """
+        run_logger = get_run_logger()
         try:
+            # Skip if this session doesn't own the execution
+            if self.skip_execution:
+                return
+
+            # Finalize any tasks still in RUNNING status before failing execution
+            if self.execution_service:
+                self._finalize_stale_running_tasks(
+                    run_logger,
+                    message="Task was still running when execution failed",
+                )
             # Reload and mark as failed
             if self.execution_service:
                 self.execution_service = self.execution_service.reload().fail_execution()
@@ -745,28 +846,52 @@ class CalibService:
         Returns:
             Dictionary with typed results from each step
         """
+        from qdash.workflow.service.session_context import (
+            clear_current_session,
+            set_current_session,
+        )
         from qdash.workflow.service.steps import Pipeline, StepContext
 
         logger = get_run_logger()
 
-        # Validate pipeline dependencies
-        pipeline = Pipeline(steps)
-        logger.info(f"Starting calibration pipeline with {len(pipeline)} steps")
+        # Set this CalibService as the current session for task execution
+        set_current_session(self)
 
-        # Initialize context
-        ctx = StepContext()
-        ctx.candidate_qids = targets.to_qids(self.chip_id)
+        try:
+            # Initialize session if not already initialized
+            qids = targets.to_qids(self.chip_id)
+            if not self._initialized:
+                self._initialize(qids)
 
-        # Execute steps sequentially
-        for i, step in enumerate(pipeline):
-            logger.info(f"Step {i + 1}/{len(pipeline)}: {step.name}")
-            try:
-                ctx = step.execute(self, targets, ctx)
-            except Exception as e:
-                logger.error(f"Step {step.name} failed: {e}")
-                raise
+            # Validate pipeline dependencies
+            pipeline = Pipeline(steps)
+            logger.info(f"Starting calibration pipeline with {len(pipeline)} steps")
 
-        logger.info("Pipeline completed successfully")
+            # Initialize context
+            ctx = StepContext()
+            ctx.candidate_qids = qids
+
+            # Execute steps sequentially
+            for i, step in enumerate(pipeline):
+                logger.info(f"Step {i + 1}/{len(pipeline)}: {step.name}")
+                try:
+                    ctx = step.execute(self, targets, ctx)
+                except Exception as e:
+                    logger.error(f"Step {step.name} failed: {e}")
+                    raise
+
+            logger.info("Pipeline completed successfully")
+
+            # Finalize execution (mark as completed, update chip history)
+            self.finish_calibration()
+        except Exception:
+            # Mark execution as failed on error and release lock (best effort)
+            with contextlib.suppress(Exception):
+                self.fail_calibration()
+            raise
+        finally:
+            # Clear session when done
+            clear_current_session()
 
         # Build results from typed context fields
         results: dict[str, Any] = {
@@ -810,7 +935,7 @@ def init_calibration(
     tags: list[str] | None = None,
     use_lock: bool = True,
     note: dict[str, Any] | None = None,
-    enable_github_pull: bool = False,
+    enable_github_pull: bool = True,
     github_push_config: GitHubPushConfig | None = None,
     muxes: list[int] | None = None,
     project_id: str | None = None,

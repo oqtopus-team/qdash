@@ -14,7 +14,7 @@ from qdash.datamodel.task import (
     CalibDataModel,
     CouplingTaskModel,
     GlobalTaskModel,
-    OutputParameterModel,
+    ParameterModel,
     QubitTaskModel,
     SystemTaskModel,
     TaskResultModel,
@@ -122,8 +122,14 @@ class TaskStateManager(BaseModel):
 
         """
         if task_type == TaskTypes.QUBIT:
+            # Initialize list if qid doesn't exist (for MUX distribution)
+            if qid not in self.task_result.qubit_tasks:
+                self.task_result.qubit_tasks[qid] = []
             self.task_result.qubit_tasks[qid].append(cast(QubitTaskModel, task))
         elif task_type == TaskTypes.COUPLING:
+            # Initialize list if qid doesn't exist
+            if qid not in self.task_result.coupling_tasks:
+                self.task_result.coupling_tasks[qid] = []
             self.task_result.coupling_tasks[qid].append(cast(CouplingTaskModel, task))
         elif task_type == TaskTypes.GLOBAL:
             self.task_result.global_tasks.append(cast(GlobalTaskModel, task))
@@ -147,9 +153,11 @@ class TaskStateManager(BaseModel):
 
         """
         if task_type == TaskTypes.QUBIT:
-            yield from self.task_result.qubit_tasks[qid]
+            # Return empty iterator if qid doesn't exist
+            yield from self.task_result.qubit_tasks.get(qid, [])
         elif task_type == TaskTypes.COUPLING:
-            yield from self.task_result.coupling_tasks[qid]
+            # Return empty iterator if qid doesn't exist
+            yield from self.task_result.coupling_tasks.get(qid, [])
         elif task_type == TaskTypes.GLOBAL:
             yield from self.task_result.global_tasks
         elif task_type == TaskTypes.SYSTEM:
@@ -390,7 +398,7 @@ class TaskStateManager(BaseModel):
     def put_output_parameters(
         self,
         task_name: str,
-        output_parameters: dict[str, OutputParameterModel],
+        output_parameters: dict[str, ParameterModel],
         task_type: str,
         qid: str,
     ) -> None:
@@ -400,7 +408,7 @@ class TaskStateManager(BaseModel):
         ----------
         task_name : str
             Name of the task
-        output_parameters : dict[str, OutputParameterModel]
+        output_parameters : dict[str, ParameterModel]
             The output parameters
         task_type : str
             Type of task

@@ -18,7 +18,7 @@ PENDING = "pending"
 SKIPPED = "skipped"
 
 # Task type definitions
-TaskType = Literal["qubit", "coupling", "global", "system"]
+TaskType = Literal["qubit", "coupling", "global", "system", "mux"]
 
 
 class TaskTypes:
@@ -28,10 +28,15 @@ class TaskTypes:
     COUPLING: Final[TaskType] = "coupling"
     GLOBAL: Final[TaskType] = "global"
     SYSTEM: Final[TaskType] = "system"
+    MUX: Final[TaskType] = "mux"
 
 
-class InputParameterModel(BaseModel):
-    """Input parameter class."""
+class RunParameterModel(BaseModel):
+    """Run parameter class for experiment configuration (e.g., shots, ranges).
+
+    This was previously named InputParameterModel. It handles experiment settings
+    that are passed to measurement functions, NOT calibration parameters.
+    """
 
     unit: str = ""
     value_type: str = "float"
@@ -94,16 +99,33 @@ class InputParameterModel(BaseModel):
         return self.value
 
 
-class OutputParameterModel(BaseModel):
-    """Data model.
+class ParameterModel(BaseModel):
+    """Calibration parameter model.
+
+    Used for both input_parameters (calibration dependencies) and
+    output_parameters (calibration outputs) in tasks.
 
     Attributes
     ----------
-        qubit (dict[str, dict[str, float | int]]): The calibration data for qubits.
-        coupling (dict[str, dict[str, float | int]]): The calibration data for couplings.
+        parameter_name: The actual DB parameter name. If empty, the dict key is used.
+        qid_role: The qid role for 2-qubit tasks. One of:
+            - "" or "self": Use task's qid as-is (default, for 1-qubit tasks)
+            - "control": Use control qubit's qid (for 2-qubit tasks)
+            - "target": Use target qubit's qid (for 2-qubit tasks)
+            - "coupling": Use coupling qid as-is (for 2-qubit tasks)
+        value: The parameter value.
+        value_type: The type of the value (default: "float").
+        error: The error/uncertainty of the value.
+        unit: The unit of measurement.
+        description: Description of the parameter.
+        calibrated_at: When the calibration was performed.
+        execution_id: The execution that produced this value.
+        task_id: The task that produced this value.
 
     """
 
+    parameter_name: str = ""
+    qid_role: str = ""
     value: float | int = 0
     value_type: str = "float"
     error: float = 0
@@ -157,20 +179,20 @@ class CalibDataModel(BaseModel):
 
     """
 
-    qubit: dict[str, dict[str, OutputParameterModel]] = Field(default_factory=dict)
-    coupling: dict[str, dict[str, OutputParameterModel]] = Field(default_factory=dict)
+    qubit: dict[str, dict[str, ParameterModel]] = Field(default_factory=dict)
+    coupling: dict[str, dict[str, ParameterModel]] = Field(default_factory=dict)
 
-    def put_qubit_data(self, qid: str, parameter_name: str, data: OutputParameterModel) -> None:
+    def put_qubit_data(self, qid: str, parameter_name: str, data: ParameterModel) -> None:
         if qid not in self.qubit:
             self.qubit[qid] = {}
         self.qubit[qid][parameter_name] = data
 
-    def put_coupling_data(self, qid: str, parameter_name: str, data: OutputParameterModel) -> None:
+    def put_coupling_data(self, qid: str, parameter_name: str, data: ParameterModel) -> None:
         if qid not in self.coupling:
             self.coupling[qid] = {}
         self.coupling[qid][parameter_name] = data
 
-    def __getitem__(self, key: str) -> dict[str, dict[str, OutputParameterModel]]:
+    def __getitem__(self, key: str) -> dict[str, dict[str, ParameterModel]]:
         """Get the item by key."""
         if key in ("qubit", "coupling"):
             return getattr(self, key)  # type: ignore
@@ -350,6 +372,23 @@ class CouplingTaskModel(BaseTaskResultModel):
     qid: str
 
 
+class MuxTaskModel(BaseTaskResultModel):
+    """MUX task result class.
+
+    For tasks that operate on a MUX (multiplexer) unit,
+    typically affecting multiple qubits simultaneously.
+
+    Attributes
+    ----------
+        task_type (str): The type of the task. e.g. "mux".
+        mux_id (int): The MUX identifier.
+
+    """
+
+    task_type: Literal["mux"] = "mux"
+    mux_id: int
+
+
 class TaskResultModel(BaseModel):
     """Task result class.
 
@@ -358,6 +397,7 @@ class TaskResultModel(BaseModel):
         global_tasks (list[GlobalTask]): The global tasks.
         qubit_tasks (dict[str, list[QubitTask]]): The qubit tasks.
         coupling_tasks (dict[str, list[CouplingTask]]): The coupling tasks.
+        mux_tasks (dict[int, list[MuxTask]]): The MUX tasks keyed by mux_id.
 
     """
 
@@ -365,6 +405,7 @@ class TaskResultModel(BaseModel):
     global_tasks: list[GlobalTaskModel] = []
     qubit_tasks: dict[str, list[QubitTaskModel]] = {}
     coupling_tasks: dict[str, list[CouplingTaskModel]] = {}
+    mux_tasks: dict[int, list[MuxTaskModel]] = {}
 
 
 class TaskModel(BaseModel):

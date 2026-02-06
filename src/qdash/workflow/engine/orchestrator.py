@@ -16,6 +16,7 @@ from prefect import get_run_logger
 from qdash.workflow.engine.backend.factory import create_backend
 from qdash.workflow.engine.execution.service import ExecutionService
 from qdash.workflow.engine.task.context import TaskContext
+from qdash.workflow.engine.task.history_recorder import TaskHistoryRecorder
 
 if TYPE_CHECKING:
     from qdash.workflow.engine.backend.base import BaseBackend
@@ -98,6 +99,22 @@ class CalibOrchestrator:
         """Check if the session is initialized."""
         return self._initialized
 
+    def _create_history_recorder(self) -> TaskHistoryRecorder:
+        """Create a TaskHistoryRecorder with optional provenance tracking.
+
+        Returns:
+            TaskHistoryRecorder configured based on enable_provenance_tracking
+        """
+        provenance_recorder = None
+        if self.config.enable_provenance_tracking:
+            from qdash.workflow.engine.task.provenance_recorder import (
+                ProvenanceRecorder,
+            )
+
+            provenance_recorder = ProvenanceRecorder()
+
+        return TaskHistoryRecorder(provenance_recorder=provenance_recorder)
+
     def initialize(self) -> None:
         """Initialize the calibration session.
 
@@ -121,26 +138,30 @@ class CalibOrchestrator:
         if config.enable_github_pull:
             self._pull_github_config(logger)
 
-        # Initialize ExecutionService
-        self._execution_service = ExecutionService.create(
-            username=config.username,
-            execution_id=config.execution_id,
-            calib_data_path=config.calib_data_path,
-            chip_id=config.chip_id,
-            name=config.flow_name or "Python Flow Execution",
-            tags=config.tags,
-            note=config.note,
-            project_id=config.project_id,
-        )
-        self._execution_service.save_with_tags()
-        self._execution_service.start_execution()
+        # Initialize ExecutionService (skip if in wrapper mode)
+        if not config.skip_execution:
+            self._execution_service = ExecutionService.create(
+                username=config.username,
+                execution_id=config.execution_id,
+                calib_data_path=config.calib_data_path,
+                chip_id=config.chip_id,
+                name=config.flow_name or "Python Flow Execution",
+                tags=config.tags,
+                note=config.note,
+                project_id=config.project_id,
+            )
+            self._execution_service.save_with_tags()
+            self._execution_service.start_execution()
+        else:
+            logger.info("Skipping Execution creation (wrapper mode)")
 
-        # Initialize TaskContext
+        # Initialize TaskContext with optional provenance tracking
         self._task_context = TaskContext(
             username=config.username,
             execution_id=config.execution_id,
             qids=config.qids,
             calib_dir=config.calib_data_path,
+            history_recorder=self._create_history_recorder(),
         )
 
         # Initialize Backend
@@ -188,6 +209,7 @@ class CalibOrchestrator:
             "note_path": note_path,
             "chip_id": config.chip_id,
             "classifier_dir": config.classifier_dir,
+            "project_id": config.project_id,
         }
 
         if config.muxes is not None:
@@ -232,6 +254,11 @@ class CalibOrchestrator:
 
         logger = get_run_logger()
         config = self.config
+
+        # Skip completion if in wrapper mode (no ExecutionService)
+        if self._execution_service is None:
+            logger.info("Skipping completion (wrapper mode - no Execution)")
+            return
 
         # Reload and complete execution
         self._execution_service = self.execution_service.reload().complete_execution()
@@ -362,12 +389,13 @@ class CalibOrchestrator:
 
         config = self.config
 
-        # Create new context for this execution
+        # Create new context for this execution with optional provenance tracking
         exec_context = TaskContext(
             username=config.username,
             execution_id=config.execution_id,
             qids=[qid],
             calib_dir=self.task_context.calib_dir,
+            history_recorder=self._create_history_recorder(),
         )
 
         # Copy relevant calibration data
@@ -421,8 +449,15 @@ class CalibOrchestrator:
         )
         execution_service, executed_context = result
 
-        # Update execution service reference
-        self._execution_service = execution_service
+        # Update execution service reference ONLY if this orchestrator owns
+        # the execution (i.e., it created the ExecutionService).
+        # When skip_execution=True (isolated Dask worker sessions), the
+        # orchestrator borrows the parent's ExecutionService temporarily for
+        # task execution but must NOT store it back — otherwise
+        # finish_calibration() would inadvertently complete the parent's
+        # execution while other workers are still running.
+        if not self.config.skip_execution:
+            self._execution_service = execution_service
 
         return cast(TaskContext, executed_context)
 

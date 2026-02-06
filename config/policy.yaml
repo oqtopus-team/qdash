@@ -1,0 +1,10 @@
+version: 1
+rules:
+  # Example: staleness (hours since valid_from)
+  - id: t1-stale
+    parameter: t1
+    checks:
+      - type: staleness_hours
+        warn: 24
+        error: 72
+        message: "T1 is stale"

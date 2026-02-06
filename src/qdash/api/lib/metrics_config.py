@@ -96,6 +96,11 @@ def load_metrics_config() -> MetricsConfig:
         raise ValueError(f"Invalid metrics configuration: {e}") from e
 
 
+def clear_metrics_config_cache() -> None:
+    """Clear the cached metrics configuration."""
+    load_metrics_config.cache_clear()
+
+
 def get_qubit_metric_metadata(metric_key: str) -> MetricMetadata | None:
     """Get metadata for a qubit metric.
 

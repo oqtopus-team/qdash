@@ -1,14 +1,19 @@
 from typing import ClassVar
 
-from qdash.datamodel.task import InputParameterModel, OutputParameterModel
+from qdash.datamodel.task import ParameterModel, RunParameterModel
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
+    PreProcessResult,
     RunResult,
 )
 from qdash.workflow.calibtasks.qubex.base import QubexTask
 from qdash.workflow.engine.backend.qubex import QubexBackend
 from qubex.experiment.experiment_constants import CALIBRATION_SHOTS
-from qubex.measurement.measurement import DEFAULT_INTERVAL
+from qubex.measurement.measurement import DEFAULT_INTERVAL, DEFAULT_READOUT_DURATION
+
+DEFAULT_CONTROL_AMPLITUDE = 0.0125
+CONTROL_AMPLITUDE_MIN = 1e-4
+CONTROL_AMPLITUDE_MAX = 1.0
 
 
 class CheckRabi(QubexTask):
@@ -16,42 +21,70 @@ class CheckRabi(QubexTask):
 
     name: str = "CheckRabi"
     task_type: str = "qubit"
-    input_parameters: ClassVar[dict[str, InputParameterModel]] = {
-        "time_range": InputParameterModel(
+    input_parameters: ClassVar[dict[str, ParameterModel | None]] = {
+        "qubit_frequency": None,
+        "control_amplitude": None,
+        "readout_amplitude": None,
+        "readout_frequency": None,
+        "readout_length": ParameterModel(
+            value=DEFAULT_READOUT_DURATION, unit="ns", description="Readout pulse length"
+        ),
+    }
+    run_parameters: ClassVar[dict[str, RunParameterModel]] = {
+        "time_range": RunParameterModel(
             unit="ns",
             value_type="range",
             value=(0, 401, 8),
             description="Time range for Rabi oscillation",
         ),
-        "shots": InputParameterModel(
+        "shots": RunParameterModel(
             unit="a.u.",
             value_type="int",
             value=CALIBRATION_SHOTS,
             description="Number of shots for Rabi oscillation",
         ),
-        "interval": InputParameterModel(
+        "interval": RunParameterModel(
             unit="ns",
             value_type="int",
             value=DEFAULT_INTERVAL,
             description="Time interval for Rabi oscillation",
         ),
     }
-    output_parameters: ClassVar[dict[str, OutputParameterModel]] = {
-        "rabi_amplitude": OutputParameterModel(
-            unit="a.u.", description="Rabi oscillation amplitude"
-        ),
-        "rabi_frequency": OutputParameterModel(
-            unit="MHz", description="Rabi oscillation frequency"
-        ),
-        "rabi_phase": OutputParameterModel(unit="a.u.", description="Rabi oscillation phase"),
-        "rabi_offset": OutputParameterModel(unit="a.u.", description="Rabi oscillation offset"),
-        "rabi_angle": OutputParameterModel(unit="degree", description="Rabi angle (in degree)"),
-        "rabi_noise": OutputParameterModel(unit="a.u.", description="Rabi oscillation noise"),
-        "rabi_distance": OutputParameterModel(unit="a.u.", description="Rabi distance"),
-        "rabi_reference_phase": OutputParameterModel(
-            unit="a.u.", description="Rabi reference phase"
+    output_parameters: ClassVar[dict[str, ParameterModel]] = {
+        "rabi_amplitude": ParameterModel(unit="a.u.", description="Rabi oscillation amplitude"),
+        "rabi_frequency": ParameterModel(unit="MHz", description="Rabi oscillation frequency"),
+        "rabi_phase": ParameterModel(unit="a.u.", description="Rabi oscillation phase"),
+        "rabi_offset": ParameterModel(unit="a.u.", description="Rabi oscillation offset"),
+        "rabi_angle": ParameterModel(unit="degree", description="Rabi angle (in degree)"),
+        "rabi_noise": ParameterModel(unit="a.u.", description="Rabi oscillation noise"),
+        "rabi_distance": ParameterModel(unit="a.u.", description="Rabi distance"),
+        "rabi_reference_phase": ParameterModel(unit="a.u.", description="Rabi reference phase"),
+        "control_amplitude": ParameterModel(unit="a.u.", description="Control pulse amplitude"),
+        "maximum_rabi_frequency": ParameterModel(
+            unit="MHz/a.u.", description="Maximum Rabi frequency per unit control amplitude"
         ),
     }
+
+    def preprocess(self, backend: QubexBackend, qid: str) -> PreProcessResult:
+        """Preprocess with control_amplitude validation."""
+        result = super().preprocess(backend, qid)
+        param = self.input_parameters.get("control_amplitude")
+        value = param.value if param is not None else None
+        if value is None or value <= CONTROL_AMPLITUDE_MIN or value >= CONTROL_AMPLITUDE_MAX:
+            print(
+                f"control_amplitude={value} is out of range "
+                f"({CONTROL_AMPLITUDE_MIN}, {CONTROL_AMPLITUDE_MAX}), "
+                f"using default={DEFAULT_CONTROL_AMPLITUDE}"
+            )
+            if param is None:
+                self.input_parameters["control_amplitude"] = ParameterModel(
+                    value=DEFAULT_CONTROL_AMPLITUDE,
+                    unit="a.u.",
+                    description="Control pulse amplitude (default)",
+                )
+            else:
+                param.value = DEFAULT_CONTROL_AMPLITUDE
+        return result
 
     def postprocess(
         self, backend: QubexBackend, execution_id: str, run_result: RunResult, qid: str
@@ -77,6 +110,16 @@ class CheckRabi(QubexTask):
         self.output_parameters["rabi_reference_phase"].value = result.rabi_params[
             label
         ].reference_phase
+        control_amplitude_param = self.input_parameters["control_amplitude"]
+        assert control_amplitude_param is not None
+        default_amp = control_amplitude_param.value
+        rabi_frequency = self.output_parameters["rabi_frequency"].value
+        print("rabi frequency (MHz): ", self.output_parameters["rabi_frequency"].value)
+        print("default amplitude (a.u.): ", control_amplitude_param.value)
+        maximum_rabi_frequency = rabi_frequency / default_amp
+        ratio = maximum_rabi_frequency / 1000
+        self.output_parameters["control_amplitude"].value = 0.0125 / ratio
+        self.output_parameters["maximum_rabi_frequency"].value = maximum_rabi_frequency
         output_parameters = self.attach_execution_id(execution_id)
         figures = [result.data[label].fit()["fig"]]
         raw_data = [result.data[label].data]
@@ -90,13 +133,19 @@ class CheckRabi(QubexTask):
         label = self.get_qubit_label(backend, qid)
 
         # Apply frequency override if qubit_frequency was explicitly provided
-        with self._apply_frequency_override(backend, qid):
-            result = exp.obtain_rabi_params(
-                time_range=self.input_parameters["time_range"].get_value(),
-                shots=self.input_parameters["shots"].get_value(),
-                interval=self.input_parameters["interval"].get_value(),
-                targets=label,
-            )
+        control_amplitude_param = self.input_parameters["control_amplitude"]
+        qubit_frequency_param = self.input_parameters["qubit_frequency"]
+        assert control_amplitude_param is not None
+        assert qubit_frequency_param is not None
+        # with self._apply_frequency_override(backend, qid):
+        result = exp.obtain_rabi_params(
+            amplitudes={label: control_amplitude_param.value},
+            frequencies={label: qubit_frequency_param.value},
+            time_range=self.run_parameters["time_range"].get_value(),
+            shots=self.run_parameters["shots"].get_value(),
+            interval=self.run_parameters["interval"].get_value(),
+            targets=label,
+        )
 
         self.save_calibration(backend)
         r2 = result.rabi_params[label].r2 if result.rabi_params else None

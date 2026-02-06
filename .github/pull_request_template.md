@@ -1,15 +1,9 @@
-# 📃 Ticket
+<!-- Keep this template minimal for Copilot/auto-drafting; remove these comments when ready. -->
+## Ticket
+<!-- Link to the ticket / issue -->
 
-<!--- Paste related ticket -->
+## Summary
+<!-- What and why (1–2 sentences) -->
 
-## ✍ Description
-
-<!--- Describe your changes in detail -->
-
-## 📸 Test Result
-
-<!--- Paste `make test result` -->
-
-## 🔗 Related PRs
-
-<!--- Paste related PRs -->
+## Changes
+<!-- Bullet list of key changes -->

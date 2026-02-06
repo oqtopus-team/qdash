@@ -2,7 +2,7 @@ from typing import Any, ClassVar
 
 import numpy as np
 import plotly.graph_objects as go
-from qdash.datamodel.task import InputParameterModel, OutputParameterModel
+from qdash.datamodel.task import ParameterModel, RunParameterModel
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
     RunResult,
@@ -12,33 +12,74 @@ from qdash.workflow.engine.backend.qubex import QubexBackend
 
 
 class CheckCrossResonance(QubexTask):
-    """Task to check the cross resonance pulse."""
+    """Task to check the cross resonance pulse (obtain_cr_params)."""
 
     name: str = "CheckCrossResonance"
     task_type: str = "coupling"
     timeout: int = 60 * 25  # 25 minutes
-    input_parameters: ClassVar[dict[str, InputParameterModel]] = {}
-    output_parameters: ClassVar[dict[str, OutputParameterModel]] = {
-        "cr_amplitude": OutputParameterModel(
-            unit="a.u.", value_type="float", description="Amplitude of the CR pulse."
+    run_parameters: ClassVar[dict[str, RunParameterModel]] = {}
+
+    # Input parameters from control and target qubits
+    input_parameters: ClassVar[dict[str, ParameterModel | None]] = {
+        # Control qubit parameters
+        "control_qubit_frequency": ParameterModel(
+            parameter_name="qubit_frequency", qid_role="control", unit="GHz"
         ),
-        "cr_phase": OutputParameterModel(
-            unit="a.u.", value_type="float", description="Phase of the CR pulse."
+        "control_drag_hpi_amplitude": ParameterModel(
+            parameter_name="drag_hpi_amplitude", qid_role="control", unit="a.u."
         ),
-        "cancel_amplitude": OutputParameterModel(
-            unit="a.u.", value_type="float", description="Amplitude of the cancel pulse."
+        "control_drag_hpi_length": ParameterModel(
+            parameter_name="drag_hpi_length", qid_role="control", unit="ns"
         ),
-        "cancel_phase": OutputParameterModel(
-            unit="a.u.", value_type="float", description="Phase of the cancel pulse."
+        "control_drag_hpi_beta": ParameterModel(
+            parameter_name="drag_hpi_beta", qid_role="control", unit="a.u."
         ),
-        "cancel_beta": OutputParameterModel(
-            unit="a.u.", value_type="float", description="Beta of the cancel pulse."
+        "control_readout_frequency": ParameterModel(
+            parameter_name="readout_frequency", qid_role="control", unit="GHz"
         ),
-        "rotary_amplitude": OutputParameterModel(
-            unit="a.u.", value_type="float", description="Amplitude of the rotary pulse."
+        "control_readout_amplitude": ParameterModel(
+            parameter_name="readout_amplitude", qid_role="control", unit="a.u."
         ),
-        "zx_rotation_rate": OutputParameterModel(
-            unit="a.u.", value_type="float", description="ZX rotation rate."
+        "control_readout_length": ParameterModel(
+            parameter_name="readout_length", qid_role="control", unit="ns"
+        ),
+        # Target qubit parameters
+        "target_qubit_frequency": ParameterModel(
+            parameter_name="qubit_frequency", qid_role="target", unit="GHz"
+        ),
+        "target_readout_frequency": ParameterModel(
+            parameter_name="readout_frequency", qid_role="target", unit="GHz"
+        ),
+        "target_readout_amplitude": ParameterModel(
+            parameter_name="readout_amplitude", qid_role="target", unit="a.u."
+        ),
+        "target_readout_length": ParameterModel(
+            parameter_name="readout_length", qid_role="target", unit="ns"
+        ),
+    }
+
+    # Output parameters with qid_role specifying where each is stored
+    output_parameters: ClassVar[dict[str, ParameterModel]] = {
+        "cr_amplitude": ParameterModel(
+            qid_role="control", unit="a.u.", description="Amplitude of the CR pulse."
+        ),
+        "cr_phase": ParameterModel(
+            qid_role="control", unit="a.u.", description="Phase of the CR pulse."
+        ),
+        "cancel_amplitude": ParameterModel(
+            qid_role="target", unit="a.u.", description="Amplitude of the cancel pulse."
+        ),
+        "cancel_phase": ParameterModel(
+            qid_role="target", unit="a.u.", description="Phase of the cancel pulse."
+        ),
+        "cancel_beta": ParameterModel(
+            qid_role="target", unit="a.u.", description="Beta of the cancel pulse."
+        ),
+        "rotary_amplitude": ParameterModel(
+            qid_role="control", unit="a.u.", description="Amplitude of the rotary pulse."
+        ),
+        "zx_rotation_rate": ParameterModel(
+            qid_role="coupling", unit="a.u.", description="ZX rotation rate."
         ),
     }
 
@@ -80,6 +121,9 @@ class CheckCrossResonance(QubexTask):
         output_parameters = self.attach_execution_id(execution_id)
         fig = self._plot_coeffs_history(result["coeffs_history"], label=label)
         figures: list[Any] = [fig]
+        for figs in result["figs_history"]:
+            figures.append(figs["fig_c"])
+            figures.append(figs["fig_t"])
         raw_data: list[Any] = []
         return PostProcessResult(
             output_parameters=output_parameters, figures=figures, raw_data=raw_data
@@ -111,6 +155,7 @@ class CheckCrossResonance(QubexTask):
             "rotary_amplitude": fit_result["rotary_amplitude"],
             "zx_rotation_rate": fit_result["zx_rotation_rate"],
             "coeffs_history": raw_result["coeffs_history"],
+            "figs_history": raw_result.data["figs_history"],
         }
         self.save_calibration(backend)
         return RunResult(raw_result=result)

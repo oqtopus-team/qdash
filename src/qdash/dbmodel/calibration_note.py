@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Any, ClassVar
+from typing import Any, ClassVar, cast
 
 from bunnet import Document
 from pydantic import ConfigDict, Field
@@ -69,7 +69,10 @@ class CalibrationNoteDocument(Document):
         note: dict[str, Any],
         project_id: str,
     ) -> "CalibrationNoteDocument":
-        """Upsert a calibration note.
+        """Upsert a calibration note atomically.
+
+        Uses MongoDB's find_one_and_update with upsert=True to ensure
+        thread-safe operations during parallel calibration task execution.
 
         Args:
         ----
@@ -85,31 +88,42 @@ class CalibrationNoteDocument(Document):
             CalibrationNoteDocument: The upserted document.
 
         """
-        doc = cls.find_one(
-            {
+        from pymongo import ReturnDocument
+
+        query = {
+            "project_id": project_id,
+            "execution_id": execution_id,
+            "task_id": task_id,
+            "username": username,
+            "chip_id": chip_id,
+        }
+
+        timestamp = now()
+
+        # Atomic upsert using find_one_and_update
+        update = {
+            "$set": {
+                "note": note,
+                "timestamp": timestamp,
+            },
+            "$setOnInsert": {
                 "project_id": project_id,
                 "execution_id": execution_id,
                 "task_id": task_id,
                 "username": username,
                 "chip_id": chip_id,
-            }
-        ).run()
-        if doc is None:
-            doc = cls(
-                project_id=project_id,
-                username=username,
-                chip_id=chip_id,
-                execution_id=execution_id,
-                task_id=task_id,
-                note=note,
-            )
-            doc.save()
-            return doc
+            },
+        }
 
-        doc.note = note
-        doc.timestamp = now()
-        doc.save()
-        return doc
+        collection = cls.get_motor_collection()
+        result = collection.find_one_and_update(
+            query,
+            update,
+            upsert=True,
+            return_document=ReturnDocument.AFTER,
+        )
+
+        return cast("CalibrationNoteDocument", cls.model_validate(result))
 
     model_config = ConfigDict(
         from_attributes=True,

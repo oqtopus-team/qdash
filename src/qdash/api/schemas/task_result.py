@@ -5,7 +5,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, field_serializer, field_validator
 from qdash.common.datetime_utils import format_elapsed_time, parse_elapsed_time
-from qdash.datamodel.task import OutputParameterModel
+from qdash.datamodel.task import ParameterModel
 
 
 class TaskResult(BaseModel):
@@ -68,6 +68,6 @@ class TimeSeriesProjection(BaseModel):
 class TimeSeriesData(BaseModel):
     """Response model for time series data."""
 
-    data: dict[str, list[OutputParameterModel]] = {}
+    data: dict[str, list[ParameterModel]] = {}
 
     model_config = ConfigDict(arbitrary_types_allowed=True)

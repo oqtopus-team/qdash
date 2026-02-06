@@ -12,6 +12,14 @@ Technical architecture documentation for QDash components.
   - Coupling topology and edge classification
   - MUX resource conflict detection
 
+### Data Lineage
+
+- **[Provenance](./provenance.md)** - Calibration data lineage tracking
+  - W3C PROV-DM based design
+  - Parameter version history and comparison
+  - Lineage/impact graph traversal
+  - MongoDB schema and indexing
+
 ### Calibration Workflow
 
 - **[1-Qubit Scheduler](./one-qubit-scheduler.md)** - Single-qubit calibration scheduling

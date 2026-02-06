@@ -471,7 +471,7 @@ qctrl-visualizer==8.0.2
     # via qubex
 qubecalib @ git+https://github.com/qiqb-osaka/qube-calib.git@487227c1154aa087e55b9fee1eabda2a164d299c
     # via qubex
-qubex @ git+https://github.com/amachino/qubex.git@0e3a46804ad204537e5bdf1687870400ce5f3148
+qubex @ git+https://github.com/amachino/qubex.git@b8440bdc80daf287fd91503ce4988f8a579a547b
 quel-clock-master @ git+https://github.com/quel-inc/quelware.git@c839e8b1a6fde4b4ece3d5f415015829857e775e#subdirectory=quel_clock_master
     # via
     #   qubecalib
@@ -504,6 +504,9 @@ rpds-py==0.23.1
     # via
     #   jsonschema
     #   referencing
+ruamel-yaml==0.18.17
+ruamel-yaml-clib==0.2.15 ; platform_python_implementation == 'CPython'
+    # via ruamel-yaml
 scikit-learn==1.7.1
     # via qubex
 scipy==1.15.3 ; python_full_version < '3.11'

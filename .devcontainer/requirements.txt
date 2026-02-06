@@ -95,6 +95,7 @@ contourpy==1.3.3 ; python_full_version >= '3.11'
     # via matplotlib
 coverage==7.6.12
     # via pytest-cov
+croniter==6.0.0
 cryptography==44.0.2
     # via
     #   pyopenssl
@@ -115,8 +116,6 @@ dnspython==2.7.0
     # via
     #   email-validator
     #   pymongo
-docker==7.1.0
-    # via testcontainers
 e7awgsw @ git+https://github.com/e-trees/e7awg_sw.git@7dccc53ce613fc42f8b0e3302b27959f0e486f87
     # via
     #   qubecalib
@@ -323,6 +322,7 @@ ml-dtypes==0.5.3
     # via
     #   jax
     #   jaxlib
+mongomock==4.1.2
 mypy==1.15.0
     # via pytest-mypy
 mypy-extensions==1.0.0
@@ -391,6 +391,7 @@ packaging==24.2
     #   jupyterlab
     #   jupyterlab-server
     #   matplotlib
+    #   mongomock
     #   nbconvert
     #   plotly
     #   pytest
@@ -469,7 +470,6 @@ pymongo==4.8.0
     # via
     #   bunnet
     #   qdash
-    #   testcontainers
 pyopenssl==25.1.0
     # via pylabrad
 pyparsing==3.2.3
@@ -495,6 +495,7 @@ pytest-mypy==0.10.3
 python-dateutil==2.9.0.post0
     # via
     #   arrow
+    #   croniter
     #   jupyter-client
     #   matplotlib
     #   pendulum
@@ -507,10 +508,10 @@ python-json-logger==3.3.0
     # via jupyter-events
 python-multipart==0.0.20
     # via fastapi
-pywin32==308 ; sys_platform == 'win32'
-    # via
-    #   docker
-    #   jupyter-core
+pytz==2025.2
+    # via croniter
+pywin32==308 ; platform_python_implementation != 'PyPy' and sys_platform == 'win32'
+    # via jupyter-core
 pywinpty==2.0.15 ; os_name == 'nt'
     # via
     #   jupyter-server
@@ -533,7 +534,7 @@ qctrl-visualizer==8.0.2
     # via qubex
 qubecalib @ git+https://github.com/qiqb-osaka/qube-calib.git@487227c1154aa087e55b9fee1eabda2a164d299c
     # via qubex
-qubex @ git+https://github.com/amachino/qubex.git@0e3a46804ad204537e5bdf1687870400ce5f3148
+qubex @ git+https://github.com/amachino/qubex.git@b8440bdc80daf287fd91503ce4988f8a579a547b
 quel-clock-master @ git+https://github.com/quel-inc/quelware.git@c839e8b1a6fde4b4ece3d5f415015829857e775e#subdirectory=quel_clock_master
     # via
     #   qubecalib
@@ -550,7 +551,6 @@ referencing==0.36.2
 reportlab==4.4.3
 requests==2.32.3
     # via
-    #   docker
     #   jupyterlab-server
     #   pylabrad
 rfc3339-validator==0.1.4
@@ -574,6 +574,9 @@ rpds-py==0.23.1
     #   referencing
 rsa==4.9
     # via python-jose
+ruamel-yaml==0.18.17
+ruamel-yaml-clib==0.2.15 ; platform_python_implementation == 'CPython'
+    # via ruamel-yaml
 ruff==0.5.5
 scikit-learn==1.7.1
     # via qubex
@@ -605,6 +608,8 @@ scs==3.2.7.post2
     # via cvxpy
 send2trash==1.8.3
     # via jupyter-server
+sentinels==1.1.1
+    # via mongomock
 service-identity==24.2.0
     # via pylabrad
 setuptools==80.9.0
@@ -640,7 +645,6 @@ terminado==0.18.1
     # via
     #   jupyter-server
     #   jupyter-server-terminals
-testcontainers==4.8.2
 threadpoolctl==3.6.0
     # via scikit-learn
 tinycss2==1.4.0
@@ -688,10 +692,12 @@ twisted==25.5.0
     # via pylabrad
 typer==0.14.0
     # via fastapi-cli
+types-croniter==6.0.0.20250809
 types-python-dateutil==2.9.0.20250809
     # via arrow
 types-pyyaml==6.0.12.20250809
     # via qubecalib
+types-requests==2.32.4.20250913
 typing-extensions==4.12.2
     # via
     #   anyio
@@ -709,7 +715,6 @@ typing-extensions==4.12.2
     #   referencing
     #   rich
     #   rich-toolkit
-    #   testcontainers
     #   twisted
     #   typer
     #   uvicorn
@@ -719,9 +724,8 @@ uri-template==1.3.0
     # via jsonschema
 urllib3==2.3.0
     # via
-    #   docker
     #   requests
-    #   testcontainers
+    #   types-requests
 uvicorn==0.34.0
     # via
     #   fastapi
@@ -744,7 +748,5 @@ websockets==15.0
     # via uvicorn
 widgetsnbextension==4.0.14
     # via ipywidgets
-wrapt==1.17.2
-    # via testcontainers
 zope-interface==7.2
     # via twisted

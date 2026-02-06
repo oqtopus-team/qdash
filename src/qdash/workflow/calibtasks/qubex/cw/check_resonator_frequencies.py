@@ -1,6 +1,6 @@
 from typing import ClassVar
 
-from qdash.datamodel.task import InputParameterModel, OutputParameterModel
+from qdash.datamodel.task import ParameterModel, RunParameterModel
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
     RunResult,
@@ -22,16 +22,17 @@ class CheckResonatorFrequencies(QubexTask):
 
     name: str = "CheckResonatorFrequencies"
     task_type: str = "qubit"
-    input_parameters: ClassVar[dict[str, InputParameterModel]] = {
-        "frequency_range": InputParameterModel(
+    input_parameters: ClassVar[dict[str, ParameterModel | None]] = {}
+    run_parameters: ClassVar[dict[str, RunParameterModel]] = {
+        "frequency_range": RunParameterModel(
             unit="GHz",
             value_type="np.arange",
             value=(9.75, 10.75, 0.002),
             description="Frequency range for resonator frequencies",
         )
     }
-    output_parameters: ClassVar[dict[str, OutputParameterModel]] = {
-        "coarse_resonator_frequency": OutputParameterModel(
+    output_parameters: ClassVar[dict[str, ParameterModel]] = {
+        "coarse_resonator_frequency": ParameterModel(
             unit="GHz", description="Coarse resonator frequency"
         ),
     }
@@ -55,7 +56,7 @@ class CheckResonatorFrequencies(QubexTask):
         exp = self.get_experiment(backend)
         label = self.get_qubit_label(backend, qid)
         result = exp.scan_resonator_frequencies(
-            target=label, frequency_range=self.input_parameters["frequency_range"].get_value()
+            target=label, frequency_range=self.run_parameters["frequency_range"].get_value()
         )
         self.save_calibration(backend)
         return RunResult(raw_result=result)
@@ -71,7 +72,7 @@ class CheckResonatorFrequencies(QubexTask):
         if read_box.type == BoxType.QUEL1SE_R8:
             frequency_range = np.arange(5.75, 6.75, 0.002)
         else:
-            frequency_range = self.input_parameters["frequency_range"].get_value()
+            frequency_range = self.run_parameters["frequency_range"].get_value()
         result = exp.scan_resonator_frequencies(
             labels[0],
             frequency_range=frequency_range,

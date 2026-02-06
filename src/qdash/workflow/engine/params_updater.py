@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol, cast
 
 from filelock import FileLock
-from qdash.datamodel.task import OutputParameterModel
+from qdash.datamodel.task import ParameterModel
 from qdash.workflow.engine.backend.qubex_paths import get_qubex_paths
 from qdash.workflow.worker.flows.push_props.formatter import represent_none
 from ruamel.yaml import YAML
@@ -150,7 +150,7 @@ class _QubexParamsUpdater:
 
     @staticmethod
     def _extract_value(param: Any) -> float | int | str | None:
-        if isinstance(param, OutputParameterModel):
+        if isinstance(param, ParameterModel):
             return _QubexParamsUpdater._coerce_value(param.value)
 
         value = getattr(param, "value", param)

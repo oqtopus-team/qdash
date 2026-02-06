@@ -8,7 +8,7 @@ import { downloadMetricsPdf } from "@/client/metrics/metrics";
 interface MetricsPdfDownloadButtonProps {
   chipId: string;
   withinHours?: number;
-  selectionMode: "latest" | "best";
+  selectionMode: "latest" | "best" | "average";
   disabled?: boolean;
 }
 

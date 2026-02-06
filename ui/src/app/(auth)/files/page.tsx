@@ -1,17 +1,21 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowDown,
-  ArrowUp,
+  Check,
+  Database,
+  ExternalLink,
   File,
   FileJson,
   Folder,
   FolderOpen,
+  GitPullRequestArrow,
   Pencil,
   Plus,
   Save,
@@ -41,6 +45,28 @@ import { useToast } from "@/components/ui/Toast";
 
 const Editor = dynamic(() => import("@monaco-editor/react"), { ssr: false });
 
+// Helper to check if file is a params YAML that can be imported
+function parseParamsFilePath(
+  path: string,
+): { chipId: string; paramName: string } | null {
+  // Match pattern: config/qubex/{chip_id}/params/{param_name}.yaml
+  const match = path.match(/^config\/qubex\/([^/]+)\/params\/([^/]+)\.ya?ml$/);
+  if (match) {
+    return { chipId: match[1], paramName: match[2] };
+  }
+  return null;
+}
+
+// Seed import response type
+interface SeedImportResponse {
+  chip_id: string;
+  source: string;
+  imported_count: number;
+  skipped_count: number;
+  error_count: number;
+  provenance_activity_id?: string | null;
+}
+
 export default function FilesEditorPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -53,6 +79,20 @@ export default function FilesEditorPage() {
   const [commitMessage, setCommitMessage] = useState("");
   const [isEditorLocked, setIsEditorLocked] = useState(true);
   const [isSidebarVisible, setIsSidebarVisible] = useState(true);
+  const [importResult, setImportResult] = useState<SeedImportResponse | null>(
+    null,
+  );
+  const [prResult, setPrResult] = useState<{
+    pr_url: string;
+    pr_number: number;
+    branch: string;
+  } | null>(null);
+
+  // Check if selected file is a params YAML that can be imported
+  const paramsFileInfo = useMemo(() => {
+    if (!selectedFile) return null;
+    return parseParamsFilePath(selectedFile);
+  }, [selectedFile]);
 
   const {
     data: fileTreeData,
@@ -120,16 +160,59 @@ export default function FilesEditorPage() {
         (res: AxiosResponse<GitPushConfig200>) => res.data,
       ),
     onSuccess: (data: GitPushConfig200) => {
-      if (data.commit) {
-        toast.success(`Git push successful! Commit: ${data.commit}`);
+      const result = data as any;
+      if (result.pr_url) {
+        toast.success(`Pull request #${result.pr_number} created!`);
+        setPrResult({
+          pr_url: result.pr_url,
+          pr_number: result.pr_number,
+          branch: result.branch,
+        });
+      } else if (result.commit) {
+        toast.success(`Pushed commit: ${result.commit}`);
       } else {
-        toast.info(String(data.message) || "No changes to commit");
+        toast.info(String(result.message) || "No changes to commit");
       }
       setCommitMessage("");
       refetchGitStatus();
     },
     onError: (error: any) => {
       toast.error(`Git push failed: ${(error as Error)?.message}`);
+    },
+  });
+
+  // Seed import mutation
+  const importMutation = useMutation({
+    mutationFn: async ({
+      chipId,
+      paramName,
+    }: {
+      chipId: string;
+      paramName: string;
+    }) => {
+      const response = await fetch("/api/calibrations/seed-import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chip_id: chipId,
+          source: "qubex_params",
+          parameters: [paramName],
+        }),
+      });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(
+          errorData.detail || `Import failed: ${response.status}`,
+        );
+      }
+      return response.json() as Promise<SeedImportResponse>;
+    },
+    onSuccess: (data) => {
+      setImportResult(data);
+      toast.success(`Imported ${data.imported_count} parameters to QDash`);
+    },
+    onError: (error: Error) => {
+      toast.error(`Import failed: ${error.message}`);
     },
   });
 
@@ -156,6 +239,15 @@ export default function FilesEditorPage() {
     setSelectedFile(path);
     setHasUnsavedChanges(false);
     setIsEditorLocked(true); // Lock editor when opening new file
+    setImportResult(null); // Clear import result when selecting new file
+  };
+
+  const handleImportToQDash = () => {
+    if (!paramsFileInfo) return;
+    importMutation.mutate({
+      chipId: paramsFileInfo.chipId,
+      paramName: paramsFileInfo.paramName,
+    });
   };
 
   const toggleEditorLock = () => {
@@ -332,9 +424,13 @@ export default function FilesEditorPage() {
             )}
             <button
               onClick={handlePull}
-              className="btn btn-sm btn-info hidden sm:flex"
+              className={`btn btn-sm hidden sm:flex ${(gitStatusData as any)?.has_remote_updates ? "btn-warning" : "btn-info"}`}
               disabled={pullMutation.isPending}
-              title="Pull latest changes from Git repository"
+              title={
+                (gitStatusData as any)?.has_remote_updates
+                  ? "Remote has new changes - click to pull"
+                  : "Pull latest changes from Git repository"
+              }
             >
               {pullMutation.isPending ? (
                 <span className="loading loading-spinner loading-xs"></span>
@@ -342,19 +438,22 @@ export default function FilesEditorPage() {
                 <ArrowDown size={16} />
               )}
               <span className="ml-1">Pull</span>
+              {(gitStatusData as any)?.has_remote_updates && (
+                <span className="inline-flex h-2 w-2 rounded-full bg-warning-content animate-ping"></span>
+              )}
             </button>
             <button
               onClick={handlePush}
               className="btn btn-sm btn-secondary hidden sm:flex"
               disabled={pushMutation.isPending}
-              title="Push changes to Git repository"
+              title="Create a pull request with config changes"
             >
               {pushMutation.isPending ? (
                 <span className="loading loading-spinner loading-xs"></span>
               ) : (
-                <ArrowUp size={16} />
+                <GitPullRequestArrow size={16} />
               )}
-              <span className="ml-1">Push</span>
+              <span className="ml-1">Create PR</span>
             </button>
             <button
               onClick={handleSave}
@@ -375,8 +474,80 @@ export default function FilesEditorPage() {
                 </>
               )}
             </button>
+            {/* Import to QDash button - only show for params YAML files */}
+            {paramsFileInfo && (
+              <button
+                onClick={handleImportToQDash}
+                className="btn btn-sm btn-accent hidden sm:flex"
+                disabled={importMutation.isPending}
+                title={`Import ${paramsFileInfo.paramName} to QDash for provenance tracking`}
+              >
+                {importMutation.isPending ? (
+                  <span className="loading loading-spinner loading-xs"></span>
+                ) : (
+                  <>
+                    <Database size={16} />
+                    <span className="ml-1">Import to QDash</span>
+                  </>
+                )}
+              </button>
+            )}
           </div>
         </div>
+
+        {/* PR created banner */}
+        {prResult && (
+          <div className="px-4 py-2 bg-secondary/20 border-b border-secondary/30 flex items-center justify-between">
+            <div className="flex items-center gap-2 text-sm">
+              <GitPullRequestArrow size={16} className="text-secondary" />
+              <span>
+                Pull request <strong>#{prResult.pr_number}</strong> created on
+                branch <strong>{prResult.branch}</strong>
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <a
+                href={prResult.pr_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn btn-xs btn-ghost gap-1"
+              >
+                Open PR <ExternalLink size={12} />
+              </a>
+              <button
+                onClick={() => setPrResult(null)}
+                className="btn btn-xs btn-ghost"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Import success banner */}
+        {importResult && (
+          <div className="px-4 py-2 bg-success/20 border-b border-success/30 flex items-center justify-between">
+            <div className="flex items-center gap-2 text-sm">
+              <Check size={16} className="text-success" />
+              <span>
+                Imported {importResult.imported_count} values for{" "}
+                <strong>{paramsFileInfo?.paramName}</strong> from{" "}
+                <strong>{importResult.chip_id}</strong>
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Link href="/provenance" className="btn btn-xs btn-ghost">
+                View in Provenance →
+              </Link>
+              <button
+                onClick={() => setImportResult(null)}
+                className="btn btn-xs btn-ghost"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+        )}
 
         <div className="flex-1 flex overflow-hidden">
           <div
@@ -509,7 +680,7 @@ export default function FilesEditorPage() {
             </span>
             <button
               onClick={handlePull}
-              className="btn btn-circle btn-info shadow-lg"
+              className={`btn btn-circle shadow-lg ${(gitStatusData as any)?.has_remote_updates ? "btn-warning" : "btn-info"}`}
               disabled={pullMutation.isPending}
             >
               {pullMutation.isPending ? (
@@ -521,7 +692,7 @@ export default function FilesEditorPage() {
           </div>
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium bg-base-100 px-2 py-1 rounded shadow">
-              Push
+              Create PR
             </span>
             <button
               onClick={handlePush}
@@ -531,7 +702,7 @@ export default function FilesEditorPage() {
               {pushMutation.isPending ? (
                 <span className="loading loading-spinner loading-xs"></span>
               ) : (
-                <ArrowUp size={20} />
+                <GitPullRequestArrow size={20} />
               )}
             </button>
           </div>

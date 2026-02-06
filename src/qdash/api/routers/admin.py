@@ -5,8 +5,13 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.logger import logger
 from qdash.api.lib.auth import get_admin_user
+from qdash.api.lib.config_loader import ConfigLoader
+from qdash.api.lib.copilot_config import clear_copilot_config_cache
+from qdash.api.lib.metrics_config import clear_metrics_config_cache
+from qdash.api.lib.policy_config import clear_policy_config_cache
 from qdash.api.schemas.admin import (
     AddMemberRequest,
+    ConfigReloadResponse,
     MemberItem,
     MemberListResponse,
     ProjectListItem,
@@ -27,6 +32,32 @@ router = APIRouter(
     prefix="/admin",
     responses={404: {"description": "Not found"}},
 )
+
+
+@router.post(
+    "/config/reload",
+    response_model=ConfigReloadResponse,
+    summary="Reload configuration caches",
+    operation_id="reloadConfigCaches",
+)
+def reload_config_caches(
+    admin: Annotated[User, Depends(get_admin_user)],
+) -> ConfigReloadResponse:
+    """Reload cached YAML configuration (admin only)."""
+    logger.debug(f"Admin {admin.username} reloading config caches")
+    ConfigLoader.clear_cache()
+    clear_metrics_config_cache()
+    clear_copilot_config_cache()
+    clear_policy_config_cache()
+    return ConfigReloadResponse(
+        cleared=[
+            "settings.yaml",
+            "metrics.yaml",
+            "copilot.yaml",
+            "backend.yaml",
+            "policy.yaml",
+        ]
+    )
 
 
 @router.get(

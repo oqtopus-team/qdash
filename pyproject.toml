@@ -187,7 +187,7 @@ workflow = [
     "gitpython>=3.1.44",
     "reportlab>=4.4.1",
     "ruamel.yaml>=0.18.0",
-]
+    ]
 dev = [
     "ruff==0.5.5",
     "pytest==8.3.2",
@@ -205,4 +205,4 @@ dev = [
     "setuptools>=80.9.0",
 ]
 [tool.uv.sources]
-qubex = { git = "https://github.com/amachino/qubex.git", branch = "chore/chevron-fig" }
+qubex = { git = "https://github.com/amachino/qubex.git", branch = "develop" }

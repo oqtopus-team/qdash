@@ -16,11 +16,9 @@ from qdash.api.lib.project import (  # noqa: TCH002
 )
 from qdash.api.schemas.metrics import (
     ChipMetricsResponse,
-    CouplingMetrics,
     MetricHistoryItem,
     MetricValue,
     QubitMetricHistoryResponse,
-    QubitMetrics,
 )
 from qdash.common.datetime_utils import now, to_datetime
 from qdash.repository.chip import MongoChipRepository
@@ -272,12 +270,68 @@ def _extract_best_metrics(
     return metrics_data
 
 
+def _extract_average_metrics(
+    chip_id: str,
+    project_id: str,
+    entity_type: Literal["qubit", "coupling"],
+    valid_metric_keys: set[str],
+    cutoff_time: Any | None,
+) -> dict[str, dict[str, MetricValue]]:
+    """Extract average metrics from task result history using aggregation.
+
+    Uses MongoDB aggregation pipeline to compute the mean value for each
+    (entity, metric) combination. Null values are excluded before averaging.
+
+    Args:
+    ----
+        chip_id: The chip identifier
+        project_id: The project identifier for filtering
+        entity_type: Type of entity - either "qubit" or "coupling"
+        valid_metric_keys: Set of metric keys to extract from config
+        cutoff_time: Optional datetime for filtering tasks
+
+    Returns:
+    -------
+        Dictionary mapping metric_name -> entity_id -> MetricValue with average values
+
+    """
+    if not valid_metric_keys:
+        return {key: {} for key in valid_metric_keys}
+
+    try:
+        task_result_repo = MongoTaskResultHistoryRepository()
+        agg_results = task_result_repo.aggregate_average_metrics(
+            chip_id=chip_id,
+            project_id=project_id,
+            entity_type=entity_type,
+            metric_keys=valid_metric_keys,
+            cutoff_time=cutoff_time,
+        )
+    except Exception as e:
+        logger.error(f"Failed to aggregate average metrics: {e}")
+        raise HTTPException(status_code=500, detail=f"Database query failed: {e}") from e
+
+    # Convert aggregation results to MetricValue format
+    metrics_data: dict[str, dict[str, MetricValue]] = {key: {} for key in valid_metric_keys}
+
+    for metric_name, entity_values in agg_results.items():
+        for entity_id, result in entity_values.items():
+            metrics_data[metric_name][entity_id] = MetricValue(
+                value=result["value"],
+                task_id=result["task_id"],
+                execution_id=result["execution_id"],
+                stddev=result.get("stddev"),
+            )
+
+    return metrics_data
+
+
 def extract_qubit_metrics(
     chip_id: str,
     project_id: str,
     within_hours: int | None = None,
-    selection_mode: Literal["latest", "best"] = "latest",
-) -> QubitMetrics:
+    selection_mode: Literal["latest", "best", "average"] = "latest",
+) -> dict[str, dict[str, MetricValue]]:
     """Extract qubit metrics from task result history.
 
     Args:
@@ -285,11 +339,11 @@ def extract_qubit_metrics(
         chip_id: The chip identifier
         project_id: The project identifier for filtering (allows all project members to see metrics)
         within_hours: Optional time filter in hours (e.g., 24 for last 24 hours)
-        selection_mode: "latest" to get most recent value, "best" to get optimal value within time range
+        selection_mode: "latest" for most recent, "best" for optimal, "average" for mean value
 
     Returns:
     -------
-        QubitMetrics with all qubit-level metrics
+        Dictionary mapping metric_name -> entity_id -> MetricValue
 
     """
     # Get valid metric keys from config
@@ -303,24 +357,13 @@ def extract_qubit_metrics(
 
     # Extract metrics based on selection mode
     if selection_mode == "latest":
-        metrics_data = _extract_latest_metrics(
+        return _extract_latest_metrics(chip_id, project_id, "qubit", valid_metric_keys, cutoff_time)
+    if selection_mode == "average":
+        return _extract_average_metrics(
             chip_id, project_id, "qubit", valid_metric_keys, cutoff_time
         )
-    else:
-        metrics_data = _extract_best_metrics(
-            chip_id, project_id, "qubit", valid_metric_keys, config.qubit_metrics, cutoff_time
-        )
-
-    # Build QubitMetrics response
-    return QubitMetrics(
-        qubit_frequency=metrics_data.get("qubit_frequency") or None,
-        anharmonicity=metrics_data.get("anharmonicity") or None,
-        t1=metrics_data.get("t1") or None,
-        t2_echo=metrics_data.get("t2_echo") or None,
-        t2_star=metrics_data.get("t2_star") or None,
-        average_readout_fidelity=metrics_data.get("average_readout_fidelity") or None,
-        x90_gate_fidelity=metrics_data.get("x90_gate_fidelity") or None,
-        x180_gate_fidelity=metrics_data.get("x180_gate_fidelity") or None,
+    return _extract_best_metrics(
+        chip_id, project_id, "qubit", valid_metric_keys, config.qubit_metrics, cutoff_time
     )
 
 
@@ -328,8 +371,8 @@ def extract_coupling_metrics(
     chip_id: str,
     project_id: str,
     within_hours: int | None = None,
-    selection_mode: Literal["latest", "best"] = "latest",
-) -> CouplingMetrics:
+    selection_mode: Literal["latest", "best", "average"] = "latest",
+) -> dict[str, dict[str, MetricValue]]:
     """Extract coupling metrics from task result history.
 
     Args:
@@ -337,11 +380,11 @@ def extract_coupling_metrics(
         chip_id: The chip identifier
         project_id: The project identifier for filtering (allows all project members to see metrics)
         within_hours: Optional time filter in hours
-        selection_mode: "latest" to get most recent value, "best" to get optimal value within time range
+        selection_mode: "latest" for most recent, "best" for optimal, "average" for mean value
 
     Returns:
     -------
-        CouplingMetrics with all coupling-level metrics
+        Dictionary mapping metric_name -> entity_id -> MetricValue
 
     """
     # Get valid metric keys from config
@@ -355,18 +398,15 @@ def extract_coupling_metrics(
 
     # Extract metrics based on selection mode
     if selection_mode == "latest":
-        metrics_data = _extract_latest_metrics(
+        return _extract_latest_metrics(
             chip_id, project_id, "coupling", valid_metric_keys, cutoff_time
         )
-    else:
-        metrics_data = _extract_best_metrics(
-            chip_id, project_id, "coupling", valid_metric_keys, config.coupling_metrics, cutoff_time
+    if selection_mode == "average":
+        return _extract_average_metrics(
+            chip_id, project_id, "coupling", valid_metric_keys, cutoff_time
         )
-
-    return CouplingMetrics(
-        zx90_gate_fidelity=metrics_data.get("zx90_gate_fidelity") or None,
-        bell_state_fidelity=metrics_data.get("bell_state_fidelity") or None,
-        static_zz_interaction=metrics_data.get("static_zz_interaction") or None,
+    return _extract_best_metrics(
+        chip_id, project_id, "coupling", valid_metric_keys, config.coupling_metrics, cutoff_time
     )
 
 
@@ -380,8 +420,10 @@ async def get_chip_metrics(
         int | None, Query(description="Filter to data within N hours (e.g., 24)")
     ] = None,
     selection_mode: Annotated[
-        Literal["latest", "best"],
-        Query(description="Selection mode: 'latest' for most recent, 'best' for optimal values"),
+        Literal["latest", "best", "average"],
+        Query(
+            description="Selection mode: 'latest' for most recent, 'best' for optimal, 'average' for mean values"
+        ),
     ] = "latest",
 ) -> ChipMetricsResponse:
     """Get chip calibration metrics for visualization.
@@ -509,6 +551,9 @@ async def get_qubit_metric_history(
                 task_id=metric_task_id or task_doc.task_id,
                 timestamp=_get_task_timestamp(task_doc),
                 calibrated_at=calibrated_at,
+                name=task_doc.name,
+                input_parameters=task_doc.input_parameters or None,
+                output_parameters=task_doc.output_parameters or None,
             )
         )
 
@@ -606,6 +651,9 @@ async def get_coupling_metric_history(
                 task_id=metric_task_id or task_doc.task_id,
                 timestamp=_get_task_timestamp(task_doc),
                 calibrated_at=calibrated_at,
+                name=task_doc.name,
+                input_parameters=task_doc.input_parameters or None,
+                output_parameters=task_doc.output_parameters or None,
             )
         )
 
@@ -643,7 +691,8 @@ async def download_metrics_pdf(
     ctx: Annotated[ProjectContext, Depends(get_project_context)],
     within_hours: Annotated[int | None, Query(description="Filter to data within N hours")] = None,
     selection_mode: Annotated[
-        Literal["latest", "best"], Query(description="Selection mode: 'latest' or 'best'")
+        Literal["latest", "best", "average"],
+        Query(description="Selection mode: 'latest', 'best', or 'average'"),
     ] = "latest",
 ) -> StreamingResponse:
     """Download chip metrics as a PDF report.
@@ -703,6 +752,21 @@ async def download_metrics_pdf(
             valid_metric_keys=set(config.coupling_metrics.keys()),
             cutoff_time=cutoff_time,
         )
+    elif selection_mode == "average":
+        qubit_metrics_data = _extract_average_metrics(
+            chip_id=chip_id,
+            project_id=ctx.project_id,
+            entity_type="qubit",
+            valid_metric_keys=set(config.qubit_metrics.keys()),
+            cutoff_time=cutoff_time,
+        )
+        coupling_metrics_data = _extract_average_metrics(
+            chip_id=chip_id,
+            project_id=ctx.project_id,
+            entity_type="coupling",
+            valid_metric_keys=set(config.coupling_metrics.keys()),
+            cutoff_time=cutoff_time,
+        )
     else:
         qubit_metrics_data = _extract_best_metrics(
             chip_id=chip_id,
@@ -722,19 +786,13 @@ async def download_metrics_pdf(
         )
 
     # Build response model (reuse logic from getChipMetrics)
-    # Map config keys to schema keys for qubit metrics
-    qubit_metrics_mapped = {}
-    for config_key, data in qubit_metrics_data.items():
-        schema_key = "qubit_frequency" if config_key == "bare_frequency" else config_key
-        qubit_metrics_mapped[schema_key] = data
-
     metrics_response = ChipMetricsResponse(
         chip_id=chip_id,
         username=ctx.user.username,
         qubit_count=qubit_count,
         within_hours=within_hours,
-        qubit_metrics=QubitMetrics(**qubit_metrics_mapped),
-        coupling_metrics=CouplingMetrics(**coupling_metrics_data),
+        qubit_metrics=qubit_metrics_data,
+        coupling_metrics=coupling_metrics_data,
     )
 
     # Generate PDF

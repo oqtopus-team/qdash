@@ -114,7 +114,9 @@ class CustomTwoQubit(CalibrationStep):
         )
 
         # Execute
-        from qdash.workflow.service._internal.scheduling_tasks import calibrate_parallel_group
+        from qdash.workflow.service._internal.scheduling_tasks import (
+            run_coupling_calibrations_parallel,
+        )
         from qdash.workflow.service.calib_service import (
             finish_calibration,
             get_session,
@@ -128,6 +130,7 @@ class CustomTwoQubit(CalibrationStep):
             candidate_qubits,
             flow_name=f"{service.flow_name}_{self.name}" if service.flow_name else self.name,
             project_id=service.project_id,
+            use_lock=False,  # Parent pipeline already holds the lock
             enable_github_pull=False,
             github_push_config=GitHubPushConfig(
                 enabled=True,
@@ -142,12 +145,27 @@ class CustomTwoQubit(CalibrationStep):
             },
         )
 
+        # Get session config for multiprocess execution
+        session = get_session()
+        session_config = {
+            "username": session.username,
+            "chip_id": session.chip_id,
+            "backend_name": session.backend_name,
+            "execution_id": session.execution_id,
+            "project_id": session.project_id,
+        }
+
+        # Execute groups sequentially (groups are scheduled to avoid resource conflicts)
+        # but within each group, coupling pairs run in parallel using separate processes
         all_raw_results: dict[str, Any] = {}
         for group in coupling_groups:
-            group_results = calibrate_parallel_group(coupling_qids=group, tasks=self.tasks)
+            group_results = run_coupling_calibrations_parallel(
+                coupling_qids=group,
+                tasks=self.tasks,
+                session_config=session_config,
+            )
             all_raw_results.update(group_results)
 
-        session = get_session()
         session.record_stage_result(self.name, all_raw_results)
         finish_calibration()
 
@@ -406,7 +424,9 @@ class TwoQubitCalibration(CalibrationStep):
         )
 
         # Execute
-        from qdash.workflow.service._internal.scheduling_tasks import calibrate_parallel_group
+        from qdash.workflow.service._internal.scheduling_tasks import (
+            run_coupling_calibrations_parallel,
+        )
         from qdash.workflow.service.calib_service import (
             finish_calibration,
             get_session,
@@ -420,6 +440,7 @@ class TwoQubitCalibration(CalibrationStep):
             candidate_qubits,
             flow_name=f"{service.flow_name}_{self.name}" if service.flow_name else self.name,
             project_id=service.project_id,
+            use_lock=False,  # Parent pipeline already holds the lock
             enable_github_pull=False,
             github_push_config=GitHubPushConfig(
                 enabled=True,
@@ -432,12 +453,27 @@ class TwoQubitCalibration(CalibrationStep):
             },
         )
 
+        # Get session config for multiprocess execution
+        session = get_session()
+        session_config = {
+            "username": session.username,
+            "chip_id": session.chip_id,
+            "backend_name": session.backend_name,
+            "execution_id": session.execution_id,
+            "project_id": session.project_id,
+        }
+
+        # Execute groups sequentially (groups are scheduled to avoid resource conflicts)
+        # but within each group, coupling pairs run in parallel using separate processes
         all_raw_results: dict[str, Any] = {}
         for group in coupling_groups:
-            group_results = calibrate_parallel_group(coupling_qids=group, tasks=tasks)
+            group_results = run_coupling_calibrations_parallel(
+                coupling_qids=group,
+                tasks=tasks,
+                session_config=session_config,
+            )
             all_raw_results.update(group_results)
 
-        session = get_session()
         session.record_stage_result(self.name, all_raw_results)
         finish_calibration()
 
