@@ -15,6 +15,7 @@ from qdash.api.lib.project import (  # noqa: TCH002
     get_project_context,
 )
 from qdash.api.schemas.provenance import (
+    DegradationTrendsResponse,
     ExecutionComparisonResponse,
     ImpactResponse,
     LineageResponse,
@@ -404,6 +405,60 @@ def get_recent_changes(
         project_id=ctx.project_id,
         limit=limit,
         within_hours=within_hours,
+        parameter_names=parameter_names,
+    )
+
+
+@router.get(
+    "/degradation-trends",
+    response_model=DegradationTrendsResponse,
+    summary="Get degradation trends (consecutive worsening)",
+    operation_id="getDegradationTrends",
+)
+def get_degradation_trends(
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    service: Annotated[ProvenanceService, Depends(get_provenance_service)],
+    min_streak: Annotated[
+        int,
+        Query(description="Minimum consecutive worsening steps", ge=3, le=20),
+    ] = 3,
+    limit: Annotated[
+        int,
+        Query(description="Maximum number of trends to return", ge=1, le=100),
+    ] = 50,
+    parameter_names: Annotated[
+        list[str] | None,
+        Query(description="Filter by parameter names"),
+    ] = None,
+) -> DegradationTrendsResponse:
+    """Get parameters with consecutive degradation across calibration versions.
+
+    Detects parameters where the value has been consistently worsening
+    (based on evaluation mode: maximize/minimize) over multiple versions.
+
+    Parameters
+    ----------
+    ctx : ProjectContext
+        Project context with user and project information
+    service : ProvenanceService
+        Provenance service instance
+    min_streak : int
+        Minimum consecutive worsening steps (3-20, default: 3)
+    limit : int
+        Maximum number of trends to return (1-100, default: 50)
+    parameter_names : list[str] | None
+        Filter by parameter names
+
+    Returns
+    -------
+    DegradationTrendsResponse
+        Detected degradation trends sorted by severity
+
+    """
+    return service.get_degradation_trends(
+        project_id=ctx.project_id,
+        min_streak=min_streak,
+        limit=limit,
         parameter_names=parameter_names,
     )
 

@@ -516,3 +516,29 @@ class PolicyViolationsResponse(BaseModel):
 
     violations: list[PolicyViolationResponse] = Field(default_factory=list)
     total_count: int = Field(0, description="Total violations matching query")
+
+
+class DegradationTrendResponse(BaseModel):
+    """Response model for a single degradation trend (consecutive worsening)."""
+
+    parameter_name: str
+    qid: str = ""
+    evaluation_mode: str = Field(..., description="maximize or minimize")
+    streak_count: int = Field(..., description="Consecutive worsening count")
+    total_delta: float = Field(..., description="Cumulative change over streak")
+    total_delta_percent: float = Field(..., description="Cumulative change in %")
+    delta_per_step: float = Field(0.0, description="Average delta per step")
+    current_value: float | int | str = 0
+    current_entity_id: str = ""
+    unit: str = ""
+    values: list[float] = Field(
+        default_factory=list, description="Recent values (oldest first) for sparkline"
+    )
+    valid_from: datetime | None = None
+
+
+class DegradationTrendsResponse(BaseModel):
+    """Response model for degradation trends."""
+
+    trends: list[DegradationTrendResponse] = Field(default_factory=list)
+    total_count: int = Field(0, description="Total trends matching query")

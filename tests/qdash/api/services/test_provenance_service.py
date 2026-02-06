@@ -5,6 +5,7 @@ from unittest.mock import MagicMock
 
 import pytest
 from qdash.api.schemas.provenance import (
+    DegradationTrendsResponse,
     ExecutionComparisonResponse,
     ImpactResponse,
     LineageNodeResponse,
@@ -540,3 +541,227 @@ class TestProvenanceService:
         assert result.activity_id == "exec-001:task-001"
         assert result.task_name == "CheckQubit"
         assert result.status == "completed"
+
+
+class TestGetDegradationTrends:
+    """Tests for ProvenanceService.get_degradation_trends."""
+
+    @pytest.fixture
+    def mock_repos(self):
+        """Create mock repositories."""
+        return {
+            "parameter_version": MagicMock(),
+            "provenance_relation": MagicMock(),
+            "activity": MagicMock(),
+        }
+
+    @pytest.fixture
+    def service(self, mock_repos):
+        """Create ProvenanceService with mock repositories."""
+        return ProvenanceService(
+            parameter_version_repo=mock_repos["parameter_version"],
+            provenance_relation_repo=mock_repos["provenance_relation"],
+            activity_repo=mock_repos["activity"],
+        )
+
+    @pytest.fixture
+    def _mock_metrics(self, monkeypatch):
+        """Mock load_metrics_config with maximize t1 and minimize qubit_frequency."""
+
+        class _Eval:
+            def __init__(self, mode):
+                self.mode = mode
+
+        class _Meta:
+            def __init__(self, mode, unit=""):
+                self.evaluation = _Eval(mode)
+                self.unit = unit
+
+        class _Config:
+            qubit_metrics = {
+                "t1": _Meta("maximize", "us"),
+                "qubit_frequency": _Meta("minimize", "GHz"),
+            }
+            coupling_metrics = {}
+
+        monkeypatch.setattr(
+            "qdash.api.services.provenance_service.load_metrics_config",
+            lambda: _Config(),
+        )
+
+    def _make_versions(self, values, *, base_entity_id="param:Q0:exec", base_version=1):
+        """Build a newest-first list of version dicts from a list of values."""
+        versions = []
+        for i, v in enumerate(values):
+            versions.append(
+                {
+                    "version": base_version + len(values) - 1 - i,
+                    "value": v,
+                    "unit": "us",
+                    "error": 0.0,
+                    "entity_id": f"{base_entity_id}-{len(values) - 1 - i}:task",
+                    "valid_from": datetime(2025, 1, 1, 10 + i, 0, 0),
+                    "valid_until": None,
+                }
+            )
+        return versions
+
+    def test_maximize_streak_detected(self, service, mock_repos, _mock_metrics):
+        """Maximize param with consecutive decreases → streak detected."""
+        # newest first: 3, 4, 5, 6, 7  → 4 consecutive decreases
+        versions = self._make_versions([3, 4, 5, 6, 7])
+        mock_repos["parameter_version"].get_recent_versions_bulk.return_value = [
+            {"parameter_name": "t1", "qid": "Q0", "versions": versions},
+        ]
+
+        result = service.get_degradation_trends("proj", min_streak=3)
+
+        assert isinstance(result, DegradationTrendsResponse)
+        assert len(result.trends) == 1
+        trend = result.trends[0]
+        assert trend.parameter_name == "t1"
+        assert trend.streak_count == 4
+        assert trend.total_delta == pytest.approx(3.0 - 7.0)
+        assert trend.total_delta_percent == pytest.approx((3.0 - 7.0) / 7.0 * 100)
+        assert trend.evaluation_mode == "maximize"
+
+    def test_minimize_streak_detected(self, service, mock_repos, _mock_metrics):
+        """Minimize param with consecutive increases → streak detected."""
+        # newest first: 7, 6, 5, 4, 3  → 4 consecutive increases (worsening for minimize)
+        versions = self._make_versions([7, 6, 5, 4, 3])
+        mock_repos["parameter_version"].get_recent_versions_bulk.return_value = [
+            {"parameter_name": "qubit_frequency", "qid": "Q0", "versions": versions},
+        ]
+
+        result = service.get_degradation_trends("proj", min_streak=3)
+
+        assert len(result.trends) == 1
+        trend = result.trends[0]
+        assert trend.parameter_name == "qubit_frequency"
+        assert trend.streak_count == 4
+        assert trend.evaluation_mode == "minimize"
+
+    def test_parameter_names_filter(self, service, mock_repos, _mock_metrics):
+        """Only requested parameter_names are passed to the repository."""
+        versions_t1 = self._make_versions([3, 4, 5, 6, 7])
+        mock_repos["parameter_version"].get_recent_versions_bulk.return_value = [
+            {"parameter_name": "t1", "qid": "Q0", "versions": versions_t1},
+        ]
+
+        result = service.get_degradation_trends("proj", min_streak=3, parameter_names=["t1"])
+
+        # Repo should be called with only ["t1"]
+        call_kwargs = mock_repos["parameter_version"].get_recent_versions_bulk.call_args
+        assert call_kwargs[1]["parameter_names"] == ["t1"]
+        # And result contains only t1
+        assert len(result.trends) == 1
+        assert result.trends[0].parameter_name == "t1"
+
+    def test_parameter_names_filter_excludes_no_eval_mode(self, service, mock_repos, _mock_metrics):
+        """Parameters not in eval_modes are excluded even if requested."""
+        mock_repos["parameter_version"].get_recent_versions_bulk.return_value = []
+
+        # "unknown_param" is not in metrics config → filtered out, empty result
+        result = service.get_degradation_trends(
+            "proj", min_streak=3, parameter_names=["unknown_param"]
+        )
+
+        assert result.trends == []
+        assert result.total_count == 0
+
+    def test_streak_below_min_streak_returns_empty(self, service, mock_repos, _mock_metrics):
+        """When streak < min_streak, trends list is empty."""
+        # streak = 2 (3 values: 4, 5, 6 → 2 decreases), but min_streak=3
+        versions = self._make_versions([4, 5, 6])
+        mock_repos["parameter_version"].get_recent_versions_bulk.return_value = [
+            {"parameter_name": "t1", "qid": "Q0", "versions": versions},
+        ]
+
+        result = service.get_degradation_trends("proj", min_streak=3)
+
+        assert result.trends == []
+        assert result.total_count == 0
+
+    def test_single_version_skipped(self, service, mock_repos, _mock_metrics):
+        """Only 1 version → skipped (need at least 2)."""
+        versions = self._make_versions([5])
+        mock_repos["parameter_version"].get_recent_versions_bulk.return_value = [
+            {"parameter_name": "t1", "qid": "Q0", "versions": versions},
+        ]
+
+        result = service.get_degradation_trends("proj", min_streak=3)
+
+        assert result.trends == []
+
+    def test_zero_versions_skipped(self, service, mock_repos, _mock_metrics):
+        """Zero versions → skipped."""
+        mock_repos["parameter_version"].get_recent_versions_bulk.return_value = [
+            {"parameter_name": "t1", "qid": "Q0", "versions": []},
+        ]
+
+        result = service.get_degradation_trends("proj", min_streak=3)
+
+        assert result.trends == []
+
+    def test_non_numeric_value_streak_zero(self, service, mock_repos, _mock_metrics):
+        """Non-numeric values break the streak → 0."""
+        versions = self._make_versions(["bad", "also_bad", "nope", "still_bad"])
+        mock_repos["parameter_version"].get_recent_versions_bulk.return_value = [
+            {"parameter_name": "t1", "qid": "Q0", "versions": versions},
+        ]
+
+        result = service.get_degradation_trends("proj", min_streak=3)
+
+        assert result.trends == []
+
+    def test_sort_order_streak_then_delta_percent(self, service, mock_repos, _mock_metrics):
+        """Trends sorted by streak desc, then |delta_percent| desc."""
+        # t1: streak=4, delta from 7→3 = -57%
+        versions_t1 = self._make_versions([3, 4, 5, 6, 7])
+        # qubit_frequency: streak=4, delta from 3→7 = +133%
+        versions_qf = self._make_versions([7, 6, 5, 4, 3])
+        mock_repos["parameter_version"].get_recent_versions_bulk.return_value = [
+            {"parameter_name": "t1", "qid": "Q0", "versions": versions_t1},
+            {"parameter_name": "qubit_frequency", "qid": "Q0", "versions": versions_qf},
+        ]
+
+        result = service.get_degradation_trends("proj", min_streak=3)
+
+        assert len(result.trends) == 2
+        # Both streak=4, so sorted by |delta_percent| desc
+        # qubit_frequency: |(7-3)/3*100| = 133.3  >  t1: |(3-7)/7*100| = 57.1
+        assert result.trends[0].parameter_name == "qubit_frequency"
+        assert result.trends[1].parameter_name == "t1"
+
+    def test_repo_key_type_error_returns_empty(self, service, mock_repos, _mock_metrics):
+        """KeyError/TypeError/ValueError → empty response + warning."""
+        mock_repos["parameter_version"].get_recent_versions_bulk.side_effect = TypeError("bad type")
+
+        result = service.get_degradation_trends("proj", min_streak=3)
+
+        assert isinstance(result, DegradationTrendsResponse)
+        assert result.trends == []
+        assert result.total_count == 0
+
+    def test_unexpected_exception_re_raised(self, service, mock_repos, _mock_metrics):
+        """Non-computation errors are re-raised."""
+        mock_repos["parameter_version"].get_recent_versions_bulk.side_effect = RuntimeError(
+            "db down"
+        )
+
+        with pytest.raises(RuntimeError, match="db down"):
+            service.get_degradation_trends("proj", min_streak=3)
+
+    def test_limit_truncates_trends(self, service, mock_repos, _mock_metrics):
+        """When more trends than limit, result is truncated."""
+        # Create 3 separate (param, qid) combos that each have streak=4
+        bulk = []
+        for i in range(3):
+            versions = self._make_versions([3, 4, 5, 6, 7])
+            bulk.append({"parameter_name": "t1", "qid": f"Q{i}", "versions": versions})
+        mock_repos["parameter_version"].get_recent_versions_bulk.return_value = bulk
+
+        result = service.get_degradation_trends("proj", min_streak=3, limit=2)
+
+        assert len(result.trends) == 2
+        assert result.total_count == 3

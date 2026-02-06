@@ -469,6 +469,52 @@ class TestProvenanceRouter:
         assert response.status_code == 200
 
 
+class TestDegradationTrendsEndpoint:
+    """Tests for GET /degradation-trends endpoint."""
+
+    def test_get_degradation_trends_success(self, test_client, test_project, auth_headers):
+        """Test GET /degradation-trends returns 200 with expected structure."""
+        response = test_client.get(
+            "/provenance/degradation-trends",
+            headers=auth_headers,
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert "trends" in data
+        assert "total_count" in data
+        assert isinstance(data["trends"], list)
+
+    def test_degradation_trends_min_streak_validation(
+        self, test_client, test_project, auth_headers
+    ):
+        """Test min_streak < 3 returns 422."""
+        response = test_client.get(
+            "/provenance/degradation-trends?min_streak=0",
+            headers=auth_headers,
+        )
+        assert response.status_code == 422
+
+        response = test_client.get(
+            "/provenance/degradation-trends?min_streak=2",
+            headers=auth_headers,
+        )
+        assert response.status_code == 422
+
+    def test_degradation_trends_limit_validation(self, test_client, test_project, auth_headers):
+        """Test limit < 1 returns 422."""
+        response = test_client.get(
+            "/provenance/degradation-trends?limit=0",
+            headers=auth_headers,
+        )
+        assert response.status_code == 422
+
+    def test_degradation_trends_requires_authentication(self, test_client, test_project):
+        """Test endpoint requires authentication."""
+        response = test_client.get("/provenance/degradation-trends")
+        assert response.status_code == 401
+
+
 class TestProvenanceService:
     """Tests for provenance service logic."""
 
