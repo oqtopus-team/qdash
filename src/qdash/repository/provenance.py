@@ -476,6 +476,64 @@ class MongoParameterVersionRepository:
             find = find.limit(limit)
         return list(find.run())
 
+    def get_recent_versions_bulk(
+        self,
+        project_id: str,
+        *,
+        parameter_names: list[str] | None = None,
+        versions_per_param: int = 10,
+    ) -> list[dict[str, Any]]:
+        """Get recent versions for all (parameter_name, qid) pairs in one aggregation.
+
+        Parameters
+        ----------
+        project_id : str
+            Project identifier
+        parameter_names : list[str] | None
+            Optional filter by parameter names
+        versions_per_param : int
+            Number of recent versions per (parameter_name, qid) pair
+
+        Returns
+        -------
+        list[dict[str, Any]]
+            List of dicts with parameter_name, qid, and versions[]
+
+        """
+        match_stage: dict[str, Any] = {"project_id": project_id}
+        if parameter_names:
+            match_stage["parameter_name"] = {"$in": parameter_names}
+
+        pipeline: list[dict[str, Any]] = [
+            {"$match": match_stage},
+            {"$sort": {"version": -1}},
+            {
+                "$group": {
+                    "_id": {"parameter_name": "$parameter_name", "qid": "$qid"},
+                    "versions": {
+                        "$push": {
+                            "version": "$version",
+                            "value": "$value",
+                            "unit": "$unit",
+                            "error": "$error",
+                            "entity_id": "$entity_id",
+                            "valid_from": "$valid_from",
+                            "valid_until": "$valid_until",
+                        }
+                    },
+                }
+            },
+            {
+                "$project": {
+                    "_id": 0,
+                    "parameter_name": "$_id.parameter_name",
+                    "qid": "$_id.qid",
+                    "versions": {"$slice": ["$versions", versions_per_param]},
+                }
+            },
+        ]
+        return list(ParameterVersionDocument.aggregate(pipeline).run())
+
     def get_current_many(
         self,
         project_id: str,

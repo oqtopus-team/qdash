@@ -11,9 +11,12 @@ import math
 from collections import defaultdict, deque
 from typing import TYPE_CHECKING, Any, cast
 
+from qdash.api.lib.metrics_config import MetricMetadata, load_metrics_config
 from qdash.api.lib.policy_config import load_policy_config
 from qdash.api.schemas.provenance import (
     ActivityResponse,
+    DegradationTrendResponse,
+    DegradationTrendsResponse,
     ExecutionComparisonResponse,
     ExecutionIdResponse,
     ImpactResponse,
@@ -628,6 +631,165 @@ class ProvenanceService:
             violations=violations[:limit],
             total_count=len(violations),
         )
+
+    def get_degradation_trends(
+        self,
+        project_id: str,
+        *,
+        min_streak: int = 3,
+        limit: int = 50,
+        parameter_names: list[str] | None = None,
+    ) -> DegradationTrendsResponse:
+        """Detect parameters with consecutive degradation across versions.
+
+        For each (parameter_name, qid), checks whether the value has been
+        consistently worsening (based on evaluation mode) over multiple
+        consecutive versions.
+
+        Parameters
+        ----------
+        project_id : str
+            Project identifier
+        min_streak : int
+            Minimum consecutive worsening steps to report (default: 3)
+        limit : int
+            Maximum number of trends to return
+        parameter_names : list[str] | None
+            Filter by parameter names
+
+        Returns
+        -------
+        DegradationTrendsResponse
+            Detected degradation trends sorted by severity
+
+        """
+        try:
+            from qdash.common.datetime_utils import ensure_timezone
+
+            metrics_config = load_metrics_config()
+
+            # Build eval_modes dict: parameter_name -> "maximize"|"minimize"
+            eval_modes: dict[str, str] = {}
+            all_metrics: dict[str, MetricMetadata] = {}
+            for name, meta in metrics_config.qubit_metrics.items():
+                if meta.evaluation.mode != "none":
+                    eval_modes[name] = meta.evaluation.mode
+                all_metrics[name] = meta
+            for name, meta in metrics_config.coupling_metrics.items():
+                if meta.evaluation.mode != "none":
+                    eval_modes[name] = meta.evaluation.mode
+                all_metrics[name] = meta
+
+            # Filter to requested parameter_names if provided
+            target_params: list[str] | None = None
+            if parameter_names:
+                target_params = [p for p in parameter_names if p in eval_modes]
+            else:
+                target_params = list(eval_modes.keys())
+
+            if not target_params:
+                return DegradationTrendsResponse(trends=[], total_count=0)
+
+            # Bulk fetch recent versions
+            bulk_data = self.parameter_version_repo.get_recent_versions_bulk(
+                project_id,
+                parameter_names=target_params,
+                versions_per_param=min_streak + 5,
+            )
+
+            trends: list[DegradationTrendResponse] = []
+
+            for item in bulk_data:
+                param_name = item.get("parameter_name", "")
+                qid = item.get("qid", "")
+                versions = item.get("versions", [])
+
+                if param_name not in eval_modes:
+                    continue
+                if len(versions) < 2:
+                    continue
+
+                mode = eval_modes[param_name]
+
+                # versions are newest-first from the aggregation
+                # Count consecutive worsening from the latest version backward
+                streak = 0
+                for i in range(len(versions) - 1):
+                    current_val = versions[i].get("value")
+                    prev_val = versions[i + 1].get("value")
+                    if not isinstance(current_val, (int, float)) or not isinstance(
+                        prev_val, (int, float)
+                    ):
+                        break
+                    if mode == "maximize":
+                        # Higher is better -> decreasing is worsening
+                        is_worse = current_val < prev_val
+                    else:  # minimize
+                        # Lower is better -> increasing is worsening
+                        is_worse = current_val > prev_val
+                    if is_worse:
+                        streak += 1
+                    else:
+                        break
+
+                if streak < min_streak:
+                    continue
+
+                # Compute total delta (newest value - oldest value in streak)
+                newest_val = versions[0].get("value", 0)
+                oldest_val = versions[streak].get("value", 0)
+                if isinstance(newest_val, (int, float)) and isinstance(oldest_val, (int, float)):
+                    total_delta = float(newest_val) - float(oldest_val)
+                    total_delta_pct = (
+                        (total_delta / float(oldest_val) * 100) if oldest_val != 0 else 0.0
+                    )
+                    delta_per_step = total_delta / streak if streak > 0 else 0.0
+                else:
+                    total_delta = 0.0
+                    total_delta_pct = 0.0
+                    delta_per_step = 0.0
+
+                # Build sparkline values (oldest first, i.e. reverse of versions[:streak+1])
+                sparkline_versions = versions[: streak + 1]
+                sparkline_versions.reverse()
+                values = [
+                    float(v.get("value", 0))
+                    for v in sparkline_versions
+                    if isinstance(v.get("value"), (int, float))
+                ]
+
+                param_meta = all_metrics.get(param_name)
+                unit = param_meta.unit if param_meta else ""
+
+                trends.append(
+                    DegradationTrendResponse(
+                        parameter_name=param_name,
+                        qid=qid,
+                        evaluation_mode=mode,
+                        streak_count=streak,
+                        total_delta=total_delta,
+                        total_delta_percent=total_delta_pct,
+                        delta_per_step=delta_per_step,
+                        current_value=self._sanitize_value(newest_val),
+                        current_entity_id=versions[0].get("entity_id", ""),
+                        unit=unit,
+                        values=values,
+                        valid_from=ensure_timezone(versions[0].get("valid_from")),
+                    )
+                )
+
+            # Sort: streak descending, then |total_delta_percent| descending
+            trends.sort(
+                key=lambda t: (-t.streak_count, -abs(t.total_delta_percent)),
+            )
+
+            return DegradationTrendsResponse(
+                trends=trends[:limit],
+                total_count=len(trends),
+            )
+        except Exception as e:
+            logger.warning(f"Failed to get degradation trends: {e}")
+            return DegradationTrendsResponse(trends=[], total_count=0)
 
     def get_policy_impact_violations(
         self,

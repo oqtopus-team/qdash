@@ -20,7 +20,9 @@ import type {
 
 import type {
   CompareExecutionsParams,
+  DegradationTrendsResponse,
   ExecutionComparisonResponse,
+  GetDegradationTrendsParams,
   GetParameterHistoryParams,
   GetProvenanceImpactParams,
   GetProvenanceLineageParams,
@@ -1495,6 +1497,190 @@ export function useGetRecentChanges<
   queryClient?: QueryClient,
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
   const queryOptions = getGetRecentChangesQueryOptions(params, options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Get parameters with consecutive degradation across calibration versions.
+
+Detects parameters where the value has been consistently worsening
+(based on evaluation mode: maximize/minimize) over multiple versions.
+
+Parameters
+----------
+ctx : ProjectContext
+    Project context with user and project information
+service : ProvenanceService
+    Provenance service instance
+min_streak : int
+    Minimum consecutive worsening steps (3-20, default: 3)
+limit : int
+    Maximum number of trends to return (1-100, default: 50)
+parameter_names : list[str] | None
+    Filter by parameter names
+
+Returns
+-------
+DegradationTrendsResponse
+    Detected degradation trends sorted by severity
+ * @summary Get degradation trends (consecutive worsening)
+ */
+export const getDegradationTrends = (
+  params?: GetDegradationTrendsParams,
+  options?: SecondParameter<typeof customInstance>,
+  signal?: AbortSignal,
+) => {
+  return customInstance<DegradationTrendsResponse>(
+    { url: `/provenance/degradation-trends`, method: "GET", params, signal },
+    options,
+  );
+};
+
+export const getGetDegradationTrendsQueryKey = (
+  params?: GetDegradationTrendsParams,
+) => {
+  return [
+    `/provenance/degradation-trends`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getGetDegradationTrendsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getDegradationTrends>>,
+  TError = HTTPValidationError,
+>(
+  params?: GetDegradationTrendsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof getDegradationTrends>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetDegradationTrendsQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getDegradationTrends>>
+  > = ({ signal }) => getDegradationTrends(params, requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getDegradationTrends>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData> };
+};
+
+export type GetDegradationTrendsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getDegradationTrends>>
+>;
+export type GetDegradationTrendsQueryError = HTTPValidationError;
+
+export function useGetDegradationTrends<
+  TData = Awaited<ReturnType<typeof getDegradationTrends>>,
+  TError = HTTPValidationError,
+>(
+  params: undefined | GetDegradationTrendsParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof getDegradationTrends>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getDegradationTrends>>,
+          TError,
+          Awaited<ReturnType<typeof getDegradationTrends>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData>;
+};
+export function useGetDegradationTrends<
+  TData = Awaited<ReturnType<typeof getDegradationTrends>>,
+  TError = HTTPValidationError,
+>(
+  params?: GetDegradationTrendsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof getDegradationTrends>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getDegradationTrends>>,
+          TError,
+          Awaited<ReturnType<typeof getDegradationTrends>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+export function useGetDegradationTrends<
+  TData = Awaited<ReturnType<typeof getDegradationTrends>>,
+  TError = HTTPValidationError,
+>(
+  params?: GetDegradationTrendsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof getDegradationTrends>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+/**
+ * @summary Get degradation trends (consecutive worsening)
+ */
+
+export function useGetDegradationTrends<
+  TData = Awaited<ReturnType<typeof getDegradationTrends>>,
+  TError = HTTPValidationError,
+>(
+  params?: GetDegradationTrendsParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof getDegradationTrends>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+  const queryOptions = getGetDegradationTrendsQueryOptions(params, options);
 
   const query = useQuery(queryOptions, queryClient) as UseQueryResult<
     TData,

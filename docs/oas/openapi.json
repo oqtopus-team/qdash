@@ -6630,6 +6630,110 @@
         }
       }
     },
+    "/provenance/degradation-trends": {
+      "get": {
+        "tags": [
+          "provenance"
+        ],
+        "summary": "Get degradation trends (consecutive worsening)",
+        "description": "Get parameters with consecutive degradation across calibration versions.\n\nDetects parameters where the value has been consistently worsening\n(based on evaluation mode: maximize/minimize) over multiple versions.\n\nParameters\n----------\nctx : ProjectContext\n    Project context with user and project information\nservice : ProvenanceService\n    Provenance service instance\nmin_streak : int\n    Minimum consecutive worsening steps (3-20, default: 3)\nlimit : int\n    Maximum number of trends to return (1-100, default: 50)\nparameter_names : list[str] | None\n    Filter by parameter names\n\nReturns\n-------\nDegradationTrendsResponse\n    Detected degradation trends sorted by severity",
+        "operationId": "getDegradationTrends",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "min_streak",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 20,
+              "minimum": 3,
+              "description": "Minimum consecutive worsening steps",
+              "default": 3,
+              "title": "Min Streak"
+            },
+            "description": "Minimum consecutive worsening steps"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Maximum number of trends to return",
+              "default": 50,
+              "title": "Limit"
+            },
+            "description": "Maximum number of trends to return"
+          },
+          {
+            "name": "parameter_names",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by parameter names",
+              "title": "Parameter Names"
+            },
+            "description": "Filter by parameter names"
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DegradationTrendsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/provenance/recommendations/{entity_id}": {
       "get": {
         "tags": [
@@ -7465,6 +7569,120 @@
         ],
         "title": "CreateChipRequest",
         "description": "Request model for creating a new chip.\n\nAttributes\n----------\n    chip_id (str): The ID of the chip to create.\n    size (int): The size of the chip (64, 144, 256, or 1024).\n    topology_id (str | None): Topology template ID. If not provided, defaults to 'square-lattice-mux-{size}'."
+      },
+      "DegradationTrendResponse": {
+        "properties": {
+          "parameter_name": {
+            "type": "string",
+            "title": "Parameter Name"
+          },
+          "qid": {
+            "type": "string",
+            "title": "Qid",
+            "default": ""
+          },
+          "evaluation_mode": {
+            "type": "string",
+            "title": "Evaluation Mode",
+            "description": "maximize or minimize"
+          },
+          "streak_count": {
+            "type": "integer",
+            "title": "Streak Count",
+            "description": "Consecutive worsening count"
+          },
+          "total_delta": {
+            "type": "number",
+            "title": "Total Delta",
+            "description": "Cumulative change over streak"
+          },
+          "total_delta_percent": {
+            "type": "number",
+            "title": "Total Delta Percent",
+            "description": "Cumulative change in %"
+          },
+          "delta_per_step": {
+            "type": "number",
+            "title": "Delta Per Step",
+            "description": "Average delta per step",
+            "default": 0
+          },
+          "current_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Current Value",
+            "default": 0
+          },
+          "current_entity_id": {
+            "type": "string",
+            "title": "Current Entity Id",
+            "default": ""
+          },
+          "unit": {
+            "type": "string",
+            "title": "Unit",
+            "default": ""
+          },
+          "values": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "title": "Values",
+            "description": "Recent values (oldest first) for sparkline"
+          },
+          "valid_from": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valid From"
+          }
+        },
+        "type": "object",
+        "required": [
+          "parameter_name",
+          "evaluation_mode",
+          "streak_count",
+          "total_delta",
+          "total_delta_percent"
+        ],
+        "title": "DegradationTrendResponse",
+        "description": "Response model for a single degradation trend (consecutive worsening)."
+      },
+      "DegradationTrendsResponse": {
+        "properties": {
+          "trends": {
+            "items": {
+              "$ref": "#/components/schemas/DegradationTrendResponse"
+            },
+            "type": "array",
+            "title": "Trends"
+          },
+          "total_count": {
+            "type": "integer",
+            "title": "Total Count",
+            "description": "Total trends matching query",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "title": "DegradationTrendsResponse",
+        "description": "Response model for degradation trends."
       },
       "DeleteScheduleResponse": {
         "properties": {
