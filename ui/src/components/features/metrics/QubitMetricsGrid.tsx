@@ -676,7 +676,11 @@ export function QubitMetricsGrid({
 
       {/* Grid display */}
       <div
-        className="flex-1 p-1 md:p-4 relative overflow-hidden flex justify-center"
+        className={`flex-1 p-1 md:p-4 relative overflow-hidden flex justify-center ${
+          viewMode === "pan-zoom"
+            ? "bg-base-200/30 border-2 border-dashed border-base-300 rounded-lg m-1 md:m-2"
+            : ""
+        }`}
         ref={containerRef}
       >
         {viewMode === "pan-zoom" ? (
