@@ -46,6 +46,9 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+_VERSIONS_BUFFER = 5  # Extra versions to fetch beyond min_streak
+
+
 class ProvenanceService:
     """Service for provenance queries.
 
@@ -666,22 +669,9 @@ class ProvenanceService:
         try:
             from qdash.common.datetime_utils import ensure_timezone
 
-            metrics_config = load_metrics_config()
+            eval_modes, all_metrics = self._load_evaluation_modes(parameter_names)
 
-            # Build eval_modes dict: parameter_name -> "maximize"|"minimize"
-            eval_modes: dict[str, str] = {}
-            all_metrics: dict[str, MetricMetadata] = {}
-            for name, meta in metrics_config.qubit_metrics.items():
-                if meta.evaluation.mode != "none":
-                    eval_modes[name] = meta.evaluation.mode
-                all_metrics[name] = meta
-            for name, meta in metrics_config.coupling_metrics.items():
-                if meta.evaluation.mode != "none":
-                    eval_modes[name] = meta.evaluation.mode
-                all_metrics[name] = meta
-
-            # Filter to requested parameter_names if provided
-            target_params: list[str] | None = None
+            # Determine target parameters
             if parameter_names:
                 target_params = [p for p in parameter_names if p in eval_modes]
             else:
@@ -694,7 +684,7 @@ class ProvenanceService:
             bulk_data = self.parameter_version_repo.get_recent_versions_bulk(
                 project_id,
                 parameter_names=target_params,
-                versions_per_param=min_streak + 5,
+                versions_per_param=min_streak + _VERSIONS_BUFFER,
             )
 
             trends: list[DegradationTrendResponse] = []
@@ -710,44 +700,14 @@ class ProvenanceService:
                     continue
 
                 mode = eval_modes[param_name]
-
-                # versions are newest-first from the aggregation
-                # Count consecutive worsening from the latest version backward
-                streak = 0
-                for i in range(len(versions) - 1):
-                    current_val = versions[i].get("value")
-                    prev_val = versions[i + 1].get("value")
-                    if not isinstance(current_val, (int, float)) or not isinstance(
-                        prev_val, (int, float)
-                    ):
-                        break
-                    if mode == "maximize":
-                        # Higher is better -> decreasing is worsening
-                        is_worse = current_val < prev_val
-                    else:  # minimize
-                        # Lower is better -> increasing is worsening
-                        is_worse = current_val > prev_val
-                    if is_worse:
-                        streak += 1
-                    else:
-                        break
+                streak = self._detect_streak(versions, mode)
 
                 if streak < min_streak:
                     continue
 
-                # Compute total delta (newest value - oldest value in streak)
-                newest_val = versions[0].get("value", 0)
-                oldest_val = versions[streak].get("value", 0)
-                if isinstance(newest_val, (int, float)) and isinstance(oldest_val, (int, float)):
-                    total_delta = float(newest_val) - float(oldest_val)
-                    total_delta_pct = (
-                        (total_delta / float(oldest_val) * 100) if oldest_val != 0 else 0.0
-                    )
-                    delta_per_step = total_delta / streak if streak > 0 else 0.0
-                else:
-                    total_delta = 0.0
-                    total_delta_pct = 0.0
-                    delta_per_step = 0.0
+                total_delta, total_delta_pct, delta_per_step = self._calculate_trend_metrics(
+                    versions, streak
+                )
 
                 # Build sparkline values (oldest first, i.e. reverse of versions[:streak+1])
                 sparkline_versions = versions[: streak + 1]
@@ -760,6 +720,7 @@ class ProvenanceService:
 
                 param_meta = all_metrics.get(param_name)
                 unit = param_meta.unit if param_meta else ""
+                newest_val = versions[0].get("value", 0)
 
                 trends.append(
                     DegradationTrendResponse(
@@ -787,9 +748,108 @@ class ProvenanceService:
                 trends=trends[:limit],
                 total_count=len(trends),
             )
-        except Exception as e:
-            logger.warning(f"Failed to get degradation trends: {e}")
+        except (KeyError, TypeError, ValueError) as e:
+            logger.warning("Failed to compute degradation trends: %s", e)
             return DegradationTrendsResponse(trends=[], total_count=0)
+        except Exception:
+            logger.exception("Unexpected error in get_degradation_trends")
+            raise
+
+    def _load_evaluation_modes(
+        self,
+        parameter_names: list[str] | None,
+    ) -> tuple[dict[str, str], dict[str, MetricMetadata]]:
+        """Load evaluation modes and metric metadata from config.
+
+        Parameters
+        ----------
+        parameter_names : list[str] | None
+            Optional filter — only include these parameter names.
+
+        Returns
+        -------
+        tuple[dict[str, str], dict[str, MetricMetadata]]
+            (eval_modes mapping, all_metrics mapping)
+
+        """
+        metrics_config = load_metrics_config()
+
+        eval_modes: dict[str, str] = {}
+        all_metrics: dict[str, MetricMetadata] = {}
+        for name, meta in metrics_config.qubit_metrics.items():
+            if meta.evaluation.mode != "none":
+                eval_modes[name] = meta.evaluation.mode
+            all_metrics[name] = meta
+        for name, meta in metrics_config.coupling_metrics.items():
+            if meta.evaluation.mode != "none":
+                eval_modes[name] = meta.evaluation.mode
+            all_metrics[name] = meta
+
+        return eval_modes, all_metrics
+
+    @staticmethod
+    def _detect_streak(versions: list[dict[str, Any]], mode: str) -> int:
+        """Count consecutive worsening steps from newest version.
+
+        Parameters
+        ----------
+        versions : list[dict]
+            Versions ordered newest-first.
+        mode : str
+            ``"maximize"`` or ``"minimize"``.
+
+        Returns
+        -------
+        int
+            Number of consecutive worsening steps.
+
+        """
+        streak = 0
+        for i in range(len(versions) - 1):
+            current_val = versions[i].get("value")
+            prev_val = versions[i + 1].get("value")
+            if not isinstance(current_val, (int, float)) or not isinstance(prev_val, (int, float)):
+                break
+            if mode == "maximize":
+                is_worse = current_val < prev_val
+            else:
+                is_worse = current_val > prev_val
+            if is_worse:
+                streak += 1
+            else:
+                break
+        return streak
+
+    @staticmethod
+    def _calculate_trend_metrics(
+        versions: list[dict[str, Any]], streak: int
+    ) -> tuple[float, float, float]:
+        """Calculate total_delta, total_delta_percent, and delta_per_step.
+
+        Parameters
+        ----------
+        versions : list[dict]
+            Versions ordered newest-first.
+        streak : int
+            Number of consecutive worsening steps.
+
+        Returns
+        -------
+        tuple[float, float, float]
+            (total_delta, total_delta_percent, delta_per_step)
+
+        """
+        newest_val = versions[0].get("value", 0)
+        oldest_val = versions[streak].get("value", 0)
+        if isinstance(newest_val, (int, float)) and isinstance(oldest_val, (int, float)):
+            total_delta = float(newest_val) - float(oldest_val)
+            total_delta_pct = (total_delta / float(oldest_val) * 100) if oldest_val != 0 else 0.0
+            delta_per_step = total_delta / streak if streak > 0 else 0.0
+        else:
+            total_delta = 0.0
+            total_delta_pct = 0.0
+            delta_per_step = 0.0
+        return total_delta, total_delta_pct, delta_per_step
 
     def get_policy_impact_violations(
         self,

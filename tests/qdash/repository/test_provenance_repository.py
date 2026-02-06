@@ -247,6 +247,64 @@ class TestActivityDocumentMethods:
         assert activity_id == "exec-001:task-001"
 
 
+class TestGetRecentVersionsBulk:
+    """Test MongoParameterVersionRepository.get_recent_versions_bulk."""
+
+    @pytest.fixture
+    def repo(self):
+        """Create repository instance."""
+        return MongoParameterVersionRepository()
+
+    def test_pipeline_construction_normal(self, repo):
+        """Test normal pipeline construction and delegation."""
+        mock_result = [
+            {"parameter_name": "t1", "qid": "Q0", "versions": [{"value": 1}]},
+        ]
+        with patch.object(
+            ParameterVersionDocument,
+            "aggregate",
+            return_value=MagicMock(run=MagicMock(return_value=mock_result)),
+        ) as mock_agg:
+            result = repo.get_recent_versions_bulk("project-001", versions_per_param=8)
+
+            mock_agg.assert_called_once()
+            pipeline = mock_agg.call_args[0][0]
+            # First stage is $match
+            assert pipeline[0]["$match"]["project_id"] == "project-001"
+            assert "$in" not in str(pipeline[0]["$match"])
+            assert result == mock_result
+
+    def test_pipeline_with_parameter_names_filter(self, repo):
+        """Test $in filter when parameter_names is provided."""
+        with patch.object(
+            ParameterVersionDocument,
+            "aggregate",
+            return_value=MagicMock(run=MagicMock(return_value=[])),
+        ) as mock_agg:
+            repo.get_recent_versions_bulk(
+                "project-001",
+                parameter_names=["t1", "t2"],
+                versions_per_param=5,
+            )
+
+            pipeline = mock_agg.call_args[0][0]
+            match_stage = pipeline[0]["$match"]
+            assert match_stage["parameter_name"] == {"$in": ["t1", "t2"]}
+
+    def test_pipeline_without_parameter_names(self, repo):
+        """Test no $in filter when parameter_names is None."""
+        with patch.object(
+            ParameterVersionDocument,
+            "aggregate",
+            return_value=MagicMock(run=MagicMock(return_value=[])),
+        ) as mock_agg:
+            repo.get_recent_versions_bulk("project-001", parameter_names=None)
+
+            pipeline = mock_agg.call_args[0][0]
+            match_stage = pipeline[0]["$match"]
+            assert "parameter_name" not in match_stage
+
+
 class TestProvenanceRelationType:
     """Test ProvenanceRelationType enum."""
 

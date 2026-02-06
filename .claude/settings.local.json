@@ -35,7 +35,9 @@
       "mcp__serena__think_about_task_adherence",
       "Bash(npx tsc:*)",
       "Bash(npx eslint:*)",
-      "mcp__serena__initial_instructions"
+      "mcp__serena__initial_instructions",
+      "Bash(uv run ruff format:*)",
+      "Bash(uv run pytest:*)"
     ],
     "deny": []
   },
