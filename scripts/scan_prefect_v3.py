@@ -119,6 +119,26 @@ def scan_risky_import() -> None:
                 print(f" - {f}")
     print()
 
+def has_prefect_import(path: Path) -> bool:
+    try:
+        tree = ast.parse(path.read_text())
+    except Exception:
+        return False
+
+    for node in ast.walk(tree):
+        # import prefect
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                if alias.name == "prefect" or alias.name.startswith("prefect."):
+                    return True
+
+        # from prefect import ...
+        if isinstance(node, ast.ImportFrom):
+            if node.module and (node.module == "prefect" or node.module.startswith("prefect.")):
+                return True
+
+    return False
+
 def scan_flow_error() -> None:
     PATTERNS = {
         "raise_on_failure": r"raise_on_failure",
@@ -127,18 +147,19 @@ def scan_flow_error() -> None:
         "state_check": r"is_failed|is_successful|State",
     }
 
-    IGNORE_DIRS = {".venv", "scripts", "tests"}
+    TARGET_DIRS = ["src/qdash/workflow"]
 
     root = Path(".")
 
-    # パターンごとにファイルを集める箱
     hits_by_pattern = defaultdict(list)
 
     for py in root.rglob("*.py"):
-        if any(part in IGNORE_DIRS for part in py.parts):
+        if not any(str(py).startswith(td) for td in TARGET_DIRS):
             continue
 
         text = py.read_text()
+        if "@flow" not in text:
+            continue
 
         for name, pattern in PATTERNS.items():
             if re.search(pattern, text):
