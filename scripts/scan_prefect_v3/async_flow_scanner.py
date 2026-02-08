@@ -1,8 +1,11 @@
 import ast
+import os
 from pathlib import Path
 from collections import defaultdict
 from common import print_with_border
 
+
+TARGET_DIR = Path("src/qdash/workflow")
 
 def _get_called_name(node: ast.AST) -> str | None:
     """Get the called function name from a Call node."""
@@ -65,7 +68,9 @@ def scan_file(path: Path) -> list[tuple[int, str]]:
 
 
 def scan_risky_async() -> None:
-    root = Path(".")
+    root = TARGET_DIR
+    print()
+    print(f"Scanning for risky async usage in Prefect 3 under: {os.path.abspath(root)}")
     findings: dict[str, list[str]] = defaultdict(list)
 
     for py in root.rglob("*.py"):

@@ -1,8 +1,11 @@
 import ast
+import os
 from pathlib import Path
 from collections import defaultdict
 from common import print_with_border
 
+
+TARGET_DIR = Path("src/qdash/workflow")
 
 def scan_risky_import() -> None:
     """
@@ -88,7 +91,9 @@ def scan_risky_import() -> None:
         return moved_hits, removed_hits
 
 
-    root = Path(".")
+    root = TARGET_DIR
+    print()
+    print(f"Scanning for Prefect 3 risky imports under: {os.path.abspath(root)}")
     moved = defaultdict(list)
     removed = defaultdict(list)
     for py in root.rglob("*.py"):
