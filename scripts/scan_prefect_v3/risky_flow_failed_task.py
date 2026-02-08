@@ -2,7 +2,7 @@ import ast
 from pathlib import Path
 from collections import defaultdict
 import re
-from .common import print_with_border
+from common import print_with_border
 
 def has_prefect_import(path: Path) -> bool:
     try:

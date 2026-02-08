@@ -1,7 +1,7 @@
 import ast
 from pathlib import Path
 from collections import defaultdict
-from .common import print_with_border
+from common import print_with_border
 
 
 def scan_risky_import() -> None:
@@ -116,3 +116,6 @@ def scan_risky_import() -> None:
             for f in files:
                 print(f" - {f}")
     print()
+
+if __name__ == "__main__":
+    scan_risky_import()
