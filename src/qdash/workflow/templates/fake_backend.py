@@ -59,6 +59,7 @@ def fake_calibration(
     qids: list[str] | None = None,
     tasks: list[str] | None = None,
     backend_name: str | None = None,
+    tags: list[str] | None = None,
     flow_name: str | None = None,
     project_id: str | None = None,
 ) -> Any:
@@ -100,6 +101,7 @@ def fake_calibration(
         chip_id,
         backend_name=backend_name,
         flow_name=flow_name,
+        tags=tags,
         project_id=project_id,
         skip_execution=False,  # Child sessions create their own Executions
     )

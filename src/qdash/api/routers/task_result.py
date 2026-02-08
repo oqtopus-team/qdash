@@ -5,7 +5,7 @@ from __future__ import annotations
 import io
 import logging
 import zipfile
-from datetime import timedelta
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated
 
@@ -668,8 +668,9 @@ def _fetch_timeseries_data(
     if start_at is None or end_at is None:
         end_at_dt = now()
         start_at_dt = now() - timedelta(days=7)
-        end_at = end_at_dt.isoformat()
-        start_at = start_at_dt.isoformat()
+    else:
+        start_at_dt = datetime.fromisoformat(start_at)
+        end_at_dt = datetime.fromisoformat(end_at)
     # Find all task results for the given tag and parameter (scoped by project)
     task_result_repo = MongoTaskResultHistoryRepository()
     task_results = task_result_repo.find_with_projection(
@@ -678,7 +679,7 @@ def _fetch_timeseries_data(
             "chip_id": chip_id,
             "tags": tag,
             "output_parameter_names": parameter,
-            "start_at": {"$gte": start_at, "$lte": end_at},
+            "start_at": {"$gte": start_at_dt, "$lte": end_at_dt},
         },
         projection_model=TimeSeriesProjection,
         sort=[("start_at", SortDirection.ASCENDING)],

@@ -27,6 +27,7 @@ def bringup(
     exclude_qids: list[str] | None = None,
     qids: list[str] | None = None,
     mode: str = "scheduled",
+    tags: list[str] | None = None,
     flow_name: str | None = None,
     project_id: str | None = None,
 ) -> Any:
@@ -67,6 +68,7 @@ def bringup(
         username,
         chip_id,
         flow_name=flow_name,
+        tags=tags,
         project_id=project_id,
         skip_execution=True,
     )

@@ -37,6 +37,7 @@ def two_qubit_scheduled(
     chip_id: str,
     schedule: list[list[tuple[str, str]]],
     tasks: list[str] | None = None,
+    tags: list[str] | None = None,
     flow_name: str | None = None,
     project_id: str | None = None,
 ) -> Any:
@@ -134,6 +135,7 @@ def two_qubit_scheduled(
         username,
         chip_id,
         flow_name=flow_name,
+        tags=tags,
         project_id=project_id,
         skip_execution=True,  # Child sessions create their own Executions
     )
