@@ -32,7 +32,7 @@ from typing import Any
 from prefect import flow
 from qdash.workflow.service import CalibService
 from qdash.workflow.service.steps import CustomOneQubit
-from qdash.workflow.service.targets import MuxTargets, QubitTargets
+from qdash.workflow.service.targets import MuxTargets, QubitTargets, Target
 
 
 @flow
@@ -79,6 +79,7 @@ def simple_calibration(
         exclude_qids = []
 
     # Define targets: MUX-based takes priority over qubit-based
+    targets: Target
     if mux_ids is not None:
         targets = MuxTargets(mux_ids=mux_ids, exclude_qids=exclude_qids)
     elif qids is not None:
