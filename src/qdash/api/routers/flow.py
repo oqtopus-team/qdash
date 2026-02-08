@@ -983,13 +983,16 @@ async def execute_flow(
         )
 
     # Merge parameters (request overrides defaults)
-    # Add flow_name and project_id for multi-tenancy support
+    # Add flow_name, project_id, and tags for multi-tenancy support
     parameters: dict[str, Any] = {
         **flow.default_parameters,
         **request.parameters,
         "flow_name": name,  # Add flow name for display purposes
         "project_id": project_id,  # Add project_id for multi-tenancy
     }
+    # Pass flow tags if not already overridden by request parameters
+    if "tags" not in parameters and flow.tags:
+        parameters["tags"] = flow.tags
 
     logger.info(
         f"Executing flow '{name}' (deployment={flow.deployment_id}) with parameters: {parameters}"
@@ -1153,6 +1156,9 @@ async def schedule_flow(
         "flow_name": name,
         "project_id": ctx.project_id,  # Add project_id for multi-tenancy
     }
+    # Pass flow tags if not already overridden by request parameters
+    if "tags" not in parameters and flow.tags:
+        parameters["tags"] = flow.tags
 
     logger.info(f"Scheduling flow '{name}' with parameters: {parameters}")
 

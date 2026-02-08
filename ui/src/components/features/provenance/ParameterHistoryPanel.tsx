@@ -13,6 +13,7 @@ import {
   GitBranch,
   BarChart3,
   X,
+  Image,
 } from "lucide-react";
 
 import { useGetParameterHistory } from "@/client/provenance/provenance";
@@ -21,6 +22,7 @@ import {
   getDaisySelectStyles,
   getDaisySelectStylesSm,
 } from "@/lib/reactSelectTheme";
+import { TaskFigure } from "@/components/charts/TaskFigure";
 import { formatDateTime } from "@/utils/datetime";
 import type { ParameterVersionResponse } from "@/schemas/parameterVersionResponse";
 
@@ -950,6 +952,36 @@ function DiffCard({
           Delta not available (non-numeric values)
         </div>
       )}
+
+      {/* Figure Comparison */}
+      <div className="space-y-2">
+        <h4 className="font-semibold text-sm flex items-center gap-2">
+          <Image className="h-4 w-4" />
+          Figures
+        </h4>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="bg-base-100 rounded-lg p-2">
+            <div className="text-xs text-base-content/60 mb-1">
+              v{older.version} — {older.task_name || "-"}
+            </div>
+            <TaskFigure
+              taskId={older.task_id}
+              qid={older.qid ?? ""}
+              className="w-full rounded"
+            />
+          </div>
+          <div className="bg-base-100 rounded-lg p-2">
+            <div className="text-xs text-base-content/60 mb-1">
+              v{newer.version} — {newer.task_name || "-"}
+            </div>
+            <TaskFigure
+              taskId={newer.task_id}
+              qid={newer.qid ?? ""}
+              className="w-full rounded"
+            />
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
