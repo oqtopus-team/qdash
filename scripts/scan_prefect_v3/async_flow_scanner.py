@@ -25,7 +25,7 @@ class AsyncPrefectVisitor(ast.NodeVisitor):
                 self.issues.append(
                     (
                         n.lineno,
-                        f"await inside sync function '{node.name}' (deprecated behavior risk)",
+                        f"await inside sync function '{node.name}'",
                     )
                 )
 
@@ -33,7 +33,7 @@ class AsyncPrefectVisitor(ast.NodeVisitor):
                 self.issues.append(
                     (
                         n.lineno,
-                        f".submit() called inside sync function '{node.name}' (deprecated behavior risk)",
+                        f".submit() called inside sync function '{node.name}'",
                     )
                 )
 
@@ -46,7 +46,7 @@ class AsyncPrefectVisitor(ast.NodeVisitor):
                     self.issues.append(
                         (
                             n.lineno,
-                            f"await task.submit() in async function '{node.name}' (deprecated behavior risk)",
+                            f"await task.submit() in async function '{node.name}'",
                         )
                     )
 
