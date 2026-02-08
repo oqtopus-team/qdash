@@ -21,6 +21,7 @@ import { useCSVExport } from "@/hooks/useCSVExport";
 import { useMetricsConfig } from "@/hooks/useMetricsConfig";
 import { useTimeRange } from "@/hooks/useTimeRange";
 import { useAnalysisUrlState } from "@/hooks/useUrlState";
+import { formatDateTime } from "@/utils/datetime";
 
 // Color palette for secondary axis traces
 const SECONDARY_AXIS_COLORS = [
@@ -241,7 +242,7 @@ export function TimeSeriesView() {
           dataPoints.forEach((point: any) => {
             tableRows.push({
               qid,
-              time: point.calibrated_at || "",
+              time: formatDateTime(point.calibrated_at),
               parameter: selectedParameter,
               value: point.value || 0,
               error: point.error,
@@ -269,7 +270,11 @@ export function TimeSeriesView() {
       ([qid, dataPoints]) => {
         if (Array.isArray(dataPoints)) {
           qidData[qid] = {
-            x: dataPoints.map((point: any) => point.calibrated_at || ""),
+            x: dataPoints.map(
+              (point: any) =>
+                formatDateTime(point.calibrated_at, "yyyy-MM-dd'T'HH:mm:ss") ||
+                "",
+            ),
             y: dataPoints.map((point: any) => {
               const value = point.value;
               if (typeof value === "number") return value;
@@ -351,7 +356,7 @@ export function TimeSeriesView() {
             dataPoints.forEach((point: any) => {
               tableRows.push({
                 qid,
-                time: point.calibrated_at || "",
+                time: formatDateTime(point.calibrated_at),
                 parameter: secondaryParameter,
                 value: point.value || 0,
                 error: point.error,
@@ -379,7 +384,13 @@ export function TimeSeriesView() {
         ([qid, dataPoints]) => {
           if (Array.isArray(dataPoints)) {
             qidData[qid] = {
-              x: dataPoints.map((point: any) => point.calibrated_at || ""),
+              x: dataPoints.map(
+                (point: any) =>
+                  formatDateTime(
+                    point.calibrated_at,
+                    "yyyy-MM-dd'T'HH:mm:ss",
+                  ) || "",
+              ),
               y: dataPoints.map((point: any) => {
                 const value = point.value;
                 if (typeof value === "number") return value;
@@ -485,7 +496,7 @@ export function TimeSeriesView() {
         font: { size: 24 },
       },
       xaxis: {
-        title: "Time",
+        title: "Time (JST)",
         type: "date",
         tickformat: "%Y-%m-%d %H:%M",
         gridcolor: "#eee",

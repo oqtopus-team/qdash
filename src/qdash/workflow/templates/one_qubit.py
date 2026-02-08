@@ -30,6 +30,7 @@ def one_qubit(
     mux_ids: list[int] | None = None,
     exclude_qids: list[str] | None = None,
     qids: list[str] | None = None,
+    tags: list[str] | None = None,
     flow_name: str | None = None,
     project_id: str | None = None,
     check_only: bool = False,
@@ -74,6 +75,7 @@ def one_qubit(
         username,
         chip_id,
         flow_name=flow_name,
+        tags=tags,
         project_id=project_id,
         skip_execution=True,  # Child sessions create their own Executions
     )

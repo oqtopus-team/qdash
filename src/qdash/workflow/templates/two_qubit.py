@@ -34,6 +34,7 @@ def two_qubit(
     qids: list[str] | None = None,
     tasks: list[str] | None = None,
     max_parallel_ops: int = 10,
+    tags: list[str] | None = None,
     flow_name: str | None = None,
     project_id: str | None = None,
 ) -> Any:
@@ -133,6 +134,7 @@ def two_qubit(
         username,
         chip_id,
         flow_name=flow_name,
+        tags=tags,
         project_id=project_id,
         skip_execution=True,  # Child sessions create their own Executions
     )

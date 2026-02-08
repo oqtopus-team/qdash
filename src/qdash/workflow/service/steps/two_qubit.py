@@ -129,6 +129,7 @@ class CustomTwoQubit(CalibrationStep):
             service.chip_id,
             candidate_qubits,
             flow_name=f"{service.flow_name}_{self.name}" if service.flow_name else self.name,
+            tags=service.tags,
             project_id=service.project_id,
             use_lock=False,  # Parent pipeline already holds the lock
             enable_github_pull=False,
@@ -439,6 +440,7 @@ class TwoQubitCalibration(CalibrationStep):
             service.chip_id,
             candidate_qubits,
             flow_name=f"{service.flow_name}_{self.name}" if service.flow_name else self.name,
+            tags=service.tags,
             project_id=service.project_id,
             use_lock=False,  # Parent pipeline already holds the lock
             enable_github_pull=False,

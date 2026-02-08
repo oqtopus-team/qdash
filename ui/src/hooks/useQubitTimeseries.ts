@@ -11,6 +11,7 @@ import type {
 import { useListTags } from "@/client/tag/tag";
 import { useGetTimeseriesTaskResults } from "@/client/task-result/task-result";
 import { useMetricsConfig } from "@/hooks/useMetricsConfig";
+import { formatDateTime } from "@/utils/datetime";
 
 interface UseQubitTimeseriesOptions {
   chipId: string;
@@ -66,12 +67,12 @@ export function useQubitTimeseries(options: UseQubitTimeseriesOptions) {
 
     return qubitData
       .map((point: ParameterModel) => ({
-        time: point.calibrated_at || "",
+        time: formatDateTime(point.calibrated_at),
         value: point.value || 0,
         error: point.error,
         unit: point.unit || "a.u.",
       }))
-      .sort((a, b) => a.time.localeCompare(b.time)); // Use string comparison for ISO dates
+      .sort((a, b) => a.time.localeCompare(b.time));
   }, [timeseriesResponse?.data?.data, qubitId]);
 
   // Process plot data
@@ -83,7 +84,8 @@ export function useQubitTimeseries(options: UseQubitTimeseriesOptions) {
       if (!Array.isArray(qubitData)) return [];
 
       const x = qubitData.map(
-        (point: ParameterModel) => point.calibrated_at || "",
+        (point: ParameterModel) =>
+          formatDateTime(point.calibrated_at, "yyyy-MM-dd'T'HH:mm:ss") || "",
       );
       const y = qubitData.map((point: ParameterModel) => {
         const value = point.value;

@@ -10,7 +10,7 @@
   {
     "id": "simple",
     "name": "Simple Calibration",
-    "description": "Basic calibration for learning and simple tasks. Supports sequential and parallel group execution.",
+    "description": "Basic calibration for learning and simple tasks. Supports MUX-based and qubit-based targeting with customizable tasks and execution modes.",
     "category": "basic",
     "filename": "simple.py",
     "function_name": "simple_calibration"
