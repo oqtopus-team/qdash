@@ -2,10 +2,10 @@ import ast
 import os
 from pathlib import Path
 from collections import defaultdict
+
 from common import print_with_border
+from config import TARGET_DIR
 
-
-TARGET_DIR = Path("src/qdash/workflow")
 
 def scan_risky_cache_patterns() -> None:
     """

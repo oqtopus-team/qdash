@@ -2,10 +2,10 @@ import ast
 import os
 from pathlib import Path
 from collections import defaultdict
+
 from common import print_with_border
+from config import TARGET_DIR
 
-
-TARGET_DIR = Path("src/qdash/workflow")
 
 def _get_called_name(node: ast.AST) -> str | None:
     """Get the called function name from a Call node."""
