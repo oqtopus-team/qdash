@@ -153,6 +153,9 @@ class ProvenanceService:
         for node in nodes:
             node.depth = depths.get(node.node_id, 0)
 
+        # Enrich entity nodes with latest version info (staleness check)
+        self._enrich_nodes_with_latest_version(project_id, nodes)
+
         # Find or create origin node
         origin = next(
             (n for n in nodes if n.node_id == entity_id),
@@ -278,6 +281,58 @@ class ProvenanceService:
                 queue.append(nxt)
 
         return depths
+
+    def _enrich_nodes_with_latest_version(
+        self,
+        project_id: str,
+        nodes: list[LineageNodeResponse],
+    ) -> None:
+        """Annotate entity nodes whose version is behind the current version.
+
+        For each entity node, if a newer version exists, sets
+        ``node.latest_version`` to the current version number.
+
+        Parameters
+        ----------
+        project_id : str
+            Project identifier
+        nodes : list[LineageNodeResponse]
+            Nodes to enrich (modified in place)
+
+        """
+        # Collect (parameter_name, qid) pairs for entity nodes
+        entity_nodes = [n for n in nodes if n.node_type == "entity" and n.entity]
+        if not entity_nodes:
+            return
+
+        keys: set[tuple[str, str]] = set()
+        for node in entity_nodes:
+            assert node.entity is not None
+            keys.add((node.entity.parameter_name, node.entity.qid))
+
+        if not keys:
+            return
+
+        # Bulk-fetch current versions
+        current_docs = self.parameter_version_repo.get_current_many(
+            project_id,
+            keys=sorted(keys),
+        )
+
+        # Build lookup: (parameter_name, qid) -> current version number
+        current_version_map: dict[tuple[str, str], int] = {}
+        for doc in current_docs:
+            current_version_map[(doc.parameter_name, getattr(doc, "qid", ""))] = getattr(
+                doc, "version", 1
+            )
+
+        # Annotate nodes where a newer version exists
+        for node in entity_nodes:
+            assert node.entity is not None
+            key = (node.entity.parameter_name, node.entity.qid)
+            current_ver = current_version_map.get(key)
+            if current_ver is not None and current_ver > node.entity.version:
+                node.latest_version = current_ver
 
     def compare_executions(
         self,

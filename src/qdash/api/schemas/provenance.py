@@ -155,6 +155,8 @@ class LineageNodeResponse(BaseModel):
         Entity details if node is an entity
     activity : ActivityResponse | None
         Activity details if node is an activity
+    latest_version : int | None
+        Current version of the parameter if newer than the node's version
 
     """
 
@@ -163,6 +165,7 @@ class LineageNodeResponse(BaseModel):
     depth: int = 0
     entity: ParameterVersionResponse | None = None
     activity: ActivityResponse | None = None
+    latest_version: int | None = None
 
 
 class LineageEdgeResponse(BaseModel):
