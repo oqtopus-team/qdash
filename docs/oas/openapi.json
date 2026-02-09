@@ -8657,6 +8657,17 @@
                 "type": "null"
               }
             ]
+          },
+          "latest_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Version"
           }
         },
         "type": "object",
@@ -8665,7 +8676,7 @@
           "node_id"
         ],
         "title": "LineageNodeResponse",
-        "description": "Response model for a node in the lineage graph.\n\nAttributes\n----------\nnode_type : str\n    Type of node (entity or activity)\nnode_id : str\n    Identifier of the node\ndepth : int\n    Distance from the queried entity (0 = origin)\nentity : ParameterVersionResponse | None\n    Entity details if node is an entity\nactivity : ActivityResponse | None\n    Activity details if node is an activity"
+        "description": "Response model for a node in the lineage graph.\n\nAttributes\n----------\nnode_type : str\n    Type of node (entity or activity)\nnode_id : str\n    Identifier of the node\ndepth : int\n    Distance from the queried entity (0 = origin)\nentity : ParameterVersionResponse | None\n    Entity details if node is an entity\nactivity : ActivityResponse | None\n    Activity details if node is an activity\nlatest_version : int | None\n    Current version of the parameter if newer than the node's version"
       },
       "LineageResponse": {
         "properties": {

@@ -7,6 +7,7 @@
  */
 import type { LineageNodeResponseEntity } from "./lineageNodeResponseEntity";
 import type { LineageNodeResponseActivity } from "./lineageNodeResponseActivity";
+import type { LineageNodeResponseLatestVersion } from "./lineageNodeResponseLatestVersion";
 
 /**
  * Response model for a node in the lineage graph.
@@ -23,6 +24,8 @@ entity : ParameterVersionResponse | None
     Entity details if node is an entity
 activity : ActivityResponse | None
     Activity details if node is an activity
+latest_version : int | None
+    Current version of the parameter if newer than the node's version
  */
 export interface LineageNodeResponse {
   node_type: string;
@@ -30,4 +33,5 @@ export interface LineageNodeResponse {
   depth?: number;
   entity?: LineageNodeResponseEntity;
   activity?: LineageNodeResponseActivity;
+  latest_version?: LineageNodeResponseLatestVersion;
 }
