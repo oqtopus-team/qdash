@@ -69,7 +69,10 @@ function EntityNode({ data, selected }: NodeProps) {
 
   // Compact value + unit + error in one line
   const valueParts: string[] = [];
-  if (typedData.value) valueParts.push(`${typedData.value}${typedData.unit ? ` ${typedData.unit}` : ""}`);
+  if (typedData.value)
+    valueParts.push(
+      `${typedData.value}${typedData.unit ? ` ${typedData.unit}` : ""}`,
+    );
   if (typedData.error) valueParts.push(`±${typedData.error}`);
   const valueText = valueParts.join("  ");
 
@@ -138,9 +141,7 @@ function EntityNode({ data, selected }: NodeProps) {
       {valueText && (
         <div
           className={`text-[10px] font-mono mt-0.5 text-center truncate ${
-            typedData.lowConfidence
-              ? "text-warning"
-              : "text-base-content/60"
+            typedData.lowConfidence ? "text-warning" : "text-base-content/60"
           }`}
         >
           {valueText}
