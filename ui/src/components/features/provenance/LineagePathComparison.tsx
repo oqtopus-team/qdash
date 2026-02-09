@@ -232,14 +232,14 @@ export function LineagePathComparison({
       badge: "badge-success",
       label: "Added",
       icon: Plus,
-      bg: "",
+      bg: "bg-success/5",
     },
     removed: {
       border: "border-error/50",
       badge: "badge-error",
       label: "Removed",
       icon: Minus,
-      bg: "",
+      bg: "bg-error/5",
     },
   };
 
@@ -252,7 +252,7 @@ export function LineagePathComparison({
         </span>
         <div className="flex items-center gap-2">
           {counts.changed > 0 && (
-            <span className="badge badge-warning badge-sm gap-1">
+            <span className="badge badge-warning badge-outline badge-sm gap-1">
               <Pen className="h-3 w-3" />
               {counts.changed} changed
             </span>
@@ -362,7 +362,13 @@ export function LineagePathComparison({
                       {step.paramBefore?.name || step.paramAfter?.name}:
                     </span>
                     {step.paramBefore && (
-                      <span className="font-mono">
+                      <span
+                        className={`font-mono ${
+                          step.status === "changed"
+                            ? "text-error line-through opacity-70"
+                            : ""
+                        }`}
+                      >
                         {formatValue(step.paramBefore.value)}
                         {step.paramBefore.unit
                           ? ` ${step.paramBefore.unit}`
@@ -376,7 +382,7 @@ export function LineagePathComparison({
                       <span
                         className={`font-mono ${
                           step.status === "changed"
-                            ? "text-warning font-semibold"
+                            ? "text-success font-semibold"
                             : ""
                         }`}
                       >
@@ -390,9 +396,19 @@ export function LineagePathComparison({
                 {/* Side-by-side figures — skip for unchanged to keep compact */}
                 {!isUnchanged && (
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 mt-1">
-                    {/* Before */}
-                    <div>
-                      <div className="text-xs text-base-content/60 mb-1">
+                    {/* Before (old) */}
+                    <div
+                      className={
+                        step.status === "removed" || step.status === "changed"
+                          ? "ring-2 ring-error/50 bg-error/5 rounded-lg p-2"
+                          : ""
+                      }
+                    >
+                      <div className="text-xs text-base-content/60 mb-1 flex items-center gap-1">
+                        {(step.status === "removed" ||
+                          step.status === "changed") && (
+                          <Minus className="h-3 w-3 text-error" />
+                        )}
                         {labelBefore}
                         {step.executionIdBefore && (
                           <span className="font-mono ml-1">
@@ -418,9 +434,19 @@ export function LineagePathComparison({
                       )}
                     </div>
 
-                    {/* After */}
-                    <div>
-                      <div className="text-xs text-base-content/60 mb-1">
+                    {/* After (new) */}
+                    <div
+                      className={
+                        step.status === "added" || step.status === "changed"
+                          ? "ring-2 ring-success/50 bg-success/5 rounded-lg p-2"
+                          : ""
+                      }
+                    >
+                      <div className="text-xs text-base-content/60 mb-1 flex items-center gap-1">
+                        {(step.status === "added" ||
+                          step.status === "changed") && (
+                          <Plus className="h-3 w-3 text-success" />
+                        )}
                         {labelAfter}
                         {step.executionIdAfter && (
                           <span className="font-mono ml-1">
