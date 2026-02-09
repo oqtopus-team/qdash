@@ -132,6 +132,7 @@ export * from "./lineageEdgeResponse";
 export * from "./lineageNodeResponse";
 export * from "./lineageNodeResponseActivity";
 export * from "./lineageNodeResponseEntity";
+export * from "./lineageNodeResponseLatestVersion";
 export * from "./lineageResponse";
 export * from "./listAllFlowSchedulesParams";
 export * from "./listAllProjectsParams";
