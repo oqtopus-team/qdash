@@ -314,13 +314,13 @@ export function LineageExplorerPanel({
                 </div>
               )}
 
-              {/* Path comparison */}
+              {/* Path comparison — old version on the left, new on the right */}
               {compareData && data && (
                 <LineagePathComparison
-                  lineageBefore={data}
-                  lineageAfter={compareData}
-                  labelBefore={getVersionLabel(entityId)}
-                  labelAfter={getVersionLabel(compareEntityId)}
+                  lineageBefore={compareData}
+                  lineageAfter={data}
+                  labelBefore={getVersionLabel(compareEntityId)}
+                  labelAfter={getVersionLabel(entityId)}
                 />
               )}
 
