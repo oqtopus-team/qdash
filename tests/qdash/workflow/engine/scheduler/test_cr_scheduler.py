@@ -5,6 +5,8 @@ These tests verify the CRScheduler functionality including:
 - Frequency directionality filtering
 - Graph coloring strategies
 - Parallel grouping
+- Topology-based direction filtering
+- Inverse direction support
 """
 
 from unittest.mock import MagicMock, patch
@@ -443,3 +445,181 @@ def test_schedule_result_repr():
     repr_str = repr(result)
     assert "pairs=2" in repr_str
     assert "groups=1" in repr_str
+
+
+# Topology-based direction tests
+def test_get_topology_direction_set_forward(scheduler):
+    """Test topology direction set construction for forward direction."""
+    # Create a mock topology with checkerboard_cr convention
+    mock_topology = MagicMock()
+    mock_topology.direction_convention = "checkerboard_cr"
+    mock_topology.couplings = [[0, 1], [2, 3], [4, 5]]
+    scheduler._topology = mock_topology
+
+    result = scheduler._get_topology_direction_set(inverse=False)
+
+    assert result == {"0-1", "2-3", "4-5"}
+
+
+def test_get_topology_direction_set_inverse(scheduler):
+    """Test topology direction set construction for inverse direction."""
+    mock_topology = MagicMock()
+    mock_topology.direction_convention = "checkerboard_cr"
+    mock_topology.couplings = [[0, 1], [2, 3], [4, 5]]
+    scheduler._topology = mock_topology
+
+    result = scheduler._get_topology_direction_set(inverse=True)
+
+    assert result == {"1-0", "3-2", "5-4"}
+
+
+def test_get_topology_direction_set_no_convention(scheduler):
+    """Test that non-checkerboard convention returns None."""
+    mock_topology = MagicMock()
+    mock_topology.direction_convention = "unspecified"
+    mock_topology.couplings = [[0, 1], [2, 3]]
+    scheduler._topology = mock_topology
+
+    result = scheduler._get_topology_direction_set(inverse=False)
+
+    assert result is None
+
+
+def test_get_topology_direction_set_no_topology(scheduler):
+    """Test that missing topology returns None (fallback)."""
+    # Ensure _load_topology returns None (no topology_id on chip)
+    scheduler._chip = MagicMock()
+    scheduler._chip.topology_id = None
+
+    result = scheduler._get_topology_direction_set(inverse=False)
+
+    assert result is None
+
+
+@patch.object(CRScheduler, "_load_coupling_ids")
+@patch.object(CRScheduler, "_load_qubit_models")
+@patch.object(CRScheduler, "_load_chip_data")
+def test_generate_with_topology_direction(
+    mock_load,
+    mock_qubits,
+    mock_couplings,
+    scheduler,
+    mock_chip,
+    mock_qubit_models,
+):
+    """Test schedule generation using topology-based direction."""
+    mock_load.return_value = mock_chip
+    mock_qubits.return_value = mock_qubit_models
+    # DB has both directions for each coupling
+    mock_couplings.return_value = ["0-1", "1-0", "0-2", "2-0", "1-3", "3-1"]
+
+    # Set up topology with checkerboard_cr convention
+    mock_topology = MagicMock()
+    mock_topology.direction_convention = "checkerboard_cr"
+    mock_topology.couplings = [[0, 1], [0, 2], [1, 3]]
+    scheduler._topology = mock_topology
+
+    schedule = scheduler.generate(candidate_qubits=["0", "1", "2", "3"])
+
+    assert schedule.metadata["direction_method"] == "topology"
+    assert schedule.metadata["inverse"] is False
+
+    # Only forward pairs should be selected
+    all_pairs = [pair for group in schedule.parallel_groups for pair in group]
+    assert ("0", "1") in all_pairs
+    assert ("1", "0") not in all_pairs
+
+
+@patch.object(CRScheduler, "_load_coupling_ids")
+@patch.object(CRScheduler, "_load_qubit_models")
+@patch.object(CRScheduler, "_load_chip_data")
+def test_generate_with_topology_inverse(
+    mock_load,
+    mock_qubits,
+    mock_couplings,
+    scheduler,
+    mock_chip,
+    mock_qubit_models,
+):
+    """Test schedule generation with inverse=True using topology."""
+    mock_load.return_value = mock_chip
+    mock_qubits.return_value = mock_qubit_models
+    # DB has both directions
+    mock_couplings.return_value = ["0-1", "1-0", "0-2", "2-0", "1-3", "3-1"]
+
+    # Topology: forward is [0,1], [0,2], [1,3]
+    mock_topology = MagicMock()
+    mock_topology.direction_convention = "checkerboard_cr"
+    mock_topology.couplings = [[0, 1], [0, 2], [1, 3]]
+    scheduler._topology = mock_topology
+
+    schedule = scheduler.generate(candidate_qubits=["0", "1", "2", "3"], inverse=True)
+
+    assert schedule.metadata["direction_method"] == "topology"
+    assert schedule.metadata["inverse"] is True
+
+    # Only inverse pairs should be selected
+    all_pairs = [pair for group in schedule.parallel_groups for pair in group]
+    assert ("1", "0") in all_pairs
+    assert ("0", "1") not in all_pairs
+
+
+@patch.object(CRScheduler, "_load_coupling_ids")
+@patch.object(CRScheduler, "_load_qubit_models")
+@patch.object(CRScheduler, "_load_chip_data")
+def test_generate_fallback_without_topology(
+    mock_load,
+    mock_qubits,
+    mock_couplings,
+    scheduler,
+    mock_chip,
+    mock_qubit_models,
+    mock_coupling_ids,
+):
+    """Test that generate falls back to measured when no topology is available."""
+    mock_chip.topology_id = None
+    mock_load.return_value = mock_chip
+    mock_qubits.return_value = mock_qubit_models
+    mock_couplings.return_value = mock_coupling_ids
+
+    # No topology set
+    scheduler._topology = None
+    scheduler._chip = mock_chip
+
+    schedule = scheduler.generate(candidate_qubits=["0", "1", "2", "3"])
+
+    # Should fall back to measured since frequency data exists
+    assert schedule.metadata["direction_method"] == "measured"
+    assert schedule.metadata["inverse"] is False
+
+
+@patch.object(CRScheduler, "_load_coupling_ids")
+@patch.object(CRScheduler, "_load_qubit_models")
+@patch.object(CRScheduler, "_load_chip_data")
+def test_generate_measured_inverse(
+    mock_load,
+    mock_qubits,
+    mock_couplings,
+    scheduler,
+    mock_chip,
+    mock_qubit_models,
+):
+    """Test inverse with measured directionality (no topology)."""
+    mock_chip.topology_id = None
+    mock_load.return_value = mock_chip
+    mock_qubits.return_value = mock_qubit_models
+    # Frequencies: 0=5.0, 1=5.1, so 0-1 is forward (low→high), 1-0 is inverse (high→low)
+    mock_couplings.return_value = ["0-1", "1-0"]
+
+    scheduler._topology = None
+    scheduler._chip = mock_chip
+
+    schedule = scheduler.generate(candidate_qubits=["0", "1"], inverse=True)
+
+    assert schedule.metadata["direction_method"] == "measured"
+    assert schedule.metadata["inverse"] is True
+
+    # Inverse: should select pair where freq[control] > freq[target]
+    all_pairs = [pair for group in schedule.parallel_groups for pair in group]
+    assert ("1", "0") in all_pairs
+    assert ("0", "1") not in all_pairs

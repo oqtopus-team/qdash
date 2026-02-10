@@ -54,6 +54,7 @@ def generate_square_lattice_mux(
         qubits[qid] = {"row": row, "col": col}
 
     # Generate couplings (adjacent qubits in the grid)
+    # Ordered as [control, target] based on checkerboard parity
     position_to_qid: dict[tuple[int, int], int] = {}
     for qid, pos in qubits.items():
         position_to_qid[(pos["row"], pos["col"])] = qid
@@ -69,7 +70,9 @@ def generate_square_lattice_mux(
             coupling = tuple(sorted([qid, neighbor]))
             if coupling not in added_couplings:
                 added_couplings.add(coupling)
-                couplings.append([qid, neighbor])
+                couplings.append(
+                    _order_coupling_by_checkerboard(qid, neighbor, qubits)
+                )
 
         # Check bottom neighbor
         bottom_pos = (row + 1, col)
@@ -78,13 +81,16 @@ def generate_square_lattice_mux(
             coupling = tuple(sorted([qid, neighbor]))
             if coupling not in added_couplings:
                 added_couplings.add(coupling)
-                couplings.append([qid, neighbor])
+                couplings.append(
+                    _order_coupling_by_checkerboard(qid, neighbor, qubits)
+                )
 
     return {
         "name": "Square Lattice with MUX",
         "description": f"Square lattice topology with {mux_size}x{mux_size} MUX groups",
         "grid_size": grid_size,
         "num_qubits": num_qubits,
+        "direction_convention": "checkerboard_cr",
         "mux": {"enabled": True, "size": mux_size},
         "qubits": qubits,
         "couplings": couplings,
@@ -113,6 +119,7 @@ def generate_square_lattice(num_qubits: int) -> dict[str, Any]:
         qubits[qid] = {"row": row, "col": col}
 
     # Generate couplings (adjacent qubits)
+    # Ordered as [control, target] based on checkerboard parity
     for qid in range(num_qubits):
         row = qid // grid_size
         col = qid % grid_size
@@ -120,18 +127,23 @@ def generate_square_lattice(num_qubits: int) -> dict[str, Any]:
         # Right neighbor
         if col + 1 < grid_size:
             neighbor_qid = row * grid_size + (col + 1)
-            couplings.append([qid, neighbor_qid])
+            couplings.append(
+                _order_coupling_by_checkerboard(qid, neighbor_qid, qubits)
+            )
 
         # Bottom neighbor
         if row + 1 < grid_size:
             neighbor_qid = (row + 1) * grid_size + col
-            couplings.append([qid, neighbor_qid])
+            couplings.append(
+                _order_coupling_by_checkerboard(qid, neighbor_qid, qubits)
+            )
 
     return {
         "name": "Square Lattice",
         "description": "Simple square lattice topology",
         "grid_size": grid_size,
         "num_qubits": num_qubits,
+        "direction_convention": "checkerboard_cr",
         "mux": {"enabled": False},
         "qubits": qubits,
         "couplings": couplings,
@@ -238,6 +250,32 @@ def generate_heavy_hex(num_qubits: int) -> dict[str, Any]:
             "region_size": 6,
         },
     }
+
+
+def _order_coupling_by_checkerboard(
+    qid_a: int,
+    qid_b: int,
+    qubits: dict[int, dict[str, int]],
+) -> list[int]:
+    """Order a coupling pair as [control, target] based on checkerboard parity.
+
+    Convention: (row+col)%2==0 → control (low-frequency), (row+col)%2==1 → target (high-frequency).
+    If both qubits have the same parity, fall back to ascending ID order.
+    """
+    pos_a = qubits[qid_a]
+    pos_b = qubits[qid_b]
+    parity_a = (pos_a["row"] + pos_a["col"]) % 2
+    parity_b = (pos_b["row"] + pos_b["col"]) % 2
+
+    if parity_a != parity_b:
+        # Low parity (even) = control, high parity (odd) = target
+        if parity_a < parity_b:
+            return [qid_a, qid_b]
+        else:
+            return [qid_b, qid_a]
+    else:
+        # Same parity: fall back to ascending ID order
+        return sorted([qid_a, qid_b])
 
 
 GENERATORS = {

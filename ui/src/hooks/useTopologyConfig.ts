@@ -28,6 +28,8 @@ export interface VisualizationConfig {
 
 export type LayoutType = "grid" | "linear" | "hex" | "custom";
 
+export type DirectionConvention = "checkerboard_cr" | "unspecified";
+
 export interface TopologyDefinition {
   id: string;
   name: string;
@@ -35,6 +37,7 @@ export interface TopologyDefinition {
   grid_size: number;
   num_qubits: number;
   layout_type: LayoutType;
+  direction_convention: DirectionConvention;
   mux: MuxConfig;
   qubits: Record<number, QubitPosition>;
   couplings: [number, number][];
@@ -104,6 +107,8 @@ export function useTopologyConfig(topologyId: string) {
       hasMux: topology.mux?.enabled ?? false,
       showMuxBoundaries: topology.visualization?.show_mux_boundaries ?? false,
       layoutType: (topology.layout_type ?? "grid") as LayoutType,
+      directionConvention: (topology.direction_convention ??
+        "unspecified") as DirectionConvention,
       getQubitPosition,
       positionMap,
     };
