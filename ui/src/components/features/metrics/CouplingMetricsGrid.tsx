@@ -471,9 +471,15 @@ export function CouplingMetricsGrid({
         return couplingList
           .filter(([qid1, qid2]) => isCouplingInRegion(qid1, qid2))
           .map(([qid1, qid2]) => {
-            const couplingId = `${qid1}-${qid2}`;
-            const metric =
-              displayData[couplingId] || displayData[`${qid2}-${qid1}`];
+            const forwardId = `${qid1}-${qid2}`;
+            const reverseId = `${qid2}-${qid1}`;
+            // Use the key that actually exists in the data for API queries
+            const couplingId = displayData[forwardId]
+              ? forwardId
+              : displayData[reverseId]
+                ? reverseId
+                : forwardId;
+            const metric = displayData[couplingId];
 
             // Use explicit positions from topology
             const pos1 = getQubitPosition(qid1);
