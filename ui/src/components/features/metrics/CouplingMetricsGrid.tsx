@@ -486,10 +486,7 @@ export function CouplingMetricsGrid({
             const topoReverseId = `${qid2}-${qid1}`;
             // Apply direction toggle
             const couplingId = isDirectionReversed ? topoReverseId : topoId;
-            // Data may be stored in either order
-            const metric =
-              displayData[couplingId] ||
-              displayData[isDirectionReversed ? topoId : topoReverseId];
+            const metric = displayData[couplingId];
 
             // Use explicit positions from topology
             const pos1 = getQubitPosition(qid1);
