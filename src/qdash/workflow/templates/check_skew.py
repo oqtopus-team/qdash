@@ -21,6 +21,7 @@ def check_skew(
     username: str,
     chip_id: str,
     muxes: list[int] | None = None,
+    tags: list[str] | None = None,
     flow_name: str | None = None,
     project_id: str | None = None,
 ) -> Any:
@@ -55,6 +56,7 @@ def check_skew(
         username,
         chip_id,
         muxes=muxes,
+        tags=tags,
         flow_name=flow_name,
         project_id=project_id,
     )

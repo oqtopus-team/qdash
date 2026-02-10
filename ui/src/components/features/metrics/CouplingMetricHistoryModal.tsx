@@ -4,6 +4,7 @@ import React, { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 
 import {
+  ArrowRightLeft,
   ChevronRight,
   GitBranch,
   History,
@@ -57,9 +58,23 @@ export function CouplingMetricHistoryModal({
   const [selectedTaskIndex, setSelectedTaskIndex] = useState(0);
   const [mobileTab, setMobileTab] = useState<MobileTab>("history");
 
+  // Direction toggle: forward = original coupling ID, reverse = reversed
+  const [isReversed, setIsReversed] = useState(false);
+  const reversedCouplingId = useMemo(() => {
+    const parts = couplingId.split("-");
+    return parts.length === 2 ? `${parts[1]}-${parts[0]}` : couplingId;
+  }, [couplingId]);
+  const activeCouplingId = isReversed ? reversedCouplingId : couplingId;
+
+  // Reset selection state when direction changes
+  useEffect(() => {
+    setSelectedExecutionId(null);
+    setSelectedTaskIndex(0);
+  }, [isReversed]);
+
   const { data, isLoading, isError } = useGetCouplingMetricHistory(
     chipId,
-    couplingId,
+    activeCouplingId,
     { metric: metricName, limit: 20, within_days: 30 },
     {
       query: {
@@ -110,8 +125,10 @@ export function CouplingMetricHistoryModal({
   // Tasks for the selected execution filtered by target couplingId
   const executionTasks = useMemo(() => {
     if (!executionDetailData?.data?.task) return [];
-    return executionDetailData.data.task.filter((t) => t.qid === couplingId);
-  }, [executionDetailData, couplingId]);
+    return executionDetailData.data.task.filter(
+      (t) => t.qid === activeCouplingId,
+    );
+  }, [executionDetailData, activeCouplingId]);
 
   const selectedGroup = executionGroups.find(
     (g) => g.executionId === selectedExecutionId,
@@ -154,33 +171,54 @@ export function CouplingMetricHistoryModal({
 
   const selectedTask = executionTasks[selectedTaskIndex] ?? null;
 
+  // Direction toggle button (shared across states)
+  const directionToggle = (
+    <div className="flex items-center gap-2">
+      <button
+        onClick={() => setIsReversed((prev) => !prev)}
+        className={`btn btn-sm gap-1.5 ${isReversed ? "btn-secondary" : "btn-outline"}`}
+        title={`Switch to ${isReversed ? couplingId : reversedCouplingId}`}
+      >
+        <ArrowRightLeft className="h-3.5 w-3.5" />
+        <span className="font-mono text-xs">{activeCouplingId}</span>
+      </button>
+    </div>
+  );
+
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <span className="loading loading-spinner loading-lg"></span>
+      <div>
+        <div className="mb-3">{directionToggle}</div>
+        <div className="flex items-center justify-center h-96">
+          <span className="loading loading-spinner loading-lg"></span>
+        </div>
       </div>
     );
   }
 
   if (isError || history.length === 0) {
     return (
-      <div className="alert alert-info">
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          fill="none"
-          viewBox="0 0 24 24"
-          className="stroke-current shrink-0 w-6 h-6"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth="2"
-            d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-          />
-        </svg>
-        <span>
-          No {metricName} history available for {couplingId} in the last 30 days
-        </span>
+      <div className="space-y-3">
+        <div>{directionToggle}</div>
+        <div className="alert alert-info">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+            className="stroke-current shrink-0 w-6 h-6"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="2"
+              d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+            />
+          </svg>
+          <span>
+            No {metricName} history available for {activeCouplingId} in the last
+            30 days
+          </span>
+        </div>
       </div>
     );
   }
@@ -293,7 +331,7 @@ export function CouplingMetricHistoryModal({
           <div className="text-center py-8">
             <ListTodo className="h-8 w-8 mx-auto text-base-content/30 mb-2" />
             <p className="text-sm text-base-content/50">
-              No {metricName}-related tasks found for {couplingId}
+              No {metricName}-related tasks found for {activeCouplingId}
             </p>
             <p className="text-xs text-base-content/40 mt-1">
               This execution may not include calibration for this coupling
@@ -428,13 +466,13 @@ export function CouplingMetricHistoryModal({
         ) : selectedTask.figure_path ? (
           <TaskFigure
             path={selectedTask.figure_path}
-            qid={couplingId}
+            qid={activeCouplingId}
             className="h-full w-auto object-contain"
           />
         ) : selectedTask.task_id ? (
           <TaskFigure
             taskId={selectedTask.task_id}
-            qid={couplingId}
+            qid={activeCouplingId}
             className="h-full w-auto object-contain"
           />
         ) : (
@@ -489,7 +527,7 @@ export function CouplingMetricHistoryModal({
           {/* Provenance link */}
           <div className="pt-2 mt-2 border-t border-base-300">
             <Link
-              href={`/provenance?parameter=${encodeURIComponent(metricName)}&qid=${encodeURIComponent(couplingId)}&tab=lineage`}
+              href={`/provenance?parameter=${encodeURIComponent(metricName)}&qid=${encodeURIComponent(activeCouplingId)}&tab=lineage`}
               className="btn btn-xs btn-outline gap-1"
             >
               <GitBranch className="h-3 w-3" />
@@ -527,6 +565,9 @@ export function CouplingMetricHistoryModal({
 
   return (
     <div className="h-full min-h-0 flex flex-col">
+      {/* Direction Toggle */}
+      <div className="mb-3 shrink-0">{directionToggle}</div>
+
       {/* Mobile Tabs */}
       <div className="lg:hidden mb-3 shrink-0">
         <div className="tabs tabs-boxed bg-base-200">

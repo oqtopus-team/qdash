@@ -35,6 +35,7 @@ def parallel_retry_calibration(
     username: str,
     chip_id: str,
     qids: list[str] | None = None,
+    tags: list[str] | None = None,
     flow_name: str | None = None,
     project_id: str | None = None,
 ) -> Any:
@@ -89,6 +90,7 @@ def parallel_retry_calibration(
         username,
         chip_id,
         qids=all_qids,
+        tags=tags,
         flow_name=flow_name,
         project_id=project_id,
     )

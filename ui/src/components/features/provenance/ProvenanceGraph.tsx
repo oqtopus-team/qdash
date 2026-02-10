@@ -61,59 +61,100 @@ function EntityNode({ data, selected }: NodeProps) {
     lowConfidence?: boolean;
     isMatch?: boolean;
     dimmed?: boolean;
+    latestVersion?: number;
+    hasNewerVersion?: boolean;
+    nodeVersion?: number;
   };
   const styles = getNodeStyles(typedData.isOrigin ?? false, true);
 
+  // Compact value + unit + error in one line
+  const valueParts: string[] = [];
+  if (typedData.value)
+    valueParts.push(
+      `${typedData.value}${typedData.unit ? ` ${typedData.unit}` : ""}`,
+    );
+  if (typedData.error) valueParts.push(`±${typedData.error}`);
+  const valueText = valueParts.join("  ");
+
   return (
     <div
-      className={`px-4 py-3 shadow-lg rounded-lg border-2 min-w-[160px] max-w-[200px] ${
+      className={`group/entity px-3 py-2 shadow-md rounded-full border-2 min-w-[180px] max-w-[240px] relative ${
         selected || typedData.isMatch ? "ring-2 ring-accent" : ""
-      } ${typedData.lowConfidence ? "border-warning" : ""}`}
+      } ${typedData.lowConfidence ? "border-warning" : ""} ${typedData.hasNewerVersion ? "border-info" : ""}`}
       style={{
         backgroundColor: styles.background,
-        borderColor: styles.borderColor,
+        borderColor: typedData.hasNewerVersion
+          ? "hsl(var(--in))"
+          : styles.borderColor,
         opacity: typedData.dimmed ? 0.25 : 1,
       }}
     >
+      {typedData.hasNewerVersion && (
+        <>
+          <span className="absolute -top-1 -right-1 flex h-3 w-3">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-info opacity-75" />
+            <span className="relative inline-flex rounded-full h-3 w-3 bg-info" />
+          </span>
+          {/* Hover tooltip - stale */}
+          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-base-100 border border-info/30 text-base-content text-xs rounded-lg shadow-lg opacity-0 group-hover/entity:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
+            <div className="font-semibold text-info mb-1">
+              Input version updated
+            </div>
+            <div>
+              <span className="font-mono">v{typedData.nodeVersion}</span>
+              <span className="mx-1">&rarr;</span>
+              <span className="font-mono font-semibold">
+                v{typedData.latestVersion}
+              </span>
+            </div>
+            <div className="text-base-content/60 mt-1">
+              Recalibration recommended
+            </div>
+            <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-[6px] border-r-[6px] border-t-[6px] border-l-transparent border-r-transparent border-t-base-100" />
+          </div>
+        </>
+      )}
       <Handle
         type="target"
         position={Position.Top}
         className="!bg-primary !w-2 !h-2"
       />
+      {/* Row 1: name + qid */}
       <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2 min-w-0">
+        <div className="flex items-center gap-1.5 min-w-0">
           <div
             className={`w-2 h-2 rounded-full flex-shrink-0 ${
-              typedData.isOrigin ? "bg-primary" : "bg-primary/50"
+              typedData.isOrigin ? "bg-primary" : "bg-primary/40"
             }`}
           />
-          <div className="font-semibold text-sm truncate">
+          <div className="font-semibold text-xs truncate">
             {typedData.label}
           </div>
         </div>
         {typedData.qid && (
-          <span className="badge badge-primary badge-sm flex-shrink-0">
+          <span className="text-[10px] text-primary/70 font-mono flex-shrink-0">
             {typedData.qid}
           </span>
         )}
       </div>
-      {typedData.value && (
-        <div className="text-xs text-base-content/70 font-mono mt-1 bg-base-100/50 rounded px-2 py-1 text-center">
-          {typedData.value} {typedData.unit || ""}
-        </div>
-      )}
-      {typedData.error && (
+      {/* Row 2: value ± error (single line) */}
+      {valueText && (
         <div
-          className={`text-[10px] font-mono mt-1 rounded px-2 py-1 text-center ${
-            typedData.lowConfidence
-              ? "bg-warning/10 text-warning"
-              : "bg-base-100/50 text-base-content/60"
+          className={`text-[10px] font-mono mt-0.5 text-center truncate ${
+            typedData.lowConfidence ? "text-warning" : "text-base-content/60"
           }`}
-          title="Measurement uncertainty (error)"
         >
-          ±{typedData.error}
+          {valueText}
         </div>
       )}
+      {/* Row 3: version update badge */}
+      {typedData.hasNewerVersion &&
+        typedData.nodeVersion != null &&
+        typedData.latestVersion != null && (
+          <div className="text-[9px] font-mono mt-0.5 rounded-full px-2 py-0.5 text-center bg-info/10 text-info">
+            v{typedData.nodeVersion} &rarr; v{typedData.latestVersion}
+          </div>
+        )}
       <Handle
         type="source"
         position={Position.Bottom}
@@ -134,8 +175,11 @@ function ActivityNode({ data, selected }: NodeProps) {
     dimmed?: boolean;
     isPinned?: boolean;
     isTaskFlow?: boolean;
+    staleInputCount?: number;
+    staleInputNames?: string[];
   };
   const styles = getNodeStyles(false, false);
+  const hasStaleInputs = (typedData.staleInputCount ?? 0) > 0;
 
   const statusClass =
     typedData.status === "completed"
@@ -147,20 +191,56 @@ function ActivityNode({ data, selected }: NodeProps) {
           : "text-warning";
 
   const sizeClass = typedData.isTaskFlow
-    ? "px-5 py-4 min-w-[240px] max-w-[280px]"
-    : "px-4 py-3 min-w-[160px] max-w-[200px]";
+    ? "px-5 py-4 min-w-[240px] max-w-[280px] rounded-lg"
+    : "px-4 py-2.5 min-w-[200px] max-w-[260px] rounded-xl";
 
   return (
     <div
-      className={`${sizeClass} shadow-lg rounded-lg border-2 cursor-pointer ${
+      className={`group/activity ${sizeClass} shadow-lg border-2 cursor-pointer relative ${
         selected || typedData.isMatch ? "ring-2 ring-accent" : ""
       } ${typedData.isPinned ? "ring-2 ring-secondary" : ""}`}
       style={{
         backgroundColor: styles.background,
-        borderColor: styles.borderColor,
+        borderColor: hasStaleInputs ? "hsl(var(--in))" : styles.borderColor,
         opacity: typedData.dimmed ? 0.25 : 1,
       }}
     >
+      {hasStaleInputs && (
+        <>
+          <span className="absolute -top-1.5 -right-1.5 flex h-3.5 w-3.5">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-info opacity-75" />
+            <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-info" />
+          </span>
+          {/* Hover tooltip */}
+          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-base-100 border border-info/30 text-base-content text-xs rounded-lg shadow-lg opacity-0 group-hover/activity:opacity-100 transition-opacity pointer-events-none z-50 min-w-[180px]">
+            <div className="font-semibold text-info mb-1">
+              Stale inputs detected
+            </div>
+            {typedData.staleInputNames &&
+            typedData.staleInputNames.length > 0 ? (
+              <ul className="space-y-0.5">
+                {typedData.staleInputNames.map((name, i) => (
+                  <li
+                    key={i}
+                    className="font-mono text-[11px] text-base-content/80"
+                  >
+                    {name}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <div className="text-base-content/60">
+                {typedData.staleInputCount} input
+                {typedData.staleInputCount === 1 ? "" : "s"} updated
+              </div>
+            )}
+            <div className="text-base-content/60 mt-1">
+              Recalibration recommended
+            </div>
+            <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-[6px] border-r-[6px] border-t-[6px] border-l-transparent border-r-transparent border-t-base-100" />
+          </div>
+        </>
+      )}
       <Handle
         type="target"
         position={Position.Top}
@@ -186,7 +266,13 @@ function ActivityNode({ data, selected }: NodeProps) {
           {typedData.status}
         </div>
       )}
-      {typedData.taskId && (
+      {hasStaleInputs && (
+        <div className="text-[10px] font-mono mt-1 rounded px-2 py-1 text-center bg-info/10 text-info">
+          {typedData.staleInputCount} stale input
+          {typedData.staleInputCount === 1 ? "" : "s"}
+        </div>
+      )}
+      {typedData.taskId && !hasStaleInputs && (
         <div className="text-[10px] text-base-content/50 mt-1 truncate">
           Click to view details
         </div>
@@ -223,13 +309,26 @@ type ViewDetail = "full" | "taskFlow";
 function collapseToTaskFlow(
   apiNodes: LineageNodeResponse[],
   apiEdges: LineageEdgeResponse[],
-): { nodes: LineageNodeResponse[]; edges: LineageEdgeResponse[] } {
+  directInputIds?: Set<string>,
+): {
+  nodes: LineageNodeResponse[];
+  edges: LineageEdgeResponse[];
+  staleInputsByActivity: Map<string, number>;
+  staleInputNamesByActivity: Map<string, string[]>;
+} {
   // Keep only activity nodes
   const activityNodes = apiNodes.filter((n) => n.node_type === "activity");
+
+  // Index entity nodes by id for quick lookup
+  const entityById = new Map(
+    apiNodes.filter((n) => n.node_type === "entity").map((n) => [n.node_id, n]),
+  );
 
   // Build maps: entity → generating activity, entity → consuming activities
   const entityToGenerator = new Map<string, string>();
   const entityToConsumers = new Map<string, string[]>();
+  // activity → set of entity ids it used
+  const activityUsedEntities = new Map<string, Set<string>>();
 
   for (const edge of apiEdges) {
     if (edge.relation_type === "wasGeneratedBy") {
@@ -240,6 +339,35 @@ function collapseToTaskFlow(
       const consumers = entityToConsumers.get(edge.target_id) ?? [];
       consumers.push(edge.source_id);
       entityToConsumers.set(edge.target_id, consumers);
+      // Track which entities each activity used
+      const used = activityUsedEntities.get(edge.source_id) ?? new Set();
+      used.add(edge.target_id);
+      activityUsedEntities.set(edge.source_id, used);
+    }
+  }
+
+  // Compute stale input counts and names per activity (only for direct inputs of origin)
+  const staleInputsByActivity = new Map<string, number>();
+  const staleInputNamesByActivity = new Map<string, string[]>();
+  for (const [activityId, entityIds] of activityUsedEntities) {
+    let staleCount = 0;
+    const staleNames: string[] = [];
+    for (const entityId of entityIds) {
+      // Only count as stale if it's a direct input of the origin
+      if (directInputIds && !directInputIds.has(entityId)) continue;
+      const entity = entityById.get(entityId);
+      if (entity?.latest_version != null && entity.entity?.version != null) {
+        if (entity.latest_version > entity.entity.version) {
+          staleCount++;
+          const name = entity.entity?.parameter_name || entityId;
+          const qid = entity.entity?.qid;
+          staleNames.push(qid ? `${name}(${qid})` : name);
+        }
+      }
+    }
+    if (staleCount > 0) {
+      staleInputsByActivity.set(activityId, staleCount);
+      staleInputNamesByActivity.set(activityId, staleNames);
     }
   }
 
@@ -262,7 +390,12 @@ function collapseToTaskFlow(
     }
   }
 
-  return { nodes: activityNodes, edges: directEdges };
+  return {
+    nodes: activityNodes,
+    edges: directEdges,
+    staleInputsByActivity,
+    staleInputNamesByActivity,
+  };
 }
 
 function normalizeForSearch(value: unknown): string {
@@ -358,6 +491,7 @@ function getLayoutedElements(
     nodeHeight?: number;
     nodesep?: number;
     ranksep?: number;
+    edgesep?: number;
     ranker?: string;
   },
 ): { nodes: Node[]; edges: Edge[] } {
@@ -372,7 +506,7 @@ function getLayoutedElements(
     rankdir: direction,
     nodesep: opts?.nodesep ?? 60,
     ranksep: opts?.ranksep ?? 80,
-    edgesep: opts?.nodesep ? Math.round(opts.nodesep / 2) : 20,
+    edgesep: opts?.edgesep ?? 20,
     marginx: 40,
     marginy: 40,
     ...(opts?.ranker && { ranker: opts.ranker }),
@@ -414,6 +548,9 @@ function convertToFlowElements(
   apiEdges: LineageEdgeResponse[],
   originId?: string,
   isTaskFlow?: boolean,
+  staleInputsByActivity?: Map<string, number>,
+  directInputIds?: Set<string>,
+  staleInputNamesByActivity?: Map<string, string[]>,
 ): { nodes: Node[]; edges: Edge[] } {
   // Convert nodes
   const flowNodes: Node[] = apiNodes.map((node) => {
@@ -427,12 +564,27 @@ function convertToFlowElements(
     let unit: string | undefined;
     let taskId: string | undefined;
     let qid: string | undefined;
+    let latestVersion: number | undefined;
+    let hasNewerVersion: boolean | undefined;
+    let nodeVersion: number | undefined;
 
     if (isEntity && node.entity) {
       label = node.entity.parameter_name || "?";
       value = formatValue(node.entity.value);
       unit = node.entity.unit;
       qid = node.entity.qid;
+      nodeVersion = node.entity.version;
+      // Only show staleness indicator for direct inputs of the origin
+      const isDirectInput = !directInputIds || directInputIds.has(node.node_id);
+      if (
+        isDirectInput &&
+        node.latest_version != null &&
+        node.entity.version != null &&
+        node.latest_version > node.entity.version
+      ) {
+        latestVersion = node.latest_version;
+        hasNewerVersion = true;
+      }
       if (typeof node.entity.error === "number" && node.entity.error !== 0) {
         error = formatValue(node.entity.error);
         if (typeof node.entity.value === "number") {
@@ -451,6 +603,16 @@ function convertToFlowElements(
       qid = node.activity.qid;
     }
 
+    // For activity nodes in task flow, propagate stale input info
+    const staleInputCount =
+      !isEntity && staleInputsByActivity
+        ? (staleInputsByActivity.get(node.node_id) ?? 0)
+        : 0;
+    const staleInputNames =
+      !isEntity && staleInputNamesByActivity
+        ? (staleInputNamesByActivity.get(node.node_id) ?? [])
+        : [];
+
     return {
       id: node.node_id,
       type: isEntity ? "entity" : "activity",
@@ -465,6 +627,11 @@ function convertToFlowElements(
         taskId,
         qid,
         isOrigin: node.node_id === originId,
+        latestVersion,
+        hasNewerVersion,
+        nodeVersion,
+        staleInputCount,
+        staleInputNames,
       },
     };
   });
@@ -479,16 +646,17 @@ function convertToFlowElements(
       id: `edge-${index}`,
       source: edge.source_id,
       target: edge.target_id,
-      type: isTaskFlow ? "default" : "smoothstep",
+      type: "default",
       style: {
         stroke: strokeColor,
-        strokeWidth: isTaskFlow ? 2.5 : 2,
+        strokeWidth: isTaskFlow ? 2.5 : 1.5,
+        opacity: isTaskFlow ? 1 : 0.7,
       },
       markerEnd: {
         type: MarkerType.ArrowClosed,
         color: strokeColor,
-        width: isTaskFlow ? 20 : 16,
-        height: isTaskFlow ? 20 : 16,
+        width: isTaskFlow ? 20 : 12,
+        height: isTaskFlow ? 20 : 12,
       },
       animated: edge.relation_type === "wasDerivedFrom",
     };
@@ -507,7 +675,14 @@ function convertToFlowElements(
           ranksep: 120,
           ranker: "tight-tree",
         }
-      : undefined,
+      : {
+          nodeWidth: 230,
+          nodeHeight: 56,
+          nodesep: 90,
+          ranksep: 110,
+          edgesep: 30,
+          ranker: "network-simplex",
+        },
   );
 }
 
@@ -584,20 +759,70 @@ export function ProvenanceGraph({
     );
   }, [filteredApiEdges, constrainedNodeIds]);
 
-  // Apply Task Flow collapse when in taskFlow mode
-  const { nodes: flowApiNodes, edges: flowApiEdges } = useMemo(() => {
-    if (viewDetail === "taskFlow") {
-      return collapseToTaskFlow(constrainedApiNodes, constrainedApiEdges);
+  // Compute direct input entity IDs for the origin parameter.
+  // Only these entities should show staleness indicators.
+  const directInputIds = useMemo(() => {
+    if (!originId) return new Set<string>();
+    // Find the activity that generated the origin entity
+    const genEdge = constrainedApiEdges.find(
+      (e) => e.relation_type === "wasGeneratedBy" && e.source_id === originId,
+    );
+    if (!genEdge) return new Set<string>();
+    const generatingActivity = genEdge.target_id;
+    // Find entities that the generating activity used
+    const inputIds = new Set<string>();
+    for (const e of constrainedApiEdges) {
+      if (e.relation_type === "used" && e.source_id === generatingActivity) {
+        inputIds.add(e.target_id);
+      }
     }
-    return { nodes: constrainedApiNodes, edges: constrainedApiEdges };
-  }, [viewDetail, constrainedApiNodes, constrainedApiEdges]);
+    return inputIds;
+  }, [originId, constrainedApiEdges]);
+
+  // Apply Task Flow collapse when in taskFlow mode
+  const {
+    nodes: flowApiNodes,
+    edges: flowApiEdges,
+    staleInputsByActivity,
+    staleInputNamesByActivity,
+  } = useMemo(() => {
+    if (viewDetail === "taskFlow") {
+      return collapseToTaskFlow(
+        constrainedApiNodes,
+        constrainedApiEdges,
+        directInputIds,
+      );
+    }
+    return {
+      nodes: constrainedApiNodes,
+      edges: constrainedApiEdges,
+      staleInputsByActivity: new Map<string, number>(),
+      staleInputNamesByActivity: new Map<string, string[]>(),
+    };
+  }, [viewDetail, constrainedApiNodes, constrainedApiEdges, directInputIds]);
 
   const isTaskFlow = viewDetail === "taskFlow";
 
   const { nodes: baseNodes, edges: baseEdges } = useMemo(
     () =>
-      convertToFlowElements(flowApiNodes, flowApiEdges, originId, isTaskFlow),
-    [flowApiNodes, flowApiEdges, originId, isTaskFlow],
+      convertToFlowElements(
+        flowApiNodes,
+        flowApiEdges,
+        originId,
+        isTaskFlow,
+        staleInputsByActivity,
+        directInputIds,
+        staleInputNamesByActivity,
+      ),
+    [
+      flowApiNodes,
+      flowApiEdges,
+      originId,
+      isTaskFlow,
+      staleInputsByActivity,
+      directInputIds,
+      staleInputNamesByActivity,
+    ],
   );
 
   const { nodes: initialNodes, edges: initialEdges } = useMemo(() => {
@@ -697,7 +922,16 @@ export function ProvenanceGraph({
     const lowConfidenceParams = initialNodes.filter(
       (n) => n.type === "entity" && (n.data as any)?.lowConfidence,
     ).length;
-    return { entityCount, taskCount, failedTasks, lowConfidenceParams };
+    const staleInputs = initialNodes.filter(
+      (n) => n.type === "entity" && (n.data as any)?.hasNewerVersion,
+    ).length;
+    return {
+      entityCount,
+      taskCount,
+      failedTasks,
+      lowConfidenceParams,
+      staleInputs,
+    };
   }, [initialNodes]);
 
   if (apiNodes.length === 0) {
@@ -851,6 +1085,11 @@ export function ProvenanceGraph({
                 uncertain {visibleCounts.lowConfidenceParams}
               </span>
             )}
+            {visibleCounts.staleInputs > 0 && (
+              <span className="badge badge-info badge-sm">
+                updated {visibleCounts.staleInputs}
+              </span>
+            )}
           </div>
         </div>
 
@@ -881,9 +1120,17 @@ export function ProvenanceGraph({
                   <span className="text-base-content/60">used</span>
                 </div>
               </div>
-              <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-base-300">
-                <div className="w-4 h-0.5 bg-blue-500 rounded" />
-                <span className="text-base-content/60">derived</span>
+              <div className="flex gap-4 mt-2 pt-2 border-t border-base-300">
+                <div className="flex items-center gap-1.5">
+                  <div className="w-4 h-0.5 bg-blue-500 rounded" />
+                  <span className="text-base-content/60">derived</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="px-1.5 py-0.5 rounded bg-info/10 text-info text-[9px] font-mono leading-none">
+                    v1→v2
+                  </div>
+                  <span className="text-base-content/60">newer available</span>
+                </div>
               </div>
             </>
           ) : (

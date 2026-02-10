@@ -348,7 +348,7 @@ def test_generate_with_plugins_custom_scheduler(
 def test_filter_repr():
     """Test filter string representations."""
     assert "CandidateQubitFilter(qubits=3)" in repr(CandidateQubitFilter(["0", "1", "2"]))
-    assert "FrequencyDirectionalityFilter(method=design)" in repr(
+    assert "FrequencyDirectionalityFilter(method=design, inverse=False)" in repr(
         FrequencyDirectionalityFilter(use_design_based=True)
     )
     assert "FidelityFilter(min=0.95)" in repr(FidelityFilter(min_fidelity=0.95))

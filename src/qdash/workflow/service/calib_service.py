@@ -248,6 +248,8 @@ class CalibService:
         self._orchestrator: CalibOrchestrator | None = None
         self.github_integration: GitHubIntegration | None = None
         self.github_push_config: GitHubPushConfig | None = github_push_config
+        self.tags: list[str] | None = tags
+        self.note: dict[str, Any] | None = note
 
         # If qids provided, initialize immediately (low-level API mode)
         if qids is not None:
@@ -861,7 +863,7 @@ class CalibService:
             # Initialize session if not already initialized
             qids = targets.to_qids(self.chip_id)
             if not self._initialized:
-                self._initialize(qids)
+                self._initialize(qids, self.tags, self.note)
 
             # Validate pipeline dependencies
             pipeline = Pipeline(steps)

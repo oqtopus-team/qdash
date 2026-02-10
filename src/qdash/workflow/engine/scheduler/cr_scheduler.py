@@ -51,6 +51,7 @@ import yaml
 from qdash.workflow.engine.backend.qubex_paths import get_qubex_paths
 
 if TYPE_CHECKING:
+    from qdash.api.lib.topology_config import TopologyDefinition
     from qdash.datamodel.chip import ChipModel
     from qdash.repository.protocols import ChipRepository
 
@@ -168,6 +169,7 @@ class CRScheduler:
         self._chip_repo = chip_repo
         self._chip: ChipModel | None = None
         self._wiring_config: list[dict[str, Any]] | None = None
+        self._topology: TopologyDefinition | None = None
         # Cached individual document data (scalable approach for 256+ qubits)
         self._qubit_models: dict[str, Any] | None = None
         self._coupling_ids: list[str] | None = None
@@ -213,6 +215,34 @@ class CRScheduler:
                 raise ValueError(f"Chip {self.chip_id} has no project_id")
             self._coupling_ids = chip_repo.get_coupling_ids(project_id, self.chip_id)
         return self._coupling_ids
+
+    def _load_topology(self) -> TopologyDefinition | None:
+        """Load topology from chip's topology_id."""
+        if self._topology is None:
+            chip = self._load_chip_data()
+            if chip.topology_id:
+                try:
+                    from qdash.api.lib.topology_config import load_topology
+
+                    self._topology = load_topology(chip.topology_id)
+                except FileNotFoundError:
+                    logger.warning(
+                        f"Topology {chip.topology_id} not found, falling back to design-based"
+                    )
+        return self._topology
+
+    def _get_topology_direction_set(self, inverse: bool = False) -> set[str] | None:
+        """Get set of valid coupling directions from topology.
+
+        Returns None if topology doesn't have checkerboard_cr convention.
+        """
+        topology = self._load_topology()
+        if topology is None or topology.direction_convention != "checkerboard_cr":
+            return None
+        if inverse:
+            return {f"{c[1]}-{c[0]}" for c in topology.couplings}
+        else:
+            return {f"{c[0]}-{c[1]}" for c in topology.couplings}
 
     def _load_wiring_config(self) -> list[dict[str, Any]]:
         """Load wiring configuration from YAML file."""
@@ -566,6 +596,9 @@ class CRScheduler:
         # Determine grid size
         grid_size = 12 if "144Q" in self.chip_id else 8
 
+        # Load topology directions if available
+        topology_directions = self._get_topology_direction_set(inverse=False)
+
         # Create filter context with qubit models for scalable filtering
         filter_context = FilterContext(
             chip=chip,
@@ -573,6 +606,7 @@ class CRScheduler:
             qubit_frequency=qubit_frequency,
             qid_to_mux=qid_to_mux,
             qubit_models=qubit_models,
+            topology_directions=topology_directions,
         )
 
         # Use default filters if not provided
@@ -664,6 +698,7 @@ class CRScheduler:
         candidate_qubits: list[str] | None = None,
         max_parallel_ops: int = 10,
         coloring_strategy: str = "largest_first",
+        inverse: bool = False,
     ) -> CRScheduleResult:
         """Generate CR execution schedule.
 
@@ -680,6 +715,9 @@ class CRScheduler:
                 - "random_sequential": Random order (non-deterministic)
                 - "connected_sequential_bfs": BFS ordering
                 - "connected_sequential_dfs": DFS ordering
+            inverse: If True, select reverse-direction pairs (target→control).
+                Only fully supported with topology-based direction. For measured
+                directionality, inverts the frequency comparison.
 
         Returns:
             CRScheduleResult containing parallel_groups and metadata
@@ -698,6 +736,9 @@ class CRScheduler:
             high_quality_qubits = ["0", "1", "2", "3"]  # From stage1 calibration
             schedule = scheduler.generate(candidate_qubits=high_quality_qubits)
 
+            # Generate inverse direction schedule
+            schedule = scheduler.generate(inverse=True)
+
             # Use different coloring strategy for potentially better parallelization
             schedule = scheduler.generate(
                 candidate_qubits=high_quality_qubits,
@@ -708,7 +749,7 @@ class CRScheduler:
 
         """
         logger.info(f"Generating CR schedule for chip_id={self.chip_id}, username={self.username}")
-        logger.info(f"  max_parallel_ops={max_parallel_ops}")
+        logger.info(f"  max_parallel_ops={max_parallel_ops}, inverse={inverse}")
         if candidate_qubits is not None:
             logger.info(
                 f"  Using {len(candidate_qubits)} candidate qubits from stage1: {candidate_qubits}"
@@ -743,30 +784,58 @@ class CRScheduler:
             )
 
         # Filter by frequency directionality
-        # Default: Use design-based inference (checkerboard pattern)
-        # Fallback: Use actual frequency measurements if available
+        # Priority: topology-based > design-based > measured
+        topology_directions = self._get_topology_direction_set(inverse=inverse)
         use_design_based = len(qubit_frequency) == 0
 
-        if use_design_based:
-            logger.info("Using design-based frequency directionality (checkerboard pattern)")
-            cr_pairs = [
-                pair
-                for pair in all_pairs
-                if (qubits := pair.split("-"))
-                and len(qubits) == 2
-                and self._infer_direction_from_design(qubits[0], qubits[1], grid_size)
-            ]
+        if topology_directions is not None:
+            direction_method = "topology"
+            logger.info(f"Using topology-based direction (inverse={inverse})")
+            cr_pairs = [p for p in all_pairs if p in topology_directions]
+        elif use_design_based:
+            direction_method = "design_based"
+            logger.info(
+                f"Using design-based frequency directionality (checkerboard pattern, inverse={inverse})"
+            )
+            if inverse:
+                cr_pairs = [
+                    pair
+                    for pair in all_pairs
+                    if (qubits := pair.split("-"))
+                    and len(qubits) == 2
+                    and not self._infer_direction_from_design(qubits[0], qubits[1], grid_size)
+                ]
+            else:
+                cr_pairs = [
+                    pair
+                    for pair in all_pairs
+                    if (qubits := pair.split("-"))
+                    and len(qubits) == 2
+                    and self._infer_direction_from_design(qubits[0], qubits[1], grid_size)
+                ]
         else:
+            direction_method = "measured"
             logger.info("Using measured frequency directionality")
-            cr_pairs = [
-                pair
-                for pair in all_pairs
-                if (qubits := pair.split("-"))
-                and len(qubits) == 2
-                and qubits[0] in qubit_frequency
-                and qubits[1] in qubit_frequency
-                and qubit_frequency[qubits[0]] < qubit_frequency[qubits[1]]
-            ]
+            if inverse:
+                cr_pairs = [
+                    pair
+                    for pair in all_pairs
+                    if (qubits := pair.split("-"))
+                    and len(qubits) == 2
+                    and qubits[0] in qubit_frequency
+                    and qubits[1] in qubit_frequency
+                    and qubit_frequency[qubits[0]] > qubit_frequency[qubits[1]]
+                ]
+            else:
+                cr_pairs = [
+                    pair
+                    for pair in all_pairs
+                    if (qubits := pair.split("-"))
+                    and len(qubits) == 2
+                    and qubits[0] in qubit_frequency
+                    and qubits[1] in qubit_frequency
+                    and qubit_frequency[qubits[0]] < qubit_frequency[qubits[1]]
+                ]
 
         logger.info(f"Filtering: {len(all_pairs)} total → {len(cr_pairs)} with freq directionality")
 
@@ -822,7 +891,8 @@ class CRScheduler:
             "candidate_qubits_count": len(candidate_qubits)
             if candidate_qubits is not None
             else None,
-            "direction_method": "design_based" if use_design_based else "measured",
+            "direction_method": direction_method,
+            "inverse": inverse,
             "grid_size": grid_size,
         }
 
@@ -832,7 +902,8 @@ class CRScheduler:
             "mux_config_filtered": len(cr_pairs),
             "mux_filtered_out": pairs_before_mux_filter - len(cr_pairs),
             "used_candidate_qubits": candidate_qubits is not None,
-            "direction_method": "design_based" if use_design_based else "measured",
+            "direction_method": direction_method,
+            "inverse": inverse,
         }
 
         return CRScheduleResult(

@@ -129,6 +129,7 @@ class CustomTwoQubit(CalibrationStep):
             service.chip_id,
             candidate_qubits,
             flow_name=f"{service.flow_name}_{self.name}" if service.flow_name else self.name,
+            tags=service.tags,
             project_id=service.project_id,
             use_lock=False,  # Parent pipeline already holds the lock
             enable_github_pull=False,
@@ -284,11 +285,16 @@ class GenerateCRSchedule(TransformStep):
     - Frequency constraints
     - Candidate qubit availability
 
+    The `inverse` parameter controls the CR direction based on the checkerboard pattern:
+    - False (default): Forward direction (control has lower frequency by design)
+    - True: Reverse direction (control has higher frequency by design)
+
     Requires: candidate_qids (at least 2 qubits)
     Provides: candidate_couplings (scheduled coupling pairs)
     """
 
     max_parallel_ops: int = 10
+    inverse: bool = False
 
     @property
     def name(self) -> str:
@@ -328,6 +334,7 @@ class GenerateCRSchedule(TransformStep):
         schedule = scheduler.generate(
             candidate_qubits=candidate_qubits,
             max_parallel_ops=self.max_parallel_ops,
+            inverse=self.inverse,
         )
 
         if not schedule.parallel_groups:
@@ -342,9 +349,10 @@ class GenerateCRSchedule(TransformStep):
         # Store schedule in metadata for TwoQubitCalibration
         ctx.metadata["cr_schedule"] = schedule.parallel_groups
 
+        direction = "reverse" if self.inverse else "forward"
         logger.info(
             f"[{self.name}] Generated {len(all_couplings)} couplings in "
-            f"{len(schedule.parallel_groups)} groups"
+            f"{len(schedule.parallel_groups)} groups (direction: {direction})"
         )
         return ctx
 
@@ -439,6 +447,7 @@ class TwoQubitCalibration(CalibrationStep):
             service.chip_id,
             candidate_qubits,
             flow_name=f"{service.flow_name}_{self.name}" if service.flow_name else self.name,
+            tags=service.tags,
             project_id=service.project_id,
             use_lock=False,  # Parent pipeline already holds the lock
             enable_github_pull=False,

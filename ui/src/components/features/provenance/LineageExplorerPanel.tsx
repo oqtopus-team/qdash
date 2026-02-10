@@ -8,7 +8,9 @@ import {
   ChevronRight,
   LayoutGrid,
   GitBranch as GraphIcon,
+  GitCompare,
   History,
+  X,
 } from "lucide-react";
 
 import {
@@ -16,10 +18,11 @@ import {
   useGetParameterHistory,
 } from "@/client/provenance/provenance";
 
+import { LineagePathComparison } from "./LineagePathComparison";
 import { ProvenanceGraph } from "./ProvenanceGraph";
 import { RecalibrationRecommendationsPanel } from "./RecalibrationRecommendationsPanel";
 
-type ViewMode = "graph" | "list";
+type ViewMode = "graph" | "list" | "compare";
 
 /** Maximum graph traversal depth for lineage queries.
  *  Set high enough to capture full calibration chains (typically 10-15 hops). */
@@ -39,6 +42,7 @@ export function LineageExplorerPanel({
   onEntityChange,
 }: LineageExplorerPanelProps) {
   const [entityId, setEntityId] = useState(initialEntityId);
+  const [compareEntityId, setCompareEntityId] = useState("");
   const [viewMode, setViewMode] = useState<ViewMode>("graph");
 
   // Fetch parameter history when parameter and qid are provided via URL
@@ -93,6 +97,18 @@ export function LineageExplorerPanel({
 
   const data = lineageResponse?.data;
 
+  // Fetch lineage for comparison version
+  const {
+    data: compareLineageResponse,
+    isLoading: isCompareLoading,
+    error: compareError,
+  } = useGetProvenanceLineage(
+    compareEntityId,
+    { max_depth: LINEAGE_MAX_DEPTH },
+    { query: { enabled: viewMode === "compare" && !!compareEntityId } },
+  );
+  const compareData = compareLineageResponse?.data;
+
   // Derive parameter_name and qid from the current origin entity
   const originEntity = useMemo(() => {
     if (!data || !entityId) return null;
@@ -121,6 +137,12 @@ export function LineageExplorerPanel({
   const handleVersionChange = (newEntityId: string) => {
     setEntityId(newEntityId);
     onEntityChange?.(newEntityId);
+  };
+
+  const getVersionLabel = (eId: string) => {
+    const v = versions.find((ver) => ver.entity_id === eId);
+    if (!v) return eId.slice(0, 8);
+    return `v${v.version}`;
   };
 
   const getNodeIcon = (nodeType: string) => {
@@ -228,8 +250,90 @@ export function LineageExplorerPanel({
                 <LayoutGrid className="h-3 w-3 sm:h-4 sm:w-4" />
                 List
               </button>
+              {versions.length > 1 && (
+                <button
+                  className={`btn btn-xs sm:btn-sm join-item ${viewMode === "compare" ? "btn-active" : ""}`}
+                  onClick={() => setViewMode("compare")}
+                >
+                  <GitCompare className="h-3 w-3 sm:h-4 sm:w-4" />
+                  Compare
+                </button>
+              )}
             </div>
           </div>
+
+          {/* Compare View - version selector and path diff */}
+          {viewMode === "compare" && (
+            <div className="space-y-4">
+              {/* Compare version selector */}
+              <div className="card bg-base-200">
+                <div className="card-body p-4">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                    <span className="text-sm font-medium">
+                      Compare {getVersionLabel(entityId)} with:
+                    </span>
+                    <select
+                      className="select select-bordered select-sm font-mono flex-1 max-w-xs"
+                      value={compareEntityId}
+                      onChange={(e) => setCompareEntityId(e.target.value)}
+                    >
+                      <option value="">Select version...</option>
+                      {versions
+                        .filter((v) => v.entity_id !== entityId)
+                        .map((v) => (
+                          <option key={v.entity_id} value={v.entity_id}>
+                            v{v.version}
+                            {v.valid_from
+                              ? ` — ${new Date(v.valid_from).toLocaleDateString()}`
+                              : ""}
+                          </option>
+                        ))}
+                    </select>
+                    {compareEntityId && (
+                      <button
+                        className="btn btn-xs btn-ghost"
+                        onClick={() => setCompareEntityId("")}
+                      >
+                        <X className="h-3 w-3" />
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Loading / Error */}
+              {isCompareLoading && (
+                <div className="flex justify-center py-8">
+                  <span className="loading loading-spinner loading-md"></span>
+                </div>
+              )}
+              {compareError && (
+                <div className="alert alert-error">
+                  <span>Failed to load comparison lineage</span>
+                </div>
+              )}
+
+              {/* Path comparison — old version on the left, new on the right */}
+              {compareData && data && (
+                <LineagePathComparison
+                  lineageBefore={compareData}
+                  lineageAfter={data}
+                  labelBefore={getVersionLabel(compareEntityId)}
+                  labelAfter={getVersionLabel(entityId)}
+                />
+              )}
+
+              {!compareEntityId && (
+                <div className="text-center py-8 text-base-content/50">
+                  <GitCompare className="h-10 w-10 mx-auto mb-3 opacity-50" />
+                  <p className="text-sm">
+                    Select a version to compare lineage paths and figures
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Graph View - full width for maximum visibility */}
           {viewMode === "graph" && (

@@ -248,12 +248,13 @@ export function QubitMetricsGrid({
   // Grid layout
   const displayCols = zoomMode === "region" ? regionSize : gridCols;
   const displayRows = zoomMode === "region" ? regionSize : gridRows;
-  const { containerRef, cellSize, isMobile } = useGridLayout({
-    cols: displayCols,
-    rows: displayRows,
-    reservedHeight: { mobile: 300, desktop: 350 },
-    deps: [metricData],
-  });
+  const { containerRef, cellSize, isMobile, viewportHeight, gap, padding } =
+    useGridLayout({
+      cols: displayCols,
+      rows: displayRows,
+      reservedHeight: { mobile: 300, desktop: 350 },
+      deps: [metricData],
+    });
 
   // Modal control
   const isModalOpen = selectedQubitInfo !== null;
@@ -445,14 +446,17 @@ export function QubitMetricsGrid({
   const gridContent = useMemo(
     () => (
       <div
-        className="grid gap-1 md:gap-2 p-2 md:p-4 bg-base-200/50 rounded-xl relative"
+        className="grid bg-base-200/50 rounded-xl relative"
         style={{
+          gap: `${gap}px`,
+          padding: `${padding / 2}px`,
           gridTemplateColumns: `repeat(${displayCols}, minmax(${displayCellSize}px, 1fr))`,
           gridTemplateRows: `repeat(${displayRows}, minmax(${displayCellSize}px, 1fr))`,
           width: calculateGridContainerWidth(
             displayCols,
             displayCellSize,
             isMobile,
+            viewportHeight,
           ),
           willChange: "transform",
         }}
@@ -481,10 +485,14 @@ export function QubitMetricsGrid({
 
         {/* MUX labels overlay */}
         {hasMux && showMuxBoundaries && showLabels && (
-          <div className="absolute inset-0 pointer-events-none p-2 md:p-4 z-10 hidden md:block">
+          <div
+            className="absolute inset-0 pointer-events-none z-10 hidden md:block"
+            style={{ padding: `${padding / 2}px` }}
+          >
             <div
-              className="grid gap-1 md:gap-2 w-full h-full"
+              className="grid w-full h-full"
               style={{
+                gap: `${gap}px`,
                 gridTemplateColumns: `repeat(${displayCols}, minmax(${displayCellSize}px, 1fr))`,
                 gridTemplateRows: `repeat(${displayRows}, minmax(${displayCellSize}px, 1fr))`,
               }}
@@ -523,7 +531,7 @@ export function QubitMetricsGrid({
                       gridRow: `${startRow} / span ${spanRows}`,
                     }}
                   >
-                    <div className="text-[0.5rem] md:text-xs font-bold text-base-content/60 bg-base-100/90 backdrop-blur-sm px-1.5 py-0.5 rounded shadow-sm border border-base-content/10">
+                    <div className="text-[0.45rem] md:text-[0.6rem] font-semibold text-base-content/30 bg-base-100/60 px-1 py-px rounded border border-base-content/5">
                       MUX{muxIndex}
                     </div>
                   </div>
@@ -538,10 +546,14 @@ export function QubitMetricsGrid({
           regionSelectionEnabled &&
           isSquareGrid &&
           viewMode === "region" && (
-            <div className="absolute inset-0 pointer-events-none p-2 md:p-4 z-20">
+            <div
+              className="absolute inset-0 pointer-events-none z-20"
+              style={{ padding: `${padding / 2}px` }}
+            >
               <div
-                className="grid gap-1 md:gap-2 w-full h-full"
+                className="grid w-full h-full"
                 style={{
+                  gap: `${gap}px`,
                   gridTemplateColumns: `repeat(${displayCols}, minmax(${displayCellSize}px, 1fr))`,
                   gridTemplateRows: `repeat(${displayRows}, minmax(${displayCellSize}px, 1fr))`,
                 }}
@@ -593,6 +605,9 @@ export function QubitMetricsGrid({
       displayRows,
       displayCellSize,
       isMobile,
+      viewportHeight,
+      gap,
+      padding,
       gridCellsData,
       unit,
       showLabels,
@@ -615,7 +630,7 @@ export function QubitMetricsGrid({
   );
 
   return (
-    <div className="flex flex-col h-full space-y-4">
+    <div className="flex flex-col h-full space-y-2">
       {/* View Mode Toggle */}
       <div className="flex items-center gap-4">
         <div className="tabs tabs-boxed bg-base-200 w-fit">
@@ -676,11 +691,12 @@ export function QubitMetricsGrid({
 
       {/* Grid display */}
       <div
-        className={`flex-1 p-1 md:p-4 relative overflow-hidden flex justify-center ${
+        className={`flex-1 relative overflow-hidden flex justify-center ${
           viewMode === "pan-zoom"
-            ? "bg-base-200/30 border-2 border-dashed border-base-300 rounded-lg m-1 md:m-2"
+            ? "bg-base-200/30 border-2 border-dashed border-base-300 rounded-lg"
             : ""
         }`}
+        style={{ padding: `${Math.max(4, padding / 4)}px` }}
         ref={containerRef}
       >
         {viewMode === "pan-zoom" ? (

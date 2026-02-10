@@ -3,14 +3,29 @@
 This template takes a list of candidate qubit IDs and automatically generates
 an optimal CR schedule using CRScheduler, then executes 2-qubit calibration.
 
+The CR direction is determined by the checkerboard pattern:
+- Forward (inverse=False, default): Control qubit has lower design frequency
+  (even parity position → low freq ~8000 MHz)
+- Reverse (inverse=True): Control qubit has higher design frequency
+  (odd parity position → high freq ~9000 MHz)
+
 Use this when you have already completed 1Q calibration and want to run 2Q
 calibration on specific qubits without going through the full pipeline.
 
 Example:
+    # Forward direction (default)
     two_qubit(
         username="alice",
         chip_id="64Qv3",
         qids=["0", "1", "4", "5", "8", "9"],
+    )
+
+    # Reverse direction
+    two_qubit(
+        username="alice",
+        chip_id="64Qv3",
+        qids=["0", "1", "4", "5", "8", "9"],
+        inverse=True,
     )
 """
 
@@ -33,7 +48,9 @@ def two_qubit(
     chip_id: str,
     qids: list[str] | None = None,
     tasks: list[str] | None = None,
+    inverse: bool = False,
     max_parallel_ops: int = 10,
+    tags: list[str] | None = None,
     flow_name: str | None = None,
     project_id: str | None = None,
 ) -> Any:
@@ -41,7 +58,7 @@ def two_qubit(
 
     Takes candidate qubit IDs and generates an optimal CR schedule based on:
     - MUX conflicts (pairs sharing MUX cannot run in parallel)
-    - Frequency constraints (CR direction based on qubit frequencies)
+    - Frequency constraints (CR direction based on checkerboard pattern)
     - Hardware topology (valid coupling pairs from chip design)
 
     Args:
@@ -56,6 +73,11 @@ def two_qubit(
             - CheckBellState
             - CheckBellStateTomography
             - ZX90InterleavedRandomizedBenchmarking
+        inverse: CR direction control based on checkerboard pattern.
+            False (default): Forward direction - control qubit is at even parity
+            position (lower design frequency).
+            True: Reverse direction - control qubit is at odd parity position
+            (higher design frequency).
         max_parallel_ops: Maximum number of CR operations to run in parallel.
             Limited by hardware constraints. Default: 10.
         flow_name: Flow name (auto-injected)
@@ -65,11 +87,19 @@ def two_qubit(
         Pipeline results with typed step outputs
 
     Example:
-        # Run full 2Q calibration on candidate qubits
+        # Run full 2Q calibration (forward direction, default)
         two_qubit(
             username="alice",
             chip_id="64Qv3",
             qids=["0", "1", "4", "5", "8", "9"],
+        )
+
+        # Run full 2Q calibration (reverse direction)
+        two_qubit(
+            username="alice",
+            chip_id="64Qv3",
+            qids=["0", "1", "4", "5", "8", "9"],
+            inverse=True,
         )
 
         # Run only specific 2Q tasks
@@ -109,8 +139,11 @@ def two_qubit(
     # =========================================================================
 
     steps: list[Step] = [
-        # Generate CR schedule from candidate qubits
-        GenerateCRSchedule(max_parallel_ops=max_parallel_ops),
+        # Generate CR schedule from candidate qubits with explicit direction
+        GenerateCRSchedule(
+            max_parallel_ops=max_parallel_ops,
+            inverse=inverse,
+        ),
     ]
 
     if tasks is not None:
@@ -133,6 +166,7 @@ def two_qubit(
         username,
         chip_id,
         flow_name=flow_name,
+        tags=tags,
         project_id=project_id,
         skip_execution=True,  # Child sessions create their own Executions
     )

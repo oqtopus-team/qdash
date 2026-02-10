@@ -14,7 +14,14 @@ import {
   useControls,
 } from "react-zoom-pan-pinch";
 
-import { GitBranch, ZoomIn, ZoomOut, Maximize2, Move } from "lucide-react";
+import {
+  ArrowRightLeft,
+  GitBranch,
+  ZoomIn,
+  ZoomOut,
+  Maximize2,
+  Move,
+} from "lucide-react";
 
 import { RegionZoomToggle } from "@/components/ui/RegionZoomToggle";
 import { useGridLayout } from "@/hooks/useGridLayout";
@@ -138,6 +145,9 @@ export function CouplingMetricsGrid({
     [hasMux, muxSize, effectiveGridSize, layoutType],
   );
 
+  // Coupling direction toggle: when true, reverse all coupling IDs
+  const [isDirectionReversed, setIsDirectionReversed] = useState(false);
+
   // View mode state: 'pan-zoom' for DOM with pan/zoom, 'region' for region zoom
   const [viewMode, setViewMode] = useState<"pan-zoom" | "region">("pan-zoom");
 
@@ -194,12 +204,13 @@ export function CouplingMetricsGrid({
   // Use grid layout hook for responsive sizing
   const displayCols = zoomMode === "region" ? regionSize : gridCols;
   const displayRows = zoomMode === "region" ? regionSize : gridRows;
-  const { containerRef, cellSize, isMobile, gap } = useGridLayout({
-    cols: displayCols,
-    rows: displayRows,
-    reservedHeight: { mobile: 300, desktop: 350 },
-    deps: [metricData],
-  });
+  const { containerRef, cellSize, isMobile, viewportHeight, gap, padding } =
+    useGridLayout({
+      cols: displayCols,
+      rows: displayRows,
+      reservedHeight: { mobile: 300, desktop: 350 },
+      deps: [metricData],
+    });
 
   const numRegions = Math.floor(effectiveGridSize / regionSize);
 
@@ -350,11 +361,13 @@ export function CouplingMetricsGrid({
           displayGridSize,
           displayCellSize,
           isMobile,
+          viewportHeight,
         ),
         height: calculateGridDimension(
           displayGridSize,
           displayCellSize,
           isMobile,
+          viewportHeight,
         ),
         maxWidth: viewMode === "pan-zoom" ? "none" : "100%",
         willChange: viewMode === "pan-zoom" ? "transform" : "auto",
@@ -449,7 +462,7 @@ export function CouplingMetricsGrid({
                   transform: "translate(-50%, -50%)",
                 }}
               >
-                <div className="text-[0.5rem] md:text-xs font-bold text-base-content/60 bg-base-100/90 backdrop-blur-sm px-1.5 py-0.5 rounded shadow-sm border border-base-content/10">
+                <div className="text-[0.45rem] md:text-[0.6rem] font-semibold text-base-content/30 bg-base-100/60 px-1 py-px rounded border border-base-content/5">
                   MUX{muxIndex}
                 </div>
               </div>
@@ -471,9 +484,12 @@ export function CouplingMetricsGrid({
         return couplingList
           .filter(([qid1, qid2]) => isCouplingInRegion(qid1, qid2))
           .map(([qid1, qid2]) => {
-            const couplingId = `${qid1}-${qid2}`;
-            const metric =
-              displayData[couplingId] || displayData[`${qid2}-${qid1}`];
+            // Topology order [qid1, qid2] defines the default direction
+            const topoId = `${qid1}-${qid2}`;
+            const topoReverseId = `${qid2}-${qid1}`;
+            // Apply direction toggle
+            const couplingId = isDirectionReversed ? topoReverseId : topoId;
+            const metric = displayData[couplingId];
 
             // Use explicit positions from topology
             const pos1 = getQubitPosition(qid1);
@@ -499,6 +515,15 @@ export function CouplingMetricsGrid({
               ? getColor(value, stats.min, stats.max)
               : null;
 
+            // Calculate direction arrow angle from source to target qubit positions
+            const [srcQ, tgtQ] = couplingId.split("-");
+            const srcPos = getQubitPosition(Number(srcQ));
+            const tgtPos = getQubitPosition(Number(tgtQ));
+            const dx = tgtPos.col - srcPos.col;
+            const dy = tgtPos.row - srcPos.row;
+            // Angle in degrees: 0=right, 90=down, 180=left, 270=up
+            const arrowAngle = (Math.atan2(dy, dx) * 180) / Math.PI;
+
             return (
               <button
                 key={couplingId}
@@ -513,13 +538,13 @@ export function CouplingMetricsGrid({
                   height: displayCellSize * 0.5,
                   backgroundColor: bgColor || undefined,
                 }}
-                className={`rounded-md shadow-md flex items-center justify-center transition-all hover:shadow-xl hover:scale-110 -translate-x-1/2 -translate-y-1/2 relative group cursor-pointer ${
+                className={`rounded-md shadow-md flex flex-col items-center justify-center transition-all hover:shadow-xl hover:scale-110 -translate-x-1/2 -translate-y-1/2 relative group cursor-pointer ${
                   !bgColor ? "bg-base-300/50" : ""
                 }`}
               >
                 {/* Value Display - LOD controlled */}
                 {value !== null && value !== undefined && showValues && (
-                  <div className="text-xs sm:text-sm md:text-base font-bold text-white drop-shadow-md">
+                  <div className="text-[0.6rem] sm:text-xs md:text-sm font-bold text-white drop-shadow-md leading-tight">
                     {value.toFixed(showUnits ? 2 : 1)}
                   </div>
                 )}
@@ -531,11 +556,40 @@ export function CouplingMetricsGrid({
                   </div>
                 )}
 
+                {/* Direction arrow pointing from source to target qubit */}
+                {showValues && (
+                  <svg
+                    width="14"
+                    height="6"
+                    viewBox="0 0 18 7"
+                    className="mt-px drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]"
+                    style={{
+                      transform: `rotate(${arrowAngle}deg)`,
+                    }}
+                  >
+                    <line
+                      x1="1"
+                      y1="3.5"
+                      x2="14"
+                      y2="3.5"
+                      stroke="white"
+                      strokeWidth="1.5"
+                    />
+                    <polyline
+                      points="11,0.5 16,3.5 11,6.5"
+                      fill="none"
+                      stroke="white"
+                      strokeWidth="1.5"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                )}
+
                 {/* Hover tooltip - always show on hover */}
                 <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-base-100 text-base-content text-sm rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
                   {value !== null && value !== undefined
-                    ? `${couplingId}: ${value.toFixed(4)} ${unit}`
-                    : `${couplingId}: No data`}
+                    ? `${srcQ}\u2192${tgtQ}: ${value.toFixed(4)} ${unit}`
+                    : `${srcQ}\u2192${tgtQ}: No data`}
                 </div>
               </button>
             );
@@ -620,12 +674,28 @@ export function CouplingMetricsGrid({
           )}
         </div>
 
-        {viewMode === "region" && zoomMode === "full" && isSquareGrid && (
-          <RegionZoomToggle
-            enabled={regionSelectionEnabled}
-            onToggle={setRegionSelectionEnabled}
-          />
-        )}
+        <div className="flex items-center gap-2">
+          {viewMode === "region" && zoomMode === "full" && isSquareGrid && (
+            <RegionZoomToggle
+              enabled={regionSelectionEnabled}
+              onToggle={setRegionSelectionEnabled}
+            />
+          )}
+          <button
+            onClick={() => setIsDirectionReversed((prev) => !prev)}
+            className={`btn btn-sm gap-1.5 ${isDirectionReversed ? "btn-secondary" : "btn-outline"}`}
+            title={
+              isDirectionReversed
+                ? "Showing reverse direction"
+                : "Showing forward direction"
+            }
+          >
+            <ArrowRightLeft className="h-3.5 w-3.5" />
+            <span className="text-xs">
+              {isDirectionReversed ? "Reverse" : "Forward"}
+            </span>
+          </button>
+        </div>
       </div>
 
       {/* Back button when in region mode */}
@@ -648,11 +718,12 @@ export function CouplingMetricsGrid({
 
       {/* Grid display */}
       <div
-        className={`flex-1 p-1 md:p-4 relative overflow-hidden flex justify-center ${
+        className={`flex-1 relative overflow-hidden flex justify-center ${
           viewMode === "pan-zoom"
-            ? "bg-base-200/30 border-2 border-dashed border-base-300 rounded-lg m-1 md:m-2"
+            ? "bg-base-200/30 border-2 border-dashed border-base-300 rounded-lg"
             : ""
         }`}
+        style={{ padding: `${Math.max(4, padding / 4)}px` }}
       >
         {viewMode === "pan-zoom" ? (
           <TransformWrapper

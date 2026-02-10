@@ -90,7 +90,7 @@ export function QubitTimeSeriesView({
         font: { size: 20 },
       },
       xaxis: {
-        title: "Time",
+        title: "Time (JST)",
         type: "date",
         tickformat: "%Y-%m-%d %H:%M",
         gridcolor: "#eee",
