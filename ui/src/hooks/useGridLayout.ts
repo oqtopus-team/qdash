@@ -50,6 +50,21 @@ interface UseGridLayoutResult {
 }
 
 /**
+ * Get dynamic reserved height based on viewport height.
+ * Smaller viewports get reduced reserved height to maximize grid space.
+ */
+function getDynamicReservedHeight(
+  viewportHeight: number,
+  isMobile: boolean,
+  base: { mobile: number; desktop: number },
+): number {
+  if (isMobile) return base.mobile;
+  if (viewportHeight < 700) return Math.min(base.desktop, 220);
+  if (viewportHeight < 900) return Math.min(base.desktop, 280);
+  return base.desktop;
+}
+
+/**
  * Custom hook for managing responsive grid layout
  * Handles cell size calculation, resize events, and provides utility functions
  */
@@ -63,22 +78,29 @@ export function useGridLayout({
   const containerRef = useRef<HTMLDivElement>(null);
   const [cellSize, setCellSize] = useState(60);
   const [isMobile, setIsMobile] = useState(false);
+  const [viewportHeight, setViewportHeight] = useState(
+    typeof window !== "undefined" ? window.innerHeight : 1080,
+  );
 
   const updateSize = useCallback(() => {
     const container = containerRef.current;
     if (!container) return;
 
     const viewportWidth = window.innerWidth;
+    const vh = window.innerHeight;
     const mobile = checkIsMobile(viewportWidth);
     setIsMobile(mobile);
+    setViewportHeight(vh);
 
     const containerPadding = mobile ? 16 : 32;
     const containerWidth =
       Math.min(container.offsetWidth, viewportWidth) - containerPadding * 2;
-    const viewportHeight = window.innerHeight;
-    const availableHeight =
-      viewportHeight -
-      (mobile ? reservedHeight.mobile : reservedHeight.desktop);
+    const dynamicReserved = getDynamicReservedHeight(
+      vh,
+      mobile,
+      reservedHeight,
+    );
+    const availableHeight = vh - dynamicReserved;
 
     const newCellSize = calculateCellSize({
       containerWidth,
@@ -108,8 +130,8 @@ export function useGridLayout({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [updateSize, ...deps]);
 
-  const gap = getGridGap(isMobile);
-  const padding = getGridPadding(isMobile);
+  const gap = getGridGap(isMobile, viewportHeight);
+  const padding = getGridPadding(isMobile, viewportHeight);
 
   const getGridDimension = useCallback(
     (count: number) => calculateGridDimension(count, cellSize, isMobile),

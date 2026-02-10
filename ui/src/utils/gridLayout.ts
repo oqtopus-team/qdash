@@ -24,24 +24,61 @@ export const MIN_CELL_SIZE = {
 export const MOBILE_BREAKPOINT = 768;
 
 /**
- * Get the gap size based on mobile state
+ * Get responsive grid constants based on viewport height.
+ * Adapts gap, padding, and minCellSize for smaller viewports
+ * (e.g. 14" displays with 125% scaling → ~864px effective height).
  */
-export function getGridGap(isMobile: boolean): number {
-  return isMobile ? GRID_GAP.mobile : GRID_GAP.desktop;
+export function getResponsiveGridConstants(viewportHeight: number): {
+  gap: number;
+  padding: number;
+  minCellSize: number;
+} {
+  if (viewportHeight < 700) {
+    return { gap: 4, padding: 16, minCellSize: 28 };
+  }
+  if (viewportHeight < 900) {
+    return { gap: 6, padding: 20, minCellSize: 32 };
+  }
+  return { gap: 8, padding: 32, minCellSize: 40 };
 }
 
 /**
- * Get the padding size based on mobile state
+ * Get the gap size based on mobile state and optional viewport height
  */
-export function getGridPadding(isMobile: boolean): number {
-  return isMobile ? GRID_PADDING.mobile : GRID_PADDING.desktop;
+export function getGridGap(isMobile: boolean, viewportHeight?: number): number {
+  if (isMobile) return GRID_GAP.mobile;
+  if (viewportHeight !== undefined) {
+    return getResponsiveGridConstants(viewportHeight).gap;
+  }
+  return GRID_GAP.desktop;
 }
 
 /**
- * Get the minimum cell size based on mobile state
+ * Get the padding size based on mobile state and optional viewport height
  */
-export function getMinCellSize(isMobile: boolean): number {
-  return isMobile ? MIN_CELL_SIZE.mobile : MIN_CELL_SIZE.desktop;
+export function getGridPadding(
+  isMobile: boolean,
+  viewportHeight?: number,
+): number {
+  if (isMobile) return GRID_PADDING.mobile;
+  if (viewportHeight !== undefined) {
+    return getResponsiveGridConstants(viewportHeight).padding;
+  }
+  return GRID_PADDING.desktop;
+}
+
+/**
+ * Get the minimum cell size based on mobile state and optional viewport height
+ */
+export function getMinCellSize(
+  isMobile: boolean,
+  viewportHeight?: number,
+): number {
+  if (isMobile) return MIN_CELL_SIZE.mobile;
+  if (viewportHeight !== undefined) {
+    return getResponsiveGridConstants(viewportHeight).minCellSize;
+  }
+  return MIN_CELL_SIZE.desktop;
 }
 
 /**
