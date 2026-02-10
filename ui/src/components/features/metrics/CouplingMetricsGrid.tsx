@@ -204,12 +204,13 @@ export function CouplingMetricsGrid({
   // Use grid layout hook for responsive sizing
   const displayCols = zoomMode === "region" ? regionSize : gridCols;
   const displayRows = zoomMode === "region" ? regionSize : gridRows;
-  const { containerRef, cellSize, isMobile, gap } = useGridLayout({
-    cols: displayCols,
-    rows: displayRows,
-    reservedHeight: { mobile: 300, desktop: 350 },
-    deps: [metricData],
-  });
+  const { containerRef, cellSize, isMobile, viewportHeight, gap, padding } =
+    useGridLayout({
+      cols: displayCols,
+      rows: displayRows,
+      reservedHeight: { mobile: 300, desktop: 350 },
+      deps: [metricData],
+    });
 
   const numRegions = Math.floor(effectiveGridSize / regionSize);
 
@@ -360,11 +361,13 @@ export function CouplingMetricsGrid({
           displayGridSize,
           displayCellSize,
           isMobile,
+          viewportHeight,
         ),
         height: calculateGridDimension(
           displayGridSize,
           displayCellSize,
           isMobile,
+          viewportHeight,
         ),
         maxWidth: viewMode === "pan-zoom" ? "none" : "100%",
         willChange: viewMode === "pan-zoom" ? "transform" : "auto",
@@ -459,7 +462,7 @@ export function CouplingMetricsGrid({
                   transform: "translate(-50%, -50%)",
                 }}
               >
-                <div className="text-[0.5rem] md:text-xs font-bold text-base-content/60 bg-base-100/90 backdrop-blur-sm px-1.5 py-0.5 rounded shadow-sm border border-base-content/10">
+                <div className="text-[0.45rem] md:text-[0.6rem] font-semibold text-base-content/30 bg-base-100/60 px-1 py-px rounded border border-base-content/5">
                   MUX{muxIndex}
                 </div>
               </div>
@@ -541,7 +544,7 @@ export function CouplingMetricsGrid({
               >
                 {/* Value Display - LOD controlled */}
                 {value !== null && value !== undefined && showValues && (
-                  <div className="text-xs sm:text-sm md:text-base font-bold text-white drop-shadow-md leading-tight">
+                  <div className="text-[0.6rem] sm:text-xs md:text-sm font-bold text-white drop-shadow-md leading-tight">
                     {value.toFixed(showUnits ? 2 : 1)}
                   </div>
                 )}
@@ -556,10 +559,10 @@ export function CouplingMetricsGrid({
                 {/* Direction arrow pointing from source to target qubit */}
                 {showValues && (
                   <svg
-                    width="18"
-                    height="7"
+                    width="14"
+                    height="6"
                     viewBox="0 0 18 7"
-                    className="mt-0.5 drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]"
+                    className="mt-px drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]"
                     style={{
                       transform: `rotate(${arrowAngle}deg)`,
                     }}
@@ -715,11 +718,12 @@ export function CouplingMetricsGrid({
 
       {/* Grid display */}
       <div
-        className={`flex-1 p-1 md:p-4 relative overflow-hidden flex justify-center ${
+        className={`flex-1 relative overflow-hidden flex justify-center ${
           viewMode === "pan-zoom"
-            ? "bg-base-200/30 border-2 border-dashed border-base-300 rounded-lg m-1 md:m-2"
+            ? "bg-base-200/30 border-2 border-dashed border-base-300 rounded-lg"
             : ""
         }`}
+        style={{ padding: `${Math.max(4, padding / 4)}px` }}
       >
         {viewMode === "pan-zoom" ? (
           <TransformWrapper
