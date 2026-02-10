@@ -15,6 +15,7 @@ import {
   checkIsMobile,
   getGridGap,
   getGridPadding,
+  VIEWPORT_HEIGHT_BREAKPOINTS,
 } from "@/utils/gridLayout";
 
 interface UseGridLayoutParams {
@@ -37,6 +38,8 @@ interface UseGridLayoutResult {
   cellSize: number;
   /** Whether the viewport is mobile width */
   isMobile: boolean;
+  /** Current viewport height in pixels */
+  viewportHeight: number;
   /** Gap between cells in pixels */
   gap: number;
   /** Padding for grid container in pixels */
@@ -59,8 +62,10 @@ function getDynamicReservedHeight(
   base: { mobile: number; desktop: number },
 ): number {
   if (isMobile) return base.mobile;
-  if (viewportHeight < 700) return Math.min(base.desktop, 220);
-  if (viewportHeight < 900) return Math.min(base.desktop, 280);
+  if (viewportHeight < VIEWPORT_HEIGHT_BREAKPOINTS.SMALL)
+    return Math.min(base.desktop, 220);
+  if (viewportHeight < VIEWPORT_HEIGHT_BREAKPOINTS.MEDIUM)
+    return Math.min(base.desktop, 280);
   return base.desktop;
 }
 
@@ -108,6 +113,7 @@ export function useGridLayout({
       cols,
       rows,
       isMobile: mobile,
+      viewportHeight: vh,
       minCellSize,
     });
 
@@ -134,20 +140,22 @@ export function useGridLayout({
   const padding = getGridPadding(isMobile, viewportHeight);
 
   const getGridDimension = useCallback(
-    (count: number) => calculateGridDimension(count, cellSize, isMobile),
-    [cellSize, isMobile],
+    (count: number) =>
+      calculateGridDimension(count, cellSize, isMobile, viewportHeight),
+    [cellSize, isMobile, viewportHeight],
   );
 
   const getContainerWidth = useCallback(
     (colCount: number) =>
-      calculateGridContainerWidth(colCount, cellSize, isMobile),
-    [cellSize, isMobile],
+      calculateGridContainerWidth(colCount, cellSize, isMobile, viewportHeight),
+    [cellSize, isMobile, viewportHeight],
   );
 
   return {
     containerRef,
     cellSize,
     isMobile,
+    viewportHeight,
     gap,
     padding,
     getGridDimension,

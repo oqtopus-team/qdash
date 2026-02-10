@@ -204,12 +204,13 @@ export function CouplingMetricsGrid({
   // Use grid layout hook for responsive sizing
   const displayCols = zoomMode === "region" ? regionSize : gridCols;
   const displayRows = zoomMode === "region" ? regionSize : gridRows;
-  const { containerRef, cellSize, isMobile, gap, padding } = useGridLayout({
-    cols: displayCols,
-    rows: displayRows,
-    reservedHeight: { mobile: 300, desktop: 350 },
-    deps: [metricData],
-  });
+  const { containerRef, cellSize, isMobile, viewportHeight, gap, padding } =
+    useGridLayout({
+      cols: displayCols,
+      rows: displayRows,
+      reservedHeight: { mobile: 300, desktop: 350 },
+      deps: [metricData],
+    });
 
   const numRegions = Math.floor(effectiveGridSize / regionSize);
 
@@ -360,11 +361,13 @@ export function CouplingMetricsGrid({
           displayGridSize,
           displayCellSize,
           isMobile,
+          viewportHeight,
         ),
         height: calculateGridDimension(
           displayGridSize,
           displayCellSize,
           isMobile,
+          viewportHeight,
         ),
         maxWidth: viewMode === "pan-zoom" ? "none" : "100%",
         willChange: viewMode === "pan-zoom" ? "transform" : "auto",

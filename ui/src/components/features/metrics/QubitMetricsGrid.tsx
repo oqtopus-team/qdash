@@ -248,12 +248,13 @@ export function QubitMetricsGrid({
   // Grid layout
   const displayCols = zoomMode === "region" ? regionSize : gridCols;
   const displayRows = zoomMode === "region" ? regionSize : gridRows;
-  const { containerRef, cellSize, isMobile, gap, padding } = useGridLayout({
-    cols: displayCols,
-    rows: displayRows,
-    reservedHeight: { mobile: 300, desktop: 350 },
-    deps: [metricData],
-  });
+  const { containerRef, cellSize, isMobile, viewportHeight, gap, padding } =
+    useGridLayout({
+      cols: displayCols,
+      rows: displayRows,
+      reservedHeight: { mobile: 300, desktop: 350 },
+      deps: [metricData],
+    });
 
   // Modal control
   const isModalOpen = selectedQubitInfo !== null;
@@ -455,6 +456,7 @@ export function QubitMetricsGrid({
             displayCols,
             displayCellSize,
             isMobile,
+            viewportHeight,
           ),
           willChange: "transform",
         }}
@@ -603,6 +605,7 @@ export function QubitMetricsGrid({
       displayRows,
       displayCellSize,
       isMobile,
+      viewportHeight,
       gap,
       padding,
       gridCellsData,
