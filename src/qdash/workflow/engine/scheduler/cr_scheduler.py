@@ -794,14 +794,25 @@ class CRScheduler:
             cr_pairs = [p for p in all_pairs if p in topology_directions]
         elif use_design_based:
             direction_method = "design_based"
-            logger.info("Using design-based frequency directionality (checkerboard pattern)")
-            cr_pairs = [
-                pair
-                for pair in all_pairs
-                if (qubits := pair.split("-"))
-                and len(qubits) == 2
-                and self._infer_direction_from_design(qubits[0], qubits[1], grid_size)
-            ]
+            logger.info(
+                f"Using design-based frequency directionality (checkerboard pattern, inverse={inverse})"
+            )
+            if inverse:
+                cr_pairs = [
+                    pair
+                    for pair in all_pairs
+                    if (qubits := pair.split("-"))
+                    and len(qubits) == 2
+                    and not self._infer_direction_from_design(qubits[0], qubits[1], grid_size)
+                ]
+            else:
+                cr_pairs = [
+                    pair
+                    for pair in all_pairs
+                    if (qubits := pair.split("-"))
+                    and len(qubits) == 2
+                    and self._infer_direction_from_design(qubits[0], qubits[1], grid_size)
+                ]
         else:
             direction_method = "measured"
             logger.info("Using measured frequency directionality")

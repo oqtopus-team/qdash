@@ -45,6 +45,7 @@ def full_calibration(
     project_id: str | None = None,
     fidelity_threshold: float = 0.90,
     max_parallel_ops: int = 10,
+    inverse: bool = False,
 ) -> Any:
     """Full calibration using step-based pipeline.
 
@@ -58,6 +59,11 @@ def full_calibration(
         project_id: Project ID (auto-injected)
         fidelity_threshold: Minimum X90 fidelity for 2Q candidates (default: 0.90)
         max_parallel_ops: Max parallel CR operations (default: 10)
+        inverse: CR direction control based on checkerboard pattern.
+            False (default): Forward direction - control qubit is at even parity
+            position (lower design frequency).
+            True: Reverse direction - control qubit is at odd parity position
+            (higher design frequency).
 
     Returns:
         Pipeline results with typed step outputs
@@ -89,8 +95,8 @@ def full_calibration(
         OneQubitFineTune(mode="synchronized"),
         # Stage 3: Filter by X90 fidelity
         FilterByMetric(metric="x90_fidelity", threshold=fidelity_threshold),
-        # Stage 4: Generate 2Q schedule
-        GenerateCRSchedule(max_parallel_ops=max_parallel_ops),
+        # Stage 4: Generate 2Q schedule with explicit direction
+        GenerateCRSchedule(max_parallel_ops=max_parallel_ops, inverse=inverse),
         # Stage 5: 2Q calibration
         TwoQubitCalibration(),
     ]
