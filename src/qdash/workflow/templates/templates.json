@@ -26,7 +26,7 @@
   {
     "id": "full_calibration",
     "name": "Full Calibration",
-    "description": "Complete calibration using step-based pipeline: 1Q Check -> 1Q Fine-tune -> Filter -> CR Schedule -> 2Q.",
+    "description": "Complete calibration using step-based pipeline: 1Q Check -> 1Q Fine-tune -> Filter -> CR Schedule (forward/reverse) -> 2Q.",
     "category": "production",
     "filename": "full_calibration.py",
     "function_name": "full_calibration"
@@ -34,7 +34,7 @@
   {
     "id": "two_qubit",
     "name": "2Q Calibration",
-    "description": "Two-qubit calibration from candidate qubits. Auto-generates optimal CR schedule based on hardware constraints.",
+    "description": "Two-qubit calibration from candidate qubits. Auto-generates optimal CR schedule with explicit checkerboard direction (forward/reverse). Default: forward.",
     "category": "production",
     "filename": "two_qubit.py",
     "function_name": "two_qubit"
