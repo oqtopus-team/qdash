@@ -294,9 +294,9 @@ export function MetricsPageContent() {
 
   return (
     <PageContainer>
-      <div className="h-full flex flex-col space-y-4 md:space-y-6">
+      <div className="h-full flex flex-col space-y-3 md:space-y-4">
         {/* Header Section */}
-        <div className="flex flex-col gap-4 md:gap-6">
+        <div className="flex flex-col gap-3 md:gap-4">
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
             <PageHeader
               title="Chip Metrics Dashboard"

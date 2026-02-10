@@ -23,25 +23,77 @@ export const MIN_CELL_SIZE = {
 /** Mobile breakpoint in pixels */
 export const MOBILE_BREAKPOINT = 768;
 
+/** Viewport height breakpoints for responsive grid adaptation */
+export const VIEWPORT_HEIGHT_BREAKPOINTS = {
+  /** Small: zoom-in / very compact displays */
+  SMALL: 700,
+  /** Medium: 14" displays with 125% scaling (~864px) */
+  MEDIUM: 900,
+} as const;
+
+/** Responsive grid configs per viewport height tier */
+const RESPONSIVE_CONFIGS = {
+  SMALL: { gap: 4, padding: 16, minCellSize: 28 },
+  MEDIUM: { gap: 6, padding: 20, minCellSize: 32 },
+  LARGE: { gap: 8, padding: 32, minCellSize: 40 },
+} as const;
+
 /**
- * Get the gap size based on mobile state
+ * Get responsive grid constants based on viewport height.
+ * Adapts gap, padding, and minCellSize for smaller viewports
+ * (e.g. 14" displays with 125% scaling → ~864px effective height).
  */
-export function getGridGap(isMobile: boolean): number {
-  return isMobile ? GRID_GAP.mobile : GRID_GAP.desktop;
+export function getResponsiveGridConstants(viewportHeight: number): {
+  gap: number;
+  padding: number;
+  minCellSize: number;
+} {
+  if (viewportHeight < VIEWPORT_HEIGHT_BREAKPOINTS.SMALL) {
+    return RESPONSIVE_CONFIGS.SMALL;
+  }
+  if (viewportHeight < VIEWPORT_HEIGHT_BREAKPOINTS.MEDIUM) {
+    return RESPONSIVE_CONFIGS.MEDIUM;
+  }
+  return RESPONSIVE_CONFIGS.LARGE;
 }
 
 /**
- * Get the padding size based on mobile state
+ * Get the gap size based on mobile state and optional viewport height
  */
-export function getGridPadding(isMobile: boolean): number {
-  return isMobile ? GRID_PADDING.mobile : GRID_PADDING.desktop;
+export function getGridGap(isMobile: boolean, viewportHeight?: number): number {
+  if (isMobile) return GRID_GAP.mobile;
+  if (viewportHeight !== undefined) {
+    return getResponsiveGridConstants(viewportHeight).gap;
+  }
+  return GRID_GAP.desktop;
 }
 
 /**
- * Get the minimum cell size based on mobile state
+ * Get the padding size based on mobile state and optional viewport height
  */
-export function getMinCellSize(isMobile: boolean): number {
-  return isMobile ? MIN_CELL_SIZE.mobile : MIN_CELL_SIZE.desktop;
+export function getGridPadding(
+  isMobile: boolean,
+  viewportHeight?: number,
+): number {
+  if (isMobile) return GRID_PADDING.mobile;
+  if (viewportHeight !== undefined) {
+    return getResponsiveGridConstants(viewportHeight).padding;
+  }
+  return GRID_PADDING.desktop;
+}
+
+/**
+ * Get the minimum cell size based on mobile state and optional viewport height
+ */
+export function getMinCellSize(
+  isMobile: boolean,
+  viewportHeight?: number,
+): number {
+  if (isMobile) return MIN_CELL_SIZE.mobile;
+  if (viewportHeight !== undefined) {
+    return getResponsiveGridConstants(viewportHeight).minCellSize;
+  }
+  return MIN_CELL_SIZE.desktop;
 }
 
 /**
@@ -52,22 +104,25 @@ export function calculateGridDimension(
   count: number,
   cellSize: number,
   isMobile: boolean,
+  viewportHeight?: number,
 ): number {
-  const gap = getGridGap(isMobile);
+  const gap = getGridGap(isMobile, viewportHeight);
   return count * cellSize + (count - 1) * gap;
 }
 
 /**
- * Calculate the total grid container width including padding
- * Formula: n * cellSize + (n - 1) * gap + 2 * padding
+ * Calculate the total grid container width including padding (both sides).
+ * Formula: n * cellSize + (n - 1) * gap + padding
+ * Note: padding here is the full padding value; callers typically apply padding/2 per side.
  */
 export function calculateGridContainerWidth(
   cols: number,
   cellSize: number,
   isMobile: boolean,
+  viewportHeight?: number,
 ): number {
-  const gap = getGridGap(isMobile);
-  const padding = getGridPadding(isMobile);
+  const gap = getGridGap(isMobile, viewportHeight);
+  const padding = getGridPadding(isMobile, viewportHeight);
   return cols * cellSize + (cols - 1) * gap + padding;
 }
 
@@ -87,6 +142,7 @@ export function calculateCellSize(params: {
   cols: number;
   rows: number;
   isMobile: boolean;
+  viewportHeight?: number;
   minCellSize?: number;
 }): number {
   const {
@@ -95,11 +151,12 @@ export function calculateCellSize(params: {
     cols,
     rows,
     isMobile,
+    viewportHeight,
     minCellSize: customMinSize,
   } = params;
 
-  const gap = getGridGap(isMobile);
-  const minSize = customMinSize ?? getMinCellSize(isMobile);
+  const gap = getGridGap(isMobile, viewportHeight);
+  const minSize = customMinSize ?? getMinCellSize(isMobile, viewportHeight);
 
   const totalGapX = gap * (cols - 1);
   const totalGapY = gap * (rows - 1);

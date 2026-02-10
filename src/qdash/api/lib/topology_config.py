@@ -49,6 +49,10 @@ class TopologyDefinition(BaseModel):
     grid_size: int
     num_qubits: int
     layout_type: str = Field(default="grid", description="Layout type: grid, hex, linear")
+    direction_convention: str = Field(
+        default="unspecified",
+        description="Coupling direction convention: 'checkerboard_cr' means [control, target] order based on (row+col)%2 parity",
+    )
     mux: MuxConfig = Field(default_factory=MuxConfig)
     qubits: dict[int, QubitPosition]
     couplings: list[list[int]]
