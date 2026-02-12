@@ -411,7 +411,7 @@ export function CouplingMetricHistoryModal({
 
   // Column 3: Task Details
   const renderTaskDetails = () => (
-    <div className="flex flex-col min-h-0 h-full">
+    <div className="flex flex-col">
       <div className="flex items-center justify-between mb-3 shrink-0">
         <div className="flex items-center gap-2">
           <FileText className="h-4 w-4 text-accent" />
@@ -539,7 +539,7 @@ export function CouplingMetricHistoryModal({
 
       {/* Input/Output Parameters */}
       {selectedTask && (
-        <div className="flex flex-col gap-2 mt-2 overflow-auto">
+        <div className="flex flex-col gap-2 mt-2">
           {selectedTask.input_parameters &&
             Object.keys(selectedTask.input_parameters).length > 0 && (
               <ParametersTable
@@ -614,8 +614,10 @@ export function CouplingMetricHistoryModal({
           {renderTasksList()}
         </div>
 
-        {/* Column 3: Details */}
-        <div className="w-1/2 flex flex-col min-h-0">{renderTaskDetails()}</div>
+        {/* Column 3: Details – scrollable */}
+        <div className="w-1/2 overflow-y-auto min-h-0">
+          {renderTaskDetails()}
+        </div>
       </div>
     </div>
   );

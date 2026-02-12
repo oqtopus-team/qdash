@@ -52,8 +52,8 @@ export function ExecutionTasksView({
 
   return (
     <div className="flex flex-col lg:flex-row gap-3 sm:gap-4 h-full">
-      {/* Task Result Display */}
-      <div className="order-1 lg:order-2 lg:w-2/3 flex flex-col">
+      {/* Task Result Display - scrollable container */}
+      <div className="order-1 lg:order-2 lg:w-2/3 flex flex-col overflow-y-auto min-h-0">
         <div className="flex items-center justify-between mb-2 sm:mb-3">
           <h3 className="text-base sm:text-lg font-bold">Task Result</h3>
           {executionTasks.length > 0 && (
