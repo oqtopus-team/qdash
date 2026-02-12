@@ -16,7 +16,7 @@ import numpy as np
 import plotly.graph_objects as go
 from PIL import Image
 from qdash.api.lib.metrics_config import load_metrics_config
-from qdash.api.lib.topology_config import TopologyDefinition, load_topology
+from qdash.common.topology_config import TopologyDefinition, load_topology
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.utils import ImageReader
@@ -68,9 +68,15 @@ class MetricsPDFGenerator:
                 logger.warning(f"Failed to load topology {topology_id}: {e}")
 
         # Calculate grid dimensions
-        self.n_qubits = metrics_response.qubit_count
-        self.grid_size = self.topology.grid_size if self.topology else int(math.sqrt(self.n_qubits))
-        self.mux_size = self.topology.mux.size if self.topology and self.topology.mux.enabled else 2
+        # Use topology num_qubits when available (metrics qubit_count may exceed grid capacity)
+        if self.topology:
+            self.n_qubits = self.topology.num_qubits
+            self.grid_size = self.topology.grid_size
+            self.mux_size = self.topology.mux.size if self.topology.mux.enabled else 2
+        else:
+            self.n_qubits = metrics_response.qubit_count
+            self.grid_size = int(math.sqrt(self.n_qubits))
+            self.mux_size = 2
 
     def generate_pdf(self) -> io.BytesIO:
         """Generate the complete PDF report.
@@ -110,18 +116,24 @@ class MetricsPDFGenerator:
                 c.showPage()
                 page_num += 1
 
-        # Coupling metrics pages
+        # Coupling metrics pages – one page per direction (forward / reverse)
         coupling_metrics = self.metrics_response.coupling_metrics
         for metric_key, metric_meta in self.config.coupling_metrics.items():
             metric_data = coupling_metrics.get(metric_key)
-            if metric_data:
+            if not metric_data:
+                continue
+            for direction in ("forward", "reverse"):
+                directed_data = self._filter_coupling_by_direction(metric_data, direction)
+                if not directed_data:
+                    continue
+                direction_label = "Forward" if direction == "forward" else "Reverse"
                 self._draw_metric_page(
                     c,
                     metric_key=metric_key,
-                    metric_title=metric_meta.title,
+                    metric_title=f"{metric_meta.title} ({direction_label})",
                     metric_unit=metric_meta.unit,
                     metric_scale=metric_meta.scale,
-                    metric_data=metric_data,
+                    metric_data=directed_data,
                     metric_type="coupling",
                     page_num=page_num,
                 )
@@ -223,7 +235,7 @@ class MetricsPDFGenerator:
         info_items = [
             ("Chip ID", self.metrics_response.chip_id),
             ("Username", self.metrics_response.username),
-            ("Qubit Count", str(self.metrics_response.qubit_count)),
+            ("Qubit Count", str(self.n_qubits)),
             ("Grid Size", f"{self.grid_size} x {self.grid_size}"),
             ("Topology", topology_name),
             ("Time Range", time_range),
@@ -628,6 +640,39 @@ class MetricsPDFGenerator:
         else:
             return f"{value:.5f}"
 
+    def _filter_coupling_by_direction(
+        self,
+        metric_data: dict[str, Any],
+        direction: Literal["forward", "reverse"],
+    ) -> dict[str, Any]:
+        """Filter coupling metric data by direction based on topology couplings.
+
+        The topology defines couplings as [control, target] pairs.
+        - forward: keys matching "control-target" order
+        - reverse: keys matching "target-control" order
+
+        Args:
+            metric_data: Coupling metric data keyed by "qid1-qid2".
+            direction: "forward" or "reverse".
+
+        Returns:
+            Filtered metric data dict containing only the requested direction.
+        """
+        if not self.topology or not self.topology.couplings:
+            # No topology: return all data for forward, empty for reverse
+            return metric_data if direction == "forward" else {}
+
+        # Build set of valid keys for this direction
+        valid_keys: set[str] = set()
+        for coupling in self.topology.couplings:
+            qid1, qid2 = coupling[0], coupling[1]
+            if direction == "forward":
+                valid_keys.add(f"{qid1}-{qid2}")
+            else:
+                valid_keys.add(f"{qid2}-{qid1}")
+
+        return {k: v for k, v in metric_data.items() if k in valid_keys}
+
     def _get_qubit_position(self, qid: int) -> tuple[int, int]:
         """Get the grid position (row, col) for a qubit ID using MUX-based layout."""
         if self.topology and self.topology.qubits:
@@ -756,9 +801,9 @@ class MetricsPDFGenerator:
         metric_unit: str,
     ) -> go.Figure:
         """Create a Plotly graph figure for coupling metrics."""
-        # Calculate figure size
-        width = 3 * NODE_SIZE * self.grid_size
-        height = 3 * NODE_SIZE * self.grid_size
+        # Calculate figure size - use larger multiplier for more spacing between nodes
+        width = 4 * NODE_SIZE * self.grid_size
+        height = 4 * NODE_SIZE * self.grid_size
 
         layout = go.Layout(
             title=None,  # Title is in PDF header
@@ -790,8 +835,8 @@ class MetricsPDFGenerator:
         mux_trace = self._create_mux_node_trace()
         data.append(mux_trace)
 
-        # Add edge traces for couplings
-        edge_traces = self._create_coupling_edge_traces(
+        # Add edge traces and text annotations for couplings
+        edge_traces, edge_annotations = self._create_coupling_edge_traces(
             metric_data=metric_data,
             metric_scale=metric_scale,
         )
@@ -801,7 +846,13 @@ class MetricsPDFGenerator:
         node_traces = self._create_qubit_node_traces()
         data.extend(node_traces)
 
-        return go.Figure(data=data, layout=layout)
+        fig = go.Figure(data=data, layout=layout)
+
+        # Add text annotations on edges (supports bgcolor and rotation)
+        for ann in edge_annotations:
+            fig.add_annotation(**ann)
+
+        return fig
 
     def _create_mux_node_trace(self) -> go.Scatter:
         """Create trace for MUX boundary rectangles."""
@@ -865,38 +916,35 @@ class MetricsPDFGenerator:
         self,
         metric_data: dict[str, Any],
         metric_scale: float,
-    ) -> list[go.Scatter]:
-        """Create traces for coupling edges with values."""
-        traces: list[go.Scatter] = []
+    ) -> tuple[list[go.Scatter], list[dict[str, Any]]]:
+        """Create traces for coupling edges and annotation dicts for value labels.
 
-        # Collect coupling values and combine bidirectional
+        Returns:
+            Tuple of (scatter traces for edges, annotation dicts for text labels).
+        """
+        traces: list[go.Scatter] = []
+        annotations: list[dict[str, Any]] = []
+
+        # Collect coupling values (already filtered by direction)
         coupling_values: dict[tuple[int, int], float] = {}
         for key, metric_value in metric_data.items():
             if metric_value and metric_value.value is not None:
                 try:
                     parts = key.split("-")
                     qid1, qid2 = int(parts[0]), int(parts[1])
-                    # Use smaller qid first for consistent key
-                    pair_key = (min(qid1, qid2), max(qid1, qid2))
                     scaled_value = metric_value.value * metric_scale
-
-                    if pair_key in coupling_values:
-                        # Average with existing value
-                        coupling_values[pair_key] = (coupling_values[pair_key] + scaled_value) / 2
-                    else:
-                        coupling_values[pair_key] = scaled_value
+                    coupling_values[(qid1, qid2)] = scaled_value
                 except (ValueError, IndexError):
                     continue
 
         if not coupling_values:
-            return traces
+            return traces, annotations
 
         # Normalize values for coloring
         min_val = min(coupling_values.values())
         max_val = max(coupling_values.values())
         val_range = max_val - min_val if max_val != min_val else 1
 
-        # Create edge lines and text annotations
         for (qid1, qid2), value in coupling_values.items():
             row1, col1 = self._get_qubit_position(qid1)
             row2, col2 = self._get_qubit_position(qid2)
@@ -907,32 +955,48 @@ class MetricsPDFGenerator:
             # Get color from viridis-like scale
             color = self._get_viridis_color(normalized)
 
-            # Line trace
+            # Thick colored edge
             line_trace = go.Scatter(
                 x=[col1, col2],
                 y=[row1, row2],
                 mode="lines",
-                line={"color": color, "width": 3},
+                line={"color": color, "width": 26},
                 hoverinfo="skip",
             )
             traces.append(line_trace)
 
-            # Text at midpoint
+            # Text annotation at midpoint
             mid_x = (col1 + col2) / 2
             mid_y = (row1 + row2) / 2
 
-            text_trace = go.Scatter(
-                x=[mid_x],
-                y=[mid_y],
-                mode="text",
-                text=[f"{value:.1f}"],
-                textfont={"size": 11, "color": "black", "weight": "bold"},
-                hoverinfo="text",
-                hovertext=[f"{qid1}-{qid2}: {value:.2f}%"],
-            )
-            traces.append(text_trace)
+            # Rotate text to align with edge direction
+            is_vertical = col1 == col2
+            text_angle = 90 if is_vertical else 0
 
-        return traces
+            # Contrasting text + background based on edge brightness
+            if normalized < 0.5:
+                font_color = "white"
+                bg_color = "rgba(0,0,0,0.35)"
+            else:
+                font_color = "rgb(10,10,10)"
+                bg_color = "rgba(255,255,255,0.5)"
+
+            annotations.append(
+                {
+                    "x": mid_x,
+                    "y": mid_y,
+                    "text": f"<b>{value:.1f}</b>",
+                    "showarrow": False,
+                    "font": {"size": 16, "color": font_color, "family": "Arial"},
+                    "bgcolor": bg_color,
+                    "borderpad": 2,
+                    "textangle": text_angle,
+                    "xanchor": "center",
+                    "yanchor": "middle",
+                }
+            )
+
+        return traces, annotations
 
     def _get_viridis_color(self, normalized: float) -> str:
         """Get a color from viridis-like colorscale."""

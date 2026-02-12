@@ -51,7 +51,7 @@ import yaml
 from qdash.workflow.engine.backend.qubex_paths import get_qubex_paths
 
 if TYPE_CHECKING:
-    from qdash.api.lib.topology_config import TopologyDefinition
+    from qdash.common.topology_config import TopologyDefinition
     from qdash.datamodel.chip import ChipModel
     from qdash.repository.protocols import ChipRepository
 
@@ -222,7 +222,7 @@ class CRScheduler:
             chip = self._load_chip_data()
             if chip.topology_id:
                 try:
-                    from qdash.api.lib.topology_config import load_topology
+                    from qdash.common.topology_config import load_topology
 
                     self._topology = load_topology(chip.topology_id)
                 except FileNotFoundError:
