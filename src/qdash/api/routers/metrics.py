@@ -718,7 +718,6 @@ async def download_metrics_pdf(
         {
             "project_id": ctx.project_id,
             "chip_id": chip_id,
-            "username": ctx.user.username,
         }
     )
 
