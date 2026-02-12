@@ -745,7 +745,7 @@ export function QubitMetricsGrid({
             maxScale={4}
             wheel={{ step: 0.08, smoothStep: 0.004 }}
             pinch={{ step: 5 }}
-            doubleClick={{ mode: "reset" }}
+            doubleClick={{ mode: "zoomIn", step: 0.7 }}
             panning={{ velocityDisabled: false }}
             smooth={true}
             onTransformed={handleTransform}
