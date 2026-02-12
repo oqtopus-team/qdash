@@ -16,7 +16,7 @@ import numpy as np
 import plotly.graph_objects as go
 from PIL import Image
 from qdash.api.lib.metrics_config import load_metrics_config
-from qdash.api.lib.topology_config import TopologyDefinition, load_topology
+from qdash.common.topology_config import TopologyDefinition, load_topology
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.utils import ImageReader

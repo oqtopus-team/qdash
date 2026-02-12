@@ -85,6 +85,28 @@ function ZoomControls() {
   );
 }
 
+// Dynamic font size calculation based on cell size
+function getCellFontSizes(cellSize: number): {
+  labelSize: string;
+  valueSize: string;
+  unitSize: string;
+} {
+  // Scale font sizes proportionally to cell size
+  // Base reference: 60px cell = 12px label, 16px value, 10px unit
+  if (cellSize >= 60) {
+    return { labelSize: "0.75rem", valueSize: "1rem", unitSize: "0.625rem" };
+  } else if (cellSize >= 50) {
+    return { labelSize: "0.65rem", valueSize: "0.875rem", unitSize: "0.5rem" };
+  } else if (cellSize >= 40) {
+    return { labelSize: "0.55rem", valueSize: "0.75rem", unitSize: "0.45rem" };
+  } else if (cellSize >= 30) {
+    return { labelSize: "0.5rem", valueSize: "0.625rem", unitSize: "0.4rem" };
+  } else {
+    // Very small cells (< 30px)
+    return { labelSize: "0.45rem", valueSize: "0.55rem", unitSize: "0.35rem" };
+  }
+}
+
 // Memoized grid cell component for performance
 interface GridCellProps {
   qid: string;
@@ -95,6 +117,7 @@ interface GridCellProps {
   showLabels: boolean;
   showValues: boolean;
   showUnits: boolean;
+  cellSize: number;
   onClick: () => void;
 }
 
@@ -107,8 +130,11 @@ const GridCell = memo(function GridCell({
   showLabels,
   showValues,
   showUnits,
+  cellSize,
   onClick,
 }: GridCellProps) {
+  const fontSizes = getCellFontSizes(cellSize);
+
   return (
     <button
       onClick={onClick}
@@ -122,11 +148,12 @@ const GridCell = memo(function GridCell({
       {/* QID Label */}
       {showLabels && (
         <div
-          className={`absolute top-0.5 left-0.5 md:top-1 md:left-1 backdrop-blur-sm px-1 py-0.5 md:px-2 rounded text-[0.6rem] md:text-xs font-bold shadow-sm ${
+          className={`absolute top-0.5 left-0.5 backdrop-blur-sm px-0.5 py-px rounded font-bold shadow-sm ${
             value !== null && value !== undefined
               ? "bg-black/30 text-white"
               : "bg-base-content/20 text-base-content"
           }`}
+          style={{ fontSize: fontSizes.labelSize }}
         >
           {qid}
         </div>
@@ -135,11 +162,17 @@ const GridCell = memo(function GridCell({
       {/* Value Display */}
       {value !== null && value !== undefined && showValues && (
         <div className="flex flex-col items-center justify-center h-full">
-          <div className="text-[0.6rem] sm:text-sm md:text-base lg:text-lg font-bold text-white drop-shadow-md">
+          <div
+            className="font-bold text-white drop-shadow-md"
+            style={{ fontSize: fontSizes.valueSize }}
+          >
             {value.toFixed(2)}
           </div>
           {showUnits && (
-            <div className="text-[0.5rem] md:text-xs text-white/90 font-medium drop-shadow hidden md:block">
+            <div
+              className="text-white/90 font-medium drop-shadow"
+              style={{ fontSize: fontSizes.unitSize }}
+            >
               {unit}
             </div>
           )}
@@ -148,8 +181,13 @@ const GridCell = memo(function GridCell({
 
       {/* No data indicator */}
       {(value === null || value === undefined) && showValues && (
-        <div className="flex flex-col items-center justify-center h-full pt-3 md:pt-4">
-          <div className="text-xs text-base-content/40 font-medium">N/A</div>
+        <div className="flex flex-col items-center justify-center h-full">
+          <div
+            className="text-base-content/40 font-medium"
+            style={{ fontSize: fontSizes.valueSize }}
+          >
+            N/A
+          </div>
         </div>
       )}
 
@@ -476,6 +514,7 @@ export function QubitMetricsGrid({
               showLabels={showLabels}
               showValues={showValues}
               showUnits={showUnits}
+              cellSize={displayCellSize}
               onClick={() =>
                 cell.metric && handleCellClick(cell.qid!, cell.metric)
               }
