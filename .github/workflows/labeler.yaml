@@ -8,6 +8,7 @@ on:
 
 jobs:
   labeler:
+    if: ${{ !contains(github.actor, '[bot]') }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -70,7 +71,6 @@ jobs:
           labels: ${{ steps.set-labels.outputs.labels }}
 
       - name: Assign PR creator
-        if: ${{ !contains(github.actor, '[bot]') }}
         uses: actions/github-script@v6
         with:
           script: |
