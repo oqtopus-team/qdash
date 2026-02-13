@@ -33,6 +33,21 @@ class ListTaskResponse(BaseModel):
     tasks: list[TaskResponse]
 
 
+class TaskKnowledgeResponse(BaseModel):
+    """Response model for task knowledge (LLM-oriented domain knowledge)."""
+
+    name: str
+    summary: str
+    what_it_measures: str
+    physical_principle: str
+    expected_curve: str
+    good_threshold: str
+    failure_modes: list[str]
+    tips: list[str]
+    prompt_text: str
+    raw_markdown: str = ""
+
+
 class TaskResultResponse(BaseModel):
     """Response model for task result by task_id.
 

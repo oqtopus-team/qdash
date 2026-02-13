@@ -13,9 +13,12 @@ from qdash.api.lib.project import (  # noqa: TCH002
 from qdash.api.schemas.task import (
     InputParameterModel,
     ListTaskResponse,
+    TaskKnowledgeResponse,
     TaskResponse,
     TaskResultResponse,
 )
+from qdash.datamodel.task_knowledge import TaskKnowledge
+from qdash.datamodel.task_knowledge import get_task_knowledge as _lookup_knowledge
 from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
 from qdash.repository.task_definition import MongoTaskDefinitionRepository
 
@@ -128,4 +131,65 @@ def get_task_result(
         start_at=task_result.start_at,
         end_at=task_result.end_at,
         elapsed_time=task_result.elapsed_time,
+    )
+
+
+def _get_task_knowledge(task_name: str) -> TaskKnowledge:
+    """Resolve TaskKnowledge from the central registry.
+
+    Raises
+    ------
+    HTTPException
+        If knowledge not defined for the given task name.
+
+    """
+    knowledge = _lookup_knowledge(task_name)
+    if knowledge is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Task '{task_name}' does not have knowledge defined",
+        )
+    return knowledge
+
+
+@router.get(
+    "/tasks/{task_name}/knowledge",
+    response_model=TaskKnowledgeResponse,
+    summary="Get task knowledge for LLM analysis",
+    operation_id="getTaskKnowledge",
+)
+def get_task_knowledge(
+    task_name: str,
+    backend: str = Query("qubex", description="Backend name"),
+) -> TaskKnowledgeResponse:
+    """Get structured domain knowledge for a calibration task.
+
+    Returns LLM-oriented knowledge including physical principles,
+    expected behavior, evaluation criteria, and failure modes.
+
+    Parameters
+    ----------
+    task_name : str
+        The task name (e.g. "CheckT1", "CheckRabi").
+    backend : str
+        The backend name (default "qubex").
+
+    Returns
+    -------
+    TaskKnowledgeResponse
+        Structured task knowledge.
+
+    """
+    knowledge = _get_task_knowledge(task_name)
+    return TaskKnowledgeResponse(
+        name=knowledge.name,
+        summary=knowledge.summary,
+        what_it_measures=knowledge.what_it_measures,
+        physical_principle=knowledge.physical_principle,
+        expected_curve=knowledge.expected_curve,
+        good_threshold=knowledge.good_threshold,
+        failure_modes=knowledge.failure_modes,
+        tips=knowledge.tips,
+        prompt_text=knowledge.to_prompt(),
+        raw_markdown=knowledge.raw_markdown,
     )

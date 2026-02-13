@@ -12,7 +12,7 @@ from qubex.measurement.measurement import DEFAULT_INTERVAL, DEFAULT_READOUT_DURA
 
 
 class CheckRamsey(QubexTask):
-    """Task to check the Rabi oscillation."""
+    """Task to check the Ramsey interference."""
 
     name: str = "CheckRamsey"
     task_type: str = "qubit"
