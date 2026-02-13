@@ -62,6 +62,7 @@ class TaskResultResponse(BaseModel):
     json_figure_path: list[str]
     input_parameters: dict[str, Any]
     output_parameters: dict[str, Any]
+    run_parameters: dict[str, Any] = {}
     start_at: datetime | None = None
     end_at: datetime | None = None
     elapsed_time: timedelta | None = None

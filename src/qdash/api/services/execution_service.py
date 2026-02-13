@@ -200,6 +200,7 @@ class ExecutionService:
                     input_parameters=doc.input_parameters,
                     output_parameters=doc.output_parameters,
                     output_parameter_names=doc.output_parameter_names,
+                    run_parameters=doc.run_parameters,
                     note=doc.note,
                     figure_path=doc.figure_path,
                     json_figure_path=doc.json_figure_path,

@@ -520,6 +520,15 @@ export function QubitMetricHistoryModal({
                 }
               />
             )}
+          {selectedTask.run_parameters &&
+            Object.keys(selectedTask.run_parameters).length > 0 && (
+              <ParametersTable
+                title="Run Parameters"
+                parameters={
+                  selectedTask.run_parameters as Record<string, unknown>
+                }
+              />
+            )}
         </div>
       )}
     </div>

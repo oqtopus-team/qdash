@@ -40,6 +40,9 @@ class CalibConfig:
     enable_github_pull: bool = True
     enable_provenance_tracking: bool = True
     skip_execution: bool = False  # Skip Execution creation (for wrapper/parent sessions)
+    default_run_parameters: dict[str, Any] = field(
+        default_factory=dict
+    )  # Default run parameters for all tasks (e.g., {"interval": {"value": "300 * 1024", "value_type": "int"}})
 
     # Derived paths (computed after initialization)
     calib_data_path: str = field(default="", init=False)

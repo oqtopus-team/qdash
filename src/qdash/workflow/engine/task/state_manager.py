@@ -395,6 +395,26 @@ class TaskStateManager(BaseModel):
         task = self._ensure_task_exists(task_name, task_type, qid)
         task.put_input_parameter(input_parameters)
 
+    def put_run_parameters(
+        self, task_name: str, run_parameters: dict[str, Any], task_type: str, qid: str
+    ) -> None:
+        """Store run parameters for a task.
+
+        Parameters
+        ----------
+        task_name : str
+            Name of the task
+        run_parameters : dict
+            The run parameters
+        task_type : str
+            Type of task
+        qid : str
+            Qubit ID
+
+        """
+        task = self._ensure_task_exists(task_name, task_type, qid)
+        task.put_run_parameter(run_parameters)
+
     def put_output_parameters(
         self,
         task_name: str,

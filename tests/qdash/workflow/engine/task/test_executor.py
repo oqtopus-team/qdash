@@ -30,6 +30,7 @@ class MockTask:
         self._task_type = task_type
         self.r2_threshold = r2_threshold
         self.backend = backend
+        self.run_parameters = {}
 
     def get_name(self) -> str:
         return self.name
