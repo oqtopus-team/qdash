@@ -150,9 +150,11 @@ class TestBaseTaskSetRunParameters:
         )
         task = instances[TASK_NAME]
 
-        task._set_run_parameters({
-            "custom_param": {"value": 42, "value_type": "int", "unit": "ms"},
-        })
+        task._set_run_parameters(
+            {
+                "custom_param": {"value": 42, "value_type": "int", "unit": "ms"},
+            }
+        )
 
         assert "custom_param" in task.run_parameters
         assert task.run_parameters["custom_param"].value == 42
