@@ -9,6 +9,7 @@ This module handles the lifecycle of a calibration session:
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
@@ -22,6 +23,8 @@ if TYPE_CHECKING:
     from qdash.workflow.engine.backend.base import BaseBackend
     from qdash.workflow.engine.config import CalibConfig
     from qdash.workflow.service.github import GitHubIntegration
+
+logger = logging.getLogger(__name__)
 
 
 class CalibOrchestrator:
@@ -379,6 +382,13 @@ class CalibOrchestrator:
             if "run_parameters" not in task_params:
                 task_params["run_parameters"] = {}
             for param_name, param_data in self.config.default_run_parameters.items():
+                if not isinstance(param_data, dict):
+                    logger.warning(
+                        "Skipping invalid default_run_parameter '%s': expected dict, got %s",
+                        param_name,
+                        type(param_data).__name__,
+                    )
+                    continue
                 if param_name not in task_params["run_parameters"]:
                     task_params["run_parameters"][param_name] = param_data
                     print(
