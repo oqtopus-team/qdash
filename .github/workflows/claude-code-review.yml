@@ -76,3 +76,5 @@ jobs:
           # if: |
           #   !contains(github.event.pull_request.title, '[skip-review]') &&
           #   !contains(github.event.pull_request.title, '[WIP]')
+
+          allowed_bots: "dependabot[bot]"
