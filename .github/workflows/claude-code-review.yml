@@ -12,6 +12,7 @@ on:
     #   - "src/**/*.jsx"
 
 jobs:
+  if: ${{ !contains(github.actor, '[bot]') }}
   claude-review:
     # Optional: Filter by PR author
     # if: |
@@ -76,5 +77,3 @@ jobs:
           # if: |
           #   !contains(github.event.pull_request.title, '[skip-review]') &&
           #   !contains(github.event.pull_request.title, '[WIP]')
-
-          allowed_bots: "dependabot[bot]"
