@@ -19,6 +19,10 @@ class SaveFlowRequest(BaseModel):
     default_parameters: dict[str, Any] = Field(
         default_factory=dict, description="Default execution parameters"
     )
+    default_run_parameters: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Default run parameters applied to all tasks (e.g., interval, shots)",
+    )
     tags: list[str] = Field(default_factory=list, description="Tags for categorization")
 
     model_config = ConfigDict(
@@ -73,6 +77,10 @@ class GetFlowResponse(BaseModel):
     flow_function_name: str = Field(..., description="Entry point function name")
     chip_id: str = Field(..., description="Target chip ID")
     default_parameters: dict[str, Any] = Field(..., description="Default parameters")
+    default_run_parameters: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Default run parameters applied to all tasks",
+    )
     file_path: str = Field(..., description="Path to file")
     created_at: datetime = Field(..., description="Creation timestamp")
     updated_at: datetime = Field(..., description="Last update timestamp")

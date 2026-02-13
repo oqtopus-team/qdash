@@ -124,6 +124,7 @@ def get_task_result(
         json_figure_path=task_result.json_figure_path,
         input_parameters=task_result.input_parameters,
         output_parameters=task_result.output_parameters,
+        run_parameters=task_result.run_parameters,
         start_at=task_result.start_at,
         end_at=task_result.end_at,
         elapsed_time=task_result.elapsed_time,

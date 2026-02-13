@@ -8427,6 +8427,12 @@
             "title": "Default Parameters",
             "description": "Default parameters"
           },
+          "default_run_parameters": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Default Run Parameters",
+            "description": "Default run parameters applied to all tasks"
+          },
           "file_path": {
             "type": "string",
             "title": "File Path",
@@ -10757,6 +10763,12 @@
             "title": "Default Parameters",
             "description": "Default execution parameters"
           },
+          "default_run_parameters": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Default Run Parameters",
+            "description": "Default run parameters applied to all tasks (e.g., interval, shots)"
+          },
           "tags": {
             "items": {
               "type": "string"
@@ -11386,6 +11398,18 @@
             ],
             "title": "Output Parameter Names"
           },
+          "run_parameters": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Parameters"
+          },
           "note": {
             "anyOf": [
               {
@@ -11822,6 +11846,18 @@
             ],
             "title": "Output Parameter Names"
           },
+          "run_parameters": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Parameters"
+          },
           "note": {
             "anyOf": [
               {
@@ -11978,6 +12014,12 @@
             "additionalProperties": true,
             "type": "object",
             "title": "Output Parameters"
+          },
+          "run_parameters": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Run Parameters",
+            "default": {}
           },
           "start_at": {
             "anyOf": [

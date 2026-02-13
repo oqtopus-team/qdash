@@ -12,6 +12,7 @@ import type { TaskResultMessage } from "./taskResultMessage";
 import type { TaskResultInputParameters } from "./taskResultInputParameters";
 import type { TaskResultOutputParameters } from "./taskResultOutputParameters";
 import type { TaskResultOutputParameterNames } from "./taskResultOutputParameterNames";
+import type { TaskResultRunParameters } from "./taskResultRunParameters";
 import type { TaskResultNote } from "./taskResultNote";
 import type { TaskResultFigurePath } from "./taskResultFigurePath";
 import type { TaskResultJsonFigurePath } from "./taskResultJsonFigurePath";
@@ -34,6 +35,7 @@ export interface TaskResult {
   input_parameters?: TaskResultInputParameters;
   output_parameters?: TaskResultOutputParameters;
   output_parameter_names?: TaskResultOutputParameterNames;
+  run_parameters?: TaskResultRunParameters;
   note?: TaskResultNote;
   figure_path?: TaskResultFigurePath;
   json_figure_path?: TaskResultJsonFigurePath;

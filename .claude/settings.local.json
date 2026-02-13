@@ -37,7 +37,10 @@
       "Bash(npx eslint:*)",
       "mcp__serena__initial_instructions",
       "Bash(uv run ruff format:*)",
-      "Bash(uv run pytest:*)"
+      "Bash(uv run pytest:*)",
+      "Bash(uv run ruff check:*)",
+      "Bash(uv run mypy:*)",
+      "Bash(uv run python -m pytest:*)"
     ],
     "deny": []
   },

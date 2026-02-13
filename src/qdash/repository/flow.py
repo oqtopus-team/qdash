@@ -77,6 +77,7 @@ class MongoFlowRepository:
         file_path: str,
         deployment_id: str,
         tags: list[str],
+        default_run_parameters: dict[str, Any] | None = None,
     ) -> FlowDocument:
         """Create a new flow document.
 
@@ -91,6 +92,7 @@ class MongoFlowRepository:
             file_path: Path to .py file
             deployment_id: Prefect deployment ID
             tags: Tags for categorization
+            default_run_parameters: Default run parameters for all tasks
 
         Returns:
             Created FlowDocument
@@ -103,6 +105,7 @@ class MongoFlowRepository:
             description=description,
             flow_function_name=flow_function_name,
             default_parameters=default_parameters,
+            default_run_parameters=default_run_parameters or {},
             file_path=file_path,
             deployment_id=deployment_id,
             tags=tags,
@@ -117,6 +120,7 @@ class MongoFlowRepository:
         chip_id: str | None = None,
         flow_function_name: str | None = None,
         default_parameters: dict[str, Any] | None = None,
+        default_run_parameters: dict[str, Any] | None = None,
         file_path: str | None = None,
         deployment_id: str | None = None,
         tags: list[str] | None = None,
@@ -129,6 +133,7 @@ class MongoFlowRepository:
             chip_id: New chip ID (optional)
             flow_function_name: New function name (optional)
             default_parameters: New parameters (optional)
+            default_run_parameters: New run parameters (optional)
             file_path: New file path (optional)
             deployment_id: New deployment ID (optional)
             tags: New tags (optional)
@@ -144,6 +149,8 @@ class MongoFlowRepository:
             flow.flow_function_name = flow_function_name
         if default_parameters is not None:
             flow.default_parameters = default_parameters
+        if default_run_parameters is not None:
+            flow.default_run_parameters = default_run_parameters
         if file_path is not None:
             flow.file_path = file_path
         if deployment_id is not None:

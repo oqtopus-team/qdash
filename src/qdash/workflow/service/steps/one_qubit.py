@@ -116,6 +116,7 @@ class CustomOneQubit(CalibrationStep):
             "backend_name": service.backend_name,
             "execution_id": service.execution_id,
             "project_id": service.project_id,
+            "default_run_parameters": service.default_run_parameters,
         }
 
         results = run_qubit_calibrations_parallel(
@@ -233,6 +234,7 @@ class OneQubitCheck(CalibrationStep):
             "backend_name": service.backend_name,
             "execution_id": service.execution_id,
             "project_id": service.project_id,
+            "default_run_parameters": service.default_run_parameters,
         }
 
         results = run_qubit_calibrations_parallel(
@@ -380,6 +382,7 @@ class OneQubitFineTune(CalibrationStep):
             "backend_name": service.backend_name,
             "execution_id": service.execution_id,
             "project_id": service.project_id,
+            "default_run_parameters": service.default_run_parameters,
         }
 
         results = run_qubit_calibrations_parallel(

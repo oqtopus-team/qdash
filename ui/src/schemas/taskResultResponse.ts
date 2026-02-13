@@ -7,6 +7,7 @@
  */
 import type { TaskResultResponseInputParameters } from "./taskResultResponseInputParameters";
 import type { TaskResultResponseOutputParameters } from "./taskResultResponseOutputParameters";
+import type { TaskResultResponseRunParameters } from "./taskResultResponseRunParameters";
 import type { TaskResultResponseStartAt } from "./taskResultResponseStartAt";
 import type { TaskResultResponseEndAt } from "./taskResultResponseEndAt";
 import type { TaskResultResponseElapsedTime } from "./taskResultResponseElapsedTime";
@@ -39,6 +40,7 @@ export interface TaskResultResponse {
   json_figure_path: string[];
   input_parameters: TaskResultResponseInputParameters;
   output_parameters: TaskResultResponseOutputParameters;
+  run_parameters?: TaskResultResponseRunParameters;
   start_at?: TaskResultResponseStartAt;
   end_at?: TaskResultResponseEndAt;
   elapsed_time?: TaskResultResponseElapsedTime;

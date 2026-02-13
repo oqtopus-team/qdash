@@ -41,6 +41,7 @@ class TaskResultHistoryDocument(Document):
     input_parameters: dict[str, Any] = Field(..., description="The input parameters")
     output_parameters: dict[str, Any] = Field(..., description="The output parameters")
     output_parameter_names: list[str] = Field(..., description="The output parameter names")
+    run_parameters: dict[str, Any] = Field(default_factory=dict, description="The run parameters")
     note: dict[str, Any] = Field(..., description="The note")
     figure_path: list[str] = Field(..., description="The path to the figure")
     json_figure_path: list[str] = Field([], description="The path to the JSON figure")
@@ -151,6 +152,7 @@ class TaskResultHistoryDocument(Document):
             input_parameters=task.input_parameters,
             output_parameters=task.output_parameters,
             output_parameter_names=task.output_parameter_names,
+            run_parameters=task.run_parameters,
             note=task.note,
             figure_path=task.figure_path,
             json_figure_path=task.json_figure_path,
@@ -186,6 +188,7 @@ class TaskResultHistoryDocument(Document):
         doc.input_parameters = task.input_parameters
         doc.output_parameters = task.output_parameters
         doc.output_parameter_names = task.output_parameter_names
+        doc.run_parameters = task.run_parameters
         doc.note = task.note
         doc.figure_path = task.figure_path
         doc.json_figure_path = task.json_figure_path

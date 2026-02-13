@@ -56,6 +56,7 @@ export default function EditFlowPage() {
   const [username, setUsername] = useState("");
   const [chipId, setChipId] = useState("");
   const [tags, setTags] = useState("");
+  const [defaultInterval, setDefaultInterval] = useState("");
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showExecuteConfirm, setShowExecuteConfirm] = useState(false);
   const [cursorPosition, setCursorPosition] = useState({ line: 1, column: 1 });
@@ -137,6 +138,14 @@ export default function EditFlowPage() {
       setChipId(flow.chip_id);
 
       setTags(flow.tags?.join(", ") || "");
+      const runParams = flow.default_run_parameters as
+        | Record<string, { value?: string | number }>
+        | undefined;
+      setDefaultInterval(
+        runParams?.interval?.value != null
+          ? String(runParams.interval.value)
+          : "",
+      );
     }
   }, [data, userData, chipsData]);
 
@@ -185,6 +194,15 @@ export default function EditFlowPage() {
         username: username.trim(),
         chip_id: chipId.trim(),
       },
+      default_run_parameters: defaultInterval.trim()
+        ? {
+            interval: {
+              value: defaultInterval.trim(),
+              value_type: "int",
+              unit: "ns",
+            },
+          }
+        : {},
     };
 
     saveMutation.mutate(request);
@@ -651,6 +669,27 @@ export default function EditFlowPage() {
                   <label className="label">
                     <span className="label-text-alt text-xs">
                       Comma-separated
+                    </span>
+                  </label>
+                </div>
+
+                <div className="form-control">
+                  <label className="label">
+                    <span className="label-text text-xs">
+                      Default Interval (ns)
+                    </span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="150 * 1024"
+                    className="input input-bordered input-sm"
+                    value={defaultInterval}
+                    onChange={(e) => setDefaultInterval(e.target.value)}
+                  />
+                  <label className="label">
+                    <span className="label-text-alt text-xs">
+                      Default: 150 * 1024 (153600 ns). Expression format
+                      supported.
                     </span>
                   </label>
                 </div>
