@@ -12,6 +12,7 @@ on:
     #   - "src/**/*.jsx"
 
 jobs:
+  if: ${{ !contains(github.actor, '[bot]') }}
   claude-review:
     # Optional: Filter by PR author
     # if: |
