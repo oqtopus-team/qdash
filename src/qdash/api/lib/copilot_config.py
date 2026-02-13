@@ -34,9 +34,9 @@ class ModelConfig(BaseModel):
     """Model configuration for CopilotKit."""
 
     provider: str = "openai"
-    name: str = "gpt-4o"
-    temperature: float = 0.7
-    max_tokens: int = 2048
+    name: str = "gpt-4.1"
+    temperature: float | None = 0.7
+    max_output_tokens: int = 2048
 
 
 class Suggestion(BaseModel):
@@ -50,7 +50,8 @@ class CopilotConfig(BaseModel):
     """Copilot configuration."""
 
     enabled: bool = False
-    language: str = "en"
+    response_language: str = "en"
+    thinking_language: str = "en"
     model: ModelConfig = ModelConfig()
     evaluation_metrics: EvaluationMetrics = EvaluationMetrics()
     scoring: dict[str, ScoringThreshold] = {}

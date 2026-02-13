@@ -1,0 +1,650 @@
+{
+  "CheckBellState": {
+    "name": "CheckBellState",
+    "summary": "Prepares Bell state (|00⟩+|11⟩)/√2 and measures state fidelity.",
+    "what_it_measures": "Bell state fidelity – quality of entanglement between qubit pair.",
+    "physical_principle": "Apply H⊗I then CNOT; measure in Z basis and verify equal |00⟩/|11⟩ populations with coherent superposition.",
+    "expected_curve": "Population histogram showing ~50/50 |00⟩/|11⟩ with minimal |01⟩/|10⟩.",
+    "good_threshold": "Bell state fidelity >90% acceptable; >95% excellent.",
+    "failure_modes": [
+      "Low fidelity from single-qubit gate errors.",
+      "Residual |01⟩/|10⟩ population from ZX90 miscalibration.",
+      "Decoherence during circuit.",
+      "Readout crosstalk – correlated measurement errors."
+    ],
+    "tips": [
+      "This is an end-to-end test combining single and two-qubit gates.",
+      "Low fidelity here means debug gates individually first.",
+      "Compare with Bell state tomography for full density matrix."
+    ],
+    "raw_markdown": "# CheckBellState\n\nPrepares Bell state (|00⟩+|11⟩)/√2 and measures state fidelity.\n\n## What it measures\n\nBell state fidelity – quality of entanglement between qubit pair.\n\n## Physical principle\n\nApply H⊗I then CNOT; measure in Z basis and verify equal |00⟩/|11⟩ populations with coherent superposition.\n\n## Expected curve\n\nPopulation histogram showing ~50/50 |00⟩/|11⟩ with minimal |01⟩/|10⟩.\n\n## Evaluation criteria\n\nBell state fidelity >90% acceptable; >95% excellent.\n\n## Common failure patterns\n\n- Low fidelity from single-qubit gate errors.\n- Residual |01⟩/|10⟩ population from ZX90 miscalibration.\n- Decoherence during circuit.\n- Readout crosstalk – correlated measurement errors.\n\n## Tips for improvement\n\n- This is an end-to-end test combining single and two-qubit gates.\n- Low fidelity here means debug gates individually first.\n- Compare with Bell state tomography for full density matrix.\n",
+    "images": [],
+    "related_context": []
+  },
+  "CheckBellStateTomography": {
+    "name": "CheckBellStateTomography",
+    "summary": "Full density matrix tomography of the Bell state for detailed characterization.",
+    "what_it_measures": "Complete density matrix of prepared Bell state; concurrence and entanglement metrics.",
+    "physical_principle": "Prepare Bell state, measure in 9 Pauli basis combinations (XX, XY, ..., ZZ), reconstruct density matrix via maximum likelihood.",
+    "expected_curve": "Density matrix close to ideal Bell state |Φ+⟩; off-diagonal elements indicating coherence.",
+    "good_threshold": "State fidelity >90%; concurrence >0.9.",
+    "failure_modes": [
+      "Systematic tomography errors – measurement basis miscalibration.",
+      "Decoherence – reduced off-diagonal elements.",
+      "State preparation errors dominate reconstruction."
+    ],
+    "tips": [
+      "Requires well-calibrated measurement rotations (X90, Y90).",
+      "Use maximum likelihood reconstruction to ensure physical state.",
+      "Compare diagonal elements with simple Bell state measurement for consistency."
+    ],
+    "raw_markdown": "# CheckBellStateTomography\n\nFull density matrix tomography of the Bell state for detailed characterization.\n\n## What it measures\n\nComplete density matrix of prepared Bell state; concurrence and entanglement metrics.\n\n## Physical principle\n\nPrepare Bell state, measure in 9 Pauli basis combinations (XX, XY, ..., ZZ), reconstruct density matrix via maximum likelihood.\n\n## Expected curve\n\nDensity matrix close to ideal Bell state |Φ+⟩; off-diagonal elements indicating coherence.\n\n## Evaluation criteria\n\nState fidelity >90%; concurrence >0.9.\n\n## Common failure patterns\n\n- Systematic tomography errors – measurement basis miscalibration.\n- Decoherence – reduced off-diagonal elements.\n- State preparation errors dominate reconstruction.\n\n## Tips for improvement\n\n- Requires well-calibrated measurement rotations (X90, Y90).\n- Use maximum likelihood reconstruction to ensure physical state.\n- Compare diagonal elements with simple Bell state measurement for consistency.\n",
+    "images": [],
+    "related_context": []
+  },
+  "CheckCrossResonance": {
+    "name": "CheckCrossResonance",
+    "summary": "Measures cross-resonance (CR) interaction strength between coupled qubits.",
+    "what_it_measures": "ZX interaction rate and CR Hamiltonian terms for two-qubit gate calibration.",
+    "physical_principle": "Drive control qubit at target frequency; monitor target rotation rate. ZX coupling enables CNOT-type gates.",
+    "expected_curve": "Target qubit oscillation proportional to CR drive amplitude; Hamiltonian tomography shows dominant ZX term.",
+    "good_threshold": "Clear ZX oscillation; IX/IY/IZ parasitic terms small relative to ZX.",
+    "failure_modes": [
+      "Weak ZX rate – large detuning or insufficient coupling.",
+      "Large IX term – direct drive leakage to target.",
+      "Classical crosstalk – signal leakage through control lines.",
+      "Frequency collision – spectator qubit interference."
+    ],
+    "tips": [
+      "Ensure single-qubit gates are well-calibrated before CR characterization.",
+      "Check for active cancellation (echo CR) if IX term is large.",
+      "Monitor spectator qubits for correlated errors."
+    ],
+    "raw_markdown": "# CheckCrossResonance\n\nMeasures cross-resonance (CR) interaction strength between coupled qubits.\n\n## What it measures\n\nZX interaction rate and CR Hamiltonian terms for two-qubit gate calibration.\n\n## Physical principle\n\nDrive control qubit at target frequency; monitor target rotation rate. ZX coupling enables CNOT-type gates.\n\n## Expected curve\n\nTarget qubit oscillation proportional to CR drive amplitude; Hamiltonian tomography shows dominant ZX term.\n\n## Evaluation criteria\n\nClear ZX oscillation; IX/IY/IZ parasitic terms small relative to ZX.\n\n## Common failure patterns\n\n- Weak ZX rate – large detuning or insufficient coupling.\n- Large IX term – direct drive leakage to target.\n- Classical crosstalk – signal leakage through control lines.\n- Frequency collision – spectator qubit interference.\n\n## Tips for improvement\n\n- Ensure single-qubit gates are well-calibrated before CR characterization.\n- Check for active cancellation (echo CR) if IX term is large.\n- Monitor spectator qubits for correlated errors.\n\n## Related context\n\n- history(last_n=5)\n- coupling(zx_rate, coupling_strength)\n",
+    "images": [],
+    "related_context": [
+      {
+        "type": "history",
+        "params": [],
+        "last_n": 5
+      },
+      {
+        "type": "coupling",
+        "params": [
+          "zx_rate",
+          "coupling_strength"
+        ],
+        "last_n": 5
+      }
+    ]
+  },
+  "CheckDRAGHPIPulse": {
+    "name": "CheckDRAGHPIPulse",
+    "summary": "Validates DRAG-corrected π/2 pulse quality for leakage suppression.",
+    "what_it_measures": "Gate fidelity of DRAG-corrected X90 pulse.",
+    "physical_principle": "Same DRAG principle as π pulse but for half rotation. Critical for quantum algorithms using superposition states.",
+    "expected_curve": "Correct superposition state after single pulse; oscillation under repeated application.",
+    "good_threshold": "Gate fidelity >99.5%; leakage to |2⟩ <0.1%.",
+    "failure_modes": [
+      "DRAG beta mis-tuned – phase or leakage errors.",
+      "Amplitude off – does not produce exact π/2 rotation.",
+      "Decoherence during measurement corrupts validation signal."
+    ],
+    "tips": [
+      "Compare with non-DRAG X90 to verify improvement.",
+      "Run after DRAG π pulse is validated since they share parameters.",
+      "Check phase accuracy with tomography if fidelity is borderline."
+    ],
+    "raw_markdown": "# CheckDRAGHPIPulse\n\nValidates DRAG-corrected π/2 pulse quality for leakage suppression.\n\n## What it measures\n\nGate fidelity of DRAG-corrected X90 pulse.\n\n## Physical principle\n\nSame DRAG principle as π pulse but for half rotation. Critical for quantum algorithms using superposition states.\n\n## Expected curve\n\nCorrect superposition state after single pulse; oscillation under repeated application.\n\n## Evaluation criteria\n\nGate fidelity >99.5%; leakage to |2⟩ <0.1%.\n\n## Common failure patterns\n\n- DRAG beta mis-tuned – phase or leakage errors.\n- Amplitude off – does not produce exact π/2 rotation.\n- Decoherence during measurement corrupts validation signal.\n\n## Tips for improvement\n\n- Compare with non-DRAG X90 to verify improvement.\n- Run after DRAG π pulse is validated since they share parameters.\n- Check phase accuracy with tomography if fidelity is borderline.\n",
+    "images": [],
+    "related_context": []
+  },
+  "CheckDRAGPIPulse": {
+    "name": "CheckDRAGPIPulse",
+    "summary": "Validates DRAG-corrected π pulse quality to suppress leakage to |2⟩.",
+    "what_it_measures": "Gate fidelity of DRAG-corrected X180 pulse.",
+    "physical_principle": "DRAG adds a derivative quadrature component to suppress leakage during fast gates. Validate by repeated pulse application.",
+    "expected_curve": "Population oscillation with high contrast under repeated DRAG π pulses.",
+    "good_threshold": "Gate fidelity >99.5%; leakage to |2⟩ <0.1%.",
+    "failure_modes": [
+      "DRAG coefficient mis-tuned – residual leakage visible as population decay.",
+      "Amplitude drift – accumulated rotation error.",
+      "Anharmonicity too small – DRAG correction insufficient for fast gates."
+    ],
+    "tips": [
+      "Compare error rate with non-DRAG π pulse to quantify improvement.",
+      "If leakage persists, try scanning DRAG beta parameter.",
+      "Ensure anharmonicity is well-characterized before DRAG tuning."
+    ],
+    "raw_markdown": "# CheckDRAGPIPulse\n\nValidates DRAG-corrected π pulse quality to suppress leakage to |2⟩.\n\n## What it measures\n\nGate fidelity of DRAG-corrected X180 pulse.\n\n## Physical principle\n\nDRAG adds a derivative quadrature component to suppress leakage during fast gates. Validate by repeated pulse application.\n\n## Expected curve\n\nPopulation oscillation with high contrast under repeated DRAG π pulses.\n\n## Evaluation criteria\n\nGate fidelity >99.5%; leakage to |2⟩ <0.1%.\n\n## Common failure patterns\n\n- DRAG coefficient mis-tuned – residual leakage visible as population decay.\n- Amplitude drift – accumulated rotation error.\n- Anharmonicity too small – DRAG correction insufficient for fast gates.\n\n## Tips for improvement\n\n- Compare error rate with non-DRAG π pulse to quantify improvement.\n- If leakage persists, try scanning DRAG beta parameter.\n- Ensure anharmonicity is well-characterized before DRAG tuning.\n",
+    "images": [],
+    "related_context": []
+  },
+  "CheckDispersiveShift": {
+    "name": "CheckDispersiveShift",
+    "summary": "Measures dispersive shift (χ) between qubit and readout resonator.",
+    "what_it_measures": "Dispersive shift (χ) – the frequency shift of the resonator conditioned on the qubit state.",
+    "physical_principle": "Measure resonator spectrum with qubit in |0⟩ and |1⟩; in the dispersive regime the resonator shifts by 2χ, enabling QND readout.",
+    "expected_curve": "Two transmission peaks/dips separated by 2χ; one for each qubit state.",
+    "good_threshold": "2χ > resonator linewidth (κ); typically 2χ > 1 MHz for reliable readout.",
+    "failure_modes": [
+      "Insufficient coupling – 2χ too small, states cannot be distinguished.",
+      "Purcell limit – large χ degrades T1 via Purcell decay.",
+      "Overlapping peaks – χ < κ/2 makes states unresolvable."
+    ],
+    "tips": [
+      "Use the midpoint between the two peaks as optimal readout frequency.",
+      "If 2χ is too small, readout fidelity will be fundamentally limited.",
+      "Monitor χ over time; shifts indicate qubit frequency drift."
+    ],
+    "raw_markdown": "# CheckDispersiveShift\n\nMeasures dispersive shift (χ) between qubit and readout resonator.\n\n## What it measures\n\nDispersive shift (χ) – the frequency shift of the resonator conditioned on the qubit state.\n\n## Physical principle\n\nMeasure resonator spectrum with qubit in |0⟩ and |1⟩; in the dispersive regime the resonator shifts by 2χ, enabling QND readout.\n\n## Expected curve\n\nTwo transmission peaks/dips separated by 2χ; one for each qubit state.\n\n## Evaluation criteria\n\n2χ > resonator linewidth (κ); typically 2χ > 1 MHz for reliable readout.\n\n## Common failure patterns\n\n- Insufficient coupling – 2χ too small, states cannot be distinguished.\n- Purcell limit – large χ degrades T1 via Purcell decay.\n- Overlapping peaks – χ < κ/2 makes states unresolvable.\n\n## Tips for improvement\n\n- Use the midpoint between the two peaks as optimal readout frequency.\n- If 2χ is too small, readout fidelity will be fundamentally limited.\n- Monitor χ over time; shifts indicate qubit frequency drift.\n",
+    "images": [],
+    "related_context": []
+  },
+  "CheckHPIPulse": {
+    "name": "CheckHPIPulse",
+    "summary": "Validates π/2 pulse quality by repeated application and population measurement.",
+    "what_it_measures": "π/2 pulse fidelity – accumulated rotation error over multiple applications.",
+    "physical_principle": "Apply the calibrated π/2 pulse repeatedly; population should cycle through superposition states. Deviation indicates rotation or phase error.",
+    "expected_curve": "Population oscillation with period 4 (four π/2 pulses = full rotation); contrast decay reveals error.",
+    "good_threshold": "Correct cycling over 20 repetitions; minimal contrast decay.",
+    "failure_modes": [
+      "Rotation angle error – population drifts from expected pattern.",
+      "Phase error – visible in tomographic basis but not always in Z measurement.",
+      "Decoherence during sequence – limits useful number of repetitions."
+    ],
+    "tips": [
+      "If validation fails, re-run CreateHPIPulse or try DRAG correction.",
+      "Compare error rate with CheckPIPulse for consistency.",
+      "Phase errors may require separate X/Y pulse calibration."
+    ],
+    "raw_markdown": "# CheckHPIPulse\n\nValidates π/2 pulse quality by repeated application and population measurement.\n\n## What it measures\n\nπ/2 pulse fidelity – accumulated rotation error over multiple applications.\n\n## Physical principle\n\nApply the calibrated π/2 pulse repeatedly; population should cycle through superposition states. Deviation indicates rotation or phase error.\n\n## Expected curve\n\nPopulation oscillation with period 4 (four π/2 pulses = full rotation); contrast decay reveals error.\n\n## Evaluation criteria\n\nCorrect cycling over 20 repetitions; minimal contrast decay.\n\n## Common failure patterns\n\n- Rotation angle error – population drifts from expected pattern.\n- Phase error – visible in tomographic basis but not always in Z measurement.\n- Decoherence during sequence – limits useful number of repetitions.\n\n## Tips for improvement\n\n- If validation fails, re-run CreateHPIPulse or try DRAG correction.\n- Compare error rate with CheckPIPulse for consistency.\n- Phase errors may require separate X/Y pulse calibration.\n",
+    "images": [],
+    "related_context": []
+  },
+  "CheckOptimalReadoutAmplitude": {
+    "name": "CheckOptimalReadoutAmplitude",
+    "summary": "Optimizes readout pulse amplitude for best state discrimination.",
+    "what_it_measures": "Optimal readout drive amplitude – the power level that maximizes |0⟩/|1⟩ discrimination.",
+    "physical_principle": "Sweep readout amplitude while measuring state separation; too low gives poor SNR, too high causes measurement-induced transitions (QND violation).",
+    "expected_curve": "Separation/fidelity vs amplitude: rises from noise floor, peaks at optimum, may decrease at high power.",
+    "good_threshold": "State separation >95% at optimal amplitude; amplitude in linear regime.",
+    "failure_modes": [
+      "Amplitude too low – poor SNR, IQ blobs overlap.",
+      "Amplitude too high – measurement-induced transitions, qubit heating.",
+      "Flat curve – resonator off-resonance or dispersive shift too small."
+    ],
+    "tips": [
+      "Run after dispersive shift characterization for best results.",
+      "If optimal amplitude is very high, check if dispersive shift is sufficient.",
+      "Monitor both |0⟩ and |1⟩ populations at optimal point for QND verification."
+    ],
+    "raw_markdown": "# CheckOptimalReadoutAmplitude\n\nOptimizes readout pulse amplitude for best state discrimination.\n\n## What it measures\n\nOptimal readout drive amplitude – the power level that maximizes |0⟩/|1⟩ discrimination.\n\n## Physical principle\n\nSweep readout amplitude while measuring state separation; too low gives poor SNR, too high causes measurement-induced transitions (QND violation).\n\n## Expected curve\n\nSeparation/fidelity vs amplitude: rises from noise floor, peaks at optimum, may decrease at high power.\n\n## Evaluation criteria\n\nState separation >95% at optimal amplitude; amplitude in linear regime.\n\n## Common failure patterns\n\n- Amplitude too low – poor SNR, IQ blobs overlap.\n- Amplitude too high – measurement-induced transitions, qubit heating.\n- Flat curve – resonator off-resonance or dispersive shift too small.\n\n## Tips for improvement\n\n- Run after dispersive shift characterization for best results.\n- If optimal amplitude is very high, check if dispersive shift is sufficient.\n- Monitor both |0⟩ and |1⟩ populations at optimal point for QND verification.\n",
+    "images": [],
+    "related_context": []
+  },
+  "CheckPIPulse": {
+    "name": "CheckPIPulse",
+    "summary": "Validates π pulse quality by repeated application and population measurement.",
+    "what_it_measures": "π pulse fidelity – accumulated error over multiple applications.",
+    "physical_principle": "Apply the calibrated π pulse repeatedly N times; odd repetitions should give |1⟩, even should give |0⟩. Deviation indicates rotation error.",
+    "expected_curve": "Population oscillation between 0 and 1 across repetitions; contrast decay reveals error accumulation.",
+    "good_threshold": "Contrast >99% over 20 repetitions; minimal decay envelope.",
+    "failure_modes": [
+      "Amplitude error accumulates – population drifts from ideal 0/1 alternation.",
+      "Leakage to |2⟩ – population decay visible as envelope on oscillation.",
+      "Decoherence during measurement – T1/T2 limit the number of useful repetitions."
+    ],
+    "tips": [
+      "If contrast decays rapidly, re-run CreatePIPulse with finer amplitude scan.",
+      "Compare with CheckDRAGPIPulse to see if DRAG correction improves fidelity.",
+      "The decay rate gives an estimate of per-gate error."
+    ],
+    "raw_markdown": "# CheckPIPulse\n\nValidates π pulse quality by repeated application and population measurement.\n\n## What it measures\n\nπ pulse fidelity – accumulated error over multiple applications.\n\n## Physical principle\n\nApply the calibrated π pulse repeatedly N times; odd repetitions should give |1⟩, even should give |0⟩. Deviation indicates rotation error.\n\n## Expected curve\n\nPopulation oscillation between 0 and 1 across repetitions; contrast decay reveals error accumulation.\n\n## Evaluation criteria\n\nContrast >99% over 20 repetitions; minimal decay envelope.\n\n## Common failure patterns\n\n- Amplitude error accumulates – population drifts from ideal 0/1 alternation.\n- Leakage to |2⟩ – population decay visible as envelope on oscillation.\n- Decoherence during measurement – T1/T2 limit the number of useful repetitions.\n\n## Tips for improvement\n\n- If contrast decays rapidly, re-run CreatePIPulse with finer amplitude scan.\n- Compare with CheckDRAGPIPulse to see if DRAG correction improves fidelity.\n- The decay rate gives an estimate of per-gate error.\n",
+    "images": [],
+    "related_context": []
+  },
+  "CheckQubit": {
+    "name": "CheckQubit",
+    "summary": "Quick qubit validation via brief Rabi oscillation check.",
+    "what_it_measures": "Basic qubit responsiveness – whether the qubit shows coherent Rabi oscillations.",
+    "physical_principle": "Short Rabi experiment with varying pulse duration to confirm qubit is functional and control/readout lines are operational.",
+    "expected_curve": "Sinusoidal Rabi oscillation with clear |0⟩/|1⟩ contrast.",
+    "good_threshold": "Clear oscillation visible; R² > 0.9; Rabi frequency consistent with drive amplitude.",
+    "failure_modes": [
+      "No oscillation – qubit not responding; check drive line and frequency.",
+      "Very low contrast – thermal population or T1 too short.",
+      "Irregular oscillation – frequency collision or TLS coupling."
+    ],
+    "tips": [
+      "This is a quick sanity check; if it fails, investigate drive and readout chains first.",
+      "Compare Rabi frequency across qubits to identify drive uniformity issues.",
+      "If amplitude is very small, adjust control amplitude."
+    ],
+    "raw_markdown": "# CheckQubit\n\nQuick qubit validation via brief Rabi oscillation check.\n\n## What it measures\n\nBasic qubit responsiveness – whether the qubit shows coherent Rabi oscillations.\n\n## Physical principle\n\nShort Rabi experiment with varying pulse duration to confirm qubit is functional and control/readout lines are operational.\n\n## Expected curve\n\nSinusoidal Rabi oscillation with clear |0⟩/|1⟩ contrast.\n\n## Evaluation criteria\n\nClear oscillation visible; R² > 0.9; Rabi frequency consistent with drive amplitude.\n\n## Common failure patterns\n\n- No oscillation – qubit not responding; check drive line and frequency.\n- Very low contrast – thermal population or T1 too short.\n- Irregular oscillation – frequency collision or TLS coupling.\n\n## Tips for improvement\n\n- This is a quick sanity check; if it fails, investigate drive and readout chains first.\n- Compare Rabi frequency across qubits to identify drive uniformity issues.\n- If amplitude is very small, adjust control amplitude.\n",
+    "images": [],
+    "related_context": []
+  },
+  "CheckQubitFrequency": {
+    "name": "CheckQubitFrequency",
+    "summary": "Measures qubit transition frequency via Ramsey-based detuning calibration.",
+    "what_it_measures": "Qubit |0⟩→|1⟩ transition frequency with high precision.",
+    "physical_principle": "Sweep drive detuning and pulse duration to map Ramsey fringes; the zero-detuning point gives the exact qubit frequency.",
+    "expected_curve": "Ramsey fringes at various detunings; the frequency calibration converges when detuning is zero.",
+    "good_threshold": "Frequency within ±50 MHz of design target; reproducible across runs.",
+    "failure_modes": [
+      "Frequency collision with neighbor (<100 MHz separation) – crosstalk risk.",
+      "TLS-induced shift – frequency jumps between runs.",
+      "Large drift over time – indicates junction aging or thermal instability."
+    ],
+    "tips": [
+      "Compare measured frequency with chip design values to flag fabrication outliers.",
+      "If frequency fluctuates between runs, suspect TLS defects near qubit frequency.",
+      "Check neighbor qubit frequencies for collision risk."
+    ],
+    "raw_markdown": "# CheckQubitFrequency\n\nMeasures qubit transition frequency via Ramsey-based detuning calibration.\n\n## What it measures\n\nQubit |0⟩→|1⟩ transition frequency with high precision.\n\n## Physical principle\n\nSweep drive detuning and pulse duration to map Ramsey fringes; the zero-detuning point gives the exact qubit frequency.\n\n## Expected curve\n\nRamsey fringes at various detunings; the frequency calibration converges when detuning is zero.\n\n## Evaluation criteria\n\nFrequency within ±50 MHz of design target; reproducible across runs.\n\n## Common failure patterns\n\n- Frequency collision with neighbor (<100 MHz separation) – crosstalk risk.\n- TLS-induced shift – frequency jumps between runs.\n- Large drift over time – indicates junction aging or thermal instability.\n\n## Tips for improvement\n\n- Compare measured frequency with chip design values to flag fabrication outliers.\n- If frequency fluctuates between runs, suspect TLS defects near qubit frequency.\n- Check neighbor qubit frequencies for collision risk.\n",
+    "images": [],
+    "related_context": []
+  },
+  "CheckRabi": {
+    "name": "CheckRabi",
+    "summary": "Measures Rabi oscillation to extract drive amplitude, frequency, and contrast.",
+    "what_it_measures": "Rabi oscillation parameters: amplitude (contrast), frequency (drive strength), and decay.",
+    "physical_principle": "Apply a resonant drive pulse of variable duration; the qubit oscillates between |0⟩ and |1⟩ at the Rabi frequency Ω_R.",
+    "expected_curve": "Damped sinusoidal oscillation of P(|1⟩) vs pulse duration. Frequency gives Ω_R, envelope gives T_Rabi.",
+    "good_threshold": "Rabi contrast > 90%; frequency consistent with calibrated drive amplitude; R² > 0.95.",
+    "failure_modes": [
+      "Low contrast – readout miscalibration, thermal population, or |0⟩/|1⟩ leakage.",
+      "Rapid decay – T1/T2 limiting or drive-induced heating.",
+      "Frequency mismatch – drive amplitude changed or DAC nonlinearity.",
+      "Beating pattern – two-level system (TLS) strongly coupled near qubit frequency."
+    ],
+    "tips": [
+      "Use Rabi frequency to calibrate π and π/2 pulse amplitudes.",
+      "If contrast is low, check effective qubit temperature and readout fidelity first.",
+      "Compare Rabi frequency across qubits for drive-line uniformity assessment."
+    ],
+    "raw_markdown": "# CheckRabi\n\nMeasures Rabi oscillation to extract drive amplitude, frequency, and contrast.\n\n## What it measures\n\nRabi oscillation parameters: amplitude (contrast), frequency (drive strength), and decay.\n\n## Physical principle\n\nApply a resonant drive pulse of variable duration; the qubit oscillates between |0⟩ and |1⟩ at the Rabi frequency Ω_R.\n\n## Expected curve\n\nDamped sinusoidal oscillation of P(|1⟩) vs pulse duration. Frequency gives Ω_R, envelope gives T_Rabi.\n\n## Evaluation criteria\n\nRabi contrast > 90%; frequency consistent with calibrated drive amplitude; R² > 0.95.\n\n## Common failure patterns\n\n- Low contrast – readout miscalibration, thermal population, or |0⟩/|1⟩ leakage.\n- Rapid decay – T1/T2 limiting or drive-induced heating.\n- Frequency mismatch – drive amplitude changed or DAC nonlinearity.\n- Beating pattern – two-level system (TLS) strongly coupled near qubit frequency.\n\n## Tips for improvement\n\n- Use Rabi frequency to calibrate π and π/2 pulse amplitudes.\n- If contrast is low, check effective qubit temperature and readout fidelity first.\n- Compare Rabi frequency across qubits for drive-line uniformity assessment.\n",
+    "images": [],
+    "related_context": []
+  },
+  "CheckRamsey": {
+    "name": "CheckRamsey",
+    "summary": "Measures T2* (free-induction) dephasing time and fine-tunes qubit frequency via Ramsey fringes.",
+    "what_it_measures": "T2* dephasing time and residual detuning from the drive frequency.",
+    "physical_principle": "X/2 – free evolution τ – X/2 (or Y/2), then measure. Fringes oscillate at the detuning Δf; envelope decays as exp(-τ/T2*).",
+    "expected_curve": "Damped cosine: oscillation frequency = detuning Δf, decay constant = T2*. If Δf=0, monotonic decay.",
+    "good_threshold": "T2* > 20 μs acceptable; > 40 μs excellent. T2* ≤ T2_echo always.",
+    "failure_modes": [
+      "T2* << T2_echo – dominated by low-frequency noise (1/f flux noise, charge noise).",
+      "No visible fringes – detuning too small or T2* extremely short.",
+      "Fringe frequency drift – qubit frequency unstable (TLS, thermal)."
+    ],
+    "tips": [
+      "Ramsey with artificial detuning (Δf ~ 1–5 MHz) gives clearer fringes for fitting.",
+      "Second-axis (Y/2) Ramsey separates detuning direction (positive vs negative).",
+      "If T2* improves dramatically with echo, the dominant noise is low-frequency and potentially fixable."
+    ],
+    "raw_markdown": "# CheckRamsey\n\nMeasures T2* (free-induction) dephasing time and fine-tunes qubit frequency via Ramsey fringes.\n\n## What it measures\n\nT2* dephasing time and residual detuning from the drive frequency.\n\n## Physical principle\n\nX/2 – free evolution τ – X/2 (or Y/2), then measure. Fringes oscillate at the detuning Δf; envelope decays as exp(-τ/T2*).\n\n## Expected curve\n\nDamped cosine: oscillation frequency = detuning Δf, decay constant = T2*. If Δf=0, monotonic decay.\n\n## Evaluation criteria\n\nT2* > 20 μs acceptable; > 40 μs excellent. T2* ≤ T2_echo always.\n\n## Common failure patterns\n\n- T2* << T2_echo – dominated by low-frequency noise (1/f flux noise, charge noise).\n- No visible fringes – detuning too small or T2* extremely short.\n- Fringe frequency drift – qubit frequency unstable (TLS, thermal).\n\n## Tips for improvement\n\n- Ramsey with artificial detuning (Δf ~ 1–5 MHz) gives clearer fringes for fitting.\n- Second-axis (Y/2) Ramsey separates detuning direction (positive vs negative).\n- If T2* improves dramatically with echo, the dominant noise is low-frequency and potentially fixable.\n\n## Related context\n\n- history(last_n=5)\n- neighbor_qubits(frequency)\n",
+    "images": [],
+    "related_context": [
+      {
+        "type": "history",
+        "params": [],
+        "last_n": 5
+      },
+      {
+        "type": "neighbor_qubits",
+        "params": [
+          "frequency"
+        ],
+        "last_n": 5
+      }
+    ]
+  },
+  "CheckReadoutFrequency": {
+    "name": "CheckReadoutFrequency",
+    "summary": "Calibrates the readout resonator frequency for optimal state discrimination.",
+    "what_it_measures": "Readout resonator frequency – the optimal probe frequency for qubit state measurement.",
+    "physical_principle": "Sweep readout tone detuning around the expected resonator frequency while measuring transmission; the optimal point maximizes state-dependent signal.",
+    "expected_curve": "Transmission dip centered at the resonator frequency; optimal readout is near the dispersive-shifted midpoint.",
+    "good_threshold": "Frequency within ±5 MHz of design; clear transmission feature.",
+    "failure_modes": [
+      "Resonator shifted from coupling – qubit-induced dispersive shift not accounted for.",
+      "Multiple modes visible – parasitic resonances or box modes.",
+      "Drift between cooldowns – thermal contraction or connector issues."
+    ],
+    "tips": [
+      "Run after qubit frequency calibration since dispersive shift depends on qubit-resonator detuning.",
+      "If readout fidelity is poor despite good frequency, check dispersive shift magnitude.",
+      "Compare with broadband resonator scan for consistency."
+    ],
+    "raw_markdown": "# CheckReadoutFrequency\n\nCalibrates the readout resonator frequency for optimal state discrimination.\n\n## What it measures\n\nReadout resonator frequency – the optimal probe frequency for qubit state measurement.\n\n## Physical principle\n\nSweep readout tone detuning around the expected resonator frequency while measuring transmission; the optimal point maximizes state-dependent signal.\n\n## Expected curve\n\nTransmission dip centered at the resonator frequency; optimal readout is near the dispersive-shifted midpoint.\n\n## Evaluation criteria\n\nFrequency within ±5 MHz of design; clear transmission feature.\n\n## Common failure patterns\n\n- Resonator shifted from coupling – qubit-induced dispersive shift not accounted for.\n- Multiple modes visible – parasitic resonances or box modes.\n- Drift between cooldowns – thermal contraction or connector issues.\n\n## Tips for improvement\n\n- Run after qubit frequency calibration since dispersive shift depends on qubit-resonator detuning.\n- If readout fidelity is poor despite good frequency, check dispersive shift magnitude.\n- Compare with broadband resonator scan for consistency.\n",
+    "images": [],
+    "related_context": []
+  },
+  "CheckT1": {
+    "name": "CheckT1",
+    "summary": "Measures T1 energy-relaxation time via exponential decay of the excited state.",
+    "what_it_measures": "T1 relaxation time – how long the qubit retains energy in the |1⟩ state.",
+    "physical_principle": "Prepare |1⟩, wait variable delay τ, measure P(|1⟩). Fit exponential decay exp(-τ/T1).",
+    "expected_curve": "Exponential decay from ~1 to ~0 as delay increases; single time constant T1.",
+    "good_threshold": "T1 > 50 μs is acceptable; > 100 μs is excellent for fixed-frequency transmons.",
+    "failure_modes": [
+      "Short T1 (<20 μs) – possible TLS coupling, dielectric loss, or Purcell decay.",
+      "Non-exponential decay – multi-level leakage or readout-induced transitions.",
+      "Large scatter between qubits – fabrication non-uniformity or localized defects."
+    ],
+    "tips": [
+      "If T1 fluctuates between runs, suspect TLS defects near the qubit frequency.",
+      "Compare with T2_echo: if T2 ≈ 2*T1, decoherence is T1-limited.",
+      "Check if readout power is too high (may cause residual excitation)."
+    ],
+    "raw_markdown": "# CheckT1\n\nMeasures T1 energy-relaxation time via exponential decay of the excited state.\n\n## What it measures\n\nT1 relaxation time – how long the qubit retains energy in the |1⟩ state.\n\n## Physical principle\n\nPrepare |1⟩, wait variable delay τ, measure P(|1⟩). Fit exponential decay exp(-τ/T1).\n\n## Expected curve\n\nExponential decay from ~1 to ~0 as delay increases; single time constant T1.\n\n## Evaluation criteria\n\nT1 > 50 μs is acceptable; > 100 μs is excellent for fixed-frequency transmons.\n\n## Common failure patterns\n\n- Short T1 (<20 μs) – possible TLS coupling, dielectric loss, or Purcell decay.\n- Non-exponential decay – multi-level leakage or readout-induced transitions.\n- Large scatter between qubits – fabrication non-uniformity or localized defects.\n\n## Tips for improvement\n\n- If T1 fluctuates between runs, suspect TLS defects near the qubit frequency.\n- Compare with T2_echo: if T2 ≈ 2*T1, decoherence is T1-limited.\n- Check if readout power is too high (may cause residual excitation).\n\n## Related context\n\n- history(last_n=5)\n- neighbor_qubits(frequency, t1)\n",
+    "images": [],
+    "related_context": [
+      {
+        "type": "history",
+        "params": [],
+        "last_n": 5
+      },
+      {
+        "type": "neighbor_qubits",
+        "params": [
+          "frequency",
+          "t1"
+        ],
+        "last_n": 5
+      }
+    ]
+  },
+  "CheckT2Echo": {
+    "name": "CheckT2Echo",
+    "summary": "Measures T2 echo (Hahn echo) coherence time, refocusing low-frequency noise.",
+    "what_it_measures": "T2 echo – phase coherence time after a Hahn-echo refocusing pulse.",
+    "physical_principle": "X/2 – wait τ/2 – π – wait τ/2 – X/2, then measure. Refocuses static and slow noise, revealing intrinsic dephasing.",
+    "expected_curve": "Exponential (or Gaussian) decay envelope of echo amplitude vs total delay τ.",
+    "good_threshold": "T2_echo > 80 μs acceptable; > 150 μs excellent. Should satisfy T2_echo ≤ 2*T1.",
+    "failure_modes": [
+      "T2_echo << 2*T1 – residual high-frequency noise not refocused by single echo.",
+      "Non-exponential decay – 1/f noise spectrum or multiple noise sources.",
+      "T2_echo > 2*T1 – measurement artifact; check fitting and readout calibration."
+    ],
+    "tips": [
+      "Compare T2_echo with T2* (Ramsey) to quantify low-frequency noise contribution.",
+      "If T2_echo is much shorter than 2*T1, try CPMG (multiple echoes) to identify noise spectrum.",
+      "Ensure π pulse is well-calibrated; a bad refocusing pulse degrades echo amplitude."
+    ],
+    "raw_markdown": "# CheckT2Echo\n\nMeasures T2 echo (Hahn echo) coherence time, refocusing low-frequency noise.\n\n## What it measures\n\nT2 echo – phase coherence time after a Hahn-echo refocusing pulse.\n\n## Physical principle\n\nX/2 – wait τ/2 – π – wait τ/2 – X/2, then measure. Refocuses static and slow noise, revealing intrinsic dephasing.\n\n## Expected curve\n\nExponential (or Gaussian) decay envelope of echo amplitude vs total delay τ.\n\n## Evaluation criteria\n\nT2_echo > 80 μs acceptable; > 150 μs excellent. Should satisfy T2_echo ≤ 2*T1.\n\n## Common failure patterns\n\n- T2_echo << 2*T1 – residual high-frequency noise not refocused by single echo.\n- Non-exponential decay – 1/f noise spectrum or multiple noise sources.\n- T2_echo > 2*T1 – measurement artifact; check fitting and readout calibration.\n\n## Tips for improvement\n\n- Compare T2_echo with T2* (Ramsey) to quantify low-frequency noise contribution.\n- If T2_echo is much shorter than 2*T1, try CPMG (multiple echoes) to identify noise spectrum.\n- Ensure π pulse is well-calibrated; a bad refocusing pulse degrades echo amplitude.\n\n## Related context\n\n- history(last_n=5)\n- neighbor_qubits(frequency, t1, t2_echo)\n",
+    "images": [],
+    "related_context": [
+      {
+        "type": "history",
+        "params": [],
+        "last_n": 5
+      },
+      {
+        "type": "neighbor_qubits",
+        "params": [
+          "frequency",
+          "t1",
+          "t2_echo"
+        ],
+        "last_n": 5
+      }
+    ]
+  },
+  "CheckZX90": {
+    "name": "CheckZX90",
+    "summary": "Validates ZX90 two-qubit gate fidelity via process or state fidelity measurement.",
+    "what_it_measures": "ZX90 gate fidelity – closeness to ideal CNOT-equivalent operation.",
+    "physical_principle": "Apply calibrated ZX90 gate and measure output state fidelity against ideal; may use interleaved RB or QPT.",
+    "expected_curve": "Gate fidelity metric; conditional rotation of target by control state.",
+    "good_threshold": "ZX90 fidelity >95% acceptable; >99% excellent.",
+    "failure_modes": [
+      "Coherence-limited – T1/T2 of either qubit too short.",
+      "Residual ZZ – static coupling causes phase errors.",
+      "CR amplitude drift – gate angle deviates from 90°."
+    ],
+    "tips": [
+      "Compare with interleaved RB for gate-specific error rate.",
+      "Check both control states (|0⟩ and |1⟩) independently.",
+      "If fidelity is poor, re-run CreateZX90 with fresh CR calibration."
+    ],
+    "raw_markdown": "# CheckZX90\n\nValidates ZX90 two-qubit gate fidelity via process or state fidelity measurement.\n\n## What it measures\n\nZX90 gate fidelity – closeness to ideal CNOT-equivalent operation.\n\n## Physical principle\n\nApply calibrated ZX90 gate and measure output state fidelity against ideal; may use interleaved RB or QPT.\n\n## Expected curve\n\nGate fidelity metric; conditional rotation of target by control state.\n\n## Evaluation criteria\n\nZX90 fidelity >95% acceptable; >99% excellent.\n\n## Common failure patterns\n\n- Coherence-limited – T1/T2 of either qubit too short.\n- Residual ZZ – static coupling causes phase errors.\n- CR amplitude drift – gate angle deviates from 90°.\n\n## Tips for improvement\n\n- Compare with interleaved RB for gate-specific error rate.\n- Check both control states (|0⟩ and |1⟩) independently.\n- If fidelity is poor, re-run CreateZX90 with fresh CR calibration.\n",
+    "images": [],
+    "related_context": []
+  },
+  "ChevronPattern": {
+    "name": "ChevronPattern",
+    "summary": "Measures qubit response vs frequency and time to map the chevron pattern.",
+    "what_it_measures": "Chevron pattern – 2D map of qubit excitation vs drive detuning and pulse duration.",
+    "physical_principle": "Drive at various frequency detunings and durations; on-resonance gives Rabi oscillations, off-resonance gives faster but smaller oscillations, forming a V-shaped pattern.",
+    "expected_curve": "2D color plot with chevron-shaped fringes; vertex at zero detuning (qubit frequency). Fringe spacing increases with detuning.",
+    "good_threshold": "Clear fringe visibility; chevron vertex identifiable to <1 MHz precision.",
+    "failure_modes": [
+      "Low contrast – insufficient drive power or poor readout fidelity.",
+      "Smeared pattern – frequency drift during measurement.",
+      "Asymmetric chevron – higher-order transitions or AC Stark shift."
+    ],
+    "tips": [
+      "Use the chevron vertex to precisely identify qubit frequency before fine calibration.",
+      "The fringe period at zero detuning gives the Rabi frequency.",
+      "If fringes are faint, increase drive amplitude or number of shots."
+    ],
+    "raw_markdown": "# ChevronPattern\n\nMeasures qubit response vs frequency and time to map the chevron pattern.\n\n## What it measures\n\nChevron pattern – 2D map of qubit excitation vs drive detuning and pulse duration.\n\n## Physical principle\n\nDrive at various frequency detunings and durations; on-resonance gives Rabi oscillations, off-resonance gives faster but smaller oscillations, forming a V-shaped pattern.\n\n## Expected curve\n\n2D color plot with chevron-shaped fringes; vertex at zero detuning (qubit frequency). Fringe spacing increases with detuning.\n\n## Evaluation criteria\n\nClear fringe visibility; chevron vertex identifiable to <1 MHz precision.\n\n## Common failure patterns\n\n- Low contrast – insufficient drive power or poor readout fidelity.\n- Smeared pattern – frequency drift during measurement.\n- Asymmetric chevron – higher-order transitions or AC Stark shift.\n\n## Tips for improvement\n\n- Use the chevron vertex to precisely identify qubit frequency before fine calibration.\n- The fringe period at zero detuning gives the Rabi frequency.\n- If fringes are faint, increase drive amplitude or number of shots.\n",
+    "images": [],
+    "related_context": []
+  },
+  "CreateDRAGHPIPulse": {
+    "name": "CreateDRAGHPIPulse",
+    "summary": "Calibrates DRAG beta and amplitude for leakage-suppressed π/2 pulse.",
+    "what_it_measures": "Optimal DRAG derivative coefficient for X90 gate.",
+    "physical_principle": "Same as CreateDRAGPIPulse but for half-rotation; may share beta but needs independent amplitude calibration.",
+    "expected_curve": "Leakage vs beta minimum; amplitude tuned for exact π/2 rotation.",
+    "good_threshold": "Leakage <0.1%; rotation angle error <0.5°.",
+    "failure_modes": [
+      "Coupled beta/amplitude landscape – need 2D optimization.",
+      "Inherited beta from π pulse not optimal for π/2.",
+      "Non-Gaussian pulse shape assumed incorrectly."
+    ],
+    "tips": [
+      "Often calibrate after CreateDRAGPIPulse and reuse beta.",
+      "If amplitude differs significantly from π_pulse/2, suspect nonlinearity.",
+      "Verify with AllXY or Clifford-based benchmarking."
+    ],
+    "raw_markdown": "# CreateDRAGHPIPulse\n\nCalibrates DRAG beta and amplitude for leakage-suppressed π/2 pulse.\n\n## What it measures\n\nOptimal DRAG derivative coefficient for X90 gate.\n\n## Physical principle\n\nSame as CreateDRAGPIPulse but for half-rotation; may share beta but needs independent amplitude calibration.\n\n## Expected curve\n\nLeakage vs beta minimum; amplitude tuned for exact π/2 rotation.\n\n## Evaluation criteria\n\nLeakage <0.1%; rotation angle error <0.5°.\n\n## Common failure patterns\n\n- Coupled beta/amplitude landscape – need 2D optimization.\n- Inherited beta from π pulse not optimal for π/2.\n- Non-Gaussian pulse shape assumed incorrectly.\n\n## Tips for improvement\n\n- Often calibrate after CreateDRAGPIPulse and reuse beta.\n- If amplitude differs significantly from π_pulse/2, suspect nonlinearity.\n- Verify with AllXY or Clifford-based benchmarking.\n",
+    "images": [],
+    "related_context": []
+  },
+  "CreateDRAGPIPulse": {
+    "name": "CreateDRAGPIPulse",
+    "summary": "Calibrates DRAG beta and amplitude for leakage-suppressed π pulse.",
+    "what_it_measures": "Optimal DRAG derivative coefficient (beta) for X180 gate.",
+    "physical_principle": "Scan DRAG beta parameter while monitoring leakage to |2⟩; find the minimum leakage point. Amplitude scan refines the rotation angle.",
+    "expected_curve": "Leakage vs beta shows a minimum; amplitude scan gives exact π rotation.",
+    "good_threshold": "Leakage <0.1% at optimal beta; amplitude gives exact π rotation.",
+    "failure_modes": [
+      "Flat leakage landscape – anharmonicity too large or pulse too slow for DRAG to matter.",
+      "Multiple local minima – coarse scan range needed.",
+      "Pulse distortion from AWG – DRAG waveform not faithfully reproduced."
+    ],
+    "tips": [
+      "Start with beta ≈ anharmonicity^(-1) as initial guess.",
+      "Ensure pulse bandwidth is within DAC/AWG limits.",
+      "Run after anharmonicity measurement for accurate initial parameters."
+    ],
+    "raw_markdown": "# CreateDRAGPIPulse\n\nCalibrates DRAG beta and amplitude for leakage-suppressed π pulse.\n\n## What it measures\n\nOptimal DRAG derivative coefficient (beta) for X180 gate.\n\n## Physical principle\n\nScan DRAG beta parameter while monitoring leakage to |2⟩; find the minimum leakage point. Amplitude scan refines the rotation angle.\n\n## Expected curve\n\nLeakage vs beta shows a minimum; amplitude scan gives exact π rotation.\n\n## Evaluation criteria\n\nLeakage <0.1% at optimal beta; amplitude gives exact π rotation.\n\n## Common failure patterns\n\n- Flat leakage landscape – anharmonicity too large or pulse too slow for DRAG to matter.\n- Multiple local minima – coarse scan range needed.\n- Pulse distortion from AWG – DRAG waveform not faithfully reproduced.\n\n## Tips for improvement\n\n- Start with beta ≈ anharmonicity^(-1) as initial guess.\n- Ensure pulse bandwidth is within DAC/AWG limits.\n- Run after anharmonicity measurement for accurate initial parameters.\n",
+    "images": [],
+    "related_context": []
+  },
+  "CreateHPIPulse": {
+    "name": "CreateHPIPulse",
+    "summary": "Calibrates π/2 (X90) gate pulse amplitude via Rabi-based fitting.",
+    "what_it_measures": "Optimal pulse amplitude for a half-π rotation (|0⟩ → superposition).",
+    "physical_principle": "Same Rabi-based calibration as CreatePIPulse but targeting the π/2 rotation point – the first point where population reaches 0.5.",
+    "expected_curve": "Rabi oscillation vs amplitude; π/2 pulse at the quarter-period point.",
+    "good_threshold": "Amplitude approximately half of π pulse; fit R² > 0.95.",
+    "failure_modes": [
+      "Amplitude calibration error – superposition state is wrong, affecting all quantum algorithms.",
+      "Leakage – same concerns as π pulse but at lower amplitude.",
+      "Phase error – X90 may accumulate phase errors visible in tomography."
+    ],
+    "tips": [
+      "Run after CreatePIPulse; the π/2 amplitude should be close to half the π amplitude.",
+      "If amplitude differs significantly from π_pulse/2, suspect drive nonlinearity.",
+      "Validate with CheckHPIPulse after calibration."
+    ],
+    "raw_markdown": "# CreateHPIPulse\n\nCalibrates π/2 (X90) gate pulse amplitude via Rabi-based fitting.\n\n## What it measures\n\nOptimal pulse amplitude for a half-π rotation (|0⟩ → superposition).\n\n## Physical principle\n\nSame Rabi-based calibration as CreatePIPulse but targeting the π/2 rotation point – the first point where population reaches 0.5.\n\n## Expected curve\n\nRabi oscillation vs amplitude; π/2 pulse at the quarter-period point.\n\n## Evaluation criteria\n\nAmplitude approximately half of π pulse; fit R² > 0.95.\n\n## Common failure patterns\n\n- Amplitude calibration error – superposition state is wrong, affecting all quantum algorithms.\n- Leakage – same concerns as π pulse but at lower amplitude.\n- Phase error – X90 may accumulate phase errors visible in tomography.\n\n## Tips for improvement\n\n- Run after CreatePIPulse; the π/2 amplitude should be close to half the π amplitude.\n- If amplitude differs significantly from π_pulse/2, suspect drive nonlinearity.\n- Validate with CheckHPIPulse after calibration.\n",
+    "images": [],
+    "related_context": []
+  },
+  "CreatePIPulse": {
+    "name": "CreatePIPulse",
+    "summary": "Calibrates π (X180) gate pulse amplitude via Rabi-based fitting.",
+    "what_it_measures": "Optimal pulse amplitude for a full π rotation (|0⟩ → |1⟩).",
+    "physical_principle": "Apply a shaped pulse of fixed duration and sweep amplitude; fit the Rabi oscillation to find the amplitude corresponding to exactly π rotation.",
+    "expected_curve": "Cosine-like Rabi oscillation vs amplitude; π pulse at the first minimum (population inverted).",
+    "good_threshold": "Amplitude in linear regime; fit R² > 0.95; consistent with expected drive power.",
+    "failure_modes": [
+      "Over/under-rotation – amplitude calibration error accumulates in gate sequences.",
+      "Leakage to |2⟩ – if pulse is too fast relative to anharmonicity.",
+      "Nonlinear drive response – DAC/amplifier compression at high amplitudes."
+    ],
+    "tips": [
+      "Duration is fixed; only amplitude is optimized. Check that duration is appropriate for anharmonicity.",
+      "If R² is poor, the qubit frequency may have drifted – recalibrate frequency first.",
+      "Compare π amplitude with previous runs to detect drift."
+    ],
+    "raw_markdown": "# CreatePIPulse\n\nCalibrates π (X180) gate pulse amplitude via Rabi-based fitting.\n\n## What it measures\n\nOptimal pulse amplitude for a full π rotation (|0⟩ → |1⟩).\n\n## Physical principle\n\nApply a shaped pulse of fixed duration and sweep amplitude; fit the Rabi oscillation to find the amplitude corresponding to exactly π rotation.\n\n## Expected curve\n\nCosine-like Rabi oscillation vs amplitude; π pulse at the first minimum (population inverted).\n\n## Evaluation criteria\n\nAmplitude in linear regime; fit R² > 0.95; consistent with expected drive power.\n\n## Common failure patterns\n\n- Over/under-rotation – amplitude calibration error accumulates in gate sequences.\n- Leakage to |2⟩ – if pulse is too fast relative to anharmonicity.\n- Nonlinear drive response – DAC/amplifier compression at high amplitudes.\n\n## Tips for improvement\n\n- Duration is fixed; only amplitude is optimized. Check that duration is appropriate for anharmonicity.\n- If R² is poor, the qubit frequency may have drifted – recalibrate frequency first.\n- Compare π amplitude with previous runs to detect drift.\n",
+    "images": [],
+    "related_context": []
+  },
+  "CreateZX90": {
+    "name": "CreateZX90",
+    "summary": "Calibrates ZX90 (CNOT-equivalent) two-qubit gate from cross-resonance interaction.",
+    "what_it_measures": "Optimal CR pulse amplitude and duration for π/2 ZX rotation.",
+    "physical_principle": "Tune CR drive parameters to achieve exactly 90° ZX rotation; combine with single-qubit corrections for CNOT.",
+    "expected_curve": "ZX rotation angle vs CR pulse duration; target the 90° crossing point.",
+    "good_threshold": "ZX rotation within 1° of 90°; parasitic rotations compensated.",
+    "failure_modes": [
+      "CR pulse too long – decoherence limits fidelity.",
+      "Parasitic ZZ coupling – requires echo sequence.",
+      "Amplitude nonlinearity – ZX rate not proportional to drive."
+    ],
+    "tips": [
+      "Use echo CR sequence to cancel IX and IZ terms.",
+      "After calibration, validate with CheckZX90.",
+      "Consider active cancellation tone on target qubit."
+    ],
+    "raw_markdown": "# CreateZX90\n\nCalibrates ZX90 (CNOT-equivalent) two-qubit gate from cross-resonance interaction.\n\n## What it measures\n\nOptimal CR pulse amplitude and duration for π/2 ZX rotation.\n\n## Physical principle\n\nTune CR drive parameters to achieve exactly 90° ZX rotation; combine with single-qubit corrections for CNOT.\n\n## Expected curve\n\nZX rotation angle vs CR pulse duration; target the 90° crossing point.\n\n## Evaluation criteria\n\nZX rotation within 1° of 90°; parasitic rotations compensated.\n\n## Common failure patterns\n\n- CR pulse too long – decoherence limits fidelity.\n- Parasitic ZZ coupling – requires echo sequence.\n- Amplitude nonlinearity – ZX rate not proportional to drive.\n\n## Tips for improvement\n\n- Use echo CR sequence to cancel IX and IZ terms.\n- After calibration, validate with CheckZX90.\n- Consider active cancellation tone on target qubit.\n",
+    "images": [],
+    "related_context": []
+  },
+  "RandomizedBenchmarking": {
+    "name": "RandomizedBenchmarking",
+    "summary": "Measures average gate error rate via randomized benchmarking (RB).",
+    "what_it_measures": "Average error per Clifford gate (EPC) – gate-set-level fidelity metric.",
+    "physical_principle": "Apply random Clifford gate sequences of increasing length with inversion gate; measure survival probability. Exponential decay rate gives average gate error.",
+    "expected_curve": "Survival probability decays exponentially with sequence length; intercept ~0.5.",
+    "good_threshold": "EPC <0.5% (fidelity >99.5%) is good; <0.1% is excellent.",
+    "failure_modes": [
+      "Non-exponential decay – leakage or non-Markovian errors.",
+      "Very fast decay – gate errors too large for useful RB.",
+      "SPAM errors dominating short sequences."
+    ],
+    "tips": [
+      "Use ≥30 random sequences per length for reliable statistics.",
+      "Compare with interleaved RB to isolate specific gate errors.",
+      "If decay is non-exponential, check for leakage."
+    ],
+    "raw_markdown": "# RandomizedBenchmarking\n\nMeasures average gate error rate via randomized benchmarking (RB).\n\n## What it measures\n\nAverage error per Clifford gate (EPC) – gate-set-level fidelity metric.\n\n## Physical principle\n\nApply random Clifford gate sequences of increasing length with inversion gate; measure survival probability. Exponential decay rate gives average gate error.\n\n## Expected curve\n\nSurvival probability decays exponentially with sequence length; intercept ~0.5.\n\n## Evaluation criteria\n\nEPC <0.5% (fidelity >99.5%) is good; <0.1% is excellent.\n\n## Common failure patterns\n\n- Non-exponential decay – leakage or non-Markovian errors.\n- Very fast decay – gate errors too large for useful RB.\n- SPAM errors dominating short sequences.\n\n## Tips for improvement\n\n- Use ≥30 random sequences per length for reliable statistics.\n- Compare with interleaved RB to isolate specific gate errors.\n- If decay is non-exponential, check for leakage.\n",
+    "images": [],
+    "related_context": []
+  },
+  "ReadoutClassification": {
+    "name": "ReadoutClassification",
+    "summary": "Calibrates and evaluates readout state discrimination (|0⟩ vs |1⟩ classification).",
+    "what_it_measures": "Readout assignment fidelity – probability of correctly identifying qubit state.",
+    "physical_principle": "Prepare |0⟩ and |1⟩ states, measure IQ data, train classifier, evaluate confusion matrix.",
+    "expected_curve": "Two IQ blob clusters; clear separation indicates good discrimination.",
+    "good_threshold": "Average readout fidelity >95% acceptable; >99% excellent.",
+    "failure_modes": [
+      "Overlapping IQ blobs – insufficient dispersive shift or readout power.",
+      "T1 decay during readout – |1⟩ relaxes to |0⟩ before measurement completes.",
+      "Readout-induced transitions – measurement drives qubit transitions.",
+      "Classifier bias – asymmetric errors for |0⟩ vs |1⟩."
+    ],
+    "tips": [
+      "If |1⟩→|0⟩ error >> |0⟩→|1⟩ error, suspect T1 during readout.",
+      "Optimize readout amplitude and duration jointly.",
+      "Consider neural network classifier for better discrimination."
+    ],
+    "raw_markdown": "# ReadoutClassification\n\nCalibrates and evaluates readout state discrimination (|0⟩ vs |1⟩ classification).\n\n## What it measures\n\nReadout assignment fidelity – probability of correctly identifying qubit state.\n\n## Physical principle\n\nPrepare |0⟩ and |1⟩ states, measure IQ data, train classifier, evaluate confusion matrix.\n\n## Expected curve\n\nTwo IQ blob clusters; clear separation indicates good discrimination.\n\n## Evaluation criteria\n\nAverage readout fidelity >95% acceptable; >99% excellent.\n\n## Common failure patterns\n\n- Overlapping IQ blobs – insufficient dispersive shift or readout power.\n- T1 decay during readout – |1⟩ relaxes to |0⟩ before measurement completes.\n- Readout-induced transitions – measurement drives qubit transitions.\n- Classifier bias – asymmetric errors for |0⟩ vs |1⟩.\n\n## Tips for improvement\n\n- If |1⟩→|0⟩ error >> |0⟩→|1⟩ error, suspect T1 during readout.\n- Optimize readout amplitude and duration jointly.\n- Consider neural network classifier for better discrimination.\n",
+    "images": [],
+    "related_context": []
+  },
+  "X180InterleavedRandomizedBenchmarking": {
+    "name": "X180InterleavedRandomizedBenchmarking",
+    "summary": "Measures X180 (π) gate-specific error rate via interleaved randomized benchmarking.",
+    "what_it_measures": "Error per X180 gate isolated from average Clifford error.",
+    "physical_principle": "Same interleaved RB protocol as X90 IRB but with X180 gate interleaved.",
+    "expected_curve": "Two exponential decays; interleaved decays faster proportional to X180 error.",
+    "good_threshold": "X180 gate error <0.1% excellent; <0.5% acceptable.",
+    "failure_modes": [
+      "X180 amplitude errors accumulate faster than X90.",
+      "Leakage to |2⟩ more likely with full π rotation.",
+      "Same statistical concerns as X90 IRB."
+    ],
+    "tips": [
+      "Compare X180 and X90 errors – X180 should be ≤2x X90 error.",
+      "If X180 error is much worse, suspect DRAG tuning issues.",
+      "Run after DRAG calibration for best results."
+    ],
+    "raw_markdown": "# X180InterleavedRandomizedBenchmarking\n\nMeasures X180 (π) gate-specific error rate via interleaved randomized benchmarking.\n\n## What it measures\n\nError per X180 gate isolated from average Clifford error.\n\n## Physical principle\n\nSame interleaved RB protocol as X90 IRB but with X180 gate interleaved.\n\n## Expected curve\n\nTwo exponential decays; interleaved decays faster proportional to X180 error.\n\n## Evaluation criteria\n\nX180 gate error <0.1% excellent; <0.5% acceptable.\n\n## Common failure patterns\n\n- X180 amplitude errors accumulate faster than X90.\n- Leakage to |2⟩ more likely with full π rotation.\n- Same statistical concerns as X90 IRB.\n\n## Tips for improvement\n\n- Compare X180 and X90 errors – X180 should be ≤2x X90 error.\n- If X180 error is much worse, suspect DRAG tuning issues.\n- Run after DRAG calibration for best results.\n",
+    "images": [],
+    "related_context": []
+  },
+  "X90InterleavedRandomizedBenchmarking": {
+    "name": "X90InterleavedRandomizedBenchmarking",
+    "summary": "Measures X90 (π/2) gate-specific error rate via interleaved randomized benchmarking.",
+    "what_it_measures": "Error per X90 gate by interleaving it between random Cliffords.",
+    "physical_principle": "Run standard RB and interleaved RB (with X90 between each Clifford); ratio of decay rates gives gate-specific error.",
+    "expected_curve": "Two exponential decays; interleaved decays faster than reference.",
+    "good_threshold": "X90 gate error <0.1% excellent; <0.5% acceptable.",
+    "failure_modes": [
+      "Reference RB fidelity too low – can't isolate X90 error.",
+      "Statistical uncertainty too large – need more sequences.",
+      "Coherent errors not captured – IRB gives average over Pauli errors."
+    ],
+    "tips": [
+      "Always run reference RB in same session for fair comparison.",
+      "If X90 error >> reference EPC, focus on pulse amplitude tuning.",
+      "Gate error = (1 - p_interleaved/p_reference) * (d-1)/d where d=2."
+    ],
+    "raw_markdown": "# X90InterleavedRandomizedBenchmarking\n\nMeasures X90 (π/2) gate-specific error rate via interleaved randomized benchmarking.\n\n## What it measures\n\nError per X90 gate by interleaving it between random Cliffords.\n\n## Physical principle\n\nRun standard RB and interleaved RB (with X90 between each Clifford); ratio of decay rates gives gate-specific error.\n\n## Expected curve\n\nTwo exponential decays; interleaved decays faster than reference.\n\n## Evaluation criteria\n\nX90 gate error <0.1% excellent; <0.5% acceptable.\n\n## Common failure patterns\n\n- Reference RB fidelity too low – can't isolate X90 error.\n- Statistical uncertainty too large – need more sequences.\n- Coherent errors not captured – IRB gives average over Pauli errors.\n\n## Tips for improvement\n\n- Always run reference RB in same session for fair comparison.\n- If X90 error >> reference EPC, focus on pulse amplitude tuning.\n- Gate error = (1 - p_interleaved/p_reference) * (d-1)/d where d=2.\n",
+    "images": [],
+    "related_context": []
+  },
+  "ZX90InterleavedRandomizedBenchmarking": {
+    "name": "ZX90InterleavedRandomizedBenchmarking",
+    "summary": "Measures ZX90 two-qubit gate error rate via interleaved randomized benchmarking.",
+    "what_it_measures": "Error per ZX90 gate isolated via two-qubit interleaved RB.",
+    "physical_principle": "Two-qubit RB with ZX90 interleaved between random two-qubit Cliffords.",
+    "expected_curve": "Two-qubit survival probability decays; interleaved faster than reference.",
+    "good_threshold": "ZX90 gate error <1% acceptable; <0.5% excellent.",
+    "failure_modes": [
+      "Two-qubit Clifford compilation errors.",
+      "Leakage in either qubit during CR drive.",
+      "Long sequences exceed coherence time."
+    ],
+    "tips": [
+      "Two-qubit RB requires many more sequences for convergence.",
+      "Compare with process tomography for consistency.",
+      "Gate error includes contributions from both qubits' decoherence."
+    ],
+    "raw_markdown": "# ZX90InterleavedRandomizedBenchmarking\n\nMeasures ZX90 two-qubit gate error rate via interleaved randomized benchmarking.\n\n## What it measures\n\nError per ZX90 gate isolated via two-qubit interleaved RB.\n\n## Physical principle\n\nTwo-qubit RB with ZX90 interleaved between random two-qubit Cliffords.\n\n## Expected curve\n\nTwo-qubit survival probability decays; interleaved faster than reference.\n\n## Evaluation criteria\n\nZX90 gate error <1% acceptable; <0.5% excellent.\n\n## Common failure patterns\n\n- Two-qubit Clifford compilation errors.\n- Leakage in either qubit during CR drive.\n- Long sequences exceed coherence time.\n\n## Tips for improvement\n\n- Two-qubit RB requires many more sequences for convergence.\n- Compare with process tomography for consistency.\n- Gate error includes contributions from both qubits' decoherence.\n",
+    "images": [],
+    "related_context": []
+  }
+}

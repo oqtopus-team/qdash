@@ -9,6 +9,7 @@ import {
   History,
   ListTodo,
   FileText,
+  Sparkles,
 } from "lucide-react";
 
 import { useGetQubitMetricHistory } from "@/client/metrics/metrics";
@@ -17,6 +18,8 @@ import { TaskFigure } from "@/components/charts/TaskFigure";
 import { formatDateTime, formatDateTimeCompact } from "@/utils/datetime";
 
 import { ParametersTable } from "./ParametersTable";
+import { AnalysisChatPanel } from "./AnalysisChatPanel";
+import type { AnalysisContext } from "@/hooks/useAnalysisChat";
 import type { MetricHistoryItem } from "./MetricHistoryView";
 
 interface QubitMetricHistoryModalProps {
@@ -56,6 +59,7 @@ export function QubitMetricHistoryModal({
   );
   const [selectedTaskIndex, setSelectedTaskIndex] = useState(0);
   const [mobileTab, setMobileTab] = useState<MobileTab>("history");
+  const [showAnalysis, setShowAnalysis] = useState(false);
 
   const { data, isLoading, isError } = useGetQubitMetricHistory(
     chipId,
@@ -153,6 +157,18 @@ export function QubitMetricHistoryModal({
   }, [executionTasks.length, selectedTaskIndex]);
 
   const selectedTask = executionTasks[selectedTaskIndex] ?? null;
+
+  // Build analysis context for the AI chat panel
+  const analysisContext: AnalysisContext | null = useMemo(() => {
+    if (!selectedTask || !selectedExecutionId) return null;
+    return {
+      taskName: selectedTask.name || "",
+      chipId: chipId,
+      qid: qid,
+      executionId: selectedExecutionId,
+      taskId: selectedTask.task_id || "",
+    };
+  }, [selectedTask, selectedExecutionId, chipId, qid]);
 
   if (isLoading) {
     return (
@@ -486,8 +502,8 @@ export function QubitMetricHistoryModal({
               </span>
             </div>
           )}
-          {/* Provenance link */}
-          <div className="pt-2 mt-2 border-t border-base-300">
+          {/* Provenance link and Ask AI */}
+          <div className="pt-2 mt-2 border-t border-base-300 flex items-center gap-2">
             <Link
               href={`/provenance?parameter=${encodeURIComponent(metricName)}&qid=${encodeURIComponent(qid)}&tab=lineage`}
               className="btn btn-xs btn-outline gap-1"
@@ -495,6 +511,13 @@ export function QubitMetricHistoryModal({
               <GitBranch className="h-3 w-3" />
               View Provenance Lineage
             </Link>
+            <button
+              onClick={() => setShowAnalysis(true)}
+              className="btn btn-xs btn-primary gap-1"
+            >
+              <Sparkles className="h-3 w-3" />
+              Ask AI
+            </button>
           </div>
         </div>
       )}
@@ -570,22 +593,38 @@ export function QubitMetricHistoryModal({
         {mobileTab === "details" && renderTaskDetails()}
       </div>
 
-      {/* Desktop 3-Column Layout */}
+      {/* Desktop Layout */}
       <div className="hidden lg:flex gap-4 h-full min-h-0">
         {/* Column 1: Execution History */}
-        <div className="w-1/4 flex flex-col min-h-0 border-r border-base-300 pr-4">
+        <div
+          className={`${showAnalysis ? "w-1/5" : "w-1/4"} flex flex-col min-h-0 border-r border-base-300 pr-4`}
+        >
           {renderExecutionHistory()}
         </div>
 
         {/* Column 2: Tasks */}
-        <div className="w-1/4 flex flex-col min-h-0 border-r border-base-300 pr-4">
+        <div
+          className={`${showAnalysis ? "w-1/5" : "w-1/4"} flex flex-col min-h-0 border-r border-base-300 pr-4`}
+        >
           {renderTasksList()}
         </div>
 
         {/* Column 3: Details – scrollable */}
-        <div className="w-1/2 overflow-y-auto min-h-0">
+        <div
+          className={`${showAnalysis ? "w-[35%]" : "w-1/2"} overflow-y-auto min-h-0`}
+        >
           {renderTaskDetails()}
         </div>
+
+        {/* Column 4: AI Chat Panel (conditional) */}
+        {showAnalysis && (
+          <div className="w-1/4 min-h-0">
+            <AnalysisChatPanel
+              context={analysisContext}
+              onClose={() => setShowAnalysis(false)}
+            />
+          </div>
+        )}
       </div>
     </div>
   );
