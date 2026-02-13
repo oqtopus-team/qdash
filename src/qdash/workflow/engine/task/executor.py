@@ -11,7 +11,7 @@ The TaskExecutor is responsible for the complete task execution lifecycle:
 """
 
 import logging
-from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, ClassVar, Protocol, runtime_checkable
 
 from pydantic import BaseModel, Field
 from qdash.datamodel.task import CalibDataModel, ParameterModel
@@ -40,6 +40,7 @@ class TaskProtocol(Protocol):
     name: str
     r2_threshold: float
     backend: str
+    run_parameters: ClassVar[dict[str, Any]]
 
     def get_name(self) -> str:
         """Get task name."""
@@ -239,6 +240,11 @@ class TaskExecutor:
         try:
             # Start task
             self.state_manager.start_task(task_name, task_type, qid)
+
+            # Record run_parameters (experiment configuration used)
+            run_params = {k: v.model_dump() for k, v in task.run_parameters.items()}
+            if run_params:
+                self.state_manager.put_run_parameters(task_name, run_params, task_type, qid)
 
             # Preprocess
             preprocess_result = self._run_preprocess(task, backend, qid)
@@ -579,6 +585,11 @@ class TaskExecutor:
 
             # 1. Start task
             self.state_manager.start_task(task_name, task_type, qid)
+
+            # Record run_parameters (experiment configuration used)
+            run_params = {k: v.model_dump() for k, v in task.run_parameters.items()}
+            if run_params:
+                self.state_manager.put_run_parameters(task_name, run_params, task_type, qid)
 
             # Record task start to history
             executed_task = self.state_manager.get_task(task_name, task_type, qid)

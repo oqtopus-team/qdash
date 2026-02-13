@@ -53,7 +53,7 @@ export function MetricHistoryView({
   return (
     <div className="flex flex-col lg:flex-row gap-3 sm:gap-4 h-full">
       {/* Image Display - shown first on mobile (top), second on desktop (right) */}
-      <div className="order-1 lg:order-2 lg:w-2/3 flex flex-col">
+      <div className="order-1 lg:order-2 lg:w-2/3 flex flex-col overflow-y-auto min-h-0">
         <div className="flex items-center justify-between mb-2 sm:mb-3">
           <h3 className="text-base sm:text-lg font-bold">Calibration Result</h3>
           <div className="text-xs sm:text-sm text-base-content/60">

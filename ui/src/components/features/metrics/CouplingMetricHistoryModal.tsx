@@ -10,6 +10,7 @@ import {
   History,
   ListTodo,
   FileText,
+  Sparkles,
 } from "lucide-react";
 
 import { useGetCouplingMetricHistory } from "@/client/metrics/metrics";
@@ -18,6 +19,8 @@ import { TaskFigure } from "@/components/charts/TaskFigure";
 import { formatDateTime, formatDateTimeCompact } from "@/utils/datetime";
 
 import { ParametersTable } from "./ParametersTable";
+import { AnalysisChatPanel } from "./AnalysisChatPanel";
+import type { AnalysisContext } from "@/hooks/useAnalysisChat";
 import type { MetricHistoryItem } from "./MetricHistoryView";
 
 interface CouplingMetricHistoryModalProps {
@@ -57,6 +60,7 @@ export function CouplingMetricHistoryModal({
   );
   const [selectedTaskIndex, setSelectedTaskIndex] = useState(0);
   const [mobileTab, setMobileTab] = useState<MobileTab>("history");
+  const [showAnalysis, setShowAnalysis] = useState(false);
 
   // Direction toggle: forward = original coupling ID, reverse = reversed
   const [isReversed, setIsReversed] = useState(false);
@@ -170,6 +174,18 @@ export function CouplingMetricHistoryModal({
   }, [executionTasks.length, selectedTaskIndex]);
 
   const selectedTask = executionTasks[selectedTaskIndex] ?? null;
+
+  // Build analysis context for the AI chat panel
+  const analysisContext: AnalysisContext | null = useMemo(() => {
+    if (!selectedTask || !selectedExecutionId) return null;
+    return {
+      taskName: selectedTask.name || "",
+      chipId: chipId,
+      qid: activeCouplingId,
+      executionId: selectedExecutionId,
+      taskId: selectedTask.task_id || "",
+    };
+  }, [selectedTask, selectedExecutionId, chipId, activeCouplingId]);
 
   // Direction toggle button (shared across states)
   const directionToggle = (
@@ -411,7 +427,7 @@ export function CouplingMetricHistoryModal({
 
   // Column 3: Task Details
   const renderTaskDetails = () => (
-    <div className="flex flex-col min-h-0 h-full">
+    <div className="flex flex-col">
       <div className="flex items-center justify-between mb-3 shrink-0">
         <div className="flex items-center gap-2">
           <FileText className="h-4 w-4 text-accent" />
@@ -524,8 +540,8 @@ export function CouplingMetricHistoryModal({
               </span>
             </div>
           )}
-          {/* Provenance link */}
-          <div className="pt-2 mt-2 border-t border-base-300">
+          {/* Provenance link and Ask AI */}
+          <div className="pt-2 mt-2 border-t border-base-300 flex items-center gap-2">
             <Link
               href={`/provenance?parameter=${encodeURIComponent(metricName)}&qid=${encodeURIComponent(activeCouplingId)}&tab=lineage`}
               className="btn btn-xs btn-outline gap-1"
@@ -533,13 +549,20 @@ export function CouplingMetricHistoryModal({
               <GitBranch className="h-3 w-3" />
               View Provenance Lineage
             </Link>
+            <button
+              onClick={() => setShowAnalysis(true)}
+              className="btn btn-xs btn-primary gap-1"
+            >
+              <Sparkles className="h-3 w-3" />
+              Ask AI
+            </button>
           </div>
         </div>
       )}
 
       {/* Input/Output Parameters */}
       {selectedTask && (
-        <div className="flex flex-col gap-2 mt-2 overflow-auto">
+        <div className="flex flex-col gap-2 mt-2">
           {selectedTask.input_parameters &&
             Object.keys(selectedTask.input_parameters).length > 0 && (
               <ParametersTable
@@ -555,6 +578,15 @@ export function CouplingMetricHistoryModal({
                 title="Output Parameters"
                 parameters={
                   selectedTask.output_parameters as Record<string, unknown>
+                }
+              />
+            )}
+          {selectedTask.run_parameters &&
+            Object.keys(selectedTask.run_parameters).length > 0 && (
+              <ParametersTable
+                title="Run Parameters"
+                parameters={
+                  selectedTask.run_parameters as Record<string, unknown>
                 }
               />
             )}
@@ -602,20 +634,38 @@ export function CouplingMetricHistoryModal({
         {mobileTab === "details" && renderTaskDetails()}
       </div>
 
-      {/* Desktop 3-Column Layout */}
+      {/* Desktop Layout */}
       <div className="hidden lg:flex gap-4 h-full min-h-0">
         {/* Column 1: Execution History */}
-        <div className="w-1/4 flex flex-col min-h-0 border-r border-base-300 pr-4">
+        <div
+          className={`${showAnalysis ? "w-1/5" : "w-1/4"} flex flex-col min-h-0 border-r border-base-300 pr-4 transition-all`}
+        >
           {renderExecutionHistory()}
         </div>
 
         {/* Column 2: Tasks */}
-        <div className="w-1/4 flex flex-col min-h-0 border-r border-base-300 pr-4">
+        <div
+          className={`${showAnalysis ? "w-1/5" : "w-1/4"} flex flex-col min-h-0 border-r border-base-300 pr-4 transition-all`}
+        >
           {renderTasksList()}
         </div>
 
-        {/* Column 3: Details */}
-        <div className="w-1/2 flex flex-col min-h-0">{renderTaskDetails()}</div>
+        {/* Column 3: Details – scrollable */}
+        <div
+          className={`${showAnalysis ? "w-[35%]" : "w-1/2"} overflow-y-auto min-h-0 transition-all`}
+        >
+          {renderTaskDetails()}
+        </div>
+
+        {/* Column 4: AI Analysis Panel */}
+        {showAnalysis && (
+          <div className="w-1/4 min-h-0">
+            <AnalysisChatPanel
+              context={analysisContext}
+              onClose={() => setShowAnalysis(false)}
+            />
+          </div>
+        )}
       </div>
     </div>
   );

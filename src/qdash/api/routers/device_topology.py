@@ -12,7 +12,6 @@ from fastapi import APIRouter, Depends
 from fastapi.logger import logger
 from fastapi.responses import Response
 from qdash.api.lib.project import ProjectContext, get_project_context
-from qdash.api.lib.topology_config import load_topology
 from qdash.api.schemas.device_topology import (
     Coupling,
     CouplingGateDuration,
@@ -25,6 +24,7 @@ from qdash.api.schemas.device_topology import (
     QubitLifetime,
 )
 from qdash.common.datetime_utils import now, to_datetime
+from qdash.common.topology_config import load_topology
 from qdash.repository import MongoCalibrationNoteRepository, MongoChipRepository
 
 router = APIRouter()

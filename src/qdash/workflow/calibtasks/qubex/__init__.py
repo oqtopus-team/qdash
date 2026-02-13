@@ -49,7 +49,6 @@ from qdash.workflow.calibtasks.qubex.one_qubit_coarse.check_t2_echo import Check
 from qdash.workflow.calibtasks.qubex.one_qubit_coarse.chevron_pattern import ChevronPattern
 from qdash.workflow.calibtasks.qubex.one_qubit_coarse.create_hpi_pulse import CreateHPIPulse
 from qdash.workflow.calibtasks.qubex.one_qubit_coarse.create_pi_pulse import CreatePIPulse
-from qdash.workflow.calibtasks.qubex.one_qubit_coarse.rabi_oscillation import RabiOscillation
 from qdash.workflow.calibtasks.qubex.one_qubit_fine.check_drag_hpi_pulse import CheckDRAGHPIPulse
 from qdash.workflow.calibtasks.qubex.one_qubit_fine.check_drag_pi_pulse import CheckDRAGPIPulse
 from qdash.workflow.calibtasks.qubex.one_qubit_fine.create_drag_hpi_pulse import CreateDRAGHPIPulse
@@ -82,7 +81,6 @@ __all__ = [
     "ChevronPattern",
     "CreateHPIPulse",
     "CreatePIPulse",
-    "RabiOscillation",
     "CheckDRAGHPIPulse",
     "CheckDRAGPIPulse",
     "CreateDRAGHPIPulse",

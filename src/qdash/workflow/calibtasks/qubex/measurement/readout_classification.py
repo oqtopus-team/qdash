@@ -10,7 +10,8 @@ from qdash.workflow.calibtasks.base import (
 )
 from qdash.workflow.calibtasks.qubex.base import QubexTask
 from qdash.workflow.engine.backend.qubex import QubexBackend
-from qubex.measurement.measurement import DEFAULT_READOUT_DURATION
+from qubex.experiment.experiment_constants import CALIBRATION_SHOTS
+from qubex.measurement.measurement import DEFAULT_INTERVAL, DEFAULT_READOUT_DURATION
 
 
 class ReadoutClassification(QubexTask):
@@ -32,7 +33,20 @@ class ReadoutClassification(QubexTask):
             value=DEFAULT_READOUT_DURATION, unit="ns", description="Readout pulse length"
         ),
     }
-    run_parameters: ClassVar[dict[str, RunParameterModel]] = {}
+    run_parameters: ClassVar[dict[str, RunParameterModel]] = {
+        "shots": RunParameterModel(
+            unit="a.u.",
+            value_type="int",
+            value=CALIBRATION_SHOTS,
+            description="Number of shots",
+        ),
+        "interval": RunParameterModel(
+            unit="ns",
+            value_type="int",
+            value=DEFAULT_INTERVAL,
+            description="Time interval",
+        ),
+    }
     output_parameters: ClassVar[dict[str, ParameterModel]] = {
         "average_readout_fidelity": ParameterModel(
             unit="a.u.",
@@ -127,6 +141,11 @@ class ReadoutClassification(QubexTask):
     def run(self, backend: QubexBackend, qid: str) -> RunResult:
         exp = self.get_experiment(backend)
         label = self.get_qubit_label(backend, qid)
-        result = exp.build_classifier(targets=label, save_dir=exp.classifier_dir)
+        result = exp.build_classifier(
+            targets=label,
+            save_dir=exp.classifier_dir,
+            shots=self.run_parameters["shots"].get_value(),
+            interval=self.run_parameters["interval"].get_value(),
+        )
         self.save_calibration(backend)
         return RunResult(raw_result=result)

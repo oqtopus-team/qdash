@@ -154,6 +154,41 @@ class TestParameterManagement:
         task = tsm.get_task("CheckRabi", "qubit", "0")
         assert task.input_parameters == {"freq": 5.0}
 
+    def test_put_run_parameters(self):
+        """Test put_run_parameters stores run params on the task."""
+        tsm = TaskStateManager(qids=["0"])
+        tsm._ensure_task_exists("CheckRabi", "qubit", "0")
+
+        run_params = {
+            "shots": {
+                "value": 1024,
+                "value_type": "int",
+                "unit": "",
+                "description": "Number of shots",
+            },
+            "interval": {
+                "value": 150,
+                "value_type": "int",
+                "unit": "us",
+                "description": "Rep interval",
+            },
+        }
+        tsm.put_run_parameters("CheckRabi", run_params, "qubit", "0")
+
+        task = tsm.get_task("CheckRabi", "qubit", "0")
+        assert task.run_parameters == run_params
+        assert task.run_parameters["shots"]["value"] == 1024
+        assert task.run_parameters["interval"]["unit"] == "us"
+
+    def test_put_run_parameters_creates_task_if_missing(self):
+        """Test put_run_parameters creates task if it doesn't exist."""
+        tsm = TaskStateManager(qids=["0"])
+
+        tsm.put_run_parameters("NewTask", {"shots": {"value": 512}}, "qubit", "0")
+
+        task = tsm.get_task("NewTask", "qubit", "0")
+        assert task.run_parameters == {"shots": {"value": 512}}
+
     def test_put_output_parameters_updates_task_and_calib_data(self):
         """Test put_output_parameters updates task and calibration data."""
         tsm = TaskStateManager(qids=["0"])

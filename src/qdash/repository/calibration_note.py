@@ -5,8 +5,10 @@ persistence operations. Used by both API and workflow components.
 """
 
 import logging
+import time
 
 from bunnet import SortDirection
+from pymongo.errors import DuplicateKeyError
 from qdash.common.datetime_utils import now
 from qdash.datamodel.calibration_note import CalibrationNoteModel
 from qdash.dbmodel.calibration_note import CalibrationNoteDocument
@@ -145,16 +147,20 @@ class MongoCalibrationNoteRepository:
         """
         return self.find_latest_master(project_id=project_id)
 
-    def upsert(self, note: CalibrationNoteModel) -> CalibrationNoteModel:
-        """Create or update a calibration note atomically.
+    def upsert(self, note: CalibrationNoteModel, max_retries: int = 3) -> CalibrationNoteModel:
+        """Create or update a calibration note atomically with retry logic.
 
         Uses MongoDB's find_one_and_update with upsert=True to ensure
         thread-safe operations during parallel calibration task execution.
+        Implements retry logic to handle race conditions when multiple
+        processes attempt to insert the same document simultaneously.
 
         Parameters
         ----------
         note : CalibrationNoteModel
             The note to create or update
+        max_retries : int
+            Maximum number of retry attempts for DuplicateKeyError (default: 3)
 
         Returns
         -------
@@ -192,16 +198,37 @@ class MongoCalibrationNoteRepository:
         }
 
         collection = CalibrationNoteDocument.get_motor_collection()
-        result = collection.find_one_and_update(
-            query,
-            update,
-            upsert=True,
-            return_document=ReturnDocument.AFTER,
-        )
 
-        # Convert raw document to CalibrationNoteDocument then to model
-        doc = CalibrationNoteDocument.model_validate(result)
-        return self._to_model(doc)
+        last_error: DuplicateKeyError | None = None
+        for attempt in range(max_retries):
+            try:
+                result = collection.find_one_and_update(
+                    query,
+                    update,
+                    upsert=True,
+                    return_document=ReturnDocument.AFTER,
+                )
+                # Convert raw document to CalibrationNoteDocument then to model
+                doc = CalibrationNoteDocument.model_validate(result)
+                return self._to_model(doc)
+            except DuplicateKeyError as e:  # noqa: PERF203
+                last_error = e
+                logger.warning(
+                    "DuplicateKeyError on upsert attempt %d/%d for %s, retrying...",
+                    attempt + 1,
+                    max_retries,
+                    query,
+                )
+                # Brief sleep with exponential backoff before retry
+                time.sleep(0.1 * (2**attempt))
+
+        # All retries exhausted, raise the last error
+        logger.error(
+            "Failed to upsert calibration note after %d attempts: %s",
+            max_retries,
+            query,
+        )
+        raise last_error  # type: ignore[misc]
 
     def _to_model(self, doc: CalibrationNoteDocument) -> CalibrationNoteModel:
         """Convert a document to a domain model.

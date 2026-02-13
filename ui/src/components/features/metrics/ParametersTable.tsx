@@ -1,12 +1,10 @@
-/** Render an expanded parameters table with internal scroll. */
+/** Render a fully-expanded parameters table (no internal scroll). */
 export function ParametersTable({
   title,
   parameters,
-  maxHeight = "300px",
 }: {
   title: string;
   parameters: Record<string, unknown>;
-  maxHeight?: string;
 }) {
   const entries = Object.entries(parameters);
   if (entries.length === 0) return null;
@@ -17,38 +15,36 @@ export function ParametersTable({
         <span className="text-sm font-semibold">{title}</span>
         <span className="badge badge-xs badge-ghost">{entries.length}</span>
       </div>
-      <div className="overflow-auto" style={{ maxHeight }}>
-        <table className="table table-zebra table-xs w-full">
-          <thead className="sticky top-0 bg-base-100 z-10">
-            <tr>
-              <th className="text-xs">Parameter</th>
-              <th className="text-xs">Value</th>
-              <th className="text-xs">Unit</th>
-            </tr>
-          </thead>
-          <tbody>
-            {entries.map(([key, val]) => {
-              const paramValue =
-                typeof val === "object" && val !== null && "value" in val
-                  ? (val as Record<string, unknown>)
-                  : { value: val };
-              return (
-                <tr key={key}>
-                  <td className="font-medium text-xs">{key}</td>
-                  <td className="font-mono text-xs">
-                    {typeof paramValue.value === "number"
-                      ? paramValue.value.toFixed(6)
-                      : typeof paramValue.value === "object"
-                        ? JSON.stringify(paramValue.value)
-                        : String(paramValue.value ?? "N/A")}
-                  </td>
-                  <td className="text-xs">{String(paramValue.unit ?? "-")}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+      <table className="table table-zebra table-xs w-full">
+        <thead>
+          <tr>
+            <th className="text-xs">Parameter</th>
+            <th className="text-xs">Value</th>
+            <th className="text-xs">Unit</th>
+          </tr>
+        </thead>
+        <tbody>
+          {entries.map(([key, val]) => {
+            const paramValue =
+              typeof val === "object" && val !== null && "value" in val
+                ? (val as Record<string, unknown>)
+                : { value: val };
+            return (
+              <tr key={key}>
+                <td className="font-medium text-xs">{key}</td>
+                <td className="font-mono text-xs">
+                  {typeof paramValue.value === "number"
+                    ? paramValue.value.toFixed(6)
+                    : typeof paramValue.value === "object"
+                      ? JSON.stringify(paramValue.value)
+                      : String(paramValue.value ?? "N/A")}
+                </td>
+                <td className="text-xs">{String(paramValue.unit ?? "-")}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   );
 }

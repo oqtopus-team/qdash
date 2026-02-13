@@ -8,12 +8,13 @@ Uses ConfigLoader for unified configuration directory resolution.
 
 from __future__ import annotations
 
+import logging
 from functools import lru_cache
 from typing import TYPE_CHECKING
 
 import yaml
 from pydantic import BaseModel, Field
-from qdash.api.lib.config_loader import ConfigLoader
+from qdash.common.config_loader import ConfigLoader
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -132,7 +133,7 @@ def list_topologies(size: int | None = None) -> list[dict[str, str]]:
                 }
             )
         except Exception:
-            # Skip invalid files
+            logging.getLogger(__name__).warning("Skipping invalid topology file: %s", path)
             continue
 
     return sorted(topologies, key=lambda x: x["id"])
