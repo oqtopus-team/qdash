@@ -12,8 +12,8 @@ on:
     #   - "src/**/*.jsx"
 
 jobs:
-  if: ${{ !contains(github.actor, '[bot]') }}
   claude-review:
+    if: ${{ !contains(github.actor, '[bot]') }}
     # Optional: Filter by PR author
     # if: |
     #   github.event.pull_request.user.login == 'external-contributor' ||
