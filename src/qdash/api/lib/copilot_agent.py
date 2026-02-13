@@ -478,7 +478,7 @@ async def _run_responses_api(
             kwargs["input"] = new_input
             response = await _create(**kwargs)
 
-    return response.output_text
+    return str(response.output_text)
 
 
 async def _run_chat_completions(

@@ -11,6 +11,7 @@ import json
 import logging
 from typing import TYPE_CHECKING, Any
 
+from bunnet import SortDirection
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 
@@ -294,7 +295,7 @@ def _load_task_history(
         TaskResultHistoryDocument.find(
             {"chip_id": chip_id, "name": task_name, "qid": qid, "status": "completed"}
         )
-        .sort([("start_at", -1)])
+        .sort([("start_at", SortDirection.DESCENDING)])
         .limit(last_n)
         .run()
     )
