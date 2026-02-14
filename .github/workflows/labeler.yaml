@@ -6,9 +6,13 @@ on:
     branches:
       - develop
 
+#Permissions are required for PRs by dependabot.
+permissions:
+  pull-requests: write
+  contents: write
+
 jobs:
   labeler:
-    if: ${{ !contains(github.actor, '[bot]') }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
