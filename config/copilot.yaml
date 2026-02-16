@@ -45,31 +45,37 @@ scoring:
   t1:
     good: 50
     excellent: 100
+    bad: 20
     unit: μs
     higher_is_better: true
   t2_echo:
     good: 80
     excellent: 150
+    bad: 30
     unit: μs
     higher_is_better: true
   t2_star:
     good: 20
     excellent: 40
+    bad: 10
     unit: μs
     higher_is_better: true
   average_readout_fidelity:
     good: 95
     excellent: 99
+    bad: 85
     unit: "%"
     higher_is_better: true
   x90_gate_fidelity:
     good: 99.5
     excellent: 99.9
+    bad: 98.0
     unit: "%"
     higher_is_better: true
   x180_gate_fidelity:
     good: 99.5
     excellent: 99.9
+    bad: 98.0
     unit: "%"
     higher_is_better: true
   bare_frequency:
@@ -80,16 +86,19 @@ scoring:
   anharmonicity:
     good: -280
     excellent: -320
+    bad: -250
     unit: MHz
     higher_is_better: false
   zx90_gate_fidelity:
     good: 95
     excellent: 99
+    bad: 85
     unit: "%"
     higher_is_better: true
   bell_state_fidelity:
     good: 90
     excellent: 95
+    bad: 80
     unit: "%"
     higher_is_better: true
 

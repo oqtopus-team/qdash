@@ -33,6 +33,36 @@ class ListTaskResponse(BaseModel):
     tasks: list[TaskResponse]
 
 
+class FailureModeResponse(BaseModel):
+    """Response model for a structured failure mode."""
+
+    severity: str
+    description: str
+    cause: str = ""
+    visual: str = ""
+    next_action: str = ""
+
+
+class OutputParameterInfoResponse(BaseModel):
+    """Response model for output parameter description."""
+
+    name: str
+    description: str
+
+
+class ExpectedResultResponse(BaseModel):
+    """Response model for expected result description."""
+
+    description: str
+    result_type: str = ""
+    x_axis: str = ""
+    y_axis: str = ""
+    z_axis: str = ""
+    fit_model: str = ""
+    typical_range: str = ""
+    good_visual: str = ""
+
+
 class TaskKnowledgeResponse(BaseModel):
     """Response model for task knowledge (LLM-oriented domain knowledge)."""
 
@@ -40,12 +70,15 @@ class TaskKnowledgeResponse(BaseModel):
     summary: str
     what_it_measures: str
     physical_principle: str
-    expected_curve: str
-    good_threshold: str
-    failure_modes: list[str]
+    expected_result: ExpectedResultResponse
+    evaluation_criteria: str
+    check_questions: list[str] = []
+    failure_modes: list[FailureModeResponse]
     tips: list[str]
+    output_parameters_info: list[OutputParameterInfoResponse] = []
+    analysis_guide: list[str] = []
+    prerequisites: list[str] = []
     prompt_text: str
-    raw_markdown: str = ""
 
 
 class TaskResultResponse(BaseModel):

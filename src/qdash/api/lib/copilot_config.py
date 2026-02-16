@@ -19,6 +19,7 @@ class ScoringThreshold(BaseModel):
 
     good: float
     excellent: float
+    bad: float | None = None
     unit: str = ""
     higher_is_better: bool = True
 

@@ -203,6 +203,20 @@ def _build_system_prompt(
     # Task knowledge
     parts.append(context.task_knowledge_prompt)
 
+    # Scoring thresholds from deployment config
+    if config and config.scoring:
+        threshold_lines = ["\n## Scoring thresholds (deployment-specific)"]
+        for metric, thresh in config.scoring.items():
+            range_parts = []
+            if thresh.bad is not None:
+                range_parts.append(f"bad < {thresh.bad} {thresh.unit}")
+            range_parts.append(f"good > {thresh.good} {thresh.unit}")
+            range_parts.append(f"excellent > {thresh.excellent} {thresh.unit}")
+            if not thresh.higher_is_better:
+                range_parts.append("(lower is better)")
+            threshold_lines.append(f"- {metric}: {', '.join(range_parts)}")
+        parts.append("\n".join(threshold_lines))
+
     # Qubit context
     lines = [f"\n## Target: Qubit {context.qid} (Chip: {context.chip_id})"]
     if context.qubit_params:

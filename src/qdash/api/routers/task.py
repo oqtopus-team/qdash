@@ -11,6 +11,7 @@ from qdash.api.lib.project import (  # noqa: TCH002
     get_project_context,
 )
 from qdash.api.schemas.task import (
+    ExpectedResultResponse,
     InputParameterModel,
     ListTaskResponse,
     TaskKnowledgeResponse,
@@ -186,10 +187,13 @@ def get_task_knowledge(
         summary=knowledge.summary,
         what_it_measures=knowledge.what_it_measures,
         physical_principle=knowledge.physical_principle,
-        expected_curve=knowledge.expected_curve,
-        good_threshold=knowledge.good_threshold,
-        failure_modes=knowledge.failure_modes,
+        expected_result=ExpectedResultResponse(**knowledge.expected_result.model_dump()),
+        evaluation_criteria=knowledge.evaluation_criteria,
+        check_questions=knowledge.check_questions,
+        failure_modes=[fm.model_dump() for fm in knowledge.failure_modes],
         tips=knowledge.tips,
+        output_parameters_info=[p.model_dump() for p in knowledge.output_parameters_info],
+        analysis_guide=knowledge.analysis_guide,
+        prerequisites=knowledge.prerequisites,
         prompt_text=knowledge.to_prompt(),
-        raw_markdown=knowledge.raw_markdown,
     )
