@@ -16,7 +16,7 @@ import type { AnalysisContext, ChatMessage } from "@/hooks/useAnalysisChat";
 
 export interface ChatSession {
   id: string;
-  context: AnalysisContext;
+  context: AnalysisContext | null;
   messages: ChatMessage[];
   createdAt: number;
   updatedAt: number;
@@ -26,6 +26,7 @@ interface AnalysisChatContextValue {
   // sidebar open/close
   isOpen: boolean;
   openAnalysisChat: (context: AnalysisContext) => void;
+  openGeneralChat: () => void;
   closeAnalysisChat: () => void;
   toggleAnalysisChat: () => void;
 
@@ -34,7 +35,7 @@ interface AnalysisChatContextValue {
   activeSessionId: string | null;
   activeSession: ChatSession | null;
   switchSession: (sessionId: string) => void;
-  createNewSession: (context: AnalysisContext) => string;
+  createNewSession: (context: AnalysisContext | null) => string;
   deleteSession: (sessionId: string) => void;
   clearActiveSession: () => void;
 
@@ -76,7 +77,10 @@ function generateId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-function contextKey(ctx: AnalysisContext): string {
+const GENERAL_CHAT_KEY = "__general__";
+
+function contextKey(ctx: AnalysisContext | null): string {
+  if (!ctx) return GENERAL_CHAT_KEY;
   return `${ctx.taskId}:${ctx.executionId}:${ctx.qid}`;
 }
 
@@ -141,6 +145,27 @@ export function AnalysisChatProvider({
     [sessions],
   );
 
+  const openGeneralChat = useCallback(() => {
+    // Find existing general session (no context)
+    const existing = sessions.find((s) => contextKey(s.context) === GENERAL_CHAT_KEY);
+    if (existing) {
+      setActiveSessionId(existing.id);
+    } else {
+      const id = generateId();
+      const now = Date.now();
+      const session: ChatSession = {
+        id,
+        context: null,
+        messages: [],
+        createdAt: now,
+        updatedAt: now,
+      };
+      setSessions((prev) => [session, ...prev]);
+      setActiveSessionId(id);
+    }
+    setIsOpen(true);
+  }, [sessions]);
+
   const closeAnalysisChat = useCallback(() => {
     setIsOpen(false);
   }, []);
@@ -155,7 +180,7 @@ export function AnalysisChatProvider({
     setActiveSessionId(sessionId);
   }, []);
 
-  const createNewSession = useCallback((ctx: AnalysisContext): string => {
+  const createNewSession = useCallback((ctx: AnalysisContext | null): string => {
     const id = generateId();
     const now = Date.now();
     const session: ChatSession = {
@@ -219,6 +244,7 @@ export function AnalysisChatProvider({
       value={{
         isOpen,
         openAnalysisChat,
+        openGeneralChat,
         closeAnalysisChat,
         toggleAnalysisChat,
         sessions,

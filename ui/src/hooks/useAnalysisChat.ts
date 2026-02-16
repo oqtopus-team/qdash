@@ -161,15 +161,13 @@ export function useAnalysisChat(
 
   const sendMessage = useCallback(
     async (userMessage: string, imageBase64?: string) => {
-      if (!context) return;
-
       // Abort any in-flight request
       abortRef.current?.abort();
       const controller = new AbortController();
       abortRef.current = controller;
 
       setError(null);
-      setStatusMessage("分析を開始中...");
+      setStatusMessage(context ? "分析を開始中..." : "チャットを開始中...");
       const newUserMessage: ChatMessage = {
         role: "user",
         content: userMessage,
@@ -179,22 +177,38 @@ export function useAnalysisChat(
 
       try {
         const baseURL = process.env.NEXT_PUBLIC_API_URL || "/api";
-        const response = await fetch(`${baseURL}/copilot/analyze/stream`, {
+
+        // Use analyze endpoint when context is available, chat endpoint otherwise
+        const endpoint = context
+          ? `${baseURL}/copilot/analyze/stream`
+          : `${baseURL}/copilot/chat/stream`;
+
+        const body = context
+          ? {
+              task_name: context.taskName,
+              chip_id: context.chipId,
+              qid: context.qid,
+              execution_id: context.executionId,
+              task_id: context.taskId,
+              message: userMessage,
+              image_base64: imageBase64 || null,
+              conversation_history: messages.map((m) => ({
+                role: m.role,
+                content: m.content,
+              })),
+            }
+          : {
+              message: userMessage,
+              conversation_history: messages.map((m) => ({
+                role: m.role,
+                content: m.content,
+              })),
+            };
+
+        const response = await fetch(endpoint, {
           method: "POST",
           headers: buildHeaders(),
-          body: JSON.stringify({
-            task_name: context.taskName,
-            chip_id: context.chipId,
-            qid: context.qid,
-            execution_id: context.executionId,
-            task_id: context.taskId,
-            message: userMessage,
-            image_base64: imageBase64 || null,
-            conversation_history: messages.map((m) => ({
-              role: m.role,
-              content: m.content,
-            })),
-          }),
+          body: JSON.stringify(body),
           signal: controller.signal,
         });
 
