@@ -77,6 +77,27 @@ class AnalysisResponse(BaseModel):
     )
 
 
+class ContentBlock(BaseModel):
+    """A single content block in a blocks response."""
+
+    type: str = Field(description="Block type: 'text' or 'chart'")
+    content: str | None = Field(default=None, description="Text content (for text blocks)")
+    chart: dict[str, Any] | None = Field(
+        default=None,
+        description="Plotly chart spec with 'data' and 'layout' keys (for chart blocks)",
+    )
+
+
+class BlocksAnalysisResponse(BaseModel):
+    """Extended analysis response with mixed text/chart content blocks."""
+
+    blocks: list[ContentBlock] = Field(description="Ordered list of content blocks")
+    assessment: str | None = Field(
+        default=None,
+        description="Overall assessment: good / warning / bad / null",
+    )
+
+
 class AnalyzeRequest(BaseModel):
     """Request body for POST /copilot/analyze."""
 
@@ -94,3 +115,16 @@ class AnalyzeRequest(BaseModel):
         default_factory=list,
         description="Previous conversation messages [{role, content}, ...]",
     )
+
+
+class ChatRequest(BaseModel):
+    """Request body for POST /copilot/chat/stream."""
+
+    message: str = Field(description="User question / message")
+    chip_id: str | None = None
+    qid: str | None = None
+    conversation_history: list[dict[str, str]] = Field(
+        default_factory=list,
+        description="Previous conversation messages [{role, content}, ...]",
+    )
+    image_base64: str | None = None

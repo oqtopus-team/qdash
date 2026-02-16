@@ -111,8 +111,7 @@ export function AnalysisChatProvider({
   }, [sessions]);
 
   // Derived: active session
-  const activeSession =
-    sessions.find((s) => s.id === activeSessionId) ?? null;
+  const activeSession = sessions.find((s) => s.id === activeSessionId) ?? null;
 
   // ------- sidebar -------
 
@@ -120,9 +119,7 @@ export function AnalysisChatProvider({
     (ctx: AnalysisContext) => {
       const key = contextKey(ctx);
       // Find existing session for this context
-      const existing = sessions.find(
-        (s) => contextKey(s.context) === key,
-      );
+      const existing = sessions.find((s) => contextKey(s.context) === key);
       if (existing) {
         setActiveSessionId(existing.id);
       } else {
@@ -158,23 +155,20 @@ export function AnalysisChatProvider({
     setActiveSessionId(sessionId);
   }, []);
 
-  const createNewSession = useCallback(
-    (ctx: AnalysisContext): string => {
-      const id = generateId();
-      const now = Date.now();
-      const session: ChatSession = {
-        id,
-        context: ctx,
-        messages: [],
-        createdAt: now,
-        updatedAt: now,
-      };
-      setSessions((prev) => [session, ...prev]);
-      setActiveSessionId(id);
-      return id;
-    },
-    [],
-  );
+  const createNewSession = useCallback((ctx: AnalysisContext): string => {
+    const id = generateId();
+    const now = Date.now();
+    const session: ChatSession = {
+      id,
+      context: ctx,
+      messages: [],
+      createdAt: now,
+      updatedAt: now,
+    };
+    setSessions((prev) => [session, ...prev]);
+    setActiveSessionId(id);
+    return id;
+  }, []);
 
   const deleteSession = useCallback(
     (sessionId: string) => {

@@ -16,6 +16,20 @@ export interface AnalysisResult {
   recommendations: string[];
 }
 
+export interface ContentBlock {
+  type: "text" | "chart";
+  content: string | null;
+  chart: {
+    data: Record<string, unknown>[];
+    layout: Record<string, unknown>;
+  } | null;
+}
+
+export interface BlocksResult {
+  blocks: ContentBlock[];
+  assessment: "good" | "warning" | "bad" | null;
+}
+
 export interface AnalysisContext {
   taskName: string;
   chipId: string;
@@ -211,12 +225,26 @@ export function useAnalysisChat(
               const payload = JSON.parse(evt.data);
               flushSync(() => setStatusMessage(payload.message));
             } else if (evt.event === "result") {
-              const result: AnalysisResult = JSON.parse(evt.data);
-              const formattedResponse = formatAnalysisResponse(result);
-              setMessages((prev) => [
-                ...prev,
-                { role: "assistant", content: formattedResponse },
-              ]);
+              const result = JSON.parse(evt.data);
+              // Blocks format: store as JSON string for rich rendering
+              if (result.blocks && Array.isArray(result.blocks)) {
+                setMessages((prev) => [
+                  ...prev,
+                  {
+                    role: "assistant",
+                    content: JSON.stringify(result),
+                  },
+                ]);
+              } else {
+                // Legacy format fallback
+                const formattedResponse = formatAnalysisResponse(
+                  result as AnalysisResult,
+                );
+                setMessages((prev) => [
+                  ...prev,
+                  { role: "assistant", content: formattedResponse },
+                ]);
+              }
             } else if (evt.event === "error") {
               const payload = JSON.parse(evt.data);
               throw new Error(payload.detail);

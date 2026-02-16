@@ -17,12 +17,29 @@ from fastapi.responses import StreamingResponse
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
-from qdash.api.lib.copilot_analysis import AnalysisResponse, AnalyzeRequest, TaskAnalysisContext
+from qdash.api.lib.copilot_analysis import (
+    AnalysisResponse,
+    AnalyzeRequest,
+    ChatRequest,
+    TaskAnalysisContext,
+)
 from qdash.api.lib.copilot_config import load_copilot_config
 from qdash.datamodel.task_knowledge import get_task_knowledge
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+TOOL_LABELS: dict[str, str] = {
+    "get_qubit_params": "キュービットパラメータを取得中",
+    "get_latest_task_result": "最新タスク結果を取得中",
+    "get_task_history": "タスク履歴を取得中",
+    "get_parameter_timeseries": "パラメータ時系列を取得中",
+    "execute_python_analysis": "Python分析コードを実行中",
+}
+
+STATUS_LABELS: dict[str, str] = {
+    "thinking": "AIが考え中...",
+}
 
 
 @router.get(
@@ -56,7 +73,7 @@ async def get_copilot_config() -> dict[str, Any]:
     summary="Analyze calibration result with AI",
     operation_id="analyzeCopilot",
 )
-async def analyze_task_result(request: AnalyzeRequest) -> AnalysisResponse:
+async def analyze_task_result(request: AnalyzeRequest) -> dict[str, Any]:
     """Analyze a calibration task result using LLM.
 
     Constructs a rich context from task knowledge, qubit parameters,
@@ -222,20 +239,45 @@ async def analyze_task_result_stream(request: AnalyzeRequest) -> StreamingRespon
             coupling_params=coupling_params,
         )
 
-        # Step 5: Run analysis
+        # Step 5: Run analysis with tool progress streaming
         yield _sse_event("status", {"step": "run_analysis", "message": "AIが分析中..."})
         tool_executors = _build_tool_executors()
+
+        queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
+
+        async def on_tool_call(name: str, args: dict[str, Any]) -> None:
+            label = TOOL_LABELS.get(name, name)
+            await queue.put({"step": "tool_call", "tool": name, "message": f"{label}..."})
+
+        async def on_status(status: str) -> None:
+            label = STATUS_LABELS.get(status, status)
+            await queue.put({"step": status, "message": label})
+
         try:
             from qdash.api.lib.copilot_agent import run_analysis
 
-            result = await run_analysis(
-                context=context,
-                user_message=request.message,
-                config=config,
-                image_base64=request.image_base64,
-                conversation_history=request.conversation_history,
-                tool_executors=tool_executors,
+            analysis_task = asyncio.create_task(
+                run_analysis(
+                    context=context,
+                    user_message=request.message,
+                    config=config,
+                    image_base64=request.image_base64,
+                    conversation_history=request.conversation_history,
+                    tool_executors=tool_executors,
+                    on_tool_call=on_tool_call,
+                    on_status=on_status,
+                )
             )
+
+            while not analysis_task.done():
+                try:
+                    event = await asyncio.wait_for(queue.get(), timeout=0.3)
+                    yield _sse_event("status", event)
+                except asyncio.TimeoutError:  # noqa: PERF203
+                    # Send SSE comment as heartbeat to keep connection alive
+                    yield ":\n\n"
+
+            result = analysis_task.result()
         except ImportError:
             yield _sse_event(
                 "error",
@@ -250,15 +292,135 @@ async def analyze_task_result_stream(request: AnalyzeRequest) -> StreamingRespon
             yield _sse_event("error", {"step": "run_analysis", "detail": f"Analysis failed: {e}"})
             return
 
+        # Drain any remaining events in the queue
+        while not queue.empty():
+            event = queue.get_nowait()
+            yield _sse_event("status", event)
+
         # Step 6: Complete
         yield _sse_event("status", {"step": "complete", "message": "分析完了"})
-        yield _sse_event("result", result.model_dump())
+        yield _sse_event("result", result)
 
     return StreamingResponse(
         event_generator(),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+@router.post("/chat/stream", include_in_schema=False)
+async def chat_stream(request: ChatRequest) -> StreamingResponse:
+    """SSE streaming generic chat endpoint.
+
+    Does not require task context. Optionally accepts chip_id/qid for scoped queries.
+    """
+
+    async def event_generator() -> AsyncGenerator[str, None]:
+        config = load_copilot_config()
+        if not config.enabled:
+            yield _sse_event("error", {"step": "init", "detail": "Copilot is not enabled"})
+            return
+
+        # Step 1: Load config and resolve default chip_id
+        yield _sse_event("status", {"step": "load_config", "message": "設定を読み込み中..."})
+        await asyncio.sleep(0)
+
+        chip_id = request.chip_id
+        qid = request.qid
+
+        # Resolve default chip_id if not provided
+        if not chip_id:
+            chip_id = _load_default_chip_id()
+
+        # Step 2: Optionally load qubit params
+        qubit_params: dict[str, Any] = {}
+        if chip_id and qid:
+            yield _sse_event(
+                "status",
+                {"step": "load_qubit_params", "message": "キュービットパラメータを取得中..."},
+            )
+            await asyncio.sleep(0)
+            qubit_params = _load_qubit_params(chip_id, qid)
+
+        # Step 3: Run chat with tool progress streaming
+        yield _sse_event("status", {"step": "run_chat", "message": "AIが応答中..."})
+        tool_executors = _build_tool_executors()
+
+        queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
+
+        async def on_tool_call(name: str, args: dict[str, Any]) -> None:
+            label = TOOL_LABELS.get(name, name)
+            await queue.put({"step": "tool_call", "tool": name, "message": f"{label}..."})
+
+        async def on_status(status: str) -> None:
+            label = STATUS_LABELS.get(status, status)
+            await queue.put({"step": status, "message": label})
+
+        try:
+            from qdash.api.lib.copilot_agent import run_chat
+
+            chat_task = asyncio.create_task(
+                run_chat(
+                    user_message=request.message,
+                    config=config,
+                    chip_id=chip_id,
+                    qid=qid,
+                    qubit_params=qubit_params if qubit_params else None,
+                    image_base64=request.image_base64,
+                    conversation_history=request.conversation_history,
+                    tool_executors=tool_executors,
+                    on_tool_call=on_tool_call,
+                    on_status=on_status,
+                )
+            )
+
+            while not chat_task.done():
+                try:
+                    event = await asyncio.wait_for(queue.get(), timeout=0.3)
+                    yield _sse_event("status", event)
+                except asyncio.TimeoutError:  # noqa: PERF203
+                    # Send SSE comment as heartbeat to keep connection alive
+                    yield ":\n\n"
+
+            result = chat_task.result()
+        except ImportError:
+            yield _sse_event(
+                "error",
+                {
+                    "step": "run_chat",
+                    "detail": "openai is not installed. Install with: pip install openai",
+                },
+            )
+            return
+        except Exception as e:
+            logger.exception("Chat failed")
+            yield _sse_event("error", {"step": "run_chat", "detail": f"Chat failed: {e}"})
+            return
+
+        # Drain any remaining events in the queue
+        while not queue.empty():
+            event = queue.get_nowait()
+            yield _sse_event("status", event)
+
+        # Step 4: Complete
+        yield _sse_event("status", {"step": "complete", "message": "完了"})
+        yield _sse_event("result", result)
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+def _load_default_chip_id() -> str | None:
+    """Load the most recently installed chip_id from DB."""
+    from qdash.dbmodel.chip import ChipDocument
+
+    doc = ChipDocument.find_one({}, sort=[("installed_at", -1)]).run()
+    if doc is None:
+        return None
+    return str(doc.chip_id)
 
 
 def _load_qubit_params(chip_id: str, qid: str) -> dict[str, Any]:
@@ -405,8 +567,59 @@ def _load_latest_task_result(task_name: str, chip_id: str, qid: str) -> dict[str
     return results[0] if results else {"error": "No results found"}
 
 
+def _load_parameter_timeseries(
+    parameter_name: str, chip_id: str, qid: str, last_n: int = 10
+) -> list[dict[str, Any]]:
+    """Load time series data for a specific output parameter by name.
+
+    Queries task_result_history by output_parameter_names field,
+    which is indexed and allows parameter-name-based lookups
+    regardless of task name.
+    """
+    from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
+
+    docs = (
+        TaskResultHistoryDocument.find(
+            {
+                "chip_id": chip_id,
+                "qid": qid,
+                "status": "completed",
+                "output_parameter_names": parameter_name,
+            }
+        )
+        .sort([("start_at", SortDirection.DESCENDING)])
+        .limit(last_n)
+        .run()
+    )
+
+    results: list[dict[str, Any]] = []
+    for doc in reversed(docs):  # chronological order (oldest first)
+        param_data = (doc.output_parameters or {}).get(parameter_name)
+        if param_data is None:
+            continue
+        entry: dict[str, Any] = {
+            "start_at": doc.start_at.isoformat() if doc.start_at else None,
+            "execution_id": doc.execution_id,
+            "task_name": doc.name,
+        }
+        if isinstance(param_data, dict):
+            entry["value"] = param_data.get("value")
+            entry["unit"] = param_data.get("unit", "")
+            entry["calibrated_at"] = param_data.get("calibrated_at")
+        else:
+            entry["value"] = param_data
+            entry["unit"] = ""
+        results.append(entry)
+
+    if not results:
+        return [{"error": f"No results found for parameter '{parameter_name}' on qid={qid}"}]
+    return results
+
+
 def _build_tool_executors() -> dict[str, Any]:
     """Build the tool executor mapping for LLM function calling."""
+    from qdash.api.lib.copilot_sandbox import execute_python_analysis
+
     return {
         "get_qubit_params": lambda args: _load_qubit_params(args["chip_id"], args["qid"]),
         "get_latest_task_result": lambda args: _load_latest_task_result(
@@ -414,5 +627,11 @@ def _build_tool_executors() -> dict[str, Any]:
         ),
         "get_task_history": lambda args: _load_task_history(
             args["task_name"], args["chip_id"], args["qid"], args.get("last_n", 5)
+        ),
+        "get_parameter_timeseries": lambda args: _load_parameter_timeseries(
+            args["parameter_name"], args["chip_id"], args["qid"], args.get("last_n", 10)
+        ),
+        "execute_python_analysis": lambda args: execute_python_analysis(
+            args["code"], args.get("context_data")
         ),
     }

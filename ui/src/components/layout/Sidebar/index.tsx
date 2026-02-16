@@ -22,6 +22,7 @@ import {
   Moon,
   Settings,
   ShieldCheck,
+  BrainCircuit,
   Sun,
   Workflow,
   X,
@@ -211,6 +212,21 @@ function Sidebar() {
           >
             <BarChart3 size={18} />
             {(isOpen || isMobileOpen) && <span className="ml-2">Analysis</span>}
+          </Link>
+        </li>
+        <li>
+          <Link
+            href="/chat"
+            className={
+              isMobileOpen
+                ? linkClass(isActive("/chat"))
+                : desktopLinkClass(isActive("/chat"))
+            }
+            title="AI Chat"
+            onClick={handleLinkClick}
+          >
+            <BrainCircuit size={18} />
+            {(isOpen || isMobileOpen) && <span className="ml-2">AI Chat</span>}
           </Link>
         </li>
         <li>

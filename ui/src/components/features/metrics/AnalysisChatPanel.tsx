@@ -4,7 +4,7 @@ import React, { useState, useRef, useEffect, useMemo } from "react";
 import {
   Send,
   X,
-  Sparkles,
+  BrainCircuit,
   AlertTriangle,
   CheckCircle2,
   XCircle,
@@ -19,22 +19,52 @@ import {
   useAnalysisChat,
   type AnalysisContext,
   type ChatMessage,
+  type BlocksResult,
 } from "@/hooks/useAnalysisChat";
 import {
   useAnalysisChatContext,
   type ChatSession,
 } from "@/contexts/AnalysisChatContext";
+import { ChatPlotlyChart } from "@/components/features/chat/ChatPlotlyChart";
+import { CodeBlock } from "@/components/features/chat/CodeBlock";
 
 interface AnalysisChatPanelProps {
   context: AnalysisContext | null;
 }
 
 // ---------------------------------------------------------------------------
+// Markdown components with code block rendering
+// ---------------------------------------------------------------------------
+
+const markdownComponents = {
+  code({
+    className,
+    children,
+    ...props
+  }: React.ComponentPropsWithoutRef<"code"> & { className?: string }) {
+    const match = /language-(\w+)/.exec(className || "");
+    const codeString = String(children).replace(/\n$/, "");
+    if (match) {
+      return <CodeBlock language={match[1]}>{codeString}</CodeBlock>;
+    }
+    return (
+      <code className="bg-base-200 px-1 py-0.5 rounded text-sm" {...props}>
+        {children}
+      </code>
+    );
+  },
+};
+
+// ---------------------------------------------------------------------------
 // Sub-components
 // ---------------------------------------------------------------------------
 
-function AssessmentBadge({ content }: { content: string }) {
-  if (content.includes("[Good]")) {
+function AssessmentBadgeFromValue({
+  assessment,
+}: {
+  assessment: string | null;
+}) {
+  if (assessment === "good") {
     return (
       <span className="badge badge-success badge-sm gap-1">
         <CheckCircle2 className="w-3 h-3" />
@@ -42,7 +72,7 @@ function AssessmentBadge({ content }: { content: string }) {
       </span>
     );
   }
-  if (content.includes("[Warning]")) {
+  if (assessment === "warning") {
     return (
       <span className="badge badge-warning badge-sm gap-1">
         <AlertTriangle className="w-3 h-3" />
@@ -50,7 +80,7 @@ function AssessmentBadge({ content }: { content: string }) {
       </span>
     );
   }
-  if (content.includes("[Bad]")) {
+  if (assessment === "bad") {
     return (
       <span className="badge badge-error badge-sm gap-1">
         <XCircle className="w-3 h-3" />
@@ -59,6 +89,70 @@ function AssessmentBadge({ content }: { content: string }) {
     );
   }
   return null;
+}
+
+function AssessmentBadge({ content }: { content: string }) {
+  if (content.includes("[Good]")) {
+    return <AssessmentBadgeFromValue assessment="good" />;
+  }
+  if (content.includes("[Warning]")) {
+    return <AssessmentBadgeFromValue assessment="warning" />;
+  }
+  if (content.includes("[Bad]")) {
+    return <AssessmentBadgeFromValue assessment="bad" />;
+  }
+  return null;
+}
+
+/**
+ * Try to parse content as a blocks-format JSON string.
+ * Returns the parsed BlocksResult or null if not blocks format.
+ */
+function parseBlocksContent(content: string): BlocksResult | null {
+  if (!content.startsWith("{")) return null;
+  try {
+    const data = JSON.parse(content);
+    if (data.blocks && Array.isArray(data.blocks)) {
+      return data as BlocksResult;
+    }
+  } catch {
+    // Not JSON — legacy format
+  }
+  return null;
+}
+
+function BlocksContent({ blocks }: { blocks: BlocksResult }) {
+  return (
+    <>
+      {blocks.assessment && (
+        <AssessmentBadgeFromValue assessment={blocks.assessment} />
+      )}
+      {blocks.blocks.map((block, i) => {
+        if (block.type === "text" && block.content) {
+          return (
+            <div key={i} className="prose prose-sm max-w-none text-sm mt-1">
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                components={markdownComponents}
+              >
+                {block.content}
+              </ReactMarkdown>
+            </div>
+          );
+        }
+        if (block.type === "chart" && block.chart) {
+          return (
+            <ChatPlotlyChart
+              key={i}
+              data={block.chart.data as Record<string, unknown>[]}
+              layout={block.chart.layout as Record<string, unknown>}
+            />
+          );
+        }
+        return null;
+      })}
+    </>
+  );
 }
 
 function MessageBubble({ message }: { message: ChatMessage }) {
@@ -72,21 +166,32 @@ function MessageBubble({ message }: { message: ChatMessage }) {
     );
   }
 
+  const blocksResult = parseBlocksContent(message.content);
+
   return (
     <div className="flex gap-2">
       <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-        <Sparkles className="w-4 h-4 text-primary" />
+        <BrainCircuit className="w-4 h-4 text-primary" />
       </div>
       <div className="flex-1 min-w-0">
-        <AssessmentBadge content={message.content} />
-        <div className="prose prose-sm max-w-none text-sm mt-1">
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>
-            {message.content
-              .replace(/\*\*\[Good\]\*\*\s*/, "")
-              .replace(/\*\*\[Warning\]\*\*\s*/, "")
-              .replace(/\*\*\[Bad\]\*\*\s*/, "")}
-          </ReactMarkdown>
-        </div>
+        {blocksResult ? (
+          <BlocksContent blocks={blocksResult} />
+        ) : (
+          <>
+            <AssessmentBadge content={message.content} />
+            <div className="prose prose-sm max-w-none text-sm mt-1">
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                components={markdownComponents}
+              >
+                {message.content
+                  .replace(/\*\*\[Good\]\*\*\s*/, "")
+                  .replace(/\*\*\[Warning\]\*\*\s*/, "")
+                  .replace(/\*\*\[Bad\]\*\*\s*/, "")}
+              </ReactMarkdown>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
@@ -243,7 +348,7 @@ export function AnalysisChatPanel({ context }: AnalysisChatPanelProps) {
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-2.5 border-b border-base-300 bg-base-200/50">
         <div className="flex items-center gap-2 min-w-0">
-          <Sparkles className="w-4 h-4 text-primary flex-shrink-0" />
+          <BrainCircuit className="w-4 h-4 text-primary flex-shrink-0" />
           <div className="min-w-0">
             <h3 className="text-sm font-bold truncate">Ask AI</h3>
             {effectiveContext && (
@@ -290,9 +395,7 @@ export function AnalysisChatPanel({ context }: AnalysisChatPanelProps) {
           >
             <div className="flex items-center gap-1.5">
               <MessageSquare className="w-3 h-3" />
-              <span>
-                Sessions ({sessions.length})
-              </span>
+              <span>Sessions ({sessions.length})</span>
             </div>
             <ChevronDown
               className={`w-3 h-3 transition-transform ${showSessions ? "rotate-180" : ""}`}
@@ -320,14 +423,14 @@ export function AnalysisChatPanel({ context }: AnalysisChatPanelProps) {
       {/* No context — guide the user */}
       {!effectiveContext && (
         <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
-          <Sparkles className="w-10 h-10 text-primary/20 mb-4" />
+          <BrainCircuit className="w-10 h-10 text-primary/20 mb-4" />
           <p className="text-sm font-semibold text-base-content/70 mb-2">
             No analysis context selected
           </p>
           <p className="text-xs text-base-content/50 leading-relaxed">
             Open a metric detail modal and click{" "}
             <span className="badge badge-primary badge-xs gap-1 align-middle">
-              <Sparkles className="w-2.5 h-2.5" />
+              <BrainCircuit className="w-2.5 h-2.5" />
               Ask AI
             </span>{" "}
             to start analyzing calibration results.
@@ -360,7 +463,7 @@ export function AnalysisChatPanel({ context }: AnalysisChatPanelProps) {
           <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0">
             {messages.length === 0 ? (
               <div className="text-center py-8">
-                <Sparkles className="w-8 h-8 mx-auto text-primary/30 mb-3" />
+                <BrainCircuit className="w-8 h-8 mx-auto text-primary/30 mb-3" />
                 <p className="text-sm text-base-content/60 mb-4">
                   Ask about this calibration result
                 </p>
@@ -387,7 +490,7 @@ export function AnalysisChatPanel({ context }: AnalysisChatPanelProps) {
             {isLoading && (
               <div className="flex gap-2">
                 <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0 animate-pulse">
-                  <Sparkles className="w-4 h-4 text-primary" />
+                  <BrainCircuit className="w-4 h-4 text-primary" />
                 </div>
                 <div className="flex items-center gap-1.5 py-2">
                   {statusMessage ? (
