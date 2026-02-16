@@ -231,7 +231,9 @@ function SessionItem({
       <div className="flex items-start justify-between gap-1">
         <div className="min-w-0 flex-1">
           <div className="font-semibold truncate">
-            {session.context ? (session.context.taskName || "Untitled") : "General Chat"}
+            {session.context
+              ? session.context.taskName || "Untitled"
+              : "General Chat"}
           </div>
           <div className="text-base-content/50 truncate">
             {session.context ? session.context.qid : "No specific task"}
@@ -300,7 +302,10 @@ export function AnalysisChatPanel({ context }: AnalysisChatPanelProps) {
 
   // Restore messages from active session
   const initialMessages = useMemo(
-    () => (effectiveContext ? getSessionMessages(effectiveContext) : activeSession?.messages ?? []),
+    () =>
+      effectiveContext
+        ? getSessionMessages(effectiveContext)
+        : (activeSession?.messages ?? []),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [activeSessionId],
   );
@@ -315,7 +320,16 @@ export function AnalysisChatPanel({ context }: AnalysisChatPanelProps) {
           setSessionMessages(effectiveContext, msgs);
         } else {
           // General mode: sync messages via dummy context key
-          setSessionMessages({ taskId: "__general__", executionId: "", qid: "", taskName: "", chipId: "" } as AnalysisContext, msgs);
+          setSessionMessages(
+            {
+              taskId: "__general__",
+              executionId: "",
+              qid: "",
+              taskName: "",
+              chipId: "",
+            } as AnalysisContext,
+            msgs,
+          );
         }
       },
     },
@@ -479,9 +493,7 @@ export function AnalysisChatPanel({ context }: AnalysisChatPanelProps) {
             )}
           </div>
         ) : (
-          messages.map((msg, idx) => (
-            <MessageBubble key={idx} message={msg} />
-          ))
+          messages.map((msg, idx) => <MessageBubble key={idx} message={msg} />)
         )}
 
         {isLoading && (

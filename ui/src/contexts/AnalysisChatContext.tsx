@@ -147,7 +147,9 @@ export function AnalysisChatProvider({
 
   const openGeneralChat = useCallback(() => {
     // Find existing general session (no context)
-    const existing = sessions.find((s) => contextKey(s.context) === GENERAL_CHAT_KEY);
+    const existing = sessions.find(
+      (s) => contextKey(s.context) === GENERAL_CHAT_KEY,
+    );
     if (existing) {
       setActiveSessionId(existing.id);
     } else {
@@ -180,20 +182,23 @@ export function AnalysisChatProvider({
     setActiveSessionId(sessionId);
   }, []);
 
-  const createNewSession = useCallback((ctx: AnalysisContext | null): string => {
-    const id = generateId();
-    const now = Date.now();
-    const session: ChatSession = {
-      id,
-      context: ctx,
-      messages: [],
-      createdAt: now,
-      updatedAt: now,
-    };
-    setSessions((prev) => [session, ...prev]);
-    setActiveSessionId(id);
-    return id;
-  }, []);
+  const createNewSession = useCallback(
+    (ctx: AnalysisContext | null): string => {
+      const id = generateId();
+      const now = Date.now();
+      const session: ChatSession = {
+        id,
+        context: ctx,
+        messages: [],
+        createdAt: now,
+        updatedAt: now,
+      };
+      setSessions((prev) => [session, ...prev]);
+      setActiveSessionId(id);
+      return id;
+    },
+    [],
+  );
 
   const deleteSession = useCallback(
     (sessionId: string) => {

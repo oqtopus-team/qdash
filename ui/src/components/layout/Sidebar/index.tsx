@@ -48,7 +48,11 @@ function Sidebar() {
   const { isOpen, isMobileOpen, toggleSidebar, setMobileSidebarOpen } =
     useSidebar();
   const { canEdit } = useProject();
-  const { isOpen: isAnalysisSidebarOpen, openGeneralChat, closeAnalysisChat } = useAnalysisChatContext();
+  const {
+    isOpen: isAnalysisSidebarOpen,
+    openGeneralChat,
+    closeAnalysisChat,
+  } = useAnalysisChatContext();
   const { user, logout: authLogout } = useAuth();
   const { theme, setTheme } = useTheme();
   const isAdmin = user?.system_role === "admin";
