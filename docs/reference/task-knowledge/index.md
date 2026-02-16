@@ -2,6 +2,35 @@
 
 Calibration task knowledge base for QDash copilot analysis. Each page describes what a task measures, its physical principle, expected results, evaluation criteria, common failure patterns, and tips for improvement.
 
+## Box Setup
+
+| Task | Description |
+|------|-------------|
+| [CheckStatus](./CheckStatus) | Checks the status of the experiment and control hardware. |
+| [LinkUp](./LinkUp) | Initializes and links up the control box hardware. |
+| [DumpBox](./DumpBox) | Dumps diagnostic information from all control boxes. |
+| [CheckNoise](./CheckNoise) | Checks the noise levels in the control and readout system. |
+| [Configure](./Configure) | Loads and applies the full calibration state configuration to the control boxes. |
+| [ReadoutConfigure](./ReadoutConfigure) | Configures readout parameters for a specified subset of qubits. |
+
+## System
+
+| Task | Description |
+|------|-------------|
+| [CheckSkew](./CheckSkew) | Measures and corrects time skew between multiple control boxes. |
+
+## CW Spectroscopy
+
+| Task | Description |
+|------|-------------|
+| [CheckResonatorFrequencies](./CheckResonatorFrequencies) | Coarse frequency scan to locate readout resonator resonance frequencies. |
+| [CheckResonatorSpectroscopy](./CheckResonatorSpectroscopy) | High-resolution 2D spectroscopy of all resonators in a readout multiplexer (MUX). |
+| [CheckReflectionCoefficient](./CheckReflectionCoefficient) | Measures resonator reflection coefficient to extract frequency and coupling rates. |
+| [CheckElectricalDelay](./CheckElectricalDelay) | Measures the electrical delay in the readout line. |
+| [CheckReadoutAmplitude](./CheckReadoutAmplitude) | Optimizes readout pulse amplitude by measuring signal-to-noise ratio. |
+| [CheckQubitFrequencies](./CheckQubitFrequencies) | Coarse qubit frequency scan to locate the qubit transition frequency. |
+| [CheckQubitSpectroscopy](./CheckQubitSpectroscopy) | High-resolution qubit spectroscopy to measure transition frequencies and anharmonicity. |
+
 ## One-Qubit Calibration
 
 | Task | Description |
