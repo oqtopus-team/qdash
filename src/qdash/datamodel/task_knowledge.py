@@ -49,6 +49,41 @@ class RelatedContextItem(BaseModel):
     last_n: int = Field(default=5, description="Number of recent results (for history type)")
 
 
+class ExpectedResult(BaseModel):
+    """Structured description of the expected experimental result."""
+
+    description: str = Field(
+        default="", description="Natural-language description of expected result"
+    )
+    result_type: str = Field(
+        default="",
+        description="Result type: decay_curve|oscillation|2d_map|histogram|scatter_plot|peak_curve|scalar_metric",
+    )
+    x_axis: str = Field(default="", description="X-axis label and unit")
+    y_axis: str = Field(default="", description="Y-axis label and unit")
+    z_axis: str = Field(default="", description="Z-axis label and unit (for 2D maps)")
+    fit_model: str = Field(default="", description="Fitting model equation (if applicable)")
+    typical_range: str = Field(default="", description="Typical value range for the metric")
+    good_visual: str = Field(default="", description="Visual characteristics of a good result")
+
+
+class FailureMode(BaseModel):
+    """Structured failure pattern with severity and remediation info."""
+
+    severity: str = Field(description="Severity level: 'critical', 'warning', or 'info'")
+    description: str = Field(description="Description of the failure pattern")
+    cause: str = Field(default="", description="Root cause explanation")
+    visual: str = Field(default="", description="Visual characteristics in the result graph")
+    next_action: str = Field(default="", description="Recommended next action")
+
+
+class OutputParameterInfo(BaseModel):
+    """Description of an output parameter and its expected value."""
+
+    name: str = Field(description="Parameter key name")
+    description: str = Field(description="Explanation and expected value range")
+
+
 class TaskKnowledge(BaseModel):
     """LLM-oriented structured knowledge for a calibration task."""
 
@@ -58,19 +93,37 @@ class TaskKnowledge(BaseModel):
     physical_principle: str = Field(
         description="Concise explanation of the physical principle, including pulse sequences"
     )
-    expected_curve: str = Field(description="Expected shape and features of the result graph")
-    good_threshold: str = Field(description="Quantitative criteria for good / excellent results")
-    failure_modes: list[str] = Field(
+    expected_result: ExpectedResult = Field(
+        default_factory=lambda: ExpectedResult(),
+        description="Expected shape and features of the result",
+    )
+    evaluation_criteria: str = Field(
+        default="",
+        description="Qualitative evaluation criteria (thresholds are in copilot.yaml)",
+    )
+    check_questions: list[str] = Field(
         default_factory=list,
-        description="Common failure patterns and their likely causes",
+        description="Rubric-style questions for LLM to evaluate",
+    )
+    failure_modes: list[FailureMode] = Field(
+        default_factory=list,
+        description="Common failure patterns with severity and remediation",
     )
     tips: list[str] = Field(
         default_factory=list,
         description="Practical tips for improving results",
     )
-    raw_markdown: str = Field(
-        default="",
-        description="Original markdown source for LLM context",
+    output_parameters_info: list[OutputParameterInfo] = Field(
+        default_factory=list,
+        description="Descriptions of output parameter keys",
+    )
+    analysis_guide: list[str] = Field(
+        default_factory=list,
+        description="Step-by-step reasoning guide for the LLM",
+    )
+    prerequisites: list[str] = Field(
+        default_factory=list,
+        description="Tasks that should be completed before this one",
     )
     images: list[TaskKnowledgeImage] = Field(
         default_factory=list,
@@ -82,7 +135,11 @@ class TaskKnowledge(BaseModel):
     )
 
     def to_prompt(self) -> str:
-        """Convert to a markdown string suitable for an LLM system prompt."""
+        """Convert to a markdown string suitable for an LLM system prompt.
+
+        Note: Deployment-specific scoring thresholds are NOT included here;
+        they are injected separately by copilot_agent._build_system_prompt().
+        """
         lines = [
             f"## Experiment: {self.name}",
             self.summary,
@@ -93,24 +150,76 @@ class TaskKnowledge(BaseModel):
             "### Physical principle",
             self.physical_principle,
             "",
-            "### Expected graph",
-            self.expected_curve,
-            "",
-            "### Evaluation criteria",
-            self.good_threshold,
+            "### Expected result",
+            self.expected_result.description,
         ]
-        if self.failure_modes:
+        # Add structured metadata if present
+        er = self.expected_result
+        meta_parts = []
+        if er.result_type:
+            meta_parts.append(f"- Result type: {er.result_type}")
+        if er.x_axis:
+            meta_parts.append(f"- X-axis: {er.x_axis}")
+        if er.y_axis:
+            meta_parts.append(f"- Y-axis: {er.y_axis}")
+        if er.z_axis:
+            meta_parts.append(f"- Z-axis: {er.z_axis}")
+        if er.fit_model:
+            meta_parts.append(f"- Fit model: {er.fit_model}")
+        if er.typical_range:
+            meta_parts.append(f"- Typical range: {er.typical_range}")
+        if er.good_visual:
+            meta_parts.append(f"- Good result looks like: {er.good_visual}")
+        if meta_parts:
+            lines += ["", *meta_parts]
+
+        if self.evaluation_criteria:
             lines += [
                 "",
-                "### Common failure patterns",
-                *[f"- {f}" for f in self.failure_modes],
+                "### Evaluation criteria",
+                self.evaluation_criteria,
             ]
+        if self.check_questions:
+            lines += ["", "**Check questions:**"]
+            lines += [f"- {q}" for q in self.check_questions]
+
+        if self.output_parameters_info:
+            lines += ["", "### Output parameters"]
+            for p in self.output_parameters_info:
+                lines.append(f"- **{p.name}**: {p.description}")
+
+        if self.failure_modes:
+            lines += ["", "### Common failure patterns"]
+            for f in self.failure_modes:
+                lines.append(f"- [{f.severity}] {f.description}")
+                if f.cause:
+                    lines.append(f"  - Cause: {f.cause}")
+                if f.visual:
+                    lines.append(f"  - Visual: {f.visual}")
+                if f.next_action:
+                    lines.append(f"  - Next: {f.next_action}")
+
         if self.tips:
             lines += [
                 "",
                 "### Tips for improvement",
                 *[f"- {t}" for t in self.tips],
             ]
+
+        if self.analysis_guide:
+            lines += ["", "### Analysis guide"]
+            for i, step in enumerate(self.analysis_guide, 1):
+                lines.append(f"{i}. {step}")
+
+        if self.prerequisites:
+            lines += ["", "### Prerequisites"]
+            lines += [f"- {p}" for p in self.prerequisites]
+
+        if self.images:
+            lines += ["", "### Reference figures"]
+            for img in self.images:
+                lines.append(f"- {img.alt_text}: {img.relative_path}")
+
         return "\n".join(lines)
 
 

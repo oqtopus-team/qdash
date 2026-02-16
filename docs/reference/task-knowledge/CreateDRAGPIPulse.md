@@ -10,22 +10,65 @@ Optimal DRAG derivative coefficient (beta) for X180 gate.
 
 Scan DRAG beta parameter while monitoring leakage to |2⟩; find the minimum leakage point. Amplitude scan refines the rotation angle.
 
-## Expected curve
+## Expected result
 
 Leakage vs beta shows a minimum; amplitude scan gives exact π rotation.
 
+- result_type: peak_curve
+- x_axis: DRAG beta parameter
+- y_axis: Leakage rate or population error
+- good_visual: clear minimum in leakage vs beta curve with well-defined optimum
+
+![DRAG PI pulse calibration](figures/CreateDRAGPIPulse/0.png)
+
 ## Evaluation criteria
 
-Leakage <0.1% at optimal beta; amplitude gives exact π rotation.
+The optimal beta should produce minimal leakage; the amplitude should give exact π rotation.
+
+- check_questions:
+  - "Is the leakage <0.1% at the optimal beta?"
+  - "Is the leakage minimum well-defined (not flat)?"
+  - "Does the amplitude give exact π rotation?"
+
+## Output parameters
+
+- drag_beta: Optimal DRAG derivative coefficient
+- pi_pulse_amplitude: Refined π pulse amplitude with DRAG
+- leakage_rate: Leakage to |2⟩ at optimal parameters; expected < 0.001
 
 ## Common failure patterns
 
-- Flat leakage landscape – anharmonicity too large or pulse too slow for DRAG to matter.
-- Multiple local minima – coarse scan range needed.
-- Pulse distortion from AWG – DRAG waveform not faithfully reproduced.
+- [info] Flat leakage landscape
+  - cause: anharmonicity too large or pulse too slow for DRAG to matter
+  - visual: leakage vs beta is nearly flat, no clear minimum
+  - next: DRAG may not be necessary for this qubit, proceed without it
+- [warning] Multiple local minima
+  - cause: complex leakage landscape
+  - visual: several dips in leakage vs beta curve
+  - next: widen scan range, use coarse-then-fine optimization
+- [warning] Pulse distortion from AWG
+  - cause: DRAG waveform not faithfully reproduced by hardware
+  - visual: leakage minimum not at expected beta value
+  - next: check AWG bandwidth and fidelity
 
 ## Tips for improvement
 
 - Start with beta ≈ anharmonicity^(-1) as initial guess.
 - Ensure pulse bandwidth is within DAC/AWG limits.
 - Run after anharmonicity measurement for accurate initial parameters.
+
+## Analysis guide
+
+1. Identify the leakage minimum in the beta scan.
+2. Verify the minimum is well-defined (not flat plateau).
+3. Check the refined amplitude gives exact π rotation.
+4. Compare beta with the theoretical estimate (anharmonicity^(-1)).
+
+## Prerequisites
+
+- CreatePIPulse
+- CheckQubitFrequency
+
+## Related context
+
+- history(last_n=5)
