@@ -23,6 +23,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 MD_DIR = REPO_ROOT / "docs" / "reference" / "task-knowledge"
 OUTPUT_FILE = REPO_ROOT / "config" / "task-knowledge.json"
+SIDEBAR_FILE = REPO_ROOT / "docs" / ".vitepress" / "task-knowledge-sidebar.json"
 
 # ---------------------------------------------------------------------------
 # Markdown parser (standalone – no project imports required)
@@ -489,6 +490,44 @@ def _generate_index(registry: dict[str, dict]) -> None:
     print(f"Generated {index_path}")
 
 
+def _generate_sidebar(registry: dict[str, dict]) -> None:
+    """Generate ``task-knowledge-sidebar.json`` for VitePress sidebar config."""
+    categorised: set[str] = set()
+    items: list[dict] = []
+
+    for cat_name, cat_tasks in _CATEGORIES:
+        present = [t for t in cat_tasks if t in registry]
+        if not present:
+            continue
+        group: dict = {
+            "text": cat_name,
+            "collapsed": True,
+            "items": [
+                {"text": t, "link": f"/reference/task-knowledge/{t}"}
+                for t in present
+            ],
+        }
+        items.append(group)
+        categorised.update(present)
+
+    remaining = sorted(set(registry.keys()) - categorised)
+    if remaining:
+        items.append({
+            "text": "Other",
+            "collapsed": True,
+            "items": [
+                {"text": t, "link": f"/reference/task-knowledge/{t}"}
+                for t in remaining
+            ],
+        })
+
+    SIDEBAR_FILE.write_text(
+        json.dumps(items, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    print(f"Generated {SIDEBAR_FILE}")
+
+
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
@@ -547,6 +586,7 @@ def main() -> int:
     print(f"\nGenerated {OUTPUT_FILE} ({len(registry)} entries)")
 
     _generate_index(registry)
+    _generate_sidebar(registry)
     return 0
 
 
