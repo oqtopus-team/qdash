@@ -19,9 +19,9 @@ import { TaskFigure } from "@/components/charts/TaskFigure";
 import { formatDateTime, formatDateTimeCompact } from "@/utils/datetime";
 
 import { ParametersTable } from "./ParametersTable";
-import { AnalysisChatPanel } from "./AnalysisChatPanel";
 import type { AnalysisContext } from "@/hooks/useAnalysisChat";
 import type { MetricHistoryItem } from "./MetricHistoryView";
+import { useAnalysisChatContext } from "@/contexts/AnalysisChatContext";
 
 interface CouplingMetricHistoryModalProps {
   chipId: string;
@@ -60,7 +60,7 @@ export function CouplingMetricHistoryModal({
   );
   const [selectedTaskIndex, setSelectedTaskIndex] = useState(0);
   const [mobileTab, setMobileTab] = useState<MobileTab>("history");
-  const [showAnalysis, setShowAnalysis] = useState(false);
+  const { openAnalysisChat } = useAnalysisChatContext();
 
   // Direction toggle: forward = original coupling ID, reverse = reversed
   const [isReversed, setIsReversed] = useState(false);
@@ -549,13 +549,15 @@ export function CouplingMetricHistoryModal({
               <GitBranch className="h-3 w-3" />
               View Provenance Lineage
             </Link>
-            <button
-              onClick={() => setShowAnalysis(true)}
-              className="btn btn-xs btn-primary gap-1"
-            >
-              <Sparkles className="h-3 w-3" />
-              Ask AI
-            </button>
+            {analysisContext && (
+              <button
+                onClick={() => openAnalysisChat(analysisContext)}
+                className="btn btn-xs btn-primary gap-1"
+              >
+                <Sparkles className="h-3 w-3" />
+                Ask AI
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -637,35 +639,19 @@ export function CouplingMetricHistoryModal({
       {/* Desktop Layout */}
       <div className="hidden lg:flex gap-4 h-full min-h-0">
         {/* Column 1: Execution History */}
-        <div
-          className={`${showAnalysis ? "w-1/5" : "w-1/4"} flex flex-col min-h-0 border-r border-base-300 pr-4 transition-all`}
-        >
+        <div className="w-1/4 flex flex-col min-h-0 border-r border-base-300 pr-4">
           {renderExecutionHistory()}
         </div>
 
         {/* Column 2: Tasks */}
-        <div
-          className={`${showAnalysis ? "w-1/5" : "w-1/4"} flex flex-col min-h-0 border-r border-base-300 pr-4 transition-all`}
-        >
+        <div className="w-1/4 flex flex-col min-h-0 border-r border-base-300 pr-4">
           {renderTasksList()}
         </div>
 
         {/* Column 3: Details – scrollable */}
-        <div
-          className={`${showAnalysis ? "w-[35%]" : "w-1/2"} overflow-y-auto min-h-0 transition-all`}
-        >
+        <div className="w-1/2 overflow-y-auto min-h-0">
           {renderTaskDetails()}
         </div>
-
-        {/* Column 4: AI Analysis Panel */}
-        {showAnalysis && (
-          <div className="w-1/4 min-h-0">
-            <AnalysisChatPanel
-              context={analysisContext}
-              onClose={() => setShowAnalysis(false)}
-            />
-          </div>
-        )}
       </div>
     </div>
   );

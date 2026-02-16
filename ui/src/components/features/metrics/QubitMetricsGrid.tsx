@@ -1,13 +1,6 @@
 "use client";
 
-import React, {
-  useMemo,
-  useState,
-  useRef,
-  useLayoutEffect,
-  useCallback,
-  memo,
-} from "react";
+import React, { useMemo, useState, useRef, useCallback, memo } from "react";
 import Link from "next/link";
 import {
   TransformWrapper,
@@ -27,6 +20,7 @@ import {
 import { calculateGridContainerWidth } from "@/utils/gridLayout";
 
 import { QubitMetricHistoryModal } from "./QubitMetricHistoryModal";
+import { useAnalysisChatContext } from "@/contexts/AnalysisChatContext";
 
 interface MetricValue {
   value: number | null;
@@ -281,8 +275,6 @@ export function QubitMetricsGrid({
   // Modal state
   const [selectedQubitInfo, setSelectedQubitInfo] =
     useState<SelectedQubitInfo | null>(null);
-  const modalRef = useRef<HTMLDialogElement>(null);
-
   // Grid layout
   const displayCols = zoomMode === "region" ? regionSize : gridCols;
   const displayRows = zoomMode === "region" ? regionSize : gridRows;
@@ -294,17 +286,8 @@ export function QubitMetricsGrid({
       deps: [metricData],
     });
 
-  // Modal control
   const isModalOpen = selectedQubitInfo !== null;
-  useLayoutEffect(() => {
-    const modal = modalRef.current;
-    if (!modal) return;
-    if (isModalOpen && !modal.open) {
-      modal.showModal();
-    } else if (!isModalOpen && modal.open) {
-      modal.close();
-    }
-  }, [isModalOpen]);
+  const { isOpen: isSidebarOpen } = useAnalysisChatContext();
 
   const numRegions = Math.floor(effectiveGridSize / regionSize);
   const isSquareGrid = gridRows === gridCols;
@@ -768,12 +751,26 @@ export function QubitMetricsGrid({
       </div>
 
       {/* Qubit Detail Modal */}
-      <dialog
-        ref={modalRef}
-        className="modal modal-bottom sm:modal-middle"
-        onClose={() => setSelectedQubitInfo(null)}
+      <div
+        className={`modal modal-bottom sm:modal-middle ${isModalOpen ? "modal-open" : ""}`}
+        style={{
+          width: isSidebarOpen ? "calc(100% - 20rem)" : "100%",
+          maxWidth: "none",
+          transition: "width 300ms ease",
+        }}
+        onClick={(e) => {
+          if (e.target === e.currentTarget) setSelectedQubitInfo(null);
+        }}
       >
-        <div className="modal-box w-full sm:w-[95vw] max-w-[1800px] bg-base-100 p-0 h-[90vh] sm:h-[95vh] overflow-hidden flex flex-col">
+        <div
+          className="modal-box w-full bg-base-100 p-0 h-[90vh] sm:h-[95vh] overflow-hidden flex flex-col"
+          style={{
+            maxWidth: isSidebarOpen
+              ? "min(calc(100vw - 22rem), 1400px)"
+              : "1800px",
+            transition: "max-width 300ms ease",
+          }}
+        >
           {selectedQubitInfo && (
             <>
               <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-base-300 flex items-center justify-between">
@@ -828,10 +825,7 @@ export function QubitMetricsGrid({
             </>
           )}
         </div>
-        <form method="dialog" className="modal-backdrop">
-          <button>close</button>
-        </form>
-      </dialog>
+      </div>
     </div>
   );
 }

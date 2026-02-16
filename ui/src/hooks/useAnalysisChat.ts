@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { flushSync } from "react-dom";
 
 export interface ChatMessage {
@@ -67,33 +67,83 @@ interface SSEEvent {
   data: string;
 }
 
-function parseSSEEvents(text: string): SSEEvent[] {
+/**
+ * Parse complete SSE events from the buffer.
+ * Returns { events, remainder } where remainder is the unparsed trailing text.
+ */
+function consumeSSEEvents(text: string): {
+  events: SSEEvent[];
+  remainder: string;
+} {
   const events: SSEEvent[] = [];
-  const blocks = text.split("\n\n");
+
+  // Only process up to the last complete block (terminated by \n\n)
+  const lastDoubleNewline = text.lastIndexOf("\n\n");
+  if (lastDoubleNewline === -1) {
+    // No complete event yet — keep everything in buffer
+    return { events, remainder: text };
+  }
+
+  const completePart = text.slice(0, lastDoubleNewline);
+  const remainder = text.slice(lastDoubleNewline + 2);
+
+  const blocks = completePart.split("\n\n");
   for (const block of blocks) {
     if (!block.trim()) continue;
     let event = "";
-    let data = "";
+    const dataLines: string[] = [];
     for (const line of block.split("\n")) {
       if (line.startsWith("event: ")) {
         event = line.slice(7);
       } else if (line.startsWith("data: ")) {
-        data = line.slice(6);
+        dataLines.push(line.slice(6));
+      } else if (line.startsWith("data:")) {
+        // "data:" with no space (empty or continuation)
+        dataLines.push(line.slice(5));
       }
     }
+    const data = dataLines.join("\n");
     if (event && data) {
       events.push({ event, data });
     }
   }
-  return events;
+  return { events, remainder };
 }
 
-export function useAnalysisChat(context: AnalysisContext | null) {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+export function useAnalysisChat(
+  context: AnalysisContext | null,
+  options?: {
+    initialMessages?: ChatMessage[];
+    onMessagesChange?: (messages: ChatMessage[]) => void;
+  },
+) {
+  const [messages, setMessagesRaw] = useState<ChatMessage[]>(
+    options?.initialMessages ?? [],
+  );
   const [isLoading, setIsLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const onMessagesChangeRef = useRef(options?.onMessagesChange);
+  onMessagesChangeRef.current = options?.onMessagesChange;
+
+  // Wrapper that also syncs to external store
+  const setMessages: typeof setMessagesRaw = useCallback((updater) => {
+    setMessagesRaw((prev) => {
+      const next = typeof updater === "function" ? updater(prev) : updater;
+      onMessagesChangeRef.current?.(next);
+      return next;
+    });
+  }, []);
+
+  // Sync from external initial messages when they change (context switch)
+  const initialRef = useRef(options?.initialMessages);
+  useEffect(() => {
+    if (options?.initialMessages !== initialRef.current) {
+      initialRef.current = options?.initialMessages;
+      setMessagesRaw(options?.initialMessages ?? []);
+    }
+  }, [options?.initialMessages]);
 
   const sendMessage = useCallback(
     async (userMessage: string, imageBase64?: string) => {
@@ -152,13 +202,9 @@ export function useAnalysisChat(context: AnalysisContext | null) {
 
           buffer += decoder.decode(value, { stream: true });
 
-          // Process complete SSE events (delimited by \n\n)
-          const events = parseSSEEvents(buffer);
-          // Keep the last incomplete block in buffer
-          const lastDoubleNewline = buffer.lastIndexOf("\n\n");
-          if (lastDoubleNewline !== -1) {
-            buffer = buffer.slice(lastDoubleNewline + 2);
-          }
+          // Process only complete SSE events (delimited by \n\n)
+          const { events, remainder } = consumeSSEEvents(buffer);
+          buffer = remainder;
 
           for (const evt of events) {
             if (evt.event === "status") {
@@ -197,7 +243,7 @@ export function useAnalysisChat(context: AnalysisContext | null) {
         abortRef.current = null;
       }
     },
-    [context, messages],
+    [context, messages, setMessages],
   );
 
   const clearMessages = useCallback(() => {
@@ -205,7 +251,7 @@ export function useAnalysisChat(context: AnalysisContext | null) {
     setMessages([]);
     setError(null);
     setStatusMessage(null);
-  }, []);
+  }, [setMessages]);
 
   return {
     messages,
