@@ -25,11 +25,11 @@ Calibration task knowledge base for QDash copilot analysis. Each page describes 
 |------|-------------|
 | [CheckResonatorFrequencies](./CheckResonatorFrequencies) | Coarse frequency scan to locate readout resonator resonance frequencies. |
 | [CheckResonatorSpectroscopy](./CheckResonatorSpectroscopy) | High-resolution 2D spectroscopy of all resonators in a readout multiplexer (MUX). |
-| [CheckReflectionCoefficient](./CheckReflectionCoefficient) | Measures resonator reflection coefficient to extract frequency and coupling rates. |
+| [CheckReflectionCoefficient](./CheckReflectionCoefficient) | Measures the resonator reflection coefficient to extract resonator frequency and coupling rates. |
 | [CheckElectricalDelay](./CheckElectricalDelay) | Measures the electrical delay in the readout line. |
-| [CheckReadoutAmplitude](./CheckReadoutAmplitude) | Optimizes readout pulse amplitude by measuring signal-to-noise ratio. |
+| [CheckReadoutAmplitude](./CheckReadoutAmplitude) | Optimizes readout pulse amplitude by sweeping amplitude and measuring signal-to-noise ratio. |
 | [CheckQubitFrequencies](./CheckQubitFrequencies) | Coarse qubit frequency scan to locate the qubit transition frequency. |
-| [CheckQubitSpectroscopy](./CheckQubitSpectroscopy) | High-resolution qubit spectroscopy to measure transition frequencies and anharmonicity. |
+| [CheckQubitSpectroscopy](./CheckQubitSpectroscopy) | High-resolution qubit spectroscopy to measure qubit transition frequencies and anharmonicity. |
 
 ## One-Qubit Calibration
 

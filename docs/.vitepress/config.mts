@@ -1,6 +1,7 @@
 import { defineConfig } from "vitepress";
 import { withMermaid } from "vitepress-plugin-mermaid";
 import { full as emoji } from "markdown-it-emoji";
+import taskKnowledgeSidebar from "./task-knowledge-sidebar.json";
 
 // Convert emoji to Fluent Emoji (flat SVG)
 function emojiToCodePoints(emoji: string): string {
@@ -144,36 +145,7 @@ export default withMermaid(
               text: "Task Knowledge",
               collapsed: true,
               link: "/reference/task-knowledge/",
-              items: [
-                { text: "CheckQubit", link: "/reference/task-knowledge/CheckQubit" },
-                { text: "CheckQubitFrequency", link: "/reference/task-knowledge/CheckQubitFrequency" },
-                { text: "CheckReadoutFrequency", link: "/reference/task-knowledge/CheckReadoutFrequency" },
-                { text: "CheckRabi", link: "/reference/task-knowledge/CheckRabi" },
-                { text: "CheckT1", link: "/reference/task-knowledge/CheckT1" },
-                { text: "CheckT2Echo", link: "/reference/task-knowledge/CheckT2Echo" },
-                { text: "CheckRamsey", link: "/reference/task-knowledge/CheckRamsey" },
-                { text: "CheckDispersiveShift", link: "/reference/task-knowledge/CheckDispersiveShift" },
-                { text: "CheckOptimalReadoutAmplitude", link: "/reference/task-knowledge/CheckOptimalReadoutAmplitude" },
-                { text: "ReadoutClassification", link: "/reference/task-knowledge/ReadoutClassification" },
-                { text: "CheckPIPulse", link: "/reference/task-knowledge/CheckPIPulse" },
-                { text: "CheckHPIPulse", link: "/reference/task-knowledge/CheckHPIPulse" },
-                { text: "CheckDRAGPIPulse", link: "/reference/task-knowledge/CheckDRAGPIPulse" },
-                { text: "CheckDRAGHPIPulse", link: "/reference/task-knowledge/CheckDRAGHPIPulse" },
-                { text: "CreatePIPulse", link: "/reference/task-knowledge/CreatePIPulse" },
-                { text: "CreateHPIPulse", link: "/reference/task-knowledge/CreateHPIPulse" },
-                { text: "CreateDRAGPIPulse", link: "/reference/task-knowledge/CreateDRAGPIPulse" },
-                { text: "CreateDRAGHPIPulse", link: "/reference/task-knowledge/CreateDRAGHPIPulse" },
-                { text: "CheckCrossResonance", link: "/reference/task-knowledge/CheckCrossResonance" },
-                { text: "ChevronPattern", link: "/reference/task-knowledge/ChevronPattern" },
-                { text: "CheckZX90", link: "/reference/task-knowledge/CheckZX90" },
-                { text: "CreateZX90", link: "/reference/task-knowledge/CreateZX90" },
-                { text: "CheckBellState", link: "/reference/task-knowledge/CheckBellState" },
-                { text: "CheckBellStateTomography", link: "/reference/task-knowledge/CheckBellStateTomography" },
-                { text: "RandomizedBenchmarking", link: "/reference/task-knowledge/RandomizedBenchmarking" },
-                { text: "X90InterleavedRandomizedBenchmarking", link: "/reference/task-knowledge/X90InterleavedRandomizedBenchmarking" },
-                { text: "X180InterleavedRandomizedBenchmarking", link: "/reference/task-knowledge/X180InterleavedRandomizedBenchmarking" },
-                { text: "ZX90InterleavedRandomizedBenchmarking", link: "/reference/task-knowledge/ZX90InterleavedRandomizedBenchmarking" },
-              ],
+              items: taskKnowledgeSidebar,
             },
           ],
         },
