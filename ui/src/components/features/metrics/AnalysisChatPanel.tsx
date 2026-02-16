@@ -9,6 +9,9 @@ import {
   CheckCircle2,
   XCircle,
   Trash2,
+  Plus,
+  ChevronDown,
+  MessageSquare,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -17,11 +20,18 @@ import {
   type AnalysisContext,
   type ChatMessage,
 } from "@/hooks/useAnalysisChat";
-import { useAnalysisChatContext } from "@/contexts/AnalysisChatContext";
+import {
+  useAnalysisChatContext,
+  type ChatSession,
+} from "@/contexts/AnalysisChatContext";
 
 interface AnalysisChatPanelProps {
   context: AnalysisContext | null;
 }
+
+// ---------------------------------------------------------------------------
+// Sub-components
+// ---------------------------------------------------------------------------
 
 function AssessmentBadge({ content }: { content: string }) {
   if (content.includes("[Good]")) {
@@ -82,6 +92,69 @@ function MessageBubble({ message }: { message: ChatMessage }) {
   );
 }
 
+function formatTimeAgo(ts: number): string {
+  const diff = Date.now() - ts;
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
+
+function SessionItem({
+  session,
+  isActive,
+  onSelect,
+  onDelete,
+}: {
+  session: ChatSession;
+  isActive: boolean;
+  onSelect: () => void;
+  onDelete: () => void;
+}) {
+  return (
+    <button
+      onClick={onSelect}
+      className={`w-full text-left px-3 py-2 rounded-lg transition-colors text-xs group ${
+        isActive
+          ? "bg-primary/10 border border-primary/30"
+          : "hover:bg-base-200 border border-transparent"
+      }`}
+    >
+      <div className="flex items-start justify-between gap-1">
+        <div className="min-w-0 flex-1">
+          <div className="font-semibold truncate">
+            {session.context.taskName || "Untitled"}
+          </div>
+          <div className="text-base-content/50 truncate">
+            {session.context.qid}
+          </div>
+          <div className="flex items-center gap-2 mt-0.5 text-base-content/40">
+            <span>{session.messages.length} msgs</span>
+            <span>{formatTimeAgo(session.updatedAt)}</span>
+          </div>
+        </div>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete();
+          }}
+          className="btn btn-ghost btn-xs btn-square opacity-0 group-hover:opacity-100 shrink-0"
+          title="Delete session"
+        >
+          <Trash2 className="w-3 h-3" />
+        </button>
+      </div>
+    </button>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
 const SUGGESTED_QUESTIONS = [
   "How should I interpret this result?",
   "Is this value within expected range?",
@@ -89,30 +162,42 @@ const SUGGESTED_QUESTIONS = [
   "What should I try next?",
 ];
 
+// ---------------------------------------------------------------------------
+// Main component
+// ---------------------------------------------------------------------------
+
 export function AnalysisChatPanel({ context }: AnalysisChatPanelProps) {
   const {
     closeAnalysisChat,
-    clearCurrentSession,
+    sessions,
+    activeSessionId,
+    activeSession,
+    switchSession,
+    createNewSession,
+    deleteSession,
+    clearActiveSession,
     getSessionMessages,
     setSessionMessages,
   } = useAnalysisChatContext();
 
-  // clearKey forces re-computation of initialMessages after clearing
-  const [clearKey, setClearKey] = useState(0);
+  const [showSessions, setShowSessions] = useState(false);
 
-  // Restore messages from session store
+  // The context to use for the chat: prefer active session's context
+  const effectiveContext = activeSession?.context ?? context;
+
+  // Restore messages from active session
   const initialMessages = useMemo(
-    () => (context ? getSessionMessages(context) : []),
+    () => (effectiveContext ? getSessionMessages(effectiveContext) : []),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [context?.taskId, context?.executionId, context?.qid, clearKey],
+    [activeSessionId],
   );
 
   const { messages, isLoading, statusMessage, sendMessage } = useAnalysisChat(
-    context,
+    effectiveContext ?? null,
     {
       initialMessages,
       onMessagesChange: (msgs) => {
-        if (context) setSessionMessages(context, msgs);
+        if (effectiveContext) setSessionMessages(effectiveContext, msgs);
       },
     },
   );
@@ -121,19 +206,19 @@ export function AnalysisChatPanel({ context }: AnalysisChatPanelProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  // Auto-scroll to bottom on new messages or status changes
+  // Auto-scroll to bottom
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, statusMessage]);
 
-  // Focus input on open
+  // Focus input when session changes
   useEffect(() => {
     inputRef.current?.focus();
-  }, [context]);
+  }, [activeSessionId]);
 
   const handleSend = () => {
     const trimmed = input.trim();
-    if (!trimmed || isLoading || !context) return;
+    if (!trimmed || isLoading || !effectiveContext) return;
     setInput("");
     sendMessage(trimmed);
   };
@@ -146,32 +231,43 @@ export function AnalysisChatPanel({ context }: AnalysisChatPanelProps) {
     }
   };
 
-  const handleClear = () => {
-    clearCurrentSession();
-    setClearKey((k) => k + 1);
+  const handleNewSession = () => {
+    if (effectiveContext) {
+      createNewSession(effectiveContext);
+    }
+    setShowSessions(false);
   };
 
   return (
     <div className="flex flex-col h-full border-l border-base-300 bg-base-100">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-base-300 bg-base-200/50">
+      <div className="flex items-center justify-between px-3 py-2.5 border-b border-base-300 bg-base-200/50">
         <div className="flex items-center gap-2 min-w-0">
           <Sparkles className="w-4 h-4 text-primary flex-shrink-0" />
           <div className="min-w-0">
             <h3 className="text-sm font-bold truncate">Ask AI</h3>
-            {context && (
+            {effectiveContext && (
               <p className="text-xs text-base-content/50 truncate">
-                {context.taskName} / {context.qid}
+                {effectiveContext.taskName} / {effectiveContext.qid}
               </p>
             )}
           </div>
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-0.5">
+          {effectiveContext && (
+            <button
+              onClick={handleNewSession}
+              className="btn btn-ghost btn-xs btn-square"
+              title="New session"
+            >
+              <Plus className="w-3.5 h-3.5" />
+            </button>
+          )}
           {messages.length > 0 && (
             <button
-              onClick={handleClear}
+              onClick={clearActiveSession}
               className="btn btn-ghost btn-xs btn-square"
-              title="Clear session"
+              title="Clear messages"
             >
               <Trash2 className="w-3.5 h-3.5" />
             </button>
@@ -185,8 +281,44 @@ export function AnalysisChatPanel({ context }: AnalysisChatPanelProps) {
         </div>
       </div>
 
+      {/* Session switcher */}
+      {sessions.length > 0 && (
+        <div className="border-b border-base-300">
+          <button
+            onClick={() => setShowSessions((prev) => !prev)}
+            className="w-full flex items-center justify-between px-3 py-1.5 text-xs text-base-content/60 hover:bg-base-200/50 transition-colors"
+          >
+            <div className="flex items-center gap-1.5">
+              <MessageSquare className="w-3 h-3" />
+              <span>
+                Sessions ({sessions.length})
+              </span>
+            </div>
+            <ChevronDown
+              className={`w-3 h-3 transition-transform ${showSessions ? "rotate-180" : ""}`}
+            />
+          </button>
+          {showSessions && (
+            <div className="max-h-48 overflow-y-auto px-2 pb-2 space-y-1">
+              {sessions.map((session) => (
+                <SessionItem
+                  key={session.id}
+                  session={session}
+                  isActive={session.id === activeSessionId}
+                  onSelect={() => {
+                    switchSession(session.id);
+                    setShowSessions(false);
+                  }}
+                  onDelete={() => deleteSession(session.id)}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* No context — guide the user */}
-      {!context && (
+      {!effectiveContext && (
         <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
           <Sparkles className="w-10 h-10 text-primary/20 mb-4" />
           <p className="text-sm font-semibold text-base-content/70 mb-2">
@@ -200,11 +332,30 @@ export function AnalysisChatPanel({ context }: AnalysisChatPanelProps) {
             </span>{" "}
             to start analyzing calibration results.
           </p>
+          {/* Show past sessions if any */}
+          {sessions.length > 0 && (
+            <div className="mt-6 w-full">
+              <p className="text-xs text-base-content/40 mb-2">
+                Or resume a previous session:
+              </p>
+              <div className="space-y-1 max-h-40 overflow-y-auto">
+                {sessions.slice(0, 5).map((session) => (
+                  <SessionItem
+                    key={session.id}
+                    session={session}
+                    isActive={false}
+                    onSelect={() => switchSession(session.id)}
+                    onDelete={() => deleteSession(session.id)}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
       {/* Messages & Input — only when context is set */}
-      {context && (
+      {effectiveContext && (
         <>
           <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0">
             {messages.length === 0 ? (

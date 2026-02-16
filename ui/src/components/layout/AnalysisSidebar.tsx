@@ -5,7 +5,7 @@ import { useAnalysisChatContext } from "@/contexts/AnalysisChatContext";
 import { AnalysisChatPanel } from "@/components/features/metrics/AnalysisChatPanel";
 
 export function AnalysisSidebar() {
-  const { isOpen, context } = useAnalysisChatContext();
+  const { isOpen, activeSession } = useAnalysisChatContext();
 
   return (
     <div
@@ -13,7 +13,7 @@ export function AnalysisSidebar() {
         isOpen ? "translate-x-0" : "translate-x-full"
       }`}
     >
-      {isOpen && <AnalysisChatPanel context={context} />}
+      {isOpen && <AnalysisChatPanel context={activeSession?.context ?? null} />}
     </div>
   );
 }
