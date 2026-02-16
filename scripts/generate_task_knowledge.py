@@ -367,6 +367,35 @@ def _parse_markdown_file(path: Path) -> dict | None:
 # "Other".
 _CATEGORIES: list[tuple[str, list[str]]] = [
     (
+        "Box Setup",
+        [
+            "CheckStatus",
+            "LinkUp",
+            "DumpBox",
+            "CheckNoise",
+            "Configure",
+            "ReadoutConfigure",
+        ],
+    ),
+    (
+        "System",
+        [
+            "CheckSkew",
+        ],
+    ),
+    (
+        "CW Spectroscopy",
+        [
+            "CheckResonatorFrequencies",
+            "CheckResonatorSpectroscopy",
+            "CheckReflectionCoefficient",
+            "CheckElectricalDelay",
+            "CheckReadoutAmplitude",
+            "CheckQubitFrequencies",
+            "CheckQubitSpectroscopy",
+        ],
+    ),
+    (
         "One-Qubit Calibration",
         [
             "CheckQubit",

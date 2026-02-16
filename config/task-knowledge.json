@@ -570,6 +570,73 @@
       }
     ]
   },
+  "CheckElectricalDelay": {
+    "name": "CheckElectricalDelay",
+    "summary": "Measures the electrical delay in the readout line.",
+    "what_it_measures": "Electrical delay – the time delay experienced by signals traveling through the readout chain (cables, components, filters) from pulse generation to measurement acquisition.",
+    "physical_principle": "Time-of-flight measurement: measures the phase slope of the readout signal as a function of frequency. The electrical delay is proportional to the linear phase gradient across the measurement bandwidth. Accurate delay compensation is essential for proper IQ demodulation and readout fidelity.",
+    "expected_result": {
+      "description": "A measured electrical delay value in nanoseconds, representing the total signal propagation time through the readout chain.",
+      "result_type": "scalar",
+      "x_axis": "",
+      "y_axis": "",
+      "z_axis": "",
+      "fit_model": "",
+      "typical_range": "",
+      "good_visual": "consistent delay value within expected range for the physical setup"
+    },
+    "evaluation_criteria": "The measured delay should be consistent with the physical cable lengths and component specifications. Sudden changes in delay indicate hardware changes or issues.",
+    "check_questions": [
+      "Is the measured delay within a reasonable range for this setup?",
+      "Is the delay consistent with previous measurements?",
+      "Has any hardware been changed that would affect the delay?"
+    ],
+    "failure_modes": [
+      {
+        "severity": "warning",
+        "description": "Unexpected delay change",
+        "cause": "cable replaced, connector issue, or component change",
+        "visual": "delay value significantly different from baseline",
+        "next_action": "verify hardware configuration, check for loose connectors"
+      },
+      {
+        "severity": "critical",
+        "description": "Unreasonable delay value",
+        "cause": "measurement error, poor signal quality, or disconnected cable",
+        "visual": "delay value far outside physical expectations",
+        "next_action": "check readout chain connectivity, verify signal quality"
+      }
+    ],
+    "tips": [
+      "Measure electrical delay after any hardware change to the readout chain.",
+      "Use consistent measurement conditions (frequency range, power) for reproducibility.",
+      "Record baseline delay values for each readout channel as reference."
+    ],
+    "output_parameters_info": [
+      {
+        "name": "electrical_delay",
+        "description": "Signal propagation delay through the readout chain (ns)"
+      }
+    ],
+    "analysis_guide": [
+      "Review the measured delay value.",
+      "Compare with baseline/previous measurements.",
+      "If delay has changed, identify hardware modifications that could explain the change.",
+      "Ensure delay compensation is updated in the system configuration."
+    ],
+    "prerequisites": [
+      "Configure",
+      "CheckResonatorFrequencies"
+    ],
+    "images": [],
+    "related_context": [
+      {
+        "type": "history",
+        "params": [],
+        "last_n": 5
+      }
+    ]
+  },
   "CheckHPIPulse": {
     "name": "CheckHPIPulse",
     "summary": "Validates π/2 pulse quality by repeated application and population measurement.",
@@ -646,6 +713,74 @@
         "section": "expected result"
       }
     ],
+    "related_context": [
+      {
+        "type": "history",
+        "params": [],
+        "last_n": 5
+      }
+    ]
+  },
+  "CheckNoise": {
+    "name": "CheckNoise",
+    "summary": "Checks the noise levels in the control and readout system.",
+    "what_it_measures": "System noise floor – measures the baseline noise level across control and readout channels to ensure the system is operating within acceptable noise margins.",
+    "physical_principle": "Measures the signal amplitude with no intentional drive applied, characterizing the noise floor from electronics, thermal sources, and environmental interference.",
+    "expected_result": {
+      "description": "Noise levels within acceptable thresholds for all channels.",
+      "result_type": "noise_measurement",
+      "x_axis": "",
+      "y_axis": "",
+      "z_axis": "",
+      "fit_model": "",
+      "typical_range": "",
+      "good_visual": "low, uniform noise floor across all channels with no spurious peaks"
+    },
+    "evaluation_criteria": "Noise levels should be below system-specific thresholds. Elevated noise or spurious peaks indicate hardware issues or electromagnetic interference.",
+    "check_questions": [
+      "Is the noise floor within acceptable limits for all channels?",
+      "Are there any spurious peaks or unexpected spectral features?",
+      "Is the noise level consistent across channels?"
+    ],
+    "failure_modes": [
+      {
+        "severity": "warning",
+        "description": "Elevated noise floor",
+        "cause": "grounding issue, thermal noise, or amplifier saturation",
+        "visual": "",
+        "next_action": "check grounding, verify attenuator settings, check cryostat temperature"
+      },
+      {
+        "severity": "critical",
+        "description": "Spurious tones",
+        "cause": "electromagnetic interference or oscillating amplifier",
+        "visual": "",
+        "next_action": "identify interference source, check shielding and filtering"
+      },
+      {
+        "severity": "warning",
+        "description": "Channel-dependent noise",
+        "cause": "faulty cable, connector, or component in specific channel",
+        "visual": "",
+        "next_action": "isolate the noisy channel and inspect hardware"
+      }
+    ],
+    "tips": [
+      "Run noise check after any hardware change (cable swap, attenuator adjustment).",
+      "Compare with historical noise data to detect degradation trends.",
+      "Ensure proper shielding and filtering in the measurement setup."
+    ],
+    "output_parameters_info": [],
+    "analysis_guide": [
+      "Review noise levels across all channels.",
+      "Compare with baseline/historical measurements.",
+      "Identify any channels with anomalously high noise.",
+      "Check for spurious tones that could interfere with qubit operations."
+    ],
+    "prerequisites": [
+      "LinkUp"
+    ],
+    "images": [],
     "related_context": [
       {
         "type": "history",
@@ -895,6 +1030,80 @@
       }
     ]
   },
+  "CheckQubitFrequencies": {
+    "name": "CheckQubitFrequencies",
+    "summary": "Coarse qubit frequency scan to locate the qubit transition frequency.",
+    "what_it_measures": "Coarse qubit frequency (f_01) – performs a broadband frequency scan to identify the approximate qubit transition frequency.",
+    "physical_principle": "Continuous-wave (CW) qubit spectroscopy: a probe tone is swept across a wide frequency range while monitoring the readout resonator response. When the probe frequency matches the qubit's ground-to-excited state transition (f_01), the qubit absorbs energy, causing a detectable shift in the resonator response.",
+    "expected_result": {
+      "description": "A spectroscopy trace showing a dip or peak at the qubit transition frequency.",
+      "result_type": "spectroscopy",
+      "x_axis": "Frequency (GHz)",
+      "y_axis": "Readout signal (a.u.)",
+      "z_axis": "",
+      "fit_model": "",
+      "typical_range": "",
+      "good_visual": "clear absorption feature (dip or peak) at the qubit frequency against a flat background"
+    },
+    "evaluation_criteria": "A clear spectral feature should be visible at the expected qubit frequency. The feature should be well-resolved above the noise floor.",
+    "check_questions": [
+      "Is a clear absorption feature visible in the spectroscopy trace?",
+      "Is the feature at a reasonable frequency for this qubit?",
+      "Is the signal-to-noise ratio sufficient to identify the peak?"
+    ],
+    "failure_modes": [
+      {
+        "severity": "critical",
+        "description": "No feature detected",
+        "cause": "qubit frequency outside scan range, drive power too low, or qubit not operational",
+        "visual": "flat trace with no discernible features",
+        "next_action": "widen scan range, increase drive power, or verify qubit is functional"
+      },
+      {
+        "severity": "warning",
+        "description": "Multiple features",
+        "cause": "TLS defects, harmonics, or frequency collisions with other qubits",
+        "visual": "multiple dips/peaks in the spectroscopy trace",
+        "next_action": "cross-reference with design frequencies to identify the correct feature"
+      },
+      {
+        "severity": "warning",
+        "description": "Broad feature",
+        "cause": "short coherence time or excessive drive power",
+        "visual": "wide absorption feature making frequency determination imprecise",
+        "next_action": "reduce drive power, check T1/T2"
+      }
+    ],
+    "tips": [
+      "Use design frequencies to set an appropriate scan range centered on the expected qubit frequency.",
+      "Start with moderate drive power; too much power broadens the feature.",
+      "This is a coarse scan; use CheckQubitSpectroscopy for precise frequency determination."
+    ],
+    "output_parameters_info": [
+      {
+        "name": "coarse_qubit_frequency",
+        "description": "Approximate qubit transition frequency f_01 (GHz)"
+      }
+    ],
+    "analysis_guide": [
+      "Look for a clear absorption feature in the spectroscopy trace.",
+      "Verify the detected frequency is reasonable for this qubit design.",
+      "If multiple features exist, use design frequency as a guide.",
+      "Record the coarse frequency for use in subsequent fine spectroscopy."
+    ],
+    "prerequisites": [
+      "Configure",
+      "CheckResonatorFrequencies"
+    ],
+    "images": [],
+    "related_context": [
+      {
+        "type": "history",
+        "params": [],
+        "last_n": 5
+      }
+    ]
+  },
   "CheckQubitFrequency": {
     "name": "CheckQubitFrequency",
     "summary": "Measures qubit transition frequency via Ramsey-based detuning calibration.",
@@ -975,6 +1184,86 @@
         "params": [
           "frequency"
         ],
+        "last_n": 5
+      }
+    ]
+  },
+  "CheckQubitSpectroscopy": {
+    "name": "CheckQubitSpectroscopy",
+    "summary": "High-resolution qubit spectroscopy to measure qubit transition frequencies and anharmonicity.",
+    "what_it_measures": "Qubit transition frequencies – measures the ground-to-excited state frequency (f_01) and optionally the excited-to-second-excited state frequency (f_12) to determine the qubit anharmonicity (alpha = f_12 - f_01).",
+    "physical_principle": "Qubit spectroscopy with peak detection and analysis: a probe tone is swept across the frequency range near the qubit's expected transition while monitoring the readout resonator. The f_01 peak appears as the dominant absorption feature. The f_12 transition, typically at a lower frequency (negative anharmonicity for transmons), appears as a secondary, weaker feature.",
+    "expected_result": {
+      "description": "Spectroscopy trace with clear f_01 peak and optionally f_12 peak, with annotated frequency markers.",
+      "result_type": "spectroscopy",
+      "x_axis": "Frequency (GHz)",
+      "y_axis": "Readout signal (dB)",
+      "z_axis": "",
+      "fit_model": "",
+      "typical_range": "",
+      "good_visual": "sharp f_01 peak clearly above noise, with f_12 peak visible at expected offset"
+    },
+    "evaluation_criteria": "The f_01 peak should be well-resolved with sufficient height. If f_12 is detected, the anharmonicity should be in the expected range for the qubit type (typically -200 to -300 MHz for transmons).",
+    "check_questions": [
+      "Is the f_01 peak clearly detected above the height threshold?",
+      "Is the f_12 peak detected at a reasonable distance from f_01?",
+      "Is the anharmonicity in the expected range for this qubit type?",
+      "Is the peak width consistent with expected coherence times?"
+    ],
+    "failure_modes": [
+      {
+        "severity": "critical",
+        "description": "No f_01 peak detected",
+        "cause": "qubit frequency outside scan range, insufficient drive power, or qubit not operational",
+        "visual": "flat trace with no peaks above threshold",
+        "next_action": "widen scan range, increase drive power, run CheckQubitFrequencies first"
+      },
+      {
+        "severity": "warning",
+        "description": "f_12 not detected",
+        "cause": "f_12 too weak, outside search distance, or threshold too high",
+        "visual": "only f_01 peak visible",
+        "next_action": "adjust f12_distance_min/max and f12_height_min parameters"
+      },
+      {
+        "severity": "warning",
+        "description": "Spurious peaks",
+        "cause": "TLS defects, drive harmonics, or crosstalk",
+        "visual": "additional unexpected peaks in the spectroscopy trace",
+        "next_action": "verify peaks by varying drive power; real qubit peaks shift with power differently than TLS"
+      }
+    ],
+    "tips": [
+      "Run CheckQubitFrequencies first to narrow the scan range.",
+      "Adjust binarize_threshold_sigma parameters if peak detection is unreliable.",
+      "For transmons, expect anharmonicity around -200 to -300 MHz.",
+      "If f_12 is not detected, try relaxing the height threshold (f12_height_min)."
+    ],
+    "output_parameters_info": [
+      {
+        "name": "qubit_frequency",
+        "description": "Estimated qubit frequency f_01 (GHz)"
+      },
+      {
+        "name": "anharmonicity",
+        "description": "Anharmonicity alpha = f_12 - f_01 (GHz); typically negative for transmons"
+      }
+    ],
+    "analysis_guide": [
+      "Verify f_01 peak is clearly detected and at reasonable frequency.",
+      "Check if f_12 is detected and compute anharmonicity.",
+      "Verify anharmonicity is in expected range for qubit type.",
+      "Review quality level; if <= 2, investigate peak quality issues.",
+      "Compare with previous measurements for drift detection."
+    ],
+    "prerequisites": [
+      "CheckResonatorSpectroscopy (provides readout_frequency)"
+    ],
+    "images": [],
+    "related_context": [
+      {
+        "type": "history",
+        "params": [],
         "last_n": 5
       }
     ]
@@ -1186,6 +1475,80 @@
       }
     ]
   },
+  "CheckReadoutAmplitude": {
+    "name": "CheckReadoutAmplitude",
+    "summary": "Optimizes readout pulse amplitude by sweeping amplitude and measuring signal-to-noise ratio.",
+    "what_it_measures": "Optimal readout amplitude – sweeps the readout pulse amplitude and measures the resulting signal-to-noise ratio (SNR) to find the minimum amplitude that achieves sufficient measurement fidelity.",
+    "physical_principle": "Readout amplitude optimization: the readout pulse amplitude is varied while measuring both signal strength and noise. At low amplitudes, SNR is poor and state discrimination is unreliable. As amplitude increases, SNR improves until reaching a threshold for reliable measurement. Excessive amplitude can cause unwanted qubit transitions (measurement-induced mixing) or nonlinear resonator effects.",
+    "expected_result": {
+      "description": "SNR vs amplitude curve showing a monotonic increase that crosses the SNR threshold at the optimal readout amplitude.",
+      "result_type": "sweep",
+      "x_axis": "Readout amplitude (a.u.)",
+      "y_axis": "Signal / Noise / SNR",
+      "z_axis": "",
+      "fit_model": "",
+      "typical_range": "",
+      "good_visual": "clear SNR increase with amplitude, crossing the threshold at a well-defined amplitude"
+    },
+    "evaluation_criteria": "The SNR should cross the threshold at a reasonable amplitude. The optimal amplitude should be in a region where SNR is increasing but not at the maximum to avoid measurement-induced effects.",
+    "check_questions": [
+      "Does the SNR cross the threshold within the sweep range?",
+      "Is the optimal amplitude at a reasonable value (not at the extremes)?",
+      "Is the SNR curve monotonically increasing?"
+    ],
+    "failure_modes": [
+      {
+        "severity": "critical",
+        "description": "SNR never crosses threshold",
+        "cause": "readout chain issue, poor qubit-resonator coupling, or amplitude range too narrow",
+        "visual": "SNR stays below threshold for all amplitudes",
+        "next_action": "check readout chain, increase amplitude range, verify resonator frequency"
+      },
+      {
+        "severity": "warning",
+        "description": "SNR oscillates",
+        "cause": "nonlinear resonator response or interference",
+        "visual": "non-monotonic SNR curve with oscillations",
+        "next_action": "check for resonator bifurcation, reduce maximum amplitude"
+      },
+      {
+        "severity": "warning",
+        "description": "Threshold crossed at very high amplitude",
+        "cause": "weak coupling, poor readout frequency calibration, or high noise floor",
+        "visual": "SNR crosses threshold only near the maximum amplitude",
+        "next_action": "verify readout frequency, check noise levels, recalibrate resonator"
+      }
+    ],
+    "tips": [
+      "Default amplitude range is 0.0-0.2 with 51 points; adjust if optimal amplitude is near the edge.",
+      "Default SNR threshold is 1.0; increase for higher fidelity requirements.",
+      "Run after readout frequency calibration for best results.",
+      "Compare optimal amplitudes across qubits for readout chain uniformity assessment."
+    ],
+    "output_parameters_info": [
+      {
+        "name": "readout_amplitude",
+        "description": "Optimal readout amplitude where SNR first exceeds the threshold (a.u.)"
+      }
+    ],
+    "analysis_guide": [
+      "Check the 3-panel figure (signal, noise, SNR vs amplitude).",
+      "Verify SNR crosses the threshold at a reasonable amplitude.",
+      "Check that signal increases and noise remains manageable.",
+      "Record the optimal amplitude for use in subsequent measurements."
+    ],
+    "prerequisites": [
+      "CheckResonatorSpectroscopy or CheckResonatorFrequencies"
+    ],
+    "images": [],
+    "related_context": [
+      {
+        "type": "history",
+        "params": [],
+        "last_n": 5
+      }
+    ]
+  },
   "CheckReadoutFrequency": {
     "name": "CheckReadoutFrequency",
     "summary": "Calibrates the readout resonator frequency for optimal state discrimination.",
@@ -1250,6 +1613,368 @@
       "Check for parasitic modes or spurious features in the spectrum.",
       "Compare with previous cooldown values for drift assessment.",
       "If shifted significantly, assess impact on readout fidelity."
+    ],
+    "prerequisites": [],
+    "images": [],
+    "related_context": [
+      {
+        "type": "history",
+        "params": [],
+        "last_n": 5
+      }
+    ]
+  },
+  "CheckReflectionCoefficient": {
+    "name": "CheckReflectionCoefficient",
+    "summary": "Measures the resonator reflection coefficient to extract resonator frequency and coupling rates.",
+    "what_it_measures": "Resonator reflection parameters – measures the S11 (reflection coefficient) of the readout resonator to precisely determine the resonator frequency (f_r), external coupling rate (kappa_external), and internal loss rate (kappa_internal).",
+    "physical_principle": "Reflection coefficient spectroscopy: the resonator is probed in reflection, and the complex S11 parameter is measured as a function of frequency. The resonance appears as a circle in the complex plane. Fitting to a resonator model extracts the resonance frequency and coupling rates. The external coupling rate (kappa_external) quantifies the resonator-feedline coupling, while the internal loss rate (kappa_internal) quantifies intrinsic losses.",
+    "expected_result": {
+      "description": "Reflection coefficient spectrum showing a clear resonance dip with a circular trajectory in the IQ plane.",
+      "result_type": "spectroscopy",
+      "x_axis": "Frequency (GHz)",
+      "y_axis": "|S11| (dB) / Phase (rad)",
+      "z_axis": "",
+      "fit_model": "",
+      "typical_range": "",
+      "good_visual": "sharp resonance dip with clean circular trajectory in IQ plane"
+    },
+    "evaluation_criteria": "The resonance should be well-fit by the model. The coupling rates should be physically reasonable. External coupling should dominate over internal losses for a good resonator (kappa_external >> kappa_internal).",
+    "check_questions": [
+      "Is the resonance clearly visible and well-fit?",
+      "Is the resonator frequency consistent with previous measurements?",
+      "Is kappa_external >> kappa_internal (over-coupled regime)?",
+      "Are the coupling rates in a physically reasonable range?"
+    ],
+    "failure_modes": [
+      {
+        "severity": "critical",
+        "description": "No resonance detected",
+        "cause": "resonator frequency far from scan range or readout line issue",
+        "visual": "flat reflection response",
+        "next_action": "run CheckResonatorFrequencies to locate resonance first"
+      },
+      {
+        "severity": "warning",
+        "description": "Poor fit quality",
+        "cause": "distorted resonance from impedance mismatch or background slope",
+        "visual": "resonance visible but fit does not match well",
+        "next_action": "check for background calibration issues, verify readout chain"
+      },
+      {
+        "severity": "warning",
+        "description": "High internal loss (kappa_internal > kappa_external)",
+        "cause": "resonator material defects, TLS loss, or fabrication issues",
+        "visual": "shallow resonance dip, small circle in IQ plane",
+        "next_action": "investigate chip quality; may indicate materials issue"
+      }
+    ],
+    "tips": [
+      "This task provides the most precise resonator frequency measurement.",
+      "Use kappa_external/kappa_internal ratio as a resonator quality diagnostic.",
+      "Compare coupling rates across resonators for fabrication uniformity assessment."
+    ],
+    "output_parameters_info": [
+      {
+        "name": "resonator_frequency",
+        "description": "Precise resonator frequency f_r (GHz)"
+      },
+      {
+        "name": "kappa_external",
+        "description": "External coupling rate (MHz); quantifies resonator-feedline coupling"
+      },
+      {
+        "name": "kappa_internal",
+        "description": "Internal coupling rate (MHz); quantifies intrinsic resonator losses"
+      }
+    ],
+    "analysis_guide": [
+      "Verify the resonance is clearly visible in the reflection spectrum.",
+      "Check the fit quality to the resonator model.",
+      "Verify resonator frequency is consistent with coarse measurements.",
+      "Assess kappa_external vs kappa_internal; over-coupled is preferred.",
+      "Compare with design values and previous measurements."
+    ],
+    "prerequisites": [
+      "Configure",
+      "CheckResonatorFrequencies"
+    ],
+    "images": [],
+    "related_context": [
+      {
+        "type": "history",
+        "params": [],
+        "last_n": 5
+      }
+    ]
+  },
+  "CheckResonatorFrequencies": {
+    "name": "CheckResonatorFrequencies",
+    "summary": "Coarse frequency scan to locate readout resonator resonance frequencies.",
+    "what_it_measures": "Coarse resonator frequency – performs a broadband frequency sweep to identify the approximate resonance frequency of the readout resonator.",
+    "physical_principle": "Resonator frequency sweep: a probe tone is swept across a wide frequency range, and the transmitted or reflected signal phase is measured. At the resonator's resonance frequency, a sharp phase shift occurs, identifying the resonance.",
+    "expected_result": {
+      "description": "Phase response showing a clear resonance feature (sharp phase shift) at the resonator frequency. Multiple peaks may be visible if the scan covers a MUX with multiple resonators.",
+      "result_type": "spectroscopy",
+      "x_axis": "Frequency (GHz)",
+      "y_axis": "Phase (rad) / Phase derivative",
+      "z_axis": "",
+      "fit_model": "",
+      "typical_range": "",
+      "good_visual": "clear, sharp phase shift at resonator frequency with well-separated peaks for each resonator in the MUX"
+    },
+    "evaluation_criteria": "A clear phase shift should be visible at the expected resonator frequency. The number of detected peaks should match the expected number of resonators in the MUX (typically 4).",
+    "check_questions": [
+      "Is a clear phase shift visible at the expected resonator frequency?",
+      "Are the expected number of resonator peaks detected (typically 4 per MUX)?",
+      "Are the peaks well-separated and individually resolvable?"
+    ],
+    "failure_modes": [
+      {
+        "severity": "critical",
+        "description": "No resonance detected",
+        "cause": "resonator frequency outside scan range or readout line not connected",
+        "visual": "flat phase response with no features",
+        "next_action": "widen scan range, check readout line connectivity"
+      },
+      {
+        "severity": "warning",
+        "description": "Fewer peaks than expected",
+        "cause": "overlapping resonators, insufficient scan resolution, or damaged resonator",
+        "visual": "fewer than expected number of phase shifts",
+        "next_action": "increase scan resolution, check chip layout for expected frequencies"
+      },
+      {
+        "severity": "warning",
+        "description": "Broad or asymmetric resonance",
+        "cause": "low Q-factor or impedance mismatch",
+        "visual": "wide or distorted phase response",
+        "next_action": "check readout chain for impedance issues"
+      }
+    ],
+    "tips": [
+      "Default frequency range is 9.75-10.75 GHz; adjust based on chip design.",
+      "For QUEL1SE_R8 readout boxes, the range shifts to 5.75-6.75 GHz.",
+      "Peak positions within a MUX are mapped by qubit index (qid % 4).",
+      "Use phase derivative (fig_phase_diff) for sharper peak identification."
+    ],
+    "output_parameters_info": [
+      {
+        "name": "coarse_resonator_frequency",
+        "description": "Approximate resonator resonance frequency (GHz)"
+      }
+    ],
+    "analysis_guide": [
+      "Check the phase response for clear resonance features.",
+      "Verify the number of detected peaks matches expectations.",
+      "Identify the correct peak for this qubit based on MUX position (qid % 4).",
+      "Record the coarse frequency for use in subsequent spectroscopy."
+    ],
+    "prerequisites": [
+      "Configure"
+    ],
+    "images": [],
+    "related_context": [
+      {
+        "type": "history",
+        "params": [],
+        "last_n": 5
+      }
+    ]
+  },
+  "CheckResonatorSpectroscopy": {
+    "name": "CheckResonatorSpectroscopy",
+    "summary": "High-resolution 2D spectroscopy of all resonators in a readout multiplexer (MUX).",
+    "what_it_measures": "Readout resonator frequency – performs a 2D sweep (frequency x power) to precisely determine each resonator's resonance frequency within a MUX, including power-dependent behavior.",
+    "physical_principle": "2D resonator spectroscopy: the readout resonator response is measured across both frequency and power ranges. At low power, the resonator frequency reflects the dispersive shift from the qubit (dressed frequency). At high power, the resonator approaches its bare frequency. Comparing low-power and high-power responses reveals coupling strength and optimal readout conditions.",
+    "expected_result": {
+      "description": "A 2D color map of resonator response vs frequency and power, with detected resonance peaks annotated.",
+      "result_type": "2d_spectroscopy",
+      "x_axis": "Frequency (GHz)",
+      "y_axis": "Power (dB)",
+      "z_axis": "Readout signal (a.u.)",
+      "fit_model": "",
+      "typical_range": "",
+      "good_visual": "clear resonance dips/peaks at each resonator frequency, with visible power-dependent frequency shift"
+    },
+    "evaluation_criteria": "All expected resonators in the MUX should be detected. Resonance frequencies should be well-separated and consistent with the chip design.",
+    "check_questions": [
+      "Are all expected resonators detected (typically 4 per MUX)?",
+      "Are the detected frequencies consistent with the chip design?",
+      "Is the power-dependent frequency shift visible and physical?",
+      "Are the peaks well-resolved at both low and high power levels?"
+    ],
+    "failure_modes": [
+      {
+        "severity": "critical",
+        "description": "Missing resonator peaks",
+        "cause": "resonator frequency outside scan range, damaged resonator, or readout line issue",
+        "visual": "fewer peaks than expected in the 2D map",
+        "next_action": "widen scan range, check readout chain hardware"
+      },
+      {
+        "severity": "warning",
+        "description": "Overlapping resonators",
+        "cause": "fabrication variation causing frequency collision",
+        "visual": "two resonators with nearly identical frequencies",
+        "next_action": "use higher resolution scan to resolve; may indicate chip fabrication issue"
+      },
+      {
+        "severity": "warning",
+        "description": "No power dependence",
+        "cause": "very weak qubit-resonator coupling or qubit not at expected frequency",
+        "visual": "resonator frequency constant across all power levels",
+        "next_action": "verify qubit frequency and coupling design"
+      }
+    ],
+    "tips": [
+      "This is a MUX-level task: it runs once per MUX and provides frequencies for all qubits in that MUX.",
+      "Default frequency range is 9.75-10.75 GHz; QUEL1SE_R8 readout boxes use 5.75-6.75 GHz.",
+      "Adjust num_resonators if the MUX has a non-standard number of resonators.",
+      "Use high_power_min/max and low_power parameters to tune peak detection sensitivity."
+    ],
+    "output_parameters_info": [
+      {
+        "name": "readout_frequency",
+        "description": "Estimated resonator frequency (GHz) for the target qubit"
+      }
+    ],
+    "analysis_guide": [
+      "Review the 2D spectroscopy map for all expected resonator peaks.",
+      "Verify peak detection accuracy on the annotated figure.",
+      "Check that the assigned frequency for this qubit corresponds to the correct MUX position.",
+      "Compare detected frequencies with design values and previous measurements.",
+      "Note any power-dependent behavior anomalies."
+    ],
+    "prerequisites": [
+      "Configure",
+      "CheckResonatorFrequencies"
+    ],
+    "images": [],
+    "related_context": [
+      {
+        "type": "history",
+        "params": [],
+        "last_n": 5
+      }
+    ]
+  },
+  "CheckSkew": {
+    "name": "CheckSkew",
+    "summary": "Measures and corrects time skew between multiple control boxes.",
+    "what_it_measures": "Inter-box timing skew – measures the relative timing offsets (clock skew) between different control boxes and applies correction to synchronize their clocks.",
+    "physical_principle": "Clock synchronization: multiple control boxes share a common reference clock, but signal propagation delays and internal clock distribution cause timing offsets between boxes. This task measures the relative timing by sending synchronized pulses and measuring arrival time differences, then applies skew correction to align all boxes to a common time reference.",
+    "expected_result": {
+      "description": "Measured skew values for each box pair, with corrections applied to synchronize timing.",
+      "result_type": "timing_measurement",
+      "x_axis": "Box pairs",
+      "y_axis": "Skew (ns)",
+      "z_axis": "",
+      "fit_model": "",
+      "typical_range": "",
+      "good_visual": "small, well-defined skew values with successful correction applied"
+    },
+    "evaluation_criteria": "Skew values should be measurable and correctable. After correction, residual skew should be within the system's timing resolution.",
+    "check_questions": [
+      "Are skew values measurable for all box pairs?",
+      "Are the measured skew values within a correctable range?",
+      "Are the skew values consistent with previous measurements?"
+    ],
+    "failure_modes": [
+      {
+        "severity": "critical",
+        "description": "Skew measurement fails",
+        "cause": "box not synchronized to reference clock, hardware fault",
+        "visual": "",
+        "next_action": "verify reference clock distribution, check box connectivity"
+      },
+      {
+        "severity": "warning",
+        "description": "Large skew values",
+        "cause": "cable length mismatch, clock distribution issue",
+        "visual": "skew values larger than typical range",
+        "next_action": "check clock distribution hardware and cable routing"
+      },
+      {
+        "severity": "warning",
+        "description": "Inconsistent skew across measurements",
+        "cause": "unstable clock or intermittent connection",
+        "visual": "skew values vary significantly between runs",
+        "next_action": "investigate clock stability, check connectors"
+      }
+    ],
+    "tips": [
+      "Run after LinkUp and before any multi-qubit calibration tasks.",
+      "The muxes parameter selects which MUXes to synchronize; default covers most standard configurations.",
+      "Skew correction is essential for two-qubit gate calibration accuracy.",
+      "Compare skew values across runs to detect clock drift."
+    ],
+    "output_parameters_info": [],
+    "analysis_guide": [
+      "Review estimated skew values for each box.",
+      "Verify skew values are within expected range.",
+      "Check the skew plot for any outliers.",
+      "Confirm correction was applied successfully.",
+      "Compare with previous measurements for drift detection."
+    ],
+    "prerequisites": [
+      "LinkUp",
+      "Configure"
+    ],
+    "images": [],
+    "related_context": [
+      {
+        "type": "history",
+        "params": [],
+        "last_n": 5
+      }
+    ]
+  },
+  "CheckStatus": {
+    "name": "CheckStatus",
+    "summary": "Checks the status of the experiment and control hardware.",
+    "what_it_measures": "Overall experiment status – verifies that the control system and hardware are in a healthy, operational state.",
+    "physical_principle": "Diagnostic query to the experiment controller. No physical measurement is performed; the task polls the system for readiness and error conditions.",
+    "expected_result": {
+      "description": "A status report confirming all subsystems are operational.",
+      "result_type": "status_report",
+      "x_axis": "",
+      "y_axis": "",
+      "z_axis": "",
+      "fit_model": "",
+      "typical_range": "",
+      "good_visual": "all subsystems report healthy status with no errors"
+    },
+    "evaluation_criteria": "All subsystems should report a healthy state. Any error or warning indicates a hardware or configuration issue that must be resolved before proceeding with calibration.",
+    "check_questions": [
+      "Do all subsystems report a healthy status?",
+      "Are there any error or warning messages?"
+    ],
+    "failure_modes": [
+      {
+        "severity": "critical",
+        "description": "Subsystem not responding",
+        "cause": "hardware disconnected or powered off",
+        "visual": "",
+        "next_action": "check physical connections and power supply"
+      },
+      {
+        "severity": "critical",
+        "description": "Error status reported",
+        "cause": "hardware fault or misconfiguration",
+        "visual": "",
+        "next_action": "review error details and consult hardware documentation"
+      }
+    ],
+    "tips": [
+      "Run this task first before any calibration to catch hardware issues early.",
+      "If status check fails, resolve all issues before proceeding."
+    ],
+    "output_parameters_info": [],
+    "analysis_guide": [
+      "Review the status output for any errors or warnings.",
+      "If errors exist, address them before running further tasks.",
+      "Confirm all control and readout lines are operational."
     ],
     "prerequisites": [],
     "images": [],
@@ -1622,6 +2347,72 @@
         "section": "expected result"
       }
     ],
+    "related_context": [
+      {
+        "type": "history",
+        "params": [],
+        "last_n": 5
+      }
+    ]
+  },
+  "Configure": {
+    "name": "Configure",
+    "summary": "Loads and applies the full calibration state configuration to the control boxes.",
+    "what_it_measures": "No measurement is performed. This task loads the saved calibration state (frequencies, amplitudes, timing parameters) from configuration files and pushes them to all control boxes.",
+    "physical_principle": "No physical measurement. This is a state management task that restores a previously saved calibration configuration to the hardware, ensuring all control parameters are set to known values.",
+    "expected_result": {
+      "description": "Full calibration state loaded and pushed to all control boxes successfully.",
+      "result_type": "configuration",
+      "x_axis": "",
+      "y_axis": "",
+      "z_axis": "",
+      "fit_model": "",
+      "typical_range": "",
+      "good_visual": "state loaded and pushed without errors"
+    },
+    "evaluation_criteria": "State should load and push without errors. All boxes should acknowledge the configuration update.",
+    "check_questions": [
+      "Did the state load from configuration files without errors?",
+      "Was the configuration successfully pushed to all boxes?"
+    ],
+    "failure_modes": [
+      {
+        "severity": "critical",
+        "description": "Configuration file not found",
+        "cause": "missing or misnamed configuration files",
+        "visual": "",
+        "next_action": "verify config_path and params_path are correct and files exist"
+      },
+      {
+        "severity": "critical",
+        "description": "Push failure",
+        "cause": "hardware communication error or incompatible configuration",
+        "visual": "",
+        "next_action": "check LinkUp status and configuration file compatibility"
+      },
+      {
+        "severity": "warning",
+        "description": "Stale configuration",
+        "cause": "configuration files are outdated relative to hardware changes",
+        "visual": "",
+        "next_action": "re-run calibration to generate updated configuration"
+      }
+    ],
+    "tips": [
+      "Always run Configure after LinkUp to ensure hardware has the correct calibration state.",
+      "Keep configuration files version-controlled for reproducibility.",
+      "Compare loaded state with expected values after pushing."
+    ],
+    "output_parameters_info": [],
+    "analysis_guide": [
+      "Verify configuration files exist and are up to date.",
+      "Confirm state was loaded and pushed successfully.",
+      "Consider running CheckStatus after Configure to verify system health."
+    ],
+    "prerequisites": [
+      "LinkUp"
+    ],
+    "images": [],
     "related_context": [
       {
         "type": "history",
@@ -2082,6 +2873,124 @@
       }
     ]
   },
+  "DumpBox": {
+    "name": "DumpBox",
+    "summary": "Dumps diagnostic information from all control boxes.",
+    "what_it_measures": "Control box internal state – extracts configuration, firmware version, register values, and other diagnostic data from each control box.",
+    "physical_principle": "No physical measurement. This task reads internal registers and configuration from the FPGA-based control hardware for diagnostic and debugging purposes.",
+    "expected_result": {
+      "description": "A dictionary of diagnostic information keyed by box ID, containing hardware configuration and status details.",
+      "result_type": "diagnostic_dump",
+      "x_axis": "",
+      "y_axis": "",
+      "z_axis": "",
+      "fit_model": "",
+      "typical_range": "",
+      "good_visual": "complete diagnostic data for all boxes without errors"
+    },
+    "evaluation_criteria": "All boxes should return complete diagnostic information. Missing or incomplete data indicates communication issues.",
+    "check_questions": [
+      "Is diagnostic data available for all expected boxes?",
+      "Are there any unexpected register values or error flags?"
+    ],
+    "failure_modes": [
+      {
+        "severity": "warning",
+        "description": "Incomplete dump",
+        "cause": "communication interrupted during data retrieval",
+        "visual": "",
+        "next_action": "retry the dump; check network stability"
+      },
+      {
+        "severity": "critical",
+        "description": "Box not found",
+        "cause": "box not linked or powered off",
+        "visual": "",
+        "next_action": "run LinkUp first, check hardware connections"
+      }
+    ],
+    "tips": [
+      "Use this task for debugging hardware issues.",
+      "Compare dumps before and after configuration changes to verify settings applied correctly.",
+      "Save dumps as reference baselines for troubleshooting."
+    ],
+    "output_parameters_info": [],
+    "analysis_guide": [
+      "Review dump output for each box.",
+      "Compare with expected configuration values.",
+      "Flag any unexpected register values or error conditions."
+    ],
+    "prerequisites": [
+      "LinkUp"
+    ],
+    "images": [],
+    "related_context": [
+      {
+        "type": "history",
+        "params": [],
+        "last_n": 5
+      }
+    ]
+  },
+  "LinkUp": {
+    "name": "LinkUp",
+    "summary": "Initializes and links up the control box hardware.",
+    "what_it_measures": "Hardware link status – establishes communication between the host system and the control boxes (FPGA-based quantum control hardware).",
+    "physical_principle": "No physical measurement. This task performs hardware initialization: establishing network/bus connections to the control boxes and verifying bidirectional communication.",
+    "expected_result": {
+      "description": "Successful link-up of all control boxes with confirmed communication.",
+      "result_type": "status_report",
+      "x_axis": "",
+      "y_axis": "",
+      "z_axis": "",
+      "fit_model": "",
+      "typical_range": "",
+      "good_visual": "all boxes linked and communicating without errors"
+    },
+    "evaluation_criteria": "All control boxes should link up successfully. Timeouts or communication errors indicate hardware or network issues.",
+    "check_questions": [
+      "Did all control boxes link up successfully?",
+      "Were there any timeout or communication errors?"
+    ],
+    "failure_modes": [
+      {
+        "severity": "critical",
+        "description": "Link-up timeout",
+        "cause": "control box powered off, network issue, or firmware mismatch",
+        "visual": "",
+        "next_action": "check power, network cables, and firmware versions"
+      },
+      {
+        "severity": "critical",
+        "description": "Partial link-up",
+        "cause": "one or more boxes not responding",
+        "visual": "",
+        "next_action": "identify which box failed and check its individual status"
+      }
+    ],
+    "tips": [
+      "Ensure all control boxes are powered on and connected before running.",
+      "Check that firmware versions are compatible with the host software.",
+      "If link-up fails intermittently, check network stability."
+    ],
+    "output_parameters_info": [],
+    "analysis_guide": [
+      "Confirm all expected control boxes are linked.",
+      "If any box fails to link, check physical connections first.",
+      "Verify firmware compatibility if connections are physically sound."
+    ],
+    "prerequisites": [
+      "CheckStatus"
+    ],
+    "images": [],
+    "related_context": [
+      {
+        "type": "history",
+        "params": [],
+        "last_n": 5
+      }
+    ]
+  },
   "RandomizedBenchmarking": {
     "name": "RandomizedBenchmarking",
     "summary": "Measures average gate error rate via randomized benchmarking (RB).",
@@ -2259,6 +3168,65 @@
         "section": "expected result"
       }
     ],
+    "related_context": [
+      {
+        "type": "history",
+        "params": [],
+        "last_n": 5
+      }
+    ]
+  },
+  "ReadoutConfigure": {
+    "name": "ReadoutConfigure",
+    "summary": "Configures readout parameters for a specified subset of qubits.",
+    "what_it_measures": "No measurement is performed. This task applies readout configuration (frequencies, amplitudes) to the control hardware for a selected set of qubits.",
+    "physical_principle": "No physical measurement. This is a configuration task that sets readout resonator frequencies for specified qubits and disables (sets to NaN) frequencies for qubits not in the target list.",
+    "expected_result": {
+      "description": "Readout parameters successfully applied to the hardware for the specified qubits.",
+      "result_type": "configuration",
+      "x_axis": "",
+      "y_axis": "",
+      "z_axis": "",
+      "fit_model": "",
+      "typical_range": "",
+      "good_visual": "configuration applied without errors"
+    },
+    "evaluation_criteria": "Configuration should apply without errors. The specified qubits should have valid readout parameters, while excluded qubits should be disabled.",
+    "check_questions": [
+      "Did the configuration apply without errors?",
+      "Are the correct qubits enabled for readout?"
+    ],
+    "failure_modes": [
+      {
+        "severity": "critical",
+        "description": "Configuration push failure",
+        "cause": "hardware communication error or invalid parameter values",
+        "visual": "",
+        "next_action": "check hardware link status and parameter validity"
+      },
+      {
+        "severity": "warning",
+        "description": "Empty qubit list",
+        "cause": "no qubits specified in run parameters",
+        "visual": "",
+        "next_action": "verify the qubit list in run parameters is correctly set"
+      }
+    ],
+    "tips": [
+      "Use this task to selectively configure readout for a subset of qubits when full-chip calibration is not needed.",
+      "Verify qubit IDs match the expected chip layout before running."
+    ],
+    "output_parameters_info": [],
+    "analysis_guide": [
+      "Confirm the target qubit list matches expectations.",
+      "Verify configuration was pushed to hardware without errors.",
+      "Check that excluded qubits are properly disabled."
+    ],
+    "prerequisites": [
+      "LinkUp",
+      "Configure"
+    ],
+    "images": [],
     "related_context": [
       {
         "type": "history",
