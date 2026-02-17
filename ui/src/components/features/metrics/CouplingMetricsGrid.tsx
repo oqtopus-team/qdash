@@ -1,12 +1,6 @@
 "use client";
 
-import React, {
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-  useCallback,
-} from "react";
+import React, { useMemo, useRef, useState, useCallback } from "react";
 import Link from "next/link";
 import {
   TransformWrapper,
@@ -33,6 +27,7 @@ import {
 import { calculateGridDimension } from "@/utils/gridLayout";
 
 import { CouplingMetricHistoryModal } from "./CouplingMetricHistoryModal";
+import { useAnalysisChatContext } from "@/contexts/AnalysisChatContext";
 
 // Dynamic font size calculation based on cell size
 function getCouplingFontSizes(cellSize: number): {
@@ -207,20 +202,8 @@ export function CouplingMetricsGrid({
   // Modal state
   const [selectedCouplingInfo, setSelectedCouplingInfo] =
     useState<SelectedCouplingInfo | null>(null);
-  const modalRef = useRef<HTMLDialogElement>(null);
-
-  // Control modal with native dialog API (useLayoutEffect for instant response)
   const isModalOpen = selectedCouplingInfo !== null;
-  useLayoutEffect(() => {
-    const modal = modalRef.current;
-    if (!modal) return;
-
-    if (isModalOpen && !modal.open) {
-      modal.showModal();
-    } else if (!isModalOpen && modal.open) {
-      modal.close();
-    }
-  }, [isModalOpen]);
+  const { isOpen: isSidebarOpen } = useAnalysisChatContext();
 
   // Use grid layout hook for responsive sizing
   const displayCols = zoomMode === "region" ? regionSize : gridCols;
@@ -785,12 +768,26 @@ export function CouplingMetricsGrid({
       </div>
 
       {/* Coupling Detail Modal with History */}
-      <dialog
-        ref={modalRef}
-        className="modal modal-bottom sm:modal-middle"
-        onClose={() => setSelectedCouplingInfo(null)}
+      <div
+        className={`modal modal-bottom sm:modal-middle ${isModalOpen ? "modal-open" : ""}`}
+        style={{
+          width: isSidebarOpen ? "calc(100% - 20rem)" : "100%",
+          maxWidth: "none",
+          transition: "width 300ms ease",
+        }}
+        onClick={(e) => {
+          if (e.target === e.currentTarget) setSelectedCouplingInfo(null);
+        }}
       >
-        <div className="modal-box w-full sm:w-[95vw] max-w-[1800px] bg-base-100 p-0 h-[90vh] sm:h-[95vh] overflow-hidden flex flex-col">
+        <div
+          className="modal-box w-full bg-base-100 p-0 h-[90vh] sm:h-[95vh] overflow-hidden flex flex-col"
+          style={{
+            maxWidth: isSidebarOpen
+              ? "min(calc(100vw - 22rem), 1400px)"
+              : "1800px",
+            transition: "max-width 300ms ease",
+          }}
+        >
           {selectedCouplingInfo && (
             <>
               {/* Modal Header */}
@@ -844,10 +841,7 @@ export function CouplingMetricsGrid({
             </>
           )}
         </div>
-        <form method="dialog" className="modal-backdrop">
-          <button>close</button>
-        </form>
-      </dialog>
+      </div>
     </div>
   );
 }

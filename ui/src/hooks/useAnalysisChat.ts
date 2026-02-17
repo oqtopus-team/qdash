@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { flushSync } from "react-dom";
 
 export interface ChatMessage {
@@ -14,6 +14,20 @@ export interface AnalysisResult {
   explanation: string;
   potential_issues: string[];
   recommendations: string[];
+}
+
+export interface ContentBlock {
+  type: "text" | "chart";
+  content: string | null;
+  chart: {
+    data: Record<string, unknown>[];
+    layout: Record<string, unknown>;
+  } | null;
+}
+
+export interface BlocksResult {
+  blocks: ContentBlock[];
+  assessment: "good" | "warning" | "bad" | null;
 }
 
 export interface AnalysisContext {
@@ -67,45 +81,93 @@ interface SSEEvent {
   data: string;
 }
 
-function parseSSEEvents(text: string): SSEEvent[] {
+/**
+ * Parse complete SSE events from the buffer.
+ * Returns { events, remainder } where remainder is the unparsed trailing text.
+ */
+function consumeSSEEvents(text: string): {
+  events: SSEEvent[];
+  remainder: string;
+} {
   const events: SSEEvent[] = [];
-  const blocks = text.split("\n\n");
+
+  // Only process up to the last complete block (terminated by \n\n)
+  const lastDoubleNewline = text.lastIndexOf("\n\n");
+  if (lastDoubleNewline === -1) {
+    // No complete event yet — keep everything in buffer
+    return { events, remainder: text };
+  }
+
+  const completePart = text.slice(0, lastDoubleNewline);
+  const remainder = text.slice(lastDoubleNewline + 2);
+
+  const blocks = completePart.split("\n\n");
   for (const block of blocks) {
     if (!block.trim()) continue;
     let event = "";
-    let data = "";
+    const dataLines: string[] = [];
     for (const line of block.split("\n")) {
       if (line.startsWith("event: ")) {
         event = line.slice(7);
       } else if (line.startsWith("data: ")) {
-        data = line.slice(6);
+        dataLines.push(line.slice(6));
+      } else if (line.startsWith("data:")) {
+        // "data:" with no space (empty or continuation)
+        dataLines.push(line.slice(5));
       }
     }
+    const data = dataLines.join("\n");
     if (event && data) {
       events.push({ event, data });
     }
   }
-  return events;
+  return { events, remainder };
 }
 
-export function useAnalysisChat(context: AnalysisContext | null) {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+export function useAnalysisChat(
+  context: AnalysisContext | null,
+  options?: {
+    initialMessages?: ChatMessage[];
+    onMessagesChange?: (messages: ChatMessage[]) => void;
+  },
+) {
+  const [messages, setMessagesRaw] = useState<ChatMessage[]>(
+    options?.initialMessages ?? [],
+  );
   const [isLoading, setIsLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const onMessagesChangeRef = useRef(options?.onMessagesChange);
+  onMessagesChangeRef.current = options?.onMessagesChange;
+
+  // Wrapper that also syncs to external store
+  const setMessages: typeof setMessagesRaw = useCallback((updater) => {
+    setMessagesRaw((prev) => {
+      const next = typeof updater === "function" ? updater(prev) : updater;
+      onMessagesChangeRef.current?.(next);
+      return next;
+    });
+  }, []);
+
+  // Sync from external initial messages when they change (context switch)
+  const initialRef = useRef(options?.initialMessages);
+  useEffect(() => {
+    if (options?.initialMessages !== initialRef.current) {
+      initialRef.current = options?.initialMessages;
+      setMessagesRaw(options?.initialMessages ?? []);
+    }
+  }, [options?.initialMessages]);
 
   const sendMessage = useCallback(
     async (userMessage: string, imageBase64?: string) => {
-      if (!context) return;
-
       // Abort any in-flight request
       abortRef.current?.abort();
       const controller = new AbortController();
       abortRef.current = controller;
 
       setError(null);
-      setStatusMessage("分析を開始中...");
+      setStatusMessage(context ? "分析を開始中..." : "チャットを開始中...");
       const newUserMessage: ChatMessage = {
         role: "user",
         content: userMessage,
@@ -115,22 +177,38 @@ export function useAnalysisChat(context: AnalysisContext | null) {
 
       try {
         const baseURL = process.env.NEXT_PUBLIC_API_URL || "/api";
-        const response = await fetch(`${baseURL}/copilot/analyze/stream`, {
+
+        // Use analyze endpoint when context is available, chat endpoint otherwise
+        const endpoint = context
+          ? `${baseURL}/copilot/analyze/stream`
+          : `${baseURL}/copilot/chat/stream`;
+
+        const body = context
+          ? {
+              task_name: context.taskName,
+              chip_id: context.chipId,
+              qid: context.qid,
+              execution_id: context.executionId,
+              task_id: context.taskId,
+              message: userMessage,
+              image_base64: imageBase64 || null,
+              conversation_history: messages.map((m) => ({
+                role: m.role,
+                content: m.content,
+              })),
+            }
+          : {
+              message: userMessage,
+              conversation_history: messages.map((m) => ({
+                role: m.role,
+                content: m.content,
+              })),
+            };
+
+        const response = await fetch(endpoint, {
           method: "POST",
           headers: buildHeaders(),
-          body: JSON.stringify({
-            task_name: context.taskName,
-            chip_id: context.chipId,
-            qid: context.qid,
-            execution_id: context.executionId,
-            task_id: context.taskId,
-            message: userMessage,
-            image_base64: imageBase64 || null,
-            conversation_history: messages.map((m) => ({
-              role: m.role,
-              content: m.content,
-            })),
-          }),
+          body: JSON.stringify(body),
           signal: controller.signal,
         });
 
@@ -152,25 +230,35 @@ export function useAnalysisChat(context: AnalysisContext | null) {
 
           buffer += decoder.decode(value, { stream: true });
 
-          // Process complete SSE events (delimited by \n\n)
-          const events = parseSSEEvents(buffer);
-          // Keep the last incomplete block in buffer
-          const lastDoubleNewline = buffer.lastIndexOf("\n\n");
-          if (lastDoubleNewline !== -1) {
-            buffer = buffer.slice(lastDoubleNewline + 2);
-          }
+          // Process only complete SSE events (delimited by \n\n)
+          const { events, remainder } = consumeSSEEvents(buffer);
+          buffer = remainder;
 
           for (const evt of events) {
             if (evt.event === "status") {
               const payload = JSON.parse(evt.data);
               flushSync(() => setStatusMessage(payload.message));
             } else if (evt.event === "result") {
-              const result: AnalysisResult = JSON.parse(evt.data);
-              const formattedResponse = formatAnalysisResponse(result);
-              setMessages((prev) => [
-                ...prev,
-                { role: "assistant", content: formattedResponse },
-              ]);
+              const result = JSON.parse(evt.data);
+              // Blocks format: store as JSON string for rich rendering
+              if (result.blocks && Array.isArray(result.blocks)) {
+                setMessages((prev) => [
+                  ...prev,
+                  {
+                    role: "assistant",
+                    content: JSON.stringify(result),
+                  },
+                ]);
+              } else {
+                // Legacy format fallback
+                const formattedResponse = formatAnalysisResponse(
+                  result as AnalysisResult,
+                );
+                setMessages((prev) => [
+                  ...prev,
+                  { role: "assistant", content: formattedResponse },
+                ]);
+              }
             } else if (evt.event === "error") {
               const payload = JSON.parse(evt.data);
               throw new Error(payload.detail);
@@ -197,7 +285,7 @@ export function useAnalysisChat(context: AnalysisContext | null) {
         abortRef.current = null;
       }
     },
-    [context, messages],
+    [context, messages, setMessages],
   );
 
   const clearMessages = useCallback(() => {
@@ -205,7 +293,7 @@ export function useAnalysisChat(context: AnalysisContext | null) {
     setMessages([]);
     setError(null);
     setStatusMessage(null);
-  }, []);
+  }, [setMessages]);
 
   return {
     messages,

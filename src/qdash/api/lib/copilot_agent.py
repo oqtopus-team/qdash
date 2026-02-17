@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING, Any
 
 from openai import AsyncOpenAI, BadRequestError
@@ -42,6 +43,8 @@ The current qubit context (chip_id, qid) is provided in the system prompt below.
 MAX_TOOL_ROUNDS = 3
 
 ToolExecutors = dict[str, Any]
+OnToolCallHook = Callable[[str, dict[str, Any]], Awaitable[None]] | None
+OnStatusHook = Callable[[str], Awaitable[None]] | None
 
 AGENT_TOOLS: list[dict[str, Any]] = [
     {
@@ -95,6 +98,71 @@ AGENT_TOOLS: list[dict[str, Any]] = [
             "additionalProperties": False,
         },
     },
+    {
+        "type": "function",
+        "name": "get_parameter_timeseries",
+        "description": (
+            "Get time series data for a specific output parameter across all task results. "
+            "This queries by parameter name (e.g. 'qubit_frequency', 't1', 't2_echo', "
+            "'x90_gate_fidelity', 'resonator_frequency') rather than by task name. "
+            "Use this when the user asks about trends or history of a specific parameter. "
+            "Returns a list of {value, unit, calibrated_at, execution_id, task_id} entries "
+            "ordered by time."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "parameter_name": {
+                    "type": "string",
+                    "description": (
+                        "The output parameter name to query "
+                        "(e.g. 'qubit_frequency', 't1', 't2_echo', 'x90_gate_fidelity')"
+                    ),
+                },
+                "chip_id": {"type": "string", "description": "Chip ID"},
+                "qid": {"type": "string", "description": "Qubit ID"},
+                "last_n": {
+                    "type": "integer",
+                    "description": "Number of recent results to return (default 10)",
+                },
+            },
+            "required": ["parameter_name", "chip_id", "qid"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "type": "function",
+        "name": "execute_python_analysis",
+        "description": (
+            "Execute Python code in a sandboxed environment for data analysis. "
+            "Use this when you need to perform calculations, statistical analysis, "
+            "or generate Plotly charts from data retrieved by other tools. "
+            "Available libraries: numpy, scipy, scipy.stats, math, statistics, json, "
+            "datetime, collections. "
+            "Pass data from previous tool calls via context_data (accessible as 'data' in code). "
+            "Set a 'result' variable as a dict with 'output' (text) and optionally "
+            "'chart' (Plotly spec with 'data' and 'layout' keys)."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string",
+                    "description": (
+                        "Python code to execute. Use 'data' to access context_data. "
+                        "Set result = {'output': '...', 'chart': {'data': [...], 'layout': {...}}} "
+                        "for structured output."
+                    ),
+                },
+                "context_data": {
+                    "type": "object",
+                    "description": "Data from previous tool calls to make available as 'data' variable in the code.",
+                },
+            },
+            "required": ["code"],
+            "additionalProperties": False,
+        },
+    },
 ]
 
 ANALYSIS_RESPONSE_SCHEMA: dict[str, Any] = {
@@ -115,6 +183,65 @@ ANALYSIS_RESPONSE_SCHEMA: dict[str, Any] = {
     ],
     "additionalProperties": False,
 }
+
+BLOCKS_RESPONSE_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "blocks": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "type": {"type": "string", "enum": ["text", "chart"]},
+                    "content": {"type": ["string", "null"]},
+                    "chart": {"type": ["object", "null"]},
+                },
+                "required": ["type", "content", "chart"],
+                "additionalProperties": False,
+            },
+        },
+        "assessment": {
+            "type": ["string", "null"],
+            "enum": ["good", "warning", "bad", None],
+        },
+    },
+    "required": ["blocks"],
+    "additionalProperties": False,
+}
+
+CHART_SYSTEM_PROMPT = """\
+
+## Response format
+
+You MUST respond with a JSON object containing a "blocks" array.
+Each block has "type" ("text" or "chart"), "content" (string or null), and "chart" (object or null).
+
+For text blocks: {"type": "text", "content": "your text here (markdown supported)", "chart": null}
+For chart blocks: {"type": "chart", "content": null, "chart": {"data": [...], "layout": {...}}}
+
+Chart specifications use Plotly.js format:
+- "data" is an array of trace objects (e.g. {"x": [...], "y": [...], "type": "scatter", "mode": "lines+markers", "name": "T1"})
+- "layout" is a Plotly layout object (e.g. {"title": "T1 Trend", "xaxis": {"title": "Date"}, "yaxis": {"title": "T1 (μs)"}})
+- Keep layouts compact: no excessive margins, use autosize
+- Supported trace types: scatter, bar, histogram, heatmap
+
+Always include at least one text block explaining the chart or analysis.
+When showing data trends, prefer scatter plots with mode "lines+markers".
+Set "assessment" to "good", "warning", or "bad" when analyzing results. Set to null for informational responses.
+
+Example response:
+{
+  "blocks": [
+    {"type": "text", "content": "Here are the T1 results:", "chart": null},
+    {"type": "chart", "content": null, "chart": {
+      "data": [{"x": ["01/01", "01/02"], "y": [45.2, 43.1], "type": "scatter", "mode": "lines+markers", "name": "T1"}],
+      "layout": {"title": "T1 Trend", "xaxis": {"title": "Date"}, "yaxis": {"title": "T1 (μs)"}}
+    }},
+    {"type": "text", "content": "T1 is stable around 44 μs.", "chart": null}
+  ],
+  "assessment": "good"
+}
+"""
 
 RESPONSE_FORMAT_INSTRUCTION = """\
 
@@ -380,19 +507,21 @@ def _build_messages(
     return messages
 
 
-def _parse_response(content: str) -> AnalysisResponse:
-    """Parse LLM response into AnalysisResponse, handling JSON and plain text."""
-    # Try to extract JSON from response
-    text = content.strip()
-
-    # Handle markdown code blocks
+def _strip_code_fences(text: str) -> str:
+    """Remove markdown code fences from text."""
+    text = text.strip()
     if text.startswith("```"):
-        # Remove ```json or ``` prefix and ``` suffix
         lines = text.split("\n")
         lines = lines[1:]  # skip first ```json line
         if lines and lines[-1].strip() == "```":
             lines = lines[:-1]
         text = "\n".join(lines)
+    return text
+
+
+def _parse_response(content: str) -> AnalysisResponse:
+    """Parse LLM response into AnalysisResponse, handling JSON and plain text."""
+    text = _strip_code_fences(content)
 
     try:
         data = json.loads(text)
@@ -408,12 +537,63 @@ def _parse_response(content: str) -> AnalysisResponse:
         )
 
 
+def _legacy_to_blocks(response: AnalysisResponse) -> dict[str, Any]:
+    """Convert a legacy AnalysisResponse to blocks format."""
+    blocks: list[dict[str, Any]] = []
+
+    # Summary + explanation as text block
+    parts: list[str] = []
+    if response.summary:
+        parts.append(response.summary)
+    if response.explanation:
+        parts.append(response.explanation)
+    if response.potential_issues:
+        parts.append("\n**Potential Issues:**")
+        for issue in response.potential_issues:
+            parts.append(f"- {issue}")
+    if response.recommendations:
+        parts.append("\n**Recommendations:**")
+        for rec in response.recommendations:
+            parts.append(f"- {rec}")
+
+    blocks.append({"type": "text", "content": "\n\n".join(parts), "chart": None})
+
+    return {
+        "blocks": blocks,
+        "assessment": response.assessment,
+    }
+
+
+def _parse_blocks_response(content: str) -> dict[str, Any]:
+    """Parse LLM response into blocks format dict, with fallback to legacy."""
+    text = _strip_code_fences(content)
+
+    try:
+        data = json.loads(text)
+        if "blocks" in data and isinstance(data["blocks"], list):
+            return dict(data)
+        # Legacy format returned — convert
+        response = AnalysisResponse(**data)
+        return _legacy_to_blocks(response)
+    except (json.JSONDecodeError, ValueError):
+        # Plain text fallback
+        return {
+            "blocks": [{"type": "text", "content": content, "chart": None}],
+            "assessment": None,
+        }
+
+
 async def _run_responses_api(
     client: AsyncOpenAI,
     system_prompt: str,
     input_items: list[dict[str, Any]],
     config: CopilotConfig,
     tool_executors: ToolExecutors | None = None,
+    *,
+    response_schema: dict[str, Any] | None = None,
+    strict_schema: bool = True,
+    on_tool_call: OnToolCallHook = None,
+    on_status: OnStatusHook = None,
 ) -> str:
     """Call OpenAI Responses API and return the output text.
 
@@ -423,6 +603,7 @@ async def _run_responses_api(
     executor, the result is fed back, and the model is called again.
     The loop runs for at most ``MAX_TOOL_ROUNDS`` iterations.
     """
+    schema = response_schema or ANALYSIS_RESPONSE_SCHEMA
     kwargs: dict[str, Any] = {
         "model": config.model.name,
         "instructions": system_prompt,
@@ -432,8 +613,8 @@ async def _run_responses_api(
             "format": {
                 "type": "json_schema",
                 "name": "analysis_response",
-                "strict": True,
-                "schema": ANALYSIS_RESPONSE_SCHEMA,
+                "strict": strict_schema,
+                "schema": schema,
             }
         },
     }
@@ -452,6 +633,8 @@ async def _run_responses_api(
                 return await client.responses.create(**kw)
             raise
 
+    if on_status:
+        await on_status("thinking")
     response = await _create(**kwargs)
 
     # Tool call loop
@@ -469,6 +652,13 @@ async def _run_responses_api(
                 new_input.append(item.model_dump())
 
             for fc in function_calls:
+                if on_tool_call:
+                    try:
+                        args = json.loads(fc.arguments)
+                    except (json.JSONDecodeError, TypeError):
+                        args = {}
+                    await on_tool_call(fc.name, args)
+
                 executor = tool_executors.get(fc.name)
                 if executor is None:
                     tool_result = {"error": f"Unknown tool: {fc.name}"}
@@ -490,6 +680,8 @@ async def _run_responses_api(
                 )
 
             kwargs["input"] = new_input
+            if on_status:
+                await on_status("thinking")
             response = await _create(**kwargs)
 
     return str(response.output_text)
@@ -528,10 +720,13 @@ async def run_analysis(
     image_base64: str | None = None,
     conversation_history: list[dict[str, str]] | None = None,
     tool_executors: ToolExecutors | None = None,
-) -> AnalysisResponse:
+    on_tool_call: OnToolCallHook = None,
+    on_status: OnStatusHook = None,
+) -> dict[str, Any]:
     """Run the analysis using OpenAI-compatible API.
 
-    For OpenAI, uses the Responses API with structured JSON Schema output.
+    For OpenAI, uses the Responses API with structured JSON Schema output
+    and the blocks response format (mixed text/chart content).
     For Ollama, falls back to Chat Completions API since Ollama does not
     support the Responses API.
 
@@ -553,8 +748,8 @@ async def run_analysis(
 
     Returns
     -------
-    AnalysisResponse
-        Structured analysis from the LLM.
+    dict[str, Any]
+        Blocks-format response: {"blocks": [...], "assessment": ...}
 
     """
     client = _build_client(config)
@@ -565,12 +760,174 @@ async def run_analysis(
         system_prompt = _build_system_prompt(context, config=config, include_response_format=True)
         messages = _build_messages(system_prompt, user_message, image_base64, conversation_history)
         content = await _run_chat_completions(client, messages, config)
+        # Ollama still uses legacy schema; convert to blocks
+        response = _parse_response(content)
+        return _legacy_to_blocks(response)
     else:
-        # OpenAI: use Responses API with structured output + tools
-        system_prompt = _build_system_prompt(context, config=config)
+        # OpenAI: use Responses API with blocks schema (strict: False for flexible chart objects)
+        system_prompt = _build_system_prompt(context, config=config) + CHART_SYSTEM_PROMPT
         input_items = _build_input(user_message, image_base64, conversation_history)
         content = await _run_responses_api(
-            client, system_prompt, input_items, config, tool_executors
+            client,
+            system_prompt,
+            input_items,
+            config,
+            tool_executors,
+            response_schema=BLOCKS_RESPONSE_SCHEMA,
+            strict_schema=False,
+            on_tool_call=on_tool_call,
+            on_status=on_status,
         )
+        return _parse_blocks_response(content)
 
-    return _parse_response(content)
+
+CHAT_SYSTEM_PROMPT = """\
+You are an expert in superconducting qubit calibration.
+You analyze calibration results for fixed-frequency transmon qubits
+on a square-lattice chip with fixed couplers.
+
+Your role:
+- Answer questions about qubit calibration data and parameters
+- Retrieve and visualize data using available tools
+- Perform statistical analysis and computations on calibration data
+- Provide actionable insights and recommendations
+- Explain findings clearly to experimentalists
+
+You have access to tools that can fetch data from the calibration database:
+- get_qubit_params: Get current calibrated parameters for a qubit (chip_id, qid required)
+- get_latest_task_result: Get the latest result for a specific calibration task
+- get_task_history: Get recent historical results for a task
+- get_parameter_timeseries: Get time series data for a parameter (ideal for trend charts)
+- execute_python_analysis: Execute Python code for data analysis and visualization
+
+IMPORTANT: When calling tools, you need chip_id and qid.
+- The default chip_id is provided in the context below. Always use it unless the user specifies a different chip.
+- For qid: users may refer to qubits as "Q16", "qubit 16", or just "16". Normalize to the plain number format (e.g. "16") when calling tools.
+- For parameter names in get_parameter_timeseries, use snake_case names like: qubit_frequency, t1, t2_echo, x90_gate_fidelity, resonator_frequency, etc.
+
+When the user asks about parameters or trends, ALWAYS use the tools to retrieve real data.
+When showing data trends, create charts using the blocks response format.
+
+## Using execute_python_analysis
+
+For complex analysis (correlations, statistics, distributions, fitting), use execute_python_analysis:
+1. First, retrieve data using get_qubit_params, get_parameter_timeseries, etc.
+2. Then call execute_python_analysis with:
+   - "code": Python code that uses 'data' variable to access context_data
+   - "context_data": Pass the retrieved data as a dict
+3. Available libraries: numpy, scipy, scipy.stats, math, statistics, json, datetime, collections
+4. In the code, set a 'result' variable:
+   ```python
+   result = {
+       "output": "Text description of analysis results",
+       "chart": {  # optional Plotly chart
+           "data": [{"x": [...], "y": [...], "type": "scatter", ...}],
+           "layout": {"title": "...", "xaxis": {"title": "..."}, ...}
+       }
+   }
+   ```
+5. Include the execution result in your blocks response: text from output, chart from chart field.
+"""
+
+
+def _build_chat_system_prompt(
+    *,
+    config: CopilotConfig | None = None,
+    chip_id: str | None = None,
+    qid: str | None = None,
+    qubit_params: dict[str, Any] | None = None,
+) -> str:
+    """Build system prompt for the generic chat endpoint."""
+    parts = [CHAT_SYSTEM_PROMPT, _build_language_instruction(config)]
+
+    if config and config.scoring:
+        threshold_lines = ["\n## Scoring thresholds (deployment-specific)"]
+        for metric, thresh in config.scoring.items():
+            range_parts = []
+            if thresh.bad is not None:
+                range_parts.append(f"bad < {thresh.bad} {thresh.unit}")
+            range_parts.append(f"good > {thresh.good} {thresh.unit}")
+            range_parts.append(f"excellent > {thresh.excellent} {thresh.unit}")
+            if not thresh.higher_is_better:
+                range_parts.append("(lower is better)")
+            threshold_lines.append(f"- {metric}: {', '.join(range_parts)}")
+        parts.append("\n".join(threshold_lines))
+
+    if chip_id:
+        if qid:
+            lines = [f"\n## Current context: Qubit {qid} (Chip: {chip_id})"]
+        else:
+            lines = [f"\n## Current context: Chip {chip_id}"]
+            lines.append(
+                "No specific qubit selected. Use this chip_id as default when calling tools."
+            )
+        if qubit_params:
+            lines.append("\n### Current qubit parameters")
+            for key, val in qubit_params.items():
+                if isinstance(val, dict) and "value" in val:
+                    lines.append(f"- {key}: {val['value']} {val.get('unit', '')}")
+                else:
+                    lines.append(f"- {key}: {val}")
+        parts.append("\n".join(lines))
+
+    parts.append(CHART_SYSTEM_PROMPT)
+    return "\n\n".join(parts)
+
+
+async def run_chat(
+    user_message: str,
+    config: CopilotConfig,
+    chip_id: str | None = None,
+    qid: str | None = None,
+    qubit_params: dict[str, Any] | None = None,
+    image_base64: str | None = None,
+    conversation_history: list[dict[str, str]] | None = None,
+    tool_executors: ToolExecutors | None = None,
+    on_tool_call: OnToolCallHook = None,
+    on_status: OnStatusHook = None,
+) -> dict[str, Any]:
+    """Run a generic chat using OpenAI-compatible API.
+
+    Lightweight version of run_analysis that does not require TaskAnalysisContext.
+    Optionally includes chip_id/qid context if provided.
+
+    Returns
+    -------
+    dict[str, Any]
+        Blocks-format response: {"blocks": [...], "assessment": ...}
+
+    """
+    client = _build_client(config)
+    provider = config.model.provider
+
+    system_prompt = _build_chat_system_prompt(
+        config=config,
+        chip_id=chip_id,
+        qid=qid,
+        qubit_params=qubit_params,
+    )
+
+    if provider == "ollama":
+        messages = _build_messages(
+            system_prompt + RESPONSE_FORMAT_INSTRUCTION,
+            user_message,
+            image_base64,
+            conversation_history,
+        )
+        content = await _run_chat_completions(client, messages, config)
+        response = _parse_response(content)
+        return _legacy_to_blocks(response)
+    else:
+        input_items = _build_input(user_message, image_base64, conversation_history)
+        content = await _run_responses_api(
+            client,
+            system_prompt,
+            input_items,
+            config,
+            tool_executors,
+            response_schema=BLOCKS_RESPONSE_SCHEMA,
+            strict_schema=False,
+            on_tool_call=on_tool_call,
+            on_status=on_status,
+        )
+        return _parse_blocks_response(content)

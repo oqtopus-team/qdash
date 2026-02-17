@@ -20,7 +20,6 @@ import { PageContainer } from "@/components/ui/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { MetricsPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
 import { useMetricsConfig } from "@/hooks/useMetricsConfig";
-import { useChatMetrics } from "@/hooks/useChatMetrics";
 import { getDaisySelectStyles } from "@/lib/reactSelectTheme";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -274,18 +273,6 @@ export function MetricsPageContent() {
       groups.find((group) => group.metrics.includes(selectedMetric)) || null
     );
   }, [metricType, cdfGroups, selectedMetric]);
-
-  // Chat integration for AI-assisted analysis
-  useChatMetrics({
-    chipId: selectedChip,
-    metricType,
-    selectedMetric,
-    metricsConfig,
-    metricData,
-    timeRange,
-    onMetricChange: setSelectedMetric,
-    onTimeRangeChange: (range) => setTimeRange(range as TimeRange),
-  });
 
   // Show skeleton during initial loading
   if (isConfigLoading || isChipsLoading) {

@@ -129,6 +129,16 @@ export default withMermaid(
                 { text: "Testing", link: "/development/workflow/testing" },
               ],
             },
+            {
+              text: "Copilot",
+              collapsed: true,
+              items: [
+                { text: "Architecture", link: "/development/copilot/architecture" },
+                { text: "Sandbox", link: "/development/copilot/sandbox" },
+                { text: "LLM Agent", link: "/development/copilot/agent" },
+                { text: "SSE Streaming", link: "/development/copilot/streaming" },
+              ],
+            },
           ],
         },
         {
