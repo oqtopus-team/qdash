@@ -23,6 +23,7 @@ MEMORY_LIMIT_BYTES = 256 * 1024 * 1024  # 256MB
 ALLOWED_MODULES = frozenset(
     {
         "numpy",
+        "pandas",
         "scipy",
         "scipy.stats",
         "scipy.optimize",

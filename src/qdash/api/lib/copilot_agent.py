@@ -40,7 +40,7 @@ use the available tools to retrieve the data rather than saying it's unavailable
 The current qubit context (chip_id, qid) is provided in the system prompt below.
 """
 
-MAX_TOOL_ROUNDS = 3
+MAX_TOOL_ROUNDS = 5
 
 ToolExecutors = dict[str, Any]
 OnToolCallHook = Callable[[str, dict[str, Any]], Awaitable[None]] | None
@@ -137,7 +137,7 @@ AGENT_TOOLS: list[dict[str, Any]] = [
             "Execute Python code in a sandboxed environment for data analysis. "
             "Use this when you need to perform calculations, statistical analysis, "
             "or generate Plotly charts from data retrieved by other tools. "
-            "Available libraries: numpy, scipy, scipy.stats, math, statistics, json, "
+            "Available libraries: numpy, pandas, scipy, scipy.stats, math, statistics, json, "
             "datetime, collections. "
             "Pass data from previous tool calls via context_data (accessible as 'data' in code). "
             "Set a 'result' variable as a dict with 'output' (text) and optionally "
@@ -160,6 +160,207 @@ AGENT_TOOLS: list[dict[str, Any]] = [
                 },
             },
             "required": ["code"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "type": "function",
+        "name": "get_chip_summary",
+        "description": (
+            "Get a summary of all qubits on a chip with per-qubit parameters and "
+            "computed statistics (mean, median, std, min, max) for numeric parameters. "
+            "Use this for chip-wide analysis or when the user asks about overall chip quality."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "chip_id": {"type": "string", "description": "Chip ID"},
+                "param_names": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": (
+                        "Optional list of parameter names to include "
+                        "(e.g. ['qubit_frequency', 't1']). If omitted, all parameters are returned."
+                    ),
+                },
+            },
+            "required": ["chip_id"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "type": "function",
+        "name": "get_coupling_params",
+        "description": (
+            "Get calibrated parameters for coupling resonators. "
+            "Specify either a coupling_id (e.g. '0-1') or a qubit_id to get all couplings "
+            "involving that qubit. Optional param_names filter."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "chip_id": {"type": "string", "description": "Chip ID"},
+                "coupling_id": {
+                    "type": "string",
+                    "description": "Coupling ID (e.g. '0-1'). If provided, returns this coupling only.",
+                },
+                "qubit_id": {
+                    "type": "string",
+                    "description": "Qubit ID. If provided, returns all couplings involving this qubit.",
+                },
+                "param_names": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Optional list of parameter names to filter.",
+                },
+            },
+            "required": ["chip_id"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "type": "function",
+        "name": "get_execution_history",
+        "description": (
+            "Get recent execution history for a chip. "
+            "Returns execution runs with status, timing, and metadata. "
+            "Optional filters by status and tags."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "chip_id": {"type": "string", "description": "Chip ID"},
+                "status": {
+                    "type": "string",
+                    "description": "Filter by status (e.g. 'completed', 'failed', 'running')",
+                },
+                "tags": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Filter by tags",
+                },
+                "last_n": {
+                    "type": "integer",
+                    "description": "Number of recent executions to return (default 10)",
+                },
+            },
+            "required": ["chip_id"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "type": "function",
+        "name": "compare_qubits",
+        "description": (
+            "Compare parameters across multiple qubits side by side. "
+            "Provide a list of qubit IDs to compare their current calibrated parameters."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "chip_id": {"type": "string", "description": "Chip ID"},
+                "qids": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "List of qubit IDs to compare (e.g. ['0', '1', '2'])",
+                },
+                "param_names": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Optional list of parameter names to compare.",
+                },
+            },
+            "required": ["chip_id", "qids"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "type": "function",
+        "name": "get_chip_topology",
+        "description": (
+            "Get the chip topology information including grid size, qubit positions, "
+            "and coupling connections. Useful for understanding the physical layout."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "chip_id": {"type": "string", "description": "Chip ID"},
+            },
+            "required": ["chip_id"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "type": "function",
+        "name": "search_task_results",
+        "description": (
+            "Search task result history with flexible filters. "
+            "Use this to find specific task results by task name, qubit, status, or execution."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "chip_id": {"type": "string", "description": "Chip ID"},
+                "task_name": {"type": "string", "description": "Filter by task name"},
+                "qid": {"type": "string", "description": "Filter by qubit ID"},
+                "status": {
+                    "type": "string",
+                    "description": "Filter by status (e.g. 'completed', 'failed')",
+                },
+                "execution_id": {"type": "string", "description": "Filter by execution ID"},
+                "last_n": {
+                    "type": "integer",
+                    "description": "Number of results to return (default 10)",
+                },
+            },
+            "required": ["chip_id"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "type": "function",
+        "name": "get_calibration_notes",
+        "description": (
+            "Get calibration notes for a chip. "
+            "Notes contain observations, issues, and annotations recorded during calibration."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "chip_id": {"type": "string", "description": "Chip ID"},
+                "execution_id": {"type": "string", "description": "Filter by execution ID"},
+                "task_id": {"type": "string", "description": "Filter by task ID"},
+                "last_n": {
+                    "type": "integer",
+                    "description": "Number of notes to return (default 10)",
+                },
+            },
+            "required": ["chip_id"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "type": "function",
+        "name": "get_parameter_lineage",
+        "description": (
+            "Get the version history (lineage) of a specific calibration parameter. "
+            "Shows how the parameter value evolved over time across executions."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "parameter_name": {
+                    "type": "string",
+                    "description": "Parameter name (e.g. 'qubit_frequency', 't1')",
+                },
+                "qid": {"type": "string", "description": "Qubit or coupling ID"},
+                "chip_id": {"type": "string", "description": "Chip ID"},
+                "last_n": {
+                    "type": "integer",
+                    "description": "Number of versions to return (default 10)",
+                },
+            },
+            "required": ["parameter_name", "qid", "chip_id"],
             "additionalProperties": False,
         },
     },
@@ -794,16 +995,35 @@ Your role:
 - Explain findings clearly to experimentalists
 
 You have access to tools that can fetch data from the calibration database:
+
+### Single-qubit tools
 - get_qubit_params: Get current calibrated parameters for a qubit (chip_id, qid required)
 - get_latest_task_result: Get the latest result for a specific calibration task
 - get_task_history: Get recent historical results for a task
 - get_parameter_timeseries: Get time series data for a parameter (ideal for trend charts)
-- execute_python_analysis: Execute Python code for data analysis and visualization
 
-IMPORTANT: When calling tools, you need chip_id and qid.
+### Chip-wide & cross-qubit tools
+- get_chip_summary: Get all qubits on a chip with statistics (mean/median/std/min/max)
+- compare_qubits: Compare parameters across multiple qubits side by side
+- get_chip_topology: Get chip topology (grid size, qubit positions, coupling connections)
+
+### Coupling & execution tools
+- get_coupling_params: Get coupling resonator parameters by coupling_id or qubit_id
+- get_execution_history: Get recent execution runs with status and timing
+- search_task_results: Search task results with flexible filters (task_name, qid, status, execution_id)
+
+### Provenance & notes
+- get_calibration_notes: Get calibration notes/annotations for a chip
+- get_parameter_lineage: Get version history of a parameter across executions
+
+### Analysis
+- execute_python_analysis: Execute Python code for data analysis and visualization (numpy, pandas, scipy available)
+
+IMPORTANT: When calling tools, you need chip_id and often qid.
 - The default chip_id is provided in the context below. Always use it unless the user specifies a different chip.
 - For qid: users may refer to qubits as "Q16", "qubit 16", or just "16". Normalize to the plain number format (e.g. "16") when calling tools.
 - For parameter names in get_parameter_timeseries, use snake_case names like: qubit_frequency, t1, t2_echo, x90_gate_fidelity, resonator_frequency, etc.
+- For chip-wide queries (get_chip_summary, get_execution_history, get_chip_topology), only chip_id is required.
 
 When the user asks about parameters or trends, ALWAYS use the tools to retrieve real data.
 When showing data trends, create charts using the blocks response format.
@@ -815,7 +1035,7 @@ For complex analysis (correlations, statistics, distributions, fitting), use exe
 2. Then call execute_python_analysis with:
    - "code": Python code that uses 'data' variable to access context_data
    - "context_data": Pass the retrieved data as a dict
-3. Available libraries: numpy, scipy, scipy.stats, math, statistics, json, datetime, collections
+3. Available libraries: numpy, pandas, scipy, scipy.stats, math, statistics, json, datetime, collections
 4. In the code, set a 'result' variable:
    ```python
    result = {

@@ -35,6 +35,14 @@ TOOL_LABELS: dict[str, str] = {
     "get_task_history": "タスク履歴を取得中",
     "get_parameter_timeseries": "パラメータ時系列を取得中",
     "execute_python_analysis": "Python分析コードを実行中",
+    "get_chip_summary": "チップサマリーを取得中",
+    "get_coupling_params": "カップリングパラメータを取得中",
+    "get_execution_history": "実行履歴を取得中",
+    "compare_qubits": "キュービット比較データを取得中",
+    "get_chip_topology": "チップトポロジーを取得中",
+    "search_task_results": "タスク結果を検索中",
+    "get_calibration_notes": "キャリブレーションノートを取得中",
+    "get_parameter_lineage": "パラメータ履歴を取得中",
 }
 
 STATUS_LABELS: dict[str, str] = {
@@ -430,7 +438,8 @@ def _load_qubit_params(chip_id: str, qid: str) -> dict[str, Any]:
     doc = QubitDocument.find_one({"chip_id": chip_id, "qid": qid}).run()
     if doc is None:
         return {}
-    return dict(doc.data)
+    result: dict[str, Any] = _sanitize_for_json(dict(doc.data))
+    return result
 
 
 def _load_task_result(task_id: str) -> dict[str, Any] | None:
@@ -616,6 +625,344 @@ def _load_parameter_timeseries(
     return results
 
 
+def _sanitize_for_json(obj: Any) -> Any:
+    """Replace NaN/Infinity float values with None for JSON safety."""
+    import math
+
+    if isinstance(obj, float):
+        return None if not math.isfinite(obj) else obj
+    if isinstance(obj, dict):
+        return {k: _sanitize_for_json(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_sanitize_for_json(v) for v in obj]
+    return obj
+
+
+def _load_chip_summary(chip_id: str, param_names: list[str] | None = None) -> dict[str, Any]:
+    """Load summary of all qubits on a chip with computed statistics."""
+    import math
+    import statistics as stats_mod
+
+    from qdash.dbmodel.qubit import QubitDocument
+
+    docs = QubitDocument.find({"chip_id": chip_id}).run()
+    if not docs:
+        return {"error": f"No qubits found for chip_id={chip_id}"}
+
+    qubits: dict[str, dict[str, Any]] = {}
+    numeric_values: dict[str, list[float]] = {}
+
+    for doc in docs:
+        data = dict(doc.data)
+        if param_names:
+            data = {k: v for k, v in data.items() if k in param_names}
+        qubits[doc.qid] = _sanitize_for_json(data)
+        for key, val in data.items():
+            raw = val.get("value") if isinstance(val, dict) and "value" in val else val
+            if isinstance(raw, (int, float)) and math.isfinite(raw):
+                numeric_values.setdefault(key, []).append(float(raw))
+
+    statistics: dict[str, dict[str, float]] = {}
+    for key, values in numeric_values.items():
+        if len(values) >= 2:
+            statistics[key] = {
+                "mean": stats_mod.mean(values),
+                "median": stats_mod.median(values),
+                "stdev": stats_mod.stdev(values),
+                "min": min(values),
+                "max": max(values),
+                "count": len(values),
+            }
+        elif len(values) == 1:
+            statistics[key] = {
+                "mean": values[0],
+                "median": values[0],
+                "stdev": 0.0,
+                "min": values[0],
+                "max": values[0],
+                "count": 1,
+            }
+
+    return {
+        "chip_id": chip_id,
+        "num_qubits": len(qubits),
+        "qubits": qubits,
+        "statistics": statistics,
+    }
+
+
+def _load_coupling_params_tool(
+    chip_id: str,
+    coupling_id: str | None = None,
+    qubit_id: str | None = None,
+    param_names: list[str] | None = None,
+) -> dict[str, Any] | list[dict[str, Any]]:
+    """Load coupling parameters by coupling_id or qubit_id."""
+    from qdash.dbmodel.coupling import CouplingDocument
+
+    if coupling_id:
+        coupling_ids = [coupling_id]
+    elif qubit_id:
+        from qdash.dbmodel.chip import ChipDocument
+
+        chip = ChipDocument.find_one({"chip_id": chip_id}).run()
+        if chip is None or chip.topology_id is None:
+            return {"error": f"Chip {chip_id} not found or has no topology"}
+
+        from qdash.common.topology_config import load_topology
+
+        topology = load_topology(chip.topology_id)
+        try:
+            qid_int = int(qubit_id)
+        except ValueError:
+            return {"error": f"Invalid qubit_id: {qubit_id}"}
+
+        coupling_ids = []
+        for q1, q2 in topology.couplings:
+            if q1 == qid_int or q2 == qid_int:
+                coupling_ids.append(f"{q1}-{q2}")
+    else:
+        return {"error": "Either coupling_id or qubit_id must be provided"}
+
+    results: list[dict[str, Any]] = []
+    for cid in coupling_ids:
+        doc = CouplingDocument.find_one({"chip_id": chip_id, "qid": cid}).run()
+        if doc is None:
+            continue
+        data = dict(doc.data)
+        if param_names:
+            data = {k: v for k, v in data.items() if k in param_names}
+        results.append({"coupling_id": cid, "data": _sanitize_for_json(data)})
+
+    if not results:
+        return {"error": "No coupling data found"}
+    return results
+
+
+def _load_execution_history(
+    chip_id: str,
+    status: str | None = None,
+    tags: list[str] | None = None,
+    last_n: int = 10,
+) -> list[dict[str, Any]]:
+    """Load recent execution history for a chip."""
+    from qdash.dbmodel.execution_history import ExecutionHistoryDocument
+
+    query: dict[str, Any] = {"chip_id": chip_id}
+    if status:
+        query["status"] = status
+    if tags:
+        query["tags"] = {"$all": tags}
+
+    docs = (
+        ExecutionHistoryDocument.find(query)
+        .sort([("start_at", SortDirection.DESCENDING)])
+        .limit(last_n)
+        .run()
+    )
+
+    results: list[dict[str, Any]] = []
+    for doc in docs:
+        results.append(
+            {
+                "execution_id": doc.execution_id,
+                "name": doc.name,
+                "status": doc.status,
+                "chip_id": doc.chip_id,
+                "tags": doc.tags,
+                "start_at": doc.start_at.isoformat() if doc.start_at else None,
+                "end_at": doc.end_at.isoformat() if doc.end_at else None,
+                "elapsed_time": doc.elapsed_time,
+                "message": doc.message,
+            }
+        )
+
+    if not results:
+        return [{"error": f"No executions found for chip_id={chip_id}"}]
+    return results
+
+
+def _load_compare_qubits(
+    chip_id: str, qids: list[str], param_names: list[str] | None = None
+) -> dict[str, Any]:
+    """Load and compare parameters across multiple qubits."""
+    from qdash.dbmodel.qubit import QubitDocument
+
+    comparison: dict[str, dict[str, Any]] = {}
+    for qid in qids:
+        doc = QubitDocument.find_one({"chip_id": chip_id, "qid": qid}).run()
+        if doc is None:
+            comparison[qid] = {"error": f"Qubit {qid} not found"}
+            continue
+        data = dict(doc.data)
+        if param_names:
+            data = {k: v for k, v in data.items() if k in param_names}
+        comparison[qid] = _sanitize_for_json(data)
+
+    return {"chip_id": chip_id, "qubits": comparison}
+
+
+def _load_chip_topology(chip_id: str) -> dict[str, Any]:
+    """Load chip topology information."""
+    from qdash.dbmodel.chip import ChipDocument
+
+    chip = ChipDocument.find_one({"chip_id": chip_id}).run()
+    if chip is None:
+        return {"error": f"Chip {chip_id} not found"}
+    if chip.topology_id is None:
+        return {"error": f"Chip {chip_id} has no topology configured"}
+
+    from qdash.common.topology_config import load_topology
+
+    topology = load_topology(chip.topology_id)
+
+    qubit_positions = {
+        str(qid): {"row": pos.row, "col": pos.col} for qid, pos in topology.qubits.items()
+    }
+    couplings = [[q1, q2] for q1, q2 in topology.couplings]
+
+    return {
+        "chip_id": chip_id,
+        "topology_id": chip.topology_id,
+        "grid_size": topology.grid_size,
+        "num_qubits": topology.num_qubits,
+        "layout_type": topology.layout_type,
+        "qubit_positions": qubit_positions,
+        "couplings": couplings,
+    }
+
+
+def _load_search_task_results(
+    chip_id: str,
+    task_name: str | None = None,
+    qid: str | None = None,
+    status: str | None = None,
+    execution_id: str | None = None,
+    last_n: int = 10,
+) -> list[dict[str, Any]]:
+    """Search task result history with flexible filters."""
+    from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
+
+    query: dict[str, Any] = {"chip_id": chip_id}
+    if task_name:
+        query["name"] = task_name
+    if qid:
+        query["qid"] = qid
+    if status:
+        query["status"] = status
+    if execution_id:
+        query["execution_id"] = execution_id
+
+    docs = (
+        TaskResultHistoryDocument.find(query)
+        .sort([("start_at", SortDirection.DESCENDING)])
+        .limit(last_n)
+        .run()
+    )
+
+    results: list[dict[str, Any]] = []
+    for doc in docs:
+        results.append(
+            {
+                "task_id": doc.task_id,
+                "task_name": doc.name,
+                "qid": doc.qid,
+                "status": doc.status,
+                "execution_id": doc.execution_id,
+                "start_at": doc.start_at.isoformat() if doc.start_at else None,
+                "end_at": doc.end_at.isoformat() if doc.end_at else None,
+                "elapsed_time": doc.elapsed_time,
+                "output_parameters": doc.output_parameters or {},
+                "message": doc.message,
+            }
+        )
+
+    if not results:
+        return [{"error": "No task results found matching the filters"}]
+    return results
+
+
+def _load_calibration_notes(
+    chip_id: str,
+    execution_id: str | None = None,
+    task_id: str | None = None,
+    last_n: int = 10,
+) -> list[dict[str, Any]]:
+    """Load calibration notes for a chip."""
+    from qdash.dbmodel.calibration_note import CalibrationNoteDocument
+
+    query: dict[str, Any] = {"chip_id": chip_id}
+    if execution_id:
+        query["execution_id"] = execution_id
+    if task_id:
+        query["task_id"] = task_id
+
+    docs = (
+        CalibrationNoteDocument.find(query)
+        .sort([("timestamp", SortDirection.DESCENDING)])
+        .limit(last_n)
+        .run()
+    )
+
+    results: list[dict[str, Any]] = []
+    for doc in docs:
+        results.append(
+            {
+                "execution_id": doc.execution_id,
+                "task_id": doc.task_id,
+                "note": doc.note,
+                "timestamp": doc.timestamp.isoformat() if doc.timestamp else None,
+            }
+        )
+
+    if not results:
+        return [{"error": f"No calibration notes found for chip_id={chip_id}"}]
+    return results
+
+
+def _load_parameter_lineage(
+    parameter_name: str, qid: str, chip_id: str, last_n: int = 10
+) -> list[dict[str, Any]]:
+    """Load version history for a specific parameter."""
+    from qdash.dbmodel.provenance import ParameterVersionDocument
+
+    docs = (
+        ParameterVersionDocument.find(
+            {"parameter_name": parameter_name, "qid": qid, "chip_id": chip_id}
+        )
+        .sort([("version", SortDirection.DESCENDING)])
+        .limit(last_n)
+        .run()
+    )
+
+    results: list[dict[str, Any]] = []
+    for doc in docs:
+        results.append(
+            {
+                "version": doc.version,
+                "value": doc.value,
+                "unit": doc.unit,
+                "error": doc.error,
+                "execution_id": doc.execution_id,
+                "task_id": doc.task_id,
+                "task_name": doc.task_name,
+                "valid_from": doc.valid_from.isoformat() if doc.valid_from else None,
+                "valid_until": doc.valid_until.isoformat() if doc.valid_until else None,
+            }
+        )
+
+    if not results:
+        return [
+            {
+                "error": (
+                    f"No version history found for parameter '{parameter_name}' "
+                    f"on qid={qid}, chip_id={chip_id}"
+                )
+            }
+        ]
+    return results
+
+
 def _build_tool_executors() -> dict[str, Any]:
     """Build the tool executor mapping for LLM function calling."""
     from qdash.api.lib.copilot_sandbox import execute_python_analysis
@@ -633,5 +980,32 @@ def _build_tool_executors() -> dict[str, Any]:
         ),
         "execute_python_analysis": lambda args: execute_python_analysis(
             args["code"], args.get("context_data")
+        ),
+        "get_chip_summary": lambda args: _load_chip_summary(
+            args["chip_id"], args.get("param_names")
+        ),
+        "get_coupling_params": lambda args: _load_coupling_params_tool(
+            args["chip_id"], args.get("coupling_id"), args.get("qubit_id"), args.get("param_names")
+        ),
+        "get_execution_history": lambda args: _load_execution_history(
+            args["chip_id"], args.get("status"), args.get("tags"), args.get("last_n", 10)
+        ),
+        "compare_qubits": lambda args: _load_compare_qubits(
+            args["chip_id"], args["qids"], args.get("param_names")
+        ),
+        "get_chip_topology": lambda args: _load_chip_topology(args["chip_id"]),
+        "search_task_results": lambda args: _load_search_task_results(
+            args["chip_id"],
+            args.get("task_name"),
+            args.get("qid"),
+            args.get("status"),
+            args.get("execution_id"),
+            args.get("last_n", 10),
+        ),
+        "get_calibration_notes": lambda args: _load_calibration_notes(
+            args["chip_id"], args.get("execution_id"), args.get("task_id"), args.get("last_n", 10)
+        ),
+        "get_parameter_lineage": lambda args: _load_parameter_lineage(
+            args["parameter_name"], args["qid"], args["chip_id"], args.get("last_n", 10)
         ),
     }

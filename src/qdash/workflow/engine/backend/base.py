@@ -42,5 +42,6 @@ class BaseBackend(ABC):
         execution_id: str,
         task_manager_id: str,
         project_id: str | None = None,
+        qid: str | None = None,
     ) -> None:
         """Update calibration note. Override in subclasses that support notes."""
