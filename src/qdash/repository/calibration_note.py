@@ -195,6 +195,7 @@ class MongoCalibrationNoteRepository:
                 "task_id": note.task_id,
                 "username": note.username,
                 "chip_id": note.chip_id,
+                "version": 0,
             },
         }
 
@@ -270,7 +271,10 @@ class MongoCalibrationNoteRepository:
             try:
                 collection.find_one_and_update(
                     query_filter,
-                    {"$set": update_ops},
+                    {
+                        "$set": update_ops,
+                        "$inc": {"version": 1},
+                    },
                     upsert=True,
                 )
                 return

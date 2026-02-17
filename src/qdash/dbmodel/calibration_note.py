@@ -35,6 +35,7 @@ class CalibrationNoteDocument(Document):
     execution_id: str = Field(..., description="The execution ID associated with this note")
     task_id: str = Field(..., description="The task ID associated with this note")
     note: dict[str, Any] = Field(..., description="The calibration note data")
+    version: int = Field(default=0, description="Version number, incremented on each update")
     timestamp: datetime = Field(
         default_factory=now,
         description="The time when the note was last updated",
