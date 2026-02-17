@@ -16,6 +16,7 @@ import type { AnalysisContext, ChatMessage } from "@/hooks/useAnalysisChat";
 
 export interface ChatSession {
   id: string;
+  title: string;
   context: AnalysisContext | null;
   messages: ChatMessage[];
   createdAt: number;
@@ -42,21 +43,77 @@ interface AnalysisChatContextValue {
   // message sync (used by useAnalysisChat)
   getSessionMessages: (ctx: AnalysisContext) => ChatMessage[];
   setSessionMessages: (ctx: AnalysisContext, messages: ChatMessage[]) => void;
+
+  // message sync by session ID (used by useCopilotChat)
+  updateSessionMessages: (sessionId: string, messages: ChatMessage[]) => void;
+  autoTitleSession: (sessionId: string, firstMessage: string) => void;
 }
 
 // ---------------------------------------------------------------------------
 // localStorage helpers
 // ---------------------------------------------------------------------------
 
-const STORAGE_KEY = "qdash_analysis_sessions";
+const STORAGE_KEY = "qdash_chat_sessions";
+const LEGACY_ANALYSIS_KEY = "qdash_analysis_sessions";
+const LEGACY_COPILOT_KEY = "qdash_copilot_sessions";
 const MAX_SESSIONS = 50;
+
+interface LegacyCopilotSession {
+  id: string;
+  title: string;
+  messages: ChatMessage[];
+  createdAt: number;
+  updatedAt: number;
+}
 
 function loadSessions(): ChatSession[] {
   if (typeof window === "undefined") return [];
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    return JSON.parse(raw) as ChatSession[];
+    if (raw) return JSON.parse(raw) as ChatSession[];
+
+    // One-time migration from legacy keys
+    const merged: ChatSession[] = [];
+
+    const legacyAnalysis = localStorage.getItem(LEGACY_ANALYSIS_KEY);
+    if (legacyAnalysis) {
+      const old = JSON.parse(legacyAnalysis) as Omit<ChatSession, "title">[];
+      for (const s of old) {
+        merged.push({
+          ...s,
+          title: s.context
+            ? `${s.context.taskName} / ${s.context.qid}`
+            : "General Chat",
+        });
+      }
+    }
+
+    const legacyCopilot = localStorage.getItem(LEGACY_COPILOT_KEY);
+    if (legacyCopilot) {
+      const old = JSON.parse(legacyCopilot) as LegacyCopilotSession[];
+      for (const s of old) {
+        // Skip duplicates by id
+        if (merged.some((m) => m.id === s.id)) continue;
+        merged.push({
+          id: s.id,
+          title: s.title || "New Chat",
+          context: null,
+          messages: s.messages,
+          createdAt: s.createdAt,
+          updatedAt: s.updatedAt,
+        });
+      }
+    }
+
+    if (merged.length > 0) {
+      merged.sort((a, b) => b.updatedAt - a.updatedAt);
+      saveSessions(merged);
+      localStorage.removeItem(LEGACY_ANALYSIS_KEY);
+      localStorage.removeItem(LEGACY_COPILOT_KEY);
+      return merged;
+    }
+
+    return [];
   } catch {
     return [];
   }
@@ -132,6 +189,7 @@ export function AnalysisChatProvider({
         const now = Date.now();
         const session: ChatSession = {
           id,
+          title: `${ctx.taskName} / ${ctx.qid}`,
           context: ctx,
           messages: [],
           createdAt: now,
@@ -157,6 +215,7 @@ export function AnalysisChatProvider({
       const now = Date.now();
       const session: ChatSession = {
         id,
+        title: "New Chat",
         context: null,
         messages: [],
         createdAt: now,
@@ -188,6 +247,7 @@ export function AnalysisChatProvider({
       const now = Date.now();
       const session: ChatSession = {
         id,
+        title: ctx ? `${ctx.taskName} / ${ctx.qid}` : "New Chat",
         context: ctx,
         messages: [],
         createdAt: now,
@@ -244,6 +304,30 @@ export function AnalysisChatProvider({
     [activeSessionId],
   );
 
+  const updateSessionMessages = useCallback(
+    (sessionId: string, messages: ChatMessage[]) => {
+      setSessions((prev) =>
+        prev.map((s) =>
+          s.id === sessionId ? { ...s, messages, updatedAt: Date.now() } : s,
+        ),
+      );
+    },
+    [],
+  );
+
+  const autoTitleSession = useCallback(
+    (sessionId: string, firstMessage: string) => {
+      setSessions((prev) =>
+        prev.map((s) =>
+          s.id === sessionId && s.title === "New Chat"
+            ? { ...s, title: firstMessage.slice(0, 50) }
+            : s,
+        ),
+      );
+    },
+    [],
+  );
+
   return (
     <AnalysisChatCtx.Provider
       value={{
@@ -261,6 +345,8 @@ export function AnalysisChatProvider({
         clearActiveSession,
         getSessionMessages,
         setSessionMessages,
+        updateSessionMessages,
+        autoTitleSession,
       }}
     >
       {children}

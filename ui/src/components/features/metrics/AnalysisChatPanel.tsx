@@ -12,7 +12,9 @@ import {
   Plus,
   ChevronDown,
   MessageSquare,
+  Maximize2,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import {
@@ -231,12 +233,10 @@ function SessionItem({
       <div className="flex items-start justify-between gap-1">
         <div className="min-w-0 flex-1">
           <div className="font-semibold truncate">
-            {session.context
-              ? session.context.taskName || "Untitled"
-              : "General Chat"}
+            {session.title || "Untitled"}
           </div>
           <div className="text-base-content/50 truncate">
-            {session.context ? session.context.qid : "No specific task"}
+            {session.context ? session.context.qid : "General"}
           </div>
           <div className="flex items-center gap-2 mt-0.5 text-base-content/40">
             <span>{session.messages.length} msgs</span>
@@ -364,9 +364,16 @@ export function AnalysisChatPanel({ context }: AnalysisChatPanelProps) {
     }
   };
 
+  const router = useRouter();
+
   const handleNewSession = () => {
     createNewSession(effectiveContext ?? null);
     setShowSessions(false);
+  };
+
+  const handleMaximize = () => {
+    closeAnalysisChat();
+    router.push("/chat");
   };
 
   return (
@@ -403,6 +410,13 @@ export function AnalysisChatPanel({ context }: AnalysisChatPanelProps) {
               <Trash2 className="w-3.5 h-3.5" />
             </button>
           )}
+          <button
+            onClick={handleMaximize}
+            className="btn btn-ghost btn-xs btn-square"
+            title="Open in full page"
+          >
+            <Maximize2 className="w-3.5 h-3.5" />
+          </button>
           <button
             onClick={closeAnalysisChat}
             className="btn btn-ghost btn-xs btn-square"

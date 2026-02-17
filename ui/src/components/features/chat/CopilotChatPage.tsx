@@ -198,6 +198,11 @@ function SessionListItem({
         <div className="min-w-0 flex-1">
           <div className="text-sm font-medium truncate">{session.title}</div>
           <div className="flex items-center gap-2 mt-0.5 text-xs text-base-content/50">
+            {session.context?.qid && (
+              <span className="badge badge-ghost badge-xs">
+                {session.context.qid}
+              </span>
+            )}
             <span>{session.messages.length} msgs</span>
             <span>{formatTime(session.updatedAt)}</span>
           </div>
