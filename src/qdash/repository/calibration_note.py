@@ -189,13 +189,13 @@ class MongoCalibrationNoteRepository:
                 "note": note.note,
                 "timestamp": timestamp,
             },
+            "$inc": {"version": 1},
             "$setOnInsert": {
                 "project_id": note.project_id,
                 "execution_id": note.execution_id,
                 "task_id": note.task_id,
                 "username": note.username,
                 "chip_id": note.chip_id,
-                "version": 0,
             },
         }
 
@@ -316,6 +316,7 @@ class MongoCalibrationNoteRepository:
             execution_id=doc.execution_id,
             task_id=doc.task_id,
             note=doc.note,
+            version=doc.version,
             timestamp=doc.timestamp,
             system_info=doc.system_info,
         )
