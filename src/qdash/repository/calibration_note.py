@@ -6,6 +6,7 @@ persistence operations. Used by both API and workflow components.
 
 import logging
 import time
+from typing import Any
 
 from bunnet import SortDirection
 from pymongo.errors import DuplicateKeyError
@@ -227,6 +228,66 @@ class MongoCalibrationNoteRepository:
             "Failed to upsert calibration note after %d attempts: %s",
             max_retries,
             query,
+        )
+        raise last_error  # type: ignore[misc]
+
+    def merge_note_fields(
+        self,
+        query_filter: dict[str, str],
+        calib_note: dict[str, Any],
+        max_retries: int = 3,
+    ) -> None:
+        """Atomically merge per-qubit fields into the master note.
+
+        Uses $set with dot-notation (e.g., "note.rabi_params.Q024": {...})
+        so each worker only touches its own qubit paths — no read-modify-write needed.
+
+        Parameters
+        ----------
+        query_filter : dict[str, str]
+            MongoDB query filter to identify the document (task_id, chip_id, project_id, etc.)
+        calib_note : dict[str, Any]
+            The calibration note data from the worker, structured as {param_type: {qubit: data}}
+        max_retries : int
+            Maximum number of retry attempts for DuplicateKeyError (default: 3)
+
+        """
+        update_ops: dict[str, Any] = {}
+        for param_type, qubits in calib_note.items():
+            if isinstance(qubits, dict):
+                for qubit, data in qubits.items():
+                    update_ops[f"note.{param_type}.{qubit}"] = data
+
+        if not update_ops:
+            return
+
+        update_ops["timestamp"] = now()
+
+        collection = CalibrationNoteDocument.get_motor_collection()
+
+        last_error: DuplicateKeyError | None = None
+        for attempt in range(max_retries):
+            try:
+                collection.find_one_and_update(
+                    query_filter,
+                    {"$set": update_ops},
+                    upsert=True,
+                )
+                return
+            except DuplicateKeyError as e:  # noqa: PERF203
+                last_error = e
+                logger.warning(
+                    "DuplicateKeyError on merge_note_fields attempt %d/%d for %s, retrying...",
+                    attempt + 1,
+                    max_retries,
+                    query_filter,
+                )
+                time.sleep(0.1 * (2**attempt))
+
+        logger.error(
+            "Failed to merge_note_fields after %d attempts: %s",
+            max_retries,
+            query_filter,
         )
         raise last_error  # type: ignore[misc]
 
