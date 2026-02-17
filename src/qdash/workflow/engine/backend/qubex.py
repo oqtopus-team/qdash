@@ -4,7 +4,6 @@ from typing import TYPE_CHECKING, Any
 
 from qdash.datamodel.calibration_note import CalibrationNoteModel
 from qdash.datamodel.task import TaskTypes
-from qdash.workflow._internal.merge_notes import merge_notes_by_timestamp
 from qdash.workflow.engine.backend.base import BaseBackend
 from qdash.workflow.engine.backend.qubex_paths import get_qubex_paths
 
@@ -153,17 +152,12 @@ class QubexBackend(BaseBackend):
         task_manager_id: str,
         project_id: str,
     ) -> None:
-        """Update the master calibration note in MongoDB only.
+        """Update the master calibration note in MongoDB atomically.
 
-        This method saves calibration notes exclusively to MongoDB, avoiding
-        file I/O operations during task execution. This design:
-        - Eliminates race conditions in thread-based parallel execution
-        - Reduces unnecessary disk I/O
-        - Establishes MongoDB as the single source of truth
-        - Simplified architecture: only master note is maintained (no per-task notes)
-
-        The calibration note file is only written during initialization (save_note)
-        and optionally during export (finish_calibration with export_note_to_file=True).
+        Uses per-qubit atomic $set operations to avoid TOCTOU race conditions
+        when multiple Dask workers update different qubits in parallel. Each
+        worker only touches its own qubit paths via dot-notation
+        (e.g., "note.rabi_params.Q024"), so concurrent updates don't conflict.
 
         Note:
         ----
@@ -173,37 +167,16 @@ class QubexBackend(BaseBackend):
         calib_note = json.loads(self.get_note())
 
         repo = self.calibration_note_repo
-        master_note = repo.find_one(
-            task_id="master",
-            chip_id=chip_id,
-            project_id=project_id,
+
+        query_filter = {
+            "task_id": "master",
+            "chip_id": chip_id,
+            "project_id": project_id,
+            "username": username,
+            "execution_id": execution_id,
+        }
+
+        repo.merge_note_fields(
+            query_filter=query_filter,
+            calib_note=calib_note,
         )
-
-        if master_note is None:
-            # Create new master note if it doesn't exist
-            repo.upsert(
-                CalibrationNoteModel(
-                    project_id=project_id,
-                    username=username,
-                    chip_id=chip_id,
-                    execution_id=execution_id,
-                    task_id="master",
-                    note=calib_note,
-                )
-            )
-        else:
-            # Merge with existing master note
-            merged_note = merge_notes_by_timestamp(master_note.note, calib_note)
-            repo.upsert(
-                CalibrationNoteModel(
-                    project_id=project_id,
-                    username=username,
-                    chip_id=chip_id,
-                    execution_id=execution_id,
-                    task_id="master",
-                    note=merged_note,
-                )
-            )
-
-        # File I/O removed - MongoDB is the single source of truth
-        # For file export, use finish_calibration(export_note_to_file=True)

@@ -565,6 +565,29 @@ class CalibrationNoteRepository(Protocol):
         """
         ...
 
+    def merge_note_fields(
+        self,
+        query_filter: dict[str, str],
+        calib_note: dict[str, Any],
+        max_retries: int = 3,
+    ) -> None:
+        """Atomically merge per-qubit fields into the master note.
+
+        Uses dot-notation paths (e.g., "note.rabi_params.Q024") so each
+        worker only touches its own qubit paths without read-modify-write.
+
+        Parameters
+        ----------
+        query_filter : dict[str, str]
+            Query filter to identify the document
+        calib_note : dict[str, Any]
+            The calibration note data, structured as {param_type: {qubit: data}}
+        max_retries : int
+            Maximum number of retry attempts (default: 3)
+
+        """
+        ...
+
 
 @runtime_checkable
 class QubitCalibrationRepository(Protocol):
