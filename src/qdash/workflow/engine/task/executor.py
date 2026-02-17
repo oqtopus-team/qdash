@@ -771,6 +771,7 @@ class TaskExecutor:
 
         # 5. Validate R²
         backend_success = True
+        r2_error_msg: str | None = None
         if run_result.has_r2() and run_result.r2 is not None:
             r2_value = run_result.r2.get(qid)
             if r2_value is None:
@@ -782,13 +783,18 @@ class TaskExecutor:
                     # Clear output parameters on R² failure
                     if postprocess_result.output_parameters:
                         self.state_manager.clear_output_parameters(task_name, task_type, qid)
-                    raise ValueError(f"{task_name} R² value too low: {r2_value:.4f}")
+                    backend_success = False
+                    r2_error_msg = f"{task_name} R² value too low: {r2_value:.4f}"
 
             if not backend_success and postprocess_result.output_parameters:
                 self.state_manager.clear_output_parameters(task_name, task_type, qid)
 
-        # 6. Backend-specific save processing
+        # 6. Backend-specific save processing (always runs, even on R² failure)
         self._save_backend_specific(task, execution_service, qid, backend, backend_success)
+
+        # Raise after save so calibration note is updated
+        if r2_error_msg is not None:
+            raise ValueError(r2_error_msg)
 
         return backend_success
 
@@ -860,6 +866,18 @@ class TaskExecutor:
         qubit_repo = MongoQubitCalibrationRepository()
         coupling_repo = MongoCouplingCalibrationRepository()
 
+        # Always update calibration note regardless of success/failure
+        if backend.name == "qubex":
+            backend.update_note(
+                username=self.username,
+                chip_id=execution_service.chip_id,
+                calib_dir=self.calib_dir,
+                execution_id=execution_service.execution_id,
+                task_manager_id=self.task_manager_id,
+                project_id=execution_service.project_id,
+                qid=qid,
+            )
+
         if not success:
             logger.info(
                 "Skipping backend parameter updates for %s due to failed R² validation",
@@ -884,18 +902,6 @@ class TaskExecutor:
                         project_id=execution_service.project_id,
                     )
             return
-
-        # Save calibration note
-        if backend.name == "qubex":
-            backend.update_note(
-                username=self.username,
-                chip_id=execution_service.chip_id,
-                calib_dir=self.calib_dir,
-                execution_id=execution_service.execution_id,
-                task_manager_id=self.task_manager_id,
-                project_id=execution_service.project_id,
-                qid=qid,
-            )
 
         # Update database
         if output_parameters:
