@@ -39,16 +39,17 @@ class FakeTask(BaseTask):
             f"Batch run is not implemented for {self.name} task. Use run method instead."
         )
 
-    def get_label(self, qid: str) -> str:
+    def get_label(self, qid: str, num_qubits: int = 64) -> str:
         """Convert qubit ID to label.
 
         Args:
         ----
             qid: Qubit ID (as string)
+            num_qubits: Total number of qubits in the system (default: 64)
 
         Returns:
         -------
             The qubit label string (e.g., "Q00", "Q01", etc.)
 
         """
-        return str(qid_to_label(qid))
+        return str(qid_to_label(qid, num_qubits))

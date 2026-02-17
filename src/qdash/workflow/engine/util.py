@@ -1,27 +1,21 @@
 """Utility functions and classes for calibration workflows."""
 
-import re
 from datetime import datetime
 from typing import Any
 
 from prefect import task
 from pydantic import BaseModel, Field
 from qdash.common.datetime_utils import now
+from qdash.common.qubit_utils import qid_to_label
 from qdash.datamodel.task import TaskModel
 from qdash.workflow.calibtasks.base import BaseTask
+
+__all__ = ["qid_to_label"]
 
 
 def get_current_timestamp() -> datetime:
     """Get current timestamp in configured timezone."""
     return now()
-
-
-def qid_to_label(qid: str) -> str:
-    """Convert a numeric qid string to a label with at least two digits. e.g. '0' -> 'Q00'."""
-    if re.fullmatch(r"\d+", qid):
-        return "Q" + qid.zfill(2)
-    error_message = "Invalid qid format."
-    raise ValueError(error_message)
 
 
 def pydantic_serializer(obj: BaseModel) -> dict[str, Any]:
