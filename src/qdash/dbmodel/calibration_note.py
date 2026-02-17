@@ -116,6 +116,7 @@ class CalibrationNoteDocument(Document):
                 "note": note,
                 "timestamp": timestamp,
             },
+            "$inc": {"version": 1},
             "$setOnInsert": {
                 "project_id": project_id,
                 "execution_id": execution_id,
