@@ -43,6 +43,7 @@ BRINGUP_TASKS: list[str] = [
 # 1Q Check: Basic characterization tasks (run first)
 CHECK_1Q_TASKS: list[str] = [
     "CheckRabi",
+    "CheckRabi",
     "CreateHPIPulse",
     "CheckHPIPulse",
     "CheckT1",
