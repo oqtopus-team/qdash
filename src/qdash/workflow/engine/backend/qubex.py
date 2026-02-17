@@ -181,18 +181,14 @@ class QubexBackend(BaseBackend):
         calib_note = json.loads(raw_note)
 
         # Filter to only the calibrated qubit/coupling to avoid TOCTOU.
-        # Each param_type dict is keyed by qubit label (e.g. "Q24") or
-        # coupling label (e.g. "Q24-Q25").  We keep only the entry that
+        # Each param_type dict is keyed by qubit label (e.g. "Q16", "Q016") or
+        # coupling label (e.g. "Q16-Q22").  We keep only the entry that
         # matches the qid that was just calibrated.
         # Note: qid is numeric (e.g. "16") but keys use label format (e.g. "Q16").
         if qid is not None:
-            from qdash.common.qubit_utils import qid_to_label
+            from qdash.common.qubit_utils import qid_to_label_from_chip
 
-            num_qubits = self._config.get("num_qubits", 64)
-            if "-" in qid:
-                label = "-".join(qid_to_label(q, num_qubits) for q in qid.split("-"))
-            else:
-                label = qid_to_label(qid, num_qubits)
+            label = qid_to_label_from_chip(qid, project_id=project_id, chip_id=chip_id)
 
             filtered: dict[str, Any] = {}
             for param_type, qubits in calib_note.items():

@@ -6,11 +6,11 @@ from typing import Any
 from prefect import task
 from pydantic import BaseModel, Field
 from qdash.common.datetime_utils import now
-from qdash.common.qubit_utils import qid_to_label
+from qdash.common.qubit_utils import qid_to_label, qid_to_label_from_chip
 from qdash.datamodel.task import TaskModel
 from qdash.workflow.calibtasks.base import BaseTask
 
-__all__ = ["qid_to_label"]
+__all__ = ["qid_to_label", "qid_to_label_from_chip"]
 
 
 def get_current_timestamp() -> datetime:
