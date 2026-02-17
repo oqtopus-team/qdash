@@ -511,7 +511,9 @@ async def get_qubit_metric_history(
     """
     # Normalize qid format (remove "Q" prefix if present)
     normalized_qid = normalize_qid(qid)
-    qid_variants = list({normalized_qid, qid, f"Q{normalized_qid.zfill(2)}"})
+    qid_variants = list(
+        {normalized_qid, qid, f"Q{normalized_qid.zfill(2)}", f"Q{normalized_qid.zfill(3)}"}
+    )
 
     # Calculate cutoff time
     cutoff_time = None
