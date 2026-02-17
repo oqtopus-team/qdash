@@ -9,7 +9,7 @@ import {
   History,
   ListTodo,
   FileText,
-  BrainCircuit,
+  Bot,
 } from "lucide-react";
 
 import { useGetQubitMetricHistory } from "@/client/metrics/metrics";
@@ -516,7 +516,7 @@ export function QubitMetricHistoryModal({
                 onClick={() => openAnalysisChat(analysisContext)}
                 className="btn btn-xs btn-primary gap-1"
               >
-                <BrainCircuit className="h-3 w-3" />
+                <Bot className="h-3 w-3" />
                 Ask AI
               </button>
             )}

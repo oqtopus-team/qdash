@@ -22,8 +22,7 @@ import {
   Moon,
   Settings,
   ShieldCheck,
-  BrainCircuit,
-  MessageSquarePlus,
+  Bot,
   Sun,
   Workflow,
   X,
@@ -33,7 +32,6 @@ import {
 import { useTheme } from "@/app/providers/theme-provider";
 import { useLogout } from "@/client/auth/auth";
 import { FluentEmoji, getAvatarEmoji } from "@/components/ui/FluentEmoji";
-import { useAnalysisChatContext } from "@/contexts/AnalysisChatContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProject } from "@/contexts/ProjectContext";
 import { useSidebar } from "@/contexts/SidebarContext";
@@ -48,11 +46,6 @@ function Sidebar() {
   const { isOpen, isMobileOpen, toggleSidebar, setMobileSidebarOpen } =
     useSidebar();
   const { canEdit } = useProject();
-  const {
-    isOpen: isAnalysisSidebarOpen,
-    openGeneralChat,
-    closeAnalysisChat,
-  } = useAnalysisChatContext();
   const { user, logout: authLogout } = useAuth();
   const { theme, setTheme } = useTheme();
   const isAdmin = user?.system_role === "admin";
@@ -232,30 +225,9 @@ function Sidebar() {
             title="AI Chat"
             onClick={handleLinkClick}
           >
-            <BrainCircuit size={18} />
+            <Bot size={18} />
             {(isOpen || isMobileOpen) && <span className="ml-2">AI Chat</span>}
           </Link>
-        </li>
-        <li>
-          <button
-            className={
-              isMobileOpen
-                ? linkClass(isAnalysisSidebarOpen)
-                : desktopLinkClass(isAnalysisSidebarOpen)
-            }
-            title="Ask AI (Sidebar)"
-            onClick={() => {
-              if (isAnalysisSidebarOpen) {
-                closeAnalysisChat();
-              } else {
-                openGeneralChat();
-              }
-              handleLinkClick();
-            }}
-          >
-            <MessageSquarePlus size={18} />
-            {(isOpen || isMobileOpen) && <span className="ml-2">Ask AI</span>}
-          </button>
         </li>
         <li>
           <Link

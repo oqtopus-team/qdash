@@ -3,7 +3,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import {
   Send,
-  BrainCircuit,
+  Bot,
   Trash2,
   Plus,
   MessageSquare,
@@ -140,7 +140,7 @@ function MessageBubble({ message }: { message: CopilotMessage }) {
   return (
     <div className="flex gap-3">
       <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
-        <BrainCircuit className="w-4 h-4 text-primary" />
+        <Bot className="w-4 h-4 text-primary" />
       </div>
       <div className="flex-1 min-w-0 max-w-[85%]">
         {blocksResult ? (
@@ -344,7 +344,7 @@ export function CopilotChatPage() {
             </button>
           )}
           <div className="flex items-center gap-2 flex-1 min-w-0">
-            <BrainCircuit className="w-4 h-4 text-primary flex-shrink-0" />
+            <Bot className="w-4 h-4 text-primary flex-shrink-0" />
             <h2 className="text-sm font-bold truncate">
               {activeSession?.title || "AI Chat"}
             </h2>
@@ -368,7 +368,7 @@ export function CopilotChatPage() {
             <div className="flex flex-col items-center justify-center h-full px-4">
               <div className="max-w-md text-center">
                 <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-6">
-                  <BrainCircuit className="w-8 h-8 text-primary" />
+                  <Bot className="w-8 h-8 text-primary" />
                 </div>
                 <h3 className="text-xl font-bold mb-2">AI Chat</h3>
                 <p className="text-sm text-base-content/60 mb-8">
@@ -403,7 +403,7 @@ export function CopilotChatPage() {
               {isLoading && (
                 <div className="flex gap-3">
                   <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0 animate-pulse">
-                    <BrainCircuit className="w-4 h-4 text-primary" />
+                    <Bot className="w-4 h-4 text-primary" />
                   </div>
                   <div className="flex items-center gap-2 py-2">
                     {statusMessage ? (

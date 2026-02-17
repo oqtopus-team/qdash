@@ -4,7 +4,7 @@ import React, { useState, useRef, useEffect, useMemo } from "react";
 import {
   Send,
   X,
-  BrainCircuit,
+  Bot,
   AlertTriangle,
   CheckCircle2,
   XCircle,
@@ -171,7 +171,7 @@ function MessageBubble({ message }: { message: ChatMessage }) {
   return (
     <div className="flex gap-2">
       <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-        <BrainCircuit className="w-4 h-4 text-primary" />
+        <Bot className="w-4 h-4 text-primary" />
       </div>
       <div className="flex-1 min-w-0">
         {blocksResult ? (
@@ -374,7 +374,7 @@ export function AnalysisChatPanel({ context }: AnalysisChatPanelProps) {
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-2.5 border-b border-base-300 bg-base-200/50">
         <div className="flex items-center gap-2 min-w-0">
-          <BrainCircuit className="w-4 h-4 text-primary flex-shrink-0" />
+          <Bot className="w-4 h-4 text-primary flex-shrink-0" />
           <div className="min-w-0">
             <h3 className="text-sm font-bold truncate">
               {isGeneralMode ? "AI Chat" : "Ask AI"}
@@ -450,7 +450,7 @@ export function AnalysisChatPanel({ context }: AnalysisChatPanelProps) {
       <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0">
         {messages.length === 0 ? (
           <div className="text-center py-8">
-            <BrainCircuit className="w-8 h-8 mx-auto text-primary/30 mb-3" />
+            <Bot className="w-8 h-8 mx-auto text-primary/30 mb-3" />
             <p className="text-sm text-base-content/60 mb-4">
               {isGeneralMode
                 ? "Ask anything about calibration"
@@ -499,7 +499,7 @@ export function AnalysisChatPanel({ context }: AnalysisChatPanelProps) {
         {isLoading && (
           <div className="flex gap-2">
             <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0 animate-pulse">
-              <BrainCircuit className="w-4 h-4 text-primary" />
+              <Bot className="w-4 h-4 text-primary" />
             </div>
             <div className="flex items-center gap-1.5 py-2">
               {statusMessage ? (
