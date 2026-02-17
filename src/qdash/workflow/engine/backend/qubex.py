@@ -151,6 +151,7 @@ class QubexBackend(BaseBackend):
         execution_id: str,
         task_manager_id: str,
         project_id: str,
+        qid: str | None = None,
     ) -> None:
         """Update the master calibration note in MongoDB atomically.
 
@@ -159,12 +160,27 @@ class QubexBackend(BaseBackend):
         worker only touches its own qubit paths via dot-notation
         (e.g., "note.rabi_params.Q024"), so concurrent updates don't conflict.
 
+        When ``qid`` is provided, only note entries whose key matches the qid
+        are written.  This prevents a worker from overwriting another worker's
+        freshly-calibrated data with its own stale snapshot.
+
         Note:
         ----
             task_manager_id is kept as a parameter for backward compatibility but not used.
             Only the master note (task_id="master") is updated.
         """
         calib_note = json.loads(self.get_note())
+
+        # Filter to only the calibrated qubit/coupling to avoid TOCTOU.
+        # Each param_type dict is keyed by qubit label (e.g. "Q024") or
+        # coupling label (e.g. "Q024-Q025").  We keep only the entry that
+        # matches the qid that was just calibrated.
+        if qid is not None:
+            filtered: dict[str, Any] = {}
+            for param_type, qubits in calib_note.items():
+                if isinstance(qubits, dict) and qid in qubits:
+                    filtered[param_type] = {qid: qubits[qid]}
+            calib_note = filtered
 
         repo = self.calibration_note_repo
 

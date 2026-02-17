@@ -91,6 +91,7 @@ class BackendProtocol(Protocol):
         execution_id: str,
         task_manager_id: str,
         project_id: str | None = None,
+        qid: str | None = None,
     ) -> None:
         """Update calibration note."""
         ...
@@ -893,6 +894,7 @@ class TaskExecutor:
                 execution_id=execution_service.execution_id,
                 task_manager_id=self.task_manager_id,
                 project_id=execution_service.project_id,
+                qid=qid,
             )
 
         # Update database
