@@ -768,7 +768,7 @@ export function HistogramView() {
                 />
               </div>
 
-              <div className="w-40 sm:w-52">
+              <div className="w-40 sm:w-56">
                 <Select<MetricOption, false>
                   className="text-base-content"
                   classNamePrefix="react-select"
