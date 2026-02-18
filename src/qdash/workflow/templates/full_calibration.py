@@ -117,6 +117,7 @@ def full_calibration(
             "pi_duration": {"value": 32, "value_type": "int"},
             "drag_hpi_duration": {"value": 16, "value_type": "int"},
             "drag_pi_duration": {"value": 24, "value_type": "int"},
+            "interval": {"value": 150 * 1024, "value_type": "int"},
         },
     )
     return cal.run(targets, steps=steps)
