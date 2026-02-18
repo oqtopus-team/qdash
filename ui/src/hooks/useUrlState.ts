@@ -700,10 +700,7 @@ export function useMetricsUrlState(): UseMetricsUrlStateResult {
     parseAsString,
   );
 
-  const [metricType, setMetricTypeState] = useQueryState(
-    "type",
-    parseAsString,
-  );
+  const [metricType, setMetricTypeState] = useQueryState("type", parseAsString);
 
   const [selectedMetric, setSelectedMetricState] = useQueryState(
     "metric",

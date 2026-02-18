@@ -1,4 +1,4 @@
-"""Fake CheckT1Average task for testing provenance without real hardware."""
+"""Fake CheckT2EchoAverage task for testing provenance without real hardware."""
 
 from typing import Any, ClassVar
 
@@ -16,11 +16,11 @@ from qdash.workflow.calibtasks.fake.base import FakeTask
 from qdash.workflow.engine.backend.fake import FakeBackend
 
 
-class FakeCheckT1Average(FakeTask):
-    """Fake task to simulate repeated T1 relaxation time measurement.
+class FakeCheckT2EchoAverage(FakeTask):
+    """Fake task to simulate repeated T2 echo measurement.
 
     This task depends on qubit_frequency and hpi_amplitude.
-    It simulates measuring T1 relaxation time n_runs times and computing statistics.
+    It simulates measuring T2 echo time n_runs times and computing statistics.
 
     Note: Uses same name as qubex task for seamless backend switching.
 
@@ -29,11 +29,11 @@ class FakeCheckT1Average(FakeTask):
         hpi_amplitude: From CheckHPI (loaded from DB)
 
     Outputs:
-        t1_average: Mean T1 relaxation time (μs)
-        t1_std: T1 standard deviation (μs)
+        t2_echo_average: Mean T2 echo time (μs)
+        t2_echo_std: T2 echo standard deviation (μs)
     """
 
-    name: str = "CheckT1Average"  # Same name as qubex task for backend-agnostic workflows
+    name: str = "CheckT2EchoAverage"  # Same name as qubex task for backend-agnostic workflows
     task_type: str = "qubit"
     timeout: int = 120
 
@@ -52,8 +52,8 @@ class FakeCheckT1Average(FakeTask):
         "time_range": RunParameterModel(
             unit="ns",
             value_type="np.logspace",
-            value=(2, 5.7, 51),  # 100 ns to 500 μs
-            description="Time range for T1 measurement (log scale)",
+            value=(2, 5.5, 51),  # 100 ns to 316 μs
+            description="Time range for T2 echo measurement (log scale)",
         ),
         "shots": RunParameterModel(
             unit="",
@@ -65,13 +65,13 @@ class FakeCheckT1Average(FakeTask):
             unit="",
             value_type="int",
             value=10,
-            description="Number of T1 measurement repetitions",
+            description="Number of T2 echo measurement repetitions",
         ),
     }
 
     output_parameters: ClassVar[dict[str, ParameterModel]] = {
-        "t1_average": ParameterModel(unit="μs", description="Mean T1 relaxation time"),
-        "t1_std": ParameterModel(unit="μs", description="T1 standard deviation"),
+        "t2_echo_average": ParameterModel(unit="μs", description="Mean T2 echo time"),
+        "t2_echo_std": ParameterModel(unit="μs", description="T2 echo standard deviation"),
     }
 
     def preprocess(self, backend: FakeBackend, qid: str) -> PreProcessResult:
@@ -79,42 +79,43 @@ class FakeCheckT1Average(FakeTask):
         return PreProcessResult(input_parameters=self.input_parameters)
 
     def run(self, backend: FakeBackend, qid: str) -> RunResult:
-        """Simulate running repeated T1 measurement experiments."""
+        """Simulate running repeated T2 echo measurement experiments."""
         qubit_freq = None
         qubit_freq_param = self.input_parameters.get("qubit_frequency")
         if qubit_freq_param is not None:
             qubit_freq = qubit_freq_param.value
 
-        # Base T1 derived from qid (matching FakeCheckT1 physics logic)
+        # Base T2 echo derived from qid (matching FakeCheckT2Echo physics logic)
         qid_int = int(qid) if qid.isdigit() else hash(qid) % 64
-        base_t1: float = 80 + (qid_int % 20) * 3  # 80-137 μs base
+        base_t2: float = 60 + (qid_int % 20) * 2  # 60-98 μs base
 
         if qubit_freq:
-            base_t1 -= (qubit_freq - 5.0) * 5
+            base_t2 -= (qubit_freq - 5.0) * 3
 
         n_runs = int(self.run_parameters["n_runs"].get_value())
 
-        t1_values = []
-        t1_err_values = []
+        t2_values = []
+        t2_err_values = []
         r2_values = []
         time_arrays = []
         signal_arrays = []
 
         for _ in range(n_runs):
-            t1 = base_t1 + np.random.normal(0, 5)  # Add variability
-            t1 = max(30, min(200, t1))  # Clamp to realistic range
-            t1_err = t1 * 0.05  # 5% error per measurement
+            t2 = base_t2 + np.random.normal(0, 5)  # Add variability
+            t2 = max(20, min(200, t2))  # Clamp to realistic range
+            t2_err = t2 * 0.08  # 8% error per measurement
 
-            # Generate fake T1 decay data
-            time_arr = np.logspace(2, 5.7, 51)  # 100 ns to 500 μs
-            decay = np.exp(-time_arr / (t1 * 1000))  # Convert μs to ns
-            signal = decay + np.random.normal(0, 0.02, len(time_arr))
+            # Generate fake T2 echo decay data
+            time_arr = np.logspace(2, 5.5, 51)  # 100 ns to 316 μs
+            decay = np.exp(-time_arr / (t2 * 1000))  # Convert μs to ns
+            oscillation = 0.05 * np.cos(2 * np.pi * time_arr / 50000)
+            signal = decay * (1 + oscillation) + np.random.normal(0, 0.02, len(time_arr))
             signal = np.clip(signal, 0, 1)
 
-            r2 = 0.97 + np.random.uniform(0, 0.02)
+            r2 = 0.95 + np.random.uniform(0, 0.04)
 
-            t1_values.append(t1)
-            t1_err_values.append(t1_err)
+            t2_values.append(t2)
+            t2_err_values.append(t2_err)
             r2_values.append(r2)
             time_arrays.append(time_arr)
             signal_arrays.append(signal)
@@ -123,8 +124,8 @@ class FakeCheckT1Average(FakeTask):
 
         return RunResult(
             raw_result={
-                "t1_values": t1_values,
-                "t1_err_values": t1_err_values,
+                "t2_values": t2_values,
+                "t2_err_values": t2_err_values,
                 "r2_values": r2_values,
                 "time_arrays": time_arrays,
                 "signal_arrays": signal_arrays,
@@ -138,27 +139,27 @@ class FakeCheckT1Average(FakeTask):
         """Process results and generate output parameters."""
         result = run_result.raw_result
 
-        t1_values = np.array(result["t1_values"])
-        t1_err_values = np.array(result["t1_err_values"])
+        t2_values = np.array(result["t2_values"])
+        t2_err_values = np.array(result["t2_err_values"])
         r2_values = np.array(result["r2_values"])
 
-        t1_mean = float(np.mean(t1_values))
-        t1_std = float(np.std(t1_values, ddof=1)) if len(t1_values) > 1 else 0.0
+        t2_mean = float(np.mean(t2_values))
+        t2_std = float(np.std(t2_values, ddof=1)) if len(t2_values) > 1 else 0.0
 
-        self.output_parameters["t1_average"].value = t1_mean
-        self.output_parameters["t1_average"].error = t1_std
-        self.output_parameters["t1_std"].value = t1_std
+        self.output_parameters["t2_echo_average"].value = t2_mean
+        self.output_parameters["t2_echo_average"].error = t2_std
+        self.output_parameters["t2_echo_std"].value = t2_std
 
         output_parameters = self.attach_execution_id(execution_id)
 
-        fluctuation_fig = self._make_fluctuation_figure(t1_values, t1_err_values, r2_values, qid)
+        fluctuation_fig = self._make_fluctuation_figure(t2_values, t2_err_values, r2_values, qid)
 
         # Generate fit figures for all runs
         figures = [fluctuation_fig]
-        for i in range(len(t1_values)):
+        for i in range(len(t2_values)):
             time_arr = np.array(result["time_arrays"][i])
             signal_arr = np.array(result["signal_arrays"][i])
-            figures.append(self._make_fit_figure(time_arr, signal_arr, t1_values[i], qid, i + 1))
+            figures.append(self._make_fit_figure(time_arr, signal_arr, t2_values[i], qid, i + 1))
 
         return PostProcessResult(
             output_parameters=output_parameters,
@@ -169,11 +170,11 @@ class FakeCheckT1Average(FakeTask):
         self,
         time: npt.NDArray[np.floating[Any]],
         signal: npt.NDArray[np.floating[Any]],
-        t1: float,
+        t2: float,
         qid: str,
         run_num: int = 1,
     ) -> go.Figure:
-        """Create a fit figure for a T1 measurement run."""
+        """Create a fit figure for a T2 echo measurement run."""
         fig = go.Figure()
         fig.add_trace(
             go.Scatter(
@@ -184,18 +185,18 @@ class FakeCheckT1Average(FakeTask):
                 marker={"size": 6},
             )
         )
-        fit_signal = np.exp(-time / (t1 * 1000))
+        fit_signal = np.exp(-time / (t2 * 1000))
         fig.add_trace(
             go.Scatter(
                 x=time / 1000,
                 y=fit_signal,
                 mode="lines",
-                name=f"Fit (T1 = {t1:.1f} μs)",
+                name=f"Fit (T2 echo = {t2:.1f} μs)",
                 line={"color": "red"},
             )
         )
         fig.update_layout(
-            title=f"T1 Relaxation (Run #{run_num}) - {qid}",
+            title=f"T2 Echo (Run #{run_num}) - {qid}",
             xaxis_title="Time (μs)",
             yaxis_title="Population",
             xaxis_type="log",
@@ -204,8 +205,8 @@ class FakeCheckT1Average(FakeTask):
 
     def _make_fluctuation_figure(
         self,
-        t1_values: npt.NDArray[np.floating[Any]],
-        t1_err_values: npt.NDArray[np.floating[Any]],
+        t2_values: npt.NDArray[np.floating[Any]],
+        t2_err_values: npt.NDArray[np.floating[Any]],
         r2_values: npt.NDArray[np.floating[Any]],
         qid: str,
     ) -> go.Figure:
@@ -214,40 +215,40 @@ class FakeCheckT1Average(FakeTask):
             rows=2,
             cols=2,
             subplot_titles=(
-                "T1 Time Series",
+                "T2 Echo Time Series",
                 "Relative Fluctuation (%)",
-                "T1 Histogram",
+                "T2 Echo Histogram",
                 "R² per Run",
             ),
         )
 
-        runs = np.arange(1, len(t1_values) + 1)
-        t1_mean = float(np.mean(t1_values))
+        runs = np.arange(1, len(t2_values) + 1)
+        t2_mean = float(np.mean(t2_values))
 
-        # Panel 1: T1 time series with error bars, mean line, rolling mean
+        # Panel 1: T2 time series with error bars, mean line
         fig.add_trace(
             go.Scatter(
                 x=runs,
-                y=t1_values,
-                error_y={"type": "data", "array": t1_err_values, "visible": True},
+                y=t2_values,
+                error_y={"type": "data", "array": t2_err_values, "visible": True},
                 mode="markers+lines",
-                name="T1",
+                name="T2 Echo",
                 marker={"size": 6},
             ),
             row=1,
             col=1,
         )
         fig.add_hline(
-            y=t1_mean,
+            y=t2_mean,
             line_dash="dash",
             line_color="red",
-            annotation_text=f"Mean: {t1_mean:.1f} μs",
+            annotation_text=f"Mean: {t2_mean:.1f} μs",
             row=1,
             col=1,
         )
 
         # Panel 2: Relative fluctuation from mean (%)
-        rel_fluct = (t1_values - t1_mean) / t1_mean * 100
+        rel_fluct = (t2_values - t2_mean) / t2_mean * 100
         fig.add_trace(
             go.Scatter(
                 x=runs,
@@ -261,11 +262,11 @@ class FakeCheckT1Average(FakeTask):
         )
         fig.add_hline(y=0, line_dash="dash", line_color="gray", row=1, col=2)
 
-        # Panel 3: T1 histogram
+        # Panel 3: T2 histogram
         fig.add_trace(
             go.Histogram(
-                x=t1_values,
-                name="T1 Distribution",
+                x=t2_values,
+                name="T2 Echo Distribution",
                 marker_color="steelblue",
             ),
             row=2,
@@ -293,12 +294,12 @@ class FakeCheckT1Average(FakeTask):
             col=2,
         )
 
-        t1_std = float(np.std(t1_values, ddof=1)) if len(t1_values) > 1 else 0.0
-        t1_cv = (t1_std / t1_mean * 100) if t1_mean > 0 else 0.0
+        t2_std = float(np.std(t2_values, ddof=1)) if len(t2_values) > 1 else 0.0
+        t2_cv = (t2_std / t2_mean * 100) if t2_mean > 0 else 0.0
         fig.update_layout(
             title_text=(
-                f"T1 Fluctuation - {qid} "
-                f"(Mean: {t1_mean:.1f}, Std: {t1_std:.1f}, CV: {t1_cv:.1f}%)"
+                f"T2 Echo Fluctuation - {qid} "
+                f"(Mean: {t2_mean:.1f}, Std: {t2_std:.1f}, CV: {t2_cv:.1f}%)"
             ),
             showlegend=False,
             width=600,

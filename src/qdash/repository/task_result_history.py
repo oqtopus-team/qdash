@@ -311,7 +311,9 @@ class MongoTaskResultHistoryRepository:
                     value=float(value),
                     task_id=doc.get("task_id"),
                     execution_id=doc.get("execution_id", ""),
-                    stddev=float(error) if error is not None and isinstance(error, (int, float)) else None,
+                    stddev=float(error)
+                    if error is not None and isinstance(error, (int, float))
+                    else None,
                 )
 
         return metrics_data

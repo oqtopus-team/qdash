@@ -45,9 +45,13 @@ Dependency Graph:
         │       ├── input: qubit_frequency, hpi_amplitude
         │       └── output: t1_average, t1_std
         │
-        └──> CheckT2Echo
+        ├──> CheckT2Echo
+        │       ├── input: qubit_frequency, hpi_amplitude
+        │       └── output: t2_echo
+        │
+        └──> CheckT2EchoAverage
                 ├── input: qubit_frequency, hpi_amplitude
-                └── output: t2_echo
+                └── output: t2_echo_average, t2_echo_std
 
     RandomizedBenchmarking (depends on multiple)
         ├── input: qubit_frequency, rabi_amplitude, t1, t2_echo
@@ -61,6 +65,7 @@ from qdash.workflow.calibtasks.fake.fake_check_ramsey import FakeCheckRamsey
 from qdash.workflow.calibtasks.fake.fake_check_t1 import FakeCheckT1
 from qdash.workflow.calibtasks.fake.fake_check_t1_average import FakeCheckT1Average
 from qdash.workflow.calibtasks.fake.fake_check_t2_echo import FakeCheckT2Echo
+from qdash.workflow.calibtasks.fake.fake_check_t2_echo_average import FakeCheckT2EchoAverage
 from qdash.workflow.calibtasks.fake.fake_chevron_pattern import FakeChevronPattern
 from qdash.workflow.calibtasks.fake.fake_create_hpi_pulse import FakeCreateHPIPulse
 from qdash.workflow.calibtasks.fake.fake_rabi import FakeRabi
@@ -79,6 +84,7 @@ __all__ = [
     "FakeCheckT1",
     "FakeCheckT1Average",
     "FakeCheckT2Echo",
+    "FakeCheckT2EchoAverage",
     "FakeRandomizedBenchmarking",
     # Original fake task (simulator-based)
     "FakeRabi",

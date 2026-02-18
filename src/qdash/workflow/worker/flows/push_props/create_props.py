@@ -18,6 +18,7 @@ qubit_field_map = {
     "t1": "t1",
     "t1_average": "t1_average",
     "t2_echo": "t2_echo",
+    "t2_echo_average": "t2_echo_average",
     "t2_star": "t2_star",
     "average_readout_fidelity": "average_readout_fidelity",
     "x90_gate_fidelity": "x90_gate_fidelity",

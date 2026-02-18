@@ -47,6 +47,9 @@ from qdash.workflow.calibtasks.qubex.one_qubit_coarse.check_readout_frequency im
 from qdash.workflow.calibtasks.qubex.one_qubit_coarse.check_t1 import CheckT1
 from qdash.workflow.calibtasks.qubex.one_qubit_coarse.check_t1_average import CheckT1Average
 from qdash.workflow.calibtasks.qubex.one_qubit_coarse.check_t2_echo import CheckT2Echo
+from qdash.workflow.calibtasks.qubex.one_qubit_coarse.check_t2_echo_average import (
+    CheckT2EchoAverage,
+)
 from qdash.workflow.calibtasks.qubex.one_qubit_coarse.chevron_pattern import ChevronPattern
 from qdash.workflow.calibtasks.qubex.one_qubit_coarse.create_hpi_pulse import CreateHPIPulse
 from qdash.workflow.calibtasks.qubex.one_qubit_coarse.create_pi_pulse import CreatePIPulse
@@ -80,6 +83,7 @@ __all__ = [
     "CheckT1",
     "CheckT1Average",
     "CheckT2Echo",
+    "CheckT2EchoAverage",
     "ChevronPattern",
     "CreateHPIPulse",
     "CreatePIPulse",

@@ -32,6 +32,7 @@ evaluation_metrics:
     - t1
     - t1_average
     - t2_echo
+    - t2_echo_average
     - t2_star
     - average_readout_fidelity
     - x90_gate_fidelity
@@ -56,6 +57,12 @@ scoring:
     unit: μs
     higher_is_better: true
   t2_echo:
+    good: 80
+    excellent: 150
+    bad: 30
+    unit: μs
+    higher_is_better: true
+  t2_echo_average:
     good: 80
     excellent: 150
     bad: 30
