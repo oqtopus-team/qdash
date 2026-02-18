@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 
+import { SlidersHorizontal } from "lucide-react";
 import Select, { type GroupBase, type SingleValue } from "react-select";
 
 import { CouplingMetricsGrid } from "./CouplingMetricsGrid";
@@ -20,27 +21,32 @@ import { PageContainer } from "@/components/ui/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { MetricsPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
 import { useMetricsConfig } from "@/hooks/useMetricsConfig";
+import { useMetricsUrlState } from "@/hooks/useUrlState";
 import { getDaisySelectStyles } from "@/lib/reactSelectTheme";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PageFiltersBar } from "@/components/ui/PageFiltersBar";
-
-type TimeRange = "1d" | "7d" | "30d";
-type SelectionMode = "latest" | "best" | "average";
 
 type MetricOption = {
   value: string;
   label: string;
 };
 
-type MetricType = "qubit" | "coupling";
-
 export function MetricsPageContent() {
-  const [selectedChip, setSelectedChip] = useState<string>("");
-  const [timeRange, setTimeRange] = useState<TimeRange>("7d");
-  const [selectionMode, setSelectionMode] = useState<SelectionMode>("latest");
-  const [metricType, setMetricType] = useState<MetricType>("qubit");
-  const [selectedMetric, setSelectedMetric] = useState<string>("t1");
+  const {
+    selectedChip,
+    timeRange,
+    selectionMode,
+    metricType,
+    selectedMetric,
+    customDays,
+    setSelectedChip,
+    setTimeRange,
+    setSelectionMode,
+    setMetricType,
+    setSelectedMetric,
+    setCustomDays,
+  } = useMetricsUrlState();
   const [gridSize, setGridSize] = useState<number>(8);
 
   // Load metrics configuration from backend
@@ -92,13 +98,15 @@ export function MetricsPageContent() {
 
   // Fetch metrics data
   const withinHours =
-    timeRange === "1d"
-      ? 24
-      : timeRange === "7d"
-        ? 24 * 7
-        : timeRange === "30d"
-          ? 24 * 30
-          : 24 * 7; // Default to 7 days
+    timeRange === "custom"
+      ? (customDays ?? 90) * 24
+      : timeRange === "1d"
+        ? 24
+        : timeRange === "7d"
+          ? 24 * 7
+          : timeRange === "30d"
+            ? 24 * 30
+            : 24 * 7; // Default to 7 days
   const { data, isLoading, isError } = useGetChipMetrics(
     selectedChip,
     {
@@ -314,7 +322,7 @@ export function MetricsPageContent() {
               className={`tab ${metricType === "qubit" ? "tab-active" : ""}`}
               onClick={() => {
                 setMetricType("qubit");
-                setSelectedMetric("t1"); // Reset to default qubit metric
+                setSelectedMetric("t1");
               }}
             >
               Qubit
@@ -323,7 +331,7 @@ export function MetricsPageContent() {
               className={`tab ${metricType === "coupling" ? "tab-active" : ""}`}
               onClick={() => {
                 setMetricType("coupling");
-                setSelectedMetric("zx90_gate_fidelity"); // Reset to default coupling metric
+                setSelectedMetric("zx90_gate_fidelity");
               }}
             >
               Coupling
@@ -335,34 +343,52 @@ export function MetricsPageContent() {
             <PageFiltersBar.Group>
               {/* Time Range Selector */}
               <PageFiltersBar.Item>
-                <div className="join rounded-lg overflow-hidden">
-                  <button
-                    className={`join-item btn btn-sm ${
-                      timeRange === "1d" ? "btn-active" : ""
-                    }`}
-                    onClick={() => setTimeRange("1d")}
-                  >
-                    <span className="hidden sm:inline">Last 1 Day</span>
-                    <span className="sm:hidden">1D</span>
-                  </button>
-                  <button
-                    className={`join-item btn btn-sm ${
-                      timeRange === "7d" ? "btn-active" : ""
-                    }`}
-                    onClick={() => setTimeRange("7d")}
-                  >
-                    <span className="hidden sm:inline">Last 7 Days</span>
-                    <span className="sm:hidden">7D</span>
-                  </button>
-                  <button
-                    className={`join-item btn btn-sm ${
-                      timeRange === "30d" ? "btn-active" : ""
-                    }`}
-                    onClick={() => setTimeRange("30d")}
-                  >
-                    <span className="hidden sm:inline">Last 30 Days</span>
-                    <span className="sm:hidden">30D</span>
-                  </button>
+                <div className="flex items-center gap-2">
+                  <div className="join rounded-lg overflow-hidden">
+                    <button
+                      className={`join-item btn btn-sm ${
+                        timeRange === "1d" ? "btn-active" : ""
+                      }`}
+                      onClick={() => setTimeRange("1d")}
+                    >
+                      <span className="hidden sm:inline">Last 1 Day</span>
+                      <span className="sm:hidden">1D</span>
+                    </button>
+                    <button
+                      className={`join-item btn btn-sm ${
+                        timeRange === "7d" ? "btn-active" : ""
+                      }`}
+                      onClick={() => setTimeRange("7d")}
+                    >
+                      <span className="hidden sm:inline">Last 7 Days</span>
+                      <span className="sm:hidden">7D</span>
+                    </button>
+                    <button
+                      className={`join-item btn btn-sm ${
+                        timeRange === "30d" ? "btn-active" : ""
+                      }`}
+                      onClick={() => setTimeRange("30d")}
+                    >
+                      <span className="hidden sm:inline">Last 30 Days</span>
+                      <span className="sm:hidden">30D</span>
+                    </button>
+                    <button
+                      className={`join-item btn btn-sm gap-1 ${
+                        timeRange === "custom" ? "btn-active" : ""
+                      }`}
+                      onClick={() => setTimeRange("custom")}
+                      title="Set a custom time range in days"
+                    >
+                      <SlidersHorizontal className="h-3.5 w-3.5" />
+                      <span className="hidden sm:inline">Custom</span>
+                    </button>
+                  </div>
+                  {timeRange === "custom" && (
+                    <CustomDaysInput
+                      value={customDays ?? 90}
+                      onChange={setCustomDays}
+                    />
+                  )}
                 </div>
               </PageFiltersBar.Item>
 
@@ -609,6 +635,60 @@ function CdfWithCoverage({
         groupTitle={currentCdfGroup.title}
         unit={currentCdfGroup.unit}
       />
+    </div>
+  );
+}
+
+// Extracted input component for custom days with debounced URL updates
+function CustomDaysInput({
+  value,
+  onChange,
+}: {
+  value: number;
+  onChange: (days: number) => void;
+}) {
+  const [localValue, setLocalValue] = useState(String(value));
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Sync local value when external value changes (e.g. URL navigation)
+  useEffect(() => {
+    setLocalValue(String(value));
+  }, [value]);
+
+  // Auto-focus input when it appears
+  useEffect(() => {
+    inputRef.current?.select();
+  }, []);
+
+  const commitValue = () => {
+    const parsed = parseInt(localValue, 10);
+    if (parsed > 0 && parsed <= 3650) {
+      onChange(parsed);
+    } else {
+      // Reset to current value on invalid input
+      setLocalValue(String(value));
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-1.5">
+      <input
+        ref={inputRef}
+        type="number"
+        min={1}
+        max={3650}
+        value={localValue}
+        onChange={(e) => setLocalValue(e.target.value)}
+        onBlur={commitValue}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            commitValue();
+            inputRef.current?.blur();
+          }
+        }}
+        className="input input-sm input-bordered w-20 text-center tabular-nums"
+      />
+      <span className="text-sm text-base-content/70">days</span>
     </div>
   );
 }

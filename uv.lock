@@ -2981,8 +2981,8 @@ dependencies = [
 
 [[package]]
 name = "qubex"
-version = "1.4.6+b8440bd"
-source = { git = "https://github.com/amachino/qubex.git?branch=develop#b8440bdc80daf287fd91503ce4988f8a579a547b" }
+version = "1.4.7+516c400"
+source = { git = "https://github.com/amachino/qubex.git?branch=develop#516c40048a357afeaeb4c1971f39982a5b826155" }
 dependencies = [
     { name = "cma" },
     { name = "cvxopt" },

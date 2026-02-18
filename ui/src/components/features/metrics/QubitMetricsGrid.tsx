@@ -26,6 +26,7 @@ interface MetricValue {
   value: number | null;
   task_id?: string | null;
   execution_id?: string | null;
+  stddev?: number | null;
 }
 
 interface QubitMetricsGridProps {
@@ -105,6 +106,7 @@ function getCellFontSizes(cellSize: number): {
 interface GridCellProps {
   qid: string;
   value: number | null;
+  stddev?: number | null;
   bgColor: string | null;
   unit: string;
   muxBgClass: string;
@@ -118,6 +120,7 @@ interface GridCellProps {
 const GridCell = memo(function GridCell({
   qid,
   value,
+  stddev,
   bgColor,
   unit,
   muxBgClass,
@@ -162,6 +165,14 @@ const GridCell = memo(function GridCell({
           >
             {value.toFixed(2)}
           </div>
+          {stddev != null && showUnits && (
+            <div
+              className="text-white/80 font-medium drop-shadow"
+              style={{ fontSize: fontSizes.unitSize }}
+            >
+              ± {stddev.toFixed(2)}
+            </div>
+          )}
           {showUnits && (
             <div
               className="text-white/90 font-medium drop-shadow"
@@ -188,7 +199,7 @@ const GridCell = memo(function GridCell({
       {/* Hover tooltip - only render when needed */}
       <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-base-100 text-base-content text-sm rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
         {value !== null && value !== undefined
-          ? `${qid}: ${value.toFixed(4)} ${unit}`
+          ? `${qid}: ${value.toFixed(4)}${stddev != null ? ` ± ${stddev.toFixed(4)}` : ""} ${unit}`
           : `${qid}: No data`}
       </div>
     </button>
@@ -398,6 +409,7 @@ export function QubitMetricsGrid({
       index: number;
       qid: string | undefined;
       value: number | null;
+      stddev: number | null;
       bgColor: string | null;
       muxBgClass: string;
       metric: MetricValue | null;
@@ -432,6 +444,7 @@ export function QubitMetricsGrid({
 
       const metric = qid ? displayData[qid] : null;
       const value = metric?.value ?? null;
+      const stddev = metric?.stddev ?? null;
       const muxBgClass =
         hasMux && showMuxBoundaries
           ? isEvenMux
@@ -440,7 +453,7 @@ export function QubitMetricsGrid({
           : "";
       const bgColor = stats ? getColor(value, stats.min, stats.max) : null;
 
-      cells.push({ index, qid, value, bgColor, muxBgClass, metric });
+      cells.push({ index, qid, value, stddev, bgColor, muxBgClass, metric });
     }
     return cells;
   }, [
@@ -491,6 +504,7 @@ export function QubitMetricsGrid({
               key={cell.qid}
               qid={cell.qid}
               value={cell.value}
+              stddev={cell.stddev}
               bgColor={cell.bgColor}
               unit={unit}
               muxBgClass={cell.muxBgClass}
@@ -780,7 +794,7 @@ export function QubitMetricsGrid({
                   </h2>
                   <p className="text-sm sm:text-base text-base-content/70 mt-0.5 sm:mt-1">
                     {selectedQubitInfo.metric.value !== null
-                      ? `${selectedQubitInfo.metric.value.toFixed(4)} ${unit}`
+                      ? `${selectedQubitInfo.metric.value.toFixed(4)}${selectedQubitInfo.metric.stddev != null ? ` ± ${selectedQubitInfo.metric.stddev.toFixed(4)}` : ""} ${unit}`
                       : "No data"}
                   </p>
                 </div>

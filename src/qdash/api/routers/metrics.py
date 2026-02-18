@@ -201,6 +201,7 @@ def _extract_latest_metrics(
                 value=result["value"],
                 task_id=result["task_id"],
                 execution_id=result["execution_id"],
+                stddev=result.get("stddev"),
             )
 
     return metrics_data

@@ -46,8 +46,8 @@ CHECK_1Q_TASKS: list[str] = [
     "CheckRabi",
     "CreateHPIPulse",
     "CheckHPIPulse",
-    "CheckT1",
-    "CheckT2Echo",
+    "CheckT1Average",
+    "CheckT2EchoAverage",
     "CheckRamsey",
 ]
 

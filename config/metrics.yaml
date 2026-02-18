@@ -58,11 +58,39 @@ qubit_metrics:
         max: 200
         step: 1
 
+  t1_average:
+    title: T1 Average
+    unit: μs
+    scale: 1
+    description: Mean T1 relaxation time over repeated measurements (± std)
+    evaluation:
+      mode: maximize
+    threshold:
+      value: 100
+      range:
+        min: 25
+        max: 200
+        step: 1
+
   t2_echo:
     title: T2 Echo
     unit: μs
     scale: 1
     description: Dephasing time measured with echo sequence
+    evaluation:
+      mode: maximize
+    threshold:
+      value: 200
+      range:
+        min: 50
+        max: 400
+        step: 1
+
+  t2_echo_average:
+    title: T2 Echo Average
+    unit: μs
+    scale: 1
+    description: Mean T2 echo time over repeated measurements (± std)
     evaluation:
       mode: maximize
     threshold:
@@ -246,7 +274,9 @@ cdf_groups:
       unit: μs
       metrics:
         - t1
+        - t1_average
         - t2_echo
+        - t2_echo_average
         - t2_star
     - id: fidelity
       title: Fidelity
