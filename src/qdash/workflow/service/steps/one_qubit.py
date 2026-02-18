@@ -161,7 +161,7 @@ class OneQubitCheck(CalibrationStep):
     """Basic 1-qubit characterization step.
 
     Executes CHECK_1Q_TASKS: CheckRabi, CreateHPIPulse, CheckHPIPulse,
-    CheckT1, CheckT2Echo, CheckRamsey.
+    CheckT1Average, CheckT2Echo, CheckRamsey.
 
     Provides: one_qubit_check
     """
@@ -268,12 +268,15 @@ class OneQubitCheck(CalibrationStep):
     def _extract_metrics(self, raw: dict[str, Any]) -> dict[str, float]:
         """Extract metrics from raw result."""
         metrics = {}
-        # T1
-        t1_result = raw.get("CheckT1", {})
+        # T1 Average
+        t1_result = raw.get("CheckT1Average", {})
         if t1_result:
-            t1_param = t1_result.get("t1")
+            t1_param = t1_result.get("t1_average")
             if t1_param is not None:
-                metrics["t1"] = t1_param.value if hasattr(t1_param, "value") else t1_param
+                metrics["t1_average"] = (
+                    t1_param.value if hasattr(t1_param, "value") else t1_param
+                )
+
         # T2 echo
         t2_result = raw.get("CheckT2Echo", {})
         if t2_result:

@@ -41,6 +41,10 @@ Dependency Graph:
         │       ├── input: qubit_frequency, hpi_amplitude
         │       └── output: t1
         │
+        ├──> CheckT1Average
+        │       ├── input: qubit_frequency, hpi_amplitude
+        │       └── output: t1_average, t1_std
+        │
         └──> CheckT2Echo
                 ├── input: qubit_frequency, hpi_amplitude
                 └── output: t2_echo
@@ -55,6 +59,7 @@ from qdash.workflow.calibtasks.fake.base import FakeTask
 from qdash.workflow.calibtasks.fake.fake_check_rabi import FakeCheckRabi
 from qdash.workflow.calibtasks.fake.fake_check_ramsey import FakeCheckRamsey
 from qdash.workflow.calibtasks.fake.fake_check_t1 import FakeCheckT1
+from qdash.workflow.calibtasks.fake.fake_check_t1_average import FakeCheckT1Average
 from qdash.workflow.calibtasks.fake.fake_check_t2_echo import FakeCheckT2Echo
 from qdash.workflow.calibtasks.fake.fake_chevron_pattern import FakeChevronPattern
 from qdash.workflow.calibtasks.fake.fake_create_hpi_pulse import FakeCreateHPIPulse
@@ -72,6 +77,7 @@ __all__ = [
     "FakeCheckRamsey",
     "FakeCheckRabi",
     "FakeCheckT1",
+    "FakeCheckT1Average",
     "FakeCheckT2Echo",
     "FakeRandomizedBenchmarking",
     # Original fake task (simulator-based)

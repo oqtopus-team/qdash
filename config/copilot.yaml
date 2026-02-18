@@ -30,6 +30,7 @@ evaluation_metrics:
     - qubit_frequency
     - anharmonicity
     - t1
+    - t1_average
     - t2_echo
     - t2_star
     - average_readout_fidelity
@@ -43,6 +44,12 @@ evaluation_metrics:
 # higher_is_better: true means higher values are better (e.g., T1, fidelity)
 scoring:
   t1:
+    good: 50
+    excellent: 100
+    bad: 20
+    unit: μs
+    higher_is_better: true
+  t1_average:
     good: 50
     excellent: 100
     bad: 20
