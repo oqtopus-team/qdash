@@ -1,5 +1,6 @@
 from typing import ClassVar
 
+import plotly.graph_objects as go
 from qdash.datamodel.task import ParameterModel, RunParameterModel
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
@@ -8,6 +9,7 @@ from qdash.workflow.calibtasks.base import (
 )
 from qdash.workflow.calibtasks.qubex.base import QubexTask
 from qdash.workflow.engine.backend.qubex import QubexBackend
+from qubex.analysis import IQPlotter
 from qubex.experiment.experiment_constants import CALIBRATION_SHOTS
 from qubex.measurement.measurement import DEFAULT_INTERVAL, DEFAULT_READOUT_DURATION
 
@@ -122,6 +124,10 @@ class CheckRabi(QubexTask):
         self.output_parameters["maximum_rabi_frequency"].value = maximum_rabi_frequency
         output_parameters = self.attach_execution_id(execution_id)
         figures = [result.data[label].fit()["fig"]]
+        exp = self.get_experiment(backend)
+        iq_plotter = IQPlotter(state_centers=exp.state_centers)
+        iq_plotter.update({label: result.data[label].data})
+        figures.append(go.Figure(iq_plotter._widget.to_dict()))
         raw_data = [result.data[label].data]
         return PostProcessResult(
             output_parameters=output_parameters, figures=figures, raw_data=raw_data
