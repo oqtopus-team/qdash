@@ -1255,7 +1255,7 @@ function MembersModal({
                     <span className="label-text font-medium">User</span>
                   </label>
                   <select
-                    className="select select-bordered"
+                    className="select select-bordered ml-2"
                     value={selectedUsername}
                     onChange={(e) => setSelectedUsername(e.target.value)}
                   >
