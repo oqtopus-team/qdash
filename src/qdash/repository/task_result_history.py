@@ -288,6 +288,7 @@ class MongoTaskResultHistoryRepository:
                 "$group": {
                     "_id": {"qid": "$qid", "metric": "$metrics.k"},
                     "value": {"$first": "$metrics.v.value"},
+                    "error": {"$first": "$metrics.v.error"},
                     "task_id": {"$first": {"$ifNull": ["$metrics.v.task_id", "$task_id"]}},
                     "execution_id": {"$first": "$execution_id"},
                 }
@@ -305,10 +306,12 @@ class MongoTaskResultHistoryRepository:
             value = doc.get("value")
 
             if value is not None and isinstance(value, (int, float)):
+                error = doc.get("error")
                 metrics_data[metric_name][qid] = MetricAggregateResult(
                     value=float(value),
                     task_id=doc.get("task_id"),
                     execution_id=doc.get("execution_id", ""),
+                    stddev=float(error) if error is not None and isinstance(error, (int, float)) else None,
                 )
 
         return metrics_data
