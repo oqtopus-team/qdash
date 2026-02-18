@@ -154,8 +154,8 @@ export function CouplingGrid({
     col: number;
   } | null>(null);
 
-  // LOD (Level of Detail) state for pan-zoom mode
-  const [lodLevel, setLodLevel] = useState<"high" | "medium" | "low">("high");
+  // LOD: store zoom scale, compute visibility flags from effective cell size.
+  const [currentScale, setCurrentScale] = useState<number | null>(null);
   const lodTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const numRegions = Math.floor(gridSize / regionSize);
@@ -181,23 +181,28 @@ export function CouplingGrid({
       deps: [taskResponse?.data],
     });
 
-  // Handle transform changes for LOD (debounced)
+  // Debounced scale update to avoid excessive re-renders during zoom
   const handleTransform = useCallback(
     (_: unknown, state: { scale: number }) => {
       if (lodTimeoutRef.current) {
         clearTimeout(lodTimeoutRef.current);
       }
       lodTimeoutRef.current = setTimeout(() => {
-        const scale = state.scale;
-        const newLod = scale >= 0.9 ? "high" : scale >= 0.6 ? "medium" : "low";
-        setLodLevel((prev) => (prev !== newLod ? newLod : prev));
+        setCurrentScale((prev) => {
+          if (prev === null) return state.scale;
+          return Math.abs(prev - state.scale) > 0.05 ? state.scale : prev;
+        });
       }, 100);
     },
     [],
   );
 
-  // LOD-based visibility flags
-  const showLabels = lodLevel !== "low" || zoomMode === "region";
+  // Calculate initial scale for TransformWrapper (must be before early returns)
+  const MIN_FIGURE_CELL_SIZE = 60;
+  const initialScale = useMemo(() => {
+    if (viewMode !== "pan-zoom" || cellSize >= MIN_FIGURE_CELL_SIZE) return 1;
+    return Math.max(0.3, cellSize / MIN_FIGURE_CELL_SIZE);
+  }, [viewMode, cellSize]);
 
   const normalizedResultMap: Record<string, ExtendedTask[]> = {};
   if (taskResponse?.data?.result) {
@@ -224,9 +229,14 @@ export function CouplingGrid({
   if (isError)
     return <div className="alert alert-error">Failed to load data</div>;
 
-  // Calculate displayed area based on zoom mode
+  // In pan-zoom mode, ensure cells are large enough for figures to be readable.
   const effectiveGridSize = gridSize;
-  const displayCellSize = zoomMode === "region" ? cellSize * 0.8 : cellSize;
+  const baseCellSize =
+    viewMode === "pan-zoom"
+      ? Math.max(cellSize, MIN_FIGURE_CELL_SIZE)
+      : cellSize;
+  const displayCellSize =
+    zoomMode === "region" ? baseCellSize * 0.8 : baseCellSize;
   const displayGridSize = zoomMode === "region" ? regionSize : gridSize;
   const displayGridStart = selectedRegion
     ? {
@@ -234,6 +244,13 @@ export function CouplingGrid({
         col: selectedRegion.col * regionSize,
       }
     : { row: 0, col: 0 };
+
+  // LOD flags: compute from effective pixel size (cellSize * zoom scale)
+  const activeScale = currentScale ?? initialScale;
+  const effectiveCellSize =
+    displayCellSize * (viewMode === "pan-zoom" ? activeScale : 1);
+  const showLabels = effectiveCellSize >= 20 || zoomMode === "region";
+  const showFigures = effectiveCellSize >= 50 || zoomMode === "region";
 
   // Helper function to get qubit position from topology (explicit) or computed
   const getQubitPosition = (qid: number) => {
@@ -495,6 +512,50 @@ export function CouplingGrid({
           );
           const canBeDownloaded = hasJsonFigures(task.couplingId);
 
+          const statusColor =
+            task.status === "completed"
+              ? "bg-success"
+              : task.status === "failed"
+                ? "bg-error"
+                : "bg-warning";
+
+          // Zoomed-out: status-colored dot
+          if (!showFigures) {
+            return (
+              <button
+                key={normKey}
+                onClick={() => {
+                  if (downloadSelectionEnabled) {
+                    if (canBeDownloaded)
+                      toggleDownloadSelection(task.couplingId);
+                  } else {
+                    setSelectedTaskInfo({
+                      couplingId: task.couplingId,
+                      taskName: selectedTask,
+                    });
+                  }
+                }}
+                style={{
+                  position: "absolute",
+                  top: centerY,
+                  left: centerX,
+                  width: displayCellSize * 0.45,
+                  height: displayCellSize * 0.45,
+                }}
+                className={`rounded-md shadow-sm group cursor-pointer -translate-x-1/2 -translate-y-1/2 ${statusColor} ${
+                  downloadSelectionEnabled && isSelectedForDownload
+                    ? "ring-2 ring-primary ring-offset-1"
+                    : ""
+                }`}
+              >
+                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 bg-base-100 text-base-content text-xs rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
+                  {task.couplingId}: {task.status}
+                </div>
+              </button>
+            );
+          }
+
+          // Zoomed-in: full figure
           return (
             <button
               key={normKey}
@@ -747,14 +808,15 @@ export function CouplingGrid({
       >
         {viewMode === "pan-zoom" ? (
           <TransformWrapper
-            initialScale={1}
-            minScale={0.3}
+            initialScale={initialScale}
+            minScale={Math.min(0.3, initialScale)}
             maxScale={4}
             wheel={{ step: 0.08, smoothStep: 0.004 }}
             pinch={{ step: 5 }}
             doubleClick={{ mode: "zoomIn", step: 0.7 }}
             panning={{ velocityDisabled: false }}
             smooth={true}
+            centerOnInit={true}
             onTransformed={handleTransform}
           >
             <ZoomControls />

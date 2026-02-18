@@ -86,6 +86,18 @@ const EmptyCell = memo(function EmptyCell({
   );
 });
 
+// Status color helper
+function getStatusColor(status: string | undefined): string {
+  switch (status) {
+    case "completed":
+      return "bg-success";
+    case "failed":
+      return "bg-error";
+    default:
+      return "bg-warning";
+  }
+}
+
 // Memoized grid cell component for performance
 interface GridCellProps {
   qid: string;
@@ -93,6 +105,7 @@ interface GridCellProps {
   figurePath: string | null;
   muxBgClass: string;
   showLabels: boolean;
+  showFigures: boolean;
   zoomMode: "full" | "region";
   isDownloadMode: boolean;
   isSelectedForDownload: boolean;
@@ -106,6 +119,7 @@ const GridCell = memo(function GridCell({
   figurePath,
   muxBgClass,
   showLabels,
+  showFigures,
   zoomMode,
   isDownloadMode,
   isSelectedForDownload,
@@ -124,6 +138,42 @@ const GridCell = memo(function GridCell({
     );
   }
 
+  // Zoomed-out: show status-colored tile (heatmap style)
+  if (!showFigures) {
+    return (
+      <button
+        onClick={onClick}
+        className={`aspect-square rounded-lg shadow-sm relative group cursor-pointer ${getStatusColor(task.status)} ${muxBgClass} ${
+          isDownloadMode && isSelectedForDownload
+            ? "ring-2 ring-primary ring-offset-1"
+            : ""
+        } ${
+          isDownloadMode && !canBeDownloaded
+            ? "opacity-40 cursor-not-allowed"
+            : ""
+        }`}
+      >
+        {showLabels && (
+          <div className="absolute top-0.5 left-0.5 bg-black/30 text-white px-0.5 py-px rounded text-[0.5rem] font-bold">
+            {qid}
+          </div>
+        )}
+        {/* Hover tooltip */}
+        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-base-100 text-base-content text-xs rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
+          {qid}: {task.status}
+        </div>
+        {isDownloadMode && canBeDownloaded && isSelectedForDownload && (
+          <div className="absolute inset-0 flex items-center justify-center bg-primary/20">
+            <div className="bg-primary text-primary-content rounded-full p-0.5">
+              <Check size={10} />
+            </div>
+          </div>
+        )}
+      </button>
+    );
+  }
+
+  // Zoomed-in: show full figure
   return (
     <button
       onClick={onClick}
@@ -156,13 +206,7 @@ const GridCell = memo(function GridCell({
         </div>
       )}
       <div
-        className={`absolute bottom-1 right-1 w-2 h-2 rounded-full ${
-          task.status === "completed"
-            ? "bg-success"
-            : task.status === "failed"
-              ? "bg-error"
-              : "bg-warning"
-        }`}
+        className={`absolute bottom-1 right-1 w-2 h-2 rounded-full ${getStatusColor(task.status)}`}
       />
       {/* Download selection overlay */}
       {isDownloadMode && canBeDownloaded && (
@@ -268,8 +312,9 @@ export function TaskResultGrid({
     col: number;
   } | null>(null);
 
-  // LOD state with ref to avoid excessive re-renders
-  const [lodLevel, setLodLevel] = useState<"high" | "medium" | "low">("high");
+  // LOD: store zoom scale, compute visibility flags from effective cell size.
+  // Initialize to a conservative value; will be updated on first transform.
+  const [currentScale, setCurrentScale] = useState<number | null>(null);
   const lodTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const numRegions = Math.floor(gridSize / regionSize);
@@ -288,20 +333,28 @@ export function TaskResultGrid({
       deps: [taskResponse, topologyQubits, zoomMode, selectedRegion],
     });
 
-  // Debounced LOD update to avoid excessive re-renders during zoom
+  // Debounced scale update to avoid excessive re-renders during zoom
   const handleTransform = useCallback(
     (_: unknown, state: { scale: number }) => {
       if (lodTimeoutRef.current) {
         clearTimeout(lodTimeoutRef.current);
       }
       lodTimeoutRef.current = setTimeout(() => {
-        const scale = state.scale;
-        const newLod = scale >= 0.9 ? "high" : scale >= 0.6 ? "medium" : "low";
-        setLodLevel((prev) => (prev !== newLod ? newLod : prev));
+        setCurrentScale((prev) => {
+          if (prev === null) return state.scale;
+          return Math.abs(prev - state.scale) > 0.05 ? state.scale : prev;
+        });
       }, 100);
     },
     [],
   );
+
+  // Calculate initial scale for TransformWrapper (must be before early returns)
+  const MIN_FIGURE_CELL_SIZE = 60;
+  const initialScale = useMemo(() => {
+    if (viewMode !== "pan-zoom" || cellSize >= MIN_FIGURE_CELL_SIZE) return 1;
+    return Math.max(0.3, cellSize / MIN_FIGURE_CELL_SIZE);
+  }, [viewMode, cellSize]);
 
   if (isLoadingTask)
     return (
@@ -415,10 +468,22 @@ export function TaskResultGrid({
       }
     : { row: 0, col: 0 };
 
-  const displayCellSize = zoomMode === "region" ? cellSize * 0.9 : cellSize;
+  // In pan-zoom mode, ensure cells are large enough for figures to be readable.
+  // For large grids (e.g., 144Q) the calculated cellSize may be very small,
+  // but TransformWrapper handles panning/zooming the oversized grid.
+  const baseCellSize =
+    viewMode === "pan-zoom"
+      ? Math.max(cellSize, MIN_FIGURE_CELL_SIZE)
+      : cellSize;
+  const displayCellSize =
+    zoomMode === "region" ? baseCellSize * 0.9 : baseCellSize;
 
-  // LOD flags
-  const showLabels = lodLevel !== "low" || zoomMode === "region";
+  // LOD flags: compute from effective pixel size (cellSize * zoom scale)
+  const activeScale = currentScale ?? initialScale;
+  const effectiveCellSize =
+    displayCellSize * (viewMode === "pan-zoom" ? activeScale : 1);
+  const showLabels = effectiveCellSize >= 20 || zoomMode === "region";
+  const showFigures = effectiveCellSize >= 50 || zoomMode === "region";
 
   // Grid content (extracted for reuse in both view modes)
   const gridContent = (
@@ -486,6 +551,7 @@ export function TaskResultGrid({
             figurePath={figurePath}
             muxBgClass={muxBgClass}
             showLabels={showLabels}
+            showFigures={showFigures}
             zoomMode={zoomMode}
             isDownloadMode={downloadSelectionEnabled}
             isSelectedForDownload={isSelectedForDownload}
@@ -764,14 +830,15 @@ export function TaskResultGrid({
       >
         {viewMode === "pan-zoom" ? (
           <TransformWrapper
-            initialScale={1}
-            minScale={0.3}
+            initialScale={initialScale}
+            minScale={Math.min(0.3, initialScale)}
             maxScale={4}
             wheel={{ step: 0.08, smoothStep: 0.004 }}
             pinch={{ step: 5 }}
             doubleClick={{ mode: "zoomIn", step: 0.7 }}
             panning={{ velocityDisabled: false }}
             smooth={true}
+            centerOnInit={true}
             onTransformed={handleTransform}
           >
             <ZoomControls />
