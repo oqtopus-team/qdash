@@ -114,6 +114,7 @@ def simple_calibration(
         skip_execution=True,  # Child sessions create their own Executions
         default_run_parameters={
             "hpi_duration": {"value": 32, "value_type": "int"},
+            "interval": {"value": 150 * 1024, "value_type": "int"},
         },
     )
     return cal.run(targets, steps=steps)
