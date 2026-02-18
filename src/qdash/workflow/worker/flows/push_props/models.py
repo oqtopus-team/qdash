@@ -8,6 +8,7 @@ class QubitProperties(BaseModel):
     external_loss_rate: float | None = None
     internal_loss_rate: float | None = None
     t1: float | None = None
+    t1_average: float | None = None
     t2_echo: float | None = None
     t2_star: float | None = None
     average_readout_fidelity: float | None = None

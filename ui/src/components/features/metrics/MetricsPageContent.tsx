@@ -20,27 +20,30 @@ import { PageContainer } from "@/components/ui/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { MetricsPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
 import { useMetricsConfig } from "@/hooks/useMetricsConfig";
+import { useMetricsUrlState } from "@/hooks/useUrlState";
 import { getDaisySelectStyles } from "@/lib/reactSelectTheme";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PageFiltersBar } from "@/components/ui/PageFiltersBar";
-
-type TimeRange = "1d" | "7d" | "30d";
-type SelectionMode = "latest" | "best" | "average";
 
 type MetricOption = {
   value: string;
   label: string;
 };
 
-type MetricType = "qubit" | "coupling";
-
 export function MetricsPageContent() {
-  const [selectedChip, setSelectedChip] = useState<string>("");
-  const [timeRange, setTimeRange] = useState<TimeRange>("7d");
-  const [selectionMode, setSelectionMode] = useState<SelectionMode>("latest");
-  const [metricType, setMetricType] = useState<MetricType>("qubit");
-  const [selectedMetric, setSelectedMetric] = useState<string>("t1");
+  const {
+    selectedChip,
+    timeRange,
+    selectionMode,
+    metricType,
+    selectedMetric,
+    setSelectedChip,
+    setTimeRange,
+    setSelectionMode,
+    setMetricType,
+    setSelectedMetric,
+  } = useMetricsUrlState();
   const [gridSize, setGridSize] = useState<number>(8);
 
   // Load metrics configuration from backend
@@ -314,7 +317,7 @@ export function MetricsPageContent() {
               className={`tab ${metricType === "qubit" ? "tab-active" : ""}`}
               onClick={() => {
                 setMetricType("qubit");
-                setSelectedMetric("t1"); // Reset to default qubit metric
+                setSelectedMetric("t1");
               }}
             >
               Qubit
@@ -323,7 +326,7 @@ export function MetricsPageContent() {
               className={`tab ${metricType === "coupling" ? "tab-active" : ""}`}
               onClick={() => {
                 setMetricType("coupling");
-                setSelectedMetric("zx90_gate_fidelity"); // Reset to default coupling metric
+                setSelectedMetric("zx90_gate_fidelity");
               }}
             >
               Coupling
