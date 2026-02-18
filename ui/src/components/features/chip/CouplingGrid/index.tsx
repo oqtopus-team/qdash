@@ -1,7 +1,20 @@
 "use client";
 
-import { Check, Download, X } from "lucide-react";
-import { useState, useMemo } from "react";
+import {
+  Check,
+  Download,
+  X,
+  ZoomIn,
+  ZoomOut,
+  Maximize2,
+  Move,
+} from "lucide-react";
+import { useState, useMemo, useRef, useCallback } from "react";
+import {
+  TransformWrapper,
+  TransformComponent,
+  useControls,
+} from "react-zoom-pan-pinch";
 
 import type { Task } from "@/schemas";
 
@@ -34,6 +47,36 @@ interface SelectedTaskInfo {
 
 interface ExtendedTask extends Task {
   couplingId: string;
+}
+
+// Zoom control buttons component
+function ZoomControls() {
+  const { zoomIn, zoomOut, resetTransform } = useControls();
+  return (
+    <div className="absolute top-2 right-2 z-30 flex flex-col gap-1">
+      <button
+        onClick={() => zoomIn()}
+        className="btn btn-sm btn-square btn-ghost bg-base-100/90 shadow-md hover:bg-base-200"
+        title="Zoom in"
+      >
+        <ZoomIn className="h-4 w-4" />
+      </button>
+      <button
+        onClick={() => zoomOut()}
+        className="btn btn-sm btn-square btn-ghost bg-base-100/90 shadow-md hover:bg-base-200"
+        title="Zoom out"
+      >
+        <ZoomOut className="h-4 w-4" />
+      </button>
+      <button
+        onClick={() => resetTransform()}
+        className="btn btn-sm btn-square btn-ghost bg-base-100/90 shadow-md hover:bg-base-200"
+        title="Reset view"
+      >
+        <Maximize2 className="h-4 w-4" />
+      </button>
+    </div>
+  );
 }
 
 export function CouplingGrid({
@@ -72,6 +115,7 @@ export function CouplingGrid({
 
   // Use the larger dimension for square grids, or actual dimensions for non-square
   const gridSize = Math.max(gridRows, gridCols);
+  const isSquareGrid = gridRows === gridCols;
 
   // Layout params for grid position calculations
   const layoutParams: TopologyLayoutParams = useMemo(
@@ -95,6 +139,9 @@ export function CouplingGrid({
   );
   const [isDownloading, setIsDownloading] = useState(false);
 
+  // View mode state: 'pan-zoom' for DOM with pan/zoom, 'region' for region zoom
+  const [viewMode, setViewMode] = useState<"pan-zoom" | "region">("pan-zoom");
+
   // Region selection state
   const [regionSelectionEnabled, setRegionSelectionEnabled] = useState(false);
   const [zoomMode, setZoomMode] = useState<"full" | "region">("full");
@@ -106,6 +153,10 @@ export function CouplingGrid({
     row: number;
     col: number;
   } | null>(null);
+
+  // LOD (Level of Detail) state for pan-zoom mode
+  const [lodLevel, setLodLevel] = useState<"high" | "medium" | "low">("high");
+  const lodTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const numRegions = Math.floor(gridSize / regionSize);
 
@@ -122,12 +173,31 @@ export function CouplingGrid({
   // Use grid layout hook for responsive sizing
   const displayCols = zoomMode === "region" ? regionSize : gridCols;
   const displayRows = zoomMode === "region" ? regionSize : gridRows;
-  const { containerRef, cellSize, isMobile, gap } = useGridLayout({
-    cols: displayCols,
-    rows: displayRows,
-    reservedHeight: { mobile: 250, desktop: 300 },
-    deps: [taskResponse?.data],
-  });
+  const { containerRef, cellSize, isMobile, viewportHeight, gap, padding } =
+    useGridLayout({
+      cols: displayCols,
+      rows: displayRows,
+      reservedHeight: { mobile: 300, desktop: 350 },
+      deps: [taskResponse?.data],
+    });
+
+  // Handle transform changes for LOD (debounced)
+  const handleTransform = useCallback(
+    (_: unknown, state: { scale: number }) => {
+      if (lodTimeoutRef.current) {
+        clearTimeout(lodTimeoutRef.current);
+      }
+      lodTimeoutRef.current = setTimeout(() => {
+        const scale = state.scale;
+        const newLod = scale >= 0.9 ? "high" : scale >= 0.6 ? "medium" : "low";
+        setLodLevel((prev) => (prev !== newLod ? newLod : prev));
+      }, 100);
+    },
+    [],
+  );
+
+  // LOD-based visibility flags
+  const showLabels = lodLevel !== "low" || zoomMode === "region";
 
   const normalizedResultMap: Record<string, ExtendedTask[]> = {};
   if (taskResponse?.data?.result) {
@@ -155,6 +225,7 @@ export function CouplingGrid({
     return <div className="alert alert-error">Failed to load data</div>;
 
   // Calculate displayed area based on zoom mode
+  const effectiveGridSize = gridSize;
   const displayCellSize = zoomMode === "region" ? cellSize * 0.8 : cellSize;
   const displayGridSize = zoomMode === "region" ? regionSize : gridSize;
   const displayGridStart = selectedRegion
@@ -166,11 +237,9 @@ export function CouplingGrid({
 
   // Helper function to get qubit position from topology (explicit) or computed
   const getQubitPosition = (qid: number) => {
-    // Try explicit position from topology first
     if (topologyQubits && topologyQubits[qid]) {
       return topologyQubits[qid];
     }
-    // Fallback to computed position
     return getQubitGridPosition(qid, layoutParams);
   };
 
@@ -253,7 +322,6 @@ export function CouplingGrid({
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
 
-      // Reset selection after successful download
       setDownloadSelectionEnabled(false);
       setSelectedForDownload(new Set());
     } catch (error) {
@@ -273,86 +341,385 @@ export function CouplingGrid({
     taskResponse?.data?.result || {},
   ).filter(([, task]) => task.json_figure_path).length;
 
-  return (
-    <div ref={containerRef} className="space-y-4 px-4">
-      {/* Toolbar - zoom toggle and download controls */}
-      {zoomMode === "full" && (
-        <div className="px-4 flex items-center justify-between">
-          {gridRows === gridCols && !downloadSelectionEnabled ? (
-            <RegionZoomToggle
-              enabled={regionSelectionEnabled}
-              onToggle={setRegionSelectionEnabled}
-            />
-          ) : (
-            <div />
-          )}
+  // Grid content (extracted for reuse in both view modes)
+  const gridContent = (
+    <div
+      className="relative flex-shrink-0"
+      style={{
+        width: calculateGridDimension(
+          displayGridSize,
+          displayCellSize,
+          isMobile,
+          viewportHeight,
+        ),
+        height: calculateGridDimension(
+          displayGridSize,
+          displayCellSize,
+          isMobile,
+          viewportHeight,
+        ),
+        maxWidth: viewMode === "pan-zoom" ? "none" : "100%",
+        willChange: viewMode === "pan-zoom" ? "transform" : "auto",
+      }}
+    >
+      {/* Qubit positions - either from topology or computed, with MUX styling */}
+      {(() => {
+        const qubitIds = topologyQubits
+          ? Object.keys(topologyQubits).map(Number)
+          : Array.from({ length: gridRows * gridCols }, (_, i) => i);
 
-          {/* Download selection controls */}
-          {downloadSelectionEnabled ? (
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-base-content/70">
-                {selectedForDownload.size} / {availableForDownloadCount}{" "}
-                selected
-              </span>
-              <button
-                className="btn btn-xs btn-ghost"
-                onClick={selectAllForDownload}
-                title="Select all"
-              >
-                All
-              </button>
-              <button
-                className="btn btn-xs btn-ghost"
-                onClick={clearDownloadSelection}
-                title="Clear selection"
-              >
-                Clear
-              </button>
-              <button
-                className="btn btn-sm btn-primary gap-1"
-                onClick={handleDownload}
-                disabled={selectedForDownload.size === 0 || isDownloading}
-              >
-                {isDownloading ? (
-                  <span className="loading loading-spinner loading-xs" />
-                ) : (
-                  <Download size={16} />
-                )}
-                Download
-              </button>
-              <button
-                className="btn btn-sm btn-ghost btn-circle"
-                onClick={() => {
-                  setDownloadSelectionEnabled(false);
-                  setSelectedForDownload(new Set());
+        return qubitIds
+          .filter((qid) => isQubitInRegion(qid))
+          .map((qid) => {
+            const pos = getQubitPosition(qid);
+            const row = pos.row;
+            const col = pos.col;
+
+            const displayRow = row - displayGridStart.row;
+            const displayCol = col - displayGridStart.col;
+            const x = displayCol * (displayCellSize + gap);
+            const y = displayRow * (displayCellSize + gap);
+
+            const muxRow = Math.floor(row / muxSize);
+            const muxCol = Math.floor(col / muxSize);
+            const isEvenMux = (muxRow + muxCol) % 2 === 0;
+
+            const muxBgClass =
+              hasMux && showMuxBoundaries
+                ? isEvenMux
+                  ? "ring-2 ring-inset ring-primary/20"
+                  : "ring-2 ring-inset ring-secondary/20"
+                : "";
+
+            return (
+              <div
+                key={qid}
+                className={`absolute bg-base-300/30 rounded-lg flex items-center justify-center text-sm text-base-content/30 ${muxBgClass}`}
+                style={{
+                  top: y,
+                  left: x,
+                  width: displayCellSize,
+                  height: displayCellSize,
                 }}
-                title="Cancel"
               >
-                <X size={16} />
-              </button>
-            </div>
-          ) : (
-            <button
-              className="btn btn-sm btn-outline gap-2"
-              onClick={() => {
-                setDownloadSelectionEnabled(true);
-                setRegionSelectionEnabled(false);
-                // Default to all selected
-                selectAllForDownload();
-              }}
-              title="Select figures to download"
-              disabled={availableForDownloadCount === 0}
-            >
-              <Download size={16} />
-              Download
-            </button>
-          )}
-        </div>
+                {showLabels && (
+                  <span
+                    className={zoomMode === "full" ? "hidden md:inline" : ""}
+                  >
+                    {qid}
+                  </span>
+                )}
+              </div>
+            );
+          });
+      })()}
+
+      {/* MUX labels - centered in each MUX group */}
+      {hasMux && showMuxBoundaries && showLabels && (
+        <>
+          {Array.from({
+            length: Math.pow(Math.ceil(displayGridSize / muxSize), 2),
+          }).map((_, idx) => {
+            const numMuxCols = Math.ceil(displayGridSize / muxSize);
+            const muxLocalRow = Math.floor(idx / numMuxCols);
+            const muxLocalCol = idx % numMuxCols;
+
+            const muxActualRow =
+              Math.floor(displayGridStart.row / muxSize) + muxLocalRow;
+            const muxActualCol =
+              Math.floor(displayGridStart.col / muxSize) + muxLocalCol;
+            const muxIndex =
+              muxActualRow * Math.floor(effectiveGridSize / muxSize) +
+              muxActualCol;
+
+            const muxCenterX =
+              (muxLocalCol * muxSize + muxSize / 2) * (displayCellSize + gap) -
+              gap / 2;
+            const muxCenterY =
+              (muxLocalRow * muxSize + muxSize / 2) * (displayCellSize + gap) -
+              gap / 2;
+
+            return (
+              <div
+                key={`mux-label-${idx}`}
+                className={`absolute z-10 pointer-events-none ${
+                  zoomMode === "full" ? "hidden md:flex" : "flex"
+                }`}
+                style={{
+                  top: muxCenterY,
+                  left: muxCenterX,
+                  transform: "translate(-50%, -50%)",
+                }}
+              >
+                <div className="text-[0.45rem] md:text-[0.6rem] font-semibold text-base-content/30 bg-base-100/60 px-1 py-px rounded border border-base-content/5">
+                  MUX{muxIndex}
+                </div>
+              </div>
+            );
+          })}
+        </>
       )}
 
+      {/* Coupling overlays */}
+      {Object.entries(normalizedResultMap)
+        .filter(([normKey]) => {
+          const [qid1, qid2] = normKey.split("-").map(Number);
+          return isCouplingInRegion(qid1, qid2);
+        })
+        .map(([normKey, taskList]) => {
+          const [qid1, qid2] = normKey.split("-").map(Number);
+          const task = taskList[0];
+          const figurePath = Array.isArray(task.figure_path)
+            ? task.figure_path[0]
+            : task.figure_path || null;
+          const pos1 = getQubitPosition(qid1);
+          const pos2 = getQubitPosition(qid2);
+          const row1 = pos1.row;
+          const col1 = pos1.col;
+          const row2 = pos2.row;
+          const col2 = pos2.col;
+
+          const displayRow1 = row1 - displayGridStart.row;
+          const displayCol1 = col1 - displayGridStart.col;
+          const displayRow2 = row2 - displayGridStart.row;
+          const displayCol2 = col2 - displayGridStart.col;
+          const centerX =
+            ((displayCol1 + displayCol2) / 2) * (displayCellSize + gap) +
+            displayCellSize / 2;
+          const centerY =
+            ((displayRow1 + displayRow2) / 2) * (displayCellSize + gap) +
+            displayCellSize / 2;
+
+          const isSelectedForDownload = selectedForDownload.has(
+            task.couplingId,
+          );
+          const canBeDownloaded = hasJsonFigures(task.couplingId);
+
+          return (
+            <button
+              key={normKey}
+              onClick={() => {
+                if (downloadSelectionEnabled) {
+                  if (canBeDownloaded) {
+                    toggleDownloadSelection(task.couplingId);
+                  }
+                } else {
+                  setSelectedTaskInfo({
+                    couplingId: task.couplingId,
+                    taskName: selectedTask,
+                  });
+                }
+              }}
+              style={{
+                position: "absolute",
+                top: centerY,
+                left: centerX,
+                width: displayCellSize * 0.6,
+                height: displayCellSize * 0.6,
+              }}
+              className={`rounded-xl bg-white shadow-md border border-base-300/60 overflow-hidden transition-all duration-200 hover:shadow-xl hover:scale-105 hover:border-primary/40 -translate-x-1/2 -translate-y-1/2 ${
+                downloadSelectionEnabled && isSelectedForDownload
+                  ? "ring-2 ring-primary ring-offset-2"
+                  : ""
+              } ${
+                downloadSelectionEnabled && !canBeDownloaded
+                  ? "opacity-40 cursor-not-allowed"
+                  : ""
+              }`}
+            >
+              {figurePath && (
+                <div className="absolute inset-1">
+                  <TaskFigure
+                    path={figurePath}
+                    qid={String(task.couplingId)}
+                    className="w-full h-full object-contain"
+                  />
+                </div>
+              )}
+              {/* Download selection overlay */}
+              {downloadSelectionEnabled && canBeDownloaded && (
+                <div
+                  className={`absolute inset-0 flex items-center justify-center transition-colors ${
+                    isSelectedForDownload
+                      ? "bg-primary/20"
+                      : "bg-transparent hover:bg-base-content/10"
+                  }`}
+                >
+                  {isSelectedForDownload && (
+                    <div className="bg-primary text-primary-content rounded-full p-1">
+                      <Check size={16} />
+                    </div>
+                  )}
+                </div>
+              )}
+            </button>
+          );
+        })}
+
+      {/* Region selection overlay - only for square grids */}
+      {zoomMode === "full" &&
+        regionSelectionEnabled &&
+        isSquareGrid &&
+        viewMode === "region" && (
+          <>
+            {Array.from({ length: numRegions * numRegions }).map((_, index) => {
+              const regionRow = Math.floor(index / numRegions);
+              const regionCol = index % numRegions;
+              const isHovered =
+                hoveredRegion?.row === regionRow &&
+                hoveredRegion?.col === regionCol;
+
+              const regionX = regionCol * regionSize * (displayCellSize + gap);
+              const regionY = regionRow * regionSize * (displayCellSize + gap);
+              const regionWidth = regionSize * (displayCellSize + gap) - gap;
+              const regionHeight = regionSize * (displayCellSize + gap) - gap;
+
+              return (
+                <button
+                  key={index}
+                  className={`absolute transition-colors duration-200 rounded-lg flex items-center justify-center z-20 ${
+                    isHovered
+                      ? "bg-primary/30 border-2 border-primary shadow-lg"
+                      : "bg-primary/5 border-2 border-primary/20 hover:border-primary/40 hover:bg-primary/10"
+                  }`}
+                  style={{
+                    top: regionY,
+                    left: regionX,
+                    width: regionWidth,
+                    height: regionHeight,
+                  }}
+                  onMouseEnter={() =>
+                    setHoveredRegion({ row: regionRow, col: regionCol })
+                  }
+                  onMouseLeave={() => setHoveredRegion(null)}
+                  onClick={() => {
+                    setSelectedRegion({
+                      row: regionRow,
+                      col: regionCol,
+                    });
+                    setZoomMode("region");
+                  }}
+                  title={`Zoom to region (${regionRow + 1}, ${regionCol + 1})`}
+                >
+                  <span className="text-xs font-bold text-white bg-black/50 px-2 py-1 rounded">
+                    {regionRow},{regionCol}
+                  </span>
+                </button>
+              );
+            })}
+          </>
+        )}
+    </div>
+  );
+
+  return (
+    <div className="flex flex-col h-full space-y-2">
+      {/* View mode toggle and Download controls */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <div className="tabs tabs-boxed bg-base-200 w-fit">
+            <button
+              className={`tab gap-2 ${viewMode === "pan-zoom" ? "tab-active" : ""}`}
+              onClick={() => {
+                setViewMode("pan-zoom");
+                setZoomMode("full");
+                setSelectedRegion(null);
+                setRegionSelectionEnabled(false);
+              }}
+            >
+              <Move className="h-4 w-4" />
+              <span className="hidden sm:inline">DOM</span>
+            </button>
+            {isSquareGrid && (
+              <button
+                className={`tab gap-2 ${viewMode === "region" ? "tab-active" : ""}`}
+                onClick={() => setViewMode("region")}
+              >
+                <Maximize2 className="h-4 w-4" />
+                <span className="hidden sm:inline">Region</span>
+              </button>
+            )}
+          </div>
+
+          {viewMode === "region" &&
+            zoomMode === "full" &&
+            isSquareGrid &&
+            !downloadSelectionEnabled && (
+              <RegionZoomToggle
+                enabled={regionSelectionEnabled}
+                onToggle={setRegionSelectionEnabled}
+              />
+            )}
+        </div>
+
+        {/* Download selection controls */}
+        {zoomMode === "full" && (
+          <>
+            {downloadSelectionEnabled ? (
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-base-content/70">
+                  {selectedForDownload.size} / {availableForDownloadCount}{" "}
+                  selected
+                </span>
+                <button
+                  className="btn btn-xs btn-ghost"
+                  onClick={selectAllForDownload}
+                  title="Select all"
+                >
+                  All
+                </button>
+                <button
+                  className="btn btn-xs btn-ghost"
+                  onClick={clearDownloadSelection}
+                  title="Clear selection"
+                >
+                  Clear
+                </button>
+                <button
+                  className="btn btn-sm btn-primary gap-1"
+                  onClick={handleDownload}
+                  disabled={selectedForDownload.size === 0 || isDownloading}
+                >
+                  {isDownloading ? (
+                    <span className="loading loading-spinner loading-xs" />
+                  ) : (
+                    <Download size={16} />
+                  )}
+                  Download
+                </button>
+                <button
+                  className="btn btn-sm btn-ghost btn-circle"
+                  onClick={() => {
+                    setDownloadSelectionEnabled(false);
+                    setSelectedForDownload(new Set());
+                  }}
+                  title="Cancel"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            ) : (
+              <button
+                className="btn btn-sm btn-outline gap-2"
+                onClick={() => {
+                  setDownloadSelectionEnabled(true);
+                  setRegionSelectionEnabled(false);
+                  selectAllForDownload();
+                }}
+                title="Select figures to download"
+                disabled={availableForDownloadCount === 0}
+              >
+                <Download size={16} />
+                Download
+              </button>
+            )}
+          </>
+        )}
+      </div>
+
       {/* Back button when in region mode */}
-      {zoomMode === "region" && selectedRegion && (
-        <div className="flex items-center gap-4 px-4">
+      {viewMode === "region" && zoomMode === "region" && selectedRegion && (
+        <div className="flex items-center gap-4">
           <button
             onClick={() => {
               setZoomMode("full");
@@ -368,284 +735,43 @@ export function CouplingGrid({
         </div>
       )}
 
-      {/* Grid Container - scrollable for non-square or large grids */}
-      <div className="relative overflow-x-auto p-1 md:p-4 flex justify-center">
-        <div
-          className="relative flex-shrink-0 mx-auto"
-          style={{
-            width: calculateGridDimension(
-              zoomMode === "region" ? displayGridSize : gridCols,
-              displayCellSize,
-              isMobile,
-            ),
-            height: calculateGridDimension(
-              zoomMode === "region" ? displayGridSize : gridRows,
-              displayCellSize,
-              isMobile,
-            ),
-            maxWidth: "100%",
-          }}
-        >
-          {/* Qubit positions - either from topology or computed, with MUX styling */}
-          {(() => {
-            // Get all qubit IDs to render
-            const qubitIds = topologyQubits
-              ? Object.keys(topologyQubits).map(Number)
-              : Array.from({ length: gridRows * gridCols }, (_, i) => i);
-
-            return qubitIds
-              .filter((qid) => isQubitInRegion(qid))
-              .map((qid) => {
-                const pos = getQubitPosition(qid);
-                const row = pos.row;
-                const col = pos.col;
-
-                // Adjust position for region mode
-                const displayRow = row - displayGridStart.row;
-                const displayCol = col - displayGridStart.col;
-                const x = displayCol * (displayCellSize + gap);
-                const y = displayRow * (displayCellSize + gap);
-
-                // Calculate MUX index for this cell (using actual position, not display position)
-                const muxRow = Math.floor(row / muxSize);
-                const muxCol = Math.floor(col / muxSize);
-                const isEvenMux = (muxRow + muxCol) % 2 === 0;
-
-                // MUX styling class
-                const muxBgClass =
-                  hasMux && showMuxBoundaries
-                    ? isEvenMux
-                      ? "ring-2 ring-inset ring-primary/20"
-                      : "ring-2 ring-inset ring-secondary/20"
-                    : "";
-
-                return (
-                  <div
-                    key={qid}
-                    className={`absolute bg-base-300/30 rounded-lg flex items-center justify-center text-sm text-base-content/30 ${muxBgClass}`}
-                    style={{
-                      top: y,
-                      left: x,
-                      width: displayCellSize,
-                      height: displayCellSize,
-                    }}
-                  >
-                    {/* QID - hidden on mobile in full view */}
-                    <span
-                      className={zoomMode === "full" ? "hidden md:inline" : ""}
-                    >
-                      {qid}
-                    </span>
-                  </div>
-                );
-              });
-          })()}
-
-          {/* MUX labels - centered in each MUX group */}
-          {hasMux && showMuxBoundaries && (
-            <>
-              {Array.from({
-                length: Math.pow(Math.ceil(displayGridSize / muxSize), 2),
-              }).map((_, idx) => {
-                const numMuxCols = Math.ceil(displayGridSize / muxSize);
-                const muxLocalRow = Math.floor(idx / numMuxCols);
-                const muxLocalCol = idx % numMuxCols;
-
-                // Calculate actual MUX position considering zoom offset
-                const muxActualRow =
-                  Math.floor(displayGridStart.row / muxSize) + muxLocalRow;
-                const muxActualCol =
-                  Math.floor(displayGridStart.col / muxSize) + muxLocalCol;
-                const muxIndex =
-                  muxActualRow * Math.floor(gridSize / muxSize) + muxActualCol;
-
-                // Calculate center position of MUX group
-                const muxCenterX =
-                  (muxLocalCol * muxSize + muxSize / 2) *
-                    (displayCellSize + gap) -
-                  gap / 2;
-                const muxCenterY =
-                  (muxLocalRow * muxSize + muxSize / 2) *
-                    (displayCellSize + gap) -
-                  gap / 2;
-
-                return (
-                  <div
-                    key={`mux-label-${idx}`}
-                    className={`absolute z-10 pointer-events-none ${
-                      zoomMode === "full" ? "hidden md:flex" : "flex"
-                    }`}
-                    style={{
-                      top: muxCenterY,
-                      left: muxCenterX,
-                      transform: "translate(-50%, -50%)",
-                    }}
-                  >
-                    <div className="text-[0.5rem] md:text-xs font-bold text-base-content/60 bg-base-100/90 backdrop-blur-sm px-1.5 py-0.5 rounded shadow-sm border border-base-content/10">
-                      MUX{muxIndex}
-                    </div>
-                  </div>
-                );
-              })}
-            </>
-          )}
-
-          {Object.entries(normalizedResultMap)
-            .filter(([normKey]) => {
-              const [qid1, qid2] = normKey.split("-").map(Number);
-              return isCouplingInRegion(qid1, qid2);
-            })
-            .map(([normKey, taskList]) => {
-              const [qid1, qid2] = normKey.split("-").map(Number);
-              const task = taskList[0];
-              const figurePath = Array.isArray(task.figure_path)
-                ? task.figure_path[0]
-                : task.figure_path || null;
-              // Use explicit positions from topology
-              const pos1 = getQubitPosition(qid1);
-              const pos2 = getQubitPosition(qid2);
-              const row1 = pos1.row;
-              const col1 = pos1.col;
-              const row2 = pos2.row;
-              const col2 = pos2.col;
-
-              // Adjust position for region mode
-              const displayRow1 = row1 - displayGridStart.row;
-              const displayCol1 = col1 - displayGridStart.col;
-              const displayRow2 = row2 - displayGridStart.row;
-              const displayCol2 = col2 - displayGridStart.col;
-              const centerX =
-                ((displayCol1 + displayCol2) / 2) * (displayCellSize + gap) +
-                displayCellSize / 2;
-              const centerY =
-                ((displayRow1 + displayRow2) / 2) * (displayCellSize + gap) +
-                displayCellSize / 2;
-
-              const isSelectedForDownload = selectedForDownload.has(
-                task.couplingId,
-              );
-              const canBeDownloaded = hasJsonFigures(task.couplingId);
-
-              return (
-                <button
-                  key={normKey}
-                  onClick={() => {
-                    if (downloadSelectionEnabled) {
-                      if (canBeDownloaded) {
-                        toggleDownloadSelection(task.couplingId);
-                      }
-                    } else {
-                      setSelectedTaskInfo({
-                        couplingId: task.couplingId,
-                        taskName: selectedTask,
-                      });
-                    }
-                  }}
-                  style={{
-                    position: "absolute",
-                    top: centerY,
-                    left: centerX,
-                    width: displayCellSize * 0.6,
-                    height: displayCellSize * 0.6,
-                  }}
-                  className={`rounded-xl bg-white shadow-md border border-base-300/60 overflow-hidden transition-all duration-200 hover:shadow-xl hover:scale-105 hover:border-primary/40 -translate-x-1/2 -translate-y-1/2 ${
-                    downloadSelectionEnabled && isSelectedForDownload
-                      ? "ring-2 ring-primary ring-offset-2"
-                      : ""
-                  } ${
-                    downloadSelectionEnabled && !canBeDownloaded
-                      ? "opacity-40 cursor-not-allowed"
-                      : ""
-                  }`}
-                >
-                  {figurePath && (
-                    <div className="absolute inset-1">
-                      <TaskFigure
-                        path={figurePath}
-                        qid={String(task.couplingId)}
-                        className="w-full h-full object-contain"
-                      />
-                    </div>
-                  )}
-                  {/* Download selection overlay */}
-                  {downloadSelectionEnabled && canBeDownloaded && (
-                    <div
-                      className={`absolute inset-0 flex items-center justify-center transition-colors ${
-                        isSelectedForDownload
-                          ? "bg-primary/20"
-                          : "bg-transparent hover:bg-base-content/10"
-                      }`}
-                    >
-                      {isSelectedForDownload && (
-                        <div className="bg-primary text-primary-content rounded-full p-1">
-                          <Check size={16} />
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </button>
-              );
-            })}
-
-          {/* Region selection overlay - only when enabled and in full view mode (square grids only) */}
-          {zoomMode === "full" &&
-            regionSelectionEnabled &&
-            gridRows === gridCols && (
-              <>
-                {Array.from({ length: numRegions * numRegions }).map(
-                  (_, index) => {
-                    const regionRow = Math.floor(index / numRegions);
-                    const regionCol = index % numRegions;
-                    const isHovered =
-                      hoveredRegion?.row === regionRow &&
-                      hoveredRegion?.col === regionCol;
-
-                    const regionX =
-                      regionCol * regionSize * (displayCellSize + gap);
-                    const regionY =
-                      regionRow * regionSize * (displayCellSize + gap);
-                    const regionWidth =
-                      regionSize * (displayCellSize + gap) - gap;
-                    const regionHeight =
-                      regionSize * (displayCellSize + gap) - gap;
-
-                    return (
-                      <button
-                        key={index}
-                        className={`absolute transition-colors duration-200 rounded-lg flex items-center justify-center z-20 ${
-                          isHovered
-                            ? "bg-primary/30 border-2 border-primary shadow-lg"
-                            : "bg-primary/5 border-2 border-primary/20 hover:border-primary/40 hover:bg-primary/10"
-                        }`}
-                        style={{
-                          top: regionY,
-                          left: regionX,
-                          width: regionWidth,
-                          height: regionHeight,
-                        }}
-                        onMouseEnter={() =>
-                          setHoveredRegion({ row: regionRow, col: regionCol })
-                        }
-                        onMouseLeave={() => setHoveredRegion(null)}
-                        onClick={() => {
-                          setSelectedRegion({
-                            row: regionRow,
-                            col: regionCol,
-                          });
-                          setZoomMode("region");
-                        }}
-                        title={`Zoom to region (${regionRow + 1}, ${regionCol + 1})`}
-                      >
-                        <span className="text-xs font-bold text-white bg-black/50 px-2 py-1 rounded">
-                          {regionRow},{regionCol}
-                        </span>
-                      </button>
-                    );
-                  },
-                )}
-              </>
-            )}
-        </div>
+      {/* Grid display */}
+      <div
+        className={`flex-1 relative overflow-hidden flex justify-center ${
+          viewMode === "pan-zoom"
+            ? "bg-base-200/30 border-2 border-dashed border-base-300 rounded-lg"
+            : ""
+        }`}
+        style={{ padding: `${Math.max(4, padding / 4)}px` }}
+        ref={containerRef}
+      >
+        {viewMode === "pan-zoom" ? (
+          <TransformWrapper
+            initialScale={1}
+            minScale={0.3}
+            maxScale={4}
+            wheel={{ step: 0.08, smoothStep: 0.004 }}
+            pinch={{ step: 5 }}
+            doubleClick={{ mode: "zoomIn", step: 0.7 }}
+            panning={{ velocityDisabled: false }}
+            smooth={true}
+            onTransformed={handleTransform}
+          >
+            <ZoomControls />
+            <TransformComponent
+              wrapperStyle={{ width: "100%", height: "100%" }}
+              contentStyle={{
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
+              }}
+            >
+              {gridContent}
+            </TransformComponent>
+          </TransformWrapper>
+        ) : (
+          gridContent
+        )}
       </div>
 
       <CouplingTaskHistoryModal
