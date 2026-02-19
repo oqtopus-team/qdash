@@ -388,8 +388,8 @@ _CATEGORIES: list[tuple[str, str, list[str]]] = [
         ],
     ),
     (
-        "CW Spectroscopy",
-        "cw-spectroscopy",
+        "CW Characterization",
+        "cw-characterization",
         [
             "CheckResonatorFrequencies",
             "CheckResonatorSpectroscopy",
@@ -401,8 +401,8 @@ _CATEGORIES: list[tuple[str, str, list[str]]] = [
         ],
     ),
     (
-        "One-Qubit Calibration",
-        "one-qubit-calibration",
+        "TD Characterization",
+        "td-characterization",
         [
             "CheckQubit",
             "CheckQubitFrequency",
@@ -414,11 +414,12 @@ _CATEGORIES: list[tuple[str, str, list[str]]] = [
             "CheckDispersiveShift",
             "CheckOptimalReadoutAmplitude",
             "ReadoutClassification",
+            "ChevronPattern",
         ],
     ),
     (
-        "Gate Calibration",
-        "gate-calibration",
+        "One-Qubit Gate Calibration",
+        "one-qubit-gate-calibration",
         [
             "CheckPIPulse",
             "CheckHPIPulse",
@@ -431,11 +432,10 @@ _CATEGORIES: list[tuple[str, str, list[str]]] = [
         ],
     ),
     (
-        "Two-Qubit Calibration",
-        "two-qubit-calibration",
+        "Two-Qubit Gate Calibration",
+        "two-qubit-gate-calibration",
         [
             "CheckCrossResonance",
-            "ChevronPattern",
             "CheckZX90",
             "CreateZX90",
             "CheckBellState",

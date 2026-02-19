@@ -40,7 +40,7 @@ Population histogram showing ~50/50 |00⟩/|11⟩ with minimal |01⟩/|10⟩.
 - y_axis: Population probability
 - good_visual: two tall bars at |00⟩ and |11⟩ (~0.5 each), negligible |01⟩ and |10⟩ bars
 
-![Bell state measurement](./0.png)
+![Bell state measurement](./check_bell_state_expected.png)
 
 ## Evaluation criteria
 

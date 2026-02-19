@@ -3,7 +3,7 @@
     "name": "RandomizedBenchmarking",
     "summary": "Measures average gate error rate via randomized benchmarking (RB).",
     "what_it_measures": "Average error per Clifford gate (EPC) – gate-set-level fidelity metric.",
-    "physical_principle": "Apply random Clifford gate sequences of increasing length with inversion gate; measure survival probability. Exponential decay rate gives average gate error.",
+    "physical_principle": "Apply random Clifford gate sequences of increasing length with inversion gate; measure survival probability. Exponential decay rate gives average gate error.\n\n```mermaid\ngantt\n    title RandomizedBenchmarking Pulse Sequence\n    dateFormat x\n    axisFormat \" \"\n\n    section Drive\n    C₁       :d1, 0, 20ms\n    C₂       :d2, after d1, 20ms\n    C₃       :d3, after d2, 20ms\n    ···      :done, d4, after d3, 15ms\n    Cₘ       :d5, after d4, 20ms\n    C_inv    :active, d6, after d5, 20ms\n\n    section Readout\n    Measurement :crit, r1, after d6, 50ms\n```",
     "expected_result": {
       "description": "Survival probability decays exponentially with sequence length; intercept ~0.5.",
       "result_type": "decay_curve",
@@ -72,7 +72,7 @@
     "images": [
       {
         "alt_text": "Randomized benchmarking decay",
-        "relative_path": "./0.png",
+        "relative_path": "./randomized_benchmarking_expected.png",
         "section": "expected result"
       }
     ],
@@ -88,7 +88,7 @@
     "name": "X180InterleavedRandomizedBenchmarking",
     "summary": "Measures X180 (π) gate-specific error rate via interleaved randomized benchmarking.",
     "what_it_measures": "Error per X180 gate isolated from average Clifford error.",
-    "physical_principle": "Same interleaved RB protocol as X90 IRB but with X180 gate interleaved.",
+    "physical_principle": "Same interleaved RB protocol as X90 IRB but with X180 gate interleaved.\n\n```mermaid\ngantt\n    title X180 Interleaved RB Pulse Sequence\n    dateFormat x\n    axisFormat \" \"\n\n    section Drive\n    C₁       :d1, 0, 20ms\n    X180     :active, x1, after d1, 15ms\n    C₂       :d2, after x1, 20ms\n    X180     :active, x2, after d2, 15ms\n    ···      :done, d3, after x2, 10ms\n    Cₘ       :d4, after d3, 20ms\n    X180     :active, x3, after d4, 15ms\n    C_inv    :d5, after x3, 20ms\n\n    section Readout\n    Measurement :crit, r1, after d5, 50ms\n```",
     "expected_result": {
       "description": "Two exponential decays; interleaved decays faster proportional to X180 error.",
       "result_type": "decay_curve",
@@ -167,7 +167,7 @@
     "name": "X90InterleavedRandomizedBenchmarking",
     "summary": "Measures X90 (π/2) gate-specific error rate via interleaved randomized benchmarking.",
     "what_it_measures": "Error per X90 gate by interleaving it between random Cliffords.",
-    "physical_principle": "Run standard RB and interleaved RB (with X90 between each Clifford); ratio of decay rates gives gate-specific error.",
+    "physical_principle": "Run standard RB and interleaved RB (with X90 between each Clifford); ratio of decay rates gives gate-specific error.\n\n```mermaid\ngantt\n    title X90 Interleaved RB Pulse Sequence\n    dateFormat x\n    axisFormat \" \"\n\n    section Drive\n    C₁       :d1, 0, 20ms\n    X90      :active, x1, after d1, 15ms\n    C₂       :d2, after x1, 20ms\n    X90      :active, x2, after d2, 15ms\n    ···      :done, d3, after x2, 10ms\n    Cₘ       :d4, after d3, 20ms\n    X90      :active, x3, after d4, 15ms\n    C_inv    :d5, after x3, 20ms\n\n    section Readout\n    Measurement :crit, r1, after d5, 50ms\n```",
     "expected_result": {
       "description": "Two exponential decays; interleaved decays faster than reference.",
       "result_type": "decay_curve",
@@ -236,7 +236,7 @@
     "images": [
       {
         "alt_text": "X90 interleaved randomized benchmarking",
-        "relative_path": "./0.png",
+        "relative_path": "./x90_interleaved_randomized_benchmarking_expected.png",
         "section": "expected result"
       }
     ],
@@ -252,7 +252,7 @@
     "name": "ZX90InterleavedRandomizedBenchmarking",
     "summary": "Measures ZX90 two-qubit gate error rate via interleaved randomized benchmarking.",
     "what_it_measures": "Error per ZX90 gate isolated via two-qubit interleaved RB.",
-    "physical_principle": "Two-qubit RB with ZX90 interleaved between random two-qubit Cliffords.",
+    "physical_principle": "Two-qubit RB with ZX90 interleaved between random two-qubit Cliffords.\n\n```mermaid\ngantt\n    title ZX90 Interleaved RB Pulse Sequence\n    dateFormat x\n    axisFormat \" \"\n\n    section Control\n    C₁       :d1, 0, 20ms\n    ZX90     :active, z1, after d1, 25ms\n    C₂       :d2, after z1, 20ms\n    ZX90     :active, z2, after d2, 25ms\n    ···      :done, d3, after z2, 10ms\n    C_inv    :d4, after d3, 20ms\n    Readout  :crit, r1, after d4, 50ms\n\n    section Target\n    C₁       :t1, 0, 20ms\n    ZX90     :active, tz1, after t1, 25ms\n    C₂       :t2, after tz1, 20ms\n    ZX90     :active, tz2, after t2, 25ms\n    ···      :done, t3, after tz2, 10ms\n    C_inv    :t4, after t3, 20ms\n    Readout  :crit, r2, after t4, 50ms\n```",
     "expected_result": {
       "description": "Two-qubit survival probability decays; interleaved faster than reference.",
       "result_type": "decay_curve",
@@ -1242,7 +1242,7 @@
     "name": "CheckDRAGHPIPulse",
     "summary": "Validates DRAG-corrected π/2 pulse quality for leakage suppression.",
     "what_it_measures": "Gate fidelity of DRAG-corrected X90 pulse.",
-    "physical_principle": "Same DRAG principle as π pulse but for half rotation. Critical for quantum algorithms using superposition states.",
+    "physical_principle": "Same DRAG principle as π pulse but for half rotation. Critical for quantum algorithms using superposition states.\n\n```mermaid\ngantt\n    title CheckDRAGHPIPulse Pulse Sequence\n    dateFormat x\n    axisFormat \" \"\n\n    section Drive (I)\n    DRAG π/2 (1) :d1, 0, 20ms\n    DRAG π/2 (2) :d2, after d1, 20ms\n    DRAG π/2 (3) :d3, after d2, 20ms\n    ···          :done, d4, after d3, 15ms\n    DRAG π/2 (N) :d5, after d4, 20ms\n\n    section Drive (Q)\n    dY/dt (1)    :active, q1, 0, 20ms\n    dY/dt (2)    :active, q2, after q1, 20ms\n    dY/dt (3)    :active, q3, after q2, 20ms\n    ···          :done, q4, after q3, 15ms\n    dY/dt (N)    :active, q5, after q4, 20ms\n\n    section Readout\n    Measurement  :crit, r1, after d5, 50ms\n```",
     "expected_result": {
       "description": "Correct superposition state after single pulse; oscillation under repeated application.",
       "result_type": "oscillation",
@@ -1301,7 +1301,7 @@
     "images": [
       {
         "alt_text": "DRAG HPI pulse error amplification",
-        "relative_path": "./0.png",
+        "relative_path": "./check_drag_hpi_pulse_expected.png",
         "section": "expected result"
       }
     ],
@@ -1317,7 +1317,7 @@
     "name": "CheckDRAGPIPulse",
     "summary": "Validates DRAG-corrected π pulse quality to suppress leakage to |2⟩.",
     "what_it_measures": "Gate fidelity of DRAG-corrected X180 pulse.",
-    "physical_principle": "DRAG adds a derivative quadrature component to suppress leakage during fast gates. Validate by repeated pulse application.",
+    "physical_principle": "DRAG adds a derivative quadrature component to suppress leakage during fast gates. Validate by repeated pulse application.\n\n```mermaid\ngantt\n    title CheckDRAGPIPulse Pulse Sequence\n    dateFormat x\n    axisFormat \" \"\n\n    section Drive (I)\n    DRAG π (1)  :d1, 0, 20ms\n    DRAG π (2)  :d2, after d1, 20ms\n    DRAG π (3)  :d3, after d2, 20ms\n    ···         :done, d4, after d3, 15ms\n    DRAG π (N)  :d5, after d4, 20ms\n\n    section Drive (Q)\n    dY/dt (1)   :active, q1, 0, 20ms\n    dY/dt (2)   :active, q2, after q1, 20ms\n    dY/dt (3)   :active, q3, after q2, 20ms\n    ···         :done, q4, after q3, 15ms\n    dY/dt (N)   :active, q5, after q4, 20ms\n\n    section Readout\n    Measurement :crit, r1, after d5, 50ms\n```",
     "expected_result": {
       "description": "Population oscillation with high contrast under repeated DRAG π pulses.",
       "result_type": "oscillation",
@@ -1376,7 +1376,7 @@
     "images": [
       {
         "alt_text": "DRAG PI pulse error amplification",
-        "relative_path": "./0.png",
+        "relative_path": "./check_drag_hpi_pulse_expected.png",
         "section": "expected result"
       }
     ],
@@ -1392,7 +1392,7 @@
     "name": "CheckHPIPulse",
     "summary": "Validates π/2 pulse quality by repeated application and population measurement.",
     "what_it_measures": "π/2 pulse fidelity – accumulated rotation error over multiple applications.",
-    "physical_principle": "Apply the calibrated π/2 pulse repeatedly; population should cycle through superposition states. Deviation indicates rotation or phase error.",
+    "physical_principle": "Apply the calibrated π/2 pulse repeatedly; population should cycle through superposition states. Deviation indicates rotation or phase error.\n\n```mermaid\ngantt\n    title CheckHPIPulse Pulse Sequence\n    dateFormat x\n    axisFormat \" \"\n\n    section Drive\n    π/2 (1)     :d1, 0, 20ms\n    π/2 (2)     :d2, after d1, 20ms\n    π/2 (3)     :d3, after d2, 20ms\n    ···         :done, d4, after d3, 15ms\n    π/2 (N)     :d5, after d4, 20ms\n\n    section Readout\n    Measurement :crit, r1, after d5, 50ms\n```",
     "expected_result": {
       "description": "Population oscillation with period 4 (four π/2 pulses = full rotation); contrast decay reveals error.",
       "result_type": "oscillation",
@@ -1451,7 +1451,7 @@
     "images": [
       {
         "alt_text": "HPI pulse error amplification",
-        "relative_path": "./0.png",
+        "relative_path": "./check_hpi_pulse_expected.png",
         "section": "expected result"
       }
     ],
@@ -1467,7 +1467,7 @@
     "name": "CheckPIPulse",
     "summary": "Validates π pulse quality by repeated application and population measurement.",
     "what_it_measures": "π pulse fidelity – accumulated error over multiple applications.",
-    "physical_principle": "Apply the calibrated π pulse repeatedly N times; odd repetitions should give |1⟩, even should give |0⟩. Deviation indicates rotation error.",
+    "physical_principle": "Apply the calibrated π pulse repeatedly N times; odd repetitions should give |1⟩, even should give |0⟩. Deviation indicates rotation error.\n\n```mermaid\ngantt\n    title CheckPIPulse Pulse Sequence\n    dateFormat x\n    axisFormat \" \"\n\n    section Drive\n    π (1)       :d1, 0, 20ms\n    π (2)       :d2, after d1, 20ms\n    π (3)       :d3, after d2, 20ms\n    ···         :done, d4, after d3, 15ms\n    π (N)       :d5, after d4, 20ms\n\n    section Readout\n    Measurement :crit, r1, after d5, 50ms\n```",
     "expected_result": {
       "description": "Population oscillation between 0 and 1 across repetitions; contrast decay reveals error accumulation.",
       "result_type": "oscillation",
@@ -1527,7 +1527,7 @@
     "images": [
       {
         "alt_text": "PI pulse error amplification",
-        "relative_path": "./0.png",
+        "relative_path": "./check_pi_pulse_expected.png",
         "section": "expected result"
       }
     ],
@@ -1543,7 +1543,7 @@
     "name": "CreateDRAGHPIPulse",
     "summary": "Calibrates DRAG beta and amplitude for leakage-suppressed π/2 pulse.",
     "what_it_measures": "Optimal DRAG derivative coefficient for X90 gate.",
-    "physical_principle": "Same as CreateDRAGPIPulse but for half-rotation; may share beta but needs independent amplitude calibration.",
+    "physical_principle": "Same as CreateDRAGPIPulse but for half-rotation; may share beta but needs independent amplitude calibration.\n\n```mermaid\ngantt\n    title CreateDRAGHPIPulse Pulse Sequence (n_rotations=4, n_iterations=2)\n    dateFormat x\n    axisFormat \" \"\n\n    section Drive (I)\n    π/2 (1) :d1, 0, 15ms\n    π/2 (2) :d2, after d1, 15ms\n    π/2 (3) :d3, after d2, 15ms\n    π/2 (4) :d4, after d3, 15ms\n\n    section Drive (Q)\n    dY/dt (sweep β) :active, q1, 0, 15ms\n    dY/dt           :active, q2, after q1, 15ms\n    dY/dt           :active, q3, after q2, 15ms\n    dY/dt           :active, q4, after q3, 15ms\n\n    section Readout\n    Measurement     :crit, r1, after d4, 40ms\n```",
     "expected_result": {
       "description": "Leakage vs beta minimum; amplitude tuned for exact π/2 rotation.",
       "result_type": "peak_curve",
@@ -1615,7 +1615,7 @@
     "images": [
       {
         "alt_text": "DRAG HPI pulse calibration",
-        "relative_path": "./0.png",
+        "relative_path": "./create_drag_hpi_pulse_expected.png",
         "section": "expected result"
       }
     ],
@@ -1631,7 +1631,7 @@
     "name": "CreateDRAGPIPulse",
     "summary": "Calibrates DRAG beta and amplitude for leakage-suppressed π pulse.",
     "what_it_measures": "Optimal DRAG derivative coefficient (beta) for X180 gate.",
-    "physical_principle": "Scan DRAG beta parameter while monitoring leakage to |2⟩; find the minimum leakage point. Amplitude scan refines the rotation angle.",
+    "physical_principle": "Scan DRAG beta parameter while monitoring leakage to |2⟩; find the minimum leakage point. Amplitude scan refines the rotation angle.\n\n```mermaid\ngantt\n    title CreateDRAGPIPulse Pulse Sequence (n_rotations=4, n_iterations=2)\n    dateFormat x\n    axisFormat \" \"\n\n    section Drive (I)\n    π (1)   :d1, 0, 15ms\n    π (2)   :d2, after d1, 15ms\n    π (3)   :d3, after d2, 15ms\n    π (4)   :d4, after d3, 15ms\n\n    section Drive (Q)\n    dY/dt (sweep β) :active, q1, 0, 15ms\n    dY/dt           :active, q2, after q1, 15ms\n    dY/dt           :active, q3, after q2, 15ms\n    dY/dt           :active, q4, after q3, 15ms\n\n    section Readout\n    Measurement     :crit, r1, after d4, 40ms\n```",
     "expected_result": {
       "description": "Leakage vs beta shows a minimum; amplitude scan gives exact π rotation.",
       "result_type": "peak_curve",
@@ -1703,7 +1703,7 @@
     "images": [
       {
         "alt_text": "DRAG PI pulse calibration",
-        "relative_path": "./0.png",
+        "relative_path": "./create_drag_pi_pulse_expected.png",
         "section": "expected result"
       }
     ],
@@ -1719,14 +1719,14 @@
     "name": "CreateHPIPulse",
     "summary": "Calibrates π/2 (X90) gate pulse amplitude via Rabi-based fitting.",
     "what_it_measures": "Optimal pulse amplitude for a half-π rotation (|0⟩ → superposition).",
-    "physical_principle": "Same Rabi-based calibration as CreatePIPulse but targeting the π/2 rotation point – the first point where population reaches 0.5.",
+    "physical_principle": "Same Rabi-based calibration as CreatePIPulse but targeting the π/2 rotation point – the first point where population reaches 0.5.\n\n```mermaid\ngantt\n    title CreateHPIPulse Pulse Sequence\n    dateFormat x\n    axisFormat \" \"\n\n    section Drive\n    Shaped pulse (sweep amp) :d1, 0, 80ms\n\n    section Readout\n    Measurement              :crit, r1, after d1, 50ms\n```",
     "expected_result": {
-      "description": "Rabi oscillation vs amplitude; π/2 pulse at the quarter-period point.",
+      "description": "Rabi oscillation vs amplitude; π/2 pulse at the quarter-period point.\n\n- fit*model: A \\* cos(π · amp / amp*π) + B (π/2 at half of π amplitude)",
       "result_type": "oscillation",
       "x_axis": "Drive amplitude (a.u.)",
       "y_axis": "P(|1⟩)",
       "z_axis": "",
-      "fit_model": "A * cos(π · amp / amp_π) + B (π/2 at half of π amplitude)",
+      "fit_model": "",
       "typical_range": "",
       "good_visual": "clear oscillation with well-identified π/2 amplitude at the 0.5 population crossing"
     },
@@ -1787,7 +1787,7 @@
     "images": [
       {
         "alt_text": "HPI pulse calibration",
-        "relative_path": "./0.png",
+        "relative_path": "./create_hpi_pulse_expected.png",
         "section": "expected result"
       }
     ],
@@ -1803,7 +1803,7 @@
     "name": "CreatePIPulse",
     "summary": "Calibrates π (X180) gate pulse amplitude via Rabi-based fitting.",
     "what_it_measures": "Optimal pulse amplitude for a full π rotation (|0⟩ → |1⟩).",
-    "physical_principle": "Apply a shaped pulse of fixed duration and sweep amplitude; fit the Rabi oscillation to find the amplitude corresponding to exactly π rotation.",
+    "physical_principle": "Apply a shaped pulse of fixed duration and sweep amplitude; fit the Rabi oscillation to find the amplitude corresponding to exactly π rotation.\n\n```mermaid\ngantt\n    title CreatePIPulse Pulse Sequence\n    dateFormat x\n    axisFormat \" \"\n\n    section Drive\n    Shaped pulse (sweep amp) :d1, 0, 80ms\n\n    section Readout\n    Measurement              :crit, r1, after d1, 50ms\n```",
     "expected_result": {
       "description": "Cosine-like Rabi oscillation vs amplitude; π pulse at the first minimum (population inverted).",
       "result_type": "oscillation",
@@ -1871,10 +1871,81 @@
     "images": [
       {
         "alt_text": "PI pulse calibration",
-        "relative_path": "./0.png",
+        "relative_path": "./create_pi_pulse_expected.png",
         "section": "expected result"
       }
     ],
+    "related_context": [
+      {
+        "type": "history",
+        "params": [],
+        "last_n": 5
+      }
+    ]
+  },
+  "CheckSkew": {
+    "name": "CheckSkew",
+    "summary": "Measures and corrects time skew between multiple control boxes.",
+    "what_it_measures": "Inter-box timing skew – measures the relative timing offsets (clock skew) between different control boxes and applies correction to synchronize their clocks.",
+    "physical_principle": "Clock synchronization: multiple control boxes share a common reference clock, but signal propagation delays and internal clock distribution cause timing offsets between boxes. This task measures the relative timing by sending synchronized pulses and measuring arrival time differences, then applies skew correction to align all boxes to a common time reference.",
+    "expected_result": {
+      "description": "Measured skew values for each box pair, with corrections applied to synchronize timing.",
+      "result_type": "timing_measurement",
+      "x_axis": "Box pairs",
+      "y_axis": "Skew (ns)",
+      "z_axis": "",
+      "fit_model": "",
+      "typical_range": "",
+      "good_visual": "small, well-defined skew values with successful correction applied"
+    },
+    "evaluation_criteria": "Skew values should be measurable and correctable. After correction, residual skew should be within the system's timing resolution.",
+    "check_questions": [
+      "Are skew values measurable for all box pairs?",
+      "Are the measured skew values within a correctable range?",
+      "Are the skew values consistent with previous measurements?"
+    ],
+    "failure_modes": [
+      {
+        "severity": "critical",
+        "description": "Skew measurement fails",
+        "cause": "box not synchronized to reference clock, hardware fault",
+        "visual": "",
+        "next_action": "verify reference clock distribution, check box connectivity"
+      },
+      {
+        "severity": "warning",
+        "description": "Large skew values",
+        "cause": "cable length mismatch, clock distribution issue",
+        "visual": "skew values larger than typical range",
+        "next_action": "check clock distribution hardware and cable routing"
+      },
+      {
+        "severity": "warning",
+        "description": "Inconsistent skew across measurements",
+        "cause": "unstable clock or intermittent connection",
+        "visual": "skew values vary significantly between runs",
+        "next_action": "investigate clock stability, check connectors"
+      }
+    ],
+    "tips": [
+      "Run after LinkUp and before any multi-qubit calibration tasks.",
+      "The muxes parameter selects which MUXes to synchronize; default covers most standard configurations.",
+      "Skew correction is essential for two-qubit gate calibration accuracy.",
+      "Compare skew values across runs to detect clock drift."
+    ],
+    "output_parameters_info": [],
+    "analysis_guide": [
+      "Review estimated skew values for each box.",
+      "Verify skew values are within expected range.",
+      "Check the skew plot for any outliers.",
+      "Confirm correction was applied successfully.",
+      "Compare with previous measurements for drift detection."
+    ],
+    "prerequisites": [
+      "LinkUp",
+      "Configure"
+    ],
+    "images": [],
     "related_context": [
       {
         "type": "history",
@@ -1887,7 +1958,7 @@
     "name": "CheckDispersiveShift",
     "summary": "Measures dispersive shift (χ) between qubit and readout resonator.",
     "what_it_measures": "Dispersive shift (χ) – the frequency shift of the resonator conditioned on the qubit state.",
-    "physical_principle": "Measure resonator spectrum with qubit in |0⟩ and |1⟩; in the dispersive regime the resonator shifts by 2χ, enabling QND readout.",
+    "physical_principle": "Measure resonator spectrum with qubit in |0⟩ and |1⟩; in the dispersive regime the resonator shifts by 2χ, enabling QND readout.\n\n```mermaid\ngantt\n    title CheckDispersiveShift Pulse Sequence\n    dateFormat x\n    axisFormat \" \"\n\n    section Electrical delay\n    Delay measurement       :active, p1, 0, 60ms\n\n    section Meas 1 (|0⟩)\n    idle (|0⟩ prep)         :done, a1, after p1, 20ms\n    Readout (sweep freq)    :crit, a2, after a1, 60ms\n\n    section Meas 2 (|1⟩)\n    π pulse (|1⟩ prep)      :b1, after p1, 20ms\n    Readout (sweep freq)    :crit, b2, after b1, 60ms\n```",
     "expected_result": {
       "description": "Two transmission peaks/dips separated by 2χ; one for each qubit state.",
       "result_type": "peak_curve",
@@ -2197,14 +2268,14 @@
     "name": "CheckRabi",
     "summary": "Measures Rabi oscillation to extract drive amplitude, frequency, and IQ-plane parameters.",
     "what_it_measures": "Rabi oscillation parameters: amplitude, frequency (drive strength), phase, offset, and IQ-plane rotation parameters.",
-    "physical_principle": "Apply a resonant drive pulse of variable duration; the qubit oscillates between |0⟩ and |1⟩ at the Rabi frequency Ω_R. The IQ data is rotated via PCA to align the measurement axis, then fitted with a damped cosine model.",
+    "physical_principle": "Apply a resonant drive pulse of variable duration; the qubit oscillates between |0⟩ and |1⟩ at the Rabi frequency Ω_R. The IQ data is rotated via PCA to align the measurement axis, then fitted with a damped cosine model.\n\n```mermaid\ngantt\n    title CheckRabi Pulse Sequence\n    dateFormat x\n    axisFormat \" \"\n\n    section Drive\n    Drive pulse (sweep t) :d1, 0, 100ms\n\n    section Readout\n    Measurement            :crit, r1, after d1, 50ms\n```",
     "expected_result": {
       "description": "Damped sinusoidal oscillation of the rotated IQ signal vs pulse duration. Frequency gives Ω_R, envelope gives the decay time τ.",
       "result_type": "oscillation",
       "x_axis": "Pulse duration (ns)",
       "y_axis": "Rotated IQ signal (arb. units)",
       "z_axis": "",
-      "fit_model": "A * cos(ω·t + φ) * exp(-t/τ) + B (damped cosine, `is_damped=True` by default)",
+      "fit_model": "A _ cos(ω·t + φ) _ exp(-t/τ) + B (damped cosine, `is_damped=True` by default)",
       "typical_range": "",
       "good_visual": "clear sinusoidal oscillation with high contrast and slow decay envelope"
     },
@@ -2305,8 +2376,13 @@
     ],
     "images": [
       {
-        "alt_text": "Rabi oscillation",
-        "relative_path": "./0.png",
+        "alt_text": "Rabi oscillation 1",
+        "relative_path": "./check_rabi_expected_1.png",
+        "section": "expected result"
+      },
+      {
+        "alt_text": "Rabi oscillation 2",
+        "relative_path": "./check_rabi_expected_2.png",
         "section": "expected result"
       }
     ],
@@ -2320,16 +2396,16 @@
   },
   "CheckRamsey": {
     "name": "CheckRamsey",
-    "summary": "Measures T2* (free-induction) dephasing time and fine-tunes qubit frequency via Ramsey fringes.",
-    "what_it_measures": "T2* dephasing time and residual detuning from the drive frequency.",
-    "physical_principle": "X/2 – free evolution τ – X/2 (or Y/2), then measure. Fringes oscillate at the detuning Δf; envelope decays as exp(-τ/T2*).",
+    "summary": "Measures T2\\* (free-induction) dephasing time and fine-tunes qubit frequency via Ramsey fringes.",
+    "what_it_measures": "T2\\* dephasing time and residual detuning from the drive frequency.",
+    "physical_principle": "X/2 – free evolution τ – X/2 (or Y/2), then measure. Fringes oscillate at the detuning Δf; envelope decays as exp(-τ/T2\\*).\n\n```mermaid\ngantt\n    title CheckRamsey Pulse Sequence (X and Y axes)\n    dateFormat x\n    axisFormat \" \"\n\n    section X-axis\n    X/2 pulse       :d1, 0, 15ms\n    free evolution τ :done, d2, after d1, 100ms\n    X/2 pulse       :d3, after d2, 15ms\n    Measurement     :crit, r1, after d3, 40ms\n\n    section Y-axis\n    X/2 pulse       :e1, 0, 15ms\n    free evolution τ :done, e2, after e1, 100ms\n    Y/2 pulse       :active, e3, after e2, 15ms\n    Measurement     :crit, r2, after e3, 40ms\n```",
     "expected_result": {
-      "description": "Damped cosine: oscillation frequency = detuning Δf, decay constant = T2*. If Δf=0, monotonic decay.",
+      "description": "Damped cosine: oscillation frequency = detuning Δf, decay constant = T2\\*. If Δf=0, monotonic decay.\n\n- fit*model: A * cos(2π·Δf·τ + φ) \\_ exp(-τ/T2\\*) + B",
       "result_type": "oscillation",
       "x_axis": "Free evolution time τ (μs)",
       "y_axis": "P(|1⟩)",
       "z_axis": "",
-      "fit_model": "A * cos(2π·Δf·τ + φ) * exp(-τ/T2*) + B",
+      "fit_model": "",
       "typical_range": "10–80 μs for fixed-frequency transmons",
       "good_visual": "clear oscillation fringes with smooth exponential envelope"
     },
@@ -2342,7 +2418,7 @@
     "failure_modes": [
       {
         "severity": "critical",
-        "description": "T2* << T2_echo",
+        "description": "T2\\* << T2_echo",
         "cause": "dominated by low-frequency noise (1/f flux noise, charge noise)",
         "visual": "rapid fringe decay, few oscillation periods visible",
         "next_action": "investigate low-frequency noise sources, check shielding"
@@ -2350,7 +2426,7 @@
       {
         "severity": "warning",
         "description": "No visible fringes",
-        "cause": "detuning too small or T2* extremely short",
+        "cause": "detuning too small or T2\\* extremely short",
         "visual": "flat or monotonically decaying signal",
         "next_action": "add artificial detuning (1–5 MHz) for clearer fringes"
       },
@@ -2365,7 +2441,7 @@
     "tips": [
       "Ramsey with artificial detuning (Δf ~ 1–5 MHz) gives clearer fringes for fitting.",
       "Second-axis (Y/2) Ramsey separates detuning direction (positive vs negative).",
-      "If T2* improves dramatically with echo, the dominant noise is low-frequency and potentially fixable."
+      "If T2\\* improves dramatically with echo, the dominant noise is low-frequency and potentially fixable."
     ],
     "output_parameters_info": [
       {
@@ -2378,15 +2454,15 @@
       },
       {
         "name": "t2_star",
-        "description": "T2* time (μs)"
+        "description": "T2\\* time (μs)"
       }
     ],
     "analysis_guide": [
       "Check fringe visibility and fit quality (R²).",
       "Verify the extracted detuning matches the intended value.",
-      "Compare T2* with T2_echo to quantify low-frequency noise contribution.",
+      "Compare T2\\* with T2_echo to quantify low-frequency noise contribution.",
       "Review recent history for frequency drift (changing detuning).",
-      "If T2* is very short, assess whether low-frequency noise mitigation is needed."
+      "If T2\\* is very short, assess whether low-frequency noise mitigation is needed."
     ],
     "prerequisites": [
       "CheckQubitFrequency",
@@ -2395,17 +2471,17 @@
     "images": [
       {
         "alt_text": "X-basis Ramsey fringe",
-        "relative_path": "./x_fringe.png",
+        "relative_path": "./check_ramsey_expected_1.png",
         "section": "expected result"
       },
       {
         "alt_text": "Y-basis Ramsey fringe",
-        "relative_path": "./y_fringe.png",
+        "relative_path": "./check_ramsey_expected_2.png",
         "section": "expected result"
       },
       {
         "alt_text": "Ramsey interference in XY plane",
-        "relative_path": "./xy_spiral.png",
+        "relative_path": "./check_ramsey_expected_3.png",
         "section": "expected result"
       }
     ],
@@ -2499,18 +2575,18 @@
     "name": "CheckT1",
     "summary": "Measures T1 energy-relaxation time via exponential decay of the excited state.",
     "what_it_measures": "T1 relaxation time – how long the qubit retains energy in the |1⟩ state.",
-    "physical_principle": "Prepare |1⟩, wait variable delay τ, measure P(|1⟩). Fit exponential decay exp(-τ/T1).",
+    "physical_principle": "Prepare |1⟩, wait variable delay τ, measure P(|1⟩). Fit exponential decay exp(-τ/T1).\n\n```mermaid\ngantt\n    title CheckT1 Pulse Sequence\n    dateFormat x\n    axisFormat \" \"\n\n    section Drive\n    π pulse    :d1, 0, 20ms\n    wait τ     :done, d2, after d1, 120ms\n\n    section Readout\n    Measurement :crit, r1, after d2, 50ms\n```",
     "expected_result": {
       "description": "Exponential decay from ~1 to ~0 as delay increases; single time constant T1.",
       "result_type": "decay_curve",
       "x_axis": "Delay τ (μs)",
       "y_axis": "P(|1⟩)",
       "z_axis": "",
-      "fit_model": "A * exp(-τ/T1) + B",
+      "fit_model": "A \\* exp(-τ/T1) + B",
       "typical_range": "20–200 μs for fixed-frequency transmons",
       "good_visual": "smooth monotonic decay with clear single-exponential shape, low residuals"
     },
-    "evaluation_criteria": "Exponential fit should have high R²; T1 should be stable across repeated measurements and consistent with chip design expectations. Compare with T2_echo to check if decoherence is T1-limited (T2 ≈ 2*T1).",
+    "evaluation_criteria": "Exponential fit should have high R²; T1 should be stable across repeated measurements and consistent with chip design expectations. Compare with T2_echo to check if decoherence is T1-limited (T2 ≈ 2\\*T1).",
     "check_questions": [
       "Is the decay clearly single-exponential with R² > 0.95?",
       "Is T1 consistent with recent measurements (within 20% variation)?",
@@ -2541,7 +2617,7 @@
     ],
     "tips": [
       "If T1 fluctuates between runs, suspect TLS defects near the qubit frequency.",
-      "Compare with T2_echo: if T2 ≈ 2*T1, decoherence is T1-limited.",
+      "Compare with T2_echo: if T2 ≈ 2\\*T1, decoherence is T1-limited.",
       "Check if readout power is too high (may cause residual excitation)."
     ],
     "output_parameters_info": [
@@ -2553,7 +2629,7 @@
     "analysis_guide": [
       "Check the exponential fit quality (R²) and residual pattern.",
       "Compare the extracted T1 with recent history for drift or instability.",
-      "Compare T1 with T2_echo: if T2 ≈ 2*T1, the qubit is T1-limited.",
+      "Compare T1 with T2_echo: if T2 ≈ 2\\*T1, the qubit is T1-limited.",
       "Check neighbor qubit T1 values for spatial correlation of defects.",
       "If T1 is anomalously short, consider TLS, Purcell, or dielectric loss mechanisms."
     ],
@@ -2564,7 +2640,7 @@
     "images": [
       {
         "alt_text": "T1 exponential decay curve",
-        "relative_path": "./0.png",
+        "relative_path": "./check_t1_expected.png",
         "section": "expected result"
       }
     ],
@@ -2588,27 +2664,27 @@
     "name": "CheckT2Echo",
     "summary": "Measures T2 echo (Hahn echo) coherence time, refocusing low-frequency noise.",
     "what_it_measures": "T2 echo – phase coherence time after a Hahn-echo refocusing pulse.",
-    "physical_principle": "X/2 – wait τ/2 – π – wait τ/2 – X/2, then measure. Refocuses static and slow noise, revealing intrinsic dephasing.",
+    "physical_principle": "X/2 – wait τ/2 – π – wait τ/2 – X/2, then measure. Refocuses static and slow noise, revealing intrinsic dephasing.\n\n```mermaid\ngantt\n    title CheckT2Echo (Hahn Echo) Pulse Sequence\n    dateFormat x\n    axisFormat \" \"\n\n    section Drive\n    X/2 pulse  :d1, 0, 15ms\n    wait τ/2   :done, d2, after d1, 55ms\n    π pulse    :d3, after d2, 20ms\n    wait τ/2   :done, d4, after d3, 55ms\n    X/2 pulse  :d5, after d4, 15ms\n\n    section Readout\n    Measurement :crit, r1, after d5, 50ms\n```",
     "expected_result": {
       "description": "Exponential (or Gaussian) decay envelope of echo amplitude vs total delay τ.",
       "result_type": "decay_curve",
       "x_axis": "Total delay τ (μs)",
       "y_axis": "Echo amplitude",
       "z_axis": "",
-      "fit_model": "A * exp(-(τ/T2_echo)^n) + B, n=1 or 2",
+      "fit_model": "A \\* exp(-(τ/T2_echo)^n) + B, n=1 or 2",
       "typical_range": "30–300 μs for fixed-frequency transmons",
       "good_visual": "smooth decay envelope with clear time constant, low residuals"
     },
-    "evaluation_criteria": "T2_echo should satisfy T2_echo ≤ 2*T1. Compare with T2* (Ramsey) to quantify low-frequency noise contribution. Fit quality should be high.",
+    "evaluation_criteria": "T2_echo should satisfy T2_echo ≤ 2\\*T1. Compare with T2\\* (Ramsey) to quantify low-frequency noise contribution. Fit quality should be high.",
     "check_questions": [
-      "Is T2_echo consistent with the 2*T1 limit?",
+      "Is T2_echo consistent with the 2\\*T1 limit?",
       "Is the decay well-fitted by a single exponential or Gaussian?",
       "Is T2_echo stable compared to recent measurements?"
     ],
     "failure_modes": [
       {
         "severity": "critical",
-        "description": "T2_echo << 2*T1",
+        "description": "T2_echo << 2\\*T1",
         "cause": "residual high-frequency noise not refocused by single echo",
         "visual": "decay much faster than expected from T1 measurement",
         "next_action": "try CPMG (multiple echoes) to identify noise spectrum"
@@ -2622,15 +2698,15 @@
       },
       {
         "severity": "warning",
-        "description": "T2_echo > 2*T1",
+        "description": "T2_echo > 2\\*T1",
         "cause": "measurement artifact; fitting or readout calibration issue",
         "visual": "decay appears slower than physically expected",
         "next_action": "verify T1 measurement, check readout calibration"
       }
     ],
     "tips": [
-      "Compare T2_echo with T2* (Ramsey) to quantify low-frequency noise contribution.",
-      "If T2_echo is much shorter than 2*T1, try CPMG (multiple echoes) to identify noise spectrum.",
+      "Compare T2_echo with T2\\* (Ramsey) to quantify low-frequency noise contribution.",
+      "If T2_echo is much shorter than 2\\*T1, try CPMG (multiple echoes) to identify noise spectrum.",
       "Ensure π pulse is well-calibrated; a bad refocusing pulse degrades echo amplitude."
     ],
     "output_parameters_info": [
@@ -2641,10 +2717,10 @@
     ],
     "analysis_guide": [
       "Check the decay fit quality (R²) and identify the decay model (exponential vs Gaussian).",
-      "Compare T2_echo with 2*T1 to assess the noise regime.",
-      "Compare T2_echo with T2* to quantify the low-frequency noise contribution.",
+      "Compare T2_echo with 2\\*T1 to assess the noise regime.",
+      "Compare T2_echo with T2\\* to quantify the low-frequency noise contribution.",
       "Review recent history for trends or instability.",
-      "If T2_echo << 2*T1, investigate high-frequency noise sources."
+      "If T2_echo << 2\\*T1, investigate high-frequency noise sources."
     ],
     "prerequisites": [
       "CheckT1",
@@ -2653,7 +2729,7 @@
     "images": [
       {
         "alt_text": "T2 echo decay curve",
-        "relative_path": "./0.png",
+        "relative_path": "./check_t2_echo_expected.png",
         "section": "expected result"
       }
     ],
@@ -2674,11 +2750,94 @@
       }
     ]
   },
+  "ChevronPattern": {
+    "name": "ChevronPattern",
+    "summary": "Measures qubit response vs frequency and time to map the chevron pattern.",
+    "what_it_measures": "Chevron pattern – 2D map of qubit excitation vs drive detuning and pulse duration.",
+    "physical_principle": "Drive at various frequency detunings and durations; on-resonance gives Rabi oscillations, off-resonance gives faster but smaller oscillations, forming a V-shaped pattern.\n\n```mermaid\ngantt\n    title ChevronPattern Pulse Sequence\n    dateFormat x\n    axisFormat \" \"\n\n    section Drive\n    Drive pulse (sweep Δf, t) :d1, 0, 100ms\n\n    section Readout\n    Measurement               :crit, r1, after d1, 50ms\n```",
+    "expected_result": {
+      "description": "2D color plot with chevron-shaped fringes; vertex at zero detuning (qubit frequency). Fringe spacing increases with detuning.",
+      "result_type": "2d_map",
+      "x_axis": "Drive detuning (MHz)",
+      "y_axis": "Pulse duration (ns)",
+      "z_axis": "P(|1⟩)",
+      "fit_model": "",
+      "typical_range": "",
+      "good_visual": "symmetric V-shaped chevron fringes with clear vertex at zero detuning, high contrast"
+    },
+    "evaluation_criteria": "Clear fringe visibility with identifiable chevron vertex; vertex position should be consistent with qubit frequency.",
+    "check_questions": [
+      "Are the chevron fringes clearly visible with good contrast?",
+      "Is the chevron vertex identifiable to <1 MHz precision?",
+      "Is the pattern symmetric about zero detuning?"
+    ],
+    "failure_modes": [
+      {
+        "severity": "warning",
+        "description": "Low contrast",
+        "cause": "insufficient drive power or poor readout fidelity",
+        "visual": "faint or washed-out fringes",
+        "next_action": "increase drive amplitude or number of shots"
+      },
+      {
+        "severity": "warning",
+        "description": "Smeared pattern",
+        "cause": "frequency drift during measurement",
+        "visual": "blurred fringes, especially at long durations",
+        "next_action": "check frequency stability, reduce measurement time"
+      },
+      {
+        "severity": "info",
+        "description": "Asymmetric chevron",
+        "cause": "higher-order transitions or AC Stark shift",
+        "visual": "fringes asymmetric about zero detuning",
+        "next_action": "check for multi-level effects, reduce drive power"
+      }
+    ],
+    "tips": [
+      "Use the chevron vertex to precisely identify qubit frequency before fine calibration.",
+      "The fringe period at zero detuning gives the Rabi frequency.",
+      "If fringes are faint, increase drive amplitude or number of shots."
+    ],
+    "output_parameters_info": [
+      {
+        "name": "qubit_frequency",
+        "description": "Qubit bare frequency (GHz)"
+      },
+      {
+        "name": "readout_amplitude",
+        "description": "Optimal readout amplitude from SNR threshold (a.u.)"
+      }
+    ],
+    "analysis_guide": [
+      "Identify the chevron vertex position for frequency determination.",
+      "Check fringe contrast and symmetry.",
+      "Extract Rabi frequency from the fringe period at zero detuning.",
+      "If asymmetric, consider multi-level effects."
+    ],
+    "prerequisites": [
+      "CheckReadoutFrequency"
+    ],
+    "images": [
+      {
+        "alt_text": "Chevron pattern",
+        "relative_path": "./0.png",
+        "section": "expected result"
+      }
+    ],
+    "related_context": [
+      {
+        "type": "history",
+        "params": [],
+        "last_n": 5
+      }
+    ]
+  },
   "ReadoutClassification": {
     "name": "ReadoutClassification",
     "summary": "Calibrates and evaluates readout state discrimination (|0⟩ vs |1⟩ classification).",
     "what_it_measures": "Readout assignment fidelity – probability of correctly identifying qubit state.",
-    "physical_principle": "Prepare |0⟩ and |1⟩ states, measure IQ data, train classifier, evaluate confusion matrix.",
+    "physical_principle": "Prepare |0⟩ and |1⟩ states, measure IQ data, train classifier, evaluate confusion matrix.\n\n```mermaid\ngantt\n    title ReadoutClassification Pulse Sequence\n    dateFormat x\n    axisFormat \" \"\n\n    section Meas 1 (|0⟩)\n    idle (|0⟩ prep)    :done, a1, 0, 30ms\n    Readout (IQ)       :crit, a2, after a1, 60ms\n\n    section Meas 2 (|1⟩)\n    π pulse (|1⟩ prep) :b1, 0, 30ms\n    Readout (IQ)       :crit, b2, after b1, 60ms\n```",
     "expected_result": {
       "description": "Two IQ blob clusters; clear separation indicates good discrimination.",
       "result_type": "scatter_plot",
@@ -2758,81 +2917,10 @@
     "images": [
       {
         "alt_text": "Readout classification",
-        "relative_path": "./0.png",
+        "relative_path": "./readout_classification_expected.png",
         "section": "expected result"
       }
     ],
-    "related_context": [
-      {
-        "type": "history",
-        "params": [],
-        "last_n": 5
-      }
-    ]
-  },
-  "CheckSkew": {
-    "name": "CheckSkew",
-    "summary": "Measures and corrects time skew between multiple control boxes.",
-    "what_it_measures": "Inter-box timing skew – measures the relative timing offsets (clock skew) between different control boxes and applies correction to synchronize their clocks.",
-    "physical_principle": "Clock synchronization: multiple control boxes share a common reference clock, but signal propagation delays and internal clock distribution cause timing offsets between boxes. This task measures the relative timing by sending synchronized pulses and measuring arrival time differences, then applies skew correction to align all boxes to a common time reference.",
-    "expected_result": {
-      "description": "Measured skew values for each box pair, with corrections applied to synchronize timing.",
-      "result_type": "timing_measurement",
-      "x_axis": "Box pairs",
-      "y_axis": "Skew (ns)",
-      "z_axis": "",
-      "fit_model": "",
-      "typical_range": "",
-      "good_visual": "small, well-defined skew values with successful correction applied"
-    },
-    "evaluation_criteria": "Skew values should be measurable and correctable. After correction, residual skew should be within the system's timing resolution.",
-    "check_questions": [
-      "Are skew values measurable for all box pairs?",
-      "Are the measured skew values within a correctable range?",
-      "Are the skew values consistent with previous measurements?"
-    ],
-    "failure_modes": [
-      {
-        "severity": "critical",
-        "description": "Skew measurement fails",
-        "cause": "box not synchronized to reference clock, hardware fault",
-        "visual": "",
-        "next_action": "verify reference clock distribution, check box connectivity"
-      },
-      {
-        "severity": "warning",
-        "description": "Large skew values",
-        "cause": "cable length mismatch, clock distribution issue",
-        "visual": "skew values larger than typical range",
-        "next_action": "check clock distribution hardware and cable routing"
-      },
-      {
-        "severity": "warning",
-        "description": "Inconsistent skew across measurements",
-        "cause": "unstable clock or intermittent connection",
-        "visual": "skew values vary significantly between runs",
-        "next_action": "investigate clock stability, check connectors"
-      }
-    ],
-    "tips": [
-      "Run after LinkUp and before any multi-qubit calibration tasks.",
-      "The muxes parameter selects which MUXes to synchronize; default covers most standard configurations.",
-      "Skew correction is essential for two-qubit gate calibration accuracy.",
-      "Compare skew values across runs to detect clock drift."
-    ],
-    "output_parameters_info": [],
-    "analysis_guide": [
-      "Review estimated skew values for each box.",
-      "Verify skew values are within expected range.",
-      "Check the skew plot for any outliers.",
-      "Confirm correction was applied successfully.",
-      "Compare with previous measurements for drift detection."
-    ],
-    "prerequisites": [
-      "LinkUp",
-      "Configure"
-    ],
-    "images": [],
     "related_context": [
       {
         "type": "history",
@@ -2845,7 +2933,7 @@
     "name": "CheckBellState",
     "summary": "Prepares Bell state (|00⟩+|11⟩)/√2 and measures state fidelity.",
     "what_it_measures": "Bell state fidelity – quality of entanglement between qubit pair.",
-    "physical_principle": "Apply H⊗I then CNOT; measure in Z basis and verify equal |00⟩/|11⟩ populations with coherent superposition.",
+    "physical_principle": "Apply H⊗I then CNOT; measure in Z basis and verify equal |00⟩/|11⟩ populations with coherent superposition.\n\n```mermaid\ngantt\n    title CheckBellState Pulse Sequence (echo CR = ZX90)\n    dateFormat x\n    axisFormat \" \"\n\n    section Control\n    X/2        :d1, 0, 15ms\n    CR pulse   :d2, after d1, 35ms\n    π          :d3, after d2, 15ms\n    CR pulse   :d4, after d3, 35ms\n    Readout    :crit, r1, after d4, 40ms\n\n    section Target\n    idle       :done, t0, 0, 15ms\n    Cancel     :active, t1, after t0, 35ms\n    idle       :done, t2, after t1, 15ms\n    Cancel     :active, t3, after t2, 35ms\n    Readout    :crit, r2, after t3, 40ms\n```",
     "expected_result": {
       "description": "Population histogram showing ~50/50 |00⟩/|11⟩ with minimal |01⟩/|10⟩.",
       "result_type": "histogram",
@@ -2913,7 +3001,7 @@
     "images": [
       {
         "alt_text": "Bell state measurement",
-        "relative_path": "./0.png",
+        "relative_path": "./check_bell_state_expected.png",
         "section": "expected result"
       }
     ],
@@ -3003,7 +3091,7 @@
     "images": [
       {
         "alt_text": "Bell state tomography",
-        "relative_path": "./0.png",
+        "relative_path": "./check_bell_state_tomography_expected.png",
         "section": "expected result"
       }
     ],
@@ -3027,7 +3115,7 @@
     "name": "CheckCrossResonance",
     "summary": "Measures cross-resonance (CR) interaction strength between coupled qubits.",
     "what_it_measures": "ZX interaction rate and CR Hamiltonian terms for two-qubit gate calibration.",
-    "physical_principle": "Drive control qubit at target frequency; monitor target rotation rate. ZX coupling enables CNOT-type gates.",
+    "physical_principle": "Drive control qubit at target frequency; monitor target rotation rate. ZX coupling enables CNOT-type gates.\n\n```mermaid\ngantt\n    title CheckCrossResonance Pulse Sequence\n    dateFormat x\n    axisFormat \" \"\n\n    section Control Drive\n    CR pulse (at target freq) :d1, 0, 120ms\n\n    section Target Drive\n    Cancel tone               :active, t1, 0, 120ms\n\n    section Readout (Target)\n    Measurement               :crit, r1, after d1, 50ms\n```",
     "expected_result": {
       "description": "Target qubit oscillation proportional to CR drive amplitude; Hamiltonian tomography shows dominant ZX term.",
       "result_type": "oscillation",
@@ -3124,12 +3212,47 @@
     "images": [
       {
         "alt_text": "CR Hamiltonian coefficients",
-        "relative_path": "./hamiltonian.png",
+        "relative_path": "./check_cross_resonance_expected_1.png",
         "section": "expected result"
       },
       {
-        "alt_text": "Target qubit dynamics under CR drive",
-        "relative_path": "./target_dynamics.png",
+        "alt_text": "Control qubit dynamics (step 1)",
+        "relative_path": "./check_cross_resonance_expected_2.png",
+        "section": "expected result"
+      },
+      {
+        "alt_text": "Target qubit dynamics (step 1)",
+        "relative_path": "./check_cross_resonance_expected_3.png",
+        "section": "expected result"
+      },
+      {
+        "alt_text": "Control qubit dynamics (step 2)",
+        "relative_path": "./check_cross_resonance_expected_4.png",
+        "section": "expected result"
+      },
+      {
+        "alt_text": "Target qubit dynamics (step 2)",
+        "relative_path": "./check_cross_resonance_expected_5.png",
+        "section": "expected result"
+      },
+      {
+        "alt_text": "Control qubit dynamics (step 3)",
+        "relative_path": "./check_cross_resonance_expected_6.png",
+        "section": "expected result"
+      },
+      {
+        "alt_text": "Target qubit dynamics (step 3)",
+        "relative_path": "./check_cross_resonance_expected_7.png",
+        "section": "expected result"
+      },
+      {
+        "alt_text": "Control qubit dynamics (step 4)",
+        "relative_path": "./check_cross_resonance_expected_8.png",
+        "section": "expected result"
+      },
+      {
+        "alt_text": "Target qubit dynamics (step 4)",
+        "relative_path": "./check_cross_resonance_expected_9.png",
         "section": "expected result"
       }
     ],
@@ -3214,12 +3337,12 @@
     "images": [
       {
         "alt_text": "ZX90 control qubit sweep",
-        "relative_path": "./control.png",
+        "relative_path": "./check_zx90_expected_1.png",
         "section": "expected result"
       },
       {
         "alt_text": "ZX90 target qubit sweep",
-        "relative_path": "./target.png",
+        "relative_path": "./check_zx90_expected_2.png",
         "section": "expected result"
       }
     ],
@@ -3239,94 +3362,11 @@
       }
     ]
   },
-  "ChevronPattern": {
-    "name": "ChevronPattern",
-    "summary": "Measures qubit response vs frequency and time to map the chevron pattern.",
-    "what_it_measures": "Chevron pattern – 2D map of qubit excitation vs drive detuning and pulse duration.",
-    "physical_principle": "Drive at various frequency detunings and durations; on-resonance gives Rabi oscillations, off-resonance gives faster but smaller oscillations, forming a V-shaped pattern.",
-    "expected_result": {
-      "description": "2D color plot with chevron-shaped fringes; vertex at zero detuning (qubit frequency). Fringe spacing increases with detuning.",
-      "result_type": "2d_map",
-      "x_axis": "Drive detuning (MHz)",
-      "y_axis": "Pulse duration (ns)",
-      "z_axis": "P(|1⟩)",
-      "fit_model": "",
-      "typical_range": "",
-      "good_visual": "symmetric V-shaped chevron fringes with clear vertex at zero detuning, high contrast"
-    },
-    "evaluation_criteria": "Clear fringe visibility with identifiable chevron vertex; vertex position should be consistent with qubit frequency.",
-    "check_questions": [
-      "Are the chevron fringes clearly visible with good contrast?",
-      "Is the chevron vertex identifiable to <1 MHz precision?",
-      "Is the pattern symmetric about zero detuning?"
-    ],
-    "failure_modes": [
-      {
-        "severity": "warning",
-        "description": "Low contrast",
-        "cause": "insufficient drive power or poor readout fidelity",
-        "visual": "faint or washed-out fringes",
-        "next_action": "increase drive amplitude or number of shots"
-      },
-      {
-        "severity": "warning",
-        "description": "Smeared pattern",
-        "cause": "frequency drift during measurement",
-        "visual": "blurred fringes, especially at long durations",
-        "next_action": "check frequency stability, reduce measurement time"
-      },
-      {
-        "severity": "info",
-        "description": "Asymmetric chevron",
-        "cause": "higher-order transitions or AC Stark shift",
-        "visual": "fringes asymmetric about zero detuning",
-        "next_action": "check for multi-level effects, reduce drive power"
-      }
-    ],
-    "tips": [
-      "Use the chevron vertex to precisely identify qubit frequency before fine calibration.",
-      "The fringe period at zero detuning gives the Rabi frequency.",
-      "If fringes are faint, increase drive amplitude or number of shots."
-    ],
-    "output_parameters_info": [
-      {
-        "name": "qubit_frequency",
-        "description": "Qubit bare frequency (GHz)"
-      },
-      {
-        "name": "readout_amplitude",
-        "description": "Optimal readout amplitude from SNR threshold (a.u.)"
-      }
-    ],
-    "analysis_guide": [
-      "Identify the chevron vertex position for frequency determination.",
-      "Check fringe contrast and symmetry.",
-      "Extract Rabi frequency from the fringe period at zero detuning.",
-      "If asymmetric, consider multi-level effects."
-    ],
-    "prerequisites": [
-      "CheckReadoutFrequency"
-    ],
-    "images": [
-      {
-        "alt_text": "Chevron pattern",
-        "relative_path": "./0.png",
-        "section": "expected result"
-      }
-    ],
-    "related_context": [
-      {
-        "type": "history",
-        "params": [],
-        "last_n": 5
-      }
-    ]
-  },
   "CreateZX90": {
     "name": "CreateZX90",
     "summary": "Calibrates ZX90 (CNOT-equivalent) two-qubit gate from cross-resonance interaction.",
     "what_it_measures": "Optimal CR pulse amplitude and duration for π/2 ZX rotation.",
-    "physical_principle": "Tune CR drive parameters to achieve exactly 90° ZX rotation; combine with single-qubit corrections for CNOT.",
+    "physical_principle": "Tune CR drive parameters to achieve exactly 90° ZX rotation; combine with single-qubit corrections for CNOT.\n\n```mermaid\ngantt\n    title CreateZX90 Pulse Sequence\n    dateFormat x\n    axisFormat \" \"\n\n    section Control Drive\n    CR pulse (sweep duration) :d1, 0, 120ms\n\n    section Target Drive\n    Cancel tone               :active, t1, 0, 120ms\n\n    section Readout (Target)\n    Measurement               :crit, r1, after d1, 50ms\n```",
     "expected_result": {
       "description": "ZX rotation angle vs CR pulse duration; target the 90° crossing point.",
       "result_type": "oscillation",
@@ -3420,17 +3460,17 @@
     "images": [
       {
         "alt_text": "ZX90 calibration n=1",
-        "relative_path": "./n1.png",
+        "relative_path": "./create_zx90_expected_1.png",
         "section": "expected result"
       },
       {
         "alt_text": "ZX90 calibration n=3",
-        "relative_path": "./n3.png",
+        "relative_path": "./create_zx90_expected_2.png",
         "section": "expected result"
       },
       {
         "alt_text": "ZX90 final calibration",
-        "relative_path": "./final.png",
+        "relative_path": "./create_zx90_expected_3.png",
         "section": "expected result"
       }
     ],

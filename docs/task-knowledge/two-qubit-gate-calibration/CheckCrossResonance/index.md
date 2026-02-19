@@ -35,8 +35,15 @@ Target qubit oscillation proportional to CR drive amplitude; Hamiltonian tomogra
 - y_axis: Target qubit rotation angle
 - good_visual: clear ZX oscillation with minimal parasitic IX/IY/IZ components
 
-![CR Hamiltonian coefficients](./hamiltonian.png)
-![Target qubit dynamics under CR drive](./target_dynamics.png)
+![CR Hamiltonian coefficients](./check_cross_resonance_expected_1.png)
+![Control qubit dynamics (step 1)](./check_cross_resonance_expected_2.png)
+![Target qubit dynamics (step 1)](./check_cross_resonance_expected_3.png)
+![Control qubit dynamics (step 2)](./check_cross_resonance_expected_4.png)
+![Target qubit dynamics (step 2)](./check_cross_resonance_expected_5.png)
+![Control qubit dynamics (step 3)](./check_cross_resonance_expected_6.png)
+![Target qubit dynamics (step 3)](./check_cross_resonance_expected_7.png)
+![Control qubit dynamics (step 4)](./check_cross_resonance_expected_8.png)
+![Target qubit dynamics (step 4)](./check_cross_resonance_expected_9.png)
 
 ## Evaluation criteria
 

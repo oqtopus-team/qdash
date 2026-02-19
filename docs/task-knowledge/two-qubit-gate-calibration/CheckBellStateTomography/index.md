@@ -20,7 +20,7 @@ Density matrix close to ideal Bell state |Φ+⟩; off-diagonal elements indicati
 - z_axis: Matrix element amplitude
 - good_visual: density matrix with large real diagonal and off-diagonal elements matching ideal Bell state pattern
 
-![Bell state tomography](./0.png)
+![Bell state tomography](./check_bell_state_tomography_expected.png)
 
 ## Evaluation criteria
 

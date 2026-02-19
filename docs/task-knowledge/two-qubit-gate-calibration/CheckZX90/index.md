@@ -17,8 +17,8 @@ Gate fidelity metric; conditional rotation of target by control state.
 - result_type: scalar_metric
 - good_visual: high fidelity value with consistent results across repeated measurements
 
-![ZX90 control qubit sweep](./control.png)
-![ZX90 target qubit sweep](./target.png)
+![ZX90 control qubit sweep](./check_zx90_expected_1.png)
+![ZX90 target qubit sweep](./check_zx90_expected_2.png)
 
 ## Evaluation criteria
 

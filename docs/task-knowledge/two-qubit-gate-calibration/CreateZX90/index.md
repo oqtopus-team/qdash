@@ -35,9 +35,9 @@ ZX rotation angle vs CR pulse duration; target the 90° crossing point.
 - y_axis: ZX rotation angle (degrees)
 - good_visual: clear oscillation with well-defined 90° crossing point
 
-![ZX90 calibration n=1](./n1.png)
-![ZX90 calibration n=3](./n3.png)
-![ZX90 final calibration](./final.png)
+![ZX90 calibration n=1](./create_zx90_expected_1.png)
+![ZX90 calibration n=3](./create_zx90_expected_2.png)
+![ZX90 final calibration](./create_zx90_expected_3.png)
 
 ## Evaluation criteria
 

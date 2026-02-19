@@ -19,56 +19,56 @@ Calibration task knowledge base for QDash copilot analysis. Each page describes 
 |------|-------------|
 | [CheckSkew](./system/CheckSkew) | Measures and corrects time skew between multiple control boxes. |
 
-## CW Spectroscopy
+## CW Characterization
 
 | Task | Description |
 |------|-------------|
-| [CheckResonatorFrequencies](./cw-spectroscopy/CheckResonatorFrequencies) | Coarse frequency scan to locate readout resonator resonance frequencies. |
-| [CheckResonatorSpectroscopy](./cw-spectroscopy/CheckResonatorSpectroscopy) | High-resolution 2D spectroscopy of all resonators in a readout multiplexer (MUX). |
-| [CheckReflectionCoefficient](./cw-spectroscopy/CheckReflectionCoefficient) | Measures the resonator reflection coefficient to extract resonator frequency and coupling rates. |
-| [CheckElectricalDelay](./cw-spectroscopy/CheckElectricalDelay) | Measures the electrical delay in the readout line. |
-| [CheckReadoutAmplitude](./cw-spectroscopy/CheckReadoutAmplitude) | Optimizes readout pulse amplitude by sweeping amplitude and measuring signal-to-noise ratio. |
-| [CheckQubitFrequencies](./cw-spectroscopy/CheckQubitFrequencies) | Coarse qubit frequency scan to locate the qubit transition frequency. |
-| [CheckQubitSpectroscopy](./cw-spectroscopy/CheckQubitSpectroscopy) | High-resolution qubit spectroscopy to measure qubit transition frequencies and anharmonicity. |
+| [CheckResonatorFrequencies](./cw-characterization/CheckResonatorFrequencies) | Coarse frequency scan to locate readout resonator resonance frequencies. |
+| [CheckResonatorSpectroscopy](./cw-characterization/CheckResonatorSpectroscopy) | High-resolution 2D spectroscopy of all resonators in a readout multiplexer (MUX). |
+| [CheckReflectionCoefficient](./cw-characterization/CheckReflectionCoefficient) | Measures the resonator reflection coefficient to extract resonator frequency and coupling rates. |
+| [CheckElectricalDelay](./cw-characterization/CheckElectricalDelay) | Measures the electrical delay in the readout line. |
+| [CheckReadoutAmplitude](./cw-characterization/CheckReadoutAmplitude) | Optimizes readout pulse amplitude by sweeping amplitude and measuring signal-to-noise ratio. |
+| [CheckQubitFrequencies](./cw-characterization/CheckQubitFrequencies) | Coarse qubit frequency scan to locate the qubit transition frequency. |
+| [CheckQubitSpectroscopy](./cw-characterization/CheckQubitSpectroscopy) | High-resolution qubit spectroscopy to measure qubit transition frequencies and anharmonicity. |
 
-## One-Qubit Calibration
-
-| Task | Description |
-|------|-------------|
-| [CheckQubit](./one-qubit-calibration/CheckQubit) | Quick qubit validation via brief Rabi oscillation check. |
-| [CheckQubitFrequency](./one-qubit-calibration/CheckQubitFrequency) | Measures qubit transition frequency via Ramsey-based detuning calibration. |
-| [CheckReadoutFrequency](./one-qubit-calibration/CheckReadoutFrequency) | Calibrates the readout resonator frequency for optimal state discrimination. |
-| [CheckRabi](./one-qubit-calibration/CheckRabi) | Measures Rabi oscillation to extract drive amplitude, frequency, and IQ-plane parameters. |
-| [CheckT1](./one-qubit-calibration/CheckT1) | Measures T1 energy-relaxation time via exponential decay of the excited state. |
-| [CheckT2Echo](./one-qubit-calibration/CheckT2Echo) | Measures T2 echo (Hahn echo) coherence time, refocusing low-frequency noise. |
-| [CheckRamsey](./one-qubit-calibration/CheckRamsey) | Measures T2* (free-induction) dephasing time and fine-tunes qubit frequency via Ramsey fringes. |
-| [CheckDispersiveShift](./one-qubit-calibration/CheckDispersiveShift) | Measures dispersive shift (χ) between qubit and readout resonator. |
-| [CheckOptimalReadoutAmplitude](./one-qubit-calibration/CheckOptimalReadoutAmplitude) | Optimizes readout pulse amplitude for best state discrimination. |
-| [ReadoutClassification](./one-qubit-calibration/ReadoutClassification) | Calibrates and evaluates readout state discrimination (|0⟩ vs |1⟩ classification). |
-
-## Gate Calibration
+## TD Characterization
 
 | Task | Description |
 |------|-------------|
-| [CheckPIPulse](./gate-calibration/CheckPIPulse) | Validates π pulse quality by repeated application and population measurement. |
-| [CheckHPIPulse](./gate-calibration/CheckHPIPulse) | Validates π/2 pulse quality by repeated application and population measurement. |
-| [CheckDRAGPIPulse](./gate-calibration/CheckDRAGPIPulse) | Validates DRAG-corrected π pulse quality to suppress leakage to |2⟩. |
-| [CheckDRAGHPIPulse](./gate-calibration/CheckDRAGHPIPulse) | Validates DRAG-corrected π/2 pulse quality for leakage suppression. |
-| [CreatePIPulse](./gate-calibration/CreatePIPulse) | Calibrates π (X180) gate pulse amplitude via Rabi-based fitting. |
-| [CreateHPIPulse](./gate-calibration/CreateHPIPulse) | Calibrates π/2 (X90) gate pulse amplitude via Rabi-based fitting. |
-| [CreateDRAGPIPulse](./gate-calibration/CreateDRAGPIPulse) | Calibrates DRAG beta and amplitude for leakage-suppressed π pulse. |
-| [CreateDRAGHPIPulse](./gate-calibration/CreateDRAGHPIPulse) | Calibrates DRAG beta and amplitude for leakage-suppressed π/2 pulse. |
+| [CheckQubit](./td-characterization/CheckQubit) | Quick qubit validation via brief Rabi oscillation check. |
+| [CheckQubitFrequency](./td-characterization/CheckQubitFrequency) | Measures qubit transition frequency via Ramsey-based detuning calibration. |
+| [CheckReadoutFrequency](./td-characterization/CheckReadoutFrequency) | Calibrates the readout resonator frequency for optimal state discrimination. |
+| [CheckRabi](./td-characterization/CheckRabi) | Measures Rabi oscillation to extract drive amplitude, frequency, and IQ-plane parameters. |
+| [CheckT1](./td-characterization/CheckT1) | Measures T1 energy-relaxation time via exponential decay of the excited state. |
+| [CheckT2Echo](./td-characterization/CheckT2Echo) | Measures T2 echo (Hahn echo) coherence time, refocusing low-frequency noise. |
+| [CheckRamsey](./td-characterization/CheckRamsey) | Measures T2\* (free-induction) dephasing time and fine-tunes qubit frequency via Ramsey fringes. |
+| [CheckDispersiveShift](./td-characterization/CheckDispersiveShift) | Measures dispersive shift (χ) between qubit and readout resonator. |
+| [CheckOptimalReadoutAmplitude](./td-characterization/CheckOptimalReadoutAmplitude) | Optimizes readout pulse amplitude for best state discrimination. |
+| [ReadoutClassification](./td-characterization/ReadoutClassification) | Calibrates and evaluates readout state discrimination (|0⟩ vs |1⟩ classification). |
+| [ChevronPattern](./td-characterization/ChevronPattern) | Measures qubit response vs frequency and time to map the chevron pattern. |
 
-## Two-Qubit Calibration
+## One-Qubit Gate Calibration
 
 | Task | Description |
 |------|-------------|
-| [CheckCrossResonance](./two-qubit-calibration/CheckCrossResonance) | Measures cross-resonance (CR) interaction strength between coupled qubits. |
-| [ChevronPattern](./two-qubit-calibration/ChevronPattern) | Measures qubit response vs frequency and time to map the chevron pattern. |
-| [CheckZX90](./two-qubit-calibration/CheckZX90) | Validates ZX90 two-qubit gate fidelity via process or state fidelity measurement. |
-| [CreateZX90](./two-qubit-calibration/CreateZX90) | Calibrates ZX90 (CNOT-equivalent) two-qubit gate from cross-resonance interaction. |
-| [CheckBellState](./two-qubit-calibration/CheckBellState) | Prepares Bell state (|00⟩+|11⟩)/√2 and measures state fidelity. |
-| [CheckBellStateTomography](./two-qubit-calibration/CheckBellStateTomography) | Full density matrix tomography of the Bell state for detailed characterization. |
+| [CheckPIPulse](./one-qubit-gate-calibration/CheckPIPulse) | Validates π pulse quality by repeated application and population measurement. |
+| [CheckHPIPulse](./one-qubit-gate-calibration/CheckHPIPulse) | Validates π/2 pulse quality by repeated application and population measurement. |
+| [CheckDRAGPIPulse](./one-qubit-gate-calibration/CheckDRAGPIPulse) | Validates DRAG-corrected π pulse quality to suppress leakage to |2⟩. |
+| [CheckDRAGHPIPulse](./one-qubit-gate-calibration/CheckDRAGHPIPulse) | Validates DRAG-corrected π/2 pulse quality for leakage suppression. |
+| [CreatePIPulse](./one-qubit-gate-calibration/CreatePIPulse) | Calibrates π (X180) gate pulse amplitude via Rabi-based fitting. |
+| [CreateHPIPulse](./one-qubit-gate-calibration/CreateHPIPulse) | Calibrates π/2 (X90) gate pulse amplitude via Rabi-based fitting. |
+| [CreateDRAGPIPulse](./one-qubit-gate-calibration/CreateDRAGPIPulse) | Calibrates DRAG beta and amplitude for leakage-suppressed π pulse. |
+| [CreateDRAGHPIPulse](./one-qubit-gate-calibration/CreateDRAGHPIPulse) | Calibrates DRAG beta and amplitude for leakage-suppressed π/2 pulse. |
+
+## Two-Qubit Gate Calibration
+
+| Task | Description |
+|------|-------------|
+| [CheckCrossResonance](./two-qubit-gate-calibration/CheckCrossResonance) | Measures cross-resonance (CR) interaction strength between coupled qubits. |
+| [CheckZX90](./two-qubit-gate-calibration/CheckZX90) | Validates ZX90 two-qubit gate fidelity via process or state fidelity measurement. |
+| [CreateZX90](./two-qubit-gate-calibration/CreateZX90) | Calibrates ZX90 (CNOT-equivalent) two-qubit gate from cross-resonance interaction. |
+| [CheckBellState](./two-qubit-gate-calibration/CheckBellState) | Prepares Bell state (|00⟩+|11⟩)/√2 and measures state fidelity. |
+| [CheckBellStateTomography](./two-qubit-gate-calibration/CheckBellStateTomography) | Full density matrix tomography of the Bell state for detailed characterization. |
 
 ## Benchmarking
 
