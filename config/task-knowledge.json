@@ -55,28 +55,7 @@
       "Low fidelity here means debug gates individually first.",
       "Compare with Bell state tomography for full density matrix."
     ],
-    "output_parameters_info": [
-      {
-        "name": "bell_state_fidelity",
-        "description": "Fidelity with ideal Bell state; target > 0.90"
-      },
-      {
-        "name": "p00",
-        "description": "Population in |00⟩; expected ~0.5"
-      },
-      {
-        "name": "p11",
-        "description": "Population in |11⟩; expected ~0.5"
-      },
-      {
-        "name": "p01",
-        "description": "Population in |01⟩; expected ~0"
-      },
-      {
-        "name": "p10",
-        "description": "Population in |10⟩; expected ~0"
-      }
-    ],
+    "output_parameters_info": [],
     "analysis_guide": [
       "Check the population histogram for |00⟩/|11⟩ balance.",
       "Quantify the |01⟩/|10⟩ leakage as fraction of total.",
@@ -92,7 +71,7 @@
     "images": [
       {
         "alt_text": "Bell state measurement",
-        "relative_path": "figures/CheckBellState/0.png",
+        "relative_path": "./0.png",
         "section": "expected result"
       }
     ],
@@ -163,16 +142,8 @@
     ],
     "output_parameters_info": [
       {
-        "name": "state_fidelity",
-        "description": "Fidelity with ideal Bell state; target > 0.90"
-      },
-      {
-        "name": "concurrence",
-        "description": "Entanglement measure; expected > 0.9"
-      },
-      {
-        "name": "purity",
-        "description": "Density matrix purity; expected close to 1.0"
+        "name": "bell_state_fidelity",
+        "description": "Bell state fidelity (a.u.)"
       }
     ],
     "analysis_guide": [
@@ -190,7 +161,7 @@
     "images": [
       {
         "alt_text": "Bell state tomography",
-        "relative_path": "figures/CheckBellStateTomography/0.png",
+        "relative_path": "./0.png",
         "section": "expected result"
       }
     ],
@@ -268,20 +239,32 @@
     ],
     "output_parameters_info": [
       {
-        "name": "zx_rate",
-        "description": "ZX interaction rate; higher enables faster gates"
+        "name": "cr_amplitude",
+        "description": "Amplitude of the CR pulse. (a.u.)"
       },
       {
-        "name": "ix_rate",
-        "description": "Parasitic IX rate; should be << ZX rate"
+        "name": "cr_phase",
+        "description": "Phase of the CR pulse. (a.u.)"
       },
       {
-        "name": "iy_rate",
-        "description": "Parasitic IY rate; should be << ZX rate"
+        "name": "cancel_amplitude",
+        "description": "Amplitude of the cancel pulse. (a.u.)"
       },
       {
-        "name": "iz_rate",
-        "description": "Parasitic IZ rate; should be << ZX rate"
+        "name": "cancel_phase",
+        "description": "Phase of the cancel pulse. (a.u.)"
+      },
+      {
+        "name": "cancel_beta",
+        "description": "Beta of the cancel pulse. (a.u.)"
+      },
+      {
+        "name": "rotary_amplitude",
+        "description": "Amplitude of the rotary pulse. (a.u.)"
+      },
+      {
+        "name": "zx_rotation_rate",
+        "description": "ZX rotation rate. (a.u.)"
       }
     ],
     "analysis_guide": [
@@ -299,12 +282,12 @@
     "images": [
       {
         "alt_text": "CR Hamiltonian coefficients",
-        "relative_path": "figures/CheckCrossResonance/hamiltonian.png",
+        "relative_path": "./hamiltonian.png",
         "section": "expected result"
       },
       {
         "alt_text": "Target qubit dynamics under CR drive",
-        "relative_path": "figures/CheckCrossResonance/target_dynamics.png",
+        "relative_path": "./target_dynamics.png",
         "section": "expected result"
       }
     ],
@@ -373,16 +356,7 @@
       "Run after DRAG π pulse is validated since they share parameters.",
       "Check phase accuracy with tomography if fidelity is borderline."
     ],
-    "output_parameters_info": [
-      {
-        "name": "gate_fidelity",
-        "description": "DRAG X90 gate fidelity; expected > 0.995"
-      },
-      {
-        "name": "leakage_rate",
-        "description": "Leakage to |2⟩ per gate; expected < 0.001"
-      }
-    ],
+    "output_parameters_info": [],
     "analysis_guide": [
       "Compare gate fidelity with the non-DRAG CheckHPIPulse result.",
       "Verify oscillation period is 4 (correct rotation angle).",
@@ -396,7 +370,7 @@
     "images": [
       {
         "alt_text": "DRAG HPI pulse error amplification",
-        "relative_path": "figures/CheckDRAGHPIPulse/0.png",
+        "relative_path": "./0.png",
         "section": "expected result"
       }
     ],
@@ -457,16 +431,7 @@
       "If leakage persists, try scanning DRAG beta parameter.",
       "Ensure anharmonicity is well-characterized before DRAG tuning."
     ],
-    "output_parameters_info": [
-      {
-        "name": "gate_fidelity",
-        "description": "DRAG X180 gate fidelity; expected > 0.995"
-      },
-      {
-        "name": "leakage_rate",
-        "description": "Leakage to |2⟩ per gate; expected < 0.001"
-      }
-    ],
+    "output_parameters_info": [],
     "analysis_guide": [
       "Compare gate fidelity with the non-DRAG CheckPIPulse result.",
       "Check for leakage signatures in the decay pattern.",
@@ -480,7 +445,7 @@
     "images": [
       {
         "alt_text": "DRAG PI pulse error amplification",
-        "relative_path": "figures/CheckDRAGPIPulse/0.png",
+        "relative_path": "./0.png",
         "section": "expected result"
       }
     ],
@@ -543,12 +508,12 @@
     ],
     "output_parameters_info": [
       {
-        "name": "dispersive_shift",
-        "description": "2χ value; expected > 1 MHz for reliable readout"
+        "name": "optimal_readout_frequency",
+        "description": "Optimal Readout Frequency (GHz)"
       },
       {
-        "name": "resonator_linewidth",
-        "description": "κ value; 2χ > κ required for state discrimination"
+        "name": "dispersive_shift",
+        "description": "Dispersive shift (MHz)"
       }
     ],
     "analysis_guide": [
@@ -615,7 +580,7 @@
     "output_parameters_info": [
       {
         "name": "electrical_delay",
-        "description": "Signal propagation delay through the readout chain (ns)"
+        "description": "Electrical delay (ns)"
       }
     ],
     "analysis_guide": [
@@ -686,16 +651,7 @@
       "Compare error rate with CheckPIPulse for consistency.",
       "Phase errors may require separate X/Y pulse calibration."
     ],
-    "output_parameters_info": [
-      {
-        "name": "gate_fidelity",
-        "description": "Estimated X90 gate fidelity from repetition decay"
-      },
-      {
-        "name": "per_gate_error",
-        "description": "Error per application extracted from contrast decay"
-      }
-    ],
+    "output_parameters_info": [],
     "analysis_guide": [
       "Verify the oscillation period is 4 (four X90 = full rotation).",
       "Check contrast decay rate to estimate per-gate error.",
@@ -709,7 +665,7 @@
     "images": [
       {
         "alt_text": "HPI pulse error amplification",
-        "relative_path": "figures/CheckHPIPulse/0.png",
+        "relative_path": "./0.png",
         "section": "expected result"
       }
     ],
@@ -841,11 +797,7 @@
     "output_parameters_info": [
       {
         "name": "optimal_readout_amplitude",
-        "description": "Best readout drive amplitude"
-      },
-      {
-        "name": "readout_fidelity",
-        "description": "State discrimination fidelity at optimal amplitude; expected > 0.95"
+        "description": "Optimal Readout Amplitude (a.u.)"
       }
     ],
     "analysis_guide": [
@@ -916,16 +868,7 @@
       "Compare with CheckDRAGPIPulse to see if DRAG correction improves fidelity.",
       "The decay rate gives an estimate of per-gate error."
     ],
-    "output_parameters_info": [
-      {
-        "name": "gate_fidelity",
-        "description": "Estimated X180 gate fidelity from repetition decay"
-      },
-      {
-        "name": "per_gate_error",
-        "description": "Error per application extracted from contrast decay"
-      }
-    ],
+    "output_parameters_info": [],
     "analysis_guide": [
       "Check the oscillation contrast over 20 repetitions.",
       "Separate decoherence-induced decay from gate-error-induced decay.",
@@ -940,7 +883,7 @@
     "images": [
       {
         "alt_text": "PI pulse error amplification",
-        "relative_path": "figures/CheckPIPulse/0.png",
+        "relative_path": "./0.png",
         "section": "expected result"
       }
     ],
@@ -1003,12 +946,12 @@
     ],
     "output_parameters_info": [
       {
-        "name": "rabi_frequency",
-        "description": "Rabi oscillation frequency; indicates drive strength"
+        "name": "rabi_amplitude",
+        "description": "Rabi oscillation amplitude (a.u.)"
       },
       {
-        "name": "rabi_contrast",
-        "description": "Peak-to-trough oscillation amplitude; expected > 0.5"
+        "name": "rabi_frequency",
+        "description": "Rabi oscillation frequency (MHz)"
       }
     ],
     "analysis_guide": [
@@ -1082,7 +1025,7 @@
     "output_parameters_info": [
       {
         "name": "coarse_qubit_frequency",
-        "description": "Approximate qubit transition frequency f_01 (GHz)"
+        "description": "Coarse qubit frequency (GHz)"
       }
     ],
     "analysis_guide": [
@@ -1156,11 +1099,7 @@
     "output_parameters_info": [
       {
         "name": "qubit_frequency",
-        "description": "Calibrated qubit frequency; expected 4–6 GHz range"
-      },
-      {
-        "name": "frequency_shift",
-        "description": "Deviation from design target"
+        "description": "Qubit frequency (GHz)"
       }
     ],
     "analysis_guide": [
@@ -1242,11 +1181,11 @@
     "output_parameters_info": [
       {
         "name": "qubit_frequency",
-        "description": "Estimated qubit frequency f_01 (GHz)"
+        "description": "Estimated qubit frequency (f01) from spectroscopy (GHz)"
       },
       {
         "name": "anharmonicity",
-        "description": "Anharmonicity alpha = f_12 - f_01 (GHz); typically negative for transmons"
+        "description": "Anharmonicity alpha = f12 - f01 (typically negative for transmon) (GHz)"
       }
     ],
     "analysis_guide": [
@@ -1270,25 +1209,25 @@
   },
   "CheckRabi": {
     "name": "CheckRabi",
-    "summary": "Measures Rabi oscillation to extract drive amplitude, frequency, and contrast.",
-    "what_it_measures": "Rabi oscillation parameters: amplitude (contrast), frequency (drive strength), and decay.",
-    "physical_principle": "Apply a resonant drive pulse of variable duration; the qubit oscillates between |0⟩ and |1⟩ at the Rabi frequency Ω_R.",
+    "summary": "Measures Rabi oscillation to extract drive amplitude, frequency, and IQ-plane parameters.",
+    "what_it_measures": "Rabi oscillation parameters: amplitude, frequency (drive strength), phase, offset, and IQ-plane rotation parameters.",
+    "physical_principle": "Apply a resonant drive pulse of variable duration; the qubit oscillates between |0⟩ and |1⟩ at the Rabi frequency Ω_R. The IQ data is rotated via PCA to align the measurement axis, then fitted with a damped cosine model.",
     "expected_result": {
-      "description": "Damped sinusoidal oscillation of P(|1⟩) vs pulse duration. Frequency gives Ω_R, envelope gives T_Rabi.",
+      "description": "Damped sinusoidal oscillation of the rotated IQ signal vs pulse duration. Frequency gives Ω_R, envelope gives the decay time τ.",
       "result_type": "oscillation",
       "x_axis": "Pulse duration (ns)",
-      "y_axis": "P(|1⟩)",
+      "y_axis": "Rotated IQ signal (arb. units)",
       "z_axis": "",
-      "fit_model": "A * cos(2π·Ω_R·t) * exp(-t/T_Rabi) + B",
+      "fit_model": "A * cos(ω·t + φ) * exp(-t/τ) + B (damped cosine, `is_damped=True` by default)",
       "typical_range": "",
       "good_visual": "clear sinusoidal oscillation with high contrast and slow decay envelope"
     },
-    "evaluation_criteria": "Rabi contrast should be high; frequency should be consistent with calibrated drive amplitude; fit quality should be good.",
+    "evaluation_criteria": "Rabi amplitude should be high; frequency should be consistent with calibrated drive amplitude; fit quality should be good.",
     "check_questions": [
-      "Is the Rabi contrast >90%?",
+      "Is the Rabi amplitude (contrast) sufficiently high?",
       "Is the Rabi frequency consistent with the expected drive amplitude?",
       "Is the fit R² > 0.95?",
-      "Is the decay (T_Rabi) slow compared to the oscillation period?"
+      "Is the decay slow compared to the oscillation period?"
     ],
     "failure_modes": [
       {
@@ -1327,20 +1266,44 @@
     ],
     "output_parameters_info": [
       {
+        "name": "rabi_amplitude",
+        "description": "Rabi oscillation amplitude (a.u.)"
+      },
+      {
         "name": "rabi_frequency",
-        "description": "Rabi oscillation frequency Ω_R; indicates drive strength"
+        "description": "Rabi oscillation frequency (MHz)"
       },
       {
-        "name": "rabi_contrast",
-        "description": "Peak-to-trough amplitude; expected > 0.9"
+        "name": "rabi_phase",
+        "description": "Rabi oscillation phase (a.u.)"
       },
       {
-        "name": "t_rabi",
-        "description": "Rabi decay time; longer is better"
+        "name": "rabi_offset",
+        "description": "Rabi oscillation offset (a.u.)"
       },
       {
-        "name": "fit_r_squared",
-        "description": "Fit quality; expected > 0.95"
+        "name": "rabi_angle",
+        "description": "Rabi angle (in degree) (degree)"
+      },
+      {
+        "name": "rabi_noise",
+        "description": "Rabi oscillation noise (a.u.)"
+      },
+      {
+        "name": "rabi_distance",
+        "description": "Rabi distance (a.u.)"
+      },
+      {
+        "name": "rabi_reference_phase",
+        "description": "Rabi reference phase (a.u.)"
+      },
+      {
+        "name": "control_amplitude",
+        "description": "Control pulse amplitude (a.u.)"
+      },
+      {
+        "name": "maximum_rabi_frequency",
+        "description": "Maximum Rabi frequency per unit control amplitude (MHz/a.u.)"
       }
     ],
     "analysis_guide": [
@@ -1357,7 +1320,7 @@
     "images": [
       {
         "alt_text": "Rabi oscillation",
-        "relative_path": "figures/CheckRabi/0.png",
+        "relative_path": "./0.png",
         "section": "expected result"
       }
     ],
@@ -1420,16 +1383,16 @@
     ],
     "output_parameters_info": [
       {
+        "name": "ramsey_frequency",
+        "description": "Ramsey oscillation frequency (MHz)"
+      },
+      {
+        "name": "qubit_frequency",
+        "description": "Qubit bare frequency (GHz)"
+      },
+      {
         "name": "t2_star",
-        "description": "T2* dephasing time; expected 10–80 μs"
-      },
-      {
-        "name": "detuning",
-        "description": "Residual frequency detuning Δf; expected near intended value"
-      },
-      {
-        "name": "fit_r_squared",
-        "description": "Goodness of fit; expected > 0.90"
+        "description": "T2* time (μs)"
       }
     ],
     "analysis_guide": [
@@ -1446,17 +1409,17 @@
     "images": [
       {
         "alt_text": "X-basis Ramsey fringe",
-        "relative_path": "figures/CheckRamsey/x_fringe.png",
+        "relative_path": "./x_fringe.png",
         "section": "expected result"
       },
       {
         "alt_text": "Y-basis Ramsey fringe",
-        "relative_path": "figures/CheckRamsey/y_fringe.png",
+        "relative_path": "./y_fringe.png",
         "section": "expected result"
       },
       {
         "alt_text": "Ramsey interference in XY plane",
-        "relative_path": "figures/CheckRamsey/xy_spiral.png",
+        "relative_path": "./xy_spiral.png",
         "section": "expected result"
       }
     ],
@@ -1528,7 +1491,7 @@
     "output_parameters_info": [
       {
         "name": "readout_amplitude",
-        "description": "Optimal readout amplitude where SNR first exceeds the threshold (a.u.)"
+        "description": "Optimal readout amplitude from SNR threshold (a.u.)"
       }
     ],
     "analysis_guide": [
@@ -1601,11 +1564,7 @@
     "output_parameters_info": [
       {
         "name": "readout_frequency",
-        "description": "Calibrated readout resonator frequency"
-      },
-      {
-        "name": "readout_amplitude",
-        "description": "Optimal readout drive amplitude (if co-calibrated)"
+        "description": "Readout frequency (GHz)"
       }
     ],
     "analysis_guide": [
@@ -1677,15 +1636,15 @@
     "output_parameters_info": [
       {
         "name": "resonator_frequency",
-        "description": "Precise resonator frequency f_r (GHz)"
+        "description": "Fine resonator frequency (GHz)"
       },
       {
         "name": "kappa_external",
-        "description": "External coupling rate (MHz); quantifies resonator-feedline coupling"
+        "description": "External coupling rate (kappa_external) (MHz)"
       },
       {
         "name": "kappa_internal",
-        "description": "Internal coupling rate (MHz); quantifies intrinsic resonator losses"
+        "description": "Internal coupling rate (kappa_internal) (MHz)"
       }
     ],
     "analysis_guide": [
@@ -1761,7 +1720,7 @@
     "output_parameters_info": [
       {
         "name": "coarse_resonator_frequency",
-        "description": "Approximate resonator resonance frequency (GHz)"
+        "description": "Coarse resonator frequency (GHz)"
       }
     ],
     "analysis_guide": [
@@ -1836,7 +1795,7 @@
     "output_parameters_info": [
       {
         "name": "readout_frequency",
-        "description": "Estimated resonator frequency (GHz) for the target qubit"
+        "description": "Estimated resonator frequency from spectroscopy (GHz)"
       }
     ],
     "analysis_guide": [
@@ -2038,11 +1997,7 @@
     "output_parameters_info": [
       {
         "name": "t1",
-        "description": "T1 relaxation time; expected 20–200 μs"
-      },
-      {
-        "name": "fit_r_squared",
-        "description": "Goodness of fit; expected > 0.95"
+        "description": "T1 time (μs)"
       }
     ],
     "analysis_guide": [
@@ -2059,7 +2014,7 @@
     "images": [
       {
         "alt_text": "T1 exponential decay curve",
-        "relative_path": "figures/CheckT1/0.png",
+        "relative_path": "./0.png",
         "section": "expected result"
       }
     ],
@@ -2131,11 +2086,7 @@
     "output_parameters_info": [
       {
         "name": "t2_echo",
-        "description": "T2 echo coherence time; expected 30–300 μs"
-      },
-      {
-        "name": "fit_r_squared",
-        "description": "Goodness of fit; expected > 0.95"
+        "description": "T2 echo time (μs)"
       }
     ],
     "analysis_guide": [
@@ -2152,7 +2103,7 @@
     "images": [
       {
         "alt_text": "T2 echo decay curve",
-        "relative_path": "figures/CheckT2Echo/0.png",
+        "relative_path": "./0.png",
         "section": "expected result"
       }
     ],
@@ -2222,16 +2173,7 @@
       "Check both control states (|0⟩ and |1⟩) independently.",
       "If fidelity is poor, re-run CreateZX90 with fresh CR calibration."
     ],
-    "output_parameters_info": [
-      {
-        "name": "zx90_gate_fidelity",
-        "description": "ZX90 gate fidelity; target depends on application"
-      },
-      {
-        "name": "conditional_phase_error",
-        "description": "Phase error conditioned on control state"
-      }
-    ],
+    "output_parameters_info": [],
     "analysis_guide": [
       "Check the ZX90 fidelity against the target threshold.",
       "Determine if the fidelity is coherence-limited or calibration-limited.",
@@ -2247,12 +2189,12 @@
     "images": [
       {
         "alt_text": "ZX90 control qubit sweep",
-        "relative_path": "figures/CheckZX90/control.png",
+        "relative_path": "./control.png",
         "section": "expected result"
       },
       {
         "alt_text": "ZX90 target qubit sweep",
-        "relative_path": "figures/CheckZX90/target.png",
+        "relative_path": "./target.png",
         "section": "expected result"
       }
     ],
@@ -2324,11 +2266,11 @@
     "output_parameters_info": [
       {
         "name": "qubit_frequency",
-        "description": "Frequency from chevron vertex position"
+        "description": "Qubit bare frequency (GHz)"
       },
       {
-        "name": "rabi_frequency",
-        "description": "Rabi frequency from fringe period at zero detuning"
+        "name": "readout_amplitude",
+        "description": "Optimal readout amplitude from SNR threshold (a.u.)"
       }
     ],
     "analysis_guide": [
@@ -2343,7 +2285,7 @@
     "images": [
       {
         "alt_text": "Chevron pattern",
-        "relative_path": "figures/ChevronPattern/0.png",
+        "relative_path": "./0.png",
         "section": "expected result"
       }
     ],
@@ -2472,16 +2414,16 @@
     ],
     "output_parameters_info": [
       {
-        "name": "drag_beta",
-        "description": "Optimal DRAG derivative coefficient for X90"
+        "name": "drag_hpi_beta",
+        "description": "DRAG HPI pulse beta (a.u.)"
       },
       {
-        "name": "hpi_pulse_amplitude",
-        "description": "Refined π/2 pulse amplitude with DRAG"
+        "name": "drag_hpi_amplitude",
+        "description": "DRAG HPI pulse amplitude (a.u.)"
       },
       {
-        "name": "leakage_rate",
-        "description": "Leakage to |2⟩ at optimal parameters; expected < 0.001"
+        "name": "drag_hpi_length",
+        "description": "DRAG HPI pulse length (ns)"
       }
     ],
     "analysis_guide": [
@@ -2497,7 +2439,7 @@
     "images": [
       {
         "alt_text": "DRAG HPI pulse calibration",
-        "relative_path": "figures/CreateDRAGHPIPulse/0.png",
+        "relative_path": "./0.png",
         "section": "expected result"
       }
     ],
@@ -2560,16 +2502,16 @@
     ],
     "output_parameters_info": [
       {
-        "name": "drag_beta",
-        "description": "Optimal DRAG derivative coefficient"
+        "name": "drag_pi_beta",
+        "description": "DRAG PI pulse beta"
       },
       {
-        "name": "pi_pulse_amplitude",
-        "description": "Refined π pulse amplitude with DRAG"
+        "name": "drag_pi_amplitude",
+        "description": "DRAG PI pulse amplitude"
       },
       {
-        "name": "leakage_rate",
-        "description": "Leakage to |2⟩ at optimal parameters; expected < 0.001"
+        "name": "drag_pi_length",
+        "description": "DRAG PI pulse length (ns)"
       }
     ],
     "analysis_guide": [
@@ -2585,7 +2527,7 @@
     "images": [
       {
         "alt_text": "DRAG PI pulse calibration",
-        "relative_path": "figures/CreateDRAGPIPulse/0.png",
+        "relative_path": "./0.png",
         "section": "expected result"
       }
     ],
@@ -2648,12 +2590,12 @@
     ],
     "output_parameters_info": [
       {
-        "name": "hpi_pulse_amplitude",
-        "description": "Calibrated amplitude for π/2 rotation"
+        "name": "hpi_amplitude",
+        "description": "HPI pulse amplitude"
       },
       {
-        "name": "fit_r_squared",
-        "description": "Fit quality; expected > 0.95"
+        "name": "hpi_length",
+        "description": "HPI pulse length (ns)"
       }
     ],
     "analysis_guide": [
@@ -2669,7 +2611,7 @@
     "images": [
       {
         "alt_text": "HPI pulse calibration",
-        "relative_path": "figures/CreateHPIPulse/0.png",
+        "relative_path": "./0.png",
         "section": "expected result"
       }
     ],
@@ -2732,12 +2674,12 @@
     ],
     "output_parameters_info": [
       {
-        "name": "pi_pulse_amplitude",
-        "description": "Calibrated amplitude for π rotation"
+        "name": "pi_amplitude",
+        "description": "PI pulse amplitude"
       },
       {
-        "name": "fit_r_squared",
-        "description": "Fit quality; expected > 0.95"
+        "name": "pi_length",
+        "description": "PI pulse length (ns)"
       }
     ],
     "analysis_guide": [
@@ -2753,7 +2695,7 @@
     "images": [
       {
         "alt_text": "PI pulse calibration",
-        "relative_path": "figures/CreatePIPulse/0.png",
+        "relative_path": "./0.png",
         "section": "expected result"
       }
     ],
@@ -2817,15 +2759,35 @@
     "output_parameters_info": [
       {
         "name": "cr_amplitude",
-        "description": "Calibrated CR drive amplitude"
+        "description": "Amplitude of the CR pulse. (a.u.)"
       },
       {
-        "name": "cr_duration",
-        "description": "Calibrated CR pulse duration for 90° ZX rotation"
+        "name": "cr_phase",
+        "description": "Phase of the CR pulse. (a.u.)"
       },
       {
-        "name": "zx_angle",
-        "description": "Actual ZX rotation angle; target 90°"
+        "name": "cancel_amplitude",
+        "description": "Amplitude of the cancel pulse. (a.u.)"
+      },
+      {
+        "name": "cancel_phase",
+        "description": "Phase of the cancel pulse. (a.u.)"
+      },
+      {
+        "name": "cancel_beta",
+        "description": "Beta of the cancel pulse. (a.u.)"
+      },
+      {
+        "name": "rotary_amplitude",
+        "description": "Amplitude of the rotary pulse. (a.u.)"
+      },
+      {
+        "name": "zx_rotation_rate",
+        "description": "ZX rotation rate. (a.u.)"
+      },
+      {
+        "name": "zx90_gate_time",
+        "description": "Duration of the ZX90 pulse. (ns)"
       }
     ],
     "analysis_guide": [
@@ -2843,17 +2805,17 @@
     "images": [
       {
         "alt_text": "ZX90 calibration n=1",
-        "relative_path": "figures/CreateZX90/n1.png",
+        "relative_path": "./n1.png",
         "section": "expected result"
       },
       {
         "alt_text": "ZX90 calibration n=3",
-        "relative_path": "figures/CreateZX90/n3.png",
+        "relative_path": "./n3.png",
         "section": "expected result"
       },
       {
         "alt_text": "ZX90 final calibration",
-        "relative_path": "figures/CreateZX90/final.png",
+        "relative_path": "./final.png",
         "section": "expected result"
       }
     ],
@@ -3042,16 +3004,12 @@
     ],
     "output_parameters_info": [
       {
-        "name": "error_per_clifford",
-        "description": "Average error per Clifford gate; lower is better"
+        "name": "average_gate_fidelity",
+        "description": "Average gate fidelity (a.u.)"
       },
       {
-        "name": "depolarizing_parameter",
-        "description": "Decay parameter p; fidelity = 1 - (1-p)(d-1)/d"
-      },
-      {
-        "name": "fit_r_squared",
-        "description": "Fit quality; expected > 0.95"
+        "name": "depolarizing_rate",
+        "description": "Depolarization rate of the qubit (a.u.)"
       }
     ],
     "analysis_guide": [
@@ -3068,7 +3026,7 @@
     "images": [
       {
         "alt_text": "Randomized benchmarking decay",
-        "relative_path": "figures/RandomizedBenchmarking/0.png",
+        "relative_path": "./0.png",
         "section": "expected result"
       }
     ],
@@ -3139,15 +3097,15 @@
     "output_parameters_info": [
       {
         "name": "average_readout_fidelity",
-        "description": "Mean of P(0|0) and P(1|1); expected > 0.95"
+        "description": "Average readout fidelity (a.u.)"
       },
       {
-        "name": "p00",
-        "description": "P(assign 0 | prepared 0); expected > 0.95"
+        "name": "readout_fidelity_0",
+        "description": "Readout fidelity with preparation state 0 (a.u.)"
       },
       {
-        "name": "p11",
-        "description": "P(assign 1 | prepared 1); expected > 0.95"
+        "name": "readout_fidelity_1",
+        "description": "Readout fidelity with preparation state 1 (a.u.)"
       }
     ],
     "analysis_guide": [
@@ -3164,7 +3122,7 @@
     "images": [
       {
         "alt_text": "Readout classification",
-        "relative_path": "figures/ReadoutClassification/0.png",
+        "relative_path": "./0.png",
         "section": "expected result"
       }
     ],
@@ -3286,16 +3244,12 @@
     ],
     "output_parameters_info": [
       {
-        "name": "x180_gate_error",
-        "description": "X180-specific error rate; lower is better"
+        "name": "x180_gate_fidelity",
+        "description": "X180 gate fidelity (a.u.)"
       },
       {
-        "name": "reference_epc",
-        "description": "Reference error per Clifford for comparison"
-      },
-      {
-        "name": "interleaved_epc",
-        "description": "Interleaved error per Clifford"
+        "name": "x180_depolarizing_rate",
+        "description": "Depolarization error of the X180 gate (a.u.)"
       }
     ],
     "analysis_guide": [
@@ -3369,16 +3323,12 @@
     ],
     "output_parameters_info": [
       {
-        "name": "x90_gate_error",
-        "description": "X90-specific error rate; lower is better"
+        "name": "x90_gate_fidelity",
+        "description": "X90 gate fidelity (a.u.)"
       },
       {
-        "name": "reference_epc",
-        "description": "Reference error per Clifford for comparison"
-      },
-      {
-        "name": "interleaved_epc",
-        "description": "Interleaved error per Clifford"
+        "name": "x90_depolarizing_rate",
+        "description": "Depolarization error of the X90 gate (a.u.)"
       }
     ],
     "analysis_guide": [
@@ -3395,7 +3345,7 @@
     "images": [
       {
         "alt_text": "X90 interleaved randomized benchmarking",
-        "relative_path": "figures/X90InterleavedRandomizedBenchmarking/0.png",
+        "relative_path": "./0.png",
         "section": "expected result"
       }
     ],
@@ -3458,16 +3408,12 @@
     ],
     "output_parameters_info": [
       {
-        "name": "zx90_gate_error",
-        "description": "ZX90-specific error rate; lower is better"
+        "name": "zx90_gate_fidelity",
+        "description": "ZX90 gate fidelity (a.u.)"
       },
       {
-        "name": "reference_epc",
-        "description": "Reference two-qubit error per Clifford"
-      },
-      {
-        "name": "interleaved_epc",
-        "description": "Interleaved two-qubit error per Clifford"
+        "name": "zx90_depolarizing_rate",
+        "description": "Depolarization error of the ZX90 gate (a.u.)"
       }
     ],
     "analysis_guide": [
@@ -3484,7 +3430,7 @@
     "images": [
       {
         "alt_text": "ZX90 interleaved randomized benchmarking",
-        "relative_path": "figures/ZX90InterleavedRandomizedBenchmarking/0.png",
+        "relative_path": "./0.png",
         "section": "expected result"
       }
     ],

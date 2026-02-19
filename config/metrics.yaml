@@ -210,6 +210,14 @@ qubit_metrics:
     evaluation:
       mode: none
 
+  one_qubit_gate_coherence_limit:
+    title: 1Q Gate Coherence Limit
+    unit: "%"
+    scale: 100
+    description: Theoretical fidelity limit of single-qubit gates from coherence times
+    evaluation:
+      mode: maximize
+
 coupling_metrics:
   zx90_gate_fidelity:
     title: ZX90 Gate Fidelity
@@ -246,6 +254,22 @@ coupling_metrics:
       min: 0.001
       max: 0.2
       step: 0.001
+
+  zx90_gate_time:
+    title: ZX90 Gate Time
+    unit: ns
+    scale: 1
+    description: Gate time of the ZX90 pulse
+    evaluation:
+      mode: none
+
+  two_qubit_gate_coherence_limit:
+    title: 2Q Gate Coherence Limit
+    unit: "%"
+    scale: 100
+    description: Theoretical fidelity limit of two-qubit gates from coherence times
+    evaluation:
+      mode: maximize
 
   static_zz_interaction:
     title: Static ZZ Interaction
@@ -285,6 +309,7 @@ cdf_groups:
         - average_gate_fidelity
         - x90_gate_fidelity
         - x180_gate_fidelity
+        - one_qubit_gate_coherence_limit
     - id: readout
       title: Readout Fidelity
       unit: "%"

@@ -112,6 +112,9 @@ class CreateZX90(QubexTask):
         "zx_rotation_rate": ParameterModel(
             qid_role="coupling", unit="a.u.", description="ZX rotation rate."
         ),
+        "zx90_gate_time": ParameterModel(
+            qid_role="coupling", unit="ns", description="Duration of the ZX90 pulse."
+        ),
     }
 
     def postprocess(
@@ -125,6 +128,7 @@ class CreateZX90(QubexTask):
         self.output_parameters["cancel_beta"].value = result["cancel_beta"]
         self.output_parameters["rotary_amplitude"].value = result["rotary_amplitude"]
         self.output_parameters["zx_rotation_rate"].value = result["zx_rotation_rate"]
+        self.output_parameters["zx90_gate_time"].value = result["zx90_gate_time"]
         output_parameters = self.attach_execution_id(execution_id)
         figures: list[Any] = [result["n1"], result["n3"], result["fig"]]
         raw_data: list[Any] = []
@@ -162,6 +166,9 @@ class CreateZX90(QubexTask):
             "n3": raw_result["n3"]["fig"],
             "fig": raw_result["fig"],
         }
+
+        zx90 = exp.zx90(control_qubit=control, target_qubit=target)
+        result["zx90_gate_time"] = zx90.duration
 
         self.save_calibration(backend)
         return RunResult(raw_result=result)

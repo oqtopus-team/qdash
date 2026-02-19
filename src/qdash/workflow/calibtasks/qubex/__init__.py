@@ -1,5 +1,11 @@
 from qdash.workflow.calibtasks.active_protocols import generate_task_instances
 from qdash.workflow.calibtasks.qubex.base import QubexTask
+from qdash.workflow.calibtasks.qubex.benchmark.check_1q_gate_coherence_limit import (
+    Check1QGateCoherenceLimit,
+)
+from qdash.workflow.calibtasks.qubex.benchmark.check_2q_gate_coherence_limit import (
+    Check2QGateCoherenceLimit,
+)
 from qdash.workflow.calibtasks.qubex.benchmark.randomized_benchmarking import RandomizedBenchmarking
 from qdash.workflow.calibtasks.qubex.benchmark.x90_interleaved_randomized_benchmarking import (
     X90InterleavedRandomizedBenchmarking,
@@ -95,6 +101,8 @@ __all__ = [
     "CheckZX90",
     "CreateZX90",
     "CheckBellState",
+    "Check1QGateCoherenceLimit",
+    "Check2QGateCoherenceLimit",
     "RandomizedBenchmarking",
     "X90InterleavedRandomizedBenchmarking",
     "X180InterleavedRandomizedBenchmarking",
