@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate task-knowledge.json from docs/reference/task-knowledge/*.md.
+"""Generate task-knowledge.json from docs/reference/task-knowledge/*/index.md.
 
 Parses all Markdown knowledge files and produces a single JSON registry
 that the application loads at runtime.  Run via ``task knowledge`` or
@@ -538,9 +538,9 @@ def main() -> int:
         print(f"ERROR: Markdown directory not found: {MD_DIR}", file=sys.stderr)
         return 1
 
-    md_files = sorted(p for p in MD_DIR.glob("*.md") if p.name != "index.md")
+    md_files = sorted(MD_DIR.glob("*/index.md"))
     if not md_files:
-        print(f"ERROR: No .md files found in {MD_DIR}", file=sys.stderr)
+        print(f"ERROR: No */index.md files found in {MD_DIR}", file=sys.stderr)
         return 1
 
     registry: dict[str, dict] = {}
@@ -549,7 +549,7 @@ def main() -> int:
     for md_path in md_files:
         entry = _parse_markdown_file(md_path)
         if entry is None:
-            errors.append(f"  SKIP {md_path.name}: no H1 heading found")
+            errors.append(f"  SKIP {md_path.parent.name}: no H1 heading found")
             continue
 
         missing = [
@@ -569,10 +569,10 @@ def main() -> int:
             missing.append("evaluation_criteria")
 
         if missing:
-            errors.append(f"  WARN {md_path.name}: missing sections: {', '.join(missing)}")
+            errors.append(f"  WARN {md_path.parent.name}: missing sections: {', '.join(missing)}")
 
         registry[entry["name"]] = entry
-        print(f"  OK   {md_path.name} -> {entry['name']}")
+        print(f"  OK   {md_path.parent.name}/index.md -> {entry['name']}")
 
     if errors:
         print("\nWarnings:")

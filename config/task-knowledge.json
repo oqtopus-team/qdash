@@ -92,7 +92,7 @@
     "images": [
       {
         "alt_text": "Bell state measurement",
-        "relative_path": "figures/CheckBellState/0.png",
+        "relative_path": "./0.png",
         "section": "expected result"
       }
     ],
@@ -190,7 +190,7 @@
     "images": [
       {
         "alt_text": "Bell state tomography",
-        "relative_path": "figures/CheckBellStateTomography/0.png",
+        "relative_path": "./0.png",
         "section": "expected result"
       }
     ],
@@ -299,12 +299,12 @@
     "images": [
       {
         "alt_text": "CR Hamiltonian coefficients",
-        "relative_path": "figures/CheckCrossResonance/hamiltonian.png",
+        "relative_path": "./hamiltonian.png",
         "section": "expected result"
       },
       {
         "alt_text": "Target qubit dynamics under CR drive",
-        "relative_path": "figures/CheckCrossResonance/target_dynamics.png",
+        "relative_path": "./target_dynamics.png",
         "section": "expected result"
       }
     ],
@@ -396,7 +396,7 @@
     "images": [
       {
         "alt_text": "DRAG HPI pulse error amplification",
-        "relative_path": "figures/CheckDRAGHPIPulse/0.png",
+        "relative_path": "./0.png",
         "section": "expected result"
       }
     ],
@@ -480,7 +480,7 @@
     "images": [
       {
         "alt_text": "DRAG PI pulse error amplification",
-        "relative_path": "figures/CheckDRAGPIPulse/0.png",
+        "relative_path": "./0.png",
         "section": "expected result"
       }
     ],
@@ -709,7 +709,7 @@
     "images": [
       {
         "alt_text": "HPI pulse error amplification",
-        "relative_path": "figures/CheckHPIPulse/0.png",
+        "relative_path": "./0.png",
         "section": "expected result"
       }
     ],
@@ -940,7 +940,7 @@
     "images": [
       {
         "alt_text": "PI pulse error amplification",
-        "relative_path": "figures/CheckPIPulse/0.png",
+        "relative_path": "./0.png",
         "section": "expected result"
       }
     ],
@@ -1357,7 +1357,7 @@
     "images": [
       {
         "alt_text": "Rabi oscillation",
-        "relative_path": "figures/CheckRabi/0.png",
+        "relative_path": "./0.png",
         "section": "expected result"
       }
     ],
@@ -1446,17 +1446,17 @@
     "images": [
       {
         "alt_text": "X-basis Ramsey fringe",
-        "relative_path": "figures/CheckRamsey/x_fringe.png",
+        "relative_path": "./x_fringe.png",
         "section": "expected result"
       },
       {
         "alt_text": "Y-basis Ramsey fringe",
-        "relative_path": "figures/CheckRamsey/y_fringe.png",
+        "relative_path": "./y_fringe.png",
         "section": "expected result"
       },
       {
         "alt_text": "Ramsey interference in XY plane",
-        "relative_path": "figures/CheckRamsey/xy_spiral.png",
+        "relative_path": "./xy_spiral.png",
         "section": "expected result"
       }
     ],
@@ -2059,7 +2059,7 @@
     "images": [
       {
         "alt_text": "T1 exponential decay curve",
-        "relative_path": "figures/CheckT1/0.png",
+        "relative_path": "./0.png",
         "section": "expected result"
       }
     ],
@@ -2152,7 +2152,7 @@
     "images": [
       {
         "alt_text": "T2 echo decay curve",
-        "relative_path": "figures/CheckT2Echo/0.png",
+        "relative_path": "./0.png",
         "section": "expected result"
       }
     ],
@@ -2247,12 +2247,12 @@
     "images": [
       {
         "alt_text": "ZX90 control qubit sweep",
-        "relative_path": "figures/CheckZX90/control.png",
+        "relative_path": "./control.png",
         "section": "expected result"
       },
       {
         "alt_text": "ZX90 target qubit sweep",
-        "relative_path": "figures/CheckZX90/target.png",
+        "relative_path": "./target.png",
         "section": "expected result"
       }
     ],
@@ -2343,7 +2343,7 @@
     "images": [
       {
         "alt_text": "Chevron pattern",
-        "relative_path": "figures/ChevronPattern/0.png",
+        "relative_path": "./0.png",
         "section": "expected result"
       }
     ],
@@ -2497,7 +2497,7 @@
     "images": [
       {
         "alt_text": "DRAG HPI pulse calibration",
-        "relative_path": "figures/CreateDRAGHPIPulse/0.png",
+        "relative_path": "./0.png",
         "section": "expected result"
       }
     ],
@@ -2585,7 +2585,7 @@
     "images": [
       {
         "alt_text": "DRAG PI pulse calibration",
-        "relative_path": "figures/CreateDRAGPIPulse/0.png",
+        "relative_path": "./0.png",
         "section": "expected result"
       }
     ],
@@ -2669,7 +2669,7 @@
     "images": [
       {
         "alt_text": "HPI pulse calibration",
-        "relative_path": "figures/CreateHPIPulse/0.png",
+        "relative_path": "./0.png",
         "section": "expected result"
       }
     ],
@@ -2753,7 +2753,7 @@
     "images": [
       {
         "alt_text": "PI pulse calibration",
-        "relative_path": "figures/CreatePIPulse/0.png",
+        "relative_path": "./0.png",
         "section": "expected result"
       }
     ],
@@ -2843,17 +2843,17 @@
     "images": [
       {
         "alt_text": "ZX90 calibration n=1",
-        "relative_path": "figures/CreateZX90/n1.png",
+        "relative_path": "./n1.png",
         "section": "expected result"
       },
       {
         "alt_text": "ZX90 calibration n=3",
-        "relative_path": "figures/CreateZX90/n3.png",
+        "relative_path": "./n3.png",
         "section": "expected result"
       },
       {
         "alt_text": "ZX90 final calibration",
-        "relative_path": "figures/CreateZX90/final.png",
+        "relative_path": "./final.png",
         "section": "expected result"
       }
     ],
@@ -3068,7 +3068,7 @@
     "images": [
       {
         "alt_text": "Randomized benchmarking decay",
-        "relative_path": "figures/RandomizedBenchmarking/0.png",
+        "relative_path": "./0.png",
         "section": "expected result"
       }
     ],
@@ -3164,7 +3164,7 @@
     "images": [
       {
         "alt_text": "Readout classification",
-        "relative_path": "figures/ReadoutClassification/0.png",
+        "relative_path": "./0.png",
         "section": "expected result"
       }
     ],
@@ -3395,7 +3395,7 @@
     "images": [
       {
         "alt_text": "X90 interleaved randomized benchmarking",
-        "relative_path": "figures/X90InterleavedRandomizedBenchmarking/0.png",
+        "relative_path": "./0.png",
         "section": "expected result"
       }
     ],
@@ -3484,7 +3484,7 @@
     "images": [
       {
         "alt_text": "ZX90 interleaved randomized benchmarking",
-        "relative_path": "figures/ZX90InterleavedRandomizedBenchmarking/0.png",
+        "relative_path": "./0.png",
         "section": "expected result"
       }
     ],

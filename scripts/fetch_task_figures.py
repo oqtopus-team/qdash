@@ -2,8 +2,9 @@
 """Fetch representative calibration figures and place them in docs.
 
 Queries MongoDB for the latest successful task results with figures,
-then copies the figure files into ``docs/reference/task-knowledge/figures/``
-and inserts image references into the corresponding Markdown files.
+then copies the figure files into each task's directory under
+``docs/reference/task-knowledge/<TaskName>/`` and inserts image
+references into the corresponding ``index.md`` files.
 
 Usage:
     # Copy from calib_data directory (run inside Docker or where data is mounted)
@@ -30,10 +31,9 @@ from dotenv import load_dotenv
 REPO_ROOT = Path(__file__).resolve().parent.parent
 load_dotenv(REPO_ROOT / ".env")
 MD_DIR = REPO_ROOT / "docs" / "reference" / "task-knowledge"
-FIGURES_DIR = MD_DIR / "figures"
 
-# Image reference pattern already in MD files
-_IMAGE_RE = re.compile(r"!\[[^\]]*\]\(figures/[^)]+\)")
+# Image reference pattern already in MD files (./filename.png within task dirs)
+_IMAGE_RE = re.compile(r"!\[[^\]]*\]\(\./[^)]+\.png\)")
 
 
 def _build_default_mongodb_uri() -> str:
@@ -105,12 +105,15 @@ def _copy_from_calib_dir(
         png_paths = paths["figure_path"]
         json_paths = paths.get("json_figure_path", [])
 
+        task_dir = MD_DIR / task_name
+        task_dir.mkdir(parents=True, exist_ok=True)
+
         task_files: list[str] = []
 
         for i, png_path in enumerate(png_paths):
             src = Path(png_path)
             dest_name = f"{task_name}_{i}.png"
-            dest = FIGURES_DIR / dest_name
+            dest = task_dir / dest_name
 
             if from_json and i < len(json_paths):
                 # Regenerate PNG from Plotly JSON
@@ -132,7 +135,7 @@ def _copy_from_calib_dir(
         for i, json_path in enumerate(json_paths):
             src = Path(json_path)
             json_dest_name = f"{task_name}_{i}.json"
-            json_dest = FIGURES_DIR / json_dest_name
+            json_dest = task_dir / json_dest_name
             if src.exists():
                 shutil.copy2(src, json_dest)
                 print(f"  Copied {json_dest_name}")
@@ -161,11 +164,15 @@ def _fetch_from_api(
 
     for task_name, paths in task_figures.items():
         png_paths = paths["figure_path"]
+
+        task_dir = MD_DIR / task_name
+        task_dir.mkdir(parents=True, exist_ok=True)
+
         task_files: list[str] = []
 
         for i, png_path in enumerate(png_paths):
             dest_name = f"{task_name}_{i}.png"
-            dest = FIGURES_DIR / dest_name
+            dest = task_dir / dest_name
 
             url = f"{api_url.rstrip('/')}/executions/figure"
             resp = requests.get(url, params={"path": png_path}, timeout=30)
@@ -205,9 +212,9 @@ def _update_md_files(copied: dict[str, list[str]]) -> int:
     updated = 0
 
     for task_name, filenames in copied.items():
-        md_path = MD_DIR / f"{task_name}.md"
+        md_path = MD_DIR / task_name / "index.md"
         if not md_path.exists():
-            print(f"  SKIP MD update: {task_name}.md not found")
+            print(f"  SKIP MD update: {task_name}/index.md not found")
             continue
 
         content = md_path.read_text(encoding="utf-8")
@@ -219,7 +226,7 @@ def _update_md_files(copied: dict[str, list[str]]) -> int:
         img_lines = []
         for fname in filenames:
             alt = f"Example result for {task_name}"
-            img_lines.append(f"![{alt}](figures/{fname})")
+            img_lines.append(f"![{alt}](./{fname})")
 
         img_block = "\n".join(img_lines)
 
@@ -302,8 +309,6 @@ def main() -> int:
     if not args.calib_dir and not args.api_url:
         print("ERROR: Either --calib-dir or --api-url is required", file=sys.stderr)
         return 1
-
-    FIGURES_DIR.mkdir(parents=True, exist_ok=True)
 
     print("Querying MongoDB for latest task figures...")
     uri = args.mongodb_uri or _build_default_mongodb_uri()
