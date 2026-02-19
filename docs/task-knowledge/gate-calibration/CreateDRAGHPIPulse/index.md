@@ -10,6 +10,22 @@ Optimal DRAG derivative coefficient for X90 gate.
 
 Same as CreateDRAGPIPulse but for half-rotation; may share beta but needs independent amplitude calibration.
 
+```mermaid
+gantt
+    title CreateDRAGHPIPulse Pulse Sequence
+    dateFormat x
+    axisFormat " "
+
+    section Drive (I)
+    Shaped π/2 pulse        :d1, 0, 80ms
+
+    section Drive (Q)
+    DRAG dY/dt (sweep β)    :active, q1, 0, 80ms
+
+    section Readout
+    Measurement             :crit, r1, after d1, 50ms
+```
+
 ## Expected result
 
 Leakage vs beta minimum; amplitude tuned for exact π/2 rotation.

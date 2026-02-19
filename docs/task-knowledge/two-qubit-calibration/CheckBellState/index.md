@@ -10,6 +10,23 @@ Bell state fidelity – quality of entanglement between qubit pair.
 
 Apply H⊗I then CNOT; measure in Z basis and verify equal |00⟩/|11⟩ populations with coherent superposition.
 
+```mermaid
+gantt
+    title CheckBellState Pulse Sequence
+    dateFormat x
+    axisFormat " "
+
+    section Control
+    X/2 (H gate) :d1, 0, 20ms
+    CR pulse     :d2, after d1, 80ms
+    Readout      :crit, r1, after d2, 50ms
+
+    section Target
+    idle         :done, t1, 0, 20ms
+    Cancel tone  :active, t2, after t1, 80ms
+    Readout      :crit, r2, after t2, 50ms
+```
+
 ## Expected result
 
 Population histogram showing ~50/50 |00⟩/|11⟩ with minimal |01⟩/|10⟩.

@@ -10,6 +10,19 @@ Optimal pulse amplitude for a full π rotation (|0⟩ → |1⟩).
 
 Apply a shaped pulse of fixed duration and sweep amplitude; fit the Rabi oscillation to find the amplitude corresponding to exactly π rotation.
 
+```mermaid
+gantt
+    title CreatePIPulse Pulse Sequence
+    dateFormat x
+    axisFormat " "
+
+    section Drive
+    Shaped pulse (sweep amp) :d1, 0, 80ms
+
+    section Readout
+    Measurement              :crit, r1, after d1, 50ms
+```
+
 ## Expected result
 
 Cosine-like Rabi oscillation vs amplitude; π pulse at the first minimum (population inverted).

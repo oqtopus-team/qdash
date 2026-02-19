@@ -10,6 +10,24 @@ Average error per Clifford gate (EPC) – gate-set-level fidelity metric.
 
 Apply random Clifford gate sequences of increasing length with inversion gate; measure survival probability. Exponential decay rate gives average gate error.
 
+```mermaid
+gantt
+    title RandomizedBenchmarking Pulse Sequence
+    dateFormat x
+    axisFormat " "
+
+    section Drive
+    C₁       :d1, 0, 20ms
+    C₂       :d2, after d1, 20ms
+    C₃       :d3, after d2, 20ms
+    ···      :done, d4, after d3, 15ms
+    Cₘ       :d5, after d4, 20ms
+    C_inv    :active, d6, after d5, 20ms
+
+    section Readout
+    Measurement :crit, r1, after d6, 50ms
+```
+
 ## Expected result
 
 Survival probability decays exponentially with sequence length; intercept ~0.5.

@@ -10,6 +10,19 @@ Optimal pulse amplitude for a half-π rotation (|0⟩ → superposition).
 
 Same Rabi-based calibration as CreatePIPulse but targeting the π/2 rotation point – the first point where population reaches 0.5.
 
+```mermaid
+gantt
+    title CreateHPIPulse Pulse Sequence
+    dateFormat x
+    axisFormat " "
+
+    section Drive
+    Shaped pulse (sweep amp) :d1, 0, 80ms
+
+    section Readout
+    Measurement              :crit, r1, after d1, 50ms
+```
+
 ## Expected result
 
 Rabi oscillation vs amplitude; π/2 pulse at the quarter-period point.

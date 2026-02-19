@@ -10,6 +10,26 @@ Error per X90 gate by interleaving it between random Cliffords.
 
 Run standard RB and interleaved RB (with X90 between each Clifford); ratio of decay rates gives gate-specific error.
 
+```mermaid
+gantt
+    title X90 Interleaved RB Pulse Sequence
+    dateFormat x
+    axisFormat " "
+
+    section Drive
+    C₁       :d1, 0, 20ms
+    X90      :active, x1, after d1, 15ms
+    C₂       :d2, after x1, 20ms
+    X90      :active, x2, after d2, 15ms
+    ···      :done, d3, after x2, 10ms
+    Cₘ       :d4, after d3, 20ms
+    X90      :active, x3, after d4, 15ms
+    C_inv    :d5, after x3, 20ms
+
+    section Readout
+    Measurement :crit, r1, after d5, 50ms
+```
+
 ## Expected result
 
 Two exponential decays; interleaved decays faster than reference.

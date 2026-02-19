@@ -10,6 +10,22 @@ Optimal DRAG derivative coefficient (beta) for X180 gate.
 
 Scan DRAG beta parameter while monitoring leakage to |2⟩; find the minimum leakage point. Amplitude scan refines the rotation angle.
 
+```mermaid
+gantt
+    title CreateDRAGPIPulse Pulse Sequence
+    dateFormat x
+    axisFormat " "
+
+    section Drive (I)
+    Shaped π pulse          :d1, 0, 80ms
+
+    section Drive (Q)
+    DRAG dY/dt (sweep β)    :active, q1, 0, 80ms
+
+    section Readout
+    Measurement             :crit, r1, after d1, 50ms
+```
+
 ## Expected result
 
 Leakage vs beta shows a minimum; amplitude scan gives exact π rotation.

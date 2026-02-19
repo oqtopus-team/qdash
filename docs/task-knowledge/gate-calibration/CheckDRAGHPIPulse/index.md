@@ -10,6 +10,30 @@ Gate fidelity of DRAG-corrected X90 pulse.
 
 Same DRAG principle as π pulse but for half rotation. Critical for quantum algorithms using superposition states.
 
+```mermaid
+gantt
+    title CheckDRAGHPIPulse Pulse Sequence
+    dateFormat x
+    axisFormat " "
+
+    section Drive (I)
+    DRAG π/2 (1) :d1, 0, 20ms
+    DRAG π/2 (2) :d2, after d1, 20ms
+    DRAG π/2 (3) :d3, after d2, 20ms
+    ···          :done, d4, after d3, 15ms
+    DRAG π/2 (N) :d5, after d4, 20ms
+
+    section Drive (Q)
+    dY/dt (1)    :active, q1, 0, 20ms
+    dY/dt (2)    :active, q2, after q1, 20ms
+    dY/dt (3)    :active, q3, after q2, 20ms
+    ···          :done, q4, after q3, 15ms
+    dY/dt (N)    :active, q5, after q4, 20ms
+
+    section Readout
+    Measurement  :crit, r1, after d5, 50ms
+```
+
 ## Expected result
 
 Correct superposition state after single pulse; oscillation under repeated application.

@@ -10,6 +10,19 @@ Rabi oscillation parameters: amplitude, frequency (drive strength), phase, offse
 
 Apply a resonant drive pulse of variable duration; the qubit oscillates between |0⟩ and |1⟩ at the Rabi frequency Ω_R. The IQ data is rotated via PCA to align the measurement axis, then fitted with a damped cosine model.
 
+```mermaid
+gantt
+    title CheckRabi Pulse Sequence
+    dateFormat x
+    axisFormat " "
+
+    section Drive
+    Drive pulse (sweep t) :d1, 0, 100ms
+
+    section Readout
+    Measurement            :crit, r1, after d1, 50ms
+```
+
 ## Expected result
 
 Damped sinusoidal oscillation of the rotated IQ signal vs pulse duration. Frequency gives Ω_R, envelope gives the decay time τ.
