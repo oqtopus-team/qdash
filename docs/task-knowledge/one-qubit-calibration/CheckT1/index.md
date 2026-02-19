@@ -10,6 +10,20 @@ T1 relaxation time – how long the qubit retains energy in the |1⟩ state.
 
 Prepare |1⟩, wait variable delay τ, measure P(|1⟩). Fit exponential decay exp(-τ/T1).
 
+```mermaid
+gantt
+    title CheckT1 Pulse Sequence
+    dateFormat x
+    axisFormat " "
+
+    section Drive
+    π pulse    :d1, 0, 20ms
+    wait τ     :done, d2, after d1, 120ms
+
+    section Readout
+    Measurement :crit, r1, after d2, 50ms
+```
+
 ## Expected result
 
 Exponential decay from ~1 to ~0 as delay increases; single time constant T1.
@@ -17,7 +31,7 @@ Exponential decay from ~1 to ~0 as delay increases; single time constant T1.
 - result_type: decay_curve
 - x_axis: Delay τ (μs)
 - y_axis: P(|1⟩)
-- fit_model: A * exp(-τ/T1) + B
+- fit_model: A \* exp(-τ/T1) + B
 - typical_range: 20–200 μs for fixed-frequency transmons
 - good_visual: smooth monotonic decay with clear single-exponential shape, low residuals
 
@@ -25,7 +39,7 @@ Exponential decay from ~1 to ~0 as delay increases; single time constant T1.
 
 ## Evaluation criteria
 
-Exponential fit should have high R²; T1 should be stable across repeated measurements and consistent with chip design expectations. Compare with T2_echo to check if decoherence is T1-limited (T2 ≈ 2*T1).
+Exponential fit should have high R²; T1 should be stable across repeated measurements and consistent with chip design expectations. Compare with T2_echo to check if decoherence is T1-limited (T2 ≈ 2\*T1).
 
 - check_questions:
   - "Is the decay clearly single-exponential with R² > 0.95?"
@@ -69,14 +83,14 @@ Exponential fit should have high R²; T1 should be stable across repeated measur
 ## Tips for improvement
 
 - If T1 fluctuates between runs, suspect TLS defects near the qubit frequency.
-- Compare with T2_echo: if T2 ≈ 2*T1, decoherence is T1-limited.
+- Compare with T2_echo: if T2 ≈ 2\*T1, decoherence is T1-limited.
 - Check if readout power is too high (may cause residual excitation).
 
 ## Analysis guide
 
 1. Check the exponential fit quality (R²) and residual pattern.
 2. Compare the extracted T1 with recent history for drift or instability.
-3. Compare T1 with T2_echo: if T2 ≈ 2*T1, the qubit is T1-limited.
+3. Compare T1 with T2_echo: if T2 ≈ 2\*T1, the qubit is T1-limited.
 4. Check neighbor qubit T1 values for spatial correlation of defects.
 5. If T1 is anomalously short, consider TLS, Purcell, or dielectric loss mechanisms.
 

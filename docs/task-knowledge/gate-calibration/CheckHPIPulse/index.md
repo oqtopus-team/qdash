@@ -10,6 +10,23 @@ Validates π/2 pulse quality by repeated application and population measurement.
 
 Apply the calibrated π/2 pulse repeatedly; population should cycle through superposition states. Deviation indicates rotation or phase error.
 
+```mermaid
+gantt
+    title CheckHPIPulse Pulse Sequence
+    dateFormat x
+    axisFormat " "
+
+    section Drive
+    π/2 (1)     :d1, 0, 20ms
+    π/2 (2)     :d2, after d1, 20ms
+    π/2 (3)     :d3, after d2, 20ms
+    ···         :done, d4, after d3, 15ms
+    π/2 (N)     :d5, after d4, 20ms
+
+    section Readout
+    Measurement :crit, r1, after d5, 50ms
+```
+
 ## Expected result
 
 Population oscillation with period 4 (four π/2 pulses = full rotation); contrast decay reveals error.

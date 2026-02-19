@@ -10,6 +10,22 @@ ZX interaction rate and CR Hamiltonian terms for two-qubit gate calibration.
 
 Drive control qubit at target frequency; monitor target rotation rate. ZX coupling enables CNOT-type gates.
 
+```mermaid
+gantt
+    title CheckCrossResonance Pulse Sequence
+    dateFormat x
+    axisFormat " "
+
+    section Control Drive
+    CR pulse (at target freq) :d1, 0, 120ms
+
+    section Target Drive
+    Cancel tone               :active, t1, 0, 120ms
+
+    section Readout (Target)
+    Measurement               :crit, r1, after d1, 50ms
+```
+
 ## Expected result
 
 Target qubit oscillation proportional to CR drive amplitude; Hamiltonian tomography shows dominant ZX term.

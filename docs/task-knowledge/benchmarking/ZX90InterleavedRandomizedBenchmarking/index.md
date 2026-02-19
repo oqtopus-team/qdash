@@ -10,6 +10,31 @@ Error per ZX90 gate isolated via two-qubit interleaved RB.
 
 Two-qubit RB with ZX90 interleaved between random two-qubit Cliffords.
 
+```mermaid
+gantt
+    title ZX90 Interleaved RB Pulse Sequence
+    dateFormat x
+    axisFormat " "
+
+    section Control
+    C₁       :d1, 0, 20ms
+    ZX90     :active, z1, after d1, 25ms
+    C₂       :d2, after z1, 20ms
+    ZX90     :active, z2, after d2, 25ms
+    ···      :done, d3, after z2, 10ms
+    C_inv    :d4, after d3, 20ms
+    Readout  :crit, r1, after d4, 50ms
+
+    section Target
+    C₁       :t1, 0, 20ms
+    ZX90     :active, tz1, after t1, 25ms
+    C₂       :t2, after tz1, 20ms
+    ZX90     :active, tz2, after t2, 25ms
+    ···      :done, t3, after tz2, 10ms
+    C_inv    :t4, after t3, 20ms
+    Readout  :crit, r2, after t4, 50ms
+```
+
 ## Expected result
 
 Two-qubit survival probability decays; interleaved faster than reference.

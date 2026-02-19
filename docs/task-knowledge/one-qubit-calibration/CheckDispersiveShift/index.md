@@ -10,6 +10,24 @@ Dispersive shift (χ) – the frequency shift of the resonator conditioned on th
 
 Measure resonator spectrum with qubit in |0⟩ and |1⟩; in the dispersive regime the resonator shifts by 2χ, enabling QND readout.
 
+```mermaid
+gantt
+    title CheckDispersiveShift Pulse Sequence
+    dateFormat x
+    axisFormat " "
+
+    section Electrical delay
+    Delay measurement       :active, p1, 0, 60ms
+
+    section Meas 1 (|0⟩)
+    idle (|0⟩ prep)         :done, a1, after p1, 20ms
+    Readout (sweep freq)    :crit, a2, after a1, 60ms
+
+    section Meas 2 (|1⟩)
+    π pulse (|1⟩ prep)      :b1, after p1, 20ms
+    Readout (sweep freq)    :crit, b2, after b1, 60ms
+```
+
 ## Expected result
 
 Two transmission peaks/dips separated by 2χ; one for each qubit state.

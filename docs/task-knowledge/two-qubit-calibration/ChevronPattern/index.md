@@ -10,6 +10,19 @@ Chevron pattern – 2D map of qubit excitation vs drive detuning and pulse durat
 
 Drive at various frequency detunings and durations; on-resonance gives Rabi oscillations, off-resonance gives faster but smaller oscillations, forming a V-shaped pattern.
 
+```mermaid
+gantt
+    title ChevronPattern Pulse Sequence
+    dateFormat x
+    axisFormat " "
+
+    section Drive
+    Drive pulse (sweep Δf, t) :d1, 0, 100ms
+
+    section Readout
+    Measurement               :crit, r1, after d1, 50ms
+```
+
 ## Expected result
 
 2D color plot with chevron-shaped fringes; vertex at zero detuning (qubit frequency). Fringe spacing increases with detuning.

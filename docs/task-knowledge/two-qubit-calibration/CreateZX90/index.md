@@ -10,6 +10,22 @@ Optimal CR pulse amplitude and duration for π/2 ZX rotation.
 
 Tune CR drive parameters to achieve exactly 90° ZX rotation; combine with single-qubit corrections for CNOT.
 
+```mermaid
+gantt
+    title CreateZX90 Pulse Sequence
+    dateFormat x
+    axisFormat " "
+
+    section Control Drive
+    CR pulse (sweep duration) :d1, 0, 120ms
+
+    section Target Drive
+    Cancel tone               :active, t1, 0, 120ms
+
+    section Readout (Target)
+    Measurement               :crit, r1, after d1, 50ms
+```
+
 ## Expected result
 
 ZX rotation angle vs CR pulse duration; target the 90° crossing point.

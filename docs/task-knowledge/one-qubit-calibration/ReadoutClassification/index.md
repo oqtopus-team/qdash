@@ -10,6 +10,21 @@ Readout assignment fidelity – probability of correctly identifying qubit state
 
 Prepare |0⟩ and |1⟩ states, measure IQ data, train classifier, evaluate confusion matrix.
 
+```mermaid
+gantt
+    title ReadoutClassification Pulse Sequence
+    dateFormat x
+    axisFormat " "
+
+    section Meas 1 (|0⟩)
+    idle (|0⟩ prep)    :done, a1, 0, 30ms
+    Readout (IQ)       :crit, a2, after a1, 60ms
+
+    section Meas 2 (|1⟩)
+    π pulse (|1⟩ prep) :b1, 0, 30ms
+    Readout (IQ)       :crit, b2, after b1, 60ms
+```
+
 ## Expected result
 
 Two IQ blob clusters; clear separation indicates good discrimination.
