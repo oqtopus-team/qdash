@@ -1,7 +1,7 @@
-"""1Q gate coherence limit calculation template.
+"""Gate coherence limit calculation template.
 
-Calculates theoretical fidelity limit of single-qubit gates
-from T1, T2 coherence times and DRAG half-pi pulse duration.
+Calculates theoretical fidelity limit of 1Q and 2Q gates
+from T1, T2 coherence times and gate duration.
 
 Example:
     coherence_limit(
@@ -21,7 +21,7 @@ from typing import Any
 
 from prefect import flow
 from qdash.workflow.service import CalibService
-from qdash.workflow.service.steps import CustomOneQubit
+from qdash.workflow.service.steps import CustomOneQubit, CustomTwoQubit, GenerateCRSchedule
 from qdash.workflow.service.targets import MuxTargets, QubitTargets, Target
 
 
@@ -37,10 +37,10 @@ def coherence_limit(
     flow_name: str | None = None,
     project_id: str | None = None,
 ) -> Any:
-    """1Q gate coherence limit calculation flow.
+    """Gate coherence limit calculation flow.
 
     Calculates the theoretical fidelity limit from coherence times (T1, T2)
-    and gate duration using qubex.analysis.util.calc_1q_gate_coherence_limit.
+    and gate duration for both 1Q and 2Q gates.
 
     Args:
         username: User name (from UI)
@@ -73,10 +73,14 @@ def coherence_limit(
     else:
         targets = MuxTargets(mux_ids=list(range(4)), exclude_qids=exclude_qids)
 
-    tasks = ["Check1QGateCoherenceLimit"]
-
     steps = [
-        CustomOneQubit(step_name="coherence_limit", tasks=tasks, mode=mode),
+        # 1Q coherence limit
+        CustomOneQubit(
+            step_name="coherence_limit_1q", tasks=["Check1QGateCoherenceLimit"], mode=mode
+        ),
+        # 2Q coherence limit
+        GenerateCRSchedule(),
+        CustomTwoQubit(step_name="coherence_limit_2q", tasks=["Check2QGateCoherenceLimit"]),
     ]
 
     # =========================================================================

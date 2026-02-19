@@ -73,8 +73,8 @@
   },
   {
     "id": "coherence_limit",
-    "name": "1Q Gate Coherence Limit",
-    "description": "Calculate theoretical fidelity limit of 1Q gates from T1, T2 coherence times and DRAG half-pi pulse duration.",
+    "name": "Gate Coherence Limit",
+    "description": "Calculate theoretical fidelity limit of 1Q and 2Q gates from T1, T2 coherence times and gate duration.",
     "category": "production",
     "filename": "coherence_limit.py",
     "function_name": "coherence_limit"

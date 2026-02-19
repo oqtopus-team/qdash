@@ -263,6 +263,14 @@ coupling_metrics:
     evaluation:
       mode: none
 
+  two_qubit_gate_coherence_limit:
+    title: 2Q Gate Coherence Limit
+    unit: "%"
+    scale: 100
+    description: Theoretical fidelity limit of two-qubit gates from coherence times
+    evaluation:
+      mode: maximize
+
   static_zz_interaction:
     title: Static ZZ Interaction
     unit: MHz
