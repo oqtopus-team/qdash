@@ -190,8 +190,7 @@ async def analyze_task_result(request: AnalyzeRequest) -> dict[str, Any]:
             "experiment_figure": bool(image_base64),
             "experiment_figure_paths": figure_paths if image_base64 else [],
             "expected_images": [
-                {"alt_text": alt, "index": i}
-                for i, (_, alt) in enumerate(expected_images)
+                {"alt_text": alt, "index": i} for i, (_, alt) in enumerate(expected_images)
             ],
             "task_name": request.task_name,
         }
@@ -370,8 +369,7 @@ async def analyze_task_result_stream(request: AnalyzeRequest) -> StreamingRespon
             "experiment_figure": has_experiment,
             "experiment_figure_paths": figure_paths if has_experiment else [],
             "expected_images": [
-                {"alt_text": alt, "index": i}
-                for i, (_, alt) in enumerate(expected_images)
+                {"alt_text": alt, "index": i} for i, (_, alt) in enumerate(expected_images)
             ],
             "task_name": request.task_name,
         }

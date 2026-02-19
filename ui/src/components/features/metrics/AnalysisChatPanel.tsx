@@ -1,6 +1,12 @@
 "use client";
 
-import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
+import React, {
+  useState,
+  useRef,
+  useEffect,
+  useMemo,
+  useCallback,
+} from "react";
 import {
   Send,
   X,
@@ -124,7 +130,11 @@ function parseBlocksContent(content: string): BlocksResult | null {
   return null;
 }
 
-function ImageSentBadge({ imagesSent }: { imagesSent: BlocksResult["images_sent"] }) {
+function ImageSentBadge({
+  imagesSent,
+}: {
+  imagesSent: BlocksResult["images_sent"];
+}) {
   const [previewSrc, setPreviewSrc] = useState<string | null>(null);
   const modalRef = useRef<HTMLDialogElement>(null);
 
@@ -134,12 +144,18 @@ function ImageSentBadge({ imagesSent }: { imagesSent: BlocksResult["images_sent"
   }, []);
 
   if (!imagesSent) return null;
-  const { experiment_figure, experiment_figure_paths, expected_images, task_name } = imagesSent;
+  const {
+    experiment_figure,
+    experiment_figure_paths,
+    expected_images,
+    task_name,
+  } = imagesSent;
   if (!experiment_figure && expected_images.length === 0) return null;
 
   const parts: string[] = [];
   if (experiment_figure) parts.push("実験結果画像");
-  if (expected_images.length > 0) parts.push(`参照画像${expected_images.length}枚`);
+  if (expected_images.length > 0)
+    parts.push(`参照画像${expected_images.length}枚`);
 
   const baseURL = process.env.NEXT_PUBLIC_API_URL || "/api";
 
@@ -150,18 +166,24 @@ function ImageSentBadge({ imagesSent }: { imagesSent: BlocksResult["images_sent"
         <span>{parts.join(" + ")}を送信</span>
       </div>
       <div className="flex gap-2 overflow-x-auto pb-1">
-        {experiment_figure && experiment_figure_paths.map((fp) => {
-          const src = `${baseURL}/executions/figure?path=${encodeURIComponent(fp)}`;
-          return (
-            <button
-              key={fp}
-              onClick={() => openPreview(src)}
-              className="flex-shrink-0 rounded border border-base-300 overflow-hidden hover:border-primary transition-colors cursor-pointer"
-            >
-              <img src={src} alt="実験結果" className="h-16 w-auto object-contain bg-base-200" loading="lazy" />
-            </button>
-          );
-        })}
+        {experiment_figure &&
+          experiment_figure_paths.map((fp) => {
+            const src = `${baseURL}/executions/figure?path=${encodeURIComponent(fp)}`;
+            return (
+              <button
+                key={fp}
+                onClick={() => openPreview(src)}
+                className="flex-shrink-0 rounded border border-base-300 overflow-hidden hover:border-primary transition-colors cursor-pointer"
+              >
+                <img
+                  src={src}
+                  alt="実験結果"
+                  className="h-16 w-auto object-contain bg-base-200"
+                  loading="lazy"
+                />
+              </button>
+            );
+          })}
         {expected_images.map((img) => {
           const src = `${baseURL}/copilot/expected-image?task_name=${encodeURIComponent(task_name)}&index=${img.index}`;
           return (
@@ -170,7 +192,12 @@ function ImageSentBadge({ imagesSent }: { imagesSent: BlocksResult["images_sent"
               onClick={() => openPreview(src)}
               className="flex-shrink-0 rounded border border-base-300 overflow-hidden hover:border-primary transition-colors cursor-pointer"
             >
-              <img src={src} alt={img.alt_text} className="h-16 w-auto object-contain bg-base-200" loading="lazy" />
+              <img
+                src={src}
+                alt={img.alt_text}
+                className="h-16 w-auto object-contain bg-base-200"
+                loading="lazy"
+              />
             </button>
           );
         })}

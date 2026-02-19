@@ -19,6 +19,7 @@ import { TaskFigure } from "@/components/charts/TaskFigure";
 import { formatDateTime, formatDateTimeCompact } from "@/utils/datetime";
 
 import { ParametersTable } from "./ParametersTable";
+import { TaskResultComments } from "./TaskResultComments";
 import type { AnalysisContext } from "@/hooks/useAnalysisChat";
 import type { MetricHistoryItem } from "./MetricHistoryView";
 import { useAnalysisChatContext } from "@/contexts/AnalysisChatContext";
@@ -593,6 +594,11 @@ export function CouplingMetricHistoryModal({
               />
             )}
         </div>
+      )}
+
+      {/* Comments */}
+      {selectedTask?.task_id && (
+        <TaskResultComments taskId={selectedTask.task_id} />
       )}
     </div>
   );

@@ -2314,6 +2314,53 @@
         ]
       }
     },
+    "/copilot/analyze": {
+      "post": {
+        "tags": [
+          "copilot"
+        ],
+        "summary": "Analyze calibration result with AI",
+        "description": "Analyze a calibration task result using LLM.\n\nConstructs a rich context from task knowledge, qubit parameters,\nand experimental data, then sends it to the configured LLM for analysis.\n\nParameters\n----------\nrequest : AnalyzeRequest\n    The analysis request containing task info, IDs, and user message.\n\nReturns\n-------\nAnalysisResponse\n    Structured analysis from the LLM.",
+        "operationId": "analyzeCopilot",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnalyzeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnalysisResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/settings": {
       "get": {
         "tags": [
@@ -3337,6 +3384,66 @@
         }
       }
     },
+    "/tasks/{task_name}/knowledge": {
+      "get": {
+        "tags": [
+          "task"
+        ],
+        "summary": "Get task knowledge for LLM analysis",
+        "description": "Get structured domain knowledge for a calibration task.\n\nReturns LLM-oriented knowledge including physical principles,\nexpected behavior, evaluation criteria, and failure modes.\n\nParameters\n----------\ntask_name : str\n    The task name (e.g. \"CheckT1\", \"CheckRabi\").\nbackend : str\n    The backend name (default \"qubex\").\n\nReturns\n-------\nTaskKnowledgeResponse\n    Structured task knowledge.",
+        "operationId": "getTaskKnowledge",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "task_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Task Name"
+            }
+          },
+          {
+            "name": "backend",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "Backend name",
+              "default": "qubex",
+              "title": "Backend"
+            },
+            "description": "Backend name"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskKnowledgeResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/task-files/settings": {
       "get": {
         "tags": [
@@ -4316,6 +4423,598 @@
             "HTTPBearer": []
           }
         ]
+      }
+    },
+    "/task-results/comments": {
+      "get": {
+        "tags": [
+          "task-result"
+        ],
+        "summary": "List all comments across tasks",
+        "description": "List all root comments across the project, with reply counts.",
+        "operationId": "listAllComments",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "skip",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Number of items to skip",
+              "default": 0,
+              "title": "Skip"
+            },
+            "description": "Number of items to skip"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "description": "Max items to return",
+              "default": 50,
+              "title": "Limit"
+            },
+            "description": "Max items to return"
+          },
+          {
+            "name": "task_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by task ID",
+              "title": "Task Id"
+            },
+            "description": "Filter by task ID"
+          },
+          {
+            "name": "is_closed",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by closed status. Default false (open only). Set to true for closed, or omit/null for all.",
+              "default": false,
+              "title": "Is Closed"
+            },
+            "description": "Filter by closed status. Default false (open only). Set to true for closed, or omit/null for all."
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListCommentsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/task-results/comments/{comment_id}": {
+      "get": {
+        "tags": [
+          "task-result"
+        ],
+        "summary": "Get a single comment by ID",
+        "description": "Get a single root comment by its ID, including reply count.",
+        "operationId": "getComment",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "comment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Comment Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommentResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/task-results/comments/{comment_id}/replies": {
+      "get": {
+        "tags": [
+          "task-result"
+        ],
+        "summary": "List replies for a comment",
+        "description": "List all replies to a specific comment, sorted by creation time ascending.",
+        "operationId": "getCommentReplies",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "comment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Comment Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CommentResponse"
+                  },
+                  "title": "Response Getcommentreplies"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/task-results/{task_id}/comments": {
+      "get": {
+        "tags": [
+          "task-result"
+        ],
+        "summary": "List comments for a task result",
+        "description": "List all comments for a task result, sorted by creation time ascending.",
+        "operationId": "getTaskResultComments",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Task Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CommentResponse"
+                  },
+                  "title": "Response Gettaskresultcomments"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "task-result"
+        ],
+        "summary": "Create a comment on a task result",
+        "description": "Create a new comment on a task result.",
+        "operationId": "createTaskResultComment",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Task Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommentCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommentResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/task-results/{task_id}/comments/{comment_id}": {
+      "delete": {
+        "tags": [
+          "task-result"
+        ],
+        "summary": "Delete a comment on a task result",
+        "description": "Delete a comment. Only the author can delete their own comment.",
+        "operationId": "deleteTaskResultComment",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Task Id"
+            }
+          },
+          {
+            "name": "comment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Comment Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/task-results/comments/{comment_id}/close": {
+      "patch": {
+        "tags": [
+          "task-result"
+        ],
+        "summary": "Close a comment thread",
+        "description": "Close a comment thread. Only the author or project owner can close.",
+        "operationId": "closeCommentThread",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "comment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Comment Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/task-results/comments/{comment_id}/reopen": {
+      "patch": {
+        "tags": [
+          "task-result"
+        ],
+        "summary": "Reopen a comment thread",
+        "description": "Reopen a closed comment thread. Only the author or project owner can reopen.",
+        "operationId": "reopenCommentThread",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "comment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Comment Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/tags": {
@@ -7149,6 +7848,113 @@
         "title": "AllConfigResponse",
         "description": "Response containing all application configuration."
       },
+      "AnalysisResponse": {
+        "properties": {
+          "summary": {
+            "type": "string",
+            "title": "Summary",
+            "description": "One-line result summary"
+          },
+          "assessment": {
+            "type": "string",
+            "title": "Assessment",
+            "description": "Overall assessment: good / warning / bad"
+          },
+          "explanation": {
+            "type": "string",
+            "title": "Explanation",
+            "description": "Detailed analysis and interpretation"
+          },
+          "potential_issues": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Potential Issues",
+            "description": "Detected potential issues"
+          },
+          "recommendations": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Recommendations",
+            "description": "Recommended next actions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "summary",
+          "assessment",
+          "explanation"
+        ],
+        "title": "AnalysisResponse",
+        "description": "Structured analysis returned by the LLM."
+      },
+      "AnalyzeRequest": {
+        "properties": {
+          "task_name": {
+            "type": "string",
+            "title": "Task Name",
+            "description": "Task class name (e.g. CheckT1)"
+          },
+          "chip_id": {
+            "type": "string",
+            "title": "Chip Id"
+          },
+          "qid": {
+            "type": "string",
+            "title": "Qid"
+          },
+          "execution_id": {
+            "type": "string",
+            "title": "Execution Id"
+          },
+          "task_id": {
+            "type": "string",
+            "title": "Task Id"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "User question / message"
+          },
+          "image_base64": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image Base64",
+            "description": "Base64-encoded result figure (for multimodal analysis)"
+          },
+          "conversation_history": {
+            "items": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Conversation History",
+            "description": "Previous conversation messages [{role, content}, ...]"
+          }
+        },
+        "type": "object",
+        "required": [
+          "task_name",
+          "chip_id",
+          "qid",
+          "execution_id",
+          "task_id",
+          "message"
+        ],
+        "title": "AnalyzeRequest",
+        "description": "Request body for POST /copilot/analyze."
+      },
       "BackendConfigResponse": {
         "properties": {
           "default_backend": {
@@ -7427,6 +8233,99 @@
         ],
         "title": "ChipResponse",
         "description": "Chip response model.\n\nQubit and coupling data are stored in separate collections for scalability\nand should be fetched via dedicated endpoints (/chips/{chip_id}/qubits, etc.).\n\nAttributes\n----------\n    chip_id (str): The ID of the chip.\n    size (int): The size of the chip.\n    topology_id (str | None): Topology template ID.\n    qubit_count (int): Number of qubits in the chip.\n    coupling_count (int): Number of couplings in the chip.\n    installed_at (datetime | None): Installation timestamp."
+      },
+      "CommentCreate": {
+        "properties": {
+          "content": {
+            "type": "string",
+            "maxLength": 5000,
+            "minLength": 1,
+            "title": "Content",
+            "description": "Comment text content"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id",
+            "description": "Parent comment ID for replies. None for root comments."
+          }
+        },
+        "type": "object",
+        "required": [
+          "content"
+        ],
+        "title": "CommentCreate",
+        "description": "Request schema for creating a comment."
+      },
+      "CommentResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Comment document ID"
+          },
+          "task_id": {
+            "type": "string",
+            "title": "Task Id",
+            "description": "Associated task ID"
+          },
+          "username": {
+            "type": "string",
+            "title": "Username",
+            "description": "Comment author username"
+          },
+          "content": {
+            "type": "string",
+            "title": "Content",
+            "description": "Comment text content"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At",
+            "description": "When the comment was created"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id",
+            "description": "Parent comment ID for replies"
+          },
+          "reply_count": {
+            "type": "integer",
+            "title": "Reply Count",
+            "description": "Number of replies to this comment",
+            "default": 0
+          },
+          "is_closed": {
+            "type": "boolean",
+            "title": "Is Closed",
+            "description": "Whether this thread is closed",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "task_id",
+          "username",
+          "content",
+          "created_at"
+        ],
+        "title": "CommentResponse",
+        "description": "Response schema for a single comment."
       },
       "Condition": {
         "properties": {
@@ -8106,6 +9005,89 @@
         "title": "ExecutionResponseSummary",
         "description": "ExecutionResponseSummary is a Pydantic model that represents the summary of an execution response.\n\nAttributes\n----------\n    name (str): The name of the execution.\n    execution_id (str): The ID of the execution.\n    status (str): The current status of the execution.\n    start_at (datetime | None): The start time of the execution.\n    end_at (datetime | None): The end time of the execution.\n    elapsed_time (timedelta | None): The total elapsed time of the execution.\n    tags (list[str]): Tags associated with the execution.\n    note (dict): Notes for the execution."
       },
+      "ExpectedResultResponse": {
+        "properties": {
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "result_type": {
+            "type": "string",
+            "title": "Result Type",
+            "default": ""
+          },
+          "x_axis": {
+            "type": "string",
+            "title": "X Axis",
+            "default": ""
+          },
+          "y_axis": {
+            "type": "string",
+            "title": "Y Axis",
+            "default": ""
+          },
+          "z_axis": {
+            "type": "string",
+            "title": "Z Axis",
+            "default": ""
+          },
+          "fit_model": {
+            "type": "string",
+            "title": "Fit Model",
+            "default": ""
+          },
+          "typical_range": {
+            "type": "string",
+            "title": "Typical Range",
+            "default": ""
+          },
+          "good_visual": {
+            "type": "string",
+            "title": "Good Visual",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "description"
+        ],
+        "title": "ExpectedResultResponse",
+        "description": "Response model for expected result description."
+      },
+      "FailureModeResponse": {
+        "properties": {
+          "severity": {
+            "type": "string",
+            "title": "Severity"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "cause": {
+            "type": "string",
+            "title": "Cause",
+            "default": ""
+          },
+          "visual": {
+            "type": "string",
+            "title": "Visual",
+            "default": ""
+          },
+          "next_action": {
+            "type": "string",
+            "title": "Next Action",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "severity",
+          "description"
+        ],
+        "title": "FailureModeResponse",
+        "description": "Response model for a structured failure mode."
+      },
       "FidelityCondition": {
         "properties": {
           "min": {
@@ -8756,6 +9738,38 @@
         ],
         "title": "ListChipsResponse",
         "description": "Response model for listing chips."
+      },
+      "ListCommentsResponse": {
+        "properties": {
+          "comments": {
+            "items": {
+              "$ref": "#/components/schemas/CommentResponse"
+            },
+            "type": "array",
+            "title": "Comments"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "skip": {
+            "type": "integer",
+            "title": "Skip"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          }
+        },
+        "type": "object",
+        "required": [
+          "comments",
+          "total",
+          "skip",
+          "limit"
+        ],
+        "title": "ListCommentsResponse",
+        "description": "Paginated list of comments."
       },
       "ListCouplingsResponse": {
         "properties": {
@@ -9581,6 +10595,25 @@
         "type": "object",
         "title": "MuxTask",
         "description": "Task information for mux display."
+      },
+      "OutputParameterInfoResponse": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "description"
+        ],
+        "title": "OutputParameterInfoResponse",
+        "description": "Response model for output parameter description."
       },
       "ParameterChangeResponse": {
         "properties": {
@@ -11281,6 +12314,24 @@
         "title": "Settings",
         "description": "Settings for the QDash application."
       },
+      "SuccessResponse": {
+        "properties": {
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message"
+        ],
+        "title": "SuccessResponse",
+        "examples": [
+          {
+            "message": "Successfuly {message}"
+          }
+        ]
+      },
       "SystemRole": {
         "type": "string",
         "enum": [
@@ -11700,6 +12751,97 @@
         ],
         "title": "TaskInfo",
         "description": "Task information extracted from Python file."
+      },
+      "TaskKnowledgeResponse": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary"
+          },
+          "what_it_measures": {
+            "type": "string",
+            "title": "What It Measures"
+          },
+          "physical_principle": {
+            "type": "string",
+            "title": "Physical Principle"
+          },
+          "expected_result": {
+            "$ref": "#/components/schemas/ExpectedResultResponse"
+          },
+          "evaluation_criteria": {
+            "type": "string",
+            "title": "Evaluation Criteria"
+          },
+          "check_questions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Check Questions",
+            "default": []
+          },
+          "failure_modes": {
+            "items": {
+              "$ref": "#/components/schemas/FailureModeResponse"
+            },
+            "type": "array",
+            "title": "Failure Modes"
+          },
+          "tips": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tips"
+          },
+          "output_parameters_info": {
+            "items": {
+              "$ref": "#/components/schemas/OutputParameterInfoResponse"
+            },
+            "type": "array",
+            "title": "Output Parameters Info",
+            "default": []
+          },
+          "analysis_guide": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Analysis Guide",
+            "default": []
+          },
+          "prerequisites": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Prerequisites",
+            "default": []
+          },
+          "prompt_text": {
+            "type": "string",
+            "title": "Prompt Text"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "summary",
+          "what_it_measures",
+          "physical_principle",
+          "expected_result",
+          "evaluation_criteria",
+          "failure_modes",
+          "tips",
+          "prompt_text"
+        ],
+        "title": "TaskKnowledgeResponse",
+        "description": "Response model for task knowledge (LLM-oriented domain knowledge)."
       },
       "TaskResponse": {
         "properties": {

@@ -19,9 +19,11 @@ import type {
 } from "@tanstack/react-query";
 
 import type {
+  GetTaskKnowledgeParams,
   HTTPValidationError,
   ListTaskResponse,
   ListTasksParams,
+  TaskKnowledgeResponse,
   TaskResultResponse,
 } from "../../schemas";
 
@@ -323,6 +325,198 @@ export function useGetTaskResult<
   queryClient?: QueryClient,
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
   const queryOptions = getGetTaskResultQueryOptions(taskId, options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Get structured domain knowledge for a calibration task.
+
+Returns LLM-oriented knowledge including physical principles,
+expected behavior, evaluation criteria, and failure modes.
+
+Parameters
+----------
+task_name : str
+    The task name (e.g. "CheckT1", "CheckRabi").
+backend : str
+    The backend name (default "qubex").
+
+Returns
+-------
+TaskKnowledgeResponse
+    Structured task knowledge.
+ * @summary Get task knowledge for LLM analysis
+ */
+export const getTaskKnowledge = (
+  taskName: string,
+  params?: GetTaskKnowledgeParams,
+  options?: SecondParameter<typeof customInstance>,
+  signal?: AbortSignal,
+) => {
+  return customInstance<TaskKnowledgeResponse>(
+    { url: `/tasks/${taskName}/knowledge`, method: "GET", params, signal },
+    options,
+  );
+};
+
+export const getGetTaskKnowledgeQueryKey = (
+  taskName?: string,
+  params?: GetTaskKnowledgeParams,
+) => {
+  return [`/tasks/${taskName}/knowledge`, ...(params ? [params] : [])] as const;
+};
+
+export const getGetTaskKnowledgeQueryOptions = <
+  TData = Awaited<ReturnType<typeof getTaskKnowledge>>,
+  TError = HTTPValidationError,
+>(
+  taskName: string,
+  params?: GetTaskKnowledgeParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof getTaskKnowledge>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetTaskKnowledgeQueryKey(taskName, params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getTaskKnowledge>>
+  > = ({ signal }) =>
+    getTaskKnowledge(taskName, params, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!taskName,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getTaskKnowledge>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData> };
+};
+
+export type GetTaskKnowledgeQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getTaskKnowledge>>
+>;
+export type GetTaskKnowledgeQueryError = HTTPValidationError;
+
+export function useGetTaskKnowledge<
+  TData = Awaited<ReturnType<typeof getTaskKnowledge>>,
+  TError = HTTPValidationError,
+>(
+  taskName: string,
+  params: undefined | GetTaskKnowledgeParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof getTaskKnowledge>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getTaskKnowledge>>,
+          TError,
+          Awaited<ReturnType<typeof getTaskKnowledge>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData>;
+};
+export function useGetTaskKnowledge<
+  TData = Awaited<ReturnType<typeof getTaskKnowledge>>,
+  TError = HTTPValidationError,
+>(
+  taskName: string,
+  params?: GetTaskKnowledgeParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof getTaskKnowledge>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getTaskKnowledge>>,
+          TError,
+          Awaited<ReturnType<typeof getTaskKnowledge>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+export function useGetTaskKnowledge<
+  TData = Awaited<ReturnType<typeof getTaskKnowledge>>,
+  TError = HTTPValidationError,
+>(
+  taskName: string,
+  params?: GetTaskKnowledgeParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof getTaskKnowledge>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+/**
+ * @summary Get task knowledge for LLM analysis
+ */
+
+export function useGetTaskKnowledge<
+  TData = Awaited<ReturnType<typeof getTaskKnowledge>>,
+  TError = HTTPValidationError,
+>(
+  taskName: string,
+  params?: GetTaskKnowledgeParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof getTaskKnowledge>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+  const queryOptions = getGetTaskKnowledgeQueryOptions(
+    taskName,
+    params,
+    options,
+  );
 
   const query = useQuery(queryOptions, queryClient) as UseQueryResult<
     TData,
