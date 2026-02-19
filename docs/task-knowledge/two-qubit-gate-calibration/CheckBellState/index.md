@@ -114,12 +114,6 @@ None.
 4. If fidelity is low, determine if limited by single-qubit, two-qubit, or readout errors.
 5. Recommend component-level debugging if needed.
 
-## Prerequisites
-
-- CheckZX90
-- CheckHPIPulse
-- CheckPIPulse
-
 ## Related context
 
 - history(last_n=5)

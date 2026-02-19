@@ -78,10 +78,6 @@ The f_01 peak should be well-resolved with sufficient height. If f_12 is detecte
 4. Review quality level; if <= 2, investigate peak quality issues.
 5. Compare with previous measurements for drift detection.
 
-## Prerequisites
-
-- CheckResonatorSpectroscopy (provides readout_frequency)
-
 ## Related context
 
 - history(last_n=5)

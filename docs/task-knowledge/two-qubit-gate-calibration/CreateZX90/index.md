@@ -114,12 +114,6 @@ ZX rotation should be precisely 90°; parasitic rotations should be compensated 
 4. If parasitic terms are visible, recommend echo CR.
 5. Validate with CheckZX90 after calibration.
 
-## Prerequisites
-
-- CheckCrossResonance
-- CheckPIPulse
-- CheckHPIPulse
-
 ## Related context
 
 - history(last_n=5)

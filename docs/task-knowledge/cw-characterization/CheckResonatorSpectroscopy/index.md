@@ -78,11 +78,6 @@ None.
 4. Compare detected frequencies with design values and previous measurements.
 5. Note any power-dependent behavior anomalies.
 
-## Prerequisites
-
-- Configure
-- CheckResonatorFrequencies
-
 ## Related context
 
 - history(last_n=5)

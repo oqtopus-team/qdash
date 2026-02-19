@@ -97,11 +97,6 @@ T2_echo should satisfy T2_echo ≤ 2\*T1. Compare with T2\* (Ramsey) to quantify
 4. Review recent history for trends or instability.
 5. If T2_echo << 2\*T1, investigate high-frequency noise sources.
 
-## Prerequisites
-
-- CheckT1
-- CheckQubitFrequency
-
 ## Related context
 
 - history(last_n=5)

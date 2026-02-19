@@ -70,11 +70,6 @@ None.
 3. Check that the optimal amplitude is not in the nonlinear/QND-violation regime.
 4. Compare the achieved fidelity with expectations from the dispersive shift.
 
-## Prerequisites
-
-- CheckDispersiveShift
-- CheckReadoutFrequency
-
 ## Related context
 
 - history(last_n=5)

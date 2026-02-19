@@ -72,11 +72,6 @@ None.
 4. Assess kappa_external vs kappa_internal; over-coupled is preferred.
 5. Compare with design values and previous measurements.
 
-## Prerequisites
-
-- Configure
-- CheckResonatorFrequencies
-
 ## Related context
 
 - history(last_n=5)

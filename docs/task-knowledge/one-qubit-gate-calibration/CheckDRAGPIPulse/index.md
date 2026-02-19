@@ -101,11 +101,6 @@ None.
 3. Verify DRAG beta is at the optimal value.
 4. If improvement is marginal, consider whether DRAG is necessary for this qubit.
 
-## Prerequisites
-
-- CreateDRAGPIPulse
-- CheckPIPulse
-
 ## Related context
 
 - history(last_n=5)

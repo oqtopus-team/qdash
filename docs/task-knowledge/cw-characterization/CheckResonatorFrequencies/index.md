@@ -69,10 +69,6 @@ None.
 3. Identify the correct peak for this qubit based on MUX position (qid % 4).
 4. Record the coarse frequency for use in subsequent spectroscopy.
 
-## Prerequisites
-
-- Configure
-
 ## Related context
 
 - history(last_n=5)

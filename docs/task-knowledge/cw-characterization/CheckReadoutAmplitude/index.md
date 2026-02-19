@@ -70,10 +70,6 @@ None.
 3. Check that signal increases and noise remains manageable.
 4. Record the optimal amplitude for use in subsequent measurements.
 
-## Prerequisites
-
-- CheckResonatorSpectroscopy or CheckResonatorFrequencies
-
 ## Related context
 
 - history(last_n=5)

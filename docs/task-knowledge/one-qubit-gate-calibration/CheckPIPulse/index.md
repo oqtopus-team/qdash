@@ -94,11 +94,6 @@ None.
 4. If error is too large, recommend recalibration with CreatePIPulse.
 5. Compare with DRAG version for improvement assessment.
 
-## Prerequisites
-
-- CreatePIPulse
-- CheckRabi
-
 ## Related context
 
 - history(last_n=5)

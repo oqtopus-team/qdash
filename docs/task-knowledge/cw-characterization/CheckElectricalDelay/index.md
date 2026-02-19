@@ -62,11 +62,6 @@ None.
 3. If delay has changed, identify hardware modifications that could explain the change.
 4. Ensure delay compensation is updated in the system configuration.
 
-## Prerequisites
-
-- Configure
-- CheckResonatorFrequencies
-
 ## Related context
 
 - history(last_n=5)

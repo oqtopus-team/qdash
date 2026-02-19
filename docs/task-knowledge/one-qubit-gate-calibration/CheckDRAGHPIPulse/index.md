@@ -101,11 +101,6 @@ None.
 3. Check for leakage signatures in the decay.
 4. If fidelity is borderline, recommend tomographic verification.
 
-## Prerequisites
-
-- CreateDRAGHPIPulse
-- CheckHPIPulse
-
 ## Related context
 
 - history(last_n=5)

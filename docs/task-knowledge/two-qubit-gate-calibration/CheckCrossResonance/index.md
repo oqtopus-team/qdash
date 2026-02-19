@@ -116,12 +116,6 @@ Clear ZX oscillation with parasitic terms (IX, IY, IZ) small relative to ZX. The
 4. If parasitic terms are large, recommend echo CR or cancellation.
 5. Check for spectator qubit effects.
 
-## Prerequisites
-
-- CheckQubitFrequency
-- CheckPIPulse
-- CheckHPIPulse
-
 ## Related context
 
 - history(last_n=5)

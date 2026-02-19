@@ -100,11 +100,6 @@ The optimal beta should produce minimal leakage; the amplitude should give exact
 3. Check the refined amplitude gives exact π rotation.
 4. Compare beta with the theoretical estimate (anharmonicity^(-1)).
 
-## Prerequisites
-
-- CreatePIPulse
-- CheckQubitFrequency
-
 ## Related context
 
 - history(last_n=5)

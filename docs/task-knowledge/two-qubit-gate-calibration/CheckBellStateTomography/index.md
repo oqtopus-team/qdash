@@ -90,12 +90,6 @@ State fidelity and concurrence should be high; density matrix should be close to
 4. If fidelity is lower than expected, identify which matrix elements deviate most.
 5. Use deviations to diagnose specific error channels.
 
-## Prerequisites
-
-- CheckBellState
-- CheckHPIPulse
-- CheckZX90
-
 ## Related context
 
 - history(last_n=5)

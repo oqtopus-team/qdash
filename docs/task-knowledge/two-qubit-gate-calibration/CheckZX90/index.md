@@ -89,12 +89,6 @@ None.
 4. If calibration-limited, recommend CreateZX90 recalibration.
 5. If coherence-limited, assess T1/T2 of both qubits.
 
-## Prerequisites
-
-- CreateZX90
-- CheckPIPulse
-- CheckHPIPulse
-
 ## Related context
 
 - history(last_n=5)

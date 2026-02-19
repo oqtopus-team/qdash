@@ -91,11 +91,6 @@ Fit quality should be high; the amplitude should be in the linear drive regime. 
 3. Compare with previous π amplitude for drift detection.
 4. If fit is poor, recommend frequency recalibration first.
 
-## Prerequisites
-
-- CheckQubitFrequency
-- CheckRabi
-
 ## Related context
 
 - history(last_n=5)

@@ -88,11 +88,6 @@ None.
 3. Verify 2χ is sufficient for the required readout fidelity.
 4. If χ has changed, check for qubit frequency drift.
 
-## Prerequisites
-
-- CheckQubitFrequency
-- CheckReadoutFrequency
-
 ## Related context
 
 - history(last_n=5)

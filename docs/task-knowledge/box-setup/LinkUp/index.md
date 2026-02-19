@@ -58,10 +58,6 @@ None.
 2. If any box fails to link, check physical connections first.
 3. Verify firmware compatibility if connections are physically sound.
 
-## Prerequisites
-
-- CheckStatus
-
 ## Related context
 
 - history(last_n=5)

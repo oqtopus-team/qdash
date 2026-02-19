@@ -68,11 +68,6 @@ None.
 3. If multiple features exist, use design frequency as a guide.
 4. Record the coarse frequency for use in subsequent fine spectroscopy.
 
-## Prerequisites
-
-- Configure
-- CheckResonatorFrequencies
-
 ## Related context
 
 - history(last_n=5)

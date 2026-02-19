@@ -71,10 +71,6 @@ None.
 3. Review frequency history for drift or instability.
 4. If frequency has shifted significantly, assess impact on gate calibrations.
 
-## Prerequisites
-
-- CheckReadoutFrequency
-
 ## Related context
 
 - history(last_n=5)

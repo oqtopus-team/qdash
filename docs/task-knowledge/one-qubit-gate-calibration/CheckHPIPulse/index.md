@@ -93,11 +93,6 @@ None.
 3. Compare with CheckPIPulse error rate for consistency.
 4. If error is large, recommend recalibration.
 
-## Prerequisites
-
-- CreateHPIPulse
-- CheckRabi
-
 ## Related context
 
 - history(last_n=5)

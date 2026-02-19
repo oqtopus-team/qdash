@@ -100,11 +100,6 @@ Optimal beta should minimize leakage; rotation angle error should be minimal.
 3. Check leakage is below threshold.
 4. Recommend CheckDRAGHPIPulse validation after calibration.
 
-## Prerequisites
-
-- CreateDRAGPIPulse
-- CreateHPIPulse
-
 ## Related context
 
 - history(last_n=5)

@@ -94,11 +94,6 @@ Exponential fit should have high R²; T1 should be stable across repeated measur
 4. Check neighbor qubit T1 values for spatial correlation of defects.
 5. If T1 is anomalously short, consider TLS, Purcell, or dielectric loss mechanisms.
 
-## Prerequisites
-
-- CheckQubitFrequency
-- CheckReadoutFrequency
-
 ## Related context
 
 - history(last_n=5)

@@ -104,11 +104,6 @@ T2* should satisfy T2* ≤ T2_echo. Fringe frequency should match the intended d
 4. Review recent history for frequency drift (changing detuning).
 5. If T2\* is very short, assess whether low-frequency noise mitigation is needed.
 
-## Prerequisites
-
-- CheckQubitFrequency
-- CheckT1
-
 ## Related context
 
 - history(last_n=5)

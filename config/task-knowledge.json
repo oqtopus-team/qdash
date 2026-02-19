@@ -65,10 +65,6 @@
       "Compare with individual gate error estimates for consistency.",
       "If EPC is too high, recommend specific gate recalibration."
     ],
-    "prerequisites": [
-      "CheckPIPulse",
-      "CheckHPIPulse"
-    ],
     "images": [
       {
         "alt_text": "Randomized benchmarking decay",
@@ -81,6 +77,31 @@
         "type": "history",
         "params": [],
         "last_n": 5
+      }
+    ],
+    "workflow_context": [
+      {
+        "workflow": "1Q Fine-tune",
+        "step": 11,
+        "total_steps": 12,
+        "previous": [
+          "ReadoutClassification"
+        ],
+        "next": [
+          "X90InterleavedRandomizedBenchmarking"
+        ],
+        "preceding_tasks": [
+          "CheckRabi",
+          "CreateHPIPulse",
+          "CheckHPIPulse",
+          "CreatePIPulse",
+          "CheckPIPulse",
+          "CreateDRAGHPIPulse",
+          "CheckDRAGHPIPulse",
+          "CreateDRAGPIPulse",
+          "CheckDRAGPIPulse",
+          "ReadoutClassification"
+        ]
       }
     ]
   },
@@ -150,10 +171,6 @@
       "Verify both reference and interleaved curves are well-fitted.",
       "Recommend DRAG recalibration if leakage is suspected."
     ],
-    "prerequisites": [
-      "RandomizedBenchmarking",
-      "CheckPIPulse"
-    ],
     "images": [],
     "related_context": [
       {
@@ -161,7 +178,8 @@
         "params": [],
         "last_n": 5
       }
-    ]
+    ],
+    "workflow_context": []
   },
   "X90InterleavedRandomizedBenchmarking": {
     "name": "X90InterleavedRandomizedBenchmarking",
@@ -229,10 +247,6 @@
       "Compare the X90 error with the overall EPC for consistency.",
       "If X90 error is dominant, recommend pulse recalibration."
     ],
-    "prerequisites": [
-      "RandomizedBenchmarking",
-      "CheckHPIPulse"
-    ],
     "images": [
       {
         "alt_text": "X90 interleaved randomized benchmarking",
@@ -245,6 +259,30 @@
         "type": "history",
         "params": [],
         "last_n": 5
+      }
+    ],
+    "workflow_context": [
+      {
+        "workflow": "1Q Fine-tune",
+        "step": 12,
+        "total_steps": 12,
+        "previous": [
+          "RandomizedBenchmarking"
+        ],
+        "next": [],
+        "preceding_tasks": [
+          "CheckRabi",
+          "CreateHPIPulse",
+          "CheckHPIPulse",
+          "CreatePIPulse",
+          "CheckPIPulse",
+          "CreateDRAGHPIPulse",
+          "CheckDRAGHPIPulse",
+          "CreateDRAGPIPulse",
+          "CheckDRAGPIPulse",
+          "ReadoutClassification",
+          "RandomizedBenchmarking"
+        ]
       }
     ]
   },
@@ -314,10 +352,6 @@
       "Compare with single-qubit gate errors to assess two-qubit gate contribution.",
       "If error is dominated by coherence, recommend coherence improvements first."
     ],
-    "prerequisites": [
-      "RandomizedBenchmarking",
-      "CheckZX90"
-    ],
     "images": [
       {
         "alt_text": "ZX90 interleaved randomized benchmarking",
@@ -338,6 +372,24 @@
           "coupling_strength"
         ],
         "last_n": 5
+      }
+    ],
+    "workflow_context": [
+      {
+        "workflow": "2Q Calibration",
+        "step": 6,
+        "total_steps": 6,
+        "previous": [
+          "CheckBellStateTomography"
+        ],
+        "next": [],
+        "preceding_tasks": [
+          "CheckCrossResonance",
+          "CreateZX90",
+          "CheckZX90",
+          "CheckBellState",
+          "CheckBellStateTomography"
+        ]
       }
     ]
   },
@@ -397,9 +449,6 @@
       "Identify any channels with anomalously high noise.",
       "Check for spurious tones that could interfere with qubit operations."
     ],
-    "prerequisites": [
-      "LinkUp"
-    ],
     "images": [],
     "related_context": [
       {
@@ -407,7 +456,8 @@
         "params": [],
         "last_n": 5
       }
-    ]
+    ],
+    "workflow_context": []
   },
   "CheckStatus": {
     "name": "CheckStatus",
@@ -455,7 +505,6 @@
       "If errors exist, address them before running further tasks.",
       "Confirm all control and readout lines are operational."
     ],
-    "prerequisites": [],
     "images": [],
     "related_context": [
       {
@@ -463,7 +512,8 @@
         "params": [],
         "last_n": 5
       }
-    ]
+    ],
+    "workflow_context": []
   },
   "Configure": {
     "name": "Configure",
@@ -519,9 +569,6 @@
       "Confirm state was loaded and pushed successfully.",
       "Consider running CheckStatus after Configure to verify system health."
     ],
-    "prerequisites": [
-      "LinkUp"
-    ],
     "images": [],
     "related_context": [
       {
@@ -529,7 +576,8 @@
         "params": [],
         "last_n": 5
       }
-    ]
+    ],
+    "workflow_context": []
   },
   "DumpBox": {
     "name": "DumpBox",
@@ -578,9 +626,6 @@
       "Compare with expected configuration values.",
       "Flag any unexpected register values or error conditions."
     ],
-    "prerequisites": [
-      "LinkUp"
-    ],
     "images": [],
     "related_context": [
       {
@@ -588,7 +633,8 @@
         "params": [],
         "last_n": 5
       }
-    ]
+    ],
+    "workflow_context": []
   },
   "LinkUp": {
     "name": "LinkUp",
@@ -637,9 +683,6 @@
       "If any box fails to link, check physical connections first.",
       "Verify firmware compatibility if connections are physically sound."
     ],
-    "prerequisites": [
-      "CheckStatus"
-    ],
     "images": [],
     "related_context": [
       {
@@ -647,7 +690,8 @@
         "params": [],
         "last_n": 5
       }
-    ]
+    ],
+    "workflow_context": []
   },
   "ReadoutConfigure": {
     "name": "ReadoutConfigure",
@@ -695,10 +739,6 @@
       "Verify configuration was pushed to hardware without errors.",
       "Check that excluded qubits are properly disabled."
     ],
-    "prerequisites": [
-      "LinkUp",
-      "Configure"
-    ],
     "images": [],
     "related_context": [
       {
@@ -706,7 +746,8 @@
         "params": [],
         "last_n": 5
       }
-    ]
+    ],
+    "workflow_context": []
   },
   "CheckElectricalDelay": {
     "name": "CheckElectricalDelay",
@@ -762,10 +803,6 @@
       "If delay has changed, identify hardware modifications that could explain the change.",
       "Ensure delay compensation is updated in the system configuration."
     ],
-    "prerequisites": [
-      "Configure",
-      "CheckResonatorFrequencies"
-    ],
     "images": [],
     "related_context": [
       {
@@ -773,7 +810,8 @@
         "params": [],
         "last_n": 5
       }
-    ]
+    ],
+    "workflow_context": []
   },
   "CheckQubitFrequencies": {
     "name": "CheckQubitFrequencies",
@@ -836,10 +874,6 @@
       "If multiple features exist, use design frequency as a guide.",
       "Record the coarse frequency for use in subsequent fine spectroscopy."
     ],
-    "prerequisites": [
-      "Configure",
-      "CheckResonatorFrequencies"
-    ],
     "images": [],
     "related_context": [
       {
@@ -847,7 +881,8 @@
         "params": [],
         "last_n": 5
       }
-    ]
+    ],
+    "workflow_context": []
   },
   "CheckQubitSpectroscopy": {
     "name": "CheckQubitSpectroscopy",
@@ -917,15 +952,28 @@
       "Review quality level; if <= 2, investigate peak quality issues.",
       "Compare with previous measurements for drift detection."
     ],
-    "prerequisites": [
-      "CheckResonatorSpectroscopy (provides readout_frequency)"
-    ],
     "images": [],
     "related_context": [
       {
         "type": "history",
         "params": [],
         "last_n": 5
+      }
+    ],
+    "workflow_context": [
+      {
+        "workflow": "Bring-up",
+        "step": 2,
+        "total_steps": 3,
+        "previous": [
+          "CheckResonatorSpectroscopy"
+        ],
+        "next": [
+          "ChevronPattern"
+        ],
+        "preceding_tasks": [
+          "CheckResonatorSpectroscopy"
+        ]
       }
     ]
   },
@@ -991,9 +1039,6 @@
       "Check that signal increases and noise remains manageable.",
       "Record the optimal amplitude for use in subsequent measurements."
     ],
-    "prerequisites": [
-      "CheckResonatorSpectroscopy or CheckResonatorFrequencies"
-    ],
     "images": [],
     "related_context": [
       {
@@ -1001,7 +1046,8 @@
         "params": [],
         "last_n": 5
       }
-    ]
+    ],
+    "workflow_context": []
   },
   "CheckReflectionCoefficient": {
     "name": "CheckReflectionCoefficient",
@@ -1074,10 +1120,6 @@
       "Assess kappa_external vs kappa_internal; over-coupled is preferred.",
       "Compare with design values and previous measurements."
     ],
-    "prerequisites": [
-      "Configure",
-      "CheckResonatorFrequencies"
-    ],
     "images": [],
     "related_context": [
       {
@@ -1085,7 +1127,8 @@
         "params": [],
         "last_n": 5
       }
-    ]
+    ],
+    "workflow_context": []
   },
   "CheckResonatorFrequencies": {
     "name": "CheckResonatorFrequencies",
@@ -1149,9 +1192,6 @@
       "Identify the correct peak for this qubit based on MUX position (qid % 4).",
       "Record the coarse frequency for use in subsequent spectroscopy."
     ],
-    "prerequisites": [
-      "Configure"
-    ],
     "images": [],
     "related_context": [
       {
@@ -1159,7 +1199,8 @@
         "params": [],
         "last_n": 5
       }
-    ]
+    ],
+    "workflow_context": []
   },
   "CheckResonatorSpectroscopy": {
     "name": "CheckResonatorSpectroscopy",
@@ -1225,16 +1266,24 @@
       "Compare detected frequencies with design values and previous measurements.",
       "Note any power-dependent behavior anomalies."
     ],
-    "prerequisites": [
-      "Configure",
-      "CheckResonatorFrequencies"
-    ],
     "images": [],
     "related_context": [
       {
         "type": "history",
         "params": [],
         "last_n": 5
+      }
+    ],
+    "workflow_context": [
+      {
+        "workflow": "Bring-up",
+        "step": 1,
+        "total_steps": 3,
+        "previous": [],
+        "next": [
+          "CheckQubitSpectroscopy"
+        ],
+        "preceding_tasks": []
       }
     ]
   },
@@ -1294,10 +1343,6 @@
       "Check for leakage signatures in the decay.",
       "If fidelity is borderline, recommend tomographic verification."
     ],
-    "prerequisites": [
-      "CreateDRAGHPIPulse",
-      "CheckHPIPulse"
-    ],
     "images": [
       {
         "alt_text": "DRAG HPI pulse error amplification",
@@ -1310,6 +1355,27 @@
         "type": "history",
         "params": [],
         "last_n": 5
+      }
+    ],
+    "workflow_context": [
+      {
+        "workflow": "1Q Fine-tune",
+        "step": 7,
+        "total_steps": 12,
+        "previous": [
+          "CreateDRAGHPIPulse"
+        ],
+        "next": [
+          "CreateDRAGPIPulse"
+        ],
+        "preceding_tasks": [
+          "CheckRabi",
+          "CreateHPIPulse",
+          "CheckHPIPulse",
+          "CreatePIPulse",
+          "CheckPIPulse",
+          "CreateDRAGHPIPulse"
+        ]
       }
     ]
   },
@@ -1369,10 +1435,6 @@
       "Verify DRAG beta is at the optimal value.",
       "If improvement is marginal, consider whether DRAG is necessary for this qubit."
     ],
-    "prerequisites": [
-      "CreateDRAGPIPulse",
-      "CheckPIPulse"
-    ],
     "images": [
       {
         "alt_text": "DRAG PI pulse error amplification",
@@ -1385,6 +1447,29 @@
         "type": "history",
         "params": [],
         "last_n": 5
+      }
+    ],
+    "workflow_context": [
+      {
+        "workflow": "1Q Fine-tune",
+        "step": 9,
+        "total_steps": 12,
+        "previous": [
+          "CreateDRAGPIPulse"
+        ],
+        "next": [
+          "ReadoutClassification"
+        ],
+        "preceding_tasks": [
+          "CheckRabi",
+          "CreateHPIPulse",
+          "CheckHPIPulse",
+          "CreatePIPulse",
+          "CheckPIPulse",
+          "CreateDRAGHPIPulse",
+          "CheckDRAGHPIPulse",
+          "CreateDRAGPIPulse"
+        ]
       }
     ]
   },
@@ -1444,10 +1529,6 @@
       "Compare with CheckPIPulse error rate for consistency.",
       "If error is large, recommend recalibration."
     ],
-    "prerequisites": [
-      "CreateHPIPulse",
-      "CheckRabi"
-    ],
     "images": [
       {
         "alt_text": "HPI pulse error amplification",
@@ -1460,6 +1541,38 @@
         "type": "history",
         "params": [],
         "last_n": 5
+      }
+    ],
+    "workflow_context": [
+      {
+        "workflow": "1Q Check",
+        "step": 4,
+        "total_steps": 7,
+        "previous": [
+          "CreateHPIPulse"
+        ],
+        "next": [
+          "CheckT1Average"
+        ],
+        "preceding_tasks": [
+          "CheckRabi",
+          "CreateHPIPulse"
+        ]
+      },
+      {
+        "workflow": "1Q Fine-tune",
+        "step": 3,
+        "total_steps": 12,
+        "previous": [
+          "CreateHPIPulse"
+        ],
+        "next": [
+          "CreatePIPulse"
+        ],
+        "preceding_tasks": [
+          "CheckRabi",
+          "CreateHPIPulse"
+        ]
       }
     ]
   },
@@ -1520,10 +1633,6 @@
       "If error is too large, recommend recalibration with CreatePIPulse.",
       "Compare with DRAG version for improvement assessment."
     ],
-    "prerequisites": [
-      "CreatePIPulse",
-      "CheckRabi"
-    ],
     "images": [
       {
         "alt_text": "PI pulse error amplification",
@@ -1536,6 +1645,25 @@
         "type": "history",
         "params": [],
         "last_n": 5
+      }
+    ],
+    "workflow_context": [
+      {
+        "workflow": "1Q Fine-tune",
+        "step": 5,
+        "total_steps": 12,
+        "previous": [
+          "CreatePIPulse"
+        ],
+        "next": [
+          "CreateDRAGHPIPulse"
+        ],
+        "preceding_tasks": [
+          "CheckRabi",
+          "CreateHPIPulse",
+          "CheckHPIPulse",
+          "CreatePIPulse"
+        ]
       }
     ]
   },
@@ -1608,10 +1736,6 @@
       "Check leakage is below threshold.",
       "Recommend CheckDRAGHPIPulse validation after calibration."
     ],
-    "prerequisites": [
-      "CreateDRAGPIPulse",
-      "CreateHPIPulse"
-    ],
     "images": [
       {
         "alt_text": "DRAG HPI pulse calibration",
@@ -1624,6 +1748,26 @@
         "type": "history",
         "params": [],
         "last_n": 5
+      }
+    ],
+    "workflow_context": [
+      {
+        "workflow": "1Q Fine-tune",
+        "step": 6,
+        "total_steps": 12,
+        "previous": [
+          "CheckPIPulse"
+        ],
+        "next": [
+          "CheckDRAGHPIPulse"
+        ],
+        "preceding_tasks": [
+          "CheckRabi",
+          "CreateHPIPulse",
+          "CheckHPIPulse",
+          "CreatePIPulse",
+          "CheckPIPulse"
+        ]
       }
     ]
   },
@@ -1696,10 +1840,6 @@
       "Check the refined amplitude gives exact π rotation.",
       "Compare beta with the theoretical estimate (anharmonicity^(-1))."
     ],
-    "prerequisites": [
-      "CreatePIPulse",
-      "CheckQubitFrequency"
-    ],
     "images": [
       {
         "alt_text": "DRAG PI pulse calibration",
@@ -1712,6 +1852,28 @@
         "type": "history",
         "params": [],
         "last_n": 5
+      }
+    ],
+    "workflow_context": [
+      {
+        "workflow": "1Q Fine-tune",
+        "step": 8,
+        "total_steps": 12,
+        "previous": [
+          "CheckDRAGHPIPulse"
+        ],
+        "next": [
+          "CheckDRAGPIPulse"
+        ],
+        "preceding_tasks": [
+          "CheckRabi",
+          "CreateHPIPulse",
+          "CheckHPIPulse",
+          "CreatePIPulse",
+          "CheckPIPulse",
+          "CreateDRAGHPIPulse",
+          "CheckDRAGHPIPulse"
+        ]
       }
     ]
   },
@@ -1780,10 +1942,6 @@
       "If significant deviation from π/2 = π_amp/2, investigate drive nonlinearity.",
       "Recommend CheckHPIPulse validation after calibration."
     ],
-    "prerequisites": [
-      "CreatePIPulse",
-      "CheckQubitFrequency"
-    ],
     "images": [
       {
         "alt_text": "HPI pulse calibration",
@@ -1796,6 +1954,36 @@
         "type": "history",
         "params": [],
         "last_n": 5
+      }
+    ],
+    "workflow_context": [
+      {
+        "workflow": "1Q Check",
+        "step": 3,
+        "total_steps": 7,
+        "previous": [
+          "CheckRabi"
+        ],
+        "next": [
+          "CheckHPIPulse"
+        ],
+        "preceding_tasks": [
+          "CheckRabi"
+        ]
+      },
+      {
+        "workflow": "1Q Fine-tune",
+        "step": 2,
+        "total_steps": 12,
+        "previous": [
+          "CheckRabi"
+        ],
+        "next": [
+          "CheckHPIPulse"
+        ],
+        "preceding_tasks": [
+          "CheckRabi"
+        ]
       }
     ]
   },
@@ -1864,10 +2052,6 @@
       "Compare with previous π amplitude for drift detection.",
       "If fit is poor, recommend frequency recalibration first."
     ],
-    "prerequisites": [
-      "CheckQubitFrequency",
-      "CheckRabi"
-    ],
     "images": [
       {
         "alt_text": "PI pulse calibration",
@@ -1880,6 +2064,24 @@
         "type": "history",
         "params": [],
         "last_n": 5
+      }
+    ],
+    "workflow_context": [
+      {
+        "workflow": "1Q Fine-tune",
+        "step": 4,
+        "total_steps": 12,
+        "previous": [
+          "CheckHPIPulse"
+        ],
+        "next": [
+          "CheckPIPulse"
+        ],
+        "preceding_tasks": [
+          "CheckRabi",
+          "CreateHPIPulse",
+          "CheckHPIPulse"
+        ]
       }
     ]
   },
@@ -1941,10 +2143,6 @@
       "Confirm correction was applied successfully.",
       "Compare with previous measurements for drift detection."
     ],
-    "prerequisites": [
-      "LinkUp",
-      "Configure"
-    ],
     "images": [],
     "related_context": [
       {
@@ -1952,7 +2150,8 @@
         "params": [],
         "last_n": 5
       }
-    ]
+    ],
+    "workflow_context": []
   },
   "CheckDispersiveShift": {
     "name": "CheckDispersiveShift",
@@ -2019,10 +2218,6 @@
       "Verify 2χ is sufficient for the required readout fidelity.",
       "If χ has changed, check for qubit frequency drift."
     ],
-    "prerequisites": [
-      "CheckQubitFrequency",
-      "CheckReadoutFrequency"
-    ],
     "images": [],
     "related_context": [
       {
@@ -2030,7 +2225,8 @@
         "params": [],
         "last_n": 5
       }
-    ]
+    ],
+    "workflow_context": []
   },
   "CheckOptimalReadoutAmplitude": {
     "name": "CheckOptimalReadoutAmplitude",
@@ -2093,10 +2289,6 @@
       "Check that the optimal amplitude is not in the nonlinear/QND-violation regime.",
       "Compare the achieved fidelity with expectations from the dispersive shift."
     ],
-    "prerequisites": [
-      "CheckDispersiveShift",
-      "CheckReadoutFrequency"
-    ],
     "images": [],
     "related_context": [
       {
@@ -2104,7 +2296,8 @@
         "params": [],
         "last_n": 5
       }
-    ]
+    ],
+    "workflow_context": []
   },
   "CheckQubit": {
     "name": "CheckQubit",
@@ -2171,10 +2364,6 @@
       "If no oscillation, diagnose drive and readout chain.",
       "If low contrast, check temperature and T1."
     ],
-    "prerequisites": [
-      "CheckQubitFrequency",
-      "CheckReadoutFrequency"
-    ],
     "images": [],
     "related_context": [
       {
@@ -2182,7 +2371,8 @@
         "params": [],
         "last_n": 5
       }
-    ]
+    ],
+    "workflow_context": []
   },
   "CheckQubitFrequency": {
     "name": "CheckQubitFrequency",
@@ -2245,9 +2435,6 @@
       "Review frequency history for drift or instability.",
       "If frequency has shifted significantly, assess impact on gate calibrations."
     ],
-    "prerequisites": [
-      "CheckReadoutFrequency"
-    ],
     "images": [],
     "related_context": [
       {
@@ -2262,7 +2449,8 @@
         ],
         "last_n": 5
       }
-    ]
+    ],
+    "workflow_context": []
   },
   "CheckRabi": {
     "name": "CheckRabi",
@@ -2370,10 +2558,6 @@
       "Look for beating patterns that would indicate TLS coupling.",
       "Compare with recent history for drift in drive calibration."
     ],
-    "prerequisites": [
-      "CheckQubitFrequency",
-      "CheckReadoutFrequency"
-    ],
     "images": [
       {
         "alt_text": "Rabi oscillation 1",
@@ -2391,6 +2575,42 @@
         "type": "history",
         "params": [],
         "last_n": 5
+      }
+    ],
+    "workflow_context": [
+      {
+        "workflow": "1Q Check",
+        "step": 1,
+        "total_steps": 7,
+        "previous": [],
+        "next": [
+          "CheckRabi"
+        ],
+        "preceding_tasks": []
+      },
+      {
+        "workflow": "1Q Check",
+        "step": 2,
+        "total_steps": 7,
+        "previous": [
+          "CheckRabi"
+        ],
+        "next": [
+          "CreateHPIPulse"
+        ],
+        "preceding_tasks": [
+          "CheckRabi"
+        ]
+      },
+      {
+        "workflow": "1Q Fine-tune",
+        "step": 1,
+        "total_steps": 12,
+        "previous": [],
+        "next": [
+          "CreateHPIPulse"
+        ],
+        "preceding_tasks": []
       }
     ]
   },
@@ -2464,10 +2684,6 @@
       "Review recent history for frequency drift (changing detuning).",
       "If T2\\* is very short, assess whether low-frequency noise mitigation is needed."
     ],
-    "prerequisites": [
-      "CheckQubitFrequency",
-      "CheckT1"
-    ],
     "images": [
       {
         "alt_text": "X-basis Ramsey fringe",
@@ -2497,6 +2713,24 @@
           "frequency"
         ],
         "last_n": 5
+      }
+    ],
+    "workflow_context": [
+      {
+        "workflow": "1Q Check",
+        "step": 7,
+        "total_steps": 7,
+        "previous": [
+          "CheckT2EchoAverage"
+        ],
+        "next": [],
+        "preceding_tasks": [
+          "CheckRabi",
+          "CreateHPIPulse",
+          "CheckHPIPulse",
+          "CheckT1Average",
+          "CheckT2EchoAverage"
+        ]
       }
     ]
   },
@@ -2561,7 +2795,6 @@
       "Compare with previous cooldown values for drift assessment.",
       "If shifted significantly, assess impact on readout fidelity."
     ],
-    "prerequisites": [],
     "images": [],
     "related_context": [
       {
@@ -2569,7 +2802,8 @@
         "params": [],
         "last_n": 5
       }
-    ]
+    ],
+    "workflow_context": []
   },
   "CheckT1": {
     "name": "CheckT1",
@@ -2633,10 +2867,6 @@
       "Check neighbor qubit T1 values for spatial correlation of defects.",
       "If T1 is anomalously short, consider TLS, Purcell, or dielectric loss mechanisms."
     ],
-    "prerequisites": [
-      "CheckQubitFrequency",
-      "CheckReadoutFrequency"
-    ],
     "images": [
       {
         "alt_text": "T1 exponential decay curve",
@@ -2658,7 +2888,8 @@
         ],
         "last_n": 5
       }
-    ]
+    ],
+    "workflow_context": []
   },
   "CheckT2Echo": {
     "name": "CheckT2Echo",
@@ -2722,10 +2953,6 @@
       "Review recent history for trends or instability.",
       "If T2_echo << 2\\*T1, investigate high-frequency noise sources."
     ],
-    "prerequisites": [
-      "CheckT1",
-      "CheckQubitFrequency"
-    ],
     "images": [
       {
         "alt_text": "T2 echo decay curve",
@@ -2748,7 +2975,8 @@
         ],
         "last_n": 5
       }
-    ]
+    ],
+    "workflow_context": []
   },
   "ChevronPattern": {
     "name": "ChevronPattern",
@@ -2815,9 +3043,6 @@
       "Extract Rabi frequency from the fringe period at zero detuning.",
       "If asymmetric, consider multi-level effects."
     ],
-    "prerequisites": [
-      "CheckReadoutFrequency"
-    ],
     "images": [
       {
         "alt_text": "Chevron pattern",
@@ -2830,6 +3055,21 @@
         "type": "history",
         "params": [],
         "last_n": 5
+      }
+    ],
+    "workflow_context": [
+      {
+        "workflow": "Bring-up",
+        "step": 3,
+        "total_steps": 3,
+        "previous": [
+          "CheckQubitSpectroscopy"
+        ],
+        "next": [],
+        "preceding_tasks": [
+          "CheckResonatorSpectroscopy",
+          "CheckQubitSpectroscopy"
+        ]
       }
     ]
   },
@@ -2910,10 +3150,6 @@
       "Compare fidelity with dispersive shift expectations.",
       "Verify readout amplitude is at the optimal point."
     ],
-    "prerequisites": [
-      "CheckOptimalReadoutAmplitude",
-      "CheckDispersiveShift"
-    ],
     "images": [
       {
         "alt_text": "Readout classification",
@@ -2926,6 +3162,30 @@
         "type": "history",
         "params": [],
         "last_n": 5
+      }
+    ],
+    "workflow_context": [
+      {
+        "workflow": "1Q Fine-tune",
+        "step": 10,
+        "total_steps": 12,
+        "previous": [
+          "CheckDRAGPIPulse"
+        ],
+        "next": [
+          "RandomizedBenchmarking"
+        ],
+        "preceding_tasks": [
+          "CheckRabi",
+          "CreateHPIPulse",
+          "CheckHPIPulse",
+          "CreatePIPulse",
+          "CheckPIPulse",
+          "CreateDRAGHPIPulse",
+          "CheckDRAGHPIPulse",
+          "CreateDRAGPIPulse",
+          "CheckDRAGPIPulse"
+        ]
       }
     ]
   },
@@ -2993,11 +3253,6 @@
       "If fidelity is low, determine if limited by single-qubit, two-qubit, or readout errors.",
       "Recommend component-level debugging if needed."
     ],
-    "prerequisites": [
-      "CheckZX90",
-      "CheckHPIPulse",
-      "CheckPIPulse"
-    ],
     "images": [
       {
         "alt_text": "Bell state measurement",
@@ -3018,6 +3273,24 @@
           "coupling_strength"
         ],
         "last_n": 5
+      }
+    ],
+    "workflow_context": [
+      {
+        "workflow": "2Q Calibration",
+        "step": 4,
+        "total_steps": 6,
+        "previous": [
+          "CheckZX90"
+        ],
+        "next": [
+          "CheckBellStateTomography"
+        ],
+        "preceding_tasks": [
+          "CheckCrossResonance",
+          "CreateZX90",
+          "CheckZX90"
+        ]
       }
     ]
   },
@@ -3083,11 +3356,6 @@
       "If fidelity is lower than expected, identify which matrix elements deviate most.",
       "Use deviations to diagnose specific error channels."
     ],
-    "prerequisites": [
-      "CheckBellState",
-      "CheckHPIPulse",
-      "CheckZX90"
-    ],
     "images": [
       {
         "alt_text": "Bell state tomography",
@@ -3108,6 +3376,25 @@
           "coupling_strength"
         ],
         "last_n": 5
+      }
+    ],
+    "workflow_context": [
+      {
+        "workflow": "2Q Calibration",
+        "step": 5,
+        "total_steps": 6,
+        "previous": [
+          "CheckBellState"
+        ],
+        "next": [
+          "ZX90InterleavedRandomizedBenchmarking"
+        ],
+        "preceding_tasks": [
+          "CheckCrossResonance",
+          "CreateZX90",
+          "CheckZX90",
+          "CheckBellState"
+        ]
       }
     ]
   },
@@ -3204,11 +3491,6 @@
       "If parasitic terms are large, recommend echo CR or cancellation.",
       "Check for spectator qubit effects."
     ],
-    "prerequisites": [
-      "CheckQubitFrequency",
-      "CheckPIPulse",
-      "CheckHPIPulse"
-    ],
     "images": [
       {
         "alt_text": "CR Hamiltonian coefficients",
@@ -3270,6 +3552,18 @@
         ],
         "last_n": 5
       }
+    ],
+    "workflow_context": [
+      {
+        "workflow": "2Q Calibration",
+        "step": 1,
+        "total_steps": 6,
+        "previous": [],
+        "next": [
+          "CreateZX90"
+        ],
+        "preceding_tasks": []
+      }
     ]
   },
   "CheckZX90": {
@@ -3329,11 +3623,6 @@
       "If calibration-limited, recommend CreateZX90 recalibration.",
       "If coherence-limited, assess T1/T2 of both qubits."
     ],
-    "prerequisites": [
-      "CreateZX90",
-      "CheckPIPulse",
-      "CheckHPIPulse"
-    ],
     "images": [
       {
         "alt_text": "ZX90 control qubit sweep",
@@ -3359,6 +3648,23 @@
           "coupling_strength"
         ],
         "last_n": 5
+      }
+    ],
+    "workflow_context": [
+      {
+        "workflow": "2Q Calibration",
+        "step": 3,
+        "total_steps": 6,
+        "previous": [
+          "CreateZX90"
+        ],
+        "next": [
+          "CheckBellState"
+        ],
+        "preceding_tasks": [
+          "CheckCrossResonance",
+          "CreateZX90"
+        ]
       }
     ]
   },
@@ -3452,11 +3758,6 @@
       "If parasitic terms are visible, recommend echo CR.",
       "Validate with CheckZX90 after calibration."
     ],
-    "prerequisites": [
-      "CheckCrossResonance",
-      "CheckPIPulse",
-      "CheckHPIPulse"
-    ],
     "images": [
       {
         "alt_text": "ZX90 calibration n=1",
@@ -3487,6 +3788,22 @@
           "coupling_strength"
         ],
         "last_n": 5
+      }
+    ],
+    "workflow_context": [
+      {
+        "workflow": "2Q Calibration",
+        "step": 2,
+        "total_steps": 6,
+        "previous": [
+          "CheckCrossResonance"
+        ],
+        "next": [
+          "CheckZX90"
+        ],
+        "preceding_tasks": [
+          "CheckCrossResonance"
+        ]
       }
     ]
   }

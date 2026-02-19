@@ -71,11 +71,6 @@ None.
 3. If no oscillation, diagnose drive and readout chain.
 4. If low contrast, check temperature and T1.
 
-## Prerequisites
-
-- CheckQubitFrequency
-- CheckReadoutFrequency
-
 ## Related context
 
 - history(last_n=5)

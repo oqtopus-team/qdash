@@ -99,11 +99,6 @@ Average readout fidelity should be high with low asymmetry between |0‚ü© and |1‚
 4. Compare fidelity with dispersive shift expectations.
 5. Verify readout amplitude is at the optimal point.
 
-## Prerequisites
-
-- CheckOptimalReadoutAmplitude
-- CheckDispersiveShift
-
 ## Related context
 
 - history(last_n=5)

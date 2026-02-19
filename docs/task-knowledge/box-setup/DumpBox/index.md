@@ -58,10 +58,6 @@ None.
 2. Compare with expected configuration values.
 3. Flag any unexpected register values or error conditions.
 
-## Prerequisites
-
-- LinkUp
-
 ## Related context
 
 - history(last_n=5)

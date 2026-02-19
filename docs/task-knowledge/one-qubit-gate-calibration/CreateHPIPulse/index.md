@@ -91,11 +91,6 @@ The π/2 amplitude should be approximately half of the π amplitude; fit quality
 3. If significant deviation from π/2 = π_amp/2, investigate drive nonlinearity.
 4. Recommend CheckHPIPulse validation after calibration.
 
-## Prerequisites
-
-- CreatePIPulse
-- CheckQubitFrequency
-
 ## Related context
 
 - history(last_n=5)

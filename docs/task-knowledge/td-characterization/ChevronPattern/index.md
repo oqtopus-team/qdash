@@ -90,10 +90,6 @@ Clear fringe visibility with identifiable chevron vertex; vertex position should
 3. Extract Rabi frequency from the fringe period at zero detuning.
 4. If asymmetric, consider multi-level effects.
 
-## Prerequisites
-
-- CheckReadoutFrequency
-
 ## Related context
 
 - history(last_n=5)

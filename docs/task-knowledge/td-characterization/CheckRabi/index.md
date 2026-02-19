@@ -106,11 +106,6 @@ Rabi amplitude should be high; frequency should be consistent with calibrated dr
 4. Look for beating patterns that would indicate TLS coupling.
 5. Compare with recent history for drift in drive calibration.
 
-## Prerequisites
-
-- CheckQubitFrequency
-- CheckReadoutFrequency
-
 ## Related context
 
 - history(last_n=5)

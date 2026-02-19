@@ -63,10 +63,6 @@ None.
 3. Identify any channels with anomalously high noise.
 4. Check for spurious tones that could interfere with qubit operations.
 
-## Prerequisites
-
-- LinkUp
-
 ## Related context
 
 - history(last_n=5)
