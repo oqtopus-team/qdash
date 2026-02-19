@@ -745,7 +745,7 @@ export function HistogramView() {
           {/* Row 1: Main Controls */}
           <div className="flex flex-col gap-3 sm:gap-4">
             {/* Row 1a: Type + Chip + Metric */}
-            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            <div className="flex flex-col sm:flex-row flex-wrap items-start gap-2 sm:gap-3">
               <div className="tabs tabs-boxed bg-base-200 h-8 sm:h-9">
                 <button
                   className={`tab h-full ${metricType === "qubit" ? "tab-active" : ""}`}
@@ -761,14 +761,14 @@ export function HistogramView() {
                 </button>
               </div>
 
-              <div className="w-28 sm:w-48">
+              <div className="w-full sm:w-48">
                 <ChipSelector
                   selectedChip={selectedChip}
                   onChipSelect={setSelectedChip}
                 />
               </div>
 
-              <div className="w-40 sm:w-56">
+              <div className="w-full sm:w-56">
                 <Select<MetricOption, false>
                   className="text-base-content"
                   classNamePrefix="react-select"
