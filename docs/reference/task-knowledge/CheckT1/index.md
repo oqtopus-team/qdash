@@ -32,10 +32,24 @@ Exponential fit should have high R²; T1 should be stable across repeated measur
   - "Is T1 consistent with recent measurements (within 20% variation)?"
   - "Is T1 long enough to support the target gate fidelity?"
 
+## Input parameters
+
+- qubit_frequency: Loaded from DB
+- hpi_amplitude: Loaded from DB
+- hpi_length: Loaded from DB
+- readout_amplitude: Loaded from DB
+- readout_frequency: Loaded from DB
+- readout_length: Readout pulse length (ns)
+
 ## Output parameters
 
-- t1: T1 relaxation time; expected 20–200 μs
-- fit_r_squared: Goodness of fit; expected > 0.95
+- t1: T1 time (μs)
+
+## Run parameters
+
+- time_range: Time range for T1 time (ns)
+- shots: Number of shots for T1 time
+- interval: Time interval for T1 time (ns)
 
 ## Common failure patterns
 

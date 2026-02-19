@@ -31,10 +31,24 @@ Fit quality should be high; the amplitude should be in the linear drive regime. 
   - "Is the π amplitude in the linear drive regime?"
   - "Is the amplitude consistent with previous calibrations?"
 
+## Input parameters
+
+- qubit_frequency: Loaded from DB
+- control_amplitude: Loaded from DB
+- readout_amplitude: Loaded from DB
+- readout_frequency: Loaded from DB
+- readout_length: Readout pulse length (ns)
+
 ## Output parameters
 
-- pi_pulse_amplitude: Calibrated amplitude for π rotation
-- fit_r_squared: Fit quality; expected > 0.95
+- pi_amplitude: PI pulse amplitude
+- pi_length: PI pulse length (ns)
+
+## Run parameters
+
+- pi_duration: PI pulse length (ns)
+- shots: Number of shots for calibration
+- interval: Time interval for calibration (ns)
 
 ## Common failure patterns
 

@@ -31,10 +31,24 @@ The π/2 amplitude should be approximately half of the π amplitude; fit quality
   - "Is the fit R² > 0.95?"
   - "Is the amplitude consistent with previous calibrations?"
 
+## Input parameters
+
+- qubit_frequency: Loaded from DB
+- control_amplitude: Loaded from DB
+- readout_amplitude: Loaded from DB
+- readout_frequency: Loaded from DB
+- readout_length: Readout pulse length (ns)
+
 ## Output parameters
 
-- hpi_pulse_amplitude: Calibrated amplitude for π/2 rotation
-- fit_r_squared: Fit quality; expected > 0.95
+- hpi_amplitude: HPI pulse amplitude
+- hpi_length: HPI pulse length (ns)
+
+## Run parameters
+
+- hpi_duration: HPI pulse length (ns)
+- shots: Number of shots for calibration
+- interval: Time interval for calibration (ns)
 
 ## Common failure patterns
 

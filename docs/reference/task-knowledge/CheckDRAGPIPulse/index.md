@@ -30,10 +30,24 @@ Gate fidelity should exceed the non-DRAG version; leakage to |2⟩ should be min
   - "Is the leakage to |2⟩ <0.1%?"
   - "Is the DRAG version better than the non-DRAG CheckPIPulse?"
 
+## Input parameters
+
+- qubit_frequency: Loaded from DB
+- drag_pi_amplitude: Loaded from DB
+- drag_pi_length: Loaded from DB
+- drag_pi_beta: Loaded from DB
+- readout_amplitude: Loaded from DB
+- readout_frequency: Loaded from DB
+- readout_length: Readout pulse length (ns)
+
 ## Output parameters
 
-- gate_fidelity: DRAG X180 gate fidelity; expected > 0.995
-- leakage_rate: Leakage to |2⟩ per gate; expected < 0.001
+None.
+
+## Run parameters
+
+- repetitions: Number of repetitions for the PI pulse (a.u.)
+- interval: Time interval (ns)
 
 ## Common failure patterns
 

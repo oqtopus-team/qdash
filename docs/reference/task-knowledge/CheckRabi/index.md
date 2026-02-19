@@ -1,43 +1,63 @@
 # CheckRabi
 
-Measures Rabi oscillation to extract drive amplitude, frequency, and contrast.
+Measures Rabi oscillation to extract drive amplitude, frequency, and IQ-plane parameters.
 
 ## What it measures
 
-Rabi oscillation parameters: amplitude (contrast), frequency (drive strength), and decay.
+Rabi oscillation parameters: amplitude, frequency (drive strength), phase, offset, and IQ-plane rotation parameters.
 
 ## Physical principle
 
-Apply a resonant drive pulse of variable duration; the qubit oscillates between |0⟩ and |1⟩ at the Rabi frequency Ω_R.
+Apply a resonant drive pulse of variable duration; the qubit oscillates between |0⟩ and |1⟩ at the Rabi frequency Ω_R. The IQ data is rotated via PCA to align the measurement axis, then fitted with a damped cosine model.
 
 ## Expected result
 
-Damped sinusoidal oscillation of P(|1⟩) vs pulse duration. Frequency gives Ω_R, envelope gives T_Rabi.
+Damped sinusoidal oscillation of the rotated IQ signal vs pulse duration. Frequency gives Ω_R, envelope gives the decay time τ.
 
 - result_type: oscillation
 - x_axis: Pulse duration (ns)
-- y_axis: P(|1⟩)
-- fit_model: A * cos(2π·Ω_R·t) * exp(-t/T_Rabi) + B
+- y_axis: Rotated IQ signal (arb. units)
+- fit_model: A * cos(ω·t + φ) * exp(-t/τ) + B (damped cosine, `is_damped=True` by default)
 - good_visual: clear sinusoidal oscillation with high contrast and slow decay envelope
 
 ![Rabi oscillation](./0.png)
 
 ## Evaluation criteria
 
-Rabi contrast should be high; frequency should be consistent with calibrated drive amplitude; fit quality should be good.
+Rabi amplitude should be high; frequency should be consistent with calibrated drive amplitude; fit quality should be good.
 
 - check_questions:
-  - "Is the Rabi contrast >90%?"
+  - "Is the Rabi amplitude (contrast) sufficiently high?"
   - "Is the Rabi frequency consistent with the expected drive amplitude?"
   - "Is the fit R² > 0.95?"
-  - "Is the decay (T_Rabi) slow compared to the oscillation period?"
+  - "Is the decay slow compared to the oscillation period?"
+
+## Input parameters
+
+- qubit_frequency: Loaded from DB
+- control_amplitude: Loaded from DB
+- readout_amplitude: Loaded from DB
+- readout_frequency: Loaded from DB
+- readout_length: Readout pulse length (ns)
 
 ## Output parameters
 
-- rabi_frequency: Rabi oscillation frequency Ω_R; indicates drive strength
-- rabi_contrast: Peak-to-trough amplitude; expected > 0.9
-- t_rabi: Rabi decay time; longer is better
-- fit_r_squared: Fit quality; expected > 0.95
+- rabi_amplitude: Rabi oscillation amplitude (a.u.)
+- rabi_frequency: Rabi oscillation frequency (MHz)
+- rabi_phase: Rabi oscillation phase (a.u.)
+- rabi_offset: Rabi oscillation offset (a.u.)
+- rabi_angle: Rabi angle (in degree) (degree)
+- rabi_noise: Rabi oscillation noise (a.u.)
+- rabi_distance: Rabi distance (a.u.)
+- rabi_reference_phase: Rabi reference phase (a.u.)
+- control_amplitude: Control pulse amplitude (a.u.)
+- maximum_rabi_frequency: Maximum Rabi frequency per unit control amplitude (MHz/a.u.)
+
+## Run parameters
+
+- time_range: Time range for Rabi oscillation (ns)
+- shots: Number of shots for Rabi oscillation (a.u.)
+- interval: Time interval for Rabi oscillation (ns)
 
 ## Common failure patterns
 

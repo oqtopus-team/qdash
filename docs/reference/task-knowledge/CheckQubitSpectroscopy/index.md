@@ -29,10 +29,24 @@ The f_01 peak should be well-resolved with sufficient height. If f_12 is detecte
   - "Is the anharmonicity in the expected range for this qubit type?"
   - "Is the peak width consistent with expected coherence times?"
 
+## Input parameters
+
+- readout_frequency: Loaded from DB
+
 ## Output parameters
 
-- qubit_frequency: Estimated qubit frequency f_01 (GHz)
-- anharmonicity: Anharmonicity alpha = f_12 - f_01 (GHz); typically negative for transmons
+- qubit_frequency: Estimated qubit frequency (f01) from spectroscopy (GHz)
+- anharmonicity: Anharmonicity alpha = f12 - f01 (typically negative for transmon) (GHz)
+
+## Run parameters
+
+- binarize_threshold_sigma_plus: Positive threshold for binarization (in sigma units) (a.u.)
+- binarize_threshold_sigma_minus: Negative threshold for binarization (in sigma units) (a.u.)
+- top_power: Reference power for height and moment calculation (should be > max(ys)) (dB)
+- f01_height_min: Minimum height for f01 peak detection (in dB) (dB)
+- f12_distance_min: Minimum distance from f01 for f12 detection (in GHz) (GHz)
+- f12_distance_max: Maximum distance from f01 for f12 detection (in GHz) (GHz)
+- f12_height_min: Minimum height for f12 peak detection (in dB) (dB)
 
 ## Common failure patterns
 

@@ -30,11 +30,25 @@ Optimal beta should minimize leakage; rotation angle error should be minimal.
   - "Is the rotation angle error <0.5°?"
   - "Is the beta consistent with the DRAG π pulse beta?"
 
+## Input parameters
+
+- qubit_frequency: Loaded from DB
+- control_amplitude: Loaded from DB
+- readout_amplitude: Loaded from DB
+- readout_frequency: Loaded from DB
+- readout_length: Readout pulse length (ns)
+
 ## Output parameters
 
-- drag_beta: Optimal DRAG derivative coefficient for X90
-- hpi_pulse_amplitude: Refined π/2 pulse amplitude with DRAG
-- leakage_rate: Leakage to |2⟩ at optimal parameters; expected < 0.001
+- drag_hpi_beta: DRAG HPI pulse beta (a.u.)
+- drag_hpi_amplitude: DRAG HPI pulse amplitude (a.u.)
+- drag_hpi_length: DRAG HPI pulse length (ns)
+
+## Run parameters
+
+- drag_hpi_duration: HPI pulse length (ns)
+- shots: Number of shots (a.u.)
+- interval: Time interval (ns)
 
 ## Common failure patterns
 

@@ -25,9 +25,17 @@ Configuration should apply without errors. The specified qubits should have vali
   - "Did the configuration apply without errors?"
   - "Are the correct qubits enabled for readout?"
 
+## Input parameters
+
+None.
+
 ## Output parameters
 
 None.
+
+## Run parameters
+
+- qubits: List of muxes to check skew (a.u.)
 
 ## Common failure patterns
 

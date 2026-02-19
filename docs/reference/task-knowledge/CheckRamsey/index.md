@@ -34,11 +34,27 @@ T2* should satisfy T2* ≤ T2_echo. Fringe frequency should match the intended d
   - "Does the fringe frequency match the intended detuning?"
   - "Is T2* consistent with the T2_echo measurement (T2* ≤ T2_echo)?"
 
+## Input parameters
+
+- qubit_frequency: Loaded from DB
+- hpi_amplitude: Loaded from DB
+- hpi_length: Loaded from DB
+- readout_amplitude: Loaded from DB
+- readout_frequency: Loaded from DB
+- readout_length: Readout pulse length (ns)
+
 ## Output parameters
 
-- t2_star: T2* dephasing time; expected 10–80 μs
-- detuning: Residual frequency detuning Δf; expected near intended value
-- fit_r_squared: Goodness of fit; expected > 0.90
+- ramsey_frequency: Ramsey oscillation frequency (MHz)
+- qubit_frequency: Qubit bare frequency (GHz)
+- t2_star: T2* time (μs)
+
+## Run parameters
+
+- detuning: Detuning for Ramsey oscillation (GHz)
+- time_range: Time range for Rabi oscillation (ns)
+- shots: Number of shots for Rabi oscillation (a.u.)
+- interval: Time interval for Rabi oscillation (ns)
 
 ## Common failure patterns
 

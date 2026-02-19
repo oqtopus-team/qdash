@@ -31,10 +31,23 @@ Clear fringe visibility with identifiable chevron vertex; vertex position should
   - "Is the chevron vertex identifiable to <1 MHz precision?"
   - "Is the pattern symmetric about zero detuning?"
 
+## Input parameters
+
+- qubit_frequency: Loaded from DB
+- readout_amplitude: Loaded from DB
+- readout_frequency: Loaded from DB
+- readout_length: Readout pulse length (ns)
+
 ## Output parameters
 
-- qubit_frequency: Frequency from chevron vertex position
-- rabi_frequency: Rabi frequency from fringe period at zero detuning
+- qubit_frequency: Qubit bare frequency (GHz)
+- readout_amplitude: Optimal readout amplitude from SNR threshold (a.u.)
+
+## Run parameters
+
+- control_amplitude: Control pulse amplitude (a.u.)
+- readout_amplitude_range: Amplitude range for readout sweep (a.u.)
+- snr_threshold: SNR threshold for determining readout amplitude (a.u.)
 
 ## Common failure patterns
 

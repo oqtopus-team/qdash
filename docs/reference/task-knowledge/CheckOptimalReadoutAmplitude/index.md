@@ -28,10 +28,19 @@ State separation should be high at optimal amplitude; amplitude should be in the
   - "Is the optimal amplitude in the linear regime (not too high)?"
   - "Is the state separation >95% at the optimal point?"
 
+## Input parameters
+
+None.
+
 ## Output parameters
 
-- optimal_readout_amplitude: Best readout drive amplitude
-- readout_fidelity: State discrimination fidelity at optimal amplitude; expected > 0.95
+- optimal_readout_amplitude: Optimal Readout Amplitude (a.u.)
+
+## Run parameters
+
+- amplitude_range: Readout amplitude range (a.u.)
+- shots: Number of shots for Rabi oscillation (a.u.)
+- interval: Time interval for Rabi oscillation (ns)
 
 ## Common failure patterns
 

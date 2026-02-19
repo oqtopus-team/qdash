@@ -25,7 +25,15 @@ State should load and push without errors. All boxes should acknowledge the conf
   - "Did the state load from configuration files without errors?"
   - "Was the configuration successfully pushed to all boxes?"
 
+## Input parameters
+
+None.
+
 ## Output parameters
+
+None.
+
+## Run parameters
 
 None.
 

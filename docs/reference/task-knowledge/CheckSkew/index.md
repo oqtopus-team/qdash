@@ -28,9 +28,17 @@ Skew values should be measurable and correctable. After correction, residual ske
   - "Are the measured skew values within a correctable range?"
   - "Are the skew values consistent with previous measurements?"
 
+## Input parameters
+
+None.
+
 ## Output parameters
 
 None.
+
+## Run parameters
+
+- muxes: List of muxes to check skew (a.u.)
 
 ## Common failure patterns
 

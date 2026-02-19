@@ -31,11 +31,35 @@ State fidelity and concurrence should be high; density matrix should be close to
   - "Is the concurrence >0.9?"
   - "Are the off-diagonal elements consistent with coherent entanglement?"
 
+## Input parameters
+
+- control_qubit_frequency: (control qubit) (GHz)
+- control_drag_hpi_amplitude: (control qubit) (a.u.)
+- control_drag_hpi_length: (control qubit) (ns)
+- control_drag_hpi_beta: (control qubit) (a.u.)
+- control_readout_frequency: (control qubit) (GHz)
+- control_readout_amplitude: (control qubit) (a.u.)
+- control_readout_length: (control qubit) (ns)
+- target_qubit_frequency: (target qubit) (GHz)
+- target_readout_frequency: (target qubit) (GHz)
+- target_readout_amplitude: (target qubit) (a.u.)
+- target_readout_length: (target qubit) (ns)
+- cr_amplitude: (control qubit) (a.u.)
+- cr_phase: (control qubit) (a.u.)
+- cancel_amplitude: (target qubit) (a.u.)
+- cancel_phase: (target qubit) (a.u.)
+- cancel_beta: (target qubit) (a.u.)
+- rotary_amplitude: (control qubit) (a.u.)
+- zx_rotation_rate: (coupling qubit) (a.u.)
+
 ## Output parameters
 
-- state_fidelity: Fidelity with ideal Bell state; target > 0.90
-- concurrence: Entanglement measure; expected > 0.9
-- purity: Density matrix purity; expected close to 1.0
+- bell_state_fidelity: Bell state fidelity (a.u.)
+
+## Run parameters
+
+- shots: Number of shots (a.u.)
+- interval: Time interval (ns)
 
 ## Common failure patterns
 

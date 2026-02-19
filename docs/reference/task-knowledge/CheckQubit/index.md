@@ -28,10 +28,20 @@ Clear oscillation visible with reasonable contrast; Rabi frequency consistent wi
   - "Is the contrast (peak-to-trough) reasonable (>50%)?"
   - "Is the Rabi frequency consistent with the drive amplitude?"
 
+## Input parameters
+
+None.
+
 ## Output parameters
 
-- rabi_frequency: Rabi oscillation frequency; indicates drive strength
-- rabi_contrast: Peak-to-trough oscillation amplitude; expected > 0.5
+- rabi_amplitude: Rabi oscillation amplitude (a.u.)
+- rabi_frequency: Rabi oscillation frequency (MHz)
+
+## Run parameters
+
+- time_range: Time range for Rabi oscillation (ns)
+- shots: Number of shots for Rabi oscillation (a.u.)
+- interval: Time interval for Rabi oscillation (ns)
 
 ## Common failure patterns
 

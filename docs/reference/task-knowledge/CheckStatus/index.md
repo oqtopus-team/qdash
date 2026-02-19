@@ -25,7 +25,15 @@ All subsystems should report a healthy state. Any error or warning indicates a h
   - "Do all subsystems report a healthy status?"
   - "Are there any error or warning messages?"
 
+## Input parameters
+
+None.
+
 ## Output parameters
+
+None.
+
+## Run parameters
 
 None.
 

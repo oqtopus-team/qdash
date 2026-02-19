@@ -25,7 +25,15 @@ All control boxes should link up successfully. Timeouts or communication errors 
   - "Did all control boxes link up successfully?"
   - "Were there any timeout or communication errors?"
 
+## Input parameters
+
+None.
+
 ## Output parameters
+
+None.
+
+## Run parameters
 
 None.
 

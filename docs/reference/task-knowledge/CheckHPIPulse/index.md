@@ -30,10 +30,23 @@ Correct cycling pattern over many repetitions with minimal contrast decay.
   - "Is the contrast maintained over 20 repetitions?"
   - "Is the per-gate error rate acceptable?"
 
+## Input parameters
+
+- qubit_frequency: Loaded from DB
+- hpi_amplitude: Loaded from DB
+- hpi_length: Loaded from DB
+- readout_amplitude: Loaded from DB
+- readout_frequency: Loaded from DB
+- readout_length: Readout pulse length (ns)
+
 ## Output parameters
 
-- gate_fidelity: Estimated X90 gate fidelity from repetition decay
-- per_gate_error: Error per application extracted from contrast decay
+None.
+
+## Run parameters
+
+- repetitions: Number of repetitions for the HPI pulse (a.u.)
+- interval: Time interval (ns)
 
 ## Common failure patterns
 

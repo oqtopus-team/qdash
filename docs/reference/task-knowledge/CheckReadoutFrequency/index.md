@@ -28,10 +28,20 @@ Frequency should be within expected range of design; clear transmission feature 
   - "Is the transmission feature clear with good SNR?"
   - "Are there any parasitic modes or spurious features?"
 
+## Input parameters
+
+None.
+
 ## Output parameters
 
-- readout_frequency: Calibrated readout resonator frequency
-- readout_amplitude: Optimal readout drive amplitude (if co-calibrated)
+- readout_frequency: Readout frequency (GHz)
+
+## Run parameters
+
+- detuning_range: Detuning range (GHz)
+- time_range: Time range (ns)
+- shots: Number of shots (a.u.)
+- interval: Time interval (ns)
 
 ## Common failure patterns
 

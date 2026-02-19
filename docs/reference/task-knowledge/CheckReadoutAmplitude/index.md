@@ -28,9 +28,18 @@ The SNR should cross the threshold at a reasonable amplitude. The optimal amplit
   - "Is the optimal amplitude at a reasonable value (not at the extremes)?"
   - "Is the SNR curve monotonically increasing?"
 
+## Input parameters
+
+None.
+
 ## Output parameters
 
-- readout_amplitude: Optimal readout amplitude where SNR first exceeds the threshold (a.u.)
+- readout_amplitude: Optimal readout amplitude from SNR threshold (a.u.)
+
+## Run parameters
+
+- amplitude_range: Amplitude range for readout (a.u.)
+- snr_threshold: SNR threshold for determining readout amplitude (a.u.)
 
 ## Common failure patterns
 

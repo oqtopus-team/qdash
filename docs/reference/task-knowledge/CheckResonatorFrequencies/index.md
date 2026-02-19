@@ -28,9 +28,17 @@ A clear phase shift should be visible at the expected resonator frequency. The n
   - "Are the expected number of resonator peaks detected (typically 4 per MUX)?"
   - "Are the peaks well-separated and individually resolvable?"
 
+## Input parameters
+
+None.
+
 ## Output parameters
 
-- coarse_resonator_frequency: Approximate resonator resonance frequency (GHz)
+- coarse_resonator_frequency: Coarse resonator frequency (GHz)
+
+## Run parameters
+
+- frequency_range: Frequency range for resonator frequencies (GHz)
 
 ## Common failure patterns
 

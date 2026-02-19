@@ -29,10 +29,36 @@ ZX90 fidelity should meet targets; both control states should produce correct co
   - "Are the results consistent for both control qubit states (|0⟩ and |1⟩)?"
   - "Is the fidelity limited by coherence or by gate calibration?"
 
+## Input parameters
+
+- control_qubit_frequency: (control qubit) (GHz)
+- control_drag_hpi_amplitude: (control qubit) (a.u.)
+- control_drag_hpi_length: (control qubit) (ns)
+- control_drag_hpi_beta: (control qubit) (a.u.)
+- control_readout_frequency: (control qubit) (GHz)
+- control_readout_amplitude: (control qubit) (a.u.)
+- control_readout_length: (control qubit) (ns)
+- target_qubit_frequency: (target qubit) (GHz)
+- target_readout_frequency: (target qubit) (GHz)
+- target_readout_amplitude: (target qubit) (a.u.)
+- target_readout_length: (target qubit) (ns)
+- cr_amplitude: (control qubit) (a.u.)
+- cr_phase: (control qubit) (a.u.)
+- cancel_amplitude: (target qubit) (a.u.)
+- cancel_phase: (target qubit) (a.u.)
+- cancel_beta: (target qubit) (a.u.)
+- rotary_amplitude: (control qubit) (a.u.)
+- zx_rotation_rate: (coupling qubit) (a.u.)
+
 ## Output parameters
 
-- zx90_gate_fidelity: ZX90 gate fidelity; target depends on application
-- conditional_phase_error: Phase error conditioned on control state
+None.
+
+## Run parameters
+
+- repetitions: Number of repetitions for the PI pulse (a.u.)
+- shots: Number of shots (a.u.)
+- interval: Time interval (ns)
 
 ## Common failure patterns
 

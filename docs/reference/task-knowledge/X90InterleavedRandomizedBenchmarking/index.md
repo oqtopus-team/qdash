@@ -31,11 +31,26 @@ X90 gate error should be low; reference and interleaved curves should both be we
   - "Are both reference and interleaved curves well-fitted?"
   - "Is the reference RB fidelity sufficient to isolate X90 error?"
 
+## Input parameters
+
+- qubit_frequency: Loaded from DB
+- drag_hpi_amplitude: Loaded from DB
+- drag_hpi_length: Loaded from DB
+- drag_hpi_beta: Loaded from DB
+- readout_amplitude: Loaded from DB
+- readout_frequency: Loaded from DB
+- readout_length: Readout pulse length (ns)
+
 ## Output parameters
 
-- x90_gate_error: X90-specific error rate; lower is better
-- reference_epc: Reference error per Clifford for comparison
-- interleaved_epc: Interleaved error per Clifford
+- x90_gate_fidelity: X90 gate fidelity (a.u.)
+- x90_depolarizing_rate: Depolarization error of the X90 gate (a.u.)
+
+## Run parameters
+
+- n_trials: Number of trials (a.u.)
+- shots: Number of shots (a.u.)
+- interval: Time interval (ns)
 
 ## Common failure patterns
 

@@ -29,11 +29,20 @@ X180 gate error should be low; error should be consistent with X90 error (X180 �
   - "Is the X180 error consistent with X90 error (≤2× X90)?"
   - "Are both curves well-fitted single exponentials?"
 
+## Input parameters
+
+None.
+
 ## Output parameters
 
-- x180_gate_error: X180-specific error rate; lower is better
-- reference_epc: Reference error per Clifford for comparison
-- interleaved_epc: Interleaved error per Clifford
+- x180_gate_fidelity: X180 gate fidelity (a.u.)
+- x180_depolarizing_rate: Depolarization error of the X180 gate (a.u.)
+
+## Run parameters
+
+- n_trials: Number of trials (a.u.)
+- shots: Number of shots (a.u.)
+- interval: Time interval (ns)
 
 ## Common failure patterns
 

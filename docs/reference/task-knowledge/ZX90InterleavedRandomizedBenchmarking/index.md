@@ -31,11 +31,37 @@ ZX90 gate error should meet the target; the decay should be well-fitted and the 
   - "Is the reference two-qubit RB clean enough to isolate ZX90 error?"
   - "Are there signs of leakage in either qubit during CR drive?"
 
+## Input parameters
+
+- control_qubit_frequency: (control qubit) (GHz)
+- control_drag_hpi_amplitude: (control qubit) (a.u.)
+- control_drag_hpi_length: (control qubit) (ns)
+- control_drag_hpi_beta: (control qubit) (a.u.)
+- control_readout_frequency: (control qubit) (GHz)
+- control_readout_amplitude: (control qubit) (a.u.)
+- control_readout_length: (control qubit) (ns)
+- target_qubit_frequency: (target qubit) (GHz)
+- target_readout_frequency: (target qubit) (GHz)
+- target_readout_amplitude: (target qubit) (a.u.)
+- target_readout_length: (target qubit) (ns)
+- cr_amplitude: (control qubit) (a.u.)
+- cr_phase: (control qubit) (a.u.)
+- cancel_amplitude: (target qubit) (a.u.)
+- cancel_phase: (target qubit) (a.u.)
+- cancel_beta: (target qubit) (a.u.)
+- rotary_amplitude: (control qubit) (a.u.)
+- zx_rotation_rate: (coupling qubit) (a.u.)
+
 ## Output parameters
 
-- zx90_gate_error: ZX90-specific error rate; lower is better
-- reference_epc: Reference two-qubit error per Clifford
-- interleaved_epc: Interleaved two-qubit error per Clifford
+- zx90_gate_fidelity: ZX90 gate fidelity (a.u.)
+- zx90_depolarizing_rate: Depolarization error of the ZX90 gate (a.u.)
+
+## Run parameters
+
+- n_trials: Number of trials (a.u.)
+- shots: Number of shots (a.u.)
+- interval: Time interval (ns)
 
 ## Common failure patterns
 

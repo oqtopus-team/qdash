@@ -28,10 +28,20 @@ Frequency should be reproducible across runs and within expected range of design
   - "Is the frequency reproducible across repeated measurements?"
   - "Is the frequency well-separated from neighbor qubits (>100 MHz)?"
 
+## Input parameters
+
+None.
+
 ## Output parameters
 
-- qubit_frequency: Calibrated qubit frequency; expected 4–6 GHz range
-- frequency_shift: Deviation from design target
+- qubit_frequency: Qubit frequency (GHz)
+
+## Run parameters
+
+- detuning_range: Detuning range (GHz)
+- time_range: Time range (ns)
+- shots: Number of shots (a.u.)
+- interval: Time interval (ns)
 
 ## Common failure patterns
 

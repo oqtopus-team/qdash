@@ -26,7 +26,15 @@ Noise levels should be below system-specific thresholds. Elevated noise or spuri
   - "Are there any spurious peaks or unexpected spectral features?"
   - "Is the noise level consistent across channels?"
 
+## Input parameters
+
+None.
+
 ## Output parameters
+
+None.
+
+## Run parameters
 
 None.
 

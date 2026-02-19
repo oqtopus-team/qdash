@@ -31,11 +31,26 @@ Error per Clifford should be low; decay should be well-fitted by single exponent
   - "Is the decay well-fitted by a single exponential (Markovian)?"
   - "Are there signs of leakage (non-exponential decay)?"
 
+## Input parameters
+
+- qubit_frequency: Loaded from DB
+- drag_hpi_amplitude: Loaded from DB
+- drag_hpi_length: Loaded from DB
+- drag_hpi_beta: Loaded from DB
+- readout_amplitude: Loaded from DB
+- readout_frequency: Loaded from DB
+- readout_length: Readout pulse length (ns)
+
 ## Output parameters
 
-- error_per_clifford: Average error per Clifford gate; lower is better
-- depolarizing_parameter: Decay parameter p; fidelity = 1 - (1-p)(d-1)/d
-- fit_r_squared: Fit quality; expected > 0.95
+- average_gate_fidelity: Average gate fidelity (a.u.)
+- depolarizing_rate: Depolarization rate of the qubit (a.u.)
+
+## Run parameters
+
+- n_trials: Number of trials (a.u.)
+- shots: Number of shots (a.u.)
+- interval: Time interval (ns)
 
 ## Common failure patterns
 

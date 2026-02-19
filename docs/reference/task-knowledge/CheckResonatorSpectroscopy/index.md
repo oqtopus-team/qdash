@@ -30,9 +30,23 @@ All expected resonators in the MUX should be detected. Resonance frequencies sho
   - "Is the power-dependent frequency shift visible and physical?"
   - "Are the peaks well-resolved at both low and high power levels?"
 
+## Input parameters
+
+None.
+
 ## Output parameters
 
-- readout_frequency: Estimated resonator frequency (GHz) for the target qubit
+- readout_frequency: Estimated resonator frequency from spectroscopy (GHz)
+
+## Run parameters
+
+- frequency_range: Frequency range for resonator spectroscopy (GHz)
+- power_range: Power range for resonator spectroscopy (dB)
+- shots: Number of shots for resonator spectroscopy (a.u.)
+- num_resonators: Number of resonators to detect (a.u.)
+- high_power_min: Minimum power for high-power peak detection (dB)
+- high_power_max: Maximum power for high-power peak detection (dB)
+- low_power: Power level for low-power peak detection (dB)
 
 ## Common failure patterns
 

@@ -26,9 +26,17 @@ The measured delay should be consistent with the physical cable lengths and comp
   - "Is the delay consistent with previous measurements?"
   - "Has any hardware been changed that would affect the delay?"
 
+## Input parameters
+
+None.
+
 ## Output parameters
 
-- electrical_delay: Signal propagation delay through the readout chain (ns)
+- electrical_delay: Electrical delay (ns)
+
+## Run parameters
+
+None.
 
 ## Common failure patterns
 

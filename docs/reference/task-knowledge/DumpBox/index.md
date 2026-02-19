@@ -25,7 +25,15 @@ All boxes should return complete diagnostic information. Missing or incomplete d
   - "Is diagnostic data available for all expected boxes?"
   - "Are there any unexpected register values or error flags?"
 
+## Input parameters
+
+None.
+
 ## Output parameters
+
+None.
+
+## Run parameters
 
 None.
 

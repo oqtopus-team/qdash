@@ -32,10 +32,24 @@ T2_echo should satisfy T2_echo ≤ 2*T1. Compare with T2* (Ramsey) to quantify l
   - "Is the decay well-fitted by a single exponential or Gaussian?"
   - "Is T2_echo stable compared to recent measurements?"
 
+## Input parameters
+
+- qubit_frequency: Loaded from DB
+- hpi_amplitude: Loaded from DB
+- hpi_length: Loaded from DB
+- readout_amplitude: Loaded from DB
+- readout_frequency: Loaded from DB
+- readout_length: Readout pulse length (ns)
+
 ## Output parameters
 
-- t2_echo: T2 echo coherence time; expected 30–300 μs
-- fit_r_squared: Goodness of fit; expected > 0.95
+- t2_echo: T2 echo time (μs)
+
+## Run parameters
+
+- time_range: Time range for T2 echo time (ns)
+- shots: Number of shots for T2 echo time
+- interval: Time interval for T2 echo time (ns)
 
 ## Common failure patterns
 

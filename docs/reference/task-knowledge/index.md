@@ -38,7 +38,7 @@ Calibration task knowledge base for QDash copilot analysis. Each page describes 
 | [CheckQubit](./CheckQubit) | Quick qubit validation via brief Rabi oscillation check. |
 | [CheckQubitFrequency](./CheckQubitFrequency) | Measures qubit transition frequency via Ramsey-based detuning calibration. |
 | [CheckReadoutFrequency](./CheckReadoutFrequency) | Calibrates the readout resonator frequency for optimal state discrimination. |
-| [CheckRabi](./CheckRabi) | Measures Rabi oscillation to extract drive amplitude, frequency, and contrast. |
+| [CheckRabi](./CheckRabi) | Measures Rabi oscillation to extract drive amplitude, frequency, and IQ-plane parameters. |
 | [CheckT1](./CheckT1) | Measures T1 energy-relaxation time via exponential decay of the excited state. |
 | [CheckT2Echo](./CheckT2Echo) | Measures T2 echo (Hahn echo) coherence time, refocusing low-frequency noise. |
 | [CheckRamsey](./CheckRamsey) | Measures T2* (free-induction) dephasing time and fine-tunes qubit frequency via Ramsey fringes. |

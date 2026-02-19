@@ -32,11 +32,42 @@ ZX rotation should be precisely 90°; parasitic rotations should be compensated 
   - "Are parasitic rotations (IX, IZ) compensated?"
   - "Is the gate duration practical (<500 ns)?"
 
+## Input parameters
+
+- control_qubit_frequency: (control qubit) (GHz)
+- control_drag_hpi_amplitude: (control qubit) (a.u.)
+- control_drag_hpi_length: (control qubit) (ns)
+- control_drag_hpi_beta: (control qubit) (a.u.)
+- control_readout_frequency: (control qubit) (GHz)
+- control_readout_amplitude: (control qubit) (a.u.)
+- control_readout_length: (control qubit) (ns)
+- target_qubit_frequency: (target qubit) (GHz)
+- target_readout_frequency: (target qubit) (GHz)
+- target_readout_amplitude: (target qubit) (a.u.)
+- target_readout_length: (target qubit) (ns)
+- cr_amplitude: (control qubit) (a.u.)
+- cr_phase: (control qubit) (a.u.)
+- cancel_amplitude: (target qubit) (a.u.)
+- cancel_phase: (target qubit) (a.u.)
+- cancel_beta: (target qubit) (a.u.)
+- rotary_amplitude: (control qubit) (a.u.)
+- zx_rotation_rate: (coupling qubit) (a.u.)
+
 ## Output parameters
 
-- cr_amplitude: Calibrated CR drive amplitude
-- cr_duration: Calibrated CR pulse duration for 90° ZX rotation
-- zx_angle: Actual ZX rotation angle; target 90°
+- cr_amplitude: Amplitude of the CR pulse. (a.u.)
+- cr_phase: Phase of the CR pulse. (a.u.)
+- cancel_amplitude: Amplitude of the cancel pulse. (a.u.)
+- cancel_phase: Phase of the cancel pulse. (a.u.)
+- cancel_beta: Beta of the cancel pulse. (a.u.)
+- rotary_amplitude: Amplitude of the rotary pulse. (a.u.)
+- zx_rotation_rate: ZX rotation rate. (a.u.)
+- zx90_gate_time: Duration of the ZX90 pulse. (ns)
+
+## Run parameters
+
+- shots: Number of shots (a.u.)
+- interval: Time interval (ns)
 
 ## Common failure patterns
 

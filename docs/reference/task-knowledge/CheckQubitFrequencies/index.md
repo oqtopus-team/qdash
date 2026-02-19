@@ -28,9 +28,17 @@ A clear spectral feature should be visible at the expected qubit frequency. The 
   - "Is the feature at a reasonable frequency for this qubit?"
   - "Is the signal-to-noise ratio sufficient to identify the peak?"
 
+## Input parameters
+
+None.
+
 ## Output parameters
 
-- coarse_qubit_frequency: Approximate qubit transition frequency f_01 (GHz)
+- coarse_qubit_frequency: Coarse qubit frequency (GHz)
+
+## Run parameters
+
+None.
 
 ## Common failure patterns
 

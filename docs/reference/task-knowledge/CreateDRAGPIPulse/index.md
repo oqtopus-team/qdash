@@ -30,11 +30,25 @@ The optimal beta should produce minimal leakage; the amplitude should give exact
   - "Is the leakage minimum well-defined (not flat)?"
   - "Does the amplitude give exact π rotation?"
 
+## Input parameters
+
+- qubit_frequency: Loaded from DB
+- control_amplitude: Loaded from DB
+- readout_amplitude: Loaded from DB
+- readout_frequency: Loaded from DB
+- readout_length: Readout pulse length (ns)
+
 ## Output parameters
 
-- drag_beta: Optimal DRAG derivative coefficient
-- pi_pulse_amplitude: Refined π pulse amplitude with DRAG
-- leakage_rate: Leakage to |2⟩ at optimal parameters; expected < 0.001
+- drag_pi_beta: DRAG PI pulse beta
+- drag_pi_amplitude: DRAG PI pulse amplitude
+- drag_pi_length: DRAG PI pulse length (ns)
+
+## Run parameters
+
+- drag_pi_duration: PI pulse length (ns)
+- shots: Number of shots (a.u.)
+- interval: Time interval (ns)
 
 ## Common failure patterns
 

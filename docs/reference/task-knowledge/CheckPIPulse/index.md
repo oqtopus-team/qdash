@@ -30,10 +30,23 @@ Contrast should remain high over many repetitions; per-gate error rate extracted
   - "Is the decay envelope slow (small per-gate error)?"
   - "Is there evidence of leakage (non-oscillatory decay)?"
 
+## Input parameters
+
+- qubit_frequency: Loaded from DB
+- pi_amplitude: Loaded from DB
+- pi_length: Loaded from DB
+- readout_amplitude: Loaded from DB
+- readout_frequency: Loaded from DB
+- readout_length: Readout pulse length (ns)
+
 ## Output parameters
 
-- gate_fidelity: Estimated X180 gate fidelity from repetition decay
-- per_gate_error: Error per application extracted from contrast decay
+None.
+
+## Run parameters
+
+- repetitions: Number of repetitions for the PI pulse (a.u.)
+- interval: Time interval (ns)
 
 ## Common failure patterns
 

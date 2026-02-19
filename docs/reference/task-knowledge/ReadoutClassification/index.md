@@ -30,11 +30,26 @@ Average readout fidelity should be high with low asymmetry between |0⟩ and |1�
   - "Is the assignment fidelity symmetric for |0⟩ and |1⟩?"
   - "Is the average readout fidelity meeting the target?"
 
+## Input parameters
+
+- qubit_frequency: Loaded from DB
+- drag_hpi_amplitude: Loaded from DB
+- drag_hpi_length: Loaded from DB
+- drag_hpi_beta: Loaded from DB
+- readout_amplitude: Loaded from DB
+- readout_frequency: Loaded from DB
+- readout_length: Readout pulse length (ns)
+
 ## Output parameters
 
-- average_readout_fidelity: Mean of P(0|0) and P(1|1); expected > 0.95
-- p00: P(assign 0 | prepared 0); expected > 0.95
-- p11: P(assign 1 | prepared 1); expected > 0.95
+- average_readout_fidelity: Average readout fidelity (a.u.)
+- readout_fidelity_0: Readout fidelity with preparation state 0 (a.u.)
+- readout_fidelity_1: Readout fidelity with preparation state 1 (a.u.)
+
+## Run parameters
+
+- shots: Number of shots (a.u.)
+- interval: Time interval (ns)
 
 ## Common failure patterns
 

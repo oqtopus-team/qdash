@@ -28,10 +28,19 @@ The dispersive shift 2χ should exceed the resonator linewidth κ for state disc
   - "Are both qubit-state-dependent peaks clearly resolved?"
   - "Is 2χ within the expected range for this qubit-resonator coupling?"
 
+## Input parameters
+
+None.
+
 ## Output parameters
 
-- dispersive_shift: 2χ value; expected > 1 MHz for reliable readout
-- resonator_linewidth: κ value; 2χ > κ required for state discrimination
+- optimal_readout_frequency: Optimal Readout Frequency (GHz)
+- dispersive_shift: Dispersive shift (MHz)
+
+## Run parameters
+
+- shots: Number of shots for Rabi oscillation (a.u.)
+- interval: Time interval for Rabi oscillation (ns)
 
 ## Common failure patterns
 

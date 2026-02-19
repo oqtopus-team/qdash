@@ -30,13 +30,35 @@ Bell state fidelity should be high; |01⟩ and |10⟩ populations should be mini
   - "Are the |01⟩ and |10⟩ populations negligible (<5%)?"
   - "Is the Bell state fidelity meeting the target?"
 
+## Input parameters
+
+- control_qubit_frequency: (control qubit) (GHz)
+- control_drag_hpi_amplitude: (control qubit) (a.u.)
+- control_drag_hpi_length: (control qubit) (ns)
+- control_drag_hpi_beta: (control qubit) (a.u.)
+- control_readout_frequency: (control qubit) (GHz)
+- control_readout_amplitude: (control qubit) (a.u.)
+- control_readout_length: (control qubit) (ns)
+- target_qubit_frequency: (target qubit) (GHz)
+- target_readout_frequency: (target qubit) (GHz)
+- target_readout_amplitude: (target qubit) (a.u.)
+- target_readout_length: (target qubit) (ns)
+- cr_amplitude: (control qubit) (a.u.)
+- cr_phase: (control qubit) (a.u.)
+- cancel_amplitude: (target qubit) (a.u.)
+- cancel_phase: (target qubit) (a.u.)
+- cancel_beta: (target qubit) (a.u.)
+- rotary_amplitude: (control qubit) (a.u.)
+- zx_rotation_rate: (coupling qubit) (a.u.)
+
 ## Output parameters
 
-- bell_state_fidelity: Fidelity with ideal Bell state; target > 0.90
-- p00: Population in |00⟩; expected ~0.5
-- p11: Population in |11⟩; expected ~0.5
-- p01: Population in |01⟩; expected ~0
-- p10: Population in |10⟩; expected ~0
+None.
+
+## Run parameters
+
+- shots: Number of shots (a.u.)
+- interval: Time interval (ns)
 
 ## Common failure patterns
 

@@ -31,12 +31,34 @@ Clear ZX oscillation with parasitic terms (IX, IY, IZ) small relative to ZX. The
   - "Are the IX/IY/IZ parasitic terms small relative to ZX?"
   - "Is the ZX rate sufficient for a practical gate duration (<500 ns)?"
 
+## Input parameters
+
+- control_qubit_frequency: (control qubit) (GHz)
+- control_drag_hpi_amplitude: (control qubit) (a.u.)
+- control_drag_hpi_length: (control qubit) (ns)
+- control_drag_hpi_beta: (control qubit) (a.u.)
+- control_readout_frequency: (control qubit) (GHz)
+- control_readout_amplitude: (control qubit) (a.u.)
+- control_readout_length: (control qubit) (ns)
+- target_qubit_frequency: (target qubit) (GHz)
+- target_readout_frequency: (target qubit) (GHz)
+- target_readout_amplitude: (target qubit) (a.u.)
+- target_readout_length: (target qubit) (ns)
+
 ## Output parameters
 
-- zx_rate: ZX interaction rate; higher enables faster gates
-- ix_rate: Parasitic IX rate; should be << ZX rate
-- iy_rate: Parasitic IY rate; should be << ZX rate
-- iz_rate: Parasitic IZ rate; should be << ZX rate
+- cr_amplitude: Amplitude of the CR pulse. (a.u.)
+- cr_phase: Phase of the CR pulse. (a.u.)
+- cancel_amplitude: Amplitude of the cancel pulse. (a.u.)
+- cancel_phase: Phase of the cancel pulse. (a.u.)
+- cancel_beta: Beta of the cancel pulse. (a.u.)
+- rotary_amplitude: Amplitude of the rotary pulse. (a.u.)
+- zx_rotation_rate: ZX rotation rate. (a.u.)
+
+## Run parameters
+
+- shots: Number of shots (a.u.)
+- interval: Time interval (ns)
 
 ## Common failure patterns
 

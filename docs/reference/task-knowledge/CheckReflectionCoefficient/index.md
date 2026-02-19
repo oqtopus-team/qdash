@@ -29,11 +29,19 @@ The resonance should be well-fit by the model. The coupling rates should be phys
   - "Is kappa_external >> kappa_internal (over-coupled regime)?"
   - "Are the coupling rates in a physically reasonable range?"
 
+## Input parameters
+
+None.
+
 ## Output parameters
 
-- resonator_frequency: Precise resonator frequency f_r (GHz)
-- kappa_external: External coupling rate (MHz); quantifies resonator-feedline coupling
-- kappa_internal: Internal coupling rate (MHz); quantifies intrinsic resonator losses
+- resonator_frequency: Fine resonator frequency (GHz)
+- kappa_external: External coupling rate (kappa_external) (MHz)
+- kappa_internal: Internal coupling rate (kappa_internal) (MHz)
+
+## Run parameters
+
+None.
 
 ## Common failure patterns
 
