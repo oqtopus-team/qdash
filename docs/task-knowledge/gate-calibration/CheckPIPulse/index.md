@@ -36,7 +36,7 @@ Population oscillation between 0 and 1 across repetitions; contrast decay reveal
 - y_axis: P(|1⟩)
 - good_visual: sharp alternation between 0 and 1 with minimal contrast decay over 20+ repetitions
 
-![PI pulse error amplification](./0.png)
+![PI pulse error amplification](./check_pi_pulse_expected.png)
 
 ## Evaluation criteria
 

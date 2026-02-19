@@ -36,7 +36,7 @@ Population oscillation with period 4 (four π/2 pulses = full rotation); contras
 - y_axis: P(|1⟩)
 - good_visual: clear oscillation with period 4, high contrast maintained over 20+ repetitions
 
-![HPI pulse error amplification](./0.png)
+![HPI pulse error amplification](./check_hpi_pulse_expected.png)
 
 ## Evaluation criteria
 

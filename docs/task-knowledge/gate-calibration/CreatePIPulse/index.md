@@ -33,7 +33,7 @@ Cosine-like Rabi oscillation vs amplitude; π pulse at the first minimum (popula
 - fit_model: A * cos(π · amp / amp_π) + B
 - good_visual: clear cosine oscillation with well-defined minimum at π amplitude
 
-![PI pulse calibration](./0.png)
+![PI pulse calibration](./create_pi_pulse_expected.png)
 
 ## Evaluation criteria
 

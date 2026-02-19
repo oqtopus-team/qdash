@@ -43,7 +43,7 @@ Population oscillation with high contrast under repeated DRAG π pulses.
 - y_axis: P(|1⟩)
 - good_visual: sharp 0/1 alternation with very slow contrast decay, better than non-DRAG version
 
-![DRAG PI pulse error amplification](./0.png)
+![DRAG PI pulse error amplification](./check_drag_hpi_pulse_expected.png)
 
 ## Evaluation criteria
 
