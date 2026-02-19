@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate task-knowledge.json from docs/reference/task-knowledge/*/index.md.
+"""Generate task-knowledge.json from docs/task-knowledge/*/index.md.
 
 Parses all Markdown knowledge files and produces a single JSON registry
 that the application loads at runtime.  Run via ``task knowledge`` or
@@ -21,7 +21,7 @@ from pathlib import Path
 # ---------------------------------------------------------------------------
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-MD_DIR = REPO_ROOT / "docs" / "reference" / "task-knowledge"
+MD_DIR = REPO_ROOT / "docs" / "task-knowledge"
 OUTPUT_FILE = REPO_ROOT / "config" / "task-knowledge.json"
 SIDEBAR_FILE = REPO_ROOT / "docs" / ".vitepress" / "task-knowledge-sidebar.json"
 
@@ -503,7 +503,7 @@ def _generate_sidebar(registry: dict[str, dict]) -> None:
             "text": cat_name,
             "collapsed": True,
             "items": [
-                {"text": t, "link": f"/reference/task-knowledge/{t}"}
+                {"text": t, "link": f"/task-knowledge/{t}"}
                 for t in present
             ],
         }
@@ -516,7 +516,7 @@ def _generate_sidebar(registry: dict[str, dict]) -> None:
             "text": "Other",
             "collapsed": True,
             "items": [
-                {"text": t, "link": f"/reference/task-knowledge/{t}"}
+                {"text": t, "link": f"/task-knowledge/{t}"}
                 for t in remaining
             ],
         })

@@ -151,13 +151,13 @@ export default withMermaid(
             },
             { text: "Database Indexes", link: "/reference/database-indexes" },
             { text: "OpenAPI", link: "/reference/openapi" },
-            {
-              text: "Task Knowledge",
-              collapsed: true,
-              link: "/reference/task-knowledge/",
-              items: taskKnowledgeSidebar,
-            },
           ],
+        },
+        {
+          text: "Task Knowledge",
+          collapsed: false,
+          link: "/task-knowledge/",
+          items: taskKnowledgeSidebar,
         },
         {
           text: "Architecture Details",

@@ -3,7 +3,7 @@
 
 Queries MongoDB for the latest successful task results with figures,
 then copies the figure files into each task's directory under
-``docs/reference/task-knowledge/<TaskName>/`` and inserts image
+``docs/task-knowledge/<TaskName>/`` and inserts image
 references into the corresponding ``index.md`` files.
 
 Usage:
@@ -30,7 +30,7 @@ from dotenv import load_dotenv
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 load_dotenv(REPO_ROOT / ".env")
-MD_DIR = REPO_ROOT / "docs" / "reference" / "task-knowledge"
+MD_DIR = REPO_ROOT / "docs" / "task-knowledge"
 
 # Image reference pattern already in MD files (./filename.png within task dirs)
 _IMAGE_RE = re.compile(r"!\[[^\]]*\]\(\./[^)]+\.png\)")
