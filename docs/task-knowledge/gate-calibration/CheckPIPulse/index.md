@@ -10,6 +10,23 @@ Validates π pulse quality by repeated application and population measurement.
 
 Apply the calibrated π pulse repeatedly N times; odd repetitions should give |1⟩, even should give |0⟩. Deviation indicates rotation error.
 
+```mermaid
+gantt
+    title CheckPIPulse Pulse Sequence
+    dateFormat x
+    axisFormat " "
+
+    section Drive
+    π (1)       :d1, 0, 20ms
+    π (2)       :d2, after d1, 20ms
+    π (3)       :d3, after d2, 20ms
+    ···         :done, d4, after d3, 15ms
+    π (N)       :d5, after d4, 20ms
+
+    section Readout
+    Measurement :crit, r1, after d5, 50ms
+```
+
 ## Expected result
 
 Population oscillation between 0 and 1 across repetitions; contrast decay reveals error accumulation.

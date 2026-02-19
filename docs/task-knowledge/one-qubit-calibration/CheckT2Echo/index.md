@@ -10,6 +10,23 @@ T2 echo – phase coherence time after a Hahn-echo refocusing pulse.
 
 X/2 – wait τ/2 – π – wait τ/2 – X/2, then measure. Refocuses static and slow noise, revealing intrinsic dephasing.
 
+```mermaid
+gantt
+    title CheckT2Echo (Hahn Echo) Pulse Sequence
+    dateFormat x
+    axisFormat " "
+
+    section Drive
+    X/2 pulse  :d1, 0, 15ms
+    wait τ/2   :done, d2, after d1, 55ms
+    π pulse    :d3, after d2, 20ms
+    wait τ/2   :done, d4, after d3, 55ms
+    X/2 pulse  :d5, after d4, 15ms
+
+    section Readout
+    Measurement :crit, r1, after d5, 50ms
+```
+
 ## Expected result
 
 Exponential (or Gaussian) decay envelope of echo amplitude vs total delay τ.
