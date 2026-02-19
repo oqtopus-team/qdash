@@ -512,6 +512,8 @@ def _build_system_prompt(
     *,
     config: CopilotConfig | None = None,
     include_response_format: bool = False,
+    has_expected_images: bool = False,
+    has_experiment_image: bool = False,
 ) -> str:
     """Build the full system prompt from base prompt and context.
 
@@ -524,9 +526,34 @@ def _build_system_prompt(
     include_response_format : bool
         If True, append RESPONSE_FORMAT_INSTRUCTION for providers that
         do not support structured output natively (e.g. Ollama).
+    has_expected_images : bool
+        If True, expected reference images are included in the input.
+    has_experiment_image : bool
+        If True, the actual experiment result image is included in the input.
 
     """
     parts = [SYSTEM_PROMPT_BASE, _build_language_instruction(config)]
+
+    # Image analysis instructions
+    if has_expected_images or has_experiment_image:
+        img_instructions = ["\n## Image analysis"]
+        if has_expected_images and has_experiment_image:
+            img_instructions.append(
+                "Reference images showing expected results are provided along with "
+                "the actual experimental result image. Compare the actual result with "
+                "these references to identify deviations, anomalies, or quality issues."
+            )
+        elif has_expected_images:
+            img_instructions.append(
+                "Reference images showing expected results are provided. "
+                "Use them to understand what a good result looks like for this task."
+            )
+        elif has_experiment_image:
+            img_instructions.append(
+                "The actual experimental result image is provided. "
+                "Analyze the graph/figure for quality, fit accuracy, and anomalies."
+            )
+        parts.append("\n".join(img_instructions))
 
     # Task knowledge
     parts.append(context.task_knowledge_prompt)
@@ -630,12 +657,25 @@ def _build_input(
     user_message: str,
     image_base64: str | None,
     conversation_history: list[dict[str, str]] | None,
+    expected_images: list[tuple[str, str]] | None = None,
 ) -> list[dict[str, Any]]:
     """Build the input items list for the OpenAI Responses API.
 
     Unlike Chat Completions, system messages are passed via the
     ``instructions`` parameter, so only user/assistant messages
     are included here.
+
+    Parameters
+    ----------
+    user_message : str
+        The user's question.
+    image_base64 : str | None
+        Base64-encoded experiment result image.
+    conversation_history : list[dict[str, str]] | None
+        Previous conversation messages.
+    expected_images : list[tuple[str, str]] | None
+        List of (base64_data, alt_text) for expected reference images.
+
     """
     items: list[dict[str, Any]] = []
 
@@ -653,17 +693,34 @@ def _build_input(
                 }
             )
 
-    # Build the current user message
-    content_parts: list[dict[str, Any]] = [
-        {"type": "input_text", "text": user_message},
-    ]
+    # Build the current user message content parts
+    content_parts: list[dict[str, Any]] = []
+
+    # Add expected reference images first (with labels)
+    if expected_images:
+        content_parts.append({"type": "input_text", "text": "Expected result reference images:"})
+        for b64_data, alt_text in expected_images:
+            content_parts.append({"type": "input_text", "text": f"[Reference: {alt_text}]"})
+            content_parts.append(
+                {
+                    "type": "input_image",
+                    "image_url": f"data:image/png;base64,{b64_data}",
+                }
+            )
+
+    # Add experiment result image (with label)
     if image_base64:
+        content_parts.append({"type": "input_text", "text": "Actual experimental result:"})
         content_parts.append(
             {
                 "type": "input_image",
                 "image_url": f"data:image/png;base64,{image_base64}",
             }
         )
+
+    # Add the user message text
+    content_parts.append({"type": "input_text", "text": user_message})
+
     items.append({"role": "user", "content": content_parts})
 
     return items
@@ -674,6 +731,7 @@ def _build_messages(
     user_message: str,
     image_base64: str | None,
     conversation_history: list[dict[str, str]] | None,
+    expected_images: list[tuple[str, str]] | None = None,
 ) -> list[dict[str, Any]]:
     """Build the messages list for the Chat Completions API (Ollama fallback)."""
     messages: list[dict[str, Any]] = [{"role": "system", "content": system_prompt}]
@@ -689,19 +747,34 @@ def _build_messages(
             )
 
     # Build the current user message
-    if image_base64:
-        messages.append(
-            {
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": user_message},
+    has_images = image_base64 or expected_images
+    if has_images:
+        content_parts: list[dict[str, Any]] = []
+
+        # Add expected reference images first
+        if expected_images:
+            content_parts.append({"type": "text", "text": "Expected result reference images:"})
+            for b64_data, alt_text in expected_images:
+                content_parts.append({"type": "text", "text": f"[Reference: {alt_text}]"})
+                content_parts.append(
                     {
                         "type": "image_url",
-                        "image_url": {"url": f"data:image/png;base64,{image_base64}"},
-                    },
-                ],
-            }
-        )
+                        "image_url": {"url": f"data:image/png;base64,{b64_data}"},
+                    }
+                )
+
+        # Add experiment result image
+        if image_base64:
+            content_parts.append({"type": "text", "text": "Actual experimental result:"})
+            content_parts.append(
+                {
+                    "type": "image_url",
+                    "image_url": {"url": f"data:image/png;base64,{image_base64}"},
+                }
+            )
+
+        content_parts.append({"type": "text", "text": user_message})
+        messages.append({"role": "user", "content": content_parts})
     else:
         messages.append({"role": "user", "content": user_message})
 
@@ -919,6 +992,7 @@ async def run_analysis(
     user_message: str,
     config: CopilotConfig,
     image_base64: str | None = None,
+    expected_images: list[tuple[str, str]] | None = None,
     conversation_history: list[dict[str, str]] | None = None,
     tool_executors: ToolExecutors | None = None,
     on_tool_call: OnToolCallHook = None,
@@ -941,6 +1015,8 @@ async def run_analysis(
         Copilot configuration (model provider, temperature, etc.).
     image_base64 : str | None
         Optional base64-encoded result figure.
+    expected_images : list[tuple[str, str]] | None
+        Optional list of (base64_data, alt_text) for expected reference images.
     conversation_history : list[dict[str, str]] | None
         Previous conversation messages.
     tool_executors : ToolExecutors | None
@@ -956,18 +1032,39 @@ async def run_analysis(
     client = _build_client(config)
     provider = config.model.provider
 
+    has_expected = bool(expected_images)
+    has_experiment = bool(image_base64)
+
     if provider == "ollama":
         # Ollama only supports Chat Completions API (no tool support)
-        system_prompt = _build_system_prompt(context, config=config, include_response_format=True)
-        messages = _build_messages(system_prompt, user_message, image_base64, conversation_history)
+        system_prompt = _build_system_prompt(
+            context,
+            config=config,
+            include_response_format=True,
+            has_expected_images=has_expected,
+            has_experiment_image=has_experiment,
+        )
+        messages = _build_messages(
+            system_prompt, user_message, image_base64, conversation_history, expected_images
+        )
         content = await _run_chat_completions(client, messages, config)
         # Ollama still uses legacy schema; convert to blocks
         response = _parse_response(content)
         return _legacy_to_blocks(response)
     else:
         # OpenAI: use Responses API with blocks schema (strict: False for flexible chart objects)
-        system_prompt = _build_system_prompt(context, config=config) + CHART_SYSTEM_PROMPT
-        input_items = _build_input(user_message, image_base64, conversation_history)
+        system_prompt = (
+            _build_system_prompt(
+                context,
+                config=config,
+                has_expected_images=has_expected,
+                has_experiment_image=has_experiment,
+            )
+            + CHART_SYSTEM_PROMPT
+        )
+        input_items = _build_input(
+            user_message, image_base64, conversation_history, expected_images
+        )
         content = await _run_responses_api(
             client,
             system_prompt,

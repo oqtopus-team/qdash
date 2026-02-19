@@ -7,8 +7,10 @@ and LLM-powered calibration result analysis.
 from __future__ import annotations
 
 import asyncio
+import base64
 import json
 import logging
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from bunnet import SortDirection
@@ -132,6 +134,15 @@ async def analyze_task_result(request: AnalyzeRequest) -> dict[str, Any]:
             elif rc.type == "coupling":
                 coupling_params = _load_coupling_params(request.chip_id, request.qid, rc.params)
 
+    # Auto-load experiment figure if not provided and multimodal is enabled
+    image_base64 = request.image_base64
+    expected_images: list[tuple[str, str]] = []
+    if config.analysis.multimodal:
+        if not image_base64 and task_result:
+            figure_paths = task_result.get("figure_path", [])
+            image_base64 = _load_figure_as_base64(figure_paths)
+        expected_images = _collect_expected_images(knowledge)
+
     # Build analysis context
     context = TaskAnalysisContext(
         task_knowledge_prompt=knowledge_prompt,
@@ -157,7 +168,8 @@ async def analyze_task_result(request: AnalyzeRequest) -> dict[str, Any]:
             context=context,
             user_message=request.message,
             config=config,
-            image_base64=request.image_base64,
+            image_base64=image_base64,
+            expected_images=expected_images,
             conversation_history=request.conversation_history,
             tool_executors=tool_executors,
         )
@@ -229,6 +241,15 @@ async def analyze_task_result_stream(request: AnalyzeRequest) -> StreamingRespon
                 elif rc.type == "coupling":
                     coupling_params = _load_coupling_params(request.chip_id, request.qid, rc.params)
 
+        # Auto-load experiment figure if not provided and multimodal is enabled
+        image_base64 = request.image_base64
+        expected_images: list[tuple[str, str]] = []
+        if config.analysis.multimodal:
+            if not image_base64 and task_result:
+                figure_paths = task_result.get("figure_path", [])
+                image_base64 = _load_figure_as_base64(figure_paths)
+            expected_images = _collect_expected_images(knowledge)
+
         # Step 4: Build context
         yield _sse_event(
             "status", {"step": "build_context", "message": "分析コンテキストを構築中..."}
@@ -269,7 +290,8 @@ async def analyze_task_result_stream(request: AnalyzeRequest) -> StreamingRespon
                     context=context,
                     user_message=request.message,
                     config=config,
-                    image_base64=request.image_base64,
+                    image_base64=image_base64,
+                    expected_images=expected_images,
                     conversation_history=request.conversation_history,
                     tool_executors=tool_executors,
                     on_tool_call=on_tool_call,
@@ -453,7 +475,29 @@ def _load_task_result(task_id: str) -> dict[str, Any] | None:
         "input_parameters": doc.input_parameters or {},
         "output_parameters": doc.output_parameters or {},
         "run_parameters": getattr(doc, "run_parameters", {}) or {},
+        "figure_path": getattr(doc, "figure_path", []) or [],
     }
+
+
+def _load_figure_as_base64(figure_paths: list[str]) -> str | None:
+    """Read the first existing PNG file from figure_paths and return base64."""
+    for fp in figure_paths:
+        p = Path(fp)
+        if p.is_file() and p.suffix.lower() == ".png":
+            return base64.b64encode(p.read_bytes()).decode("ascii")
+    return None
+
+
+def _collect_expected_images(
+    knowledge: Any,
+) -> list[tuple[str, str]]:
+    """Collect expected reference images from TaskKnowledge.
+
+    Returns list of (base64_data, alt_text) for images with embedded data.
+    """
+    if knowledge is None or not knowledge.images:
+        return []
+    return [(img.base64_data, img.alt_text) for img in knowledge.images if img.base64_data]
 
 
 def _load_task_history(

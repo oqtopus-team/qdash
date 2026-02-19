@@ -11,6 +11,7 @@ Usage:
 
 from __future__ import annotations
 
+import base64
 import json
 import re
 import sys
@@ -295,11 +296,18 @@ def _parse_markdown_file(path: Path) -> dict | None:
     images = []
     for heading, body in sections.items():
         for m in _IMAGE_RE.finditer(body):
+            rel = m.group(2)
+            # Resolve image path relative to the markdown file's directory
+            img_path = (path.parent / rel).resolve()
+            b64 = ""
+            if img_path.is_file():
+                b64 = base64.b64encode(img_path.read_bytes()).decode("ascii")
             images.append(
                 {
                     "alt_text": m.group(1),
-                    "relative_path": m.group(2),
+                    "relative_path": rel,
                     "section": heading,
+                    "base64_data": b64,
                 }
             )
 
