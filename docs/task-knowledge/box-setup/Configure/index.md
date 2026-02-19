@@ -61,10 +61,6 @@ None.
 2. Confirm state was loaded and pushed successfully.
 3. Consider running CheckStatus after Configure to verify system health.
 
-## Prerequisites
-
-- LinkUp
-
 ## Related context
 
 - history(last_n=5)

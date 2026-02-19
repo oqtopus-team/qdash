@@ -57,8 +57,6 @@ None.
 2. If errors exist, address them before running further tasks.
 3. Confirm all control and readout lines are operational.
 
-## Prerequisites
-
 None (this is typically the first task in a calibration workflow).
 
 ## Related context

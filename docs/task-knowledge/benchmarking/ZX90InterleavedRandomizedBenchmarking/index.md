@@ -117,11 +117,6 @@ ZX90 gate error should meet the target; the decay should be well-fitted and the 
 4. Compare with single-qubit gate errors to assess two-qubit gate contribution.
 5. If error is dominated by coherence, recommend coherence improvements first.
 
-## Prerequisites
-
-- RandomizedBenchmarking
-- CheckZX90
-
 ## Related context
 
 - history(last_n=5)

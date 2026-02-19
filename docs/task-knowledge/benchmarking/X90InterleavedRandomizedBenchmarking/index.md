@@ -101,11 +101,6 @@ X90 gate error should be low; reference and interleaved curves should both be we
 4. Compare the X90 error with the overall EPC for consistency.
 5. If X90 error is dominant, recommend pulse recalibration.
 
-## Prerequisites
-
-- RandomizedBenchmarking
-- CheckHPIPulse
-
 ## Related context
 
 - history(last_n=5)

@@ -69,11 +69,6 @@ None.
 4. Confirm correction was applied successfully.
 5. Compare with previous measurements for drift detection.
 
-## Prerequisites
-
-- LinkUp
-- Configure
-
 ## Related context
 
 - history(last_n=5)

@@ -57,11 +57,6 @@ None.
 2. Verify configuration was pushed to hardware without errors.
 3. Check that excluded qubits are properly disabled.
 
-## Prerequisites
-
-- LinkUp
-- Configure
-
 ## Related context
 
 - history(last_n=5)

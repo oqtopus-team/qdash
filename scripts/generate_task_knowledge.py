@@ -43,7 +43,6 @@ _SECTION_MAP: dict[str, str] = {
     "tips for improvement": "tips",
     "tips": "tips",
     "analysis guide": "analysis_guide",
-    "prerequisites": "prerequisites",
     "related context": "related_context",
 }
 
@@ -260,11 +259,6 @@ def _parse_analysis_guide(text: str) -> list[str]:
     return steps
 
 
-def _parse_prerequisites(text: str) -> list[str]:
-    """Parse ``## Prerequisites`` into list of task names."""
-    return _parse_list_items(text)
-
-
 def _parse_markdown_file(path: Path) -> dict | None:
     """Parse a Markdown knowledge file into a dict.
 
@@ -329,8 +323,6 @@ def _parse_markdown_file(path: Path) -> dict | None:
             fields["output_parameters_info"] = _parse_output_parameters(body)
         elif field_name == "analysis_guide":
             fields[field_name] = _parse_analysis_guide(body)
-        elif field_name == "prerequisites":
-            fields[field_name] = _parse_prerequisites(body)
         elif field_name == "tips":
             fields[field_name] = _parse_list_items(body)
         else:
@@ -354,7 +346,6 @@ def _parse_markdown_file(path: Path) -> dict | None:
         "tips": fields.get("tips", []),
         "output_parameters_info": fields.get("output_parameters_info", []),
         "analysis_guide": fields.get("analysis_guide", []),
-        "prerequisites": fields.get("prerequisites", []),
         "images": images,
         "related_context": fields.get("related_context", []),
     }
@@ -388,8 +379,8 @@ _CATEGORIES: list[tuple[str, str, list[str]]] = [
         ],
     ),
     (
-        "CW Spectroscopy",
-        "cw-spectroscopy",
+        "CW Characterization",
+        "cw-characterization",
         [
             "CheckResonatorFrequencies",
             "CheckResonatorSpectroscopy",
@@ -401,8 +392,8 @@ _CATEGORIES: list[tuple[str, str, list[str]]] = [
         ],
     ),
     (
-        "One-Qubit Calibration",
-        "one-qubit-calibration",
+        "TD Characterization",
+        "td-characterization",
         [
             "CheckQubit",
             "CheckQubitFrequency",
@@ -414,11 +405,12 @@ _CATEGORIES: list[tuple[str, str, list[str]]] = [
             "CheckDispersiveShift",
             "CheckOptimalReadoutAmplitude",
             "ReadoutClassification",
+            "ChevronPattern",
         ],
     ),
     (
-        "Gate Calibration",
-        "gate-calibration",
+        "One-Qubit Gate Calibration",
+        "one-qubit-gate-calibration",
         [
             "CheckPIPulse",
             "CheckHPIPulse",
@@ -431,11 +423,10 @@ _CATEGORIES: list[tuple[str, str, list[str]]] = [
         ],
     ),
     (
-        "Two-Qubit Calibration",
-        "two-qubit-calibration",
+        "Two-Qubit Gate Calibration",
+        "two-qubit-gate-calibration",
         [
             "CheckCrossResonance",
-            "ChevronPattern",
             "CheckZX90",
             "CreateZX90",
             "CheckBellState",
@@ -459,6 +450,105 @@ _TASK_TO_CAT_DIR: dict[str, str] = {}
 for _cat_name, _cat_dir, _cat_tasks in _CATEGORIES:
     for _t in _cat_tasks:
         _TASK_TO_CAT_DIR[_t] = _cat_dir
+
+# ---------------------------------------------------------------------------
+# Calibration Workflows
+# ---------------------------------------------------------------------------
+# Workflow definitions corresponding to task lists in
+# src/qdash/workflow/service/tasks.py and templates in
+# src/qdash/workflow/templates/templates.json.
+# (name, description, task_list)
+
+_WORKFLOWS: list[tuple[str, str, list[str]]] = [
+    (
+        "Bring-up",
+        "MUX-level initial characterization. Identifies resonator and qubit frequencies.",
+        [
+            "CheckResonatorSpectroscopy",
+            "CheckQubitSpectroscopy",
+            "ChevronPattern",
+        ],
+    ),
+    (
+        "1Q Check",
+        "Basic single-qubit characterization.",
+        [
+            "CheckRabi",
+            "CheckRabi",
+            "CreateHPIPulse",
+            "CheckHPIPulse",
+            "CheckT1Average",
+            "CheckT2EchoAverage",
+            "CheckRamsey",
+        ],
+    ),
+    (
+        "1Q Fine-tune",
+        "Advanced single-qubit calibration including DRAG pulse optimization, "
+        "readout classification, and randomized benchmarking.",
+        [
+            "CheckRabi",
+            "CreateHPIPulse",
+            "CheckHPIPulse",
+            "CreatePIPulse",
+            "CheckPIPulse",
+            "CreateDRAGHPIPulse",
+            "CheckDRAGHPIPulse",
+            "CreateDRAGPIPulse",
+            "CheckDRAGPIPulse",
+            "ReadoutClassification",
+            "RandomizedBenchmarking",
+            "X90InterleavedRandomizedBenchmarking",
+        ],
+    ),
+    (
+        "2Q Calibration",
+        "Two-qubit gate calibration from cross-resonance measurement "
+        "through ZX90 gate creation to Bell state verification.",
+        [
+            "CheckCrossResonance",
+            "CreateZX90",
+            "CheckZX90",
+            "CheckBellState",
+            "CheckBellStateTomography",
+            "ZX90InterleavedRandomizedBenchmarking",
+        ],
+    ),
+]
+
+
+def _enrich_workflow_context(registry: dict[str, dict]) -> None:
+    """Add ``workflow_context`` to each registry entry.
+
+    For every task that appears in a workflow, records which workflow(s) it
+    belongs to, its position, the immediately preceding / following tasks,
+    and **all** preceding tasks in the workflow (replaces hand-written
+    prerequisites).
+    """
+    for entry in registry.values():
+        entry.setdefault("workflow_context", [])
+
+    for wf_name, _wf_desc, wf_tasks in _WORKFLOWS:
+        for idx, task_name in enumerate(wf_tasks):
+            prev_tasks = [wf_tasks[idx - 1]] if idx > 0 else []
+            next_tasks = [wf_tasks[idx + 1]] if idx < len(wf_tasks) - 1 else []
+            # Deduplicated, order-preserving list of all preceding tasks
+            seen: set[str] = set()
+            preceding: list[str] = []
+            for t in wf_tasks[:idx]:
+                if t not in seen:
+                    seen.add(t)
+                    preceding.append(t)
+            ctx = {
+                "workflow": wf_name,
+                "step": idx + 1,
+                "total_steps": len(wf_tasks),
+                "previous": prev_tasks,
+                "next": next_tasks,
+                "preceding_tasks": preceding,
+            }
+            if task_name in registry:
+                registry[task_name]["workflow_context"].append(ctx)
 
 
 def _generate_index(registry: dict[str, dict]) -> None:
@@ -500,6 +590,72 @@ def _generate_index(registry: dict[str, dict]) -> None:
             prefix = f"./{cat_dir}/" if cat_dir else "./"
             lines.append(f"| [{task_name}]({prefix}{task_name}) | {desc} |")
         lines.append("")
+
+    # ----- Calibration Workflows section -----
+    lines.append("## Calibration Workflows")
+    lines.append("")
+    lines.append(
+        "Standard calibration workflows and their task composition. "
+        "See [workflow task definitions](https://github.com/oqtopus-team/qdash/blob/"
+        "develop/src/qdash/workflow/service/tasks.py) for the source of truth."
+    )
+    lines.append("")
+
+    for wf_name, wf_desc, wf_tasks in _WORKFLOWS:
+        lines.append(f"### {wf_name}")
+        lines.append("")
+        lines.append(wf_desc)
+        lines.append("")
+
+        # Per-workflow mermaid diagram
+        lines.append("```mermaid")
+        lines.append("flowchart LR")
+        seen: dict[str, int] = {}
+        for i, task_name in enumerate(wf_tasks):
+            seen[task_name] = seen.get(task_name, 0) + 1
+            label = task_name
+            if wf_tasks.count(task_name) > 1:
+                label = f"{task_name} #{seen[task_name]}"
+            node_id = f"T{i}"
+            lines.append(f"  {node_id}[{label}]")
+        for i in range(len(wf_tasks) - 1):
+            lines.append(f"  T{i} --> T{i + 1}")
+        lines.append("```")
+        lines.append("")
+
+        # Numbered task list with links
+        seen.clear()
+        for idx, task_name in enumerate(wf_tasks, 1):
+            seen[task_name] = seen.get(task_name, 0) + 1
+            suffix = ""
+            if wf_tasks.count(task_name) > 1:
+                suffix = f" (#{seen[task_name]})"
+            cat_dir = _TASK_TO_CAT_DIR.get(task_name)
+            if cat_dir:
+                lines.append(f"{idx}. [{task_name}](./{cat_dir}/{task_name}){suffix}")
+            else:
+                lines.append(f"{idx}. {task_name}{suffix}")
+        lines.append("")
+
+    # Full Calibration Pipeline overview with mermaid diagram
+    lines.append("### Full Calibration Pipeline")
+    lines.append("")
+    lines.append(
+        "End-to-end calibration runs in the following order: "
+        "1Q Check, filter, 1Q Fine-tune, filter, CR schedule generation, "
+        "then 2Q Calibration."
+    )
+    lines.append("")
+    lines.append("```mermaid")
+    lines.append("flowchart LR")
+    lines.append("  A[Bring-up] --> B[1Q Check]")
+    lines.append("  B --> C[Filter]")
+    lines.append("  C --> D[1Q Fine-tune]")
+    lines.append("  D --> E[Filter]")
+    lines.append("  E --> F[CR Schedule]")
+    lines.append("  F --> G[2Q Calibration]")
+    lines.append("```")
+    lines.append("")
 
     index_path = MD_DIR / "index.md"
     index_path.write_text("\n".join(lines), encoding="utf-8")
@@ -594,6 +750,8 @@ def main() -> int:
         print("\nWarnings:")
         for e in errors:
             print(e)
+
+    _enrich_workflow_context(registry)
 
     OUTPUT_FILE.write_text(
         json.dumps(registry, ensure_ascii=False, indent=2) + "\n",

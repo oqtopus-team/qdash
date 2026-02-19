@@ -99,11 +99,6 @@ Error per Clifford should be low; decay should be well-fitted by single exponent
 4. Compare with individual gate error estimates for consistency.
 5. If EPC is too high, recommend specific gate recalibration.
 
-## Prerequisites
-
-- CheckPIPulse
-- CheckHPIPulse
-
 ## Related context
 
 - history(last_n=5)

@@ -93,11 +93,6 @@ None.
 4. Verify both reference and interleaved curves are well-fitted.
 5. Recommend DRAG recalibration if leakage is suspected.
 
-## Prerequisites
-
-- RandomizedBenchmarking
-- CheckPIPulse
-
 ## Related context
 
 - history(last_n=5)
