@@ -3,7 +3,7 @@
 
 Queries MongoDB for the latest successful task results with figures,
 then copies the figure files into each task's directory under
-``docs/task-knowledge/<TaskName>/`` and inserts image
+``docs/task-knowledge/<category>/<TaskName>/`` and inserts image
 references into the corresponding ``index.md`` files.
 
 Usage:
@@ -34,6 +34,15 @@ MD_DIR = REPO_ROOT / "docs" / "task-knowledge"
 
 # Image reference pattern already in MD files (./filename.png within task dirs)
 _IMAGE_RE = re.compile(r"!\[[^\]]*\]\(\./[^)]+\.png\)")
+
+
+def _find_task_dir(task_name: str) -> Path:
+    """Find the task directory under category subdirectories."""
+    matches = list(MD_DIR.glob(f"*/{task_name}"))
+    if matches:
+        return matches[0]
+    # Fallback: create under top-level (will need manual categorisation)
+    return MD_DIR / task_name
 
 
 def _build_default_mongodb_uri() -> str:
@@ -105,7 +114,7 @@ def _copy_from_calib_dir(
         png_paths = paths["figure_path"]
         json_paths = paths.get("json_figure_path", [])
 
-        task_dir = MD_DIR / task_name
+        task_dir = _find_task_dir(task_name)
         task_dir.mkdir(parents=True, exist_ok=True)
 
         task_files: list[str] = []
@@ -212,7 +221,7 @@ def _update_md_files(copied: dict[str, list[str]]) -> int:
     updated = 0
 
     for task_name, filenames in copied.items():
-        md_path = MD_DIR / task_name / "index.md"
+        md_path = _find_task_dir(task_name) / "index.md"
         if not md_path.exists():
             print(f"  SKIP MD update: {task_name}/index.md not found")
             continue

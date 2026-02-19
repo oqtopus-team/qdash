@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate task-knowledge.json from docs/task-knowledge/*/index.md.
+"""Generate task-knowledge.json from docs/task-knowledge/<category>/<Task>/index.md.
 
 Parses all Markdown knowledge files and produces a single JSON registry
 that the application loads at runtime.  Run via ``task knowledge`` or
@@ -366,9 +366,11 @@ def _parse_markdown_file(path: Path) -> dict | None:
 
 # Categories for organising the index page.  Tasks not listed here go into
 # "Other".
-_CATEGORIES: list[tuple[str, list[str]]] = [
+# (display_name, dir_slug, task_list)
+_CATEGORIES: list[tuple[str, str, list[str]]] = [
     (
         "Box Setup",
+        "box-setup",
         [
             "CheckStatus",
             "LinkUp",
@@ -380,12 +382,14 @@ _CATEGORIES: list[tuple[str, list[str]]] = [
     ),
     (
         "System",
+        "system",
         [
             "CheckSkew",
         ],
     ),
     (
         "CW Spectroscopy",
+        "cw-spectroscopy",
         [
             "CheckResonatorFrequencies",
             "CheckResonatorSpectroscopy",
@@ -398,6 +402,7 @@ _CATEGORIES: list[tuple[str, list[str]]] = [
     ),
     (
         "One-Qubit Calibration",
+        "one-qubit-calibration",
         [
             "CheckQubit",
             "CheckQubitFrequency",
@@ -413,6 +418,7 @@ _CATEGORIES: list[tuple[str, list[str]]] = [
     ),
     (
         "Gate Calibration",
+        "gate-calibration",
         [
             "CheckPIPulse",
             "CheckHPIPulse",
@@ -426,6 +432,7 @@ _CATEGORIES: list[tuple[str, list[str]]] = [
     ),
     (
         "Two-Qubit Calibration",
+        "two-qubit-calibration",
         [
             "CheckCrossResonance",
             "ChevronPattern",
@@ -437,6 +444,7 @@ _CATEGORIES: list[tuple[str, list[str]]] = [
     ),
     (
         "Benchmarking",
+        "benchmarking",
         [
             "RandomizedBenchmarking",
             "X90InterleavedRandomizedBenchmarking",
@@ -445,6 +453,12 @@ _CATEGORIES: list[tuple[str, list[str]]] = [
         ],
     ),
 ]
+
+# Reverse lookup: task_name -> category dir slug
+_TASK_TO_CAT_DIR: dict[str, str] = {}
+for _cat_name, _cat_dir, _cat_tasks in _CATEGORIES:
+    for _t in _cat_tasks:
+        _TASK_TO_CAT_DIR[_t] = _cat_dir
 
 
 def _generate_index(registry: dict[str, dict]) -> None:
@@ -460,7 +474,7 @@ def _generate_index(registry: dict[str, dict]) -> None:
         "",
     ]
 
-    for cat_name, cat_tasks in _CATEGORIES:
+    for cat_name, cat_dir, cat_tasks in _CATEGORIES:
         lines.append(f"## {cat_name}")
         lines.append("")
         lines.append("| Task | Description |")
@@ -468,7 +482,7 @@ def _generate_index(registry: dict[str, dict]) -> None:
         for task_name in cat_tasks:
             entry = registry.get(task_name)
             desc = entry["summary"].split("\n")[0] if entry else ""
-            lines.append(f"| [{task_name}](./{task_name}) | {desc} |")
+            lines.append(f"| [{task_name}](./{cat_dir}/{task_name}) | {desc} |")
             categorised.add(task_name)
         lines.append("")
 
@@ -482,7 +496,9 @@ def _generate_index(registry: dict[str, dict]) -> None:
         for task_name in remaining:
             entry = registry[task_name]
             desc = entry["summary"].split("\n")[0]
-            lines.append(f"| [{task_name}](./{task_name}) | {desc} |")
+            cat_dir = _TASK_TO_CAT_DIR.get(task_name, "")
+            prefix = f"./{cat_dir}/" if cat_dir else "./"
+            lines.append(f"| [{task_name}]({prefix}{task_name}) | {desc} |")
         lines.append("")
 
     index_path = MD_DIR / "index.md"
@@ -495,7 +511,7 @@ def _generate_sidebar(registry: dict[str, dict]) -> None:
     categorised: set[str] = set()
     items: list[dict] = []
 
-    for cat_name, cat_tasks in _CATEGORIES:
+    for cat_name, cat_dir, cat_tasks in _CATEGORIES:
         present = [t for t in cat_tasks if t in registry]
         if not present:
             continue
@@ -503,7 +519,7 @@ def _generate_sidebar(registry: dict[str, dict]) -> None:
             "text": cat_name,
             "collapsed": True,
             "items": [
-                {"text": t, "link": f"/task-knowledge/{t}"}
+                {"text": t, "link": f"/task-knowledge/{cat_dir}/{t}"}
                 for t in present
             ],
         }
@@ -516,7 +532,7 @@ def _generate_sidebar(registry: dict[str, dict]) -> None:
             "text": "Other",
             "collapsed": True,
             "items": [
-                {"text": t, "link": f"/task-knowledge/{t}"}
+                {"text": t, "link": f"/task-knowledge/{_TASK_TO_CAT_DIR.get(t, 'other')}/{t}"}
                 for t in remaining
             ],
         })
@@ -538,9 +554,9 @@ def main() -> int:
         print(f"ERROR: Markdown directory not found: {MD_DIR}", file=sys.stderr)
         return 1
 
-    md_files = sorted(MD_DIR.glob("*/index.md"))
+    md_files = sorted(MD_DIR.glob("*/*/index.md"))
     if not md_files:
-        print(f"ERROR: No */index.md files found in {MD_DIR}", file=sys.stderr)
+        print(f"ERROR: No */*/index.md files found in {MD_DIR}", file=sys.stderr)
         return 1
 
     registry: dict[str, dict] = {}
