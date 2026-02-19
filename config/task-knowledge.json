@@ -1,293 +1,327 @@
 {
-  "CheckBellState": {
-    "name": "CheckBellState",
-    "summary": "Prepares Bell state (|00⟩+|11⟩)/√2 and measures state fidelity.",
-    "what_it_measures": "Bell state fidelity – quality of entanglement between qubit pair.",
-    "physical_principle": "Apply H⊗I then CNOT; measure in Z basis and verify equal |00⟩/|11⟩ populations with coherent superposition.",
+  "RandomizedBenchmarking": {
+    "name": "RandomizedBenchmarking",
+    "summary": "Measures average gate error rate via randomized benchmarking (RB).",
+    "what_it_measures": "Average error per Clifford gate (EPC) – gate-set-level fidelity metric.",
+    "physical_principle": "Apply random Clifford gate sequences of increasing length with inversion gate; measure survival probability. Exponential decay rate gives average gate error.",
     "expected_result": {
-      "description": "Population histogram showing ~50/50 |00⟩/|11⟩ with minimal |01⟩/|10⟩.",
-      "result_type": "histogram",
-      "x_axis": "Computational basis states (|00⟩, |01⟩, |10⟩, |11⟩)",
-      "y_axis": "Population probability",
+      "description": "Survival probability decays exponentially with sequence length; intercept ~0.5.",
+      "result_type": "decay_curve",
+      "x_axis": "Clifford sequence length",
+      "y_axis": "Survival probability",
       "z_axis": "",
-      "fit_model": "",
+      "fit_model": "A * p^m + B, where p is the depolarizing parameter",
       "typical_range": "",
-      "good_visual": "two tall bars at |00⟩ and |11⟩ (~0.5 each), negligible |01⟩ and |10⟩ bars"
+      "good_visual": "smooth exponential decay with clear trend, low shot noise"
     },
-    "evaluation_criteria": "Bell state fidelity should be high; |01⟩ and |10⟩ populations should be minimal. This is an end-to-end test of single and two-qubit gates.",
+    "evaluation_criteria": "Error per Clifford should be low; decay should be well-fitted by single exponential (Markovian errors).",
     "check_questions": [
-      "Are the |00⟩ and |11⟩ populations approximately equal (~0.5)?",
-      "Are the |01⟩ and |10⟩ populations negligible (<5%)?",
-      "Is the Bell state fidelity meeting the target?"
+      "Is the EPC (error per Clifford) below target?",
+      "Is the decay well-fitted by a single exponential (Markovian)?",
+      "Are there signs of leakage (non-exponential decay)?"
     ],
     "failure_modes": [
+      {
+        "severity": "warning",
+        "description": "Non-exponential decay",
+        "cause": "leakage or non-Markovian errors",
+        "visual": "curve deviates from single exponential, kink or plateau",
+        "next_action": "check for leakage, investigate non-Markovian noise"
+      },
       {
         "severity": "critical",
-        "description": "Low fidelity from single-qubit gate errors",
-        "cause": "H gate or measurement basis errors",
-        "visual": "unequal |00⟩/|11⟩ populations or significant |01⟩/|10⟩",
-        "next_action": "debug single-qubit gates first (CheckHPIPulse, CheckPIPulse)"
+        "description": "Very fast decay",
+        "cause": "gate errors too large for useful RB",
+        "visual": "survival drops to 0.5 within a few Cliffords",
+        "next_action": "recalibrate single-qubit gates first"
       },
       {
-        "severity": "warning",
-        "description": "Residual |01⟩/|10⟩ population",
-        "cause": "ZX90 miscalibration, gate angle error",
-        "visual": "non-negligible bars at |01⟩ and |10⟩",
-        "next_action": "recalibrate ZX90 gate (CreateZX90)"
-      },
-      {
-        "severity": "warning",
-        "description": "Decoherence during circuit",
-        "cause": "T1/T2 too short for the circuit depth",
-        "visual": "overall contrast reduction, all populations mixed",
-        "next_action": "check coherence times, optimize circuit"
-      },
-      {
-        "severity": "warning",
-        "description": "Readout crosstalk",
-        "cause": "correlated measurement errors between qubits",
-        "visual": "unexpected correlations in error pattern",
-        "next_action": "check readout isolation between qubits"
+        "severity": "info",
+        "description": "SPAM errors dominating short sequences",
+        "cause": "readout or preparation errors",
+        "visual": "intercept significantly different from 0.5 or 1.0",
+        "next_action": "improve readout calibration, use SPAM-robust fitting"
       }
     ],
     "tips": [
-      "This is an end-to-end test combining single and two-qubit gates.",
-      "Low fidelity here means debug gates individually first.",
-      "Compare with Bell state tomography for full density matrix."
-    ],
-    "output_parameters_info": [],
-    "analysis_guide": [
-      "Check the population histogram for |00⟩/|11⟩ balance.",
-      "Quantify the |01⟩/|10⟩ leakage as fraction of total.",
-      "Compare Bell fidelity with individual gate fidelities.",
-      "If fidelity is low, determine if limited by single-qubit, two-qubit, or readout errors.",
-      "Recommend component-level debugging if needed."
-    ],
-    "prerequisites": [
-      "CheckZX90",
-      "CheckHPIPulse",
-      "CheckPIPulse"
-    ],
-    "images": [
-      {
-        "alt_text": "Bell state measurement",
-        "relative_path": "./0.png",
-        "section": "expected result"
-      }
-    ],
-    "related_context": [
-      {
-        "type": "history",
-        "params": [],
-        "last_n": 5
-      },
-      {
-        "type": "coupling",
-        "params": [
-          "zx_rate",
-          "coupling_strength"
-        ],
-        "last_n": 5
-      }
-    ]
-  },
-  "CheckBellStateTomography": {
-    "name": "CheckBellStateTomography",
-    "summary": "Full density matrix tomography of the Bell state for detailed characterization.",
-    "what_it_measures": "Complete density matrix of prepared Bell state; concurrence and entanglement metrics.",
-    "physical_principle": "Prepare Bell state, measure in 9 Pauli basis combinations (XX, XY, ..., ZZ), reconstruct density matrix via maximum likelihood.",
-    "expected_result": {
-      "description": "Density matrix close to ideal Bell state |Φ+⟩; off-diagonal elements indicating coherence.",
-      "result_type": "2d_map",
-      "x_axis": "Density matrix row index",
-      "y_axis": "Density matrix column index",
-      "z_axis": "Matrix element amplitude",
-      "fit_model": "",
-      "typical_range": "",
-      "good_visual": "density matrix with large real diagonal and off-diagonal elements matching ideal Bell state pattern"
-    },
-    "evaluation_criteria": "State fidelity and concurrence should be high; density matrix should be close to ideal Bell state with strong off-diagonal coherence.",
-    "check_questions": [
-      "Is the state fidelity >90%?",
-      "Is the concurrence >0.9?",
-      "Are the off-diagonal elements consistent with coherent entanglement?"
-    ],
-    "failure_modes": [
-      {
-        "severity": "warning",
-        "description": "Systematic tomography errors",
-        "cause": "measurement basis miscalibration (X90, Y90 pulses)",
-        "visual": "density matrix has unphysical features or asymmetries",
-        "next_action": "verify measurement rotation calibration"
-      },
-      {
-        "severity": "warning",
-        "description": "Decoherence",
-        "cause": "T1/T2 reduce off-diagonal coherence elements",
-        "visual": "reduced off-diagonal elements, mixed state",
-        "next_action": "check coherence times, optimize circuit depth"
-      },
-      {
-        "severity": "warning",
-        "description": "State preparation errors",
-        "cause": "gate errors dominate reconstruction",
-        "visual": "density matrix deviates from ideal Bell state pattern",
-        "next_action": "check individual gate fidelities"
-      }
-    ],
-    "tips": [
-      "Requires well-calibrated measurement rotations (X90, Y90).",
-      "Use maximum likelihood reconstruction to ensure physical state.",
-      "Compare diagonal elements with simple Bell state measurement for consistency."
+      "Use >=30 random sequences per length for reliable statistics.",
+      "Compare with interleaved RB to isolate specific gate errors.",
+      "If decay is non-exponential, check for leakage."
     ],
     "output_parameters_info": [
       {
-        "name": "bell_state_fidelity",
-        "description": "Bell state fidelity (a.u.)"
+        "name": "average_gate_fidelity",
+        "description": "Average gate fidelity (a.u.)"
+      },
+      {
+        "name": "depolarizing_rate",
+        "description": "Depolarization rate of the qubit (a.u.)"
       }
     ],
     "analysis_guide": [
-      "Check the state fidelity and concurrence values.",
-      "Examine the density matrix for expected Bell state structure.",
-      "Compare with the simple CheckBellState Z-basis measurement.",
-      "If fidelity is lower than expected, identify which matrix elements deviate most.",
-      "Use deviations to diagnose specific error channels."
+      "Verify the exponential decay fit quality.",
+      "Extract the error per Clifford from the decay parameter.",
+      "Check for non-exponential behavior indicating leakage or non-Markovian errors.",
+      "Compare with individual gate error estimates for consistency.",
+      "If EPC is too high, recommend specific gate recalibration."
     ],
     "prerequisites": [
-      "CheckBellState",
-      "CheckHPIPulse",
-      "CheckZX90"
-    ],
-    "images": [
-      {
-        "alt_text": "Bell state tomography",
-        "relative_path": "./0.png",
-        "section": "expected result"
-      }
-    ],
-    "related_context": [
-      {
-        "type": "history",
-        "params": [],
-        "last_n": 5
-      },
-      {
-        "type": "coupling",
-        "params": [
-          "zx_rate",
-          "coupling_strength"
-        ],
-        "last_n": 5
-      }
-    ]
-  },
-  "CheckCrossResonance": {
-    "name": "CheckCrossResonance",
-    "summary": "Measures cross-resonance (CR) interaction strength between coupled qubits.",
-    "what_it_measures": "ZX interaction rate and CR Hamiltonian terms for two-qubit gate calibration.",
-    "physical_principle": "Drive control qubit at target frequency; monitor target rotation rate. ZX coupling enables CNOT-type gates.",
-    "expected_result": {
-      "description": "Target qubit oscillation proportional to CR drive amplitude; Hamiltonian tomography shows dominant ZX term.",
-      "result_type": "oscillation",
-      "x_axis": "CR drive duration (ns)",
-      "y_axis": "Target qubit rotation angle",
-      "z_axis": "",
-      "fit_model": "",
-      "typical_range": "",
-      "good_visual": "clear ZX oscillation with minimal parasitic IX/IY/IZ components"
-    },
-    "evaluation_criteria": "Clear ZX oscillation with parasitic terms (IX, IY, IZ) small relative to ZX. The ZX rate should be sufficient for practical gate durations.",
-    "check_questions": [
-      "Is the ZX oscillation clearly visible?",
-      "Are the IX/IY/IZ parasitic terms small relative to ZX?",
-      "Is the ZX rate sufficient for a practical gate duration (<500 ns)?"
-    ],
-    "failure_modes": [
-      {
-        "severity": "critical",
-        "description": "Weak ZX rate",
-        "cause": "large detuning between qubits or insufficient coupling",
-        "visual": "very slow or no oscillation in target qubit",
-        "next_action": "verify coupling strength, check qubit frequency separation"
-      },
-      {
-        "severity": "warning",
-        "description": "Large IX term",
-        "cause": "direct drive leakage to target qubit",
-        "visual": "target qubit rotates even with control in |0⟩",
-        "next_action": "implement echo CR sequence to cancel IX term"
-      },
-      {
-        "severity": "warning",
-        "description": "Classical crosstalk",
-        "cause": "signal leakage through control lines",
-        "visual": "spurious oscillation independent of qubit state",
-        "next_action": "check microwave isolation, add cancellation tone"
-      },
-      {
-        "severity": "warning",
-        "description": "Frequency collision",
-        "cause": "spectator qubit interference",
-        "visual": "beating or inconsistent oscillation patterns",
-        "next_action": "check spectator qubit frequencies"
-      }
-    ],
-    "tips": [
-      "Ensure single-qubit gates are well-calibrated before CR characterization.",
-      "Check for active cancellation (echo CR) if IX term is large.",
-      "Monitor spectator qubits for correlated errors."
-    ],
-    "output_parameters_info": [
-      {
-        "name": "cr_amplitude",
-        "description": "Amplitude of the CR pulse. (a.u.)"
-      },
-      {
-        "name": "cr_phase",
-        "description": "Phase of the CR pulse. (a.u.)"
-      },
-      {
-        "name": "cancel_amplitude",
-        "description": "Amplitude of the cancel pulse. (a.u.)"
-      },
-      {
-        "name": "cancel_phase",
-        "description": "Phase of the cancel pulse. (a.u.)"
-      },
-      {
-        "name": "cancel_beta",
-        "description": "Beta of the cancel pulse. (a.u.)"
-      },
-      {
-        "name": "rotary_amplitude",
-        "description": "Amplitude of the rotary pulse. (a.u.)"
-      },
-      {
-        "name": "zx_rotation_rate",
-        "description": "ZX rotation rate. (a.u.)"
-      }
-    ],
-    "analysis_guide": [
-      "Identify the ZX oscillation rate from the target qubit data.",
-      "Quantify the IX/IY/IZ parasitic terms relative to ZX.",
-      "Assess whether ZX rate supports practical gate durations.",
-      "If parasitic terms are large, recommend echo CR or cancellation.",
-      "Check for spectator qubit effects."
-    ],
-    "prerequisites": [
-      "CheckQubitFrequency",
       "CheckPIPulse",
       "CheckHPIPulse"
     ],
     "images": [
       {
-        "alt_text": "CR Hamiltonian coefficients",
-        "relative_path": "./hamiltonian.png",
+        "alt_text": "Randomized benchmarking decay",
+        "relative_path": "./0.png",
         "section": "expected result"
+      }
+    ],
+    "related_context": [
+      {
+        "type": "history",
+        "params": [],
+        "last_n": 5
+      }
+    ]
+  },
+  "X180InterleavedRandomizedBenchmarking": {
+    "name": "X180InterleavedRandomizedBenchmarking",
+    "summary": "Measures X180 (π) gate-specific error rate via interleaved randomized benchmarking.",
+    "what_it_measures": "Error per X180 gate isolated from average Clifford error.",
+    "physical_principle": "Same interleaved RB protocol as X90 IRB but with X180 gate interleaved.",
+    "expected_result": {
+      "description": "Two exponential decays; interleaved decays faster proportional to X180 error.",
+      "result_type": "decay_curve",
+      "x_axis": "Clifford sequence length",
+      "y_axis": "Survival probability",
+      "z_axis": "",
+      "fit_model": "A * p^m + B for both reference and interleaved",
+      "typical_range": "",
+      "good_visual": "two clear exponential decays with interleaved decaying faster, both well-fitted"
+    },
+    "evaluation_criteria": "X180 gate error should be low; error should be consistent with X90 error (X180 ≤ 2× X90 typically).",
+    "check_questions": [
+      "Is the X180 gate error below the target?",
+      "Is the X180 error consistent with X90 error (≤2× X90)?",
+      "Are both curves well-fitted single exponentials?"
+    ],
+    "failure_modes": [
+      {
+        "severity": "warning",
+        "description": "X180 amplitude errors accumulate faster",
+        "cause": "full π rotation is more sensitive to amplitude miscalibration",
+        "visual": "interleaved curve decays much faster than reference",
+        "next_action": "recalibrate π pulse amplitude"
       },
       {
-        "alt_text": "Target qubit dynamics under CR drive",
-        "relative_path": "./target_dynamics.png",
+        "severity": "warning",
+        "description": "Leakage to |2⟩",
+        "cause": "more likely with full π rotation than π/2",
+        "visual": "non-exponential interleaved decay",
+        "next_action": "apply DRAG correction, check leakage"
+      },
+      {
+        "severity": "info",
+        "description": "Statistical uncertainty",
+        "cause": "same statistical concerns as X90 IRB",
+        "visual": "large error bars on gate error estimate",
+        "next_action": "increase number of random sequences"
+      }
+    ],
+    "tips": [
+      "Compare X180 and X90 errors – X180 should be ≤2× X90 error.",
+      "If X180 error is much worse, suspect DRAG tuning issues.",
+      "Run after DRAG calibration for best results."
+    ],
+    "output_parameters_info": [
+      {
+        "name": "x180_gate_fidelity",
+        "description": "X180 gate fidelity (a.u.)"
+      },
+      {
+        "name": "x180_depolarizing_rate",
+        "description": "Depolarization error of the X180 gate (a.u.)"
+      }
+    ],
+    "analysis_guide": [
+      "Compare X180 error with X90 error for consistency (expect ≤2×).",
+      "Check for non-exponential decay indicating leakage.",
+      "If X180 error >> 2× X90 error, investigate leakage or DRAG tuning.",
+      "Verify both reference and interleaved curves are well-fitted.",
+      "Recommend DRAG recalibration if leakage is suspected."
+    ],
+    "prerequisites": [
+      "RandomizedBenchmarking",
+      "CheckPIPulse"
+    ],
+    "images": [],
+    "related_context": [
+      {
+        "type": "history",
+        "params": [],
+        "last_n": 5
+      }
+    ]
+  },
+  "X90InterleavedRandomizedBenchmarking": {
+    "name": "X90InterleavedRandomizedBenchmarking",
+    "summary": "Measures X90 (π/2) gate-specific error rate via interleaved randomized benchmarking.",
+    "what_it_measures": "Error per X90 gate by interleaving it between random Cliffords.",
+    "physical_principle": "Run standard RB and interleaved RB (with X90 between each Clifford); ratio of decay rates gives gate-specific error.",
+    "expected_result": {
+      "description": "Two exponential decays; interleaved decays faster than reference.",
+      "result_type": "decay_curve",
+      "x_axis": "Clifford sequence length",
+      "y_axis": "Survival probability",
+      "z_axis": "",
+      "fit_model": "A * p^m + B for both reference and interleaved",
+      "typical_range": "",
+      "good_visual": "two clear exponential decays with the interleaved curve decaying faster, both well-fitted"
+    },
+    "evaluation_criteria": "X90 gate error should be low; reference and interleaved curves should both be well-fitted exponentials.",
+    "check_questions": [
+      "Is the X90 gate error below the target?",
+      "Are both reference and interleaved curves well-fitted?",
+      "Is the reference RB fidelity sufficient to isolate X90 error?"
+    ],
+    "failure_modes": [
+      {
+        "severity": "warning",
+        "description": "Reference RB fidelity too low",
+        "cause": "overall gate quality insufficient to isolate X90 error",
+        "visual": "both curves decay very quickly",
+        "next_action": "improve overall gate calibration first"
+      },
+      {
+        "severity": "info",
+        "description": "Statistical uncertainty too large",
+        "cause": "insufficient number of random sequences",
+        "visual": "large error bars on fitted parameters",
+        "next_action": "increase number of random sequences (>=30 per length)"
+      },
+      {
+        "severity": "warning",
+        "description": "Coherent errors not captured",
+        "cause": "IRB gives average over Pauli errors, may miss coherent errors",
+        "visual": "IRB error lower than expected from other diagnostics",
+        "next_action": "supplement with tomographic diagnostics"
+      }
+    ],
+    "tips": [
+      "Always run reference RB in same session for fair comparison.",
+      "If X90 error >> reference EPC, focus on pulse amplitude tuning.",
+      "Gate error = (1 - p_interleaved/p_reference) * (d-1)/d where d=2."
+    ],
+    "output_parameters_info": [
+      {
+        "name": "x90_gate_fidelity",
+        "description": "X90 gate fidelity (a.u.)"
+      },
+      {
+        "name": "x90_depolarizing_rate",
+        "description": "Depolarization error of the X90 gate (a.u.)"
+      }
+    ],
+    "analysis_guide": [
+      "Compare the reference and interleaved decay curves.",
+      "Extract the X90-specific error rate from the decay ratio.",
+      "Check if the reference EPC is low enough for meaningful interleaving.",
+      "Compare the X90 error with the overall EPC for consistency.",
+      "If X90 error is dominant, recommend pulse recalibration."
+    ],
+    "prerequisites": [
+      "RandomizedBenchmarking",
+      "CheckHPIPulse"
+    ],
+    "images": [
+      {
+        "alt_text": "X90 interleaved randomized benchmarking",
+        "relative_path": "./0.png",
+        "section": "expected result"
+      }
+    ],
+    "related_context": [
+      {
+        "type": "history",
+        "params": [],
+        "last_n": 5
+      }
+    ]
+  },
+  "ZX90InterleavedRandomizedBenchmarking": {
+    "name": "ZX90InterleavedRandomizedBenchmarking",
+    "summary": "Measures ZX90 two-qubit gate error rate via interleaved randomized benchmarking.",
+    "what_it_measures": "Error per ZX90 gate isolated via two-qubit interleaved RB.",
+    "physical_principle": "Two-qubit RB with ZX90 interleaved between random two-qubit Cliffords.",
+    "expected_result": {
+      "description": "Two-qubit survival probability decays; interleaved faster than reference.",
+      "result_type": "decay_curve",
+      "x_axis": "Two-qubit Clifford sequence length",
+      "y_axis": "Survival probability",
+      "z_axis": "",
+      "fit_model": "A * p^m + B for both reference and interleaved",
+      "typical_range": "",
+      "good_visual": "two clear exponential decays with interleaved faster, sufficient data points for fitting"
+    },
+    "evaluation_criteria": "ZX90 gate error should meet the target; the decay should be well-fitted and the reference should be clean enough to isolate the ZX90 contribution.",
+    "check_questions": [
+      "Is the ZX90 gate error below the target?",
+      "Is the reference two-qubit RB clean enough to isolate ZX90 error?",
+      "Are there signs of leakage in either qubit during CR drive?"
+    ],
+    "failure_modes": [
+      {
+        "severity": "warning",
+        "description": "Two-qubit Clifford compilation errors",
+        "cause": "errors from decomposing two-qubit Cliffords into native gates",
+        "visual": "reference decay faster than expected from individual gate errors",
+        "next_action": "verify Clifford decomposition, check compiler"
+      },
+      {
+        "severity": "warning",
+        "description": "Leakage during CR drive",
+        "cause": "CR pulse excites higher levels in either qubit",
+        "visual": "non-exponential decay, especially at longer sequences",
+        "next_action": "check DRAG on both qubits, optimize CR parameters"
+      },
+      {
+        "severity": "info",
+        "description": "Long sequences exceed coherence time",
+        "cause": "total circuit duration approaches T1/T2 of either qubit",
+        "visual": "survival drops to 0.25 before meaningful fit is possible",
+        "next_action": "shorten maximum sequence length, improve coherence"
+      }
+    ],
+    "tips": [
+      "Two-qubit RB requires many more sequences for convergence.",
+      "Compare with process tomography for consistency.",
+      "Gate error includes contributions from both qubits' decoherence."
+    ],
+    "output_parameters_info": [
+      {
+        "name": "zx90_gate_fidelity",
+        "description": "ZX90 gate fidelity (a.u.)"
+      },
+      {
+        "name": "zx90_depolarizing_rate",
+        "description": "Depolarization error of the ZX90 gate (a.u.)"
+      }
+    ],
+    "analysis_guide": [
+      "Compare the reference and interleaved two-qubit decay curves.",
+      "Extract the ZX90-specific error rate from the decay ratio.",
+      "Check for non-exponential behavior indicating leakage.",
+      "Compare with single-qubit gate errors to assess two-qubit gate contribution.",
+      "If error is dominated by coherence, recommend coherence improvements first."
+    ],
+    "prerequisites": [
+      "RandomizedBenchmarking",
+      "CheckZX90"
+    ],
+    "images": [
+      {
+        "alt_text": "ZX90 interleaved randomized benchmarking",
+        "relative_path": "./0.png",
         "section": "expected result"
       }
     ],
@@ -303,376 +337,6 @@
           "zx_rate",
           "coupling_strength"
         ],
-        "last_n": 5
-      }
-    ]
-  },
-  "CheckDRAGHPIPulse": {
-    "name": "CheckDRAGHPIPulse",
-    "summary": "Validates DRAG-corrected π/2 pulse quality for leakage suppression.",
-    "what_it_measures": "Gate fidelity of DRAG-corrected X90 pulse.",
-    "physical_principle": "Same DRAG principle as π pulse but for half rotation. Critical for quantum algorithms using superposition states.",
-    "expected_result": {
-      "description": "Correct superposition state after single pulse; oscillation under repeated application.",
-      "result_type": "oscillation",
-      "x_axis": "Number of DRAG π/2 pulse repetitions",
-      "y_axis": "P(|1⟩)",
-      "z_axis": "",
-      "fit_model": "",
-      "typical_range": "",
-      "good_visual": "oscillation with period 4 and very slow contrast decay, better than non-DRAG version"
-    },
-    "evaluation_criteria": "Gate fidelity should exceed the non-DRAG version; leakage should be minimal.",
-    "check_questions": [
-      "Is the gate fidelity >99.5%?",
-      "Is the leakage to |2⟩ <0.1%?",
-      "Is the DRAG version better than the non-DRAG CheckHPIPulse?"
-    ],
-    "failure_modes": [
-      {
-        "severity": "critical",
-        "description": "DRAG beta mis-tuned",
-        "cause": "beta parameter off, causing phase or leakage errors",
-        "visual": "distorted oscillation pattern or fast contrast decay",
-        "next_action": "rescan DRAG beta parameter"
-      },
-      {
-        "severity": "warning",
-        "description": "Amplitude off",
-        "cause": "does not produce exact π/2 rotation",
-        "visual": "oscillation period deviates from 4",
-        "next_action": "recalibrate amplitude with CreateDRAGHPIPulse"
-      },
-      {
-        "severity": "info",
-        "description": "Decoherence during measurement",
-        "cause": "T1/T2 corruption of validation signal",
-        "visual": "exponential decay independent of gate quality",
-        "next_action": "reduce measurement length, compare with coherence times"
-      }
-    ],
-    "tips": [
-      "Compare with non-DRAG X90 to verify improvement.",
-      "Run after DRAG π pulse is validated since they share parameters.",
-      "Check phase accuracy with tomography if fidelity is borderline."
-    ],
-    "output_parameters_info": [],
-    "analysis_guide": [
-      "Compare gate fidelity with the non-DRAG CheckHPIPulse result.",
-      "Verify oscillation period is 4 (correct rotation angle).",
-      "Check for leakage signatures in the decay.",
-      "If fidelity is borderline, recommend tomographic verification."
-    ],
-    "prerequisites": [
-      "CreateDRAGHPIPulse",
-      "CheckHPIPulse"
-    ],
-    "images": [
-      {
-        "alt_text": "DRAG HPI pulse error amplification",
-        "relative_path": "./0.png",
-        "section": "expected result"
-      }
-    ],
-    "related_context": [
-      {
-        "type": "history",
-        "params": [],
-        "last_n": 5
-      }
-    ]
-  },
-  "CheckDRAGPIPulse": {
-    "name": "CheckDRAGPIPulse",
-    "summary": "Validates DRAG-corrected π pulse quality to suppress leakage to |2⟩.",
-    "what_it_measures": "Gate fidelity of DRAG-corrected X180 pulse.",
-    "physical_principle": "DRAG adds a derivative quadrature component to suppress leakage during fast gates. Validate by repeated pulse application.",
-    "expected_result": {
-      "description": "Population oscillation with high contrast under repeated DRAG π pulses.",
-      "result_type": "oscillation",
-      "x_axis": "Number of DRAG π pulse repetitions",
-      "y_axis": "P(|1⟩)",
-      "z_axis": "",
-      "fit_model": "",
-      "typical_range": "",
-      "good_visual": "sharp 0/1 alternation with very slow contrast decay, better than non-DRAG version"
-    },
-    "evaluation_criteria": "Gate fidelity should exceed the non-DRAG version; leakage to |2⟩ should be minimal.",
-    "check_questions": [
-      "Is the gate fidelity >99.5%?",
-      "Is the leakage to |2⟩ <0.1%?",
-      "Is the DRAG version better than the non-DRAG CheckPIPulse?"
-    ],
-    "failure_modes": [
-      {
-        "severity": "critical",
-        "description": "DRAG coefficient mis-tuned",
-        "cause": "beta parameter not at optimal value for leakage suppression",
-        "visual": "residual leakage visible as population decay faster than decoherence",
-        "next_action": "rescan DRAG beta parameter"
-      },
-      {
-        "severity": "warning",
-        "description": "Amplitude drift",
-        "cause": "accumulated rotation error from amplitude miscalibration",
-        "visual": "population drift from ideal 0/1 alternation",
-        "next_action": "recalibrate amplitude with CreateDRAGPIPulse"
-      },
-      {
-        "severity": "info",
-        "description": "Anharmonicity too small",
-        "cause": "DRAG correction insufficient for fast gates when anharmonicity is marginal",
-        "visual": "leakage persists despite DRAG optimization",
-        "next_action": "slow down gate, consider alternative pulse shapes"
-      }
-    ],
-    "tips": [
-      "Compare error rate with non-DRAG π pulse to quantify improvement.",
-      "If leakage persists, try scanning DRAG beta parameter.",
-      "Ensure anharmonicity is well-characterized before DRAG tuning."
-    ],
-    "output_parameters_info": [],
-    "analysis_guide": [
-      "Compare gate fidelity with the non-DRAG CheckPIPulse result.",
-      "Check for leakage signatures in the decay pattern.",
-      "Verify DRAG beta is at the optimal value.",
-      "If improvement is marginal, consider whether DRAG is necessary for this qubit."
-    ],
-    "prerequisites": [
-      "CreateDRAGPIPulse",
-      "CheckPIPulse"
-    ],
-    "images": [
-      {
-        "alt_text": "DRAG PI pulse error amplification",
-        "relative_path": "./0.png",
-        "section": "expected result"
-      }
-    ],
-    "related_context": [
-      {
-        "type": "history",
-        "params": [],
-        "last_n": 5
-      }
-    ]
-  },
-  "CheckDispersiveShift": {
-    "name": "CheckDispersiveShift",
-    "summary": "Measures dispersive shift (χ) between qubit and readout resonator.",
-    "what_it_measures": "Dispersive shift (χ) – the frequency shift of the resonator conditioned on the qubit state.",
-    "physical_principle": "Measure resonator spectrum with qubit in |0⟩ and |1⟩; in the dispersive regime the resonator shifts by 2χ, enabling QND readout.",
-    "expected_result": {
-      "description": "Two transmission peaks/dips separated by 2χ; one for each qubit state.",
-      "result_type": "peak_curve",
-      "x_axis": "Readout frequency (GHz)",
-      "y_axis": "Transmission amplitude",
-      "z_axis": "",
-      "fit_model": "",
-      "typical_range": "",
-      "good_visual": "two clearly separated transmission dips, one per qubit state, with separation >> linewidth"
-    },
-    "evaluation_criteria": "The dispersive shift 2χ should exceed the resonator linewidth κ for state discrimination. Typical 2χ > 1 MHz for reliable readout.",
-    "check_questions": [
-      "Is 2χ clearly larger than the resonator linewidth κ?",
-      "Are both qubit-state-dependent peaks clearly resolved?",
-      "Is 2χ within the expected range for this qubit-resonator coupling?"
-    ],
-    "failure_modes": [
-      {
-        "severity": "critical",
-        "description": "Insufficient dispersive shift (2χ < κ)",
-        "cause": "weak qubit-resonator coupling or large detuning",
-        "visual": "overlapping or barely separated peaks",
-        "next_action": "readout fidelity will be fundamentally limited, check coupling design"
-      },
-      {
-        "severity": "warning",
-        "description": "Purcell-limited T1",
-        "cause": "large χ degrades T1 via Purcell decay",
-        "visual": "T1 shorter than expected given other loss mechanisms",
-        "next_action": "check Purcell filter design, balance χ vs T1 tradeoff"
-      },
-      {
-        "severity": "warning",
-        "description": "Overlapping peaks",
-        "cause": "χ < κ/2 makes states unresolvable",
-        "visual": "single broad peak instead of two separated features",
-        "next_action": "optimize readout frequency and power"
-      }
-    ],
-    "tips": [
-      "Use the midpoint between the two peaks as optimal readout frequency.",
-      "If 2χ is too small, readout fidelity will be fundamentally limited.",
-      "Monitor χ over time; shifts indicate qubit frequency drift."
-    ],
-    "output_parameters_info": [
-      {
-        "name": "optimal_readout_frequency",
-        "description": "Optimal Readout Frequency (GHz)"
-      },
-      {
-        "name": "dispersive_shift",
-        "description": "Dispersive shift (MHz)"
-      }
-    ],
-    "analysis_guide": [
-      "Identify the two qubit-state-dependent resonator peaks.",
-      "Measure the separation 2χ and compare with resonator linewidth κ.",
-      "Verify 2χ is sufficient for the required readout fidelity.",
-      "If χ has changed, check for qubit frequency drift."
-    ],
-    "prerequisites": [
-      "CheckQubitFrequency",
-      "CheckReadoutFrequency"
-    ],
-    "images": [],
-    "related_context": [
-      {
-        "type": "history",
-        "params": [],
-        "last_n": 5
-      }
-    ]
-  },
-  "CheckElectricalDelay": {
-    "name": "CheckElectricalDelay",
-    "summary": "Measures the electrical delay in the readout line.",
-    "what_it_measures": "Electrical delay – the time delay experienced by signals traveling through the readout chain (cables, components, filters) from pulse generation to measurement acquisition.",
-    "physical_principle": "Time-of-flight measurement: measures the phase slope of the readout signal as a function of frequency. The electrical delay is proportional to the linear phase gradient across the measurement bandwidth. Accurate delay compensation is essential for proper IQ demodulation and readout fidelity.",
-    "expected_result": {
-      "description": "A measured electrical delay value in nanoseconds, representing the total signal propagation time through the readout chain.",
-      "result_type": "scalar",
-      "x_axis": "",
-      "y_axis": "",
-      "z_axis": "",
-      "fit_model": "",
-      "typical_range": "",
-      "good_visual": "consistent delay value within expected range for the physical setup"
-    },
-    "evaluation_criteria": "The measured delay should be consistent with the physical cable lengths and component specifications. Sudden changes in delay indicate hardware changes or issues.",
-    "check_questions": [
-      "Is the measured delay within a reasonable range for this setup?",
-      "Is the delay consistent with previous measurements?",
-      "Has any hardware been changed that would affect the delay?"
-    ],
-    "failure_modes": [
-      {
-        "severity": "warning",
-        "description": "Unexpected delay change",
-        "cause": "cable replaced, connector issue, or component change",
-        "visual": "delay value significantly different from baseline",
-        "next_action": "verify hardware configuration, check for loose connectors"
-      },
-      {
-        "severity": "critical",
-        "description": "Unreasonable delay value",
-        "cause": "measurement error, poor signal quality, or disconnected cable",
-        "visual": "delay value far outside physical expectations",
-        "next_action": "check readout chain connectivity, verify signal quality"
-      }
-    ],
-    "tips": [
-      "Measure electrical delay after any hardware change to the readout chain.",
-      "Use consistent measurement conditions (frequency range, power) for reproducibility.",
-      "Record baseline delay values for each readout channel as reference."
-    ],
-    "output_parameters_info": [
-      {
-        "name": "electrical_delay",
-        "description": "Electrical delay (ns)"
-      }
-    ],
-    "analysis_guide": [
-      "Review the measured delay value.",
-      "Compare with baseline/previous measurements.",
-      "If delay has changed, identify hardware modifications that could explain the change.",
-      "Ensure delay compensation is updated in the system configuration."
-    ],
-    "prerequisites": [
-      "Configure",
-      "CheckResonatorFrequencies"
-    ],
-    "images": [],
-    "related_context": [
-      {
-        "type": "history",
-        "params": [],
-        "last_n": 5
-      }
-    ]
-  },
-  "CheckHPIPulse": {
-    "name": "CheckHPIPulse",
-    "summary": "Validates π/2 pulse quality by repeated application and population measurement.",
-    "what_it_measures": "π/2 pulse fidelity – accumulated rotation error over multiple applications.",
-    "physical_principle": "Apply the calibrated π/2 pulse repeatedly; population should cycle through superposition states. Deviation indicates rotation or phase error.",
-    "expected_result": {
-      "description": "Population oscillation with period 4 (four π/2 pulses = full rotation); contrast decay reveals error.",
-      "result_type": "oscillation",
-      "x_axis": "Number of π/2 pulse repetitions",
-      "y_axis": "P(|1⟩)",
-      "z_axis": "",
-      "fit_model": "",
-      "typical_range": "",
-      "good_visual": "clear oscillation with period 4, high contrast maintained over 20+ repetitions"
-    },
-    "evaluation_criteria": "Correct cycling pattern over many repetitions with minimal contrast decay.",
-    "check_questions": [
-      "Does the population cycle with period 4 as expected?",
-      "Is the contrast maintained over 20 repetitions?",
-      "Is the per-gate error rate acceptable?"
-    ],
-    "failure_modes": [
-      {
-        "severity": "critical",
-        "description": "Rotation angle error",
-        "cause": "π/2 pulse amplitude off, population drifts from expected pattern",
-        "visual": "oscillation period deviates from 4, systematic drift",
-        "next_action": "re-run CreateHPIPulse with finer amplitude scan"
-      },
-      {
-        "severity": "warning",
-        "description": "Phase error",
-        "cause": "phase calibration off, visible in tomographic basis",
-        "visual": "pattern distortion not visible in Z-only measurement",
-        "next_action": "check phase calibration, use tomographic validation"
-      },
-      {
-        "severity": "info",
-        "description": "Decoherence during sequence",
-        "cause": "T1/T2 limit useful number of repetitions",
-        "visual": "exponential contrast decay",
-        "next_action": "reduce repetitions, compare with coherence times"
-      }
-    ],
-    "tips": [
-      "If validation fails, re-run CreateHPIPulse or try DRAG correction.",
-      "Compare error rate with CheckPIPulse for consistency.",
-      "Phase errors may require separate X/Y pulse calibration."
-    ],
-    "output_parameters_info": [],
-    "analysis_guide": [
-      "Verify the oscillation period is 4 (four X90 = full rotation).",
-      "Check contrast decay rate to estimate per-gate error.",
-      "Compare with CheckPIPulse error rate for consistency.",
-      "If error is large, recommend recalibration."
-    ],
-    "prerequisites": [
-      "CreateHPIPulse",
-      "CheckRabi"
-    ],
-    "images": [
-      {
-        "alt_text": "HPI pulse error amplification",
-        "relative_path": "./0.png",
-        "section": "expected result"
-      }
-    ],
-    "related_context": [
-      {
-        "type": "history",
-        "params": [],
         "last_n": 5
       }
     ]
@@ -745,70 +409,118 @@
       }
     ]
   },
-  "CheckOptimalReadoutAmplitude": {
-    "name": "CheckOptimalReadoutAmplitude",
-    "summary": "Optimizes readout pulse amplitude for best state discrimination.",
-    "what_it_measures": "Optimal readout drive amplitude – the power level that maximizes |0⟩/|1⟩ discrimination.",
-    "physical_principle": "Sweep readout amplitude while measuring state separation; too low gives poor SNR, too high causes measurement-induced transitions (QND violation).",
+  "CheckStatus": {
+    "name": "CheckStatus",
+    "summary": "Checks the status of the experiment and control hardware.",
+    "what_it_measures": "Overall experiment status – verifies that the control system and hardware are in a healthy, operational state.",
+    "physical_principle": "Diagnostic query to the experiment controller. No physical measurement is performed; the task polls the system for readiness and error conditions.",
     "expected_result": {
-      "description": "Separation/fidelity vs amplitude: rises from noise floor, peaks at optimum, may decrease at high power.",
-      "result_type": "peak_curve",
-      "x_axis": "Readout amplitude (a.u.)",
-      "y_axis": "State separation or readout fidelity",
+      "description": "A status report confirming all subsystems are operational.",
+      "result_type": "status_report",
+      "x_axis": "",
+      "y_axis": "",
       "z_axis": "",
       "fit_model": "",
       "typical_range": "",
-      "good_visual": "clear peak in fidelity vs amplitude curve with well-defined optimum"
+      "good_visual": "all subsystems report healthy status with no errors"
     },
-    "evaluation_criteria": "State separation should be high at optimal amplitude; amplitude should be in the linear regime below QND violation threshold.",
+    "evaluation_criteria": "All subsystems should report a healthy state. Any error or warning indicates a hardware or configuration issue that must be resolved before proceeding with calibration.",
     "check_questions": [
-      "Is there a clear optimum in the fidelity vs amplitude curve?",
-      "Is the optimal amplitude in the linear regime (not too high)?",
-      "Is the state separation >95% at the optimal point?"
+      "Do all subsystems report a healthy status?",
+      "Are there any error or warning messages?"
     ],
     "failure_modes": [
       {
-        "severity": "warning",
-        "description": "Amplitude too low",
-        "cause": "insufficient SNR for state discrimination",
-        "visual": "IQ blobs overlap significantly, poor fidelity",
-        "next_action": "increase readout amplitude or integration time"
+        "severity": "critical",
+        "description": "Subsystem not responding",
+        "cause": "hardware disconnected or powered off",
+        "visual": "",
+        "next_action": "check physical connections and power supply"
       },
       {
         "severity": "critical",
-        "description": "Amplitude too high",
-        "cause": "measurement-induced transitions, qubit heating",
-        "visual": "fidelity decreases at high amplitudes, QND violation",
-        "next_action": "reduce amplitude, check for non-QND effects"
-      },
-      {
-        "severity": "warning",
-        "description": "Flat curve",
-        "cause": "resonator off-resonance or dispersive shift too small",
-        "visual": "fidelity does not vary significantly with amplitude",
-        "next_action": "verify readout frequency and dispersive shift"
+        "description": "Error status reported",
+        "cause": "hardware fault or misconfiguration",
+        "visual": "",
+        "next_action": "review error details and consult hardware documentation"
       }
     ],
     "tips": [
-      "Run after dispersive shift characterization for best results.",
-      "If optimal amplitude is very high, check if dispersive shift is sufficient.",
-      "Monitor both |0⟩ and |1⟩ populations at optimal point for QND verification."
+      "Run this task first before any calibration to catch hardware issues early.",
+      "If status check fails, resolve all issues before proceeding."
     ],
-    "output_parameters_info": [
+    "output_parameters_info": [],
+    "analysis_guide": [
+      "Review the status output for any errors or warnings.",
+      "If errors exist, address them before running further tasks.",
+      "Confirm all control and readout lines are operational."
+    ],
+    "prerequisites": [],
+    "images": [],
+    "related_context": [
       {
-        "name": "optimal_readout_amplitude",
-        "description": "Optimal Readout Amplitude (a.u.)"
+        "type": "history",
+        "params": [],
+        "last_n": 5
+      }
+    ]
+  },
+  "Configure": {
+    "name": "Configure",
+    "summary": "Loads and applies the full calibration state configuration to the control boxes.",
+    "what_it_measures": "No measurement is performed. This task loads the saved calibration state (frequencies, amplitudes, timing parameters) from configuration files and pushes them to all control boxes.",
+    "physical_principle": "No physical measurement. This is a state management task that restores a previously saved calibration configuration to the hardware, ensuring all control parameters are set to known values.",
+    "expected_result": {
+      "description": "Full calibration state loaded and pushed to all control boxes successfully.",
+      "result_type": "configuration",
+      "x_axis": "",
+      "y_axis": "",
+      "z_axis": "",
+      "fit_model": "",
+      "typical_range": "",
+      "good_visual": "state loaded and pushed without errors"
+    },
+    "evaluation_criteria": "State should load and push without errors. All boxes should acknowledge the configuration update.",
+    "check_questions": [
+      "Did the state load from configuration files without errors?",
+      "Was the configuration successfully pushed to all boxes?"
+    ],
+    "failure_modes": [
+      {
+        "severity": "critical",
+        "description": "Configuration file not found",
+        "cause": "missing or misnamed configuration files",
+        "visual": "",
+        "next_action": "verify config_path and params_path are correct and files exist"
+      },
+      {
+        "severity": "critical",
+        "description": "Push failure",
+        "cause": "hardware communication error or incompatible configuration",
+        "visual": "",
+        "next_action": "check LinkUp status and configuration file compatibility"
+      },
+      {
+        "severity": "warning",
+        "description": "Stale configuration",
+        "cause": "configuration files are outdated relative to hardware changes",
+        "visual": "",
+        "next_action": "re-run calibration to generate updated configuration"
       }
     ],
+    "tips": [
+      "Always run Configure after LinkUp to ensure hardware has the correct calibration state.",
+      "Keep configuration files version-controlled for reproducibility.",
+      "Compare loaded state with expected values after pushing."
+    ],
+    "output_parameters_info": [],
     "analysis_guide": [
-      "Identify the optimal amplitude from the fidelity vs amplitude curve.",
-      "Verify the optimum is well-defined (clear peak, not plateau).",
-      "Check that the optimal amplitude is not in the nonlinear/QND-violation regime.",
-      "Compare the achieved fidelity with expectations from the dispersive shift."
+      "Verify configuration files exist and are up to date.",
+      "Confirm state was loaded and pushed successfully.",
+      "Consider running CheckStatus after Configure to verify system health."
     ],
     "prerequisites": [
-      "CheckDispersiveShift",
-      "CheckReadoutFrequency"
+      "LinkUp"
     ],
     "images": [],
     "related_context": [
@@ -819,74 +531,57 @@
       }
     ]
   },
-  "CheckPIPulse": {
-    "name": "CheckPIPulse",
-    "summary": "Validates π pulse quality by repeated application and population measurement.",
-    "what_it_measures": "π pulse fidelity – accumulated error over multiple applications.",
-    "physical_principle": "Apply the calibrated π pulse repeatedly N times; odd repetitions should give |1⟩, even should give |0⟩. Deviation indicates rotation error.",
+  "DumpBox": {
+    "name": "DumpBox",
+    "summary": "Dumps diagnostic information from all control boxes.",
+    "what_it_measures": "Control box internal state – extracts configuration, firmware version, register values, and other diagnostic data from each control box.",
+    "physical_principle": "No physical measurement. This task reads internal registers and configuration from the FPGA-based control hardware for diagnostic and debugging purposes.",
     "expected_result": {
-      "description": "Population oscillation between 0 and 1 across repetitions; contrast decay reveals error accumulation.",
-      "result_type": "oscillation",
-      "x_axis": "Number of π pulse repetitions",
-      "y_axis": "P(|1⟩)",
+      "description": "A dictionary of diagnostic information keyed by box ID, containing hardware configuration and status details.",
+      "result_type": "diagnostic_dump",
+      "x_axis": "",
+      "y_axis": "",
       "z_axis": "",
       "fit_model": "",
       "typical_range": "",
-      "good_visual": "sharp alternation between 0 and 1 with minimal contrast decay over 20+ repetitions"
+      "good_visual": "complete diagnostic data for all boxes without errors"
     },
-    "evaluation_criteria": "Contrast should remain high over many repetitions; per-gate error rate extracted from decay should be low.",
+    "evaluation_criteria": "All boxes should return complete diagnostic information. Missing or incomplete data indicates communication issues.",
     "check_questions": [
-      "Is the contrast >99% over 20 repetitions?",
-      "Is the decay envelope slow (small per-gate error)?",
-      "Is there evidence of leakage (non-oscillatory decay)?"
+      "Is diagnostic data available for all expected boxes?",
+      "Are there any unexpected register values or error flags?"
     ],
     "failure_modes": [
       {
-        "severity": "critical",
-        "description": "Amplitude error accumulation",
-        "cause": "π pulse amplitude slightly off, error compounds with repetitions",
-        "visual": "population drifts from ideal 0/1 alternation pattern",
-        "next_action": "re-run CreatePIPulse with finer amplitude scan"
-      },
-      {
         "severity": "warning",
-        "description": "Leakage to |2⟩",
-        "cause": "pulse too fast relative to anharmonicity, insufficient DRAG",
-        "visual": "population decay envelope on oscillation (not just amplitude error)",
-        "next_action": "try DRAG correction, slow down pulse"
+        "description": "Incomplete dump",
+        "cause": "communication interrupted during data retrieval",
+        "visual": "",
+        "next_action": "retry the dump; check network stability"
       },
       {
-        "severity": "info",
-        "description": "Decoherence during measurement",
-        "cause": "T1/T2 limit the number of useful repetitions",
-        "visual": "exponential decay of contrast independent of gate error",
-        "next_action": "reduce number of repetitions, compare with T1 timescale"
+        "severity": "critical",
+        "description": "Box not found",
+        "cause": "box not linked or powered off",
+        "visual": "",
+        "next_action": "run LinkUp first, check hardware connections"
       }
     ],
     "tips": [
-      "If contrast decays rapidly, re-run CreatePIPulse with finer amplitude scan.",
-      "Compare with CheckDRAGPIPulse to see if DRAG correction improves fidelity.",
-      "The decay rate gives an estimate of per-gate error."
+      "Use this task for debugging hardware issues.",
+      "Compare dumps before and after configuration changes to verify settings applied correctly.",
+      "Save dumps as reference baselines for troubleshooting."
     ],
     "output_parameters_info": [],
     "analysis_guide": [
-      "Check the oscillation contrast over 20 repetitions.",
-      "Separate decoherence-induced decay from gate-error-induced decay.",
-      "Estimate per-gate error from the contrast decay rate.",
-      "If error is too large, recommend recalibration with CreatePIPulse.",
-      "Compare with DRAG version for improvement assessment."
+      "Review dump output for each box.",
+      "Compare with expected configuration values.",
+      "Flag any unexpected register values or error conditions."
     ],
     "prerequisites": [
-      "CreatePIPulse",
-      "CheckRabi"
+      "LinkUp"
     ],
-    "images": [
-      {
-        "alt_text": "PI pulse error amplification",
-        "relative_path": "./0.png",
-        "section": "expected result"
-      }
-    ],
+    "images": [],
     "related_context": [
       {
         "type": "history",
@@ -895,74 +590,181 @@
       }
     ]
   },
-  "CheckQubit": {
-    "name": "CheckQubit",
-    "summary": "Quick qubit validation via brief Rabi oscillation check.",
-    "what_it_measures": "Basic qubit responsiveness – whether the qubit shows coherent Rabi oscillations.",
-    "physical_principle": "Short Rabi experiment with varying pulse duration to confirm qubit is functional and control/readout lines are operational.",
+  "LinkUp": {
+    "name": "LinkUp",
+    "summary": "Initializes and links up the control box hardware.",
+    "what_it_measures": "Hardware link status – establishes communication between the host system and the control boxes (FPGA-based quantum control hardware).",
+    "physical_principle": "No physical measurement. This task performs hardware initialization: establishing network/bus connections to the control boxes and verifying bidirectional communication.",
     "expected_result": {
-      "description": "Sinusoidal Rabi oscillation with clear |0⟩/|1⟩ contrast.",
-      "result_type": "oscillation",
-      "x_axis": "Pulse duration (ns)",
-      "y_axis": "P(|1⟩)",
+      "description": "Successful link-up of all control boxes with confirmed communication.",
+      "result_type": "status_report",
+      "x_axis": "",
+      "y_axis": "",
       "z_axis": "",
       "fit_model": "",
       "typical_range": "",
-      "good_visual": "clear sinusoidal oscillation with high contrast between |0⟩ and |1⟩ states"
+      "good_visual": "all boxes linked and communicating without errors"
     },
-    "evaluation_criteria": "Clear oscillation visible with reasonable contrast; Rabi frequency consistent with drive amplitude. This is a quick sanity check, not a precision measurement.",
+    "evaluation_criteria": "All control boxes should link up successfully. Timeouts or communication errors indicate hardware or network issues.",
     "check_questions": [
-      "Is a clear oscillation visible in the data?",
-      "Is the contrast (peak-to-trough) reasonable (>50%)?",
-      "Is the Rabi frequency consistent with the drive amplitude?"
+      "Did all control boxes link up successfully?",
+      "Were there any timeout or communication errors?"
     ],
     "failure_modes": [
       {
         "severity": "critical",
-        "description": "No oscillation",
-        "cause": "qubit not responding; drive line or frequency misconfigured",
-        "visual": "flat line, no modulation in signal",
-        "next_action": "check drive line connectivity and qubit frequency calibration"
+        "description": "Link-up timeout",
+        "cause": "control box powered off, network issue, or firmware mismatch",
+        "visual": "",
+        "next_action": "check power, network cables, and firmware versions"
       },
       {
-        "severity": "warning",
-        "description": "Very low contrast",
-        "cause": "thermal population or T1 too short",
-        "visual": "small amplitude oscillation riding on large offset",
-        "next_action": "check effective qubit temperature and readout fidelity"
-      },
-      {
-        "severity": "warning",
-        "description": "Irregular oscillation",
-        "cause": "frequency collision or TLS coupling",
-        "visual": "beating pattern or non-sinusoidal oscillation",
-        "next_action": "check for TLS near qubit frequency, verify frequency calibration"
+        "severity": "critical",
+        "description": "Partial link-up",
+        "cause": "one or more boxes not responding",
+        "visual": "",
+        "next_action": "identify which box failed and check its individual status"
       }
     ],
     "tips": [
-      "This is a quick sanity check; if it fails, investigate drive and readout chains first.",
-      "Compare Rabi frequency across qubits to identify drive uniformity issues.",
-      "If amplitude is very small, adjust control amplitude."
+      "Ensure all control boxes are powered on and connected before running.",
+      "Check that firmware versions are compatible with the host software.",
+      "If link-up fails intermittently, check network stability."
+    ],
+    "output_parameters_info": [],
+    "analysis_guide": [
+      "Confirm all expected control boxes are linked.",
+      "If any box fails to link, check physical connections first.",
+      "Verify firmware compatibility if connections are physically sound."
+    ],
+    "prerequisites": [
+      "CheckStatus"
+    ],
+    "images": [],
+    "related_context": [
+      {
+        "type": "history",
+        "params": [],
+        "last_n": 5
+      }
+    ]
+  },
+  "ReadoutConfigure": {
+    "name": "ReadoutConfigure",
+    "summary": "Configures readout parameters for a specified subset of qubits.",
+    "what_it_measures": "No measurement is performed. This task applies readout configuration (frequencies, amplitudes) to the control hardware for a selected set of qubits.",
+    "physical_principle": "No physical measurement. This is a configuration task that sets readout resonator frequencies for specified qubits and disables (sets to NaN) frequencies for qubits not in the target list.",
+    "expected_result": {
+      "description": "Readout parameters successfully applied to the hardware for the specified qubits.",
+      "result_type": "configuration",
+      "x_axis": "",
+      "y_axis": "",
+      "z_axis": "",
+      "fit_model": "",
+      "typical_range": "",
+      "good_visual": "configuration applied without errors"
+    },
+    "evaluation_criteria": "Configuration should apply without errors. The specified qubits should have valid readout parameters, while excluded qubits should be disabled.",
+    "check_questions": [
+      "Did the configuration apply without errors?",
+      "Are the correct qubits enabled for readout?"
+    ],
+    "failure_modes": [
+      {
+        "severity": "critical",
+        "description": "Configuration push failure",
+        "cause": "hardware communication error or invalid parameter values",
+        "visual": "",
+        "next_action": "check hardware link status and parameter validity"
+      },
+      {
+        "severity": "warning",
+        "description": "Empty qubit list",
+        "cause": "no qubits specified in run parameters",
+        "visual": "",
+        "next_action": "verify the qubit list in run parameters is correctly set"
+      }
+    ],
+    "tips": [
+      "Use this task to selectively configure readout for a subset of qubits when full-chip calibration is not needed.",
+      "Verify qubit IDs match the expected chip layout before running."
+    ],
+    "output_parameters_info": [],
+    "analysis_guide": [
+      "Confirm the target qubit list matches expectations.",
+      "Verify configuration was pushed to hardware without errors.",
+      "Check that excluded qubits are properly disabled."
+    ],
+    "prerequisites": [
+      "LinkUp",
+      "Configure"
+    ],
+    "images": [],
+    "related_context": [
+      {
+        "type": "history",
+        "params": [],
+        "last_n": 5
+      }
+    ]
+  },
+  "CheckElectricalDelay": {
+    "name": "CheckElectricalDelay",
+    "summary": "Measures the electrical delay in the readout line.",
+    "what_it_measures": "Electrical delay – the time delay experienced by signals traveling through the readout chain (cables, components, filters) from pulse generation to measurement acquisition.",
+    "physical_principle": "Time-of-flight measurement: measures the phase slope of the readout signal as a function of frequency. The electrical delay is proportional to the linear phase gradient across the measurement bandwidth. Accurate delay compensation is essential for proper IQ demodulation and readout fidelity.",
+    "expected_result": {
+      "description": "A measured electrical delay value in nanoseconds, representing the total signal propagation time through the readout chain.",
+      "result_type": "scalar",
+      "x_axis": "",
+      "y_axis": "",
+      "z_axis": "",
+      "fit_model": "",
+      "typical_range": "",
+      "good_visual": "consistent delay value within expected range for the physical setup"
+    },
+    "evaluation_criteria": "The measured delay should be consistent with the physical cable lengths and component specifications. Sudden changes in delay indicate hardware changes or issues.",
+    "check_questions": [
+      "Is the measured delay within a reasonable range for this setup?",
+      "Is the delay consistent with previous measurements?",
+      "Has any hardware been changed that would affect the delay?"
+    ],
+    "failure_modes": [
+      {
+        "severity": "warning",
+        "description": "Unexpected delay change",
+        "cause": "cable replaced, connector issue, or component change",
+        "visual": "delay value significantly different from baseline",
+        "next_action": "verify hardware configuration, check for loose connectors"
+      },
+      {
+        "severity": "critical",
+        "description": "Unreasonable delay value",
+        "cause": "measurement error, poor signal quality, or disconnected cable",
+        "visual": "delay value far outside physical expectations",
+        "next_action": "check readout chain connectivity, verify signal quality"
+      }
+    ],
+    "tips": [
+      "Measure electrical delay after any hardware change to the readout chain.",
+      "Use consistent measurement conditions (frequency range, power) for reproducibility.",
+      "Record baseline delay values for each readout channel as reference."
     ],
     "output_parameters_info": [
       {
-        "name": "rabi_amplitude",
-        "description": "Rabi oscillation amplitude (a.u.)"
-      },
-      {
-        "name": "rabi_frequency",
-        "description": "Rabi oscillation frequency (MHz)"
+        "name": "electrical_delay",
+        "description": "Electrical delay (ns)"
       }
     ],
     "analysis_guide": [
-      "Verify that a clear oscillation is present in the data.",
-      "Check the contrast (should be >50% for a functional qubit).",
-      "If no oscillation, diagnose drive and readout chain.",
-      "If low contrast, check temperature and T1."
+      "Review the measured delay value.",
+      "Compare with baseline/previous measurements.",
+      "If delay has changed, identify hardware modifications that could explain the change.",
+      "Ensure delay compensation is updated in the system configuration."
     ],
     "prerequisites": [
-      "CheckQubitFrequency",
-      "CheckReadoutFrequency"
+      "Configure",
+      "CheckResonatorFrequencies"
     ],
     "images": [],
     "related_context": [
@@ -1047,86 +849,6 @@
       }
     ]
   },
-  "CheckQubitFrequency": {
-    "name": "CheckQubitFrequency",
-    "summary": "Measures qubit transition frequency via Ramsey-based detuning calibration.",
-    "what_it_measures": "Qubit |0⟩→|1⟩ transition frequency with high precision.",
-    "physical_principle": "Sweep drive detuning and pulse duration to map Ramsey fringes; the zero-detuning point gives the exact qubit frequency.",
-    "expected_result": {
-      "description": "Ramsey fringes at various detunings; the frequency calibration converges when detuning is zero.",
-      "result_type": "oscillation",
-      "x_axis": "Drive detuning (MHz)",
-      "y_axis": "P(|1⟩)",
-      "z_axis": "",
-      "fit_model": "",
-      "typical_range": "",
-      "good_visual": "clear Ramsey fringes with well-defined zero-detuning convergence point"
-    },
-    "evaluation_criteria": "Frequency should be reproducible across runs and within expected range of design target. Calibration should converge cleanly.",
-    "check_questions": [
-      "Is the frequency within the expected range for this qubit?",
-      "Is the frequency reproducible across repeated measurements?",
-      "Is the frequency well-separated from neighbor qubits (>100 MHz)?"
-    ],
-    "failure_modes": [
-      {
-        "severity": "critical",
-        "description": "Frequency collision with neighbor (<100 MHz separation)",
-        "cause": "fabrication deviation from design, insufficient detuning margin",
-        "visual": "crosstalk artifacts in Ramsey fringes",
-        "next_action": "assess crosstalk risk, consider frequency tuning if possible"
-      },
-      {
-        "severity": "warning",
-        "description": "TLS-induced shift",
-        "cause": "frequency jumps between runs due to TLS defects",
-        "visual": "inconsistent frequency across repeated measurements",
-        "next_action": "monitor for TLS switching, check frequency stability over time"
-      },
-      {
-        "severity": "warning",
-        "description": "Large drift over time",
-        "cause": "junction aging or thermal instability",
-        "visual": "systematic frequency trend in history",
-        "next_action": "monitor thermal stability, check junction parameters"
-      }
-    ],
-    "tips": [
-      "Compare measured frequency with chip design values to flag fabrication outliers.",
-      "If frequency fluctuates between runs, suspect TLS defects near qubit frequency.",
-      "Check neighbor qubit frequencies for collision risk."
-    ],
-    "output_parameters_info": [
-      {
-        "name": "qubit_frequency",
-        "description": "Qubit frequency (GHz)"
-      }
-    ],
-    "analysis_guide": [
-      "Compare the measured frequency with the design target value.",
-      "Check separation from neighbor qubit frequencies (should be >100 MHz).",
-      "Review frequency history for drift or instability.",
-      "If frequency has shifted significantly, assess impact on gate calibrations."
-    ],
-    "prerequisites": [
-      "CheckReadoutFrequency"
-    ],
-    "images": [],
-    "related_context": [
-      {
-        "type": "history",
-        "params": [],
-        "last_n": 5
-      },
-      {
-        "type": "neighbor_qubits",
-        "params": [
-          "frequency"
-        ],
-        "last_n": 5
-      }
-    ]
-  },
   "CheckQubitSpectroscopy": {
     "name": "CheckQubitSpectroscopy",
     "summary": "High-resolution qubit spectroscopy to measure qubit transition frequencies and anharmonicity.",
@@ -1207,237 +929,6 @@
       }
     ]
   },
-  "CheckRabi": {
-    "name": "CheckRabi",
-    "summary": "Measures Rabi oscillation to extract drive amplitude, frequency, and IQ-plane parameters.",
-    "what_it_measures": "Rabi oscillation parameters: amplitude, frequency (drive strength), phase, offset, and IQ-plane rotation parameters.",
-    "physical_principle": "Apply a resonant drive pulse of variable duration; the qubit oscillates between |0⟩ and |1⟩ at the Rabi frequency Ω_R. The IQ data is rotated via PCA to align the measurement axis, then fitted with a damped cosine model.",
-    "expected_result": {
-      "description": "Damped sinusoidal oscillation of the rotated IQ signal vs pulse duration. Frequency gives Ω_R, envelope gives the decay time τ.",
-      "result_type": "oscillation",
-      "x_axis": "Pulse duration (ns)",
-      "y_axis": "Rotated IQ signal (arb. units)",
-      "z_axis": "",
-      "fit_model": "A * cos(ω·t + φ) * exp(-t/τ) + B (damped cosine, `is_damped=True` by default)",
-      "typical_range": "",
-      "good_visual": "clear sinusoidal oscillation with high contrast and slow decay envelope"
-    },
-    "evaluation_criteria": "Rabi amplitude should be high; frequency should be consistent with calibrated drive amplitude; fit quality should be good.",
-    "check_questions": [
-      "Is the Rabi amplitude (contrast) sufficiently high?",
-      "Is the Rabi frequency consistent with the expected drive amplitude?",
-      "Is the fit R² > 0.95?",
-      "Is the decay slow compared to the oscillation period?"
-    ],
-    "failure_modes": [
-      {
-        "severity": "critical",
-        "description": "Low contrast (<70%)",
-        "cause": "readout miscalibration, thermal population, or leakage",
-        "visual": "small oscillation amplitude, large DC offset",
-        "next_action": "check readout fidelity and effective qubit temperature"
-      },
-      {
-        "severity": "warning",
-        "description": "Rapid decay",
-        "cause": "T1/T2 limiting or drive-induced heating",
-        "visual": "oscillation amplitude drops quickly with pulse duration",
-        "next_action": "check T1, reduce drive amplitude if heating is suspected"
-      },
-      {
-        "severity": "warning",
-        "description": "Frequency mismatch",
-        "cause": "drive amplitude changed or DAC nonlinearity",
-        "visual": "oscillation frequency inconsistent with drive setting",
-        "next_action": "recalibrate drive amplitude, check DAC linearity"
-      },
-      {
-        "severity": "warning",
-        "description": "Beating pattern",
-        "cause": "TLS strongly coupled near qubit frequency",
-        "visual": "amplitude modulation with a second frequency component",
-        "next_action": "check for TLS, try different qubit frequency operating point"
-      }
-    ],
-    "tips": [
-      "Use Rabi frequency to calibrate π and π/2 pulse amplitudes.",
-      "If contrast is low, check effective qubit temperature and readout fidelity first.",
-      "Compare Rabi frequency across qubits for drive-line uniformity assessment."
-    ],
-    "output_parameters_info": [
-      {
-        "name": "rabi_amplitude",
-        "description": "Rabi oscillation amplitude (a.u.)"
-      },
-      {
-        "name": "rabi_frequency",
-        "description": "Rabi oscillation frequency (MHz)"
-      },
-      {
-        "name": "rabi_phase",
-        "description": "Rabi oscillation phase (a.u.)"
-      },
-      {
-        "name": "rabi_offset",
-        "description": "Rabi oscillation offset (a.u.)"
-      },
-      {
-        "name": "rabi_angle",
-        "description": "Rabi angle (in degree) (degree)"
-      },
-      {
-        "name": "rabi_noise",
-        "description": "Rabi oscillation noise (a.u.)"
-      },
-      {
-        "name": "rabi_distance",
-        "description": "Rabi distance (a.u.)"
-      },
-      {
-        "name": "rabi_reference_phase",
-        "description": "Rabi reference phase (a.u.)"
-      },
-      {
-        "name": "control_amplitude",
-        "description": "Control pulse amplitude (a.u.)"
-      },
-      {
-        "name": "maximum_rabi_frequency",
-        "description": "Maximum Rabi frequency per unit control amplitude (MHz/a.u.)"
-      }
-    ],
-    "analysis_guide": [
-      "Assess the oscillation contrast and fit quality (R²).",
-      "Verify Rabi frequency is consistent with the drive amplitude setting.",
-      "Check the decay envelope – rapid decay indicates decoherence or heating.",
-      "Look for beating patterns that would indicate TLS coupling.",
-      "Compare with recent history for drift in drive calibration."
-    ],
-    "prerequisites": [
-      "CheckQubitFrequency",
-      "CheckReadoutFrequency"
-    ],
-    "images": [
-      {
-        "alt_text": "Rabi oscillation",
-        "relative_path": "./0.png",
-        "section": "expected result"
-      }
-    ],
-    "related_context": [
-      {
-        "type": "history",
-        "params": [],
-        "last_n": 5
-      }
-    ]
-  },
-  "CheckRamsey": {
-    "name": "CheckRamsey",
-    "summary": "Measures T2* (free-induction) dephasing time and fine-tunes qubit frequency via Ramsey fringes.",
-    "what_it_measures": "T2* dephasing time and residual detuning from the drive frequency.",
-    "physical_principle": "X/2 – free evolution τ – X/2 (or Y/2), then measure. Fringes oscillate at the detuning Δf; envelope decays as exp(-τ/T2*).",
-    "expected_result": {
-      "description": "Damped cosine: oscillation frequency = detuning Δf, decay constant = T2*. If Δf=0, monotonic decay.",
-      "result_type": "oscillation",
-      "x_axis": "Free evolution time τ (μs)",
-      "y_axis": "P(|1⟩)",
-      "z_axis": "",
-      "fit_model": "A * cos(2π·Δf·τ + φ) * exp(-τ/T2*) + B",
-      "typical_range": "10–80 μs for fixed-frequency transmons",
-      "good_visual": "clear oscillation fringes with smooth exponential envelope"
-    },
-    "evaluation_criteria": "T2* should satisfy T2* ≤ T2_echo. Fringe frequency should match the intended detuning. Fit quality and fringe visibility should be high.",
-    "check_questions": [
-      "Are the Ramsey fringes clearly visible with good contrast?",
-      "Does the fringe frequency match the intended detuning?",
-      "Is T2* consistent with the T2_echo measurement (T2* ≤ T2_echo)?"
-    ],
-    "failure_modes": [
-      {
-        "severity": "critical",
-        "description": "T2* << T2_echo",
-        "cause": "dominated by low-frequency noise (1/f flux noise, charge noise)",
-        "visual": "rapid fringe decay, few oscillation periods visible",
-        "next_action": "investigate low-frequency noise sources, check shielding"
-      },
-      {
-        "severity": "warning",
-        "description": "No visible fringes",
-        "cause": "detuning too small or T2* extremely short",
-        "visual": "flat or monotonically decaying signal",
-        "next_action": "add artificial detuning (1–5 MHz) for clearer fringes"
-      },
-      {
-        "severity": "warning",
-        "description": "Fringe frequency drift",
-        "cause": "qubit frequency unstable (TLS, thermal)",
-        "visual": "inconsistent fringe spacing, poor fit",
-        "next_action": "repeat measurement, check for TLS coupling"
-      }
-    ],
-    "tips": [
-      "Ramsey with artificial detuning (Δf ~ 1–5 MHz) gives clearer fringes for fitting.",
-      "Second-axis (Y/2) Ramsey separates detuning direction (positive vs negative).",
-      "If T2* improves dramatically with echo, the dominant noise is low-frequency and potentially fixable."
-    ],
-    "output_parameters_info": [
-      {
-        "name": "ramsey_frequency",
-        "description": "Ramsey oscillation frequency (MHz)"
-      },
-      {
-        "name": "qubit_frequency",
-        "description": "Qubit bare frequency (GHz)"
-      },
-      {
-        "name": "t2_star",
-        "description": "T2* time (μs)"
-      }
-    ],
-    "analysis_guide": [
-      "Check fringe visibility and fit quality (R²).",
-      "Verify the extracted detuning matches the intended value.",
-      "Compare T2* with T2_echo to quantify low-frequency noise contribution.",
-      "Review recent history for frequency drift (changing detuning).",
-      "If T2* is very short, assess whether low-frequency noise mitigation is needed."
-    ],
-    "prerequisites": [
-      "CheckQubitFrequency",
-      "CheckT1"
-    ],
-    "images": [
-      {
-        "alt_text": "X-basis Ramsey fringe",
-        "relative_path": "./x_fringe.png",
-        "section": "expected result"
-      },
-      {
-        "alt_text": "Y-basis Ramsey fringe",
-        "relative_path": "./y_fringe.png",
-        "section": "expected result"
-      },
-      {
-        "alt_text": "Ramsey interference in XY plane",
-        "relative_path": "./xy_spiral.png",
-        "section": "expected result"
-      }
-    ],
-    "related_context": [
-      {
-        "type": "history",
-        "params": [],
-        "last_n": 5
-      },
-      {
-        "type": "neighbor_qubits",
-        "params": [
-          "frequency"
-        ],
-        "last_n": 5
-      }
-    ]
-  },
   "CheckReadoutAmplitude": {
     "name": "CheckReadoutAmplitude",
     "summary": "Optimizes readout pulse amplitude by sweeping amplitude and measuring signal-to-noise ratio.",
@@ -1503,77 +994,6 @@
     "prerequisites": [
       "CheckResonatorSpectroscopy or CheckResonatorFrequencies"
     ],
-    "images": [],
-    "related_context": [
-      {
-        "type": "history",
-        "params": [],
-        "last_n": 5
-      }
-    ]
-  },
-  "CheckReadoutFrequency": {
-    "name": "CheckReadoutFrequency",
-    "summary": "Calibrates the readout resonator frequency for optimal state discrimination.",
-    "what_it_measures": "Readout resonator frequency – the optimal probe frequency for qubit state measurement.",
-    "physical_principle": "Sweep readout tone detuning around the expected resonator frequency while measuring transmission; the optimal point maximizes state-dependent signal.",
-    "expected_result": {
-      "description": "Transmission dip centered at the resonator frequency; optimal readout is near the dispersive-shifted midpoint.",
-      "result_type": "peak_curve",
-      "x_axis": "Readout frequency (GHz)",
-      "y_axis": "Transmission amplitude",
-      "z_axis": "",
-      "fit_model": "",
-      "typical_range": "",
-      "good_visual": "clear transmission dip with well-defined minimum, symmetric line shape"
-    },
-    "evaluation_criteria": "Frequency should be within expected range of design; clear transmission feature with good signal-to-noise ratio.",
-    "check_questions": [
-      "Is the resonator frequency within ±5 MHz of design target?",
-      "Is the transmission feature clear with good SNR?",
-      "Are there any parasitic modes or spurious features?"
-    ],
-    "failure_modes": [
-      {
-        "severity": "warning",
-        "description": "Resonator shifted from design",
-        "cause": "qubit-induced dispersive shift not accounted for",
-        "visual": "transmission dip shifted from expected position",
-        "next_action": "run after qubit frequency calibration, re-center readout"
-      },
-      {
-        "severity": "warning",
-        "description": "Multiple modes visible",
-        "cause": "parasitic resonances or box modes",
-        "visual": "multiple dips in transmission spectrum",
-        "next_action": "identify which mode is the target resonator"
-      },
-      {
-        "severity": "info",
-        "description": "Drift between cooldowns",
-        "cause": "thermal contraction or connector issues",
-        "visual": "systematic frequency shift from previous cooldown",
-        "next_action": "recalibrate after each cooldown"
-      }
-    ],
-    "tips": [
-      "Run after qubit frequency calibration since dispersive shift depends on qubit-resonator detuning.",
-      "If readout fidelity is poor despite good frequency, check dispersive shift magnitude.",
-      "Compare with broadband resonator scan for consistency."
-    ],
-    "output_parameters_info": [
-      {
-        "name": "readout_frequency",
-        "description": "Readout frequency (GHz)"
-      }
-    ],
-    "analysis_guide": [
-      "Verify the readout frequency is near the design target.",
-      "Check for parasitic modes or spurious features in the spectrum.",
-      "Compare with previous cooldown values for drift assessment.",
-      "If shifted significantly, assess impact on readout fidelity."
-    ],
-    "prerequisites": [],
     "images": [],
     "related_context": [
       {
@@ -1818,473 +1238,69 @@
       }
     ]
   },
-  "CheckSkew": {
-    "name": "CheckSkew",
-    "summary": "Measures and corrects time skew between multiple control boxes.",
-    "what_it_measures": "Inter-box timing skew – measures the relative timing offsets (clock skew) between different control boxes and applies correction to synchronize their clocks.",
-    "physical_principle": "Clock synchronization: multiple control boxes share a common reference clock, but signal propagation delays and internal clock distribution cause timing offsets between boxes. This task measures the relative timing by sending synchronized pulses and measuring arrival time differences, then applies skew correction to align all boxes to a common time reference.",
+  "CheckDRAGHPIPulse": {
+    "name": "CheckDRAGHPIPulse",
+    "summary": "Validates DRAG-corrected π/2 pulse quality for leakage suppression.",
+    "what_it_measures": "Gate fidelity of DRAG-corrected X90 pulse.",
+    "physical_principle": "Same DRAG principle as π pulse but for half rotation. Critical for quantum algorithms using superposition states.",
     "expected_result": {
-      "description": "Measured skew values for each box pair, with corrections applied to synchronize timing.",
-      "result_type": "timing_measurement",
-      "x_axis": "Box pairs",
-      "y_axis": "Skew (ns)",
-      "z_axis": "",
-      "fit_model": "",
-      "typical_range": "",
-      "good_visual": "small, well-defined skew values with successful correction applied"
-    },
-    "evaluation_criteria": "Skew values should be measurable and correctable. After correction, residual skew should be within the system's timing resolution.",
-    "check_questions": [
-      "Are skew values measurable for all box pairs?",
-      "Are the measured skew values within a correctable range?",
-      "Are the skew values consistent with previous measurements?"
-    ],
-    "failure_modes": [
-      {
-        "severity": "critical",
-        "description": "Skew measurement fails",
-        "cause": "box not synchronized to reference clock, hardware fault",
-        "visual": "",
-        "next_action": "verify reference clock distribution, check box connectivity"
-      },
-      {
-        "severity": "warning",
-        "description": "Large skew values",
-        "cause": "cable length mismatch, clock distribution issue",
-        "visual": "skew values larger than typical range",
-        "next_action": "check clock distribution hardware and cable routing"
-      },
-      {
-        "severity": "warning",
-        "description": "Inconsistent skew across measurements",
-        "cause": "unstable clock or intermittent connection",
-        "visual": "skew values vary significantly between runs",
-        "next_action": "investigate clock stability, check connectors"
-      }
-    ],
-    "tips": [
-      "Run after LinkUp and before any multi-qubit calibration tasks.",
-      "The muxes parameter selects which MUXes to synchronize; default covers most standard configurations.",
-      "Skew correction is essential for two-qubit gate calibration accuracy.",
-      "Compare skew values across runs to detect clock drift."
-    ],
-    "output_parameters_info": [],
-    "analysis_guide": [
-      "Review estimated skew values for each box.",
-      "Verify skew values are within expected range.",
-      "Check the skew plot for any outliers.",
-      "Confirm correction was applied successfully.",
-      "Compare with previous measurements for drift detection."
-    ],
-    "prerequisites": [
-      "LinkUp",
-      "Configure"
-    ],
-    "images": [],
-    "related_context": [
-      {
-        "type": "history",
-        "params": [],
-        "last_n": 5
-      }
-    ]
-  },
-  "CheckStatus": {
-    "name": "CheckStatus",
-    "summary": "Checks the status of the experiment and control hardware.",
-    "what_it_measures": "Overall experiment status – verifies that the control system and hardware are in a healthy, operational state.",
-    "physical_principle": "Diagnostic query to the experiment controller. No physical measurement is performed; the task polls the system for readiness and error conditions.",
-    "expected_result": {
-      "description": "A status report confirming all subsystems are operational.",
-      "result_type": "status_report",
-      "x_axis": "",
-      "y_axis": "",
-      "z_axis": "",
-      "fit_model": "",
-      "typical_range": "",
-      "good_visual": "all subsystems report healthy status with no errors"
-    },
-    "evaluation_criteria": "All subsystems should report a healthy state. Any error or warning indicates a hardware or configuration issue that must be resolved before proceeding with calibration.",
-    "check_questions": [
-      "Do all subsystems report a healthy status?",
-      "Are there any error or warning messages?"
-    ],
-    "failure_modes": [
-      {
-        "severity": "critical",
-        "description": "Subsystem not responding",
-        "cause": "hardware disconnected or powered off",
-        "visual": "",
-        "next_action": "check physical connections and power supply"
-      },
-      {
-        "severity": "critical",
-        "description": "Error status reported",
-        "cause": "hardware fault or misconfiguration",
-        "visual": "",
-        "next_action": "review error details and consult hardware documentation"
-      }
-    ],
-    "tips": [
-      "Run this task first before any calibration to catch hardware issues early.",
-      "If status check fails, resolve all issues before proceeding."
-    ],
-    "output_parameters_info": [],
-    "analysis_guide": [
-      "Review the status output for any errors or warnings.",
-      "If errors exist, address them before running further tasks.",
-      "Confirm all control and readout lines are operational."
-    ],
-    "prerequisites": [],
-    "images": [],
-    "related_context": [
-      {
-        "type": "history",
-        "params": [],
-        "last_n": 5
-      }
-    ]
-  },
-  "CheckT1": {
-    "name": "CheckT1",
-    "summary": "Measures T1 energy-relaxation time via exponential decay of the excited state.",
-    "what_it_measures": "T1 relaxation time – how long the qubit retains energy in the |1⟩ state.",
-    "physical_principle": "Prepare |1⟩, wait variable delay τ, measure P(|1⟩). Fit exponential decay exp(-τ/T1).",
-    "expected_result": {
-      "description": "Exponential decay from ~1 to ~0 as delay increases; single time constant T1.",
-      "result_type": "decay_curve",
-      "x_axis": "Delay τ (μs)",
+      "description": "Correct superposition state after single pulse; oscillation under repeated application.",
+      "result_type": "oscillation",
+      "x_axis": "Number of DRAG π/2 pulse repetitions",
       "y_axis": "P(|1⟩)",
       "z_axis": "",
-      "fit_model": "A * exp(-τ/T1) + B",
-      "typical_range": "20–200 μs for fixed-frequency transmons",
-      "good_visual": "smooth monotonic decay with clear single-exponential shape, low residuals"
-    },
-    "evaluation_criteria": "Exponential fit should have high R²; T1 should be stable across repeated measurements and consistent with chip design expectations. Compare with T2_echo to check if decoherence is T1-limited (T2 ≈ 2*T1).",
-    "check_questions": [
-      "Is the decay clearly single-exponential with R² > 0.95?",
-      "Is T1 consistent with recent measurements (within 20% variation)?",
-      "Is T1 long enough to support the target gate fidelity?"
-    ],
-    "failure_modes": [
-      {
-        "severity": "critical",
-        "description": "Short T1 (<20 μs)",
-        "cause": "TLS coupling, dielectric loss, or Purcell decay",
-        "visual": "rapid decay, curve flattens well before maximum delay",
-        "next_action": "check TLS defects near qubit frequency, inspect packaging and substrate"
-      },
-      {
-        "severity": "warning",
-        "description": "Non-exponential decay",
-        "cause": "multi-level leakage or readout-induced transitions",
-        "visual": "shoulder or kink in decay curve, poor single-exponential fit",
-        "next_action": "check for leakage to |2⟩, verify readout is QND"
-      },
-      {
-        "severity": "warning",
-        "description": "Large scatter between qubits",
-        "cause": "fabrication non-uniformity or localized defects",
-        "visual": "T1 values vary widely across chip",
-        "next_action": "compare with spatial map to identify defect regions"
-      }
-    ],
-    "tips": [
-      "If T1 fluctuates between runs, suspect TLS defects near the qubit frequency.",
-      "Compare with T2_echo: if T2 ≈ 2*T1, decoherence is T1-limited.",
-      "Check if readout power is too high (may cause residual excitation)."
-    ],
-    "output_parameters_info": [
-      {
-        "name": "t1",
-        "description": "T1 time (μs)"
-      }
-    ],
-    "analysis_guide": [
-      "Check the exponential fit quality (R²) and residual pattern.",
-      "Compare the extracted T1 with recent history for drift or instability.",
-      "Compare T1 with T2_echo: if T2 ≈ 2*T1, the qubit is T1-limited.",
-      "Check neighbor qubit T1 values for spatial correlation of defects.",
-      "If T1 is anomalously short, consider TLS, Purcell, or dielectric loss mechanisms."
-    ],
-    "prerequisites": [
-      "CheckQubitFrequency",
-      "CheckReadoutFrequency"
-    ],
-    "images": [
-      {
-        "alt_text": "T1 exponential decay curve",
-        "relative_path": "./0.png",
-        "section": "expected result"
-      }
-    ],
-    "related_context": [
-      {
-        "type": "history",
-        "params": [],
-        "last_n": 5
-      },
-      {
-        "type": "neighbor_qubits",
-        "params": [
-          "frequency",
-          "t1"
-        ],
-        "last_n": 5
-      }
-    ]
-  },
-  "CheckT2Echo": {
-    "name": "CheckT2Echo",
-    "summary": "Measures T2 echo (Hahn echo) coherence time, refocusing low-frequency noise.",
-    "what_it_measures": "T2 echo – phase coherence time after a Hahn-echo refocusing pulse.",
-    "physical_principle": "X/2 – wait τ/2 – π – wait τ/2 – X/2, then measure. Refocuses static and slow noise, revealing intrinsic dephasing.",
-    "expected_result": {
-      "description": "Exponential (or Gaussian) decay envelope of echo amplitude vs total delay τ.",
-      "result_type": "decay_curve",
-      "x_axis": "Total delay τ (μs)",
-      "y_axis": "Echo amplitude",
-      "z_axis": "",
-      "fit_model": "A * exp(-(τ/T2_echo)^n) + B, n=1 or 2",
-      "typical_range": "30–300 μs for fixed-frequency transmons",
-      "good_visual": "smooth decay envelope with clear time constant, low residuals"
-    },
-    "evaluation_criteria": "T2_echo should satisfy T2_echo ≤ 2*T1. Compare with T2* (Ramsey) to quantify low-frequency noise contribution. Fit quality should be high.",
-    "check_questions": [
-      "Is T2_echo consistent with the 2*T1 limit?",
-      "Is the decay well-fitted by a single exponential or Gaussian?",
-      "Is T2_echo stable compared to recent measurements?"
-    ],
-    "failure_modes": [
-      {
-        "severity": "critical",
-        "description": "T2_echo << 2*T1",
-        "cause": "residual high-frequency noise not refocused by single echo",
-        "visual": "decay much faster than expected from T1 measurement",
-        "next_action": "try CPMG (multiple echoes) to identify noise spectrum"
-      },
-      {
-        "severity": "warning",
-        "description": "Non-exponential decay",
-        "cause": "1/f noise spectrum or multiple noise sources",
-        "visual": "decay does not fit single exponential, stretched or compressed shape",
-        "next_action": "try stretched exponential fit, investigate noise spectrum"
-      },
-      {
-        "severity": "warning",
-        "description": "T2_echo > 2*T1",
-        "cause": "measurement artifact; fitting or readout calibration issue",
-        "visual": "decay appears slower than physically expected",
-        "next_action": "verify T1 measurement, check readout calibration"
-      }
-    ],
-    "tips": [
-      "Compare T2_echo with T2* (Ramsey) to quantify low-frequency noise contribution.",
-      "If T2_echo is much shorter than 2*T1, try CPMG (multiple echoes) to identify noise spectrum.",
-      "Ensure π pulse is well-calibrated; a bad refocusing pulse degrades echo amplitude."
-    ],
-    "output_parameters_info": [
-      {
-        "name": "t2_echo",
-        "description": "T2 echo time (μs)"
-      }
-    ],
-    "analysis_guide": [
-      "Check the decay fit quality (R²) and identify the decay model (exponential vs Gaussian).",
-      "Compare T2_echo with 2*T1 to assess the noise regime.",
-      "Compare T2_echo with T2* to quantify the low-frequency noise contribution.",
-      "Review recent history for trends or instability.",
-      "If T2_echo << 2*T1, investigate high-frequency noise sources."
-    ],
-    "prerequisites": [
-      "CheckT1",
-      "CheckQubitFrequency"
-    ],
-    "images": [
-      {
-        "alt_text": "T2 echo decay curve",
-        "relative_path": "./0.png",
-        "section": "expected result"
-      }
-    ],
-    "related_context": [
-      {
-        "type": "history",
-        "params": [],
-        "last_n": 5
-      },
-      {
-        "type": "neighbor_qubits",
-        "params": [
-          "frequency",
-          "t1",
-          "t2_echo"
-        ],
-        "last_n": 5
-      }
-    ]
-  },
-  "CheckZX90": {
-    "name": "CheckZX90",
-    "summary": "Validates ZX90 two-qubit gate fidelity via process or state fidelity measurement.",
-    "what_it_measures": "ZX90 gate fidelity – closeness to ideal CNOT-equivalent operation.",
-    "physical_principle": "Apply calibrated ZX90 gate and measure output state fidelity against ideal; may use interleaved RB or QPT.",
-    "expected_result": {
-      "description": "Gate fidelity metric; conditional rotation of target by control state.",
-      "result_type": "scalar_metric",
-      "x_axis": "",
-      "y_axis": "",
-      "z_axis": "",
       "fit_model": "",
       "typical_range": "",
-      "good_visual": "high fidelity value with consistent results across repeated measurements"
+      "good_visual": "oscillation with period 4 and very slow contrast decay, better than non-DRAG version"
     },
-    "evaluation_criteria": "ZX90 fidelity should meet targets; both control states should produce correct conditional rotation.",
+    "evaluation_criteria": "Gate fidelity should exceed the non-DRAG version; leakage should be minimal.",
     "check_questions": [
-      "Is the ZX90 fidelity meeting the target?",
-      "Are the results consistent for both control qubit states (|0⟩ and |1⟩)?",
-      "Is the fidelity limited by coherence or by gate calibration?"
+      "Is the gate fidelity >99.5%?",
+      "Is the leakage to |2⟩ <0.1%?",
+      "Is the DRAG version better than the non-DRAG CheckHPIPulse?"
     ],
     "failure_modes": [
       {
         "severity": "critical",
-        "description": "Coherence-limited fidelity",
-        "cause": "T1/T2 of either qubit too short for gate duration",
-        "visual": "fidelity degrades with gate length, consistent with decoherence",
-        "next_action": "improve coherence or shorten gate"
+        "description": "DRAG beta mis-tuned",
+        "cause": "beta parameter off, causing phase or leakage errors",
+        "visual": "distorted oscillation pattern or fast contrast decay",
+        "next_action": "rescan DRAG beta parameter"
       },
       {
         "severity": "warning",
-        "description": "Residual ZZ coupling",
-        "cause": "static coupling causes unwanted phase errors",
-        "visual": "phase error correlated with idle time between gates",
-        "next_action": "implement ZZ cancellation or echo sequences"
+        "description": "Amplitude off",
+        "cause": "does not produce exact π/2 rotation",
+        "visual": "oscillation period deviates from 4",
+        "next_action": "recalibrate amplitude with CreateDRAGHPIPulse"
       },
       {
-        "severity": "warning",
-        "description": "CR amplitude drift",
-        "cause": "gate angle deviates from 90° due to parameter drift",
-        "visual": "systematic rotation error in output state",
-        "next_action": "re-run CreateZX90 with fresh CR calibration"
+        "severity": "info",
+        "description": "Decoherence during measurement",
+        "cause": "T1/T2 corruption of validation signal",
+        "visual": "exponential decay independent of gate quality",
+        "next_action": "reduce measurement length, compare with coherence times"
       }
     ],
     "tips": [
-      "Compare with interleaved RB for gate-specific error rate.",
-      "Check both control states (|0⟩ and |1⟩) independently.",
-      "If fidelity is poor, re-run CreateZX90 with fresh CR calibration."
+      "Compare with non-DRAG X90 to verify improvement.",
+      "Run after DRAG π pulse is validated since they share parameters.",
+      "Check phase accuracy with tomography if fidelity is borderline."
     ],
     "output_parameters_info": [],
     "analysis_guide": [
-      "Check the ZX90 fidelity against the target threshold.",
-      "Determine if the fidelity is coherence-limited or calibration-limited.",
-      "Compare with single-qubit gate fidelities to isolate two-qubit gate contribution.",
-      "If calibration-limited, recommend CreateZX90 recalibration.",
-      "If coherence-limited, assess T1/T2 of both qubits."
+      "Compare gate fidelity with the non-DRAG CheckHPIPulse result.",
+      "Verify oscillation period is 4 (correct rotation angle).",
+      "Check for leakage signatures in the decay.",
+      "If fidelity is borderline, recommend tomographic verification."
     ],
     "prerequisites": [
-      "CreateZX90",
-      "CheckPIPulse",
+      "CreateDRAGHPIPulse",
       "CheckHPIPulse"
     ],
     "images": [
       {
-        "alt_text": "ZX90 control qubit sweep",
-        "relative_path": "./control.png",
-        "section": "expected result"
-      },
-      {
-        "alt_text": "ZX90 target qubit sweep",
-        "relative_path": "./target.png",
-        "section": "expected result"
-      }
-    ],
-    "related_context": [
-      {
-        "type": "history",
-        "params": [],
-        "last_n": 5
-      },
-      {
-        "type": "coupling",
-        "params": [
-          "zx_rate",
-          "coupling_strength"
-        ],
-        "last_n": 5
-      }
-    ]
-  },
-  "ChevronPattern": {
-    "name": "ChevronPattern",
-    "summary": "Measures qubit response vs frequency and time to map the chevron pattern.",
-    "what_it_measures": "Chevron pattern – 2D map of qubit excitation vs drive detuning and pulse duration.",
-    "physical_principle": "Drive at various frequency detunings and durations; on-resonance gives Rabi oscillations, off-resonance gives faster but smaller oscillations, forming a V-shaped pattern.",
-    "expected_result": {
-      "description": "2D color plot with chevron-shaped fringes; vertex at zero detuning (qubit frequency). Fringe spacing increases with detuning.",
-      "result_type": "2d_map",
-      "x_axis": "Drive detuning (MHz)",
-      "y_axis": "Pulse duration (ns)",
-      "z_axis": "P(|1⟩)",
-      "fit_model": "",
-      "typical_range": "",
-      "good_visual": "symmetric V-shaped chevron fringes with clear vertex at zero detuning, high contrast"
-    },
-    "evaluation_criteria": "Clear fringe visibility with identifiable chevron vertex; vertex position should be consistent with qubit frequency.",
-    "check_questions": [
-      "Are the chevron fringes clearly visible with good contrast?",
-      "Is the chevron vertex identifiable to <1 MHz precision?",
-      "Is the pattern symmetric about zero detuning?"
-    ],
-    "failure_modes": [
-      {
-        "severity": "warning",
-        "description": "Low contrast",
-        "cause": "insufficient drive power or poor readout fidelity",
-        "visual": "faint or washed-out fringes",
-        "next_action": "increase drive amplitude or number of shots"
-      },
-      {
-        "severity": "warning",
-        "description": "Smeared pattern",
-        "cause": "frequency drift during measurement",
-        "visual": "blurred fringes, especially at long durations",
-        "next_action": "check frequency stability, reduce measurement time"
-      },
-      {
-        "severity": "info",
-        "description": "Asymmetric chevron",
-        "cause": "higher-order transitions or AC Stark shift",
-        "visual": "fringes asymmetric about zero detuning",
-        "next_action": "check for multi-level effects, reduce drive power"
-      }
-    ],
-    "tips": [
-      "Use the chevron vertex to precisely identify qubit frequency before fine calibration.",
-      "The fringe period at zero detuning gives the Rabi frequency.",
-      "If fringes are faint, increase drive amplitude or number of shots."
-    ],
-    "output_parameters_info": [
-      {
-        "name": "qubit_frequency",
-        "description": "Qubit bare frequency (GHz)"
-      },
-      {
-        "name": "readout_amplitude",
-        "description": "Optimal readout amplitude from SNR threshold (a.u.)"
-      }
-    ],
-    "analysis_guide": [
-      "Identify the chevron vertex position for frequency determination.",
-      "Check fringe contrast and symmetry.",
-      "Extract Rabi frequency from the fringe period at zero detuning.",
-      "If asymmetric, consider multi-level effects."
-    ],
-    "prerequisites": [
-      "CheckReadoutFrequency"
-    ],
-    "images": [
-      {
-        "alt_text": "Chevron pattern",
+        "alt_text": "DRAG HPI pulse error amplification",
         "relative_path": "./0.png",
         "section": "expected result"
       }
@@ -2297,64 +1313,224 @@
       }
     ]
   },
-  "Configure": {
-    "name": "Configure",
-    "summary": "Loads and applies the full calibration state configuration to the control boxes.",
-    "what_it_measures": "No measurement is performed. This task loads the saved calibration state (frequencies, amplitudes, timing parameters) from configuration files and pushes them to all control boxes.",
-    "physical_principle": "No physical measurement. This is a state management task that restores a previously saved calibration configuration to the hardware, ensuring all control parameters are set to known values.",
+  "CheckDRAGPIPulse": {
+    "name": "CheckDRAGPIPulse",
+    "summary": "Validates DRAG-corrected π pulse quality to suppress leakage to |2⟩.",
+    "what_it_measures": "Gate fidelity of DRAG-corrected X180 pulse.",
+    "physical_principle": "DRAG adds a derivative quadrature component to suppress leakage during fast gates. Validate by repeated pulse application.",
     "expected_result": {
-      "description": "Full calibration state loaded and pushed to all control boxes successfully.",
-      "result_type": "configuration",
-      "x_axis": "",
-      "y_axis": "",
+      "description": "Population oscillation with high contrast under repeated DRAG π pulses.",
+      "result_type": "oscillation",
+      "x_axis": "Number of DRAG π pulse repetitions",
+      "y_axis": "P(|1⟩)",
       "z_axis": "",
       "fit_model": "",
       "typical_range": "",
-      "good_visual": "state loaded and pushed without errors"
+      "good_visual": "sharp 0/1 alternation with very slow contrast decay, better than non-DRAG version"
     },
-    "evaluation_criteria": "State should load and push without errors. All boxes should acknowledge the configuration update.",
+    "evaluation_criteria": "Gate fidelity should exceed the non-DRAG version; leakage to |2⟩ should be minimal.",
     "check_questions": [
-      "Did the state load from configuration files without errors?",
-      "Was the configuration successfully pushed to all boxes?"
+      "Is the gate fidelity >99.5%?",
+      "Is the leakage to |2⟩ <0.1%?",
+      "Is the DRAG version better than the non-DRAG CheckPIPulse?"
     ],
     "failure_modes": [
       {
         "severity": "critical",
-        "description": "Configuration file not found",
-        "cause": "missing or misnamed configuration files",
-        "visual": "",
-        "next_action": "verify config_path and params_path are correct and files exist"
-      },
-      {
-        "severity": "critical",
-        "description": "Push failure",
-        "cause": "hardware communication error or incompatible configuration",
-        "visual": "",
-        "next_action": "check LinkUp status and configuration file compatibility"
+        "description": "DRAG coefficient mis-tuned",
+        "cause": "beta parameter not at optimal value for leakage suppression",
+        "visual": "residual leakage visible as population decay faster than decoherence",
+        "next_action": "rescan DRAG beta parameter"
       },
       {
         "severity": "warning",
-        "description": "Stale configuration",
-        "cause": "configuration files are outdated relative to hardware changes",
-        "visual": "",
-        "next_action": "re-run calibration to generate updated configuration"
+        "description": "Amplitude drift",
+        "cause": "accumulated rotation error from amplitude miscalibration",
+        "visual": "population drift from ideal 0/1 alternation",
+        "next_action": "recalibrate amplitude with CreateDRAGPIPulse"
+      },
+      {
+        "severity": "info",
+        "description": "Anharmonicity too small",
+        "cause": "DRAG correction insufficient for fast gates when anharmonicity is marginal",
+        "visual": "leakage persists despite DRAG optimization",
+        "next_action": "slow down gate, consider alternative pulse shapes"
       }
     ],
     "tips": [
-      "Always run Configure after LinkUp to ensure hardware has the correct calibration state.",
-      "Keep configuration files version-controlled for reproducibility.",
-      "Compare loaded state with expected values after pushing."
+      "Compare error rate with non-DRAG π pulse to quantify improvement.",
+      "If leakage persists, try scanning DRAG beta parameter.",
+      "Ensure anharmonicity is well-characterized before DRAG tuning."
     ],
     "output_parameters_info": [],
     "analysis_guide": [
-      "Verify configuration files exist and are up to date.",
-      "Confirm state was loaded and pushed successfully.",
-      "Consider running CheckStatus after Configure to verify system health."
+      "Compare gate fidelity with the non-DRAG CheckPIPulse result.",
+      "Check for leakage signatures in the decay pattern.",
+      "Verify DRAG beta is at the optimal value.",
+      "If improvement is marginal, consider whether DRAG is necessary for this qubit."
     ],
     "prerequisites": [
-      "LinkUp"
+      "CreateDRAGPIPulse",
+      "CheckPIPulse"
     ],
-    "images": [],
+    "images": [
+      {
+        "alt_text": "DRAG PI pulse error amplification",
+        "relative_path": "./0.png",
+        "section": "expected result"
+      }
+    ],
+    "related_context": [
+      {
+        "type": "history",
+        "params": [],
+        "last_n": 5
+      }
+    ]
+  },
+  "CheckHPIPulse": {
+    "name": "CheckHPIPulse",
+    "summary": "Validates π/2 pulse quality by repeated application and population measurement.",
+    "what_it_measures": "π/2 pulse fidelity – accumulated rotation error over multiple applications.",
+    "physical_principle": "Apply the calibrated π/2 pulse repeatedly; population should cycle through superposition states. Deviation indicates rotation or phase error.",
+    "expected_result": {
+      "description": "Population oscillation with period 4 (four π/2 pulses = full rotation); contrast decay reveals error.",
+      "result_type": "oscillation",
+      "x_axis": "Number of π/2 pulse repetitions",
+      "y_axis": "P(|1⟩)",
+      "z_axis": "",
+      "fit_model": "",
+      "typical_range": "",
+      "good_visual": "clear oscillation with period 4, high contrast maintained over 20+ repetitions"
+    },
+    "evaluation_criteria": "Correct cycling pattern over many repetitions with minimal contrast decay.",
+    "check_questions": [
+      "Does the population cycle with period 4 as expected?",
+      "Is the contrast maintained over 20 repetitions?",
+      "Is the per-gate error rate acceptable?"
+    ],
+    "failure_modes": [
+      {
+        "severity": "critical",
+        "description": "Rotation angle error",
+        "cause": "π/2 pulse amplitude off, population drifts from expected pattern",
+        "visual": "oscillation period deviates from 4, systematic drift",
+        "next_action": "re-run CreateHPIPulse with finer amplitude scan"
+      },
+      {
+        "severity": "warning",
+        "description": "Phase error",
+        "cause": "phase calibration off, visible in tomographic basis",
+        "visual": "pattern distortion not visible in Z-only measurement",
+        "next_action": "check phase calibration, use tomographic validation"
+      },
+      {
+        "severity": "info",
+        "description": "Decoherence during sequence",
+        "cause": "T1/T2 limit useful number of repetitions",
+        "visual": "exponential contrast decay",
+        "next_action": "reduce repetitions, compare with coherence times"
+      }
+    ],
+    "tips": [
+      "If validation fails, re-run CreateHPIPulse or try DRAG correction.",
+      "Compare error rate with CheckPIPulse for consistency.",
+      "Phase errors may require separate X/Y pulse calibration."
+    ],
+    "output_parameters_info": [],
+    "analysis_guide": [
+      "Verify the oscillation period is 4 (four X90 = full rotation).",
+      "Check contrast decay rate to estimate per-gate error.",
+      "Compare with CheckPIPulse error rate for consistency.",
+      "If error is large, recommend recalibration."
+    ],
+    "prerequisites": [
+      "CreateHPIPulse",
+      "CheckRabi"
+    ],
+    "images": [
+      {
+        "alt_text": "HPI pulse error amplification",
+        "relative_path": "./0.png",
+        "section": "expected result"
+      }
+    ],
+    "related_context": [
+      {
+        "type": "history",
+        "params": [],
+        "last_n": 5
+      }
+    ]
+  },
+  "CheckPIPulse": {
+    "name": "CheckPIPulse",
+    "summary": "Validates π pulse quality by repeated application and population measurement.",
+    "what_it_measures": "π pulse fidelity – accumulated error over multiple applications.",
+    "physical_principle": "Apply the calibrated π pulse repeatedly N times; odd repetitions should give |1⟩, even should give |0⟩. Deviation indicates rotation error.",
+    "expected_result": {
+      "description": "Population oscillation between 0 and 1 across repetitions; contrast decay reveals error accumulation.",
+      "result_type": "oscillation",
+      "x_axis": "Number of π pulse repetitions",
+      "y_axis": "P(|1⟩)",
+      "z_axis": "",
+      "fit_model": "",
+      "typical_range": "",
+      "good_visual": "sharp alternation between 0 and 1 with minimal contrast decay over 20+ repetitions"
+    },
+    "evaluation_criteria": "Contrast should remain high over many repetitions; per-gate error rate extracted from decay should be low.",
+    "check_questions": [
+      "Is the contrast >99% over 20 repetitions?",
+      "Is the decay envelope slow (small per-gate error)?",
+      "Is there evidence of leakage (non-oscillatory decay)?"
+    ],
+    "failure_modes": [
+      {
+        "severity": "critical",
+        "description": "Amplitude error accumulation",
+        "cause": "π pulse amplitude slightly off, error compounds with repetitions",
+        "visual": "population drifts from ideal 0/1 alternation pattern",
+        "next_action": "re-run CreatePIPulse with finer amplitude scan"
+      },
+      {
+        "severity": "warning",
+        "description": "Leakage to |2⟩",
+        "cause": "pulse too fast relative to anharmonicity, insufficient DRAG",
+        "visual": "population decay envelope on oscillation (not just amplitude error)",
+        "next_action": "try DRAG correction, slow down pulse"
+      },
+      {
+        "severity": "info",
+        "description": "Decoherence during measurement",
+        "cause": "T1/T2 limit the number of useful repetitions",
+        "visual": "exponential decay of contrast independent of gate error",
+        "next_action": "reduce number of repetitions, compare with T1 timescale"
+      }
+    ],
+    "tips": [
+      "If contrast decays rapidly, re-run CreatePIPulse with finer amplitude scan.",
+      "Compare with CheckDRAGPIPulse to see if DRAG correction improves fidelity.",
+      "The decay rate gives an estimate of per-gate error."
+    ],
+    "output_parameters_info": [],
+    "analysis_guide": [
+      "Check the oscillation contrast over 20 repetitions.",
+      "Separate decoherence-induced decay from gate-error-induced decay.",
+      "Estimate per-gate error from the contrast decay rate.",
+      "If error is too large, recommend recalibration with CreatePIPulse.",
+      "Compare with DRAG version for improvement assessment."
+    ],
+    "prerequisites": [
+      "CreatePIPulse",
+      "CheckRabi"
+    ],
+    "images": [
+      {
+        "alt_text": "PI pulse error amplification",
+        "relative_path": "./0.png",
+        "section": "expected result"
+      }
+    ],
     "related_context": [
       {
         "type": "history",
@@ -2707,6 +1883,1445 @@
       }
     ]
   },
+  "CheckDispersiveShift": {
+    "name": "CheckDispersiveShift",
+    "summary": "Measures dispersive shift (χ) between qubit and readout resonator.",
+    "what_it_measures": "Dispersive shift (χ) – the frequency shift of the resonator conditioned on the qubit state.",
+    "physical_principle": "Measure resonator spectrum with qubit in |0⟩ and |1⟩; in the dispersive regime the resonator shifts by 2χ, enabling QND readout.",
+    "expected_result": {
+      "description": "Two transmission peaks/dips separated by 2χ; one for each qubit state.",
+      "result_type": "peak_curve",
+      "x_axis": "Readout frequency (GHz)",
+      "y_axis": "Transmission amplitude",
+      "z_axis": "",
+      "fit_model": "",
+      "typical_range": "",
+      "good_visual": "two clearly separated transmission dips, one per qubit state, with separation >> linewidth"
+    },
+    "evaluation_criteria": "The dispersive shift 2χ should exceed the resonator linewidth κ for state discrimination. Typical 2χ > 1 MHz for reliable readout.",
+    "check_questions": [
+      "Is 2χ clearly larger than the resonator linewidth κ?",
+      "Are both qubit-state-dependent peaks clearly resolved?",
+      "Is 2χ within the expected range for this qubit-resonator coupling?"
+    ],
+    "failure_modes": [
+      {
+        "severity": "critical",
+        "description": "Insufficient dispersive shift (2χ < κ)",
+        "cause": "weak qubit-resonator coupling or large detuning",
+        "visual": "overlapping or barely separated peaks",
+        "next_action": "readout fidelity will be fundamentally limited, check coupling design"
+      },
+      {
+        "severity": "warning",
+        "description": "Purcell-limited T1",
+        "cause": "large χ degrades T1 via Purcell decay",
+        "visual": "T1 shorter than expected given other loss mechanisms",
+        "next_action": "check Purcell filter design, balance χ vs T1 tradeoff"
+      },
+      {
+        "severity": "warning",
+        "description": "Overlapping peaks",
+        "cause": "χ < κ/2 makes states unresolvable",
+        "visual": "single broad peak instead of two separated features",
+        "next_action": "optimize readout frequency and power"
+      }
+    ],
+    "tips": [
+      "Use the midpoint between the two peaks as optimal readout frequency.",
+      "If 2χ is too small, readout fidelity will be fundamentally limited.",
+      "Monitor χ over time; shifts indicate qubit frequency drift."
+    ],
+    "output_parameters_info": [
+      {
+        "name": "optimal_readout_frequency",
+        "description": "Optimal Readout Frequency (GHz)"
+      },
+      {
+        "name": "dispersive_shift",
+        "description": "Dispersive shift (MHz)"
+      }
+    ],
+    "analysis_guide": [
+      "Identify the two qubit-state-dependent resonator peaks.",
+      "Measure the separation 2χ and compare with resonator linewidth κ.",
+      "Verify 2χ is sufficient for the required readout fidelity.",
+      "If χ has changed, check for qubit frequency drift."
+    ],
+    "prerequisites": [
+      "CheckQubitFrequency",
+      "CheckReadoutFrequency"
+    ],
+    "images": [],
+    "related_context": [
+      {
+        "type": "history",
+        "params": [],
+        "last_n": 5
+      }
+    ]
+  },
+  "CheckOptimalReadoutAmplitude": {
+    "name": "CheckOptimalReadoutAmplitude",
+    "summary": "Optimizes readout pulse amplitude for best state discrimination.",
+    "what_it_measures": "Optimal readout drive amplitude – the power level that maximizes |0⟩/|1⟩ discrimination.",
+    "physical_principle": "Sweep readout amplitude while measuring state separation; too low gives poor SNR, too high causes measurement-induced transitions (QND violation).",
+    "expected_result": {
+      "description": "Separation/fidelity vs amplitude: rises from noise floor, peaks at optimum, may decrease at high power.",
+      "result_type": "peak_curve",
+      "x_axis": "Readout amplitude (a.u.)",
+      "y_axis": "State separation or readout fidelity",
+      "z_axis": "",
+      "fit_model": "",
+      "typical_range": "",
+      "good_visual": "clear peak in fidelity vs amplitude curve with well-defined optimum"
+    },
+    "evaluation_criteria": "State separation should be high at optimal amplitude; amplitude should be in the linear regime below QND violation threshold.",
+    "check_questions": [
+      "Is there a clear optimum in the fidelity vs amplitude curve?",
+      "Is the optimal amplitude in the linear regime (not too high)?",
+      "Is the state separation >95% at the optimal point?"
+    ],
+    "failure_modes": [
+      {
+        "severity": "warning",
+        "description": "Amplitude too low",
+        "cause": "insufficient SNR for state discrimination",
+        "visual": "IQ blobs overlap significantly, poor fidelity",
+        "next_action": "increase readout amplitude or integration time"
+      },
+      {
+        "severity": "critical",
+        "description": "Amplitude too high",
+        "cause": "measurement-induced transitions, qubit heating",
+        "visual": "fidelity decreases at high amplitudes, QND violation",
+        "next_action": "reduce amplitude, check for non-QND effects"
+      },
+      {
+        "severity": "warning",
+        "description": "Flat curve",
+        "cause": "resonator off-resonance or dispersive shift too small",
+        "visual": "fidelity does not vary significantly with amplitude",
+        "next_action": "verify readout frequency and dispersive shift"
+      }
+    ],
+    "tips": [
+      "Run after dispersive shift characterization for best results.",
+      "If optimal amplitude is very high, check if dispersive shift is sufficient.",
+      "Monitor both |0⟩ and |1⟩ populations at optimal point for QND verification."
+    ],
+    "output_parameters_info": [
+      {
+        "name": "optimal_readout_amplitude",
+        "description": "Optimal Readout Amplitude (a.u.)"
+      }
+    ],
+    "analysis_guide": [
+      "Identify the optimal amplitude from the fidelity vs amplitude curve.",
+      "Verify the optimum is well-defined (clear peak, not plateau).",
+      "Check that the optimal amplitude is not in the nonlinear/QND-violation regime.",
+      "Compare the achieved fidelity with expectations from the dispersive shift."
+    ],
+    "prerequisites": [
+      "CheckDispersiveShift",
+      "CheckReadoutFrequency"
+    ],
+    "images": [],
+    "related_context": [
+      {
+        "type": "history",
+        "params": [],
+        "last_n": 5
+      }
+    ]
+  },
+  "CheckQubit": {
+    "name": "CheckQubit",
+    "summary": "Quick qubit validation via brief Rabi oscillation check.",
+    "what_it_measures": "Basic qubit responsiveness – whether the qubit shows coherent Rabi oscillations.",
+    "physical_principle": "Short Rabi experiment with varying pulse duration to confirm qubit is functional and control/readout lines are operational.",
+    "expected_result": {
+      "description": "Sinusoidal Rabi oscillation with clear |0⟩/|1⟩ contrast.",
+      "result_type": "oscillation",
+      "x_axis": "Pulse duration (ns)",
+      "y_axis": "P(|1⟩)",
+      "z_axis": "",
+      "fit_model": "",
+      "typical_range": "",
+      "good_visual": "clear sinusoidal oscillation with high contrast between |0⟩ and |1⟩ states"
+    },
+    "evaluation_criteria": "Clear oscillation visible with reasonable contrast; Rabi frequency consistent with drive amplitude. This is a quick sanity check, not a precision measurement.",
+    "check_questions": [
+      "Is a clear oscillation visible in the data?",
+      "Is the contrast (peak-to-trough) reasonable (>50%)?",
+      "Is the Rabi frequency consistent with the drive amplitude?"
+    ],
+    "failure_modes": [
+      {
+        "severity": "critical",
+        "description": "No oscillation",
+        "cause": "qubit not responding; drive line or frequency misconfigured",
+        "visual": "flat line, no modulation in signal",
+        "next_action": "check drive line connectivity and qubit frequency calibration"
+      },
+      {
+        "severity": "warning",
+        "description": "Very low contrast",
+        "cause": "thermal population or T1 too short",
+        "visual": "small amplitude oscillation riding on large offset",
+        "next_action": "check effective qubit temperature and readout fidelity"
+      },
+      {
+        "severity": "warning",
+        "description": "Irregular oscillation",
+        "cause": "frequency collision or TLS coupling",
+        "visual": "beating pattern or non-sinusoidal oscillation",
+        "next_action": "check for TLS near qubit frequency, verify frequency calibration"
+      }
+    ],
+    "tips": [
+      "This is a quick sanity check; if it fails, investigate drive and readout chains first.",
+      "Compare Rabi frequency across qubits to identify drive uniformity issues.",
+      "If amplitude is very small, adjust control amplitude."
+    ],
+    "output_parameters_info": [
+      {
+        "name": "rabi_amplitude",
+        "description": "Rabi oscillation amplitude (a.u.)"
+      },
+      {
+        "name": "rabi_frequency",
+        "description": "Rabi oscillation frequency (MHz)"
+      }
+    ],
+    "analysis_guide": [
+      "Verify that a clear oscillation is present in the data.",
+      "Check the contrast (should be >50% for a functional qubit).",
+      "If no oscillation, diagnose drive and readout chain.",
+      "If low contrast, check temperature and T1."
+    ],
+    "prerequisites": [
+      "CheckQubitFrequency",
+      "CheckReadoutFrequency"
+    ],
+    "images": [],
+    "related_context": [
+      {
+        "type": "history",
+        "params": [],
+        "last_n": 5
+      }
+    ]
+  },
+  "CheckQubitFrequency": {
+    "name": "CheckQubitFrequency",
+    "summary": "Measures qubit transition frequency via Ramsey-based detuning calibration.",
+    "what_it_measures": "Qubit |0⟩→|1⟩ transition frequency with high precision.",
+    "physical_principle": "Sweep drive detuning and pulse duration to map Ramsey fringes; the zero-detuning point gives the exact qubit frequency.",
+    "expected_result": {
+      "description": "Ramsey fringes at various detunings; the frequency calibration converges when detuning is zero.",
+      "result_type": "oscillation",
+      "x_axis": "Drive detuning (MHz)",
+      "y_axis": "P(|1⟩)",
+      "z_axis": "",
+      "fit_model": "",
+      "typical_range": "",
+      "good_visual": "clear Ramsey fringes with well-defined zero-detuning convergence point"
+    },
+    "evaluation_criteria": "Frequency should be reproducible across runs and within expected range of design target. Calibration should converge cleanly.",
+    "check_questions": [
+      "Is the frequency within the expected range for this qubit?",
+      "Is the frequency reproducible across repeated measurements?",
+      "Is the frequency well-separated from neighbor qubits (>100 MHz)?"
+    ],
+    "failure_modes": [
+      {
+        "severity": "critical",
+        "description": "Frequency collision with neighbor (<100 MHz separation)",
+        "cause": "fabrication deviation from design, insufficient detuning margin",
+        "visual": "crosstalk artifacts in Ramsey fringes",
+        "next_action": "assess crosstalk risk, consider frequency tuning if possible"
+      },
+      {
+        "severity": "warning",
+        "description": "TLS-induced shift",
+        "cause": "frequency jumps between runs due to TLS defects",
+        "visual": "inconsistent frequency across repeated measurements",
+        "next_action": "monitor for TLS switching, check frequency stability over time"
+      },
+      {
+        "severity": "warning",
+        "description": "Large drift over time",
+        "cause": "junction aging or thermal instability",
+        "visual": "systematic frequency trend in history",
+        "next_action": "monitor thermal stability, check junction parameters"
+      }
+    ],
+    "tips": [
+      "Compare measured frequency with chip design values to flag fabrication outliers.",
+      "If frequency fluctuates between runs, suspect TLS defects near qubit frequency.",
+      "Check neighbor qubit frequencies for collision risk."
+    ],
+    "output_parameters_info": [
+      {
+        "name": "qubit_frequency",
+        "description": "Qubit frequency (GHz)"
+      }
+    ],
+    "analysis_guide": [
+      "Compare the measured frequency with the design target value.",
+      "Check separation from neighbor qubit frequencies (should be >100 MHz).",
+      "Review frequency history for drift or instability.",
+      "If frequency has shifted significantly, assess impact on gate calibrations."
+    ],
+    "prerequisites": [
+      "CheckReadoutFrequency"
+    ],
+    "images": [],
+    "related_context": [
+      {
+        "type": "history",
+        "params": [],
+        "last_n": 5
+      },
+      {
+        "type": "neighbor_qubits",
+        "params": [
+          "frequency"
+        ],
+        "last_n": 5
+      }
+    ]
+  },
+  "CheckRabi": {
+    "name": "CheckRabi",
+    "summary": "Measures Rabi oscillation to extract drive amplitude, frequency, and IQ-plane parameters.",
+    "what_it_measures": "Rabi oscillation parameters: amplitude, frequency (drive strength), phase, offset, and IQ-plane rotation parameters.",
+    "physical_principle": "Apply a resonant drive pulse of variable duration; the qubit oscillates between |0⟩ and |1⟩ at the Rabi frequency Ω_R. The IQ data is rotated via PCA to align the measurement axis, then fitted with a damped cosine model.",
+    "expected_result": {
+      "description": "Damped sinusoidal oscillation of the rotated IQ signal vs pulse duration. Frequency gives Ω_R, envelope gives the decay time τ.",
+      "result_type": "oscillation",
+      "x_axis": "Pulse duration (ns)",
+      "y_axis": "Rotated IQ signal (arb. units)",
+      "z_axis": "",
+      "fit_model": "A * cos(ω·t + φ) * exp(-t/τ) + B (damped cosine, `is_damped=True` by default)",
+      "typical_range": "",
+      "good_visual": "clear sinusoidal oscillation with high contrast and slow decay envelope"
+    },
+    "evaluation_criteria": "Rabi amplitude should be high; frequency should be consistent with calibrated drive amplitude; fit quality should be good.",
+    "check_questions": [
+      "Is the Rabi amplitude (contrast) sufficiently high?",
+      "Is the Rabi frequency consistent with the expected drive amplitude?",
+      "Is the fit R² > 0.95?",
+      "Is the decay slow compared to the oscillation period?"
+    ],
+    "failure_modes": [
+      {
+        "severity": "critical",
+        "description": "Low contrast (<70%)",
+        "cause": "readout miscalibration, thermal population, or leakage",
+        "visual": "small oscillation amplitude, large DC offset",
+        "next_action": "check readout fidelity and effective qubit temperature"
+      },
+      {
+        "severity": "warning",
+        "description": "Rapid decay",
+        "cause": "T1/T2 limiting or drive-induced heating",
+        "visual": "oscillation amplitude drops quickly with pulse duration",
+        "next_action": "check T1, reduce drive amplitude if heating is suspected"
+      },
+      {
+        "severity": "warning",
+        "description": "Frequency mismatch",
+        "cause": "drive amplitude changed or DAC nonlinearity",
+        "visual": "oscillation frequency inconsistent with drive setting",
+        "next_action": "recalibrate drive amplitude, check DAC linearity"
+      },
+      {
+        "severity": "warning",
+        "description": "Beating pattern",
+        "cause": "TLS strongly coupled near qubit frequency",
+        "visual": "amplitude modulation with a second frequency component",
+        "next_action": "check for TLS, try different qubit frequency operating point"
+      }
+    ],
+    "tips": [
+      "Use Rabi frequency to calibrate π and π/2 pulse amplitudes.",
+      "If contrast is low, check effective qubit temperature and readout fidelity first.",
+      "Compare Rabi frequency across qubits for drive-line uniformity assessment."
+    ],
+    "output_parameters_info": [
+      {
+        "name": "rabi_amplitude",
+        "description": "Rabi oscillation amplitude (a.u.)"
+      },
+      {
+        "name": "rabi_frequency",
+        "description": "Rabi oscillation frequency (MHz)"
+      },
+      {
+        "name": "rabi_phase",
+        "description": "Rabi oscillation phase (a.u.)"
+      },
+      {
+        "name": "rabi_offset",
+        "description": "Rabi oscillation offset (a.u.)"
+      },
+      {
+        "name": "rabi_angle",
+        "description": "Rabi angle (in degree) (degree)"
+      },
+      {
+        "name": "rabi_noise",
+        "description": "Rabi oscillation noise (a.u.)"
+      },
+      {
+        "name": "rabi_distance",
+        "description": "Rabi distance (a.u.)"
+      },
+      {
+        "name": "rabi_reference_phase",
+        "description": "Rabi reference phase (a.u.)"
+      },
+      {
+        "name": "control_amplitude",
+        "description": "Control pulse amplitude (a.u.)"
+      },
+      {
+        "name": "maximum_rabi_frequency",
+        "description": "Maximum Rabi frequency per unit control amplitude (MHz/a.u.)"
+      }
+    ],
+    "analysis_guide": [
+      "Assess the oscillation contrast and fit quality (R²).",
+      "Verify Rabi frequency is consistent with the drive amplitude setting.",
+      "Check the decay envelope – rapid decay indicates decoherence or heating.",
+      "Look for beating patterns that would indicate TLS coupling.",
+      "Compare with recent history for drift in drive calibration."
+    ],
+    "prerequisites": [
+      "CheckQubitFrequency",
+      "CheckReadoutFrequency"
+    ],
+    "images": [
+      {
+        "alt_text": "Rabi oscillation",
+        "relative_path": "./0.png",
+        "section": "expected result"
+      }
+    ],
+    "related_context": [
+      {
+        "type": "history",
+        "params": [],
+        "last_n": 5
+      }
+    ]
+  },
+  "CheckRamsey": {
+    "name": "CheckRamsey",
+    "summary": "Measures T2* (free-induction) dephasing time and fine-tunes qubit frequency via Ramsey fringes.",
+    "what_it_measures": "T2* dephasing time and residual detuning from the drive frequency.",
+    "physical_principle": "X/2 – free evolution τ – X/2 (or Y/2), then measure. Fringes oscillate at the detuning Δf; envelope decays as exp(-τ/T2*).",
+    "expected_result": {
+      "description": "Damped cosine: oscillation frequency = detuning Δf, decay constant = T2*. If Δf=0, monotonic decay.",
+      "result_type": "oscillation",
+      "x_axis": "Free evolution time τ (μs)",
+      "y_axis": "P(|1⟩)",
+      "z_axis": "",
+      "fit_model": "A * cos(2π·Δf·τ + φ) * exp(-τ/T2*) + B",
+      "typical_range": "10–80 μs for fixed-frequency transmons",
+      "good_visual": "clear oscillation fringes with smooth exponential envelope"
+    },
+    "evaluation_criteria": "T2* should satisfy T2* ≤ T2_echo. Fringe frequency should match the intended detuning. Fit quality and fringe visibility should be high.",
+    "check_questions": [
+      "Are the Ramsey fringes clearly visible with good contrast?",
+      "Does the fringe frequency match the intended detuning?",
+      "Is T2* consistent with the T2_echo measurement (T2* ≤ T2_echo)?"
+    ],
+    "failure_modes": [
+      {
+        "severity": "critical",
+        "description": "T2* << T2_echo",
+        "cause": "dominated by low-frequency noise (1/f flux noise, charge noise)",
+        "visual": "rapid fringe decay, few oscillation periods visible",
+        "next_action": "investigate low-frequency noise sources, check shielding"
+      },
+      {
+        "severity": "warning",
+        "description": "No visible fringes",
+        "cause": "detuning too small or T2* extremely short",
+        "visual": "flat or monotonically decaying signal",
+        "next_action": "add artificial detuning (1–5 MHz) for clearer fringes"
+      },
+      {
+        "severity": "warning",
+        "description": "Fringe frequency drift",
+        "cause": "qubit frequency unstable (TLS, thermal)",
+        "visual": "inconsistent fringe spacing, poor fit",
+        "next_action": "repeat measurement, check for TLS coupling"
+      }
+    ],
+    "tips": [
+      "Ramsey with artificial detuning (Δf ~ 1–5 MHz) gives clearer fringes for fitting.",
+      "Second-axis (Y/2) Ramsey separates detuning direction (positive vs negative).",
+      "If T2* improves dramatically with echo, the dominant noise is low-frequency and potentially fixable."
+    ],
+    "output_parameters_info": [
+      {
+        "name": "ramsey_frequency",
+        "description": "Ramsey oscillation frequency (MHz)"
+      },
+      {
+        "name": "qubit_frequency",
+        "description": "Qubit bare frequency (GHz)"
+      },
+      {
+        "name": "t2_star",
+        "description": "T2* time (μs)"
+      }
+    ],
+    "analysis_guide": [
+      "Check fringe visibility and fit quality (R²).",
+      "Verify the extracted detuning matches the intended value.",
+      "Compare T2* with T2_echo to quantify low-frequency noise contribution.",
+      "Review recent history for frequency drift (changing detuning).",
+      "If T2* is very short, assess whether low-frequency noise mitigation is needed."
+    ],
+    "prerequisites": [
+      "CheckQubitFrequency",
+      "CheckT1"
+    ],
+    "images": [
+      {
+        "alt_text": "X-basis Ramsey fringe",
+        "relative_path": "./x_fringe.png",
+        "section": "expected result"
+      },
+      {
+        "alt_text": "Y-basis Ramsey fringe",
+        "relative_path": "./y_fringe.png",
+        "section": "expected result"
+      },
+      {
+        "alt_text": "Ramsey interference in XY plane",
+        "relative_path": "./xy_spiral.png",
+        "section": "expected result"
+      }
+    ],
+    "related_context": [
+      {
+        "type": "history",
+        "params": [],
+        "last_n": 5
+      },
+      {
+        "type": "neighbor_qubits",
+        "params": [
+          "frequency"
+        ],
+        "last_n": 5
+      }
+    ]
+  },
+  "CheckReadoutFrequency": {
+    "name": "CheckReadoutFrequency",
+    "summary": "Calibrates the readout resonator frequency for optimal state discrimination.",
+    "what_it_measures": "Readout resonator frequency – the optimal probe frequency for qubit state measurement.",
+    "physical_principle": "Sweep readout tone detuning around the expected resonator frequency while measuring transmission; the optimal point maximizes state-dependent signal.",
+    "expected_result": {
+      "description": "Transmission dip centered at the resonator frequency; optimal readout is near the dispersive-shifted midpoint.",
+      "result_type": "peak_curve",
+      "x_axis": "Readout frequency (GHz)",
+      "y_axis": "Transmission amplitude",
+      "z_axis": "",
+      "fit_model": "",
+      "typical_range": "",
+      "good_visual": "clear transmission dip with well-defined minimum, symmetric line shape"
+    },
+    "evaluation_criteria": "Frequency should be within expected range of design; clear transmission feature with good signal-to-noise ratio.",
+    "check_questions": [
+      "Is the resonator frequency within ±5 MHz of design target?",
+      "Is the transmission feature clear with good SNR?",
+      "Are there any parasitic modes or spurious features?"
+    ],
+    "failure_modes": [
+      {
+        "severity": "warning",
+        "description": "Resonator shifted from design",
+        "cause": "qubit-induced dispersive shift not accounted for",
+        "visual": "transmission dip shifted from expected position",
+        "next_action": "run after qubit frequency calibration, re-center readout"
+      },
+      {
+        "severity": "warning",
+        "description": "Multiple modes visible",
+        "cause": "parasitic resonances or box modes",
+        "visual": "multiple dips in transmission spectrum",
+        "next_action": "identify which mode is the target resonator"
+      },
+      {
+        "severity": "info",
+        "description": "Drift between cooldowns",
+        "cause": "thermal contraction or connector issues",
+        "visual": "systematic frequency shift from previous cooldown",
+        "next_action": "recalibrate after each cooldown"
+      }
+    ],
+    "tips": [
+      "Run after qubit frequency calibration since dispersive shift depends on qubit-resonator detuning.",
+      "If readout fidelity is poor despite good frequency, check dispersive shift magnitude.",
+      "Compare with broadband resonator scan for consistency."
+    ],
+    "output_parameters_info": [
+      {
+        "name": "readout_frequency",
+        "description": "Readout frequency (GHz)"
+      }
+    ],
+    "analysis_guide": [
+      "Verify the readout frequency is near the design target.",
+      "Check for parasitic modes or spurious features in the spectrum.",
+      "Compare with previous cooldown values for drift assessment.",
+      "If shifted significantly, assess impact on readout fidelity."
+    ],
+    "prerequisites": [],
+    "images": [],
+    "related_context": [
+      {
+        "type": "history",
+        "params": [],
+        "last_n": 5
+      }
+    ]
+  },
+  "CheckT1": {
+    "name": "CheckT1",
+    "summary": "Measures T1 energy-relaxation time via exponential decay of the excited state.",
+    "what_it_measures": "T1 relaxation time – how long the qubit retains energy in the |1⟩ state.",
+    "physical_principle": "Prepare |1⟩, wait variable delay τ, measure P(|1⟩). Fit exponential decay exp(-τ/T1).",
+    "expected_result": {
+      "description": "Exponential decay from ~1 to ~0 as delay increases; single time constant T1.",
+      "result_type": "decay_curve",
+      "x_axis": "Delay τ (μs)",
+      "y_axis": "P(|1⟩)",
+      "z_axis": "",
+      "fit_model": "A * exp(-τ/T1) + B",
+      "typical_range": "20–200 μs for fixed-frequency transmons",
+      "good_visual": "smooth monotonic decay with clear single-exponential shape, low residuals"
+    },
+    "evaluation_criteria": "Exponential fit should have high R²; T1 should be stable across repeated measurements and consistent with chip design expectations. Compare with T2_echo to check if decoherence is T1-limited (T2 ≈ 2*T1).",
+    "check_questions": [
+      "Is the decay clearly single-exponential with R² > 0.95?",
+      "Is T1 consistent with recent measurements (within 20% variation)?",
+      "Is T1 long enough to support the target gate fidelity?"
+    ],
+    "failure_modes": [
+      {
+        "severity": "critical",
+        "description": "Short T1 (<20 μs)",
+        "cause": "TLS coupling, dielectric loss, or Purcell decay",
+        "visual": "rapid decay, curve flattens well before maximum delay",
+        "next_action": "check TLS defects near qubit frequency, inspect packaging and substrate"
+      },
+      {
+        "severity": "warning",
+        "description": "Non-exponential decay",
+        "cause": "multi-level leakage or readout-induced transitions",
+        "visual": "shoulder or kink in decay curve, poor single-exponential fit",
+        "next_action": "check for leakage to |2⟩, verify readout is QND"
+      },
+      {
+        "severity": "warning",
+        "description": "Large scatter between qubits",
+        "cause": "fabrication non-uniformity or localized defects",
+        "visual": "T1 values vary widely across chip",
+        "next_action": "compare with spatial map to identify defect regions"
+      }
+    ],
+    "tips": [
+      "If T1 fluctuates between runs, suspect TLS defects near the qubit frequency.",
+      "Compare with T2_echo: if T2 ≈ 2*T1, decoherence is T1-limited.",
+      "Check if readout power is too high (may cause residual excitation)."
+    ],
+    "output_parameters_info": [
+      {
+        "name": "t1",
+        "description": "T1 time (μs)"
+      }
+    ],
+    "analysis_guide": [
+      "Check the exponential fit quality (R²) and residual pattern.",
+      "Compare the extracted T1 with recent history for drift or instability.",
+      "Compare T1 with T2_echo: if T2 ≈ 2*T1, the qubit is T1-limited.",
+      "Check neighbor qubit T1 values for spatial correlation of defects.",
+      "If T1 is anomalously short, consider TLS, Purcell, or dielectric loss mechanisms."
+    ],
+    "prerequisites": [
+      "CheckQubitFrequency",
+      "CheckReadoutFrequency"
+    ],
+    "images": [
+      {
+        "alt_text": "T1 exponential decay curve",
+        "relative_path": "./0.png",
+        "section": "expected result"
+      }
+    ],
+    "related_context": [
+      {
+        "type": "history",
+        "params": [],
+        "last_n": 5
+      },
+      {
+        "type": "neighbor_qubits",
+        "params": [
+          "frequency",
+          "t1"
+        ],
+        "last_n": 5
+      }
+    ]
+  },
+  "CheckT2Echo": {
+    "name": "CheckT2Echo",
+    "summary": "Measures T2 echo (Hahn echo) coherence time, refocusing low-frequency noise.",
+    "what_it_measures": "T2 echo – phase coherence time after a Hahn-echo refocusing pulse.",
+    "physical_principle": "X/2 – wait τ/2 – π – wait τ/2 – X/2, then measure. Refocuses static and slow noise, revealing intrinsic dephasing.",
+    "expected_result": {
+      "description": "Exponential (or Gaussian) decay envelope of echo amplitude vs total delay τ.",
+      "result_type": "decay_curve",
+      "x_axis": "Total delay τ (μs)",
+      "y_axis": "Echo amplitude",
+      "z_axis": "",
+      "fit_model": "A * exp(-(τ/T2_echo)^n) + B, n=1 or 2",
+      "typical_range": "30–300 μs for fixed-frequency transmons",
+      "good_visual": "smooth decay envelope with clear time constant, low residuals"
+    },
+    "evaluation_criteria": "T2_echo should satisfy T2_echo ≤ 2*T1. Compare with T2* (Ramsey) to quantify low-frequency noise contribution. Fit quality should be high.",
+    "check_questions": [
+      "Is T2_echo consistent with the 2*T1 limit?",
+      "Is the decay well-fitted by a single exponential or Gaussian?",
+      "Is T2_echo stable compared to recent measurements?"
+    ],
+    "failure_modes": [
+      {
+        "severity": "critical",
+        "description": "T2_echo << 2*T1",
+        "cause": "residual high-frequency noise not refocused by single echo",
+        "visual": "decay much faster than expected from T1 measurement",
+        "next_action": "try CPMG (multiple echoes) to identify noise spectrum"
+      },
+      {
+        "severity": "warning",
+        "description": "Non-exponential decay",
+        "cause": "1/f noise spectrum or multiple noise sources",
+        "visual": "decay does not fit single exponential, stretched or compressed shape",
+        "next_action": "try stretched exponential fit, investigate noise spectrum"
+      },
+      {
+        "severity": "warning",
+        "description": "T2_echo > 2*T1",
+        "cause": "measurement artifact; fitting or readout calibration issue",
+        "visual": "decay appears slower than physically expected",
+        "next_action": "verify T1 measurement, check readout calibration"
+      }
+    ],
+    "tips": [
+      "Compare T2_echo with T2* (Ramsey) to quantify low-frequency noise contribution.",
+      "If T2_echo is much shorter than 2*T1, try CPMG (multiple echoes) to identify noise spectrum.",
+      "Ensure π pulse is well-calibrated; a bad refocusing pulse degrades echo amplitude."
+    ],
+    "output_parameters_info": [
+      {
+        "name": "t2_echo",
+        "description": "T2 echo time (μs)"
+      }
+    ],
+    "analysis_guide": [
+      "Check the decay fit quality (R²) and identify the decay model (exponential vs Gaussian).",
+      "Compare T2_echo with 2*T1 to assess the noise regime.",
+      "Compare T2_echo with T2* to quantify the low-frequency noise contribution.",
+      "Review recent history for trends or instability.",
+      "If T2_echo << 2*T1, investigate high-frequency noise sources."
+    ],
+    "prerequisites": [
+      "CheckT1",
+      "CheckQubitFrequency"
+    ],
+    "images": [
+      {
+        "alt_text": "T2 echo decay curve",
+        "relative_path": "./0.png",
+        "section": "expected result"
+      }
+    ],
+    "related_context": [
+      {
+        "type": "history",
+        "params": [],
+        "last_n": 5
+      },
+      {
+        "type": "neighbor_qubits",
+        "params": [
+          "frequency",
+          "t1",
+          "t2_echo"
+        ],
+        "last_n": 5
+      }
+    ]
+  },
+  "ReadoutClassification": {
+    "name": "ReadoutClassification",
+    "summary": "Calibrates and evaluates readout state discrimination (|0⟩ vs |1⟩ classification).",
+    "what_it_measures": "Readout assignment fidelity – probability of correctly identifying qubit state.",
+    "physical_principle": "Prepare |0⟩ and |1⟩ states, measure IQ data, train classifier, evaluate confusion matrix.",
+    "expected_result": {
+      "description": "Two IQ blob clusters; clear separation indicates good discrimination.",
+      "result_type": "scatter_plot",
+      "x_axis": "I quadrature (a.u.)",
+      "y_axis": "Q quadrature (a.u.)",
+      "z_axis": "",
+      "fit_model": "",
+      "typical_range": "",
+      "good_visual": "two well-separated IQ clusters with minimal overlap, clear classification boundary"
+    },
+    "evaluation_criteria": "Average readout fidelity should be high with low asymmetry between |0⟩ and |1⟩ assignment errors.",
+    "check_questions": [
+      "Are the IQ blobs well-separated with minimal overlap?",
+      "Is the assignment fidelity symmetric for |0⟩ and |1⟩?",
+      "Is the average readout fidelity meeting the target?"
+    ],
+    "failure_modes": [
+      {
+        "severity": "critical",
+        "description": "Overlapping IQ blobs",
+        "cause": "insufficient dispersive shift or readout power",
+        "visual": "IQ clusters overlap significantly, poor separation",
+        "next_action": "check dispersive shift, optimize readout amplitude"
+      },
+      {
+        "severity": "warning",
+        "description": "T1 decay during readout",
+        "cause": "|1⟩ relaxes to |0⟩ before measurement completes",
+        "visual": "asymmetric errors: P(0|1) >> P(1|0)",
+        "next_action": "shorten readout pulse, check T1"
+      },
+      {
+        "severity": "warning",
+        "description": "Readout-induced transitions",
+        "cause": "measurement drives qubit transitions",
+        "visual": "increased error rate at high readout power",
+        "next_action": "reduce readout amplitude, check for non-QND effects"
+      },
+      {
+        "severity": "info",
+        "description": "Classifier bias",
+        "cause": "asymmetric errors for |0⟩ vs |1⟩",
+        "visual": "confusion matrix has large off-diagonal asymmetry",
+        "next_action": "retrain classifier, check IQ blob balance"
+      }
+    ],
+    "tips": [
+      "If |1⟩→|0⟩ error >> |0⟩→|1⟩ error, suspect T1 during readout.",
+      "Optimize readout amplitude and duration jointly.",
+      "Consider neural network classifier for better discrimination."
+    ],
+    "output_parameters_info": [
+      {
+        "name": "average_readout_fidelity",
+        "description": "Average readout fidelity (a.u.)"
+      },
+      {
+        "name": "readout_fidelity_0",
+        "description": "Readout fidelity with preparation state 0 (a.u.)"
+      },
+      {
+        "name": "readout_fidelity_1",
+        "description": "Readout fidelity with preparation state 1 (a.u.)"
+      }
+    ],
+    "analysis_guide": [
+      "Examine IQ scatter plot for blob separation and overlap.",
+      "Check the confusion matrix for error symmetry.",
+      "If P(0|1) >> P(1|0), T1 during readout is the limiting factor.",
+      "Compare fidelity with dispersive shift expectations.",
+      "Verify readout amplitude is at the optimal point."
+    ],
+    "prerequisites": [
+      "CheckOptimalReadoutAmplitude",
+      "CheckDispersiveShift"
+    ],
+    "images": [
+      {
+        "alt_text": "Readout classification",
+        "relative_path": "./0.png",
+        "section": "expected result"
+      }
+    ],
+    "related_context": [
+      {
+        "type": "history",
+        "params": [],
+        "last_n": 5
+      }
+    ]
+  },
+  "CheckSkew": {
+    "name": "CheckSkew",
+    "summary": "Measures and corrects time skew between multiple control boxes.",
+    "what_it_measures": "Inter-box timing skew – measures the relative timing offsets (clock skew) between different control boxes and applies correction to synchronize their clocks.",
+    "physical_principle": "Clock synchronization: multiple control boxes share a common reference clock, but signal propagation delays and internal clock distribution cause timing offsets between boxes. This task measures the relative timing by sending synchronized pulses and measuring arrival time differences, then applies skew correction to align all boxes to a common time reference.",
+    "expected_result": {
+      "description": "Measured skew values for each box pair, with corrections applied to synchronize timing.",
+      "result_type": "timing_measurement",
+      "x_axis": "Box pairs",
+      "y_axis": "Skew (ns)",
+      "z_axis": "",
+      "fit_model": "",
+      "typical_range": "",
+      "good_visual": "small, well-defined skew values with successful correction applied"
+    },
+    "evaluation_criteria": "Skew values should be measurable and correctable. After correction, residual skew should be within the system's timing resolution.",
+    "check_questions": [
+      "Are skew values measurable for all box pairs?",
+      "Are the measured skew values within a correctable range?",
+      "Are the skew values consistent with previous measurements?"
+    ],
+    "failure_modes": [
+      {
+        "severity": "critical",
+        "description": "Skew measurement fails",
+        "cause": "box not synchronized to reference clock, hardware fault",
+        "visual": "",
+        "next_action": "verify reference clock distribution, check box connectivity"
+      },
+      {
+        "severity": "warning",
+        "description": "Large skew values",
+        "cause": "cable length mismatch, clock distribution issue",
+        "visual": "skew values larger than typical range",
+        "next_action": "check clock distribution hardware and cable routing"
+      },
+      {
+        "severity": "warning",
+        "description": "Inconsistent skew across measurements",
+        "cause": "unstable clock or intermittent connection",
+        "visual": "skew values vary significantly between runs",
+        "next_action": "investigate clock stability, check connectors"
+      }
+    ],
+    "tips": [
+      "Run after LinkUp and before any multi-qubit calibration tasks.",
+      "The muxes parameter selects which MUXes to synchronize; default covers most standard configurations.",
+      "Skew correction is essential for two-qubit gate calibration accuracy.",
+      "Compare skew values across runs to detect clock drift."
+    ],
+    "output_parameters_info": [],
+    "analysis_guide": [
+      "Review estimated skew values for each box.",
+      "Verify skew values are within expected range.",
+      "Check the skew plot for any outliers.",
+      "Confirm correction was applied successfully.",
+      "Compare with previous measurements for drift detection."
+    ],
+    "prerequisites": [
+      "LinkUp",
+      "Configure"
+    ],
+    "images": [],
+    "related_context": [
+      {
+        "type": "history",
+        "params": [],
+        "last_n": 5
+      }
+    ]
+  },
+  "CheckBellState": {
+    "name": "CheckBellState",
+    "summary": "Prepares Bell state (|00⟩+|11⟩)/√2 and measures state fidelity.",
+    "what_it_measures": "Bell state fidelity – quality of entanglement between qubit pair.",
+    "physical_principle": "Apply H⊗I then CNOT; measure in Z basis and verify equal |00⟩/|11⟩ populations with coherent superposition.",
+    "expected_result": {
+      "description": "Population histogram showing ~50/50 |00⟩/|11⟩ with minimal |01⟩/|10⟩.",
+      "result_type": "histogram",
+      "x_axis": "Computational basis states (|00⟩, |01⟩, |10⟩, |11⟩)",
+      "y_axis": "Population probability",
+      "z_axis": "",
+      "fit_model": "",
+      "typical_range": "",
+      "good_visual": "two tall bars at |00⟩ and |11⟩ (~0.5 each), negligible |01⟩ and |10⟩ bars"
+    },
+    "evaluation_criteria": "Bell state fidelity should be high; |01⟩ and |10⟩ populations should be minimal. This is an end-to-end test of single and two-qubit gates.",
+    "check_questions": [
+      "Are the |00⟩ and |11⟩ populations approximately equal (~0.5)?",
+      "Are the |01⟩ and |10⟩ populations negligible (<5%)?",
+      "Is the Bell state fidelity meeting the target?"
+    ],
+    "failure_modes": [
+      {
+        "severity": "critical",
+        "description": "Low fidelity from single-qubit gate errors",
+        "cause": "H gate or measurement basis errors",
+        "visual": "unequal |00⟩/|11⟩ populations or significant |01⟩/|10⟩",
+        "next_action": "debug single-qubit gates first (CheckHPIPulse, CheckPIPulse)"
+      },
+      {
+        "severity": "warning",
+        "description": "Residual |01⟩/|10⟩ population",
+        "cause": "ZX90 miscalibration, gate angle error",
+        "visual": "non-negligible bars at |01⟩ and |10⟩",
+        "next_action": "recalibrate ZX90 gate (CreateZX90)"
+      },
+      {
+        "severity": "warning",
+        "description": "Decoherence during circuit",
+        "cause": "T1/T2 too short for the circuit depth",
+        "visual": "overall contrast reduction, all populations mixed",
+        "next_action": "check coherence times, optimize circuit"
+      },
+      {
+        "severity": "warning",
+        "description": "Readout crosstalk",
+        "cause": "correlated measurement errors between qubits",
+        "visual": "unexpected correlations in error pattern",
+        "next_action": "check readout isolation between qubits"
+      }
+    ],
+    "tips": [
+      "This is an end-to-end test combining single and two-qubit gates.",
+      "Low fidelity here means debug gates individually first.",
+      "Compare with Bell state tomography for full density matrix."
+    ],
+    "output_parameters_info": [],
+    "analysis_guide": [
+      "Check the population histogram for |00⟩/|11⟩ balance.",
+      "Quantify the |01⟩/|10⟩ leakage as fraction of total.",
+      "Compare Bell fidelity with individual gate fidelities.",
+      "If fidelity is low, determine if limited by single-qubit, two-qubit, or readout errors.",
+      "Recommend component-level debugging if needed."
+    ],
+    "prerequisites": [
+      "CheckZX90",
+      "CheckHPIPulse",
+      "CheckPIPulse"
+    ],
+    "images": [
+      {
+        "alt_text": "Bell state measurement",
+        "relative_path": "./0.png",
+        "section": "expected result"
+      }
+    ],
+    "related_context": [
+      {
+        "type": "history",
+        "params": [],
+        "last_n": 5
+      },
+      {
+        "type": "coupling",
+        "params": [
+          "zx_rate",
+          "coupling_strength"
+        ],
+        "last_n": 5
+      }
+    ]
+  },
+  "CheckBellStateTomography": {
+    "name": "CheckBellStateTomography",
+    "summary": "Full density matrix tomography of the Bell state for detailed characterization.",
+    "what_it_measures": "Complete density matrix of prepared Bell state; concurrence and entanglement metrics.",
+    "physical_principle": "Prepare Bell state, measure in 9 Pauli basis combinations (XX, XY, ..., ZZ), reconstruct density matrix via maximum likelihood.",
+    "expected_result": {
+      "description": "Density matrix close to ideal Bell state |Φ+⟩; off-diagonal elements indicating coherence.",
+      "result_type": "2d_map",
+      "x_axis": "Density matrix row index",
+      "y_axis": "Density matrix column index",
+      "z_axis": "Matrix element amplitude",
+      "fit_model": "",
+      "typical_range": "",
+      "good_visual": "density matrix with large real diagonal and off-diagonal elements matching ideal Bell state pattern"
+    },
+    "evaluation_criteria": "State fidelity and concurrence should be high; density matrix should be close to ideal Bell state with strong off-diagonal coherence.",
+    "check_questions": [
+      "Is the state fidelity >90%?",
+      "Is the concurrence >0.9?",
+      "Are the off-diagonal elements consistent with coherent entanglement?"
+    ],
+    "failure_modes": [
+      {
+        "severity": "warning",
+        "description": "Systematic tomography errors",
+        "cause": "measurement basis miscalibration (X90, Y90 pulses)",
+        "visual": "density matrix has unphysical features or asymmetries",
+        "next_action": "verify measurement rotation calibration"
+      },
+      {
+        "severity": "warning",
+        "description": "Decoherence",
+        "cause": "T1/T2 reduce off-diagonal coherence elements",
+        "visual": "reduced off-diagonal elements, mixed state",
+        "next_action": "check coherence times, optimize circuit depth"
+      },
+      {
+        "severity": "warning",
+        "description": "State preparation errors",
+        "cause": "gate errors dominate reconstruction",
+        "visual": "density matrix deviates from ideal Bell state pattern",
+        "next_action": "check individual gate fidelities"
+      }
+    ],
+    "tips": [
+      "Requires well-calibrated measurement rotations (X90, Y90).",
+      "Use maximum likelihood reconstruction to ensure physical state.",
+      "Compare diagonal elements with simple Bell state measurement for consistency."
+    ],
+    "output_parameters_info": [
+      {
+        "name": "bell_state_fidelity",
+        "description": "Bell state fidelity (a.u.)"
+      }
+    ],
+    "analysis_guide": [
+      "Check the state fidelity and concurrence values.",
+      "Examine the density matrix for expected Bell state structure.",
+      "Compare with the simple CheckBellState Z-basis measurement.",
+      "If fidelity is lower than expected, identify which matrix elements deviate most.",
+      "Use deviations to diagnose specific error channels."
+    ],
+    "prerequisites": [
+      "CheckBellState",
+      "CheckHPIPulse",
+      "CheckZX90"
+    ],
+    "images": [
+      {
+        "alt_text": "Bell state tomography",
+        "relative_path": "./0.png",
+        "section": "expected result"
+      }
+    ],
+    "related_context": [
+      {
+        "type": "history",
+        "params": [],
+        "last_n": 5
+      },
+      {
+        "type": "coupling",
+        "params": [
+          "zx_rate",
+          "coupling_strength"
+        ],
+        "last_n": 5
+      }
+    ]
+  },
+  "CheckCrossResonance": {
+    "name": "CheckCrossResonance",
+    "summary": "Measures cross-resonance (CR) interaction strength between coupled qubits.",
+    "what_it_measures": "ZX interaction rate and CR Hamiltonian terms for two-qubit gate calibration.",
+    "physical_principle": "Drive control qubit at target frequency; monitor target rotation rate. ZX coupling enables CNOT-type gates.",
+    "expected_result": {
+      "description": "Target qubit oscillation proportional to CR drive amplitude; Hamiltonian tomography shows dominant ZX term.",
+      "result_type": "oscillation",
+      "x_axis": "CR drive duration (ns)",
+      "y_axis": "Target qubit rotation angle",
+      "z_axis": "",
+      "fit_model": "",
+      "typical_range": "",
+      "good_visual": "clear ZX oscillation with minimal parasitic IX/IY/IZ components"
+    },
+    "evaluation_criteria": "Clear ZX oscillation with parasitic terms (IX, IY, IZ) small relative to ZX. The ZX rate should be sufficient for practical gate durations.",
+    "check_questions": [
+      "Is the ZX oscillation clearly visible?",
+      "Are the IX/IY/IZ parasitic terms small relative to ZX?",
+      "Is the ZX rate sufficient for a practical gate duration (<500 ns)?"
+    ],
+    "failure_modes": [
+      {
+        "severity": "critical",
+        "description": "Weak ZX rate",
+        "cause": "large detuning between qubits or insufficient coupling",
+        "visual": "very slow or no oscillation in target qubit",
+        "next_action": "verify coupling strength, check qubit frequency separation"
+      },
+      {
+        "severity": "warning",
+        "description": "Large IX term",
+        "cause": "direct drive leakage to target qubit",
+        "visual": "target qubit rotates even with control in |0⟩",
+        "next_action": "implement echo CR sequence to cancel IX term"
+      },
+      {
+        "severity": "warning",
+        "description": "Classical crosstalk",
+        "cause": "signal leakage through control lines",
+        "visual": "spurious oscillation independent of qubit state",
+        "next_action": "check microwave isolation, add cancellation tone"
+      },
+      {
+        "severity": "warning",
+        "description": "Frequency collision",
+        "cause": "spectator qubit interference",
+        "visual": "beating or inconsistent oscillation patterns",
+        "next_action": "check spectator qubit frequencies"
+      }
+    ],
+    "tips": [
+      "Ensure single-qubit gates are well-calibrated before CR characterization.",
+      "Check for active cancellation (echo CR) if IX term is large.",
+      "Monitor spectator qubits for correlated errors."
+    ],
+    "output_parameters_info": [
+      {
+        "name": "cr_amplitude",
+        "description": "Amplitude of the CR pulse. (a.u.)"
+      },
+      {
+        "name": "cr_phase",
+        "description": "Phase of the CR pulse. (a.u.)"
+      },
+      {
+        "name": "cancel_amplitude",
+        "description": "Amplitude of the cancel pulse. (a.u.)"
+      },
+      {
+        "name": "cancel_phase",
+        "description": "Phase of the cancel pulse. (a.u.)"
+      },
+      {
+        "name": "cancel_beta",
+        "description": "Beta of the cancel pulse. (a.u.)"
+      },
+      {
+        "name": "rotary_amplitude",
+        "description": "Amplitude of the rotary pulse. (a.u.)"
+      },
+      {
+        "name": "zx_rotation_rate",
+        "description": "ZX rotation rate. (a.u.)"
+      }
+    ],
+    "analysis_guide": [
+      "Identify the ZX oscillation rate from the target qubit data.",
+      "Quantify the IX/IY/IZ parasitic terms relative to ZX.",
+      "Assess whether ZX rate supports practical gate durations.",
+      "If parasitic terms are large, recommend echo CR or cancellation.",
+      "Check for spectator qubit effects."
+    ],
+    "prerequisites": [
+      "CheckQubitFrequency",
+      "CheckPIPulse",
+      "CheckHPIPulse"
+    ],
+    "images": [
+      {
+        "alt_text": "CR Hamiltonian coefficients",
+        "relative_path": "./hamiltonian.png",
+        "section": "expected result"
+      },
+      {
+        "alt_text": "Target qubit dynamics under CR drive",
+        "relative_path": "./target_dynamics.png",
+        "section": "expected result"
+      }
+    ],
+    "related_context": [
+      {
+        "type": "history",
+        "params": [],
+        "last_n": 5
+      },
+      {
+        "type": "coupling",
+        "params": [
+          "zx_rate",
+          "coupling_strength"
+        ],
+        "last_n": 5
+      }
+    ]
+  },
+  "CheckZX90": {
+    "name": "CheckZX90",
+    "summary": "Validates ZX90 two-qubit gate fidelity via process or state fidelity measurement.",
+    "what_it_measures": "ZX90 gate fidelity – closeness to ideal CNOT-equivalent operation.",
+    "physical_principle": "Apply calibrated ZX90 gate and measure output state fidelity against ideal; may use interleaved RB or QPT.",
+    "expected_result": {
+      "description": "Gate fidelity metric; conditional rotation of target by control state.",
+      "result_type": "scalar_metric",
+      "x_axis": "",
+      "y_axis": "",
+      "z_axis": "",
+      "fit_model": "",
+      "typical_range": "",
+      "good_visual": "high fidelity value with consistent results across repeated measurements"
+    },
+    "evaluation_criteria": "ZX90 fidelity should meet targets; both control states should produce correct conditional rotation.",
+    "check_questions": [
+      "Is the ZX90 fidelity meeting the target?",
+      "Are the results consistent for both control qubit states (|0⟩ and |1⟩)?",
+      "Is the fidelity limited by coherence or by gate calibration?"
+    ],
+    "failure_modes": [
+      {
+        "severity": "critical",
+        "description": "Coherence-limited fidelity",
+        "cause": "T1/T2 of either qubit too short for gate duration",
+        "visual": "fidelity degrades with gate length, consistent with decoherence",
+        "next_action": "improve coherence or shorten gate"
+      },
+      {
+        "severity": "warning",
+        "description": "Residual ZZ coupling",
+        "cause": "static coupling causes unwanted phase errors",
+        "visual": "phase error correlated with idle time between gates",
+        "next_action": "implement ZZ cancellation or echo sequences"
+      },
+      {
+        "severity": "warning",
+        "description": "CR amplitude drift",
+        "cause": "gate angle deviates from 90° due to parameter drift",
+        "visual": "systematic rotation error in output state",
+        "next_action": "re-run CreateZX90 with fresh CR calibration"
+      }
+    ],
+    "tips": [
+      "Compare with interleaved RB for gate-specific error rate.",
+      "Check both control states (|0⟩ and |1⟩) independently.",
+      "If fidelity is poor, re-run CreateZX90 with fresh CR calibration."
+    ],
+    "output_parameters_info": [],
+    "analysis_guide": [
+      "Check the ZX90 fidelity against the target threshold.",
+      "Determine if the fidelity is coherence-limited or calibration-limited.",
+      "Compare with single-qubit gate fidelities to isolate two-qubit gate contribution.",
+      "If calibration-limited, recommend CreateZX90 recalibration.",
+      "If coherence-limited, assess T1/T2 of both qubits."
+    ],
+    "prerequisites": [
+      "CreateZX90",
+      "CheckPIPulse",
+      "CheckHPIPulse"
+    ],
+    "images": [
+      {
+        "alt_text": "ZX90 control qubit sweep",
+        "relative_path": "./control.png",
+        "section": "expected result"
+      },
+      {
+        "alt_text": "ZX90 target qubit sweep",
+        "relative_path": "./target.png",
+        "section": "expected result"
+      }
+    ],
+    "related_context": [
+      {
+        "type": "history",
+        "params": [],
+        "last_n": 5
+      },
+      {
+        "type": "coupling",
+        "params": [
+          "zx_rate",
+          "coupling_strength"
+        ],
+        "last_n": 5
+      }
+    ]
+  },
+  "ChevronPattern": {
+    "name": "ChevronPattern",
+    "summary": "Measures qubit response vs frequency and time to map the chevron pattern.",
+    "what_it_measures": "Chevron pattern – 2D map of qubit excitation vs drive detuning and pulse duration.",
+    "physical_principle": "Drive at various frequency detunings and durations; on-resonance gives Rabi oscillations, off-resonance gives faster but smaller oscillations, forming a V-shaped pattern.",
+    "expected_result": {
+      "description": "2D color plot with chevron-shaped fringes; vertex at zero detuning (qubit frequency). Fringe spacing increases with detuning.",
+      "result_type": "2d_map",
+      "x_axis": "Drive detuning (MHz)",
+      "y_axis": "Pulse duration (ns)",
+      "z_axis": "P(|1⟩)",
+      "fit_model": "",
+      "typical_range": "",
+      "good_visual": "symmetric V-shaped chevron fringes with clear vertex at zero detuning, high contrast"
+    },
+    "evaluation_criteria": "Clear fringe visibility with identifiable chevron vertex; vertex position should be consistent with qubit frequency.",
+    "check_questions": [
+      "Are the chevron fringes clearly visible with good contrast?",
+      "Is the chevron vertex identifiable to <1 MHz precision?",
+      "Is the pattern symmetric about zero detuning?"
+    ],
+    "failure_modes": [
+      {
+        "severity": "warning",
+        "description": "Low contrast",
+        "cause": "insufficient drive power or poor readout fidelity",
+        "visual": "faint or washed-out fringes",
+        "next_action": "increase drive amplitude or number of shots"
+      },
+      {
+        "severity": "warning",
+        "description": "Smeared pattern",
+        "cause": "frequency drift during measurement",
+        "visual": "blurred fringes, especially at long durations",
+        "next_action": "check frequency stability, reduce measurement time"
+      },
+      {
+        "severity": "info",
+        "description": "Asymmetric chevron",
+        "cause": "higher-order transitions or AC Stark shift",
+        "visual": "fringes asymmetric about zero detuning",
+        "next_action": "check for multi-level effects, reduce drive power"
+      }
+    ],
+    "tips": [
+      "Use the chevron vertex to precisely identify qubit frequency before fine calibration.",
+      "The fringe period at zero detuning gives the Rabi frequency.",
+      "If fringes are faint, increase drive amplitude or number of shots."
+    ],
+    "output_parameters_info": [
+      {
+        "name": "qubit_frequency",
+        "description": "Qubit bare frequency (GHz)"
+      },
+      {
+        "name": "readout_amplitude",
+        "description": "Optimal readout amplitude from SNR threshold (a.u.)"
+      }
+    ],
+    "analysis_guide": [
+      "Identify the chevron vertex position for frequency determination.",
+      "Check fringe contrast and symmetry.",
+      "Extract Rabi frequency from the fringe period at zero detuning.",
+      "If asymmetric, consider multi-level effects."
+    ],
+    "prerequisites": [
+      "CheckReadoutFrequency"
+    ],
+    "images": [
+      {
+        "alt_text": "Chevron pattern",
+        "relative_path": "./0.png",
+        "section": "expected result"
+      }
+    ],
+    "related_context": [
+      {
+        "type": "history",
+        "params": [],
+        "last_n": 5
+      }
+    ]
+  },
   "CreateZX90": {
     "name": "CreateZX90",
     "summary": "Calibrates ZX90 (CNOT-equivalent) two-qubit gate from cross-resonance interaction.",
@@ -2816,621 +3431,6 @@
       {
         "alt_text": "ZX90 final calibration",
         "relative_path": "./final.png",
-        "section": "expected result"
-      }
-    ],
-    "related_context": [
-      {
-        "type": "history",
-        "params": [],
-        "last_n": 5
-      },
-      {
-        "type": "coupling",
-        "params": [
-          "zx_rate",
-          "coupling_strength"
-        ],
-        "last_n": 5
-      }
-    ]
-  },
-  "DumpBox": {
-    "name": "DumpBox",
-    "summary": "Dumps diagnostic information from all control boxes.",
-    "what_it_measures": "Control box internal state – extracts configuration, firmware version, register values, and other diagnostic data from each control box.",
-    "physical_principle": "No physical measurement. This task reads internal registers and configuration from the FPGA-based control hardware for diagnostic and debugging purposes.",
-    "expected_result": {
-      "description": "A dictionary of diagnostic information keyed by box ID, containing hardware configuration and status details.",
-      "result_type": "diagnostic_dump",
-      "x_axis": "",
-      "y_axis": "",
-      "z_axis": "",
-      "fit_model": "",
-      "typical_range": "",
-      "good_visual": "complete diagnostic data for all boxes without errors"
-    },
-    "evaluation_criteria": "All boxes should return complete diagnostic information. Missing or incomplete data indicates communication issues.",
-    "check_questions": [
-      "Is diagnostic data available for all expected boxes?",
-      "Are there any unexpected register values or error flags?"
-    ],
-    "failure_modes": [
-      {
-        "severity": "warning",
-        "description": "Incomplete dump",
-        "cause": "communication interrupted during data retrieval",
-        "visual": "",
-        "next_action": "retry the dump; check network stability"
-      },
-      {
-        "severity": "critical",
-        "description": "Box not found",
-        "cause": "box not linked or powered off",
-        "visual": "",
-        "next_action": "run LinkUp first, check hardware connections"
-      }
-    ],
-    "tips": [
-      "Use this task for debugging hardware issues.",
-      "Compare dumps before and after configuration changes to verify settings applied correctly.",
-      "Save dumps as reference baselines for troubleshooting."
-    ],
-    "output_parameters_info": [],
-    "analysis_guide": [
-      "Review dump output for each box.",
-      "Compare with expected configuration values.",
-      "Flag any unexpected register values or error conditions."
-    ],
-    "prerequisites": [
-      "LinkUp"
-    ],
-    "images": [],
-    "related_context": [
-      {
-        "type": "history",
-        "params": [],
-        "last_n": 5
-      }
-    ]
-  },
-  "LinkUp": {
-    "name": "LinkUp",
-    "summary": "Initializes and links up the control box hardware.",
-    "what_it_measures": "Hardware link status – establishes communication between the host system and the control boxes (FPGA-based quantum control hardware).",
-    "physical_principle": "No physical measurement. This task performs hardware initialization: establishing network/bus connections to the control boxes and verifying bidirectional communication.",
-    "expected_result": {
-      "description": "Successful link-up of all control boxes with confirmed communication.",
-      "result_type": "status_report",
-      "x_axis": "",
-      "y_axis": "",
-      "z_axis": "",
-      "fit_model": "",
-      "typical_range": "",
-      "good_visual": "all boxes linked and communicating without errors"
-    },
-    "evaluation_criteria": "All control boxes should link up successfully. Timeouts or communication errors indicate hardware or network issues.",
-    "check_questions": [
-      "Did all control boxes link up successfully?",
-      "Were there any timeout or communication errors?"
-    ],
-    "failure_modes": [
-      {
-        "severity": "critical",
-        "description": "Link-up timeout",
-        "cause": "control box powered off, network issue, or firmware mismatch",
-        "visual": "",
-        "next_action": "check power, network cables, and firmware versions"
-      },
-      {
-        "severity": "critical",
-        "description": "Partial link-up",
-        "cause": "one or more boxes not responding",
-        "visual": "",
-        "next_action": "identify which box failed and check its individual status"
-      }
-    ],
-    "tips": [
-      "Ensure all control boxes are powered on and connected before running.",
-      "Check that firmware versions are compatible with the host software.",
-      "If link-up fails intermittently, check network stability."
-    ],
-    "output_parameters_info": [],
-    "analysis_guide": [
-      "Confirm all expected control boxes are linked.",
-      "If any box fails to link, check physical connections first.",
-      "Verify firmware compatibility if connections are physically sound."
-    ],
-    "prerequisites": [
-      "CheckStatus"
-    ],
-    "images": [],
-    "related_context": [
-      {
-        "type": "history",
-        "params": [],
-        "last_n": 5
-      }
-    ]
-  },
-  "RandomizedBenchmarking": {
-    "name": "RandomizedBenchmarking",
-    "summary": "Measures average gate error rate via randomized benchmarking (RB).",
-    "what_it_measures": "Average error per Clifford gate (EPC) – gate-set-level fidelity metric.",
-    "physical_principle": "Apply random Clifford gate sequences of increasing length with inversion gate; measure survival probability. Exponential decay rate gives average gate error.",
-    "expected_result": {
-      "description": "Survival probability decays exponentially with sequence length; intercept ~0.5.",
-      "result_type": "decay_curve",
-      "x_axis": "Clifford sequence length",
-      "y_axis": "Survival probability",
-      "z_axis": "",
-      "fit_model": "A * p^m + B, where p is the depolarizing parameter",
-      "typical_range": "",
-      "good_visual": "smooth exponential decay with clear trend, low shot noise"
-    },
-    "evaluation_criteria": "Error per Clifford should be low; decay should be well-fitted by single exponential (Markovian errors).",
-    "check_questions": [
-      "Is the EPC (error per Clifford) below target?",
-      "Is the decay well-fitted by a single exponential (Markovian)?",
-      "Are there signs of leakage (non-exponential decay)?"
-    ],
-    "failure_modes": [
-      {
-        "severity": "warning",
-        "description": "Non-exponential decay",
-        "cause": "leakage or non-Markovian errors",
-        "visual": "curve deviates from single exponential, kink or plateau",
-        "next_action": "check for leakage, investigate non-Markovian noise"
-      },
-      {
-        "severity": "critical",
-        "description": "Very fast decay",
-        "cause": "gate errors too large for useful RB",
-        "visual": "survival drops to 0.5 within a few Cliffords",
-        "next_action": "recalibrate single-qubit gates first"
-      },
-      {
-        "severity": "info",
-        "description": "SPAM errors dominating short sequences",
-        "cause": "readout or preparation errors",
-        "visual": "intercept significantly different from 0.5 or 1.0",
-        "next_action": "improve readout calibration, use SPAM-robust fitting"
-      }
-    ],
-    "tips": [
-      "Use >=30 random sequences per length for reliable statistics.",
-      "Compare with interleaved RB to isolate specific gate errors.",
-      "If decay is non-exponential, check for leakage."
-    ],
-    "output_parameters_info": [
-      {
-        "name": "average_gate_fidelity",
-        "description": "Average gate fidelity (a.u.)"
-      },
-      {
-        "name": "depolarizing_rate",
-        "description": "Depolarization rate of the qubit (a.u.)"
-      }
-    ],
-    "analysis_guide": [
-      "Verify the exponential decay fit quality.",
-      "Extract the error per Clifford from the decay parameter.",
-      "Check for non-exponential behavior indicating leakage or non-Markovian errors.",
-      "Compare with individual gate error estimates for consistency.",
-      "If EPC is too high, recommend specific gate recalibration."
-    ],
-    "prerequisites": [
-      "CheckPIPulse",
-      "CheckHPIPulse"
-    ],
-    "images": [
-      {
-        "alt_text": "Randomized benchmarking decay",
-        "relative_path": "./0.png",
-        "section": "expected result"
-      }
-    ],
-    "related_context": [
-      {
-        "type": "history",
-        "params": [],
-        "last_n": 5
-      }
-    ]
-  },
-  "ReadoutClassification": {
-    "name": "ReadoutClassification",
-    "summary": "Calibrates and evaluates readout state discrimination (|0⟩ vs |1⟩ classification).",
-    "what_it_measures": "Readout assignment fidelity – probability of correctly identifying qubit state.",
-    "physical_principle": "Prepare |0⟩ and |1⟩ states, measure IQ data, train classifier, evaluate confusion matrix.",
-    "expected_result": {
-      "description": "Two IQ blob clusters; clear separation indicates good discrimination.",
-      "result_type": "scatter_plot",
-      "x_axis": "I quadrature (a.u.)",
-      "y_axis": "Q quadrature (a.u.)",
-      "z_axis": "",
-      "fit_model": "",
-      "typical_range": "",
-      "good_visual": "two well-separated IQ clusters with minimal overlap, clear classification boundary"
-    },
-    "evaluation_criteria": "Average readout fidelity should be high with low asymmetry between |0⟩ and |1⟩ assignment errors.",
-    "check_questions": [
-      "Are the IQ blobs well-separated with minimal overlap?",
-      "Is the assignment fidelity symmetric for |0⟩ and |1⟩?",
-      "Is the average readout fidelity meeting the target?"
-    ],
-    "failure_modes": [
-      {
-        "severity": "critical",
-        "description": "Overlapping IQ blobs",
-        "cause": "insufficient dispersive shift or readout power",
-        "visual": "IQ clusters overlap significantly, poor separation",
-        "next_action": "check dispersive shift, optimize readout amplitude"
-      },
-      {
-        "severity": "warning",
-        "description": "T1 decay during readout",
-        "cause": "|1⟩ relaxes to |0⟩ before measurement completes",
-        "visual": "asymmetric errors: P(0|1) >> P(1|0)",
-        "next_action": "shorten readout pulse, check T1"
-      },
-      {
-        "severity": "warning",
-        "description": "Readout-induced transitions",
-        "cause": "measurement drives qubit transitions",
-        "visual": "increased error rate at high readout power",
-        "next_action": "reduce readout amplitude, check for non-QND effects"
-      },
-      {
-        "severity": "info",
-        "description": "Classifier bias",
-        "cause": "asymmetric errors for |0⟩ vs |1⟩",
-        "visual": "confusion matrix has large off-diagonal asymmetry",
-        "next_action": "retrain classifier, check IQ blob balance"
-      }
-    ],
-    "tips": [
-      "If |1⟩→|0⟩ error >> |0⟩→|1⟩ error, suspect T1 during readout.",
-      "Optimize readout amplitude and duration jointly.",
-      "Consider neural network classifier for better discrimination."
-    ],
-    "output_parameters_info": [
-      {
-        "name": "average_readout_fidelity",
-        "description": "Average readout fidelity (a.u.)"
-      },
-      {
-        "name": "readout_fidelity_0",
-        "description": "Readout fidelity with preparation state 0 (a.u.)"
-      },
-      {
-        "name": "readout_fidelity_1",
-        "description": "Readout fidelity with preparation state 1 (a.u.)"
-      }
-    ],
-    "analysis_guide": [
-      "Examine IQ scatter plot for blob separation and overlap.",
-      "Check the confusion matrix for error symmetry.",
-      "If P(0|1) >> P(1|0), T1 during readout is the limiting factor.",
-      "Compare fidelity with dispersive shift expectations.",
-      "Verify readout amplitude is at the optimal point."
-    ],
-    "prerequisites": [
-      "CheckOptimalReadoutAmplitude",
-      "CheckDispersiveShift"
-    ],
-    "images": [
-      {
-        "alt_text": "Readout classification",
-        "relative_path": "./0.png",
-        "section": "expected result"
-      }
-    ],
-    "related_context": [
-      {
-        "type": "history",
-        "params": [],
-        "last_n": 5
-      }
-    ]
-  },
-  "ReadoutConfigure": {
-    "name": "ReadoutConfigure",
-    "summary": "Configures readout parameters for a specified subset of qubits.",
-    "what_it_measures": "No measurement is performed. This task applies readout configuration (frequencies, amplitudes) to the control hardware for a selected set of qubits.",
-    "physical_principle": "No physical measurement. This is a configuration task that sets readout resonator frequencies for specified qubits and disables (sets to NaN) frequencies for qubits not in the target list.",
-    "expected_result": {
-      "description": "Readout parameters successfully applied to the hardware for the specified qubits.",
-      "result_type": "configuration",
-      "x_axis": "",
-      "y_axis": "",
-      "z_axis": "",
-      "fit_model": "",
-      "typical_range": "",
-      "good_visual": "configuration applied without errors"
-    },
-    "evaluation_criteria": "Configuration should apply without errors. The specified qubits should have valid readout parameters, while excluded qubits should be disabled.",
-    "check_questions": [
-      "Did the configuration apply without errors?",
-      "Are the correct qubits enabled for readout?"
-    ],
-    "failure_modes": [
-      {
-        "severity": "critical",
-        "description": "Configuration push failure",
-        "cause": "hardware communication error or invalid parameter values",
-        "visual": "",
-        "next_action": "check hardware link status and parameter validity"
-      },
-      {
-        "severity": "warning",
-        "description": "Empty qubit list",
-        "cause": "no qubits specified in run parameters",
-        "visual": "",
-        "next_action": "verify the qubit list in run parameters is correctly set"
-      }
-    ],
-    "tips": [
-      "Use this task to selectively configure readout for a subset of qubits when full-chip calibration is not needed.",
-      "Verify qubit IDs match the expected chip layout before running."
-    ],
-    "output_parameters_info": [],
-    "analysis_guide": [
-      "Confirm the target qubit list matches expectations.",
-      "Verify configuration was pushed to hardware without errors.",
-      "Check that excluded qubits are properly disabled."
-    ],
-    "prerequisites": [
-      "LinkUp",
-      "Configure"
-    ],
-    "images": [],
-    "related_context": [
-      {
-        "type": "history",
-        "params": [],
-        "last_n": 5
-      }
-    ]
-  },
-  "X180InterleavedRandomizedBenchmarking": {
-    "name": "X180InterleavedRandomizedBenchmarking",
-    "summary": "Measures X180 (π) gate-specific error rate via interleaved randomized benchmarking.",
-    "what_it_measures": "Error per X180 gate isolated from average Clifford error.",
-    "physical_principle": "Same interleaved RB protocol as X90 IRB but with X180 gate interleaved.",
-    "expected_result": {
-      "description": "Two exponential decays; interleaved decays faster proportional to X180 error.",
-      "result_type": "decay_curve",
-      "x_axis": "Clifford sequence length",
-      "y_axis": "Survival probability",
-      "z_axis": "",
-      "fit_model": "A * p^m + B for both reference and interleaved",
-      "typical_range": "",
-      "good_visual": "two clear exponential decays with interleaved decaying faster, both well-fitted"
-    },
-    "evaluation_criteria": "X180 gate error should be low; error should be consistent with X90 error (X180 ≤ 2× X90 typically).",
-    "check_questions": [
-      "Is the X180 gate error below the target?",
-      "Is the X180 error consistent with X90 error (≤2× X90)?",
-      "Are both curves well-fitted single exponentials?"
-    ],
-    "failure_modes": [
-      {
-        "severity": "warning",
-        "description": "X180 amplitude errors accumulate faster",
-        "cause": "full π rotation is more sensitive to amplitude miscalibration",
-        "visual": "interleaved curve decays much faster than reference",
-        "next_action": "recalibrate π pulse amplitude"
-      },
-      {
-        "severity": "warning",
-        "description": "Leakage to |2⟩",
-        "cause": "more likely with full π rotation than π/2",
-        "visual": "non-exponential interleaved decay",
-        "next_action": "apply DRAG correction, check leakage"
-      },
-      {
-        "severity": "info",
-        "description": "Statistical uncertainty",
-        "cause": "same statistical concerns as X90 IRB",
-        "visual": "large error bars on gate error estimate",
-        "next_action": "increase number of random sequences"
-      }
-    ],
-    "tips": [
-      "Compare X180 and X90 errors – X180 should be ≤2× X90 error.",
-      "If X180 error is much worse, suspect DRAG tuning issues.",
-      "Run after DRAG calibration for best results."
-    ],
-    "output_parameters_info": [
-      {
-        "name": "x180_gate_fidelity",
-        "description": "X180 gate fidelity (a.u.)"
-      },
-      {
-        "name": "x180_depolarizing_rate",
-        "description": "Depolarization error of the X180 gate (a.u.)"
-      }
-    ],
-    "analysis_guide": [
-      "Compare X180 error with X90 error for consistency (expect ≤2×).",
-      "Check for non-exponential decay indicating leakage.",
-      "If X180 error >> 2× X90 error, investigate leakage or DRAG tuning.",
-      "Verify both reference and interleaved curves are well-fitted.",
-      "Recommend DRAG recalibration if leakage is suspected."
-    ],
-    "prerequisites": [
-      "RandomizedBenchmarking",
-      "CheckPIPulse"
-    ],
-    "images": [],
-    "related_context": [
-      {
-        "type": "history",
-        "params": [],
-        "last_n": 5
-      }
-    ]
-  },
-  "X90InterleavedRandomizedBenchmarking": {
-    "name": "X90InterleavedRandomizedBenchmarking",
-    "summary": "Measures X90 (π/2) gate-specific error rate via interleaved randomized benchmarking.",
-    "what_it_measures": "Error per X90 gate by interleaving it between random Cliffords.",
-    "physical_principle": "Run standard RB and interleaved RB (with X90 between each Clifford); ratio of decay rates gives gate-specific error.",
-    "expected_result": {
-      "description": "Two exponential decays; interleaved decays faster than reference.",
-      "result_type": "decay_curve",
-      "x_axis": "Clifford sequence length",
-      "y_axis": "Survival probability",
-      "z_axis": "",
-      "fit_model": "A * p^m + B for both reference and interleaved",
-      "typical_range": "",
-      "good_visual": "two clear exponential decays with the interleaved curve decaying faster, both well-fitted"
-    },
-    "evaluation_criteria": "X90 gate error should be low; reference and interleaved curves should both be well-fitted exponentials.",
-    "check_questions": [
-      "Is the X90 gate error below the target?",
-      "Are both reference and interleaved curves well-fitted?",
-      "Is the reference RB fidelity sufficient to isolate X90 error?"
-    ],
-    "failure_modes": [
-      {
-        "severity": "warning",
-        "description": "Reference RB fidelity too low",
-        "cause": "overall gate quality insufficient to isolate X90 error",
-        "visual": "both curves decay very quickly",
-        "next_action": "improve overall gate calibration first"
-      },
-      {
-        "severity": "info",
-        "description": "Statistical uncertainty too large",
-        "cause": "insufficient number of random sequences",
-        "visual": "large error bars on fitted parameters",
-        "next_action": "increase number of random sequences (>=30 per length)"
-      },
-      {
-        "severity": "warning",
-        "description": "Coherent errors not captured",
-        "cause": "IRB gives average over Pauli errors, may miss coherent errors",
-        "visual": "IRB error lower than expected from other diagnostics",
-        "next_action": "supplement with tomographic diagnostics"
-      }
-    ],
-    "tips": [
-      "Always run reference RB in same session for fair comparison.",
-      "If X90 error >> reference EPC, focus on pulse amplitude tuning.",
-      "Gate error = (1 - p_interleaved/p_reference) * (d-1)/d where d=2."
-    ],
-    "output_parameters_info": [
-      {
-        "name": "x90_gate_fidelity",
-        "description": "X90 gate fidelity (a.u.)"
-      },
-      {
-        "name": "x90_depolarizing_rate",
-        "description": "Depolarization error of the X90 gate (a.u.)"
-      }
-    ],
-    "analysis_guide": [
-      "Compare the reference and interleaved decay curves.",
-      "Extract the X90-specific error rate from the decay ratio.",
-      "Check if the reference EPC is low enough for meaningful interleaving.",
-      "Compare the X90 error with the overall EPC for consistency.",
-      "If X90 error is dominant, recommend pulse recalibration."
-    ],
-    "prerequisites": [
-      "RandomizedBenchmarking",
-      "CheckHPIPulse"
-    ],
-    "images": [
-      {
-        "alt_text": "X90 interleaved randomized benchmarking",
-        "relative_path": "./0.png",
-        "section": "expected result"
-      }
-    ],
-    "related_context": [
-      {
-        "type": "history",
-        "params": [],
-        "last_n": 5
-      }
-    ]
-  },
-  "ZX90InterleavedRandomizedBenchmarking": {
-    "name": "ZX90InterleavedRandomizedBenchmarking",
-    "summary": "Measures ZX90 two-qubit gate error rate via interleaved randomized benchmarking.",
-    "what_it_measures": "Error per ZX90 gate isolated via two-qubit interleaved RB.",
-    "physical_principle": "Two-qubit RB with ZX90 interleaved between random two-qubit Cliffords.",
-    "expected_result": {
-      "description": "Two-qubit survival probability decays; interleaved faster than reference.",
-      "result_type": "decay_curve",
-      "x_axis": "Two-qubit Clifford sequence length",
-      "y_axis": "Survival probability",
-      "z_axis": "",
-      "fit_model": "A * p^m + B for both reference and interleaved",
-      "typical_range": "",
-      "good_visual": "two clear exponential decays with interleaved faster, sufficient data points for fitting"
-    },
-    "evaluation_criteria": "ZX90 gate error should meet the target; the decay should be well-fitted and the reference should be clean enough to isolate the ZX90 contribution.",
-    "check_questions": [
-      "Is the ZX90 gate error below the target?",
-      "Is the reference two-qubit RB clean enough to isolate ZX90 error?",
-      "Are there signs of leakage in either qubit during CR drive?"
-    ],
-    "failure_modes": [
-      {
-        "severity": "warning",
-        "description": "Two-qubit Clifford compilation errors",
-        "cause": "errors from decomposing two-qubit Cliffords into native gates",
-        "visual": "reference decay faster than expected from individual gate errors",
-        "next_action": "verify Clifford decomposition, check compiler"
-      },
-      {
-        "severity": "warning",
-        "description": "Leakage during CR drive",
-        "cause": "CR pulse excites higher levels in either qubit",
-        "visual": "non-exponential decay, especially at longer sequences",
-        "next_action": "check DRAG on both qubits, optimize CR parameters"
-      },
-      {
-        "severity": "info",
-        "description": "Long sequences exceed coherence time",
-        "cause": "total circuit duration approaches T1/T2 of either qubit",
-        "visual": "survival drops to 0.25 before meaningful fit is possible",
-        "next_action": "shorten maximum sequence length, improve coherence"
-      }
-    ],
-    "tips": [
-      "Two-qubit RB requires many more sequences for convergence.",
-      "Compare with process tomography for consistency.",
-      "Gate error includes contributions from both qubits' decoherence."
-    ],
-    "output_parameters_info": [
-      {
-        "name": "zx90_gate_fidelity",
-        "description": "ZX90 gate fidelity (a.u.)"
-      },
-      {
-        "name": "zx90_depolarizing_rate",
-        "description": "Depolarization error of the ZX90 gate (a.u.)"
-      }
-    ],
-    "analysis_guide": [
-      "Compare the reference and interleaved two-qubit decay curves.",
-      "Extract the ZX90-specific error rate from the decay ratio.",
-      "Check for non-exponential behavior indicating leakage.",
-      "Compare with single-qubit gate errors to assess two-qubit gate contribution.",
-      "If error is dominated by coherence, recommend coherence improvements first."
-    ],
-    "prerequisites": [
-      "RandomizedBenchmarking",
-      "CheckZX90"
-    ],
-    "images": [
-      {
-        "alt_text": "ZX90 interleaved randomized benchmarking",
-        "relative_path": "./0.png",
         "section": "expected result"
       }
     ],

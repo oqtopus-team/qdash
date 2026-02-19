@@ -5,27 +5,27 @@
     "items": [
       {
         "text": "CheckStatus",
-        "link": "/reference/task-knowledge/CheckStatus"
+        "link": "/task-knowledge/box-setup/CheckStatus"
       },
       {
         "text": "LinkUp",
-        "link": "/reference/task-knowledge/LinkUp"
+        "link": "/task-knowledge/box-setup/LinkUp"
       },
       {
         "text": "DumpBox",
-        "link": "/reference/task-knowledge/DumpBox"
+        "link": "/task-knowledge/box-setup/DumpBox"
       },
       {
         "text": "CheckNoise",
-        "link": "/reference/task-knowledge/CheckNoise"
+        "link": "/task-knowledge/box-setup/CheckNoise"
       },
       {
         "text": "Configure",
-        "link": "/reference/task-knowledge/Configure"
+        "link": "/task-knowledge/box-setup/Configure"
       },
       {
         "text": "ReadoutConfigure",
-        "link": "/reference/task-knowledge/ReadoutConfigure"
+        "link": "/task-knowledge/box-setup/ReadoutConfigure"
       }
     ]
   },
@@ -35,7 +35,7 @@
     "items": [
       {
         "text": "CheckSkew",
-        "link": "/reference/task-knowledge/CheckSkew"
+        "link": "/task-knowledge/system/CheckSkew"
       }
     ]
   },
@@ -45,31 +45,31 @@
     "items": [
       {
         "text": "CheckResonatorFrequencies",
-        "link": "/reference/task-knowledge/CheckResonatorFrequencies"
+        "link": "/task-knowledge/cw-spectroscopy/CheckResonatorFrequencies"
       },
       {
         "text": "CheckResonatorSpectroscopy",
-        "link": "/reference/task-knowledge/CheckResonatorSpectroscopy"
+        "link": "/task-knowledge/cw-spectroscopy/CheckResonatorSpectroscopy"
       },
       {
         "text": "CheckReflectionCoefficient",
-        "link": "/reference/task-knowledge/CheckReflectionCoefficient"
+        "link": "/task-knowledge/cw-spectroscopy/CheckReflectionCoefficient"
       },
       {
         "text": "CheckElectricalDelay",
-        "link": "/reference/task-knowledge/CheckElectricalDelay"
+        "link": "/task-knowledge/cw-spectroscopy/CheckElectricalDelay"
       },
       {
         "text": "CheckReadoutAmplitude",
-        "link": "/reference/task-knowledge/CheckReadoutAmplitude"
+        "link": "/task-knowledge/cw-spectroscopy/CheckReadoutAmplitude"
       },
       {
         "text": "CheckQubitFrequencies",
-        "link": "/reference/task-knowledge/CheckQubitFrequencies"
+        "link": "/task-knowledge/cw-spectroscopy/CheckQubitFrequencies"
       },
       {
         "text": "CheckQubitSpectroscopy",
-        "link": "/reference/task-knowledge/CheckQubitSpectroscopy"
+        "link": "/task-knowledge/cw-spectroscopy/CheckQubitSpectroscopy"
       }
     ]
   },
@@ -79,43 +79,43 @@
     "items": [
       {
         "text": "CheckQubit",
-        "link": "/reference/task-knowledge/CheckQubit"
+        "link": "/task-knowledge/one-qubit-calibration/CheckQubit"
       },
       {
         "text": "CheckQubitFrequency",
-        "link": "/reference/task-knowledge/CheckQubitFrequency"
+        "link": "/task-knowledge/one-qubit-calibration/CheckQubitFrequency"
       },
       {
         "text": "CheckReadoutFrequency",
-        "link": "/reference/task-knowledge/CheckReadoutFrequency"
+        "link": "/task-knowledge/one-qubit-calibration/CheckReadoutFrequency"
       },
       {
         "text": "CheckRabi",
-        "link": "/reference/task-knowledge/CheckRabi"
+        "link": "/task-knowledge/one-qubit-calibration/CheckRabi"
       },
       {
         "text": "CheckT1",
-        "link": "/reference/task-knowledge/CheckT1"
+        "link": "/task-knowledge/one-qubit-calibration/CheckT1"
       },
       {
         "text": "CheckT2Echo",
-        "link": "/reference/task-knowledge/CheckT2Echo"
+        "link": "/task-knowledge/one-qubit-calibration/CheckT2Echo"
       },
       {
         "text": "CheckRamsey",
-        "link": "/reference/task-knowledge/CheckRamsey"
+        "link": "/task-knowledge/one-qubit-calibration/CheckRamsey"
       },
       {
         "text": "CheckDispersiveShift",
-        "link": "/reference/task-knowledge/CheckDispersiveShift"
+        "link": "/task-knowledge/one-qubit-calibration/CheckDispersiveShift"
       },
       {
         "text": "CheckOptimalReadoutAmplitude",
-        "link": "/reference/task-knowledge/CheckOptimalReadoutAmplitude"
+        "link": "/task-knowledge/one-qubit-calibration/CheckOptimalReadoutAmplitude"
       },
       {
         "text": "ReadoutClassification",
-        "link": "/reference/task-knowledge/ReadoutClassification"
+        "link": "/task-knowledge/one-qubit-calibration/ReadoutClassification"
       }
     ]
   },
@@ -125,35 +125,35 @@
     "items": [
       {
         "text": "CheckPIPulse",
-        "link": "/reference/task-knowledge/CheckPIPulse"
+        "link": "/task-knowledge/gate-calibration/CheckPIPulse"
       },
       {
         "text": "CheckHPIPulse",
-        "link": "/reference/task-knowledge/CheckHPIPulse"
+        "link": "/task-knowledge/gate-calibration/CheckHPIPulse"
       },
       {
         "text": "CheckDRAGPIPulse",
-        "link": "/reference/task-knowledge/CheckDRAGPIPulse"
+        "link": "/task-knowledge/gate-calibration/CheckDRAGPIPulse"
       },
       {
         "text": "CheckDRAGHPIPulse",
-        "link": "/reference/task-knowledge/CheckDRAGHPIPulse"
+        "link": "/task-knowledge/gate-calibration/CheckDRAGHPIPulse"
       },
       {
         "text": "CreatePIPulse",
-        "link": "/reference/task-knowledge/CreatePIPulse"
+        "link": "/task-knowledge/gate-calibration/CreatePIPulse"
       },
       {
         "text": "CreateHPIPulse",
-        "link": "/reference/task-knowledge/CreateHPIPulse"
+        "link": "/task-knowledge/gate-calibration/CreateHPIPulse"
       },
       {
         "text": "CreateDRAGPIPulse",
-        "link": "/reference/task-knowledge/CreateDRAGPIPulse"
+        "link": "/task-knowledge/gate-calibration/CreateDRAGPIPulse"
       },
       {
         "text": "CreateDRAGHPIPulse",
-        "link": "/reference/task-knowledge/CreateDRAGHPIPulse"
+        "link": "/task-knowledge/gate-calibration/CreateDRAGHPIPulse"
       }
     ]
   },
@@ -163,27 +163,27 @@
     "items": [
       {
         "text": "CheckCrossResonance",
-        "link": "/reference/task-knowledge/CheckCrossResonance"
+        "link": "/task-knowledge/two-qubit-calibration/CheckCrossResonance"
       },
       {
         "text": "ChevronPattern",
-        "link": "/reference/task-knowledge/ChevronPattern"
+        "link": "/task-knowledge/two-qubit-calibration/ChevronPattern"
       },
       {
         "text": "CheckZX90",
-        "link": "/reference/task-knowledge/CheckZX90"
+        "link": "/task-knowledge/two-qubit-calibration/CheckZX90"
       },
       {
         "text": "CreateZX90",
-        "link": "/reference/task-knowledge/CreateZX90"
+        "link": "/task-knowledge/two-qubit-calibration/CreateZX90"
       },
       {
         "text": "CheckBellState",
-        "link": "/reference/task-knowledge/CheckBellState"
+        "link": "/task-knowledge/two-qubit-calibration/CheckBellState"
       },
       {
         "text": "CheckBellStateTomography",
-        "link": "/reference/task-knowledge/CheckBellStateTomography"
+        "link": "/task-knowledge/two-qubit-calibration/CheckBellStateTomography"
       }
     ]
   },
@@ -193,19 +193,19 @@
     "items": [
       {
         "text": "RandomizedBenchmarking",
-        "link": "/reference/task-knowledge/RandomizedBenchmarking"
+        "link": "/task-knowledge/benchmarking/RandomizedBenchmarking"
       },
       {
         "text": "X90InterleavedRandomizedBenchmarking",
-        "link": "/reference/task-knowledge/X90InterleavedRandomizedBenchmarking"
+        "link": "/task-knowledge/benchmarking/X90InterleavedRandomizedBenchmarking"
       },
       {
         "text": "X180InterleavedRandomizedBenchmarking",
-        "link": "/reference/task-knowledge/X180InterleavedRandomizedBenchmarking"
+        "link": "/task-knowledge/benchmarking/X180InterleavedRandomizedBenchmarking"
       },
       {
         "text": "ZX90InterleavedRandomizedBenchmarking",
-        "link": "/reference/task-knowledge/ZX90InterleavedRandomizedBenchmarking"
+        "link": "/task-knowledge/benchmarking/ZX90InterleavedRandomizedBenchmarking"
       }
     ]
   }
