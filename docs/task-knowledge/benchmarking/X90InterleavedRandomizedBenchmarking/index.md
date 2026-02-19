@@ -40,7 +40,7 @@ Two exponential decays; interleaved decays faster than reference.
 - fit_model: A * p^m + B for both reference and interleaved
 - good_visual: two clear exponential decays with the interleaved curve decaying faster, both well-fitted
 
-![X90 interleaved randomized benchmarking](./0.png)
+![X90 interleaved randomized benchmarking](./x90_interleaved_randomized_benchmarking_expected.png)
 
 ## Evaluation criteria
 

@@ -40,9 +40,9 @@ Damped cosine: oscillation frequency = detuning Δf, decay constant = T2\*. If �
 - typical_range: 10–80 μs for fixed-frequency transmons
 - good_visual: clear oscillation fringes with smooth exponential envelope
 
-![X-basis Ramsey fringe](./x_fringe.png)
-![Y-basis Ramsey fringe](./y_fringe.png)
-![Ramsey interference in XY plane](./xy_spiral.png)
+![X-basis Ramsey fringe](./check_ramsey_expected_1.png)
+![Y-basis Ramsey fringe](./check_ramsey_expected_2.png)
+![Ramsey interference in XY plane](./check_ramsey_expected_3.png)
 
 ## Evaluation criteria
 

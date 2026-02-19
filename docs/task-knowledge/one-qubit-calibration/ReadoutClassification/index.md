@@ -34,7 +34,7 @@ Two IQ blob clusters; clear separation indicates good discrimination.
 - y_axis: Q quadrature (a.u.)
 - good_visual: two well-separated IQ clusters with minimal overlap, clear classification boundary
 
-![Readout classification](./0.png)
+![Readout classification](./readout_classification_expected.png)
 
 ## Evaluation criteria
 

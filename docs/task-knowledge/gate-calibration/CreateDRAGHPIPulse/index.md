@@ -41,7 +41,7 @@ Leakage vs beta minimum; amplitude tuned for exact π/2 rotation.
 - y_axis: Leakage rate or population error
 - good_visual: clear minimum in leakage vs beta with well-defined optimum, consistent with π pulse beta
 
-![DRAG HPI pulse calibration](./0.png)
+![DRAG HPI pulse calibration](./create_drag_hpi_pulse_expected.png)
 
 ## Evaluation criteria
 

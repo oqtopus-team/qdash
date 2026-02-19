@@ -35,7 +35,7 @@ Exponential decay from ~1 to ~0 as delay increases; single time constant T1.
 - typical_range: 20–200 μs for fixed-frequency transmons
 - good_visual: smooth monotonic decay with clear single-exponential shape, low residuals
 
-![T1 exponential decay curve](./0.png)
+![T1 exponential decay curve](./check_t1_expected.png)
 
 ## Evaluation criteria
 

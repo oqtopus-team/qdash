@@ -38,7 +38,7 @@ Survival probability decays exponentially with sequence length; intercept ~0.5.
 - fit_model: A * p^m + B, where p is the depolarizing parameter
 - good_visual: smooth exponential decay with clear trend, low shot noise
 
-![Randomized benchmarking decay](./0.png)
+![Randomized benchmarking decay](./randomized_benchmarking_expected.png)
 
 ## Evaluation criteria
 

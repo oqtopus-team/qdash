@@ -43,7 +43,7 @@ Correct superposition state after single pulse; oscillation under repeated appli
 - y_axis: P(|1⟩)
 - good_visual: oscillation with period 4 and very slow contrast decay, better than non-DRAG version
 
-![DRAG HPI pulse error amplification](./0.png)
+![DRAG HPI pulse error amplification](./check_drag_hpi_pulse_expected.png)
 
 ## Evaluation criteria
 

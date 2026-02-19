@@ -30,10 +30,10 @@ Rabi oscillation vs amplitude; π/2 pulse at the quarter-period point.
 - result_type: oscillation
 - x_axis: Drive amplitude (a.u.)
 - y_axis: P(|1⟩)
-- fit_model: A * cos(π · amp / amp_π) + B (π/2 at half of π amplitude)
+- fit*model: A \* cos(π · amp / amp*π) + B (π/2 at half of π amplitude)
 - good_visual: clear oscillation with well-identified π/2 amplitude at the 0.5 population crossing
 
-![HPI pulse calibration](./0.png)
+![HPI pulse calibration](./create_hpi_pulse_expected.png)
 
 ## Evaluation criteria
 

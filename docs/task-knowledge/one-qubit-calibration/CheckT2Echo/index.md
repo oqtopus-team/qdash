@@ -34,18 +34,18 @@ Exponential (or Gaussian) decay envelope of echo amplitude vs total delay τ.
 - result_type: decay_curve
 - x_axis: Total delay τ (μs)
 - y_axis: Echo amplitude
-- fit_model: A * exp(-(τ/T2_echo)^n) + B, n=1 or 2
+- fit_model: A \* exp(-(τ/T2_echo)^n) + B, n=1 or 2
 - typical_range: 30–300 μs for fixed-frequency transmons
 - good_visual: smooth decay envelope with clear time constant, low residuals
 
-![T2 echo decay curve](./0.png)
+![T2 echo decay curve](./check_t2_echo_expected.png)
 
 ## Evaluation criteria
 
-T2_echo should satisfy T2_echo ≤ 2*T1. Compare with T2* (Ramsey) to quantify low-frequency noise contribution. Fit quality should be high.
+T2_echo should satisfy T2_echo ≤ 2\*T1. Compare with T2\* (Ramsey) to quantify low-frequency noise contribution. Fit quality should be high.
 
 - check_questions:
-  - "Is T2_echo consistent with the 2*T1 limit?"
+  - "Is T2_echo consistent with the 2\*T1 limit?"
   - "Is the decay well-fitted by a single exponential or Gaussian?"
   - "Is T2_echo stable compared to recent measurements?"
 
@@ -70,7 +70,7 @@ T2_echo should satisfy T2_echo ≤ 2*T1. Compare with T2* (Ramsey) to quantify l
 
 ## Common failure patterns
 
-- [critical] T2_echo << 2*T1
+- [critical] T2_echo << 2\*T1
   - cause: residual high-frequency noise not refocused by single echo
   - visual: decay much faster than expected from T1 measurement
   - next: try CPMG (multiple echoes) to identify noise spectrum
@@ -78,24 +78,24 @@ T2_echo should satisfy T2_echo ≤ 2*T1. Compare with T2* (Ramsey) to quantify l
   - cause: 1/f noise spectrum or multiple noise sources
   - visual: decay does not fit single exponential, stretched or compressed shape
   - next: try stretched exponential fit, investigate noise spectrum
-- [warning] T2_echo > 2*T1
+- [warning] T2_echo > 2\*T1
   - cause: measurement artifact; fitting or readout calibration issue
   - visual: decay appears slower than physically expected
   - next: verify T1 measurement, check readout calibration
 
 ## Tips for improvement
 
-- Compare T2_echo with T2* (Ramsey) to quantify low-frequency noise contribution.
-- If T2_echo is much shorter than 2*T1, try CPMG (multiple echoes) to identify noise spectrum.
+- Compare T2_echo with T2\* (Ramsey) to quantify low-frequency noise contribution.
+- If T2_echo is much shorter than 2\*T1, try CPMG (multiple echoes) to identify noise spectrum.
 - Ensure π pulse is well-calibrated; a bad refocusing pulse degrades echo amplitude.
 
 ## Analysis guide
 
 1. Check the decay fit quality (R²) and identify the decay model (exponential vs Gaussian).
-2. Compare T2_echo with 2*T1 to assess the noise regime.
-3. Compare T2_echo with T2* to quantify the low-frequency noise contribution.
+2. Compare T2_echo with 2\*T1 to assess the noise regime.
+3. Compare T2_echo with T2\* to quantify the low-frequency noise contribution.
 4. Review recent history for trends or instability.
-5. If T2_echo << 2*T1, investigate high-frequency noise sources.
+5. If T2_echo << 2\*T1, investigate high-frequency noise sources.
 
 ## Prerequisites
 

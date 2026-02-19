@@ -30,10 +30,11 @@ Damped sinusoidal oscillation of the rotated IQ signal vs pulse duration. Freque
 - result_type: oscillation
 - x_axis: Pulse duration (ns)
 - y_axis: Rotated IQ signal (arb. units)
-- fit_model: A * cos(ω·t + φ) * exp(-t/τ) + B (damped cosine, `is_damped=True` by default)
+- fit_model: A _ cos(ω·t + φ) _ exp(-t/τ) + B (damped cosine, `is_damped=True` by default)
 - good_visual: clear sinusoidal oscillation with high contrast and slow decay envelope
 
-![Rabi oscillation](./0.png)
+![Rabi oscillation 1](./check_rabi_expected_1.png)
+![Rabi oscillation 2](./check_rabi_expected_2.png)
 
 ## Evaluation criteria
 

@@ -41,7 +41,7 @@ Leakage vs beta shows a minimum; amplitude scan gives exact π rotation.
 - y_axis: Leakage rate or population error
 - good_visual: clear minimum in leakage vs beta curve with well-defined optimum
 
-![DRAG PI pulse calibration](./0.png)
+![DRAG PI pulse calibration](./create_drag_pi_pulse_expected.png)
 
 ## Evaluation criteria
 
