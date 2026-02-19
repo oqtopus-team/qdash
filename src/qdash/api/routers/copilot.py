@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING, Any
 
 from bunnet import SortDirection
 from fastapi import APIRouter, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi.responses import Response, StreamingResponse
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
@@ -29,6 +29,7 @@ from qdash.api.lib.copilot_config import load_copilot_config
 from qdash.datamodel.task_knowledge import get_task_knowledge
 
 router = APIRouter()
+public_router = APIRouter()
 logger = logging.getLogger(__name__)
 
 TOOL_LABELS: dict[str, str] = {
@@ -75,6 +76,18 @@ async def get_copilot_config() -> dict[str, Any]:
     """
     config = load_copilot_config()
     return dict(config.model_dump())
+
+
+@public_router.get("/expected-image", include_in_schema=False)
+def get_expected_image(task_name: str, index: int) -> Response:
+    """Serve a reference/expected image from TaskKnowledge by index."""
+    knowledge = get_task_knowledge(task_name)
+    if not knowledge or not knowledge.images or index < 0 or index >= len(knowledge.images):
+        raise HTTPException(status_code=404, detail="Image not found")
+    img = knowledge.images[index]
+    if not img.base64_data:
+        raise HTTPException(status_code=404, detail="Image has no data")
+    return Response(content=base64.b64decode(img.base64_data), media_type="image/png")
 
 
 @router.post(
@@ -137,9 +150,9 @@ async def analyze_task_result(request: AnalyzeRequest) -> dict[str, Any]:
     # Auto-load experiment figure if not provided and multimodal is enabled
     image_base64 = request.image_base64
     expected_images: list[tuple[str, str]] = []
+    figure_paths: list[str] = task_result.get("figure_path", []) if task_result else []
     if config.analysis.multimodal:
         if not image_base64 and task_result:
-            figure_paths = task_result.get("figure_path", [])
             image_base64 = _load_figure_as_base64(figure_paths)
         expected_images = _collect_expected_images(knowledge)
 
@@ -164,7 +177,7 @@ async def analyze_task_result(request: AnalyzeRequest) -> dict[str, Any]:
     try:
         from qdash.api.lib.copilot_agent import run_analysis
 
-        return await run_analysis(
+        result = await run_analysis(
             context=context,
             user_message=request.message,
             config=config,
@@ -173,6 +186,16 @@ async def analyze_task_result(request: AnalyzeRequest) -> dict[str, Any]:
             conversation_history=request.conversation_history,
             tool_executors=tool_executors,
         )
+        result["images_sent"] = {
+            "experiment_figure": bool(image_base64),
+            "experiment_figure_paths": figure_paths if image_base64 else [],
+            "expected_images": [
+                {"alt_text": alt, "index": i}
+                for i, (_, alt) in enumerate(expected_images)
+            ],
+            "task_name": request.task_name,
+        }
+        return result
     except ImportError:
         raise HTTPException(
             status_code=503,
@@ -244,11 +267,26 @@ async def analyze_task_result_stream(request: AnalyzeRequest) -> StreamingRespon
         # Auto-load experiment figure if not provided and multimodal is enabled
         image_base64 = request.image_base64
         expected_images: list[tuple[str, str]] = []
+        figure_paths: list[str] = task_result.get("figure_path", []) if task_result else []
         if config.analysis.multimodal:
             if not image_base64 and task_result:
-                figure_paths = task_result.get("figure_path", [])
                 image_base64 = _load_figure_as_base64(figure_paths)
             expected_images = _collect_expected_images(knowledge)
+
+        # Emit image loading status
+        has_experiment = bool(image_base64)
+        num_expected = len(expected_images)
+        if has_experiment and num_expected > 0:
+            img_msg = f"実験結果画像と参照画像{num_expected}枚をAIに送信中..."
+        elif has_experiment:
+            img_msg = "実験結果画像をAIに送信中..."
+        elif num_expected > 0:
+            img_msg = f"参照画像{num_expected}枚をAIに送信中..."
+        else:
+            img_msg = None
+        if img_msg:
+            yield _sse_event("status", {"step": "load_images", "message": img_msg})
+            await asyncio.sleep(0)
 
         # Step 4: Build context
         yield _sse_event(
@@ -326,6 +364,17 @@ async def analyze_task_result_stream(request: AnalyzeRequest) -> StreamingRespon
         while not queue.empty():
             event = queue.get_nowait()
             yield _sse_event("status", event)
+
+        # Inject images_sent metadata
+        result["images_sent"] = {
+            "experiment_figure": has_experiment,
+            "experiment_figure_paths": figure_paths if has_experiment else [],
+            "expected_images": [
+                {"alt_text": alt, "index": i}
+                for i, (_, alt) in enumerate(expected_images)
+            ],
+            "task_name": request.task_name,
+        }
 
         # Step 6: Complete
         yield _sse_event("status", {"step": "complete", "message": "分析完了"})
