@@ -53,12 +53,14 @@ class Check1QGateCoherenceLimit(QubexTask):
             t1=t1_ns,
             t2=t2_ns,
         )
-        return RunResult(raw_result={
-            "fidelity": result["fidelity"],
-            "gate_time": gate_time,
-            "t1_ns": t1_ns,
-            "t2_ns": t2_ns,
-        })
+        return RunResult(
+            raw_result={
+                "fidelity": result["fidelity"],
+                "gate_time": gate_time,
+                "t1_ns": t1_ns,
+                "t2_ns": t2_ns,
+            }
+        )
 
     def postprocess(
         self, backend: QubexBackend, execution_id: str, run_result: RunResult, qid: str
@@ -94,20 +96,24 @@ class Check1QGateCoherenceLimit(QubexTask):
         ]
 
         fig = go.Figure()
-        fig.add_trace(go.Scatter(
-            x=gate_times,
-            y=fidelities,
-            mode="lines",
-            name="Coherence Limit",
-            line={"color": "steelblue", "width": 2},
-        ))
-        fig.add_trace(go.Scatter(
-            x=[gate_time],
-            y=[fidelity],
-            mode="markers",
-            name=f"Current ({gate_time:.0f} ns)",
-            marker={"color": "red", "size": 10, "symbol": "diamond"},
-        ))
+        fig.add_trace(
+            go.Scatter(
+                x=gate_times,
+                y=fidelities,
+                mode="lines",
+                name="Coherence Limit",
+                line={"color": "steelblue", "width": 2},
+            )
+        )
+        fig.add_trace(
+            go.Scatter(
+                x=[gate_time],
+                y=[fidelity],
+                mode="markers",
+                name=f"Current ({gate_time:.0f} ns)",
+                marker={"color": "red", "size": 10, "symbol": "diamond"},
+            )
+        )
         # Crosshair lines at current operating point
         fig.add_vline(
             x=gate_time,
