@@ -12,17 +12,21 @@ X/2 – free evolution τ – X/2 (or Y/2), then measure. Fringes oscillate at t
 
 ```mermaid
 gantt
-    title CheckRamsey Pulse Sequence
+    title CheckRamsey Pulse Sequence (X and Y axes)
     dateFormat x
     axisFormat " "
 
-    section Drive
+    section X-axis
     X/2 pulse       :d1, 0, 15ms
-    free evolution τ :done, d2, after d1, 120ms
+    free evolution τ :done, d2, after d1, 100ms
     X/2 pulse       :d3, after d2, 15ms
+    Measurement     :crit, r1, after d3, 40ms
 
-    section Readout
-    Measurement     :crit, r1, after d3, 50ms
+    section Y-axis
+    X/2 pulse       :e1, 0, 15ms
+    free evolution τ :done, e2, after e1, 100ms
+    Y/2 pulse       :active, e3, after e2, 15ms
+    Measurement     :crit, r2, after e3, 40ms
 ```
 
 ## Expected result

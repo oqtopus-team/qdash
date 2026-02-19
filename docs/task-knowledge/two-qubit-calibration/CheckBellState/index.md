@@ -12,19 +12,23 @@ Apply H⊗I then CNOT; measure in Z basis and verify equal |00⟩/|11⟩ populat
 
 ```mermaid
 gantt
-    title CheckBellState Pulse Sequence
+    title CheckBellState Pulse Sequence (echo CR = ZX90)
     dateFormat x
     axisFormat " "
 
     section Control
-    X/2 (H gate) :d1, 0, 20ms
-    CR pulse     :d2, after d1, 80ms
-    Readout      :crit, r1, after d2, 50ms
+    X/2        :d1, 0, 15ms
+    CR pulse   :d2, after d1, 35ms
+    π          :d3, after d2, 15ms
+    CR pulse   :d4, after d3, 35ms
+    Readout    :crit, r1, after d4, 40ms
 
     section Target
-    idle         :done, t1, 0, 20ms
-    Cancel tone  :active, t2, after t1, 80ms
-    Readout      :crit, r2, after t2, 50ms
+    idle       :done, t0, 0, 15ms
+    Cancel     :active, t1, after t0, 35ms
+    idle       :done, t2, after t1, 15ms
+    Cancel     :active, t3, after t2, 35ms
+    Readout    :crit, r2, after t3, 40ms
 ```
 
 ## Expected result

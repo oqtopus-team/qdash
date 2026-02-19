@@ -16,13 +16,16 @@ gantt
     dateFormat x
     axisFormat " "
 
+    section Electrical delay
+    Delay measurement       :active, p1, 0, 60ms
+
     section Meas 1 (|0⟩)
-    idle (|0⟩ prep)         :done, a1, 0, 30ms
-    Readout (sweep freq)    :crit, a2, after a1, 80ms
+    idle (|0⟩ prep)         :done, a1, after p1, 20ms
+    Readout (sweep freq)    :crit, a2, after a1, 60ms
 
     section Meas 2 (|1⟩)
-    π pulse (|1⟩ prep)      :b1, 0, 30ms
-    Readout (sweep freq)    :crit, b2, after b1, 80ms
+    π pulse (|1⟩ prep)      :b1, after p1, 20ms
+    Readout (sweep freq)    :crit, b2, after b1, 60ms
 ```
 
 ## Expected result
