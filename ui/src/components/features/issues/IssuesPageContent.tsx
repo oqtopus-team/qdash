@@ -8,9 +8,10 @@ import { PageContainer } from "@/components/ui/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { MarkdownContent } from "@/components/ui/MarkdownContent";
-import { useIssues, type IssueComment } from "@/hooks/useIssues";
+import { useIssues } from "@/hooks/useIssues";
 import { useProject } from "@/contexts/ProjectContext";
 import { formatRelativeTime } from "@/utils/datetime";
+import type { IssueResponse } from "@/schemas";
 
 function getCurrentUsername(): string {
   if (typeof document === "undefined") return "";
@@ -21,67 +22,66 @@ function getCurrentUsername(): string {
 }
 
 function IssueThread({
-  comment,
+  issue,
   onClose,
   onReopen,
   canManage,
 }: {
-  comment: IssueComment;
-  onClose: (commentId: string) => void;
-  onReopen: (commentId: string) => void;
+  issue: IssueResponse;
+  onClose: (issueId: string) => void;
+  onReopen: (issueId: string) => void;
   canManage: boolean;
 }) {
   const router = useRouter();
 
   const handleCardClick = () => {
-    router.push(`/issues/${comment.id}`);
+    router.push(`/issues/${issue.id}`);
   };
 
   return (
     <div
       onClick={handleCardClick}
-      className={`bg-base-100 rounded-lg border border-base-300 cursor-pointer hover:border-primary/50 transition-colors ${comment.is_closed === true ? "opacity-70" : ""}`}
+      className={`bg-base-100 rounded-lg border border-base-300 cursor-pointer hover:border-primary/50 transition-colors ${issue.is_closed === true ? "opacity-70" : ""}`}
     >
-      {/* Root comment */}
       <div className="p-4">
         <div className="flex items-center gap-3 mb-2 flex-wrap">
           <Link
-            href={`/task-results/${comment.task_id}`}
+            href={`/task-results/${issue.task_id}`}
             onClick={(e) => e.stopPropagation()}
             className="font-mono text-xs font-semibold text-primary hover:underline"
           >
-            {comment.task_id}
+            {issue.task_id}
           </Link>
           <div className="flex items-center gap-1.5">
             <span className="badge badge-sm badge-neutral">
-              {comment.username}
+              {issue.username}
             </span>
             <span className="text-xs text-base-content/40">
-              {formatRelativeTime(comment.created_at)}
+              {formatRelativeTime(issue.created_at)}
             </span>
-            {comment.is_closed === true && (
+            {issue.is_closed === true && (
               <span className="badge badge-sm badge-ghost">Closed</span>
             )}
           </div>
         </div>
-        {comment.title && (
-          <h3 className="text-sm font-semibold mb-1">{comment.title}</h3>
+        {issue.title && (
+          <h3 className="text-sm font-semibold mb-1">{issue.title}</h3>
         )}
         <div className="text-sm text-base-content/80 mb-3 line-clamp-3">
-          <MarkdownContent content={comment.content} />
+          <MarkdownContent content={issue.content} />
         </div>
         <div className="flex items-center gap-3">
           <span className="text-xs text-base-content/50 flex items-center gap-1">
             <MessageSquare className="h-3 w-3" />
-            {comment.reply_count ?? 0}{" "}
-            {comment.reply_count === 1 ? "reply" : "replies"}
+            {issue.reply_count ?? 0}{" "}
+            {issue.reply_count === 1 ? "reply" : "replies"}
           </span>
           {canManage &&
-            (comment.is_closed === true ? (
+            (issue.is_closed === true ? (
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  onReopen(comment.id);
+                  onReopen(issue.id);
                 }}
                 className="btn btn-ghost btn-xs gap-1"
               >
@@ -92,7 +92,7 @@ function IssueThread({
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  onClose(comment.id);
+                  onClose(issue.id);
                 }}
                 className="btn btn-ghost btn-xs gap-1"
               >
@@ -108,7 +108,7 @@ function IssueThread({
 
 export function IssuesPageContent() {
   const {
-    comments,
+    issues,
     total,
     skip,
     pageSize,
@@ -117,8 +117,8 @@ export function IssuesPageContent() {
     filterByTaskId,
     statusFilter,
     setStatusFilter,
-    closeComment,
-    reopenComment,
+    closeIssue,
+    reopenIssue,
     goToPage,
   } = useIssues();
   const { isOwner } = useProject();
@@ -206,7 +206,7 @@ export function IssuesPageContent() {
         <div className="flex justify-center py-16">
           <span className="loading loading-spinner loading-lg"></span>
         </div>
-      ) : comments.length === 0 ? (
+      ) : issues.length === 0 ? (
         <EmptyState
           title="No issues yet"
           description={
@@ -219,13 +219,13 @@ export function IssuesPageContent() {
       ) : (
         <>
           <div className="space-y-3">
-            {comments.map((comment) => (
+            {issues.map((issue) => (
               <IssueThread
-                key={comment.id}
-                comment={comment}
-                onClose={closeComment}
-                onReopen={reopenComment}
-                canManage={isOwner || currentUser === comment.username}
+                key={issue.id}
+                issue={issue}
+                onClose={closeIssue}
+                onReopen={reopenIssue}
+                canManage={isOwner || currentUser === issue.username}
               />
             ))}
           </div>

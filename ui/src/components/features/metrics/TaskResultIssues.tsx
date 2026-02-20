@@ -98,11 +98,11 @@ function IssueRow({
   );
 }
 
-interface TaskResultCommentsProps {
+interface TaskResultIssuesProps {
   taskId: string;
 }
 
-export function TaskResultComments({ taskId }: TaskResultCommentsProps) {
+export function TaskResultIssues({ taskId }: TaskResultIssuesProps) {
   const queryClient = useQueryClient();
   const { isOwner } = useProject();
   const currentUser = getCurrentUsername();

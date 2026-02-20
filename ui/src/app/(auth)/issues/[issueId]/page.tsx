@@ -26,7 +26,7 @@ export default function IssueDetailPageRoute() {
   return (
     <Suspense fallback={<IssueSkeleton />}>
       <PageContainer maxWidth>
-        <IssueDetailPage commentId={params.issueId} />
+        <IssueDetailPage issueId={params.issueId} />
       </PageContainer>
     </Suspense>
   );

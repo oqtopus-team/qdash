@@ -8,7 +8,8 @@ import { useGetTaskResult } from "@/client/task/task";
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { ParametersTable } from "@/components/features/metrics/ParametersTable";
 import { formatDateTime, formatRelativeTime } from "@/utils/datetime";
-import { useCommentReplies, type IssueComment } from "@/hooks/useIssues";
+import { useIssueReplies } from "@/hooks/useIssues";
+import type { IssueResponse } from "@/schemas";
 import { MarkdownContent } from "@/components/ui/MarkdownContent";
 import { MarkdownEditor } from "@/components/ui/MarkdownEditor";
 import {
@@ -40,7 +41,7 @@ function StatusBadge({ status }: { status: string }) {
   return <span className={`badge badge-sm ${color}`}>{status}</span>;
 }
 
-export function IssueDetailPage({ commentId }: { commentId: string }) {
+export function IssueDetailPage({ issueId }: { issueId: string }) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { isOwner } = useProject();
@@ -48,16 +49,16 @@ export function IssueDetailPage({ commentId }: { commentId: string }) {
   const [replyText, setReplyText] = useState("");
 
   // Fetch issue
-  const { data: issueResponse, isLoading: commentLoading } = useGetIssue(
-    commentId,
+  const { data: issueResponse, isLoading: issueLoading } = useGetIssue(
+    issueId,
     { query: { staleTime: 30_000 } },
   );
-  const comment = issueResponse?.data ?? null;
+  const issue = issueResponse?.data ?? null;
 
   // Fetch task result (only when we have a task_id)
   const { data: taskResultResponse, isLoading: taskResultLoading } =
-    useGetTaskResult(comment?.task_id ?? "", {
-      query: { enabled: !!comment?.task_id },
+    useGetTaskResult(issue?.task_id ?? "", {
+      query: { enabled: !!issue?.task_id },
     });
   const taskResult = taskResultResponse?.data;
 
@@ -68,21 +69,21 @@ export function IssueDetailPage({ commentId }: { commentId: string }) {
     isSubmitting,
     addReply,
     deleteReply,
-  } = useCommentReplies(commentId);
+  } = useIssueReplies(issueId);
 
   // Close/Reopen mutations
   const closeMutation = useCloseIssue();
   const reopenMutation = useReopenIssue();
 
-  const canManage = isOwner || currentUser === comment?.username;
+  const canManage = isOwner || currentUser === issue?.username;
 
   const handleClose = () => {
     closeMutation.mutate(
-      { issueId: commentId },
+      { issueId: issueId },
       {
         onSuccess: () => {
           queryClient.invalidateQueries({
-            queryKey: getGetIssueQueryKey(commentId),
+            queryKey: getGetIssueQueryKey(issueId),
           });
         },
       },
@@ -91,11 +92,11 @@ export function IssueDetailPage({ commentId }: { commentId: string }) {
 
   const handleReopen = () => {
     reopenMutation.mutate(
-      { issueId: commentId },
+      { issueId: issueId },
       {
         onSuccess: () => {
           queryClient.invalidateQueries({
-            queryKey: getGetIssueQueryKey(commentId),
+            queryKey: getGetIssueQueryKey(issueId),
           });
         },
       },
@@ -104,18 +105,18 @@ export function IssueDetailPage({ commentId }: { commentId: string }) {
 
   const handleAddReply = async () => {
     const trimmed = replyText.trim();
-    if (!trimmed || !comment) return;
-    await addReply(comment.task_id, trimmed);
+    if (!trimmed || !issue) return;
+    await addReply(issue.task_id, trimmed);
     setReplyText("");
   };
 
   const handleDeleteReply = async (replyId: string) => {
-    if (!comment) return;
-    await deleteReply(comment.task_id, replyId);
+    if (!issue) return;
+    await deleteReply(issue.task_id, replyId);
   };
 
   // Loading state
-  if (commentLoading) {
+  if (issueLoading) {
     return (
       <div className="flex justify-center py-16">
         <span className="loading loading-spinner loading-lg"></span>
@@ -124,7 +125,7 @@ export function IssueDetailPage({ commentId }: { commentId: string }) {
   }
 
   // Not found
-  if (!comment) {
+  if (!issue) {
     return (
       <div className="flex flex-col items-center justify-center py-16 gap-4">
         <p className="text-base-content/60">Issue not found</p>
@@ -147,15 +148,15 @@ export function IssueDetailPage({ commentId }: { commentId: string }) {
           <ArrowLeft className="h-4 w-4" />
         </button>
         <div className="flex flex-col gap-1 flex-1 min-w-0">
-          {comment.title && (
-            <h1 className="text-lg font-bold truncate">{comment.title}</h1>
+          {issue.title && (
+            <h1 className="text-lg font-bold truncate">{issue.title}</h1>
           )}
           <div className="flex items-center gap-3 flex-wrap">
             <Link
-              href={`/task-results/${comment.task_id}`}
+              href={`/task-results/${issue.task_id}`}
               className="font-mono text-sm font-semibold text-primary hover:underline truncate"
             >
-              {comment.task_id}
+              {issue.task_id}
             </Link>
             <div className="flex items-center gap-1.5">
               {taskResult && (
@@ -166,14 +167,14 @@ export function IssueDetailPage({ commentId }: { commentId: string }) {
                   <StatusBadge status={taskResult.status} />
                 </>
               )}
-              {comment.is_closed && (
+              {issue.is_closed && (
                 <span className="badge badge-sm badge-ghost">Closed</span>
               )}
             </div>
           </div>
         </div>
         {canManage &&
-          (comment.is_closed ? (
+          (issue.is_closed ? (
             <button
               onClick={handleReopen}
               className="btn btn-sm btn-ghost gap-1"
@@ -252,7 +253,7 @@ export function IssueDetailPage({ commentId }: { commentId: string }) {
                 taskResult.json_figure_path.length > 0)) && (
               <div className="h-[220px] overflow-x-auto flex gap-2">
                 <TaskFigure
-                  taskId={comment.task_id}
+                  taskId={issue.task_id}
                   qid={taskResult.qid}
                   className="h-full w-auto object-contain rounded"
                 />
@@ -301,18 +302,18 @@ export function IssueDetailPage({ commentId }: { commentId: string }) {
         Conversation
       </div>
 
-      {/* Root comment */}
+      {/* Root issue */}
       <div className="bg-base-100 rounded-lg border border-base-300 p-4 mb-4">
         <div className="flex items-center gap-2 mb-2">
           <span className="badge badge-sm badge-neutral">
-            {comment.username}
+            {issue.username}
           </span>
           <span className="text-xs text-base-content/40">
-            {formatRelativeTime(comment.created_at)}
+            {formatRelativeTime(issue.created_at)}
           </span>
         </div>
         <MarkdownContent
-          content={comment.content}
+          content={issue.content}
           className="text-sm text-base-content/80"
         />
       </div>
@@ -324,7 +325,7 @@ export function IssueDetailPage({ commentId }: { commentId: string }) {
             <span className="loading loading-spinner loading-sm"></span>
           </div>
         ) : replies.length > 0 ? (
-          replies.map((reply: IssueComment) => (
+          replies.map((reply: IssueResponse) => (
             <div
               key={reply.id}
               className="bg-base-100 rounded-md border border-base-300 px-3 py-2 text-sm"

@@ -10,10 +10,6 @@ import {
   useCloseIssue,
   useReopenIssue,
 } from "@/client/issue/issue";
-import type { IssueResponse } from "@/schemas";
-
-export type { IssueResponse as IssueComment };
-
 export type StatusFilter = "open" | "closed" | "all";
 
 const PAGE_SIZE = 50;
@@ -65,14 +61,14 @@ export function useIssues() {
     mutation: { onSuccess: invalidateList },
   });
 
-  const closeComment = useCallback(
+  const closeIssue = useCallback(
     (issueId: string) => {
       closeMutation.mutate({ issueId });
     },
     [closeMutation],
   );
 
-  const reopenComment = useCallback(
+  const reopenIssue = useCallback(
     (issueId: string) => {
       reopenMutation.mutate({ issueId });
     },
@@ -84,7 +80,7 @@ export function useIssues() {
   }, [invalidateList]);
 
   return {
-    comments: issues,
+    issues,
     total,
     skip,
     pageSize: PAGE_SIZE,
@@ -93,18 +89,18 @@ export function useIssues() {
     filterByTaskId,
     statusFilter,
     setStatusFilter,
-    closeComment,
-    reopenComment,
+    closeIssue,
+    reopenIssue,
     goToPage,
     refresh,
   };
 }
 
-export function useCommentReplies(commentId: string | null) {
+export function useIssueReplies(issueId: string | null) {
   const queryClient = useQueryClient();
-  const effectiveId = commentId ?? "";
+  const effectiveId = issueId ?? "";
   const { data, isLoading } = useGetIssueReplies(effectiveId, {
-    query: { enabled: !!commentId },
+    query: { enabled: !!issueId },
   });
 
   const replies = data?.data ?? [];
@@ -113,27 +109,27 @@ export function useCommentReplies(commentId: string | null) {
   const deleteMutation = useDeleteIssue();
 
   const invalidateReplies = useCallback(() => {
-    if (!commentId) return;
+    if (!issueId) return;
     queryClient.invalidateQueries({
-      queryKey: getGetIssueRepliesQueryKey(commentId),
+      queryKey: getGetIssueRepliesQueryKey(issueId),
     });
     // Also invalidate the list to update reply_count
     queryClient.invalidateQueries({
       queryKey: getListIssuesQueryKey(),
     });
-  }, [queryClient, commentId]);
+  }, [queryClient, issueId]);
 
   const addReply = useCallback(
     async (taskId: string, content: string) => {
-      if (!commentId) return;
+      if (!issueId) return;
       const result = await createMutation.mutateAsync({
         taskId,
-        data: { content, parent_id: commentId },
+        data: { content, parent_id: issueId },
       });
       invalidateReplies();
       return result;
     },
-    [commentId, createMutation, invalidateReplies],
+    [issueId, createMutation, invalidateReplies],
   );
 
   const deleteReply = useCallback(
