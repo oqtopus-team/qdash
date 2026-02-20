@@ -607,7 +607,16 @@ export default function ExecutionDetailClient({
                             Task ID
                           </div>
                           <div className="font-mono text-sm break-all">
-                            {selectedTask.task_id || "N/A"}
+                            {selectedTask.task_id ? (
+                              <Link
+                                href={`/task-results/${selectedTask.task_id}`}
+                                className="text-primary hover:underline"
+                              >
+                                {selectedTask.task_id}
+                              </Link>
+                            ) : (
+                              "N/A"
+                            )}
                           </div>
                         </div>
 

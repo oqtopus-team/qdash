@@ -42,7 +42,7 @@ export function TaskResultComments({ taskId }: TaskResultCommentsProps) {
           </h4>
         </div>
         <Link
-          href="/issues"
+          href={`/task-results/${taskId}`}
           className="text-xs text-primary hover:underline flex items-center gap-1"
         >
           View all <ExternalLink className="h-3 w-3" />
