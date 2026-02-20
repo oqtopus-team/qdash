@@ -588,7 +588,7 @@ export function CorrelationView() {
 
               {/* X Parameter Selection - inline */}
               <span className="text-xs sm:text-sm font-medium">X:</span>
-              <div className="w-32 sm:w-48">
+              <div className="w-32 sm:w-56">
                 <Select<MetricOption, false>
                   className="text-base-content"
                   classNamePrefix="react-select"
@@ -611,7 +611,7 @@ export function CorrelationView() {
 
               {/* Y Parameter Selection - inline */}
               <span className="text-xs sm:text-sm font-medium">Y:</span>
-              <div className="w-32 sm:w-48">
+              <div className="w-32 sm:w-56">
                 <Select<MetricOption, false>
                   className="text-base-content"
                   classNamePrefix="react-select"
