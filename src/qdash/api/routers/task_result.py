@@ -16,7 +16,6 @@ from qdash.api.lib.project import (  # noqa: TCH002
     ProjectContext,
     get_project_context,
 )
-from qdash.api.schemas.success import SuccessResponse
 from qdash.api.schemas.task_result import (
     LatestTaskResultResponse,
     TaskHistoryResponse,
@@ -845,4 +844,3 @@ def download_figures_as_zip(
         media_type="application/zip",
         headers={"Content-Disposition": f"attachment; filename={safe_filename}"},
     )
-

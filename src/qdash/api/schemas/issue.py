@@ -9,7 +9,9 @@ class IssueCreate(BaseModel):
     """Request schema for creating an issue."""
 
     title: str | None = Field(
-        default=None, max_length=200, description="Issue title. Required for root issues, None for replies."
+        default=None,
+        max_length=200,
+        description="Issue title. Required for root issues, None for replies.",
     )
     content: str = Field(..., min_length=1, max_length=5000, description="Issue text content")
     parent_id: str | None = Field(

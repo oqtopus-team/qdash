@@ -62,11 +62,7 @@ def list_issues(
     total = IssueDocument.find(query).count()
 
     docs = (
-        IssueDocument.find(query)
-        .sort("-system_info.created_at")
-        .skip(skip)
-        .limit(limit)
-        .to_list()
+        IssueDocument.find(query).sort("-system_info.created_at").skip(skip).limit(limit).to_list()
     )
 
     # Collect root issue IDs to get reply counts

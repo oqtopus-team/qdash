@@ -10,6 +10,7 @@ from qdash.dbmodel.execution_counter import ExecutionCounterDocument
 from qdash.dbmodel.execution_history import ExecutionHistoryDocument
 from qdash.dbmodel.execution_lock import ExecutionLockDocument
 from qdash.dbmodel.flow import FlowDocument
+from qdash.dbmodel.issue import IssueDocument
 from qdash.dbmodel.project import ProjectDocument
 from qdash.dbmodel.project_membership import ProjectMembershipDocument
 from qdash.dbmodel.provenance import (
@@ -21,7 +22,6 @@ from qdash.dbmodel.qubit import QubitDocument
 from qdash.dbmodel.qubit_history import QubitHistoryDocument
 from qdash.dbmodel.tag import TagDocument
 from qdash.dbmodel.task import TaskDocument
-from qdash.dbmodel.issue import IssueDocument
 from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
 from qdash.dbmodel.user import UserDocument
 

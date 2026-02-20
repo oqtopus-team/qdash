@@ -305,9 +305,7 @@ export function IssueDetailPage({ issueId }: { issueId: string }) {
       {/* Root issue */}
       <div className="bg-base-100 rounded-lg border border-base-300 p-4 mb-4">
         <div className="flex items-center gap-2 mb-2">
-          <span className="badge badge-sm badge-neutral">
-            {issue.username}
-          </span>
+          <span className="badge badge-sm badge-neutral">{issue.username}</span>
           <span className="text-xs text-base-content/40">
             {formatRelativeTime(issue.created_at)}
           </span>
