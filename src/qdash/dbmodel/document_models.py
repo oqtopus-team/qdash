@@ -21,7 +21,7 @@ from qdash.dbmodel.qubit import QubitDocument
 from qdash.dbmodel.qubit_history import QubitHistoryDocument
 from qdash.dbmodel.tag import TagDocument
 from qdash.dbmodel.task import TaskDocument
-from qdash.dbmodel.task_result_comment import TaskResultCommentDocument
+from qdash.dbmodel.issue import IssueDocument
 from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
 from qdash.dbmodel.user import UserDocument
 
@@ -47,7 +47,7 @@ def document_models() -> list[Any]:
         CouplingHistoryDocument,
         BackendDocument,
         FlowDocument,
-        TaskResultCommentDocument,
+        IssueDocument,
         # Provenance tracking
         ParameterVersionDocument,
         ProvenanceRelationDocument,

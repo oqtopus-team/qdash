@@ -7,6 +7,6 @@
  */
 
 /**
- * Parent comment ID for replies
+ * Issue title
  */
-export type CommentResponseParentId = string | null;
+export type IssueResponseTitle = string | null;

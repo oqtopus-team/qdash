@@ -597,7 +597,18 @@ export default function ExecutionDetailClient({
                         <h3 className="card-title text-lg sm:text-xl break-all">
                           {selectedTask.name}
                         </h3>
-                        {getStatusBadge(selectedTask.status)}
+                        <div className="flex items-center gap-2">
+                          {getStatusBadge(selectedTask.status)}
+                          {selectedTask.task_id && (
+                            <Link
+                              href={`/task-results/${selectedTask.task_id}`}
+                              className="btn btn-sm btn-outline btn-primary gap-1"
+                            >
+                              <ExternalLink size={14} />
+                              View Details
+                            </Link>
+                          )}
+                        </div>
                       </div>
 
                       {/* Task Information */}

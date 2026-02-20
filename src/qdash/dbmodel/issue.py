@@ -1,4 +1,4 @@
-"""Document model for task result comments."""
+"""Document model for issues."""
 
 from typing import ClassVar
 
@@ -8,32 +8,38 @@ from pymongo import ASCENDING, IndexModel
 from qdash.datamodel.system_info import SystemInfoModel
 
 
-class TaskResultCommentDocument(Document):
-    """Document for storing comments on task results.
+class IssueDocument(Document):
+    """Document for storing issues on task results.
 
-    Each document represents a single comment on a task result,
-    enabling multi-comment discussion threads per task.
+    Each document represents a single issue or reply on a task result,
+    enabling multi-issue discussion threads per task.
 
     Attributes
     ----------
         project_id (str): The project ID for multi-tenancy.
-        task_id (str): The task ID this comment is associated with.
-        username (str): The username of the comment author.
-        content (str): The comment text content.
+        task_id (str): The task ID this issue is associated with.
+        username (str): The username of the issue author.
+        title (str | None): Issue title. Only for root issues.
+        content (str): The issue text content.
+        parent_id (str | None): Parent issue ID for replies. None for root issues.
+        is_closed (bool): Whether this thread is closed.
         system_info (SystemInfoModel): Created/updated timestamps.
 
     """
 
     project_id: str = Field(..., description="Owning project identifier")
-    task_id: str = Field(..., description="The task ID this comment belongs to")
-    username: str = Field(..., description="The username of the comment author")
-    content: str = Field(..., description="The comment text content")
+    task_id: str = Field(..., description="The task ID this issue belongs to")
+    username: str = Field(..., description="The username of the issue author")
+    title: str | None = Field(
+        default=None, description="Issue title. Only for root issues."
+    )
+    content: str = Field(..., description="The issue text content")
     parent_id: str | None = Field(
-        default=None, description="Parent comment ID for replies. None for root comments."
+        default=None, description="Parent issue ID for replies. None for root issues."
     )
     is_closed: bool = Field(
         default=False,
-        description="Whether this thread is closed. Only meaningful for root comments.",
+        description="Whether this thread is closed. Only meaningful for root issues.",
     )
     system_info: SystemInfoModel = Field(
         default_factory=SystemInfoModel, description="System timestamps"
@@ -42,7 +48,7 @@ class TaskResultCommentDocument(Document):
     class Settings:
         """Settings for the document."""
 
-        name = "task_result_comment"
+        name = "issue"
         indexes: ClassVar = [
             IndexModel(
                 [

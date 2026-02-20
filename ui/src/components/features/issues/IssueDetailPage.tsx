@@ -12,11 +12,11 @@ import { useCommentReplies, type IssueComment } from "@/hooks/useIssues";
 import { MarkdownContent } from "@/components/ui/MarkdownContent";
 import { MarkdownEditor } from "@/components/ui/MarkdownEditor";
 import {
-  useGetComment,
-  getGetCommentQueryKey,
-  useCloseCommentThread,
-  useReopenCommentThread,
-} from "@/client/task-result/task-result";
+  useGetIssue,
+  getGetIssueQueryKey,
+  useCloseIssue,
+  useReopenIssue,
+} from "@/client/issue/issue";
 import { useProject } from "@/contexts/ProjectContext";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -47,12 +47,12 @@ export function IssueDetailPage({ commentId }: { commentId: string }) {
   const currentUser = getCurrentUsername();
   const [replyText, setReplyText] = useState("");
 
-  // Fetch comment
-  const { data: commentResponse, isLoading: commentLoading } = useGetComment(
+  // Fetch issue
+  const { data: issueResponse, isLoading: commentLoading } = useGetIssue(
     commentId,
     { query: { staleTime: 30_000 } },
   );
-  const comment = commentResponse?.data ?? null;
+  const comment = issueResponse?.data ?? null;
 
   // Fetch task result (only when we have a task_id)
   const { data: taskResultResponse, isLoading: taskResultLoading } =
@@ -71,18 +71,18 @@ export function IssueDetailPage({ commentId }: { commentId: string }) {
   } = useCommentReplies(commentId);
 
   // Close/Reopen mutations
-  const closeMutation = useCloseCommentThread();
-  const reopenMutation = useReopenCommentThread();
+  const closeMutation = useCloseIssue();
+  const reopenMutation = useReopenIssue();
 
   const canManage = isOwner || currentUser === comment?.username;
 
   const handleClose = () => {
     closeMutation.mutate(
-      { commentId },
+      { issueId: commentId },
       {
         onSuccess: () => {
           queryClient.invalidateQueries({
-            queryKey: getGetCommentQueryKey(commentId),
+            queryKey: getGetIssueQueryKey(commentId),
           });
         },
       },
@@ -91,11 +91,11 @@ export function IssueDetailPage({ commentId }: { commentId: string }) {
 
   const handleReopen = () => {
     reopenMutation.mutate(
-      { commentId },
+      { issueId: commentId },
       {
         onSuccess: () => {
           queryClient.invalidateQueries({
-            queryKey: getGetCommentQueryKey(commentId),
+            queryKey: getGetIssueQueryKey(commentId),
           });
         },
       },
@@ -146,25 +146,30 @@ export function IssueDetailPage({ commentId }: { commentId: string }) {
         >
           <ArrowLeft className="h-4 w-4" />
         </button>
-        <div className="flex items-center gap-3 flex-wrap flex-1 min-w-0">
-          <Link
-            href={`/execution?task_id=${comment.task_id}`}
-            className="font-mono text-sm font-semibold text-primary hover:underline truncate"
-          >
-            {comment.task_id}
-          </Link>
-          <div className="flex items-center gap-1.5">
-            {taskResult && (
-              <>
-                <span className="badge badge-sm badge-neutral">
-                  {taskResult.qid}
-                </span>
-                <StatusBadge status={taskResult.status} />
-              </>
-            )}
-            {comment.is_closed && (
-              <span className="badge badge-sm badge-ghost">Closed</span>
-            )}
+        <div className="flex flex-col gap-1 flex-1 min-w-0">
+          {comment.title && (
+            <h1 className="text-lg font-bold truncate">{comment.title}</h1>
+          )}
+          <div className="flex items-center gap-3 flex-wrap">
+            <Link
+              href={`/task-results/${comment.task_id}`}
+              className="font-mono text-sm font-semibold text-primary hover:underline truncate"
+            >
+              {comment.task_id}
+            </Link>
+            <div className="flex items-center gap-1.5">
+              {taskResult && (
+                <>
+                  <span className="badge badge-sm badge-neutral">
+                    {taskResult.qid}
+                  </span>
+                  <StatusBadge status={taskResult.status} />
+                </>
+              )}
+              {comment.is_closed && (
+                <span className="badge badge-sm badge-ghost">Closed</span>
+              )}
+            </div>
           </div>
         </div>
         {canManage &&

@@ -1,18 +1,18 @@
 import { useState, useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
-  useListAllComments,
-  getListAllCommentsQueryKey,
-  useGetCommentReplies,
-  getGetCommentRepliesQueryKey,
-  useCreateTaskResultComment,
-  useDeleteTaskResultComment,
-  useCloseCommentThread,
-  useReopenCommentThread,
-} from "@/client/task-result/task-result";
-import type { CommentResponse } from "@/schemas";
+  useListIssues,
+  getListIssuesQueryKey,
+  useGetIssueReplies,
+  getGetIssueRepliesQueryKey,
+  useCreateIssue,
+  useDeleteIssue,
+  useCloseIssue,
+  useReopenIssue,
+} from "@/client/issue/issue";
+import type { IssueResponse } from "@/schemas";
 
-export type { CommentResponse as IssueComment };
+export type { IssueResponse as IssueComment };
 
 export type StatusFilter = "open" | "closed" | "all";
 
@@ -37,9 +37,9 @@ export function useIssues() {
     is_closed: buildIsClosedParam(statusFilter),
   };
 
-  const { data, isLoading } = useListAllComments(params);
+  const { data, isLoading } = useListIssues(params);
 
-  const comments = data?.data?.comments ?? [];
+  const issues = data?.data?.issues ?? [];
   const total = data?.data?.total ?? 0;
 
   const goToPage = useCallback((page: number) => {
@@ -53,28 +53,28 @@ export function useIssues() {
 
   const invalidateList = useCallback(() => {
     queryClient.invalidateQueries({
-      queryKey: getListAllCommentsQueryKey(),
+      queryKey: getListIssuesQueryKey(),
     });
   }, [queryClient]);
 
-  const closeMutation = useCloseCommentThread({
+  const closeMutation = useCloseIssue({
     mutation: { onSuccess: invalidateList },
   });
 
-  const reopenMutation = useReopenCommentThread({
+  const reopenMutation = useReopenIssue({
     mutation: { onSuccess: invalidateList },
   });
 
   const closeComment = useCallback(
-    (commentId: string) => {
-      closeMutation.mutate({ commentId });
+    (issueId: string) => {
+      closeMutation.mutate({ issueId });
     },
     [closeMutation],
   );
 
   const reopenComment = useCallback(
-    (commentId: string) => {
-      reopenMutation.mutate({ commentId });
+    (issueId: string) => {
+      reopenMutation.mutate({ issueId });
     },
     [reopenMutation],
   );
@@ -84,7 +84,7 @@ export function useIssues() {
   }, [invalidateList]);
 
   return {
-    comments,
+    comments: issues,
     total,
     skip,
     pageSize: PAGE_SIZE,
@@ -103,23 +103,23 @@ export function useIssues() {
 export function useCommentReplies(commentId: string | null) {
   const queryClient = useQueryClient();
   const effectiveId = commentId ?? "";
-  const { data, isLoading } = useGetCommentReplies(effectiveId, {
+  const { data, isLoading } = useGetIssueReplies(effectiveId, {
     query: { enabled: !!commentId },
   });
 
   const replies = data?.data ?? [];
 
-  const createMutation = useCreateTaskResultComment();
-  const deleteMutation = useDeleteTaskResultComment();
+  const createMutation = useCreateIssue();
+  const deleteMutation = useDeleteIssue();
 
   const invalidateReplies = useCallback(() => {
     if (!commentId) return;
     queryClient.invalidateQueries({
-      queryKey: getGetCommentRepliesQueryKey(commentId),
+      queryKey: getGetIssueRepliesQueryKey(commentId),
     });
     // Also invalidate the list to update reply_count
     queryClient.invalidateQueries({
-      queryKey: getListAllCommentsQueryKey(),
+      queryKey: getListIssuesQueryKey(),
     });
   }, [queryClient, commentId]);
 
@@ -137,8 +137,8 @@ export function useCommentReplies(commentId: string | null) {
   );
 
   const deleteReply = useCallback(
-    async (taskId: string, replyId: string) => {
-      await deleteMutation.mutateAsync({ taskId, commentId: replyId });
+    async (_taskId: string, replyId: string) => {
+      await deleteMutation.mutateAsync({ issueId: replyId });
       invalidateReplies();
     },
     [deleteMutation, invalidateReplies],

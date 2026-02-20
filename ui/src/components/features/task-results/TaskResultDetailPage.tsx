@@ -2,18 +2,12 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  ArrowLeft,
-  MessageSquare,
-  Plus,
-  Lock,
-  Unlock,
-} from "lucide-react";
+import { ArrowLeft, MessageSquare, Plus, Lock, Unlock } from "lucide-react";
 import { useGetTaskResult } from "@/client/task/task";
 import {
-  useCreateTaskResultComment,
-  getGetTaskResultCommentsQueryKey,
-} from "@/client/task-result/task-result";
+  useCreateIssue,
+  getGetTaskResultIssuesQueryKey,
+} from "@/client/issue/issue";
 import { useQueryClient } from "@tanstack/react-query";
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { ParametersTable } from "@/components/features/metrics/ParametersTable";
@@ -85,6 +79,9 @@ function IssueCard({
             {issue.reply_count === 1 ? "reply" : "replies"}
           </span>
         </div>
+        {issue.title && (
+          <h3 className="text-sm font-semibold mb-1">{issue.title}</h3>
+        )}
         <div className="text-sm text-base-content/80 mb-3 line-clamp-3">
           <MarkdownContent content={issue.content} />
         </div>
@@ -125,6 +122,7 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
   const { isOwner } = useProject();
   const currentUser = getCurrentUsername();
   const [showEditor, setShowEditor] = useState(false);
+  const [newIssueTitle, setNewIssueTitle] = useState("");
   const [newIssueContent, setNewIssueContent] = useState("");
 
   // Task result
@@ -147,20 +145,22 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
   } = useTaskResultIssues(taskId);
 
   // Create issue
-  const createMutation = useCreateTaskResultComment();
+  const createMutation = useCreateIssue();
 
   const handleCreateIssue = async () => {
-    const trimmed = newIssueContent.trim();
-    if (!trimmed) return;
+    const trimmedTitle = newIssueTitle.trim();
+    const trimmedContent = newIssueContent.trim();
+    if (!trimmedTitle || !trimmedContent) return;
     await createMutation.mutateAsync({
       taskId,
-      data: { content: trimmed, parent_id: null },
+      data: { title: trimmedTitle, content: trimmedContent, parent_id: null },
     });
+    setNewIssueTitle("");
     setNewIssueContent("");
     setShowEditor(false);
     invalidateList();
     queryClient.invalidateQueries({
-      queryKey: getGetTaskResultCommentsQueryKey(taskId),
+      queryKey: getGetTaskResultIssuesQueryKey(taskId),
     });
   };
 
@@ -207,25 +207,18 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
           <span className="font-mono text-sm font-semibold truncate">
             {taskId}
           </span>
-          <span className="badge badge-sm badge-neutral">
-            {taskResult.qid}
-          </span>
+          <span className="badge badge-sm badge-neutral">{taskResult.qid}</span>
           <StatusBadge status={taskResult.status} />
         </div>
       </div>
 
       {/* Task Info Box */}
       <div className="bg-base-200/50 rounded-lg p-4 mb-4">
-        <h2 className="text-sm font-semibold mb-2">
-          {taskResult.task_name}
-        </h2>
+        <h2 className="text-sm font-semibold mb-2">{taskResult.task_name}</h2>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
           <div>
             <span className="text-base-content/50">Execution ID</span>
-            <p
-              className="font-mono truncate"
-              title={taskResult.execution_id}
-            >
+            <p className="font-mono truncate" title={taskResult.execution_id}>
               {taskResult.execution_id}
             </p>
           </div>
@@ -297,9 +290,7 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
           Object.keys(taskResult.run_parameters).length > 0 && (
             <ParametersTable
               title="Run Parameters"
-              parameters={
-                taskResult.run_parameters as Record<string, unknown>
-              }
+              parameters={taskResult.run_parameters as Record<string, unknown>}
             />
           )}
       </div>
@@ -334,7 +325,15 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
 
       {/* New issue editor */}
       {showEditor && (
-        <div className="mb-4 border border-base-300 rounded-lg p-4 bg-base-100">
+        <div className="mb-4 border border-base-300 rounded-lg p-4 bg-base-100 space-y-3">
+          <input
+            type="text"
+            className="input input-bordered w-full"
+            placeholder="Issue title"
+            value={newIssueTitle}
+            onChange={(e) => setNewIssueTitle(e.target.value)}
+            maxLength={200}
+          />
           <MarkdownEditor
             value={newIssueContent}
             onChange={setNewIssueContent}

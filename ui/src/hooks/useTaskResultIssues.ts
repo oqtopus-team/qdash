@@ -1,14 +1,14 @@
 import { useState, useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
-  useListAllComments,
-  getListAllCommentsQueryKey,
-  useCloseCommentThread,
-  useReopenCommentThread,
-} from "@/client/task-result/task-result";
-import type { CommentResponse } from "@/schemas";
+  useListIssues,
+  getListIssuesQueryKey,
+  useCloseIssue,
+  useReopenIssue,
+} from "@/client/issue/issue";
+import type { IssueResponse } from "@/schemas";
 
-export type { CommentResponse as TaskResultIssue };
+export type { IssueResponse as TaskResultIssue };
 
 export type StatusFilter = "open" | "closed" | "all";
 
@@ -29,35 +29,35 @@ export function useTaskResultIssues(taskId: string) {
     is_closed: buildIsClosedParam(statusFilter),
   };
 
-  const { data, isLoading } = useListAllComments(params);
+  const { data, isLoading } = useListIssues(params);
 
-  const issues = data?.data?.comments ?? [];
+  const issues = data?.data?.issues ?? [];
   const total = data?.data?.total ?? 0;
 
   const invalidateList = useCallback(() => {
     queryClient.invalidateQueries({
-      queryKey: getListAllCommentsQueryKey(),
+      queryKey: getListIssuesQueryKey(),
     });
   }, [queryClient]);
 
-  const closeMutation = useCloseCommentThread({
+  const closeMutation = useCloseIssue({
     mutation: { onSuccess: invalidateList },
   });
 
-  const reopenMutation = useReopenCommentThread({
+  const reopenMutation = useReopenIssue({
     mutation: { onSuccess: invalidateList },
   });
 
   const closeIssue = useCallback(
-    (commentId: string) => {
-      closeMutation.mutate({ commentId });
+    (issueId: string) => {
+      closeMutation.mutate({ issueId });
     },
     [closeMutation],
   );
 
   const reopenIssue = useCallback(
-    (commentId: string) => {
-      reopenMutation.mutate({ commentId });
+    (issueId: string) => {
+      reopenMutation.mutate({ issueId });
     },
     [reopenMutation],
   );

@@ -4425,14 +4425,14 @@
         ]
       }
     },
-    "/task-results/comments": {
+    "/issues": {
       "get": {
         "tags": [
-          "task-result"
+          "issue"
         ],
-        "summary": "List all comments across tasks",
-        "description": "List all root comments across the project, with reply counts.",
-        "operationId": "listAllComments",
+        "summary": "List all issues across tasks",
+        "description": "List all root issues across the project, with reply counts.",
+        "operationId": "listIssues",
         "security": [
           {
             "HTTPBearer": []
@@ -4526,7 +4526,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ListCommentsResponse"
+                  "$ref": "#/components/schemas/ListIssuesResponse"
                 }
               }
             }
@@ -4544,14 +4544,14 @@
         }
       }
     },
-    "/task-results/comments/{comment_id}": {
+    "/issues/{issue_id}": {
       "get": {
         "tags": [
-          "task-result"
+          "issue"
         ],
-        "summary": "Get a single comment by ID",
-        "description": "Get a single root comment by its ID, including reply count.",
-        "operationId": "getComment",
+        "summary": "Get a single issue by ID",
+        "description": "Get a single root issue by its ID, including reply count.",
+        "operationId": "getIssue",
         "security": [
           {
             "HTTPBearer": []
@@ -4559,12 +4559,12 @@
         ],
         "parameters": [
           {
-            "name": "comment_id",
+            "name": "issue_id",
             "in": "path",
             "required": true,
             "schema": {
               "type": "string",
-              "title": "Comment Id"
+              "title": "Issue Id"
             }
           },
           {
@@ -4590,7 +4590,69 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/CommentResponse"
+                  "$ref": "#/components/schemas/IssueResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "issue"
+        ],
+        "summary": "Delete an issue",
+        "description": "Delete an issue. Only the author can delete their own issue.",
+        "operationId": "deleteIssue",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "issue_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Issue Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
                 }
               }
             }
@@ -4608,14 +4670,14 @@
         }
       }
     },
-    "/task-results/comments/{comment_id}/replies": {
+    "/issues/{issue_id}/replies": {
       "get": {
         "tags": [
-          "task-result"
+          "issue"
         ],
-        "summary": "List replies for a comment",
-        "description": "List all replies to a specific comment, sorted by creation time ascending.",
-        "operationId": "getCommentReplies",
+        "summary": "List replies for an issue",
+        "description": "List all replies to a specific issue, sorted by creation time ascending.",
+        "operationId": "getIssueReplies",
         "security": [
           {
             "HTTPBearer": []
@@ -4623,12 +4685,12 @@
         ],
         "parameters": [
           {
-            "name": "comment_id",
+            "name": "issue_id",
             "in": "path",
             "required": true,
             "schema": {
               "type": "string",
-              "title": "Comment Id"
+              "title": "Issue Id"
             }
           },
           {
@@ -4656,9 +4718,9 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/CommentResponse"
+                    "$ref": "#/components/schemas/IssueResponse"
                   },
-                  "title": "Response Getcommentreplies"
+                  "title": "Response Getissuereplies"
                 }
               }
             }
@@ -4676,14 +4738,142 @@
         }
       }
     },
-    "/task-results/{task_id}/comments": {
+    "/issues/{issue_id}/close": {
+      "patch": {
+        "tags": [
+          "issue"
+        ],
+        "summary": "Close an issue",
+        "description": "Close an issue thread. Only the author or project owner can close.",
+        "operationId": "closeIssue",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "issue_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Issue Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/issues/{issue_id}/reopen": {
+      "patch": {
+        "tags": [
+          "issue"
+        ],
+        "summary": "Reopen an issue",
+        "description": "Reopen a closed issue thread. Only the author or project owner can reopen.",
+        "operationId": "reopenIssue",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "issue_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Issue Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/task-results/{task_id}/issues": {
       "get": {
         "tags": [
-          "task-result"
+          "issue"
         ],
-        "summary": "List comments for a task result",
-        "description": "List all comments for a task result, sorted by creation time ascending.",
-        "operationId": "getTaskResultComments",
+        "summary": "List issues for a task result",
+        "description": "List all issues for a task result, sorted by creation time ascending.",
+        "operationId": "getTaskResultIssues",
         "security": [
           {
             "HTTPBearer": []
@@ -4724,9 +4914,9 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/CommentResponse"
+                    "$ref": "#/components/schemas/IssueResponse"
                   },
-                  "title": "Response Gettaskresultcomments"
+                  "title": "Response Gettaskresultissues"
                 }
               }
             }
@@ -4745,11 +4935,11 @@
       },
       "post": {
         "tags": [
-          "task-result"
+          "issue"
         ],
-        "summary": "Create a comment on a task result",
-        "description": "Create a new comment on a task result.",
-        "operationId": "createTaskResultComment",
+        "summary": "Create an issue on a task result",
+        "description": "Create a new issue on a task result.",
+        "operationId": "createIssue",
         "security": [
           {
             "HTTPBearer": []
@@ -4787,7 +4977,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CommentCreate"
+                "$ref": "#/components/schemas/IssueCreate"
               }
             }
           }
@@ -4798,208 +4988,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/CommentResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/task-results/{task_id}/comments/{comment_id}": {
-      "delete": {
-        "tags": [
-          "task-result"
-        ],
-        "summary": "Delete a comment on a task result",
-        "description": "Delete a comment. Only the author can delete their own comment.",
-        "operationId": "deleteTaskResultComment",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "task_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Task Id"
-            }
-          },
-          {
-            "name": "comment_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Comment Id"
-            }
-          },
-          {
-            "name": "X-Project-Id",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Project-Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SuccessResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/task-results/comments/{comment_id}/close": {
-      "patch": {
-        "tags": [
-          "task-result"
-        ],
-        "summary": "Close a comment thread",
-        "description": "Close a comment thread. Only the author or project owner can close.",
-        "operationId": "closeCommentThread",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "comment_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Comment Id"
-            }
-          },
-          {
-            "name": "X-Project-Id",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Project-Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SuccessResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/task-results/comments/{comment_id}/reopen": {
-      "patch": {
-        "tags": [
-          "task-result"
-        ],
-        "summary": "Reopen a comment thread",
-        "description": "Reopen a closed comment thread. Only the author or project owner can reopen.",
-        "operationId": "reopenCommentThread",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "comment_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Comment Id"
-            }
-          },
-          {
-            "name": "X-Project-Id",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Project-Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SuccessResponse"
+                  "$ref": "#/components/schemas/IssueResponse"
                 }
               }
             }
@@ -8234,99 +8223,6 @@
         "title": "ChipResponse",
         "description": "Chip response model.\n\nQubit and coupling data are stored in separate collections for scalability\nand should be fetched via dedicated endpoints (/chips/{chip_id}/qubits, etc.).\n\nAttributes\n----------\n    chip_id (str): The ID of the chip.\n    size (int): The size of the chip.\n    topology_id (str | None): Topology template ID.\n    qubit_count (int): Number of qubits in the chip.\n    coupling_count (int): Number of couplings in the chip.\n    installed_at (datetime | None): Installation timestamp."
       },
-      "CommentCreate": {
-        "properties": {
-          "content": {
-            "type": "string",
-            "maxLength": 5000,
-            "minLength": 1,
-            "title": "Content",
-            "description": "Comment text content"
-          },
-          "parent_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Parent Id",
-            "description": "Parent comment ID for replies. None for root comments."
-          }
-        },
-        "type": "object",
-        "required": [
-          "content"
-        ],
-        "title": "CommentCreate",
-        "description": "Request schema for creating a comment."
-      },
-      "CommentResponse": {
-        "properties": {
-          "id": {
-            "type": "string",
-            "title": "Id",
-            "description": "Comment document ID"
-          },
-          "task_id": {
-            "type": "string",
-            "title": "Task Id",
-            "description": "Associated task ID"
-          },
-          "username": {
-            "type": "string",
-            "title": "Username",
-            "description": "Comment author username"
-          },
-          "content": {
-            "type": "string",
-            "title": "Content",
-            "description": "Comment text content"
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Created At",
-            "description": "When the comment was created"
-          },
-          "parent_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Parent Id",
-            "description": "Parent comment ID for replies"
-          },
-          "reply_count": {
-            "type": "integer",
-            "title": "Reply Count",
-            "description": "Number of replies to this comment",
-            "default": 0
-          },
-          "is_closed": {
-            "type": "boolean",
-            "title": "Is Closed",
-            "description": "Whether this thread is closed",
-            "default": false
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "task_id",
-          "username",
-          "content",
-          "created_at"
-        ],
-        "title": "CommentResponse",
-        "description": "Response schema for a single comment."
-      },
       "Condition": {
         "properties": {
           "coupling_fidelity": {
@@ -9565,6 +9461,124 @@
         "title": "InputParameterModel",
         "description": "Input parameter class."
       },
+      "IssueCreate": {
+        "properties": {
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title",
+            "description": "Issue title. Required for root issues, None for replies."
+          },
+          "content": {
+            "type": "string",
+            "maxLength": 5000,
+            "minLength": 1,
+            "title": "Content",
+            "description": "Issue text content"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id",
+            "description": "Parent issue ID for replies. None for root issues."
+          }
+        },
+        "type": "object",
+        "required": [
+          "content"
+        ],
+        "title": "IssueCreate",
+        "description": "Request schema for creating an issue."
+      },
+      "IssueResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Issue document ID"
+          },
+          "task_id": {
+            "type": "string",
+            "title": "Task Id",
+            "description": "Associated task ID"
+          },
+          "username": {
+            "type": "string",
+            "title": "Username",
+            "description": "Issue author username"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title",
+            "description": "Issue title"
+          },
+          "content": {
+            "type": "string",
+            "title": "Content",
+            "description": "Issue text content"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At",
+            "description": "When the issue was created"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id",
+            "description": "Parent issue ID for replies"
+          },
+          "reply_count": {
+            "type": "integer",
+            "title": "Reply Count",
+            "description": "Number of replies to this issue",
+            "default": 0
+          },
+          "is_closed": {
+            "type": "boolean",
+            "title": "Is Closed",
+            "description": "Whether this thread is closed",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "task_id",
+          "username",
+          "content",
+          "created_at"
+        ],
+        "title": "IssueResponse",
+        "description": "Response schema for a single issue."
+      },
       "LatestTaskResultResponse": {
         "properties": {
           "task_name": {
@@ -9739,38 +9753,6 @@
         "title": "ListChipsResponse",
         "description": "Response model for listing chips."
       },
-      "ListCommentsResponse": {
-        "properties": {
-          "comments": {
-            "items": {
-              "$ref": "#/components/schemas/CommentResponse"
-            },
-            "type": "array",
-            "title": "Comments"
-          },
-          "total": {
-            "type": "integer",
-            "title": "Total"
-          },
-          "skip": {
-            "type": "integer",
-            "title": "Skip"
-          },
-          "limit": {
-            "type": "integer",
-            "title": "Limit"
-          }
-        },
-        "type": "object",
-        "required": [
-          "comments",
-          "total",
-          "skip",
-          "limit"
-        ],
-        "title": "ListCommentsResponse",
-        "description": "Paginated list of comments."
-      },
       "ListCouplingsResponse": {
         "properties": {
           "couplings": {
@@ -9888,6 +9870,38 @@
         ],
         "title": "ListFlowsResponse",
         "description": "Response for listing flows."
+      },
+      "ListIssuesResponse": {
+        "properties": {
+          "issues": {
+            "items": {
+              "$ref": "#/components/schemas/IssueResponse"
+            },
+            "type": "array",
+            "title": "Issues"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "skip": {
+            "type": "integer",
+            "title": "Skip"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          }
+        },
+        "type": "object",
+        "required": [
+          "issues",
+          "total",
+          "skip",
+          "limit"
+        ],
+        "title": "ListIssuesResponse",
+        "description": "Paginated list of issues."
       },
       "ListMuxResponse": {
         "properties": {

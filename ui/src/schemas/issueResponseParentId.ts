@@ -7,6 +7,6 @@
  */
 
 /**
- * Parent comment ID for replies. None for root comments.
+ * Parent issue ID for replies
  */
-export type CommentCreateParentId = string | null;
+export type IssueResponseParentId = string | null;

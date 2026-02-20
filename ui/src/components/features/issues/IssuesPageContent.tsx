@@ -46,7 +46,7 @@ function IssueThread({
       <div className="p-4">
         <div className="flex items-center gap-3 mb-2 flex-wrap">
           <Link
-            href={`/execution?task_id=${comment.task_id}`}
+            href={`/task-results/${comment.task_id}`}
             onClick={(e) => e.stopPropagation()}
             className="font-mono text-xs font-semibold text-primary hover:underline"
           >
@@ -64,6 +64,9 @@ function IssueThread({
             )}
           </div>
         </div>
+        {comment.title && (
+          <h3 className="text-sm font-semibold mb-1">{comment.title}</h3>
+        )}
         <div className="text-sm text-base-content/80 mb-3 line-clamp-3">
           <MarkdownContent content={comment.content} />
         </div>

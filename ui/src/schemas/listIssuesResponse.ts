@@ -5,13 +5,13 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { CommentResponse } from "./commentResponse";
+import type { IssueResponse } from "./issueResponse";
 
 /**
- * Paginated list of comments.
+ * Paginated list of issues.
  */
-export interface ListCommentsResponse {
-  comments: CommentResponse[];
+export interface ListIssuesResponse {
+  issues: IssueResponse[];
   total: number;
   skip: number;
   limit: number;
