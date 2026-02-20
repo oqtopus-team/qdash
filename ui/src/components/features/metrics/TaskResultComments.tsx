@@ -5,6 +5,8 @@ import Link from "next/link";
 import { MessageSquare, Trash2, ExternalLink } from "lucide-react";
 import { useTaskResultComments } from "@/hooks/useTaskResultComments";
 import { formatRelativeTime } from "@/utils/datetime";
+import { MarkdownContent } from "@/components/ui/MarkdownContent";
+import { MarkdownEditor } from "@/components/ui/MarkdownEditor";
 
 function getCurrentUsername(): string {
   const match = document.cookie
@@ -30,13 +32,6 @@ export function TaskResultComments({ taskId }: TaskResultCommentsProps) {
     setNewComment("");
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-      e.preventDefault();
-      handleSubmit();
-    }
-  };
-
   return (
     <div className="mt-3 bg-base-200 rounded-lg p-3">
       <div className="flex items-center justify-between mb-2">
@@ -47,7 +42,7 @@ export function TaskResultComments({ taskId }: TaskResultCommentsProps) {
           </h4>
         </div>
         <Link
-          href="/forum"
+          href="/issues"
           className="text-xs text-primary hover:underline flex items-center gap-1"
         >
           View all <ExternalLink className="h-3 w-3" />
@@ -89,35 +84,24 @@ export function TaskResultComments({ taskId }: TaskResultCommentsProps) {
                   </button>
                 )}
               </div>
-              <p className="text-base-content/80 whitespace-pre-wrap">
-                {comment.content}
-              </p>
+              <MarkdownContent
+                content={comment.content}
+                className="text-base-content/80 text-xs"
+              />
             </div>
           ))}
         </div>
       )}
 
-      <div className="flex gap-2">
-        <textarea
-          className="textarea textarea-bordered textarea-xs flex-1 min-h-[2.5rem] resize-none text-xs"
-          placeholder="Add a comment... (Ctrl+Enter to submit)"
-          value={newComment}
-          onChange={(e) => setNewComment(e.target.value)}
-          onKeyDown={handleKeyDown}
-          rows={1}
-        />
-        <button
-          className="btn btn-xs btn-primary self-end"
-          disabled={isSubmitting || !newComment.trim()}
-          onClick={handleSubmit}
-        >
-          {isSubmitting ? (
-            <span className="loading loading-spinner loading-xs"></span>
-          ) : (
-            "Add"
-          )}
-        </button>
-      </div>
+      <MarkdownEditor
+        value={newComment}
+        onChange={setNewComment}
+        onSubmit={handleSubmit}
+        placeholder="Add a comment... (Ctrl+Enter to submit)"
+        rows={2}
+        submitLabel="Add"
+        isSubmitting={isSubmitting}
+      />
     </div>
   );
 }

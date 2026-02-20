@@ -8,7 +8,9 @@ import { useGetTaskResult } from "@/client/task/task";
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { ParametersTable } from "@/components/features/metrics/ParametersTable";
 import { formatDateTime, formatRelativeTime } from "@/utils/datetime";
-import { useCommentReplies, type ForumComment } from "@/hooks/useCommentsForum";
+import { useCommentReplies, type IssueComment } from "@/hooks/useIssues";
+import { MarkdownContent } from "@/components/ui/MarkdownContent";
+import { MarkdownEditor } from "@/components/ui/MarkdownEditor";
 import {
   useGetComment,
   getGetCommentQueryKey,
@@ -38,7 +40,7 @@ function StatusBadge({ status }: { status: string }) {
   return <span className={`badge badge-sm ${color}`}>{status}</span>;
 }
 
-export function ThreadDetailPage({ commentId }: { commentId: string }) {
+export function IssueDetailPage({ commentId }: { commentId: string }) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { isOwner } = useProject();
@@ -107,13 +109,6 @@ export function ThreadDetailPage({ commentId }: { commentId: string }) {
     setReplyText("");
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-      e.preventDefault();
-      handleAddReply();
-    }
-  };
-
   const handleDeleteReply = async (replyId: string) => {
     if (!comment) return;
     await deleteReply(comment.task_id, replyId);
@@ -132,10 +127,10 @@ export function ThreadDetailPage({ commentId }: { commentId: string }) {
   if (!comment) {
     return (
       <div className="flex flex-col items-center justify-center py-16 gap-4">
-        <p className="text-base-content/60">Comment not found</p>
-        <Link href="/forum" className="btn btn-sm btn-ghost">
+        <p className="text-base-content/60">Issue not found</p>
+        <Link href="/issues" className="btn btn-sm btn-ghost">
           <ArrowLeft className="h-4 w-4" />
-          Back to Comments
+          Back to Issues
         </Link>
       </div>
     );
@@ -146,7 +141,7 @@ export function ThreadDetailPage({ commentId }: { commentId: string }) {
       {/* Back navigation + header */}
       <div className="flex items-center gap-3 mb-6">
         <button
-          onClick={() => router.push("/forum")}
+          onClick={() => router.push("/issues")}
           className="btn btn-sm btn-ghost btn-square"
         >
           <ArrowLeft className="h-4 w-4" />
@@ -311,9 +306,10 @@ export function ThreadDetailPage({ commentId }: { commentId: string }) {
             {formatRelativeTime(comment.created_at)}
           </span>
         </div>
-        <p className="text-sm text-base-content/80 whitespace-pre-wrap">
-          {comment.content}
-        </p>
+        <MarkdownContent
+          content={comment.content}
+          className="text-sm text-base-content/80"
+        />
       </div>
 
       {/* Replies */}
@@ -323,7 +319,7 @@ export function ThreadDetailPage({ commentId }: { commentId: string }) {
             <span className="loading loading-spinner loading-sm"></span>
           </div>
         ) : replies.length > 0 ? (
-          replies.map((reply: ForumComment) => (
+          replies.map((reply: IssueComment) => (
             <div
               key={reply.id}
               className="bg-base-100 rounded-md border border-base-300 px-3 py-2 text-sm"
@@ -347,9 +343,10 @@ export function ThreadDetailPage({ commentId }: { commentId: string }) {
                   </button>
                 )}
               </div>
-              <p className="text-base-content/80 whitespace-pre-wrap">
-                {reply.content}
-              </p>
+              <MarkdownContent
+                content={reply.content}
+                className="text-base-content/80"
+              />
             </div>
           ))
         ) : (
@@ -358,26 +355,16 @@ export function ThreadDetailPage({ commentId }: { commentId: string }) {
       </div>
 
       {/* Reply input */}
-      <div className="ml-4 pl-4 flex gap-2 pb-8">
-        <textarea
-          className="textarea textarea-bordered flex-1 min-h-[3rem] resize-none text-sm"
-          placeholder="Write a reply... (Ctrl+Enter to submit)"
+      <div className="ml-4 pl-4 pb-8">
+        <MarkdownEditor
           value={replyText}
-          onChange={(e) => setReplyText(e.target.value)}
-          onKeyDown={handleKeyDown}
+          onChange={setReplyText}
+          onSubmit={handleAddReply}
+          placeholder="Write a reply... (Ctrl+Enter to submit)"
           rows={2}
+          submitLabel="Reply"
+          isSubmitting={isSubmitting}
         />
-        <button
-          className="btn btn-sm btn-primary self-end"
-          disabled={isSubmitting || !replyText.trim()}
-          onClick={handleAddReply}
-        >
-          {isSubmitting ? (
-            <span className="loading loading-spinner loading-xs"></span>
-          ) : (
-            "Reply"
-          )}
-        </button>
       </div>
     </div>
   );

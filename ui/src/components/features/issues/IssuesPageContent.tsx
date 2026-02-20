@@ -7,7 +7,8 @@ import { MessageSquare, Search, X, Lock, Unlock } from "lucide-react";
 import { PageContainer } from "@/components/ui/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { useCommentsForum, type ForumComment } from "@/hooks/useCommentsForum";
+import { MarkdownContent } from "@/components/ui/MarkdownContent";
+import { useIssues, type IssueComment } from "@/hooks/useIssues";
 import { useProject } from "@/contexts/ProjectContext";
 import { formatRelativeTime } from "@/utils/datetime";
 
@@ -19,13 +20,13 @@ function getCurrentUsername(): string {
   return match ? decodeURIComponent(match.split("=")[1]) : "";
 }
 
-function CommentThread({
+function IssueThread({
   comment,
   onClose,
   onReopen,
   canManage,
 }: {
-  comment: ForumComment;
+  comment: IssueComment;
   onClose: (commentId: string) => void;
   onReopen: (commentId: string) => void;
   canManage: boolean;
@@ -33,7 +34,7 @@ function CommentThread({
   const router = useRouter();
 
   const handleCardClick = () => {
-    router.push(`/forum/${comment.id}`);
+    router.push(`/issues/${comment.id}`);
   };
 
   return (
@@ -63,9 +64,9 @@ function CommentThread({
             )}
           </div>
         </div>
-        <p className="text-sm text-base-content/80 whitespace-pre-wrap mb-3 line-clamp-3">
-          {comment.content}
-        </p>
+        <div className="text-sm text-base-content/80 mb-3 line-clamp-3">
+          <MarkdownContent content={comment.content} />
+        </div>
         <div className="flex items-center gap-3">
           <span className="text-xs text-base-content/50 flex items-center gap-1">
             <MessageSquare className="h-3 w-3" />
@@ -102,7 +103,7 @@ function CommentThread({
   );
 }
 
-export function CommentsPageContent() {
+export function IssuesPageContent() {
   const {
     comments,
     total,
@@ -116,7 +117,7 @@ export function CommentsPageContent() {
     closeComment,
     reopenComment,
     goToPage,
-  } = useCommentsForum();
+  } = useIssues();
   const { isOwner } = useProject();
   const [filterInput, setFilterInput] = useState("");
   const currentUser = getCurrentUsername();
@@ -137,8 +138,8 @@ export function CommentsPageContent() {
   return (
     <PageContainer maxWidth>
       <PageHeader
-        title="Forum"
-        description="View and discuss task results across your project"
+        title="Issues"
+        description="Track and discuss issues on task results"
       />
 
       {/* Status tabs */}
@@ -204,11 +205,11 @@ export function CommentsPageContent() {
         </div>
       ) : comments.length === 0 ? (
         <EmptyState
-          title="No comments yet"
+          title="No issues yet"
           description={
             taskIdFilter
-              ? "No comments found for this task. Try removing the filter."
-              : "Comments on task results will appear here."
+              ? "No issues found for this task. Try removing the filter."
+              : "Issues on task results will appear here."
           }
           emoji="speech-balloon"
         />
@@ -216,7 +217,7 @@ export function CommentsPageContent() {
         <>
           <div className="space-y-3">
             {comments.map((comment) => (
-              <CommentThread
+              <IssueThread
                 key={comment.id}
                 comment={comment}
                 onClose={closeComment}

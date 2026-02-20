@@ -12,7 +12,7 @@ import {
 } from "@/client/task-result/task-result";
 import type { CommentResponse } from "@/schemas";
 
-export type { CommentResponse as ForumComment };
+export type { CommentResponse as IssueComment };
 
 export type StatusFilter = "open" | "closed" | "all";
 
@@ -24,7 +24,7 @@ function buildIsClosedParam(status: StatusFilter): boolean | null | undefined {
   return null; // "all"
 }
 
-export function useCommentsForum() {
+export function useIssues() {
   const queryClient = useQueryClient();
   const [skip, setSkip] = useState(0);
   const [taskIdFilter, setTaskIdFilter] = useState<string>("");

@@ -19,7 +19,7 @@ import {
   LayoutGrid,
   ListTodo,
   LogOut,
-  MessagesSquare,
+  CircleDot,
   Moon,
   Settings,
   ShieldCheck,
@@ -288,17 +288,17 @@ function Sidebar() {
         </li>
         <li>
           <Link
-            href="/forum"
+            href="/issues"
             className={
               isMobileOpen
-                ? linkClass(pathname.startsWith("/forum"))
-                : desktopLinkClass(pathname.startsWith("/forum"))
+                ? linkClass(pathname.startsWith("/issues"))
+                : desktopLinkClass(pathname.startsWith("/issues"))
             }
-            title="Forum"
+            title="Issues"
             onClick={handleLinkClick}
           >
-            <MessagesSquare size={18} />
-            {(isOpen || isMobileOpen) && <span className="ml-2">Forum</span>}
+            <CircleDot size={18} />
+            {(isOpen || isMobileOpen) && <span className="ml-2">Issues</span>}
           </Link>
         </li>
         {canEdit && (

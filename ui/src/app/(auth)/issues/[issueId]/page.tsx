@@ -4,9 +4,9 @@ import { Suspense } from "react";
 import { useParams } from "next/navigation";
 
 import { PageContainer } from "@/components/ui/PageContainer";
-import { ThreadDetailPage } from "@/components/features/comments/ThreadDetailPage";
+import { IssueDetailPage } from "@/components/features/issues/IssueDetailPage";
 
-function ThreadSkeleton() {
+function IssueSkeleton() {
   return (
     <div className="max-w-4xl mx-auto">
       <div className="flex items-center gap-3 mb-6">
@@ -20,13 +20,13 @@ function ThreadSkeleton() {
   );
 }
 
-export default function ThreadPage() {
-  const params = useParams<{ commentId: string }>();
+export default function IssueDetailPageRoute() {
+  const params = useParams<{ issueId: string }>();
 
   return (
-    <Suspense fallback={<ThreadSkeleton />}>
+    <Suspense fallback={<IssueSkeleton />}>
       <PageContainer maxWidth>
-        <ThreadDetailPage commentId={params.commentId} />
+        <IssueDetailPage commentId={params.issueId} />
       </PageContainer>
     </Suspense>
   );
