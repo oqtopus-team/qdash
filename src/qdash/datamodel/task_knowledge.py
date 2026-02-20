@@ -36,6 +36,7 @@ class TaskKnowledgeImage(BaseModel):
     alt_text: str = Field(description="Alt text from ![alt](path)")
     relative_path: str = Field(description="Relative path from the markdown file")
     section: str = Field(description="H2 section where the image was found")
+    base64_data: str = Field(default="", description="Base64-encoded image data")
 
 
 class RelatedContextItem(BaseModel):

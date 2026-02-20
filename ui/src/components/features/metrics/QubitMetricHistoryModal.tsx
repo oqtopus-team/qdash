@@ -18,6 +18,7 @@ import { TaskFigure } from "@/components/charts/TaskFigure";
 import { formatDateTime, formatDateTimeCompact } from "@/utils/datetime";
 
 import { ParametersTable } from "./ParametersTable";
+import { TaskResultIssues } from "./TaskResultIssues";
 import type { AnalysisContext } from "@/hooks/useAnalysisChat";
 import type { MetricHistoryItem } from "./MetricHistoryView";
 import { useAnalysisChatContext } from "@/contexts/AnalysisChatContext";
@@ -555,6 +556,11 @@ export function QubitMetricHistoryModal({
               />
             )}
         </div>
+      )}
+
+      {/* Issues */}
+      {selectedTask?.task_id && (
+        <TaskResultIssues taskId={selectedTask.task_id} />
       )}
     </div>
   );

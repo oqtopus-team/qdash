@@ -11,6 +11,7 @@ Usage:
 
 from __future__ import annotations
 
+import base64
 import json
 import re
 import sys
@@ -46,6 +47,8 @@ _SECTION_MAP: dict[str, str] = {
     "related context": "related_context",
 }
 
+MAX_IMAGE_SIZE = 1 * 1024 * 1024  # 1MB
+
 _IMAGE_RE = re.compile(r"!\[([^\]]*)\]\(([^)]+)\)")
 _RELATED_CONTEXT_RE = re.compile(r"-\s+(history|neighbor_qubits|coupling)\(([^)]*)\)")
 
@@ -57,6 +60,22 @@ _METADATA_RE = re.compile(r"^-\s+(\w[\w_]*):\s*(.+)")
 
 # Check question lines
 _CHECK_QUESTION_RE = re.compile(r'^-\s+"(.+?)"$')
+
+
+def _detect_image_type(data: bytes) -> str | None:
+    """Detect image format from magic bytes.
+
+    Returns the MIME subtype (e.g. "png", "jpeg") or None if unrecognised.
+    """
+    if data[:8] == b"\x89PNG\r\n\x1a\n":
+        return "png"
+    if data[:2] == b"\xff\xd8":
+        return "jpeg"
+    if data[:4] == b"GIF8":
+        return "gif"
+    if data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+        return "webp"
+    return None
 
 
 def _parse_list_items(text: str) -> list[str]:
@@ -295,11 +314,30 @@ def _parse_markdown_file(path: Path) -> dict | None:
     images = []
     for heading, body in sections.items():
         for m in _IMAGE_RE.finditer(body):
+            rel = m.group(2)
+            # Resolve image path relative to the markdown file's directory
+            img_path = (path.parent / rel).resolve()
+            b64 = ""
+            if img_path.is_file():
+                try:
+                    data = img_path.read_bytes()
+                    if len(data) > MAX_IMAGE_SIZE:
+                        print(f"  Warning: {img_path.name} ({len(data)} bytes) exceeds 1MB limit, skipping")
+                    elif _detect_image_type(data) is None:
+                        print(f"  Warning: {img_path.name} is not a valid image format, skipping")
+                    else:
+                        b64 = base64.b64encode(data).decode("ascii")
+                        print(f"  Encoded {img_path.name} ({len(data)} bytes)")
+                except (OSError, MemoryError) as e:
+                    print(f"  Error encoding {img_path.name}: {e}")
+            else:
+                print(f"  Warning: Image not found: {rel}")
             images.append(
                 {
                     "alt_text": m.group(1),
-                    "relative_path": m.group(2),
+                    "relative_path": rel,
                     "section": heading,
+                    "base64_data": b64,
                 }
             )
 

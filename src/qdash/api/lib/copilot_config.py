@@ -47,6 +47,14 @@ class Suggestion(BaseModel):
     prompt: str
 
 
+class AnalysisConfig(BaseModel):
+    """Task analysis configuration (side-panel chat in metrics modal)."""
+
+    enabled: bool = True
+    multimodal: bool = True
+    max_conversation_turns: int = 10
+
+
 class CopilotConfig(BaseModel):
     """Copilot configuration."""
 
@@ -59,6 +67,7 @@ class CopilotConfig(BaseModel):
     system_prompt: str = ""
     initial_message: str = ""
     suggestions: list[Suggestion] = []
+    analysis: AnalysisConfig = AnalysisConfig()
 
 
 @lru_cache(maxsize=1)

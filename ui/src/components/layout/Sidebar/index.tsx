@@ -19,6 +19,7 @@ import {
   LayoutGrid,
   ListTodo,
   LogOut,
+  CircleDot,
   Moon,
   Settings,
   ShieldCheck,
@@ -283,6 +284,21 @@ function Sidebar() {
             {(isOpen || isMobileOpen) && (
               <span className="ml-2">Execution</span>
             )}
+          </Link>
+        </li>
+        <li>
+          <Link
+            href="/issues"
+            className={
+              isMobileOpen
+                ? linkClass(pathname.startsWith("/issues"))
+                : desktopLinkClass(pathname.startsWith("/issues"))
+            }
+            title="Issues"
+            onClick={handleLinkClick}
+          >
+            <CircleDot size={18} />
+            {(isOpen || isMobileOpen) && <span className="ml-2">Issues</span>}
           </Link>
         </li>
         {canEdit && (

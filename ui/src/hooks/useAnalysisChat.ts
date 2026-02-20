@@ -28,6 +28,12 @@ export interface ContentBlock {
 export interface BlocksResult {
   blocks: ContentBlock[];
   assessment: "good" | "warning" | "bad" | null;
+  images_sent?: {
+    experiment_figure: boolean;
+    experiment_figure_paths: string[];
+    expected_images: { alt_text: string; index: number }[];
+    task_name: string;
+  };
 }
 
 export interface AnalysisContext {

@@ -139,6 +139,13 @@ export default withMermaid(
                 { text: "SSE Streaming", link: "/development/copilot/streaming" },
               ],
             },
+            {
+              text: "Issues",
+              collapsed: true,
+              items: [
+                { text: "Architecture", link: "/development/issues/architecture" },
+              ],
+            },
           ],
         },
         {
