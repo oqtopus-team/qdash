@@ -7,8 +7,10 @@ import {
   getGetIssueRepliesQueryKey,
   useCreateIssue,
   useDeleteIssue,
+  useUpdateIssue,
   useCloseIssue,
   useReopenIssue,
+  getGetIssueQueryKey,
 } from "@/client/issue/issue";
 export type StatusFilter = "open" | "closed" | "all";
 
@@ -107,11 +109,15 @@ export function useIssueReplies(issueId: string | null) {
 
   const createMutation = useCreateIssue();
   const deleteMutation = useDeleteIssue();
+  const updateMutation = useUpdateIssue();
 
   const invalidateReplies = useCallback(() => {
     if (!issueId) return;
     queryClient.invalidateQueries({
       queryKey: getGetIssueRepliesQueryKey(issueId),
+    });
+    queryClient.invalidateQueries({
+      queryKey: getGetIssueQueryKey(issueId),
     });
     // Also invalidate the list to update reply_count
     queryClient.invalidateQueries({
@@ -140,12 +146,24 @@ export function useIssueReplies(issueId: string | null) {
     [deleteMutation, invalidateReplies],
   );
 
+  const editReply = useCallback(
+    async (replyId: string, content: string, title?: string | null) => {
+      await updateMutation.mutateAsync({
+        issueId: replyId,
+        data: { content, title: title ?? undefined },
+      });
+      invalidateReplies();
+    },
+    [updateMutation, invalidateReplies],
+  );
+
   return {
     replies,
     isLoading,
     isSubmitting: createMutation.isPending,
     addReply,
     deleteReply,
+    editReply,
     fetchReplies: invalidateReplies,
   };
 }

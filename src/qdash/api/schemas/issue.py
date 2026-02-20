@@ -19,6 +19,17 @@ class IssueCreate(BaseModel):
     )
 
 
+class IssueUpdate(BaseModel):
+    """Request schema for updating an issue."""
+
+    title: str | None = Field(
+        default=None, max_length=200, description="Updated title (root issues only)"
+    )
+    content: str = Field(
+        ..., min_length=1, max_length=5000, description="Updated issue text content"
+    )
+
+
 class IssueResponse(BaseModel):
     """Response schema for a single issue."""
 
@@ -28,6 +39,7 @@ class IssueResponse(BaseModel):
     title: str | None = Field(default=None, description="Issue title")
     content: str = Field(..., description="Issue text content")
     created_at: datetime = Field(..., description="When the issue was created")
+    updated_at: datetime = Field(..., description="When the issue was last updated")
     parent_id: str | None = Field(default=None, description="Parent issue ID for replies")
     reply_count: int = Field(default=0, description="Number of replies to this issue")
     is_closed: bool = Field(default=False, description="Whether this thread is closed")

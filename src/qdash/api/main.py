@@ -89,6 +89,7 @@ app.include_router(project.router, tags=["projects"])
 app.include_router(execution.router, tags=["execution"])
 app.include_router(file.router, tags=["file"])
 app.include_router(copilot.public_router, prefix="/copilot", tags=["copilot"])
+app.include_router(issue.public_router, tags=["issue"])
 
 # All other routers with global auth dependency
 auth_dependency = [Depends(get_current_active_user)]

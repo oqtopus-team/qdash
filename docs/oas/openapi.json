@@ -4668,6 +4668,78 @@
             }
           }
         }
+      },
+      "patch": {
+        "tags": [
+          "issue"
+        ],
+        "summary": "Update an issue",
+        "description": "Update an issue's content (and title for root issues). Only the author can edit.",
+        "operationId": "updateIssue",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "issue_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Issue Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IssueUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IssueResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/issues/{issue_id}/replies": {
@@ -9543,6 +9615,12 @@
             "title": "Created At",
             "description": "When the issue was created"
           },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At",
+            "description": "When the issue was last updated"
+          },
           "parent_id": {
             "anyOf": [
               {
@@ -9574,10 +9652,41 @@
           "task_id",
           "username",
           "content",
-          "created_at"
+          "created_at",
+          "updated_at"
         ],
         "title": "IssueResponse",
         "description": "Response schema for a single issue."
+      },
+      "IssueUpdate": {
+        "properties": {
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title",
+            "description": "Updated title (root issues only)"
+          },
+          "content": {
+            "type": "string",
+            "maxLength": 5000,
+            "minLength": 1,
+            "title": "Content",
+            "description": "Updated issue text content"
+          }
+        },
+        "type": "object",
+        "required": [
+          "content"
+        ],
+        "title": "IssueUpdate",
+        "description": "Request schema for updating an issue."
       },
       "LatestTaskResultResponse": {
         "properties": {

@@ -12,6 +12,7 @@ from qdash.workflow.engine.backend.qubex import QubexBackend
 from qubex.measurement.measurement import DEFAULT_READOUT_DURATION
 
 DEFAULT_SNR_THRESHOLD = 1.0
+DEFAULT_READOUT_AMPLITUDE = 0.025
 
 
 class ChevronPattern(QubexTask):
@@ -80,7 +81,14 @@ class ChevronPattern(QubexTask):
             self.output_parameters["readout_amplitude"].value = optimal_amp
             print(f"readout_amplitude={optimal_amp:.6f} (from SNR sweep, threshold={threshold})")
         else:
-            print(f"WARNING: SNR never exceeded {threshold} for {label}, using DB value")
+            print(
+                f"WARNING: SNR never exceeded {threshold} for {label}, "
+                f"using default={DEFAULT_READOUT_AMPLITUDE}"
+            )
+            readout_amp_param = self.input_parameters["readout_amplitude"]
+            assert readout_amp_param is not None
+            readout_amp_param.value = DEFAULT_READOUT_AMPLITUDE
+            self.output_parameters["readout_amplitude"].value = DEFAULT_READOUT_AMPLITUDE
 
         return result
 
@@ -109,7 +117,7 @@ class ChevronPattern(QubexTask):
         exp.params.readout_amplitude[labels[0]] = readout_amplitude.value
         with exp.modified_frequencies({"R" + labels[0]: readout_frequency.value}):
             result = exp.chevron_pattern(
-                amplitudes={labels[0]: self.run_parameters["control_amplitude"].value},
+                amplitudes={labels[0]: self.run_parameters["control_amplitude"].get_value()},
                 frequencies={labels[0]: qubit_frequency.value},
                 targets=labels,
                 detuning_range=np.linspace(-0.05, 0.05, 51),

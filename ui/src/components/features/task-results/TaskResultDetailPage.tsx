@@ -13,6 +13,7 @@ import { TaskFigure } from "@/components/charts/TaskFigure";
 import { ParametersTable } from "@/components/features/metrics/ParametersTable";
 import { MarkdownContent } from "@/components/ui/MarkdownContent";
 import { MarkdownEditor } from "@/components/ui/MarkdownEditor";
+import { useImageUpload } from "@/hooks/useImageUpload";
 import { EmptyState } from "@/components/ui/EmptyState";
 import {
   useTaskResultIssues,
@@ -124,6 +125,7 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
   const [showEditor, setShowEditor] = useState(false);
   const [newIssueTitle, setNewIssueTitle] = useState("");
   const [newIssueContent, setNewIssueContent] = useState("");
+  const { uploadImage } = useImageUpload();
 
   // Task result
   const { data: taskResultResponse, isLoading: taskResultLoading } =
@@ -342,6 +344,7 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
             rows={4}
             submitLabel="Submit Issue"
             isSubmitting={createMutation.isPending}
+            onImageUpload={uploadImage}
           />
         </div>
       )}

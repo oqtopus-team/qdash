@@ -140,6 +140,8 @@ export * from "./issueCreateTitle";
 export * from "./issueResponse";
 export * from "./issueResponseParentId";
 export * from "./issueResponseTitle";
+export * from "./issueUpdate";
+export * from "./issueUpdateTitle";
 export * from "./latestTaskResultResponse";
 export * from "./latestTaskResultResponseResult";
 export * from "./lineageEdgeResponse";

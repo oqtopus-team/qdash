@@ -24,6 +24,8 @@ export interface IssueResponse {
   content: string;
   /** When the issue was created */
   created_at: string;
+  /** When the issue was last updated */
+  updated_at: string;
   /** Parent issue ID for replies */
   parent_id?: IssueResponseParentId;
   /** Number of replies to this issue */

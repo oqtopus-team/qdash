@@ -10,6 +10,7 @@ import {
   Quote,
   List,
   ListOrdered,
+  ImageIcon,
 } from "lucide-react";
 import { MarkdownContent } from "./MarkdownContent";
 
@@ -22,6 +23,7 @@ interface MarkdownEditorProps {
   disabled?: boolean;
   submitLabel?: string;
   isSubmitting?: boolean;
+  onImageUpload?: (file: File) => Promise<string>;
 }
 
 type ToolbarAction = {
@@ -167,9 +169,85 @@ export function MarkdownEditor({
   disabled = false,
   submitLabel,
   isSubmitting = false,
+  onImageUpload,
 }: MarkdownEditorProps) {
   const [tab, setTab] = useState<"write" | "preview">("write");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const valueRef = useRef(value);
+  valueRef.current = value;
+
+  const insertImageMarkdown = useCallback(
+    async (file: File) => {
+      if (!onImageUpload) return;
+      const textarea = textareaRef.current;
+      const pos = textarea?.selectionStart ?? valueRef.current.length;
+      const placeholder = "![Uploading...]()";
+      const before = valueRef.current.slice(0, pos);
+      const after = valueRef.current.slice(pos);
+      onChange(before + placeholder + after);
+
+      try {
+        const url = await onImageUpload(file);
+        const current = valueRef.current;
+        const idx = current.indexOf(placeholder);
+        if (idx !== -1) {
+          onChange(
+            current.slice(0, idx) +
+              `![image](${url})` +
+              current.slice(idx + placeholder.length),
+          );
+        } else {
+          onChange(current + `\n![image](${url})`);
+        }
+      } catch {
+        const current = valueRef.current;
+        onChange(current.replace(placeholder, ""));
+      }
+    },
+    [onImageUpload, onChange],
+  );
+
+  const handlePaste = useCallback(
+    (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+      if (!onImageUpload) return;
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      for (const item of items) {
+        if (item.type.startsWith("image/")) {
+          e.preventDefault();
+          const file = item.getAsFile();
+          if (file) insertImageMarkdown(file);
+          return;
+        }
+      }
+    },
+    [onImageUpload, insertImageMarkdown],
+  );
+
+  const handleDrop = useCallback(
+    (e: React.DragEvent<HTMLTextAreaElement>) => {
+      if (!onImageUpload) return;
+      const files = e.dataTransfer?.files;
+      if (!files) return;
+      for (const file of files) {
+        if (file.type.startsWith("image/")) {
+          e.preventDefault();
+          insertImageMarkdown(file);
+          return;
+        }
+      }
+    },
+    [onImageUpload, insertImageMarkdown],
+  );
+
+  const handleDragOver = useCallback(
+    (e: React.DragEvent<HTMLTextAreaElement>) => {
+      if (!onImageUpload) return;
+      e.preventDefault();
+    },
+    [onImageUpload],
+  );
 
   const applyAction = useCallback(
     (action: ToolbarAction) => {
@@ -234,6 +312,30 @@ export function MarkdownEditor({
                 {action.icon}
               </button>
             ))}
+            {onImageUpload && (
+              <>
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-xs px-1.5"
+                  title="Upload Image"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={disabled}
+                >
+                  <ImageIcon className={ICON_SIZE} />
+                </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/gif,image/webp"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) insertImageMarkdown(file);
+                    e.target.value = "";
+                  }}
+                />
+              </>
+            )}
           </div>
 
           {/* Textarea */}
@@ -244,6 +346,9 @@ export function MarkdownEditor({
             value={value}
             onChange={(e) => onChange(e.target.value)}
             onKeyDown={handleKeyDown}
+            onPaste={handlePaste}
+            onDrop={handleDrop}
+            onDragOver={handleDragOver}
             rows={rows}
             disabled={disabled}
           />

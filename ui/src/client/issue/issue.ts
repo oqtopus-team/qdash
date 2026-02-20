@@ -25,6 +25,7 @@ import type {
   HTTPValidationError,
   IssueCreate,
   IssueResponse,
+  IssueUpdate,
   ListIssuesParams,
   ListIssuesResponse,
   SuccessResponse,
@@ -393,6 +394,97 @@ export const useDeleteIssue = <
   TContext
 > => {
   const mutationOptions = getDeleteIssueMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+/**
+ * Update an issue's content (and title for root issues). Only the author can edit.
+ * @summary Update an issue
+ */
+export const updateIssue = (
+  issueId: string,
+  issueUpdate: IssueUpdate,
+  options?: SecondParameter<typeof customInstance>,
+) => {
+  return customInstance<IssueResponse>(
+    {
+      url: `/issues/${issueId}`,
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      data: issueUpdate,
+    },
+    options,
+  );
+};
+
+export const getUpdateIssueMutationOptions = <
+  TError = HTTPValidationError,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateIssue>>,
+    TError,
+    { issueId: string; data: IssueUpdate },
+    TContext
+  >;
+  request?: SecondParameter<typeof customInstance>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateIssue>>,
+  TError,
+  { issueId: string; data: IssueUpdate },
+  TContext
+> => {
+  const mutationKey = ["updateIssue"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateIssue>>,
+    { issueId: string; data: IssueUpdate }
+  > = (props) => {
+    const { issueId, data } = props ?? {};
+
+    return updateIssue(issueId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateIssueMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateIssue>>
+>;
+export type UpdateIssueMutationBody = IssueUpdate;
+export type UpdateIssueMutationError = HTTPValidationError;
+
+/**
+ * @summary Update an issue
+ */
+export const useUpdateIssue = <
+  TError = HTTPValidationError,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof updateIssue>>,
+      TError,
+      { issueId: string; data: IssueUpdate },
+      TContext
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof updateIssue>>,
+  TError,
+  { issueId: string; data: IssueUpdate },
+  TContext
+> => {
+  const mutationOptions = getUpdateIssueMutationOptions(options);
 
   return useMutation(mutationOptions, queryClient);
 };

@@ -3,7 +3,14 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Lock, Unlock, Trash2, MessageSquare } from "lucide-react";
+import {
+  ArrowLeft,
+  Lock,
+  Unlock,
+  Trash2,
+  MessageSquare,
+  Pencil,
+} from "lucide-react";
 import { useGetTaskResult } from "@/client/task/task";
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { ParametersTable } from "@/components/features/metrics/ParametersTable";
@@ -12,6 +19,7 @@ import { useIssueReplies } from "@/hooks/useIssues";
 import type { IssueResponse } from "@/schemas";
 import { MarkdownContent } from "@/components/ui/MarkdownContent";
 import { MarkdownEditor } from "@/components/ui/MarkdownEditor";
+import { useImageUpload } from "@/hooks/useImageUpload";
 import {
   useGetIssue,
   getGetIssueQueryKey,
@@ -41,12 +49,25 @@ function StatusBadge({ status }: { status: string }) {
   return <span className={`badge badge-sm ${color}`}>{status}</span>;
 }
 
+function isEdited(createdAt: string, updatedAt: string): boolean {
+  return (
+    Math.abs(new Date(updatedAt).getTime() - new Date(createdAt).getTime()) >
+    1000
+  );
+}
+
 export function IssueDetailPage({ issueId }: { issueId: string }) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { isOwner } = useProject();
   const currentUser = getCurrentUsername();
   const [replyText, setReplyText] = useState("");
+  const [editingIssue, setEditingIssue] = useState(false);
+  const [editIssueTitle, setEditIssueTitle] = useState("");
+  const [editIssueContent, setEditIssueContent] = useState("");
+  const [editingReplyId, setEditingReplyId] = useState<string | null>(null);
+  const [editReplyContent, setEditReplyContent] = useState("");
+  const { uploadImage } = useImageUpload();
 
   // Fetch issue
   const { data: issueResponse, isLoading: issueLoading } = useGetIssue(
@@ -69,6 +90,7 @@ export function IssueDetailPage({ issueId }: { issueId: string }) {
     isSubmitting,
     addReply,
     deleteReply,
+    editReply,
   } = useIssueReplies(issueId);
 
   // Close/Reopen mutations
@@ -115,6 +137,34 @@ export function IssueDetailPage({ issueId }: { issueId: string }) {
     await deleteReply(issue.task_id, replyId);
   };
 
+  const handleStartEditIssue = () => {
+    if (!issue) return;
+    setEditIssueTitle(issue.title ?? "");
+    setEditIssueContent(issue.content);
+    setEditingIssue(true);
+  };
+
+  const handleSaveEditIssue = async () => {
+    if (!issue) return;
+    const trimmed = editIssueContent.trim();
+    if (!trimmed) return;
+    await editReply(issueId, trimmed, editIssueTitle || null);
+    setEditingIssue(false);
+  };
+
+  const handleStartEditReply = (reply: IssueResponse) => {
+    setEditReplyContent(reply.content);
+    setEditingReplyId(reply.id);
+  };
+
+  const handleSaveEditReply = async () => {
+    if (!editingReplyId) return;
+    const trimmed = editReplyContent.trim();
+    if (!trimmed) return;
+    await editReply(editingReplyId, trimmed);
+    setEditingReplyId(null);
+  };
+
   // Loading state
   if (issueLoading) {
     return (
@@ -148,9 +198,44 @@ export function IssueDetailPage({ issueId }: { issueId: string }) {
           <ArrowLeft className="h-4 w-4" />
         </button>
         <div className="flex flex-col gap-1 flex-1 min-w-0">
-          {issue.title && (
-            <h1 className="text-lg font-bold truncate">{issue.title}</h1>
-          )}
+          {issue.title != null &&
+            (editingIssue ? (
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  className="input input-bordered input-sm flex-1"
+                  value={editIssueTitle}
+                  onChange={(e) => setEditIssueTitle(e.target.value)}
+                  placeholder="Title"
+                />
+                <button
+                  className="btn btn-sm btn-ghost"
+                  onClick={() => setEditingIssue(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="btn btn-sm btn-primary"
+                  onClick={handleSaveEditIssue}
+                  disabled={!editIssueContent.trim()}
+                >
+                  Save
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5 min-w-0">
+                <h1 className="text-lg font-bold truncate">{issue.title}</h1>
+                {currentUser === issue.username && (
+                  <button
+                    onClick={handleStartEditIssue}
+                    className="btn btn-ghost btn-xs p-0 h-auto min-h-0 text-base-content/30 hover:text-primary shrink-0"
+                    title="Edit issue"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
+            ))}
           <div className="flex items-center gap-3 flex-wrap">
             <Link
               href={`/task-results/${issue.task_id}`}
@@ -309,11 +394,27 @@ export function IssueDetailPage({ issueId }: { issueId: string }) {
           <span className="text-xs text-base-content/40">
             {formatRelativeTime(issue.created_at)}
           </span>
+          {isEdited(issue.created_at, issue.updated_at) && (
+            <span className="text-xs text-base-content/30 italic">
+              (edited)
+            </span>
+          )}
         </div>
-        <MarkdownContent
-          content={issue.content}
-          className="text-sm text-base-content/80"
-        />
+        {editingIssue ? (
+          <MarkdownEditor
+            value={editIssueContent}
+            onChange={setEditIssueContent}
+            onSubmit={handleSaveEditIssue}
+            placeholder="Edit issue content..."
+            rows={4}
+            onImageUpload={uploadImage}
+          />
+        ) : (
+          <MarkdownContent
+            content={issue.content}
+            className="text-sm text-base-content/80"
+          />
+        )}
       </div>
 
       {/* Replies */}
@@ -336,21 +437,64 @@ export function IssueDetailPage({ issueId }: { issueId: string }) {
                   <span className="text-xs text-base-content/40">
                     {formatRelativeTime(reply.created_at)}
                   </span>
+                  {isEdited(reply.created_at, reply.updated_at) && (
+                    <span className="text-xs text-base-content/30 italic">
+                      (edited)
+                    </span>
+                  )}
                 </div>
-                {currentUser === reply.username && (
-                  <button
-                    onClick={() => handleDeleteReply(reply.id)}
-                    className="btn btn-ghost btn-xs p-0 h-auto min-h-0 text-base-content/30 hover:text-error"
-                    title="Delete reply"
-                  >
-                    <Trash2 className="h-3 w-3" />
-                  </button>
-                )}
+                {currentUser === reply.username &&
+                  editingReplyId !== reply.id && (
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => handleStartEditReply(reply)}
+                        className="btn btn-ghost btn-xs p-0 h-auto min-h-0 text-base-content/30 hover:text-primary"
+                        title="Edit reply"
+                      >
+                        <Pencil className="h-3 w-3" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteReply(reply.id)}
+                        className="btn btn-ghost btn-xs p-0 h-auto min-h-0 text-base-content/30 hover:text-error"
+                        title="Delete reply"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </button>
+                    </div>
+                  )}
               </div>
-              <MarkdownContent
-                content={reply.content}
-                className="text-base-content/80"
-              />
+              {editingReplyId === reply.id ? (
+                <div className="space-y-2">
+                  <MarkdownEditor
+                    value={editReplyContent}
+                    onChange={setEditReplyContent}
+                    onSubmit={handleSaveEditReply}
+                    placeholder="Edit reply..."
+                    rows={3}
+                    onImageUpload={uploadImage}
+                  />
+                  <div className="flex justify-end gap-2">
+                    <button
+                      className="btn btn-sm btn-ghost"
+                      onClick={() => setEditingReplyId(null)}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      className="btn btn-sm btn-primary"
+                      onClick={handleSaveEditReply}
+                      disabled={!editReplyContent.trim()}
+                    >
+                      Save
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <MarkdownContent
+                  content={reply.content}
+                  className="text-base-content/80"
+                />
+              )}
             </div>
           ))
         ) : (
@@ -368,6 +512,7 @@ export function IssueDetailPage({ issueId }: { issueId: string }) {
           rows={2}
           submitLabel="Reply"
           isSubmitting={isSubmitting}
+          onImageUpload={uploadImage}
         />
       </div>
     </div>

@@ -17,6 +17,7 @@ import { useProject } from "@/contexts/ProjectContext";
 import { formatRelativeTime } from "@/utils/datetime";
 import { MarkdownContent } from "@/components/ui/MarkdownContent";
 import { MarkdownEditor } from "@/components/ui/MarkdownEditor";
+import { useImageUpload } from "@/hooks/useImageUpload";
 
 function getCurrentUsername(): string {
   if (typeof document === "undefined") return "";
@@ -109,6 +110,7 @@ export function TaskResultIssues({ taskId }: TaskResultIssuesProps) {
   const [showEditor, setShowEditor] = useState(false);
   const [newIssueTitle, setNewIssueTitle] = useState("");
   const [newIssue, setNewIssue] = useState("");
+  const { uploadImage } = useImageUpload();
 
   const { issues, total, isLoading, closeIssue, reopenIssue, invalidateList } =
     useTaskResultIssues(taskId);
@@ -176,6 +178,7 @@ export function TaskResultIssues({ taskId }: TaskResultIssuesProps) {
             rows={2}
             submitLabel="Submit"
             isSubmitting={createMutation.isPending}
+            onImageUpload={uploadImage}
           />
         </div>
       )}

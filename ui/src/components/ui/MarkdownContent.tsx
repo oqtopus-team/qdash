@@ -20,6 +20,17 @@ const markdownComponents = {
       </code>
     );
   },
+  img({ src, alt, ...props }: React.ComponentPropsWithoutRef<"img">) {
+    return (
+      <img
+        src={src}
+        alt={alt ?? ""}
+        className="max-w-full h-auto rounded border border-base-300 my-2"
+        loading="lazy"
+        {...props}
+      />
+    );
+  },
 };
 
 export function MarkdownContent({

@@ -3,9 +3,13 @@
 from __future__ import annotations
 
 import logging
+import re
+from pathlib import Path
 from typing import Annotated
+from uuid import uuid4
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, UploadFile
+from fastapi.responses import FileResponse
 from qdash.api.lib.project import (  # noqa: TCH002
     ProjectContext,
     get_project_context,
@@ -13,14 +17,28 @@ from qdash.api.lib.project import (  # noqa: TCH002
 from qdash.api.schemas.issue import (
     IssueCreate,
     IssueResponse,
+    IssueUpdate,
     ListIssuesResponse,
 )
 from qdash.api.schemas.success import SuccessResponse
+from qdash.common.paths import CALIB_DATA_BASE
 from qdash.datamodel.project import ProjectRole
 from qdash.dbmodel.issue import IssueDocument
 from starlette.exceptions import HTTPException
 
 router = APIRouter()
+public_router = APIRouter()
+
+ISSUES_IMAGE_DIR = CALIB_DATA_BASE / "issues"
+ALLOWED_CONTENT_TYPES = {"image/png", "image/jpeg", "image/gif", "image/webp"}
+CONTENT_TYPE_TO_EXT = {
+    "image/png": ".png",
+    "image/jpeg": ".jpg",
+    "image/gif": ".gif",
+    "image/webp": ".webp",
+}
+MAX_IMAGE_SIZE = 5 * 1024 * 1024  # 5MB
+FILENAME_PATTERN = re.compile(r"^[0-9a-f\-]{36}\.(png|jpg|gif|webp)$")
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -92,6 +110,7 @@ def list_issues(
             title=doc.title,
             content=doc.content,
             created_at=doc.system_info.created_at,
+            updated_at=doc.system_info.updated_at,
             parent_id=doc.parent_id,
             reply_count=reply_counts.get(str(doc.id), 0),
             is_closed=doc.is_closed,
@@ -147,6 +166,7 @@ def get_issue(
         title=doc.title,
         content=doc.content,
         created_at=doc.system_info.created_at,
+        updated_at=doc.system_info.updated_at,
         parent_id=doc.parent_id,
         reply_count=reply_count,
         is_closed=doc.is_closed,
@@ -183,6 +203,7 @@ def get_issue_replies(
             title=doc.title,
             content=doc.content,
             created_at=doc.system_info.created_at,
+            updated_at=doc.system_info.updated_at,
             parent_id=doc.parent_id,
             is_closed=doc.is_closed,
         )
@@ -219,6 +240,54 @@ def delete_issue(
     doc.delete()
 
     return SuccessResponse(message="Issue deleted")
+
+
+@router.patch(
+    "/issues/{issue_id}",
+    summary="Update an issue",
+    operation_id="updateIssue",
+    response_model=IssueResponse,
+)
+def update_issue(
+    issue_id: str,
+    body: IssueUpdate,
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+) -> IssueResponse:
+    """Update an issue's content (and title for root issues). Only the author can edit."""
+    from bson import ObjectId
+
+    doc = IssueDocument.find_one(
+        {
+            "_id": ObjectId(issue_id),
+            "project_id": ctx.project_id,
+        },
+    ).run()
+
+    if doc is None:
+        raise HTTPException(status_code=404, detail="Issue not found")
+
+    if doc.username != ctx.user.username:
+        raise HTTPException(status_code=403, detail="You can only edit your own issues")
+
+    # Only update title for root issues
+    if doc.parent_id is None and body.title is not None:
+        doc.title = body.title
+
+    doc.content = body.content
+    doc.system_info.update_time()
+    doc.save()
+
+    return IssueResponse(
+        id=str(doc.id),
+        task_id=doc.task_id,
+        username=doc.username,
+        title=doc.title,
+        content=doc.content,
+        created_at=doc.system_info.created_at,
+        updated_at=doc.system_info.updated_at,
+        parent_id=doc.parent_id,
+        is_closed=doc.is_closed,
+    )
 
 
 @router.patch(
@@ -326,6 +395,7 @@ def get_task_result_issues(
             title=doc.title,
             content=doc.content,
             created_at=doc.system_info.created_at,
+            updated_at=doc.system_info.updated_at,
             parent_id=doc.parent_id,
             is_closed=doc.is_closed,
         )
@@ -367,6 +437,69 @@ def create_issue(
         title=doc.title,
         content=doc.content,
         created_at=doc.system_info.created_at,
+        updated_at=doc.system_info.updated_at,
         parent_id=doc.parent_id,
         is_closed=doc.is_closed,
     )
+
+
+# =============================================================================
+# Image upload / serving endpoints
+# =============================================================================
+
+
+@router.post(
+    "/issues/upload-image",
+    summary="Upload an image for an issue",
+    operation_id="uploadIssueImage",
+    include_in_schema=False,
+)
+async def upload_issue_image(
+    file: UploadFile,
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+) -> dict[str, str]:
+    """Upload an image to attach to an issue. Returns the image URL."""
+    if file.content_type not in ALLOWED_CONTENT_TYPES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported image type: {file.content_type}. Allowed: png, jpeg, gif, webp",
+        )
+
+    data = await file.read()
+    if len(data) > MAX_IMAGE_SIZE:
+        raise HTTPException(status_code=400, detail="Image exceeds 5MB size limit")
+
+    ext = CONTENT_TYPE_TO_EXT[file.content_type]
+    filename = f"{uuid4()}{ext}"
+    dest = ISSUES_IMAGE_DIR / filename
+
+    ISSUES_IMAGE_DIR.mkdir(parents=True, exist_ok=True)
+    dest.write_bytes(data)
+
+    return {"url": f"/api/issues/images/{filename}"}
+
+
+@public_router.get(
+    "/issues/images/{filename}",
+    summary="Serve an issue image",
+    include_in_schema=False,
+)
+def get_issue_image(filename: str) -> FileResponse:
+    """Serve an uploaded issue image."""
+    if not FILENAME_PATTERN.match(filename):
+        raise HTTPException(status_code=400, detail="Invalid filename")
+
+    filepath = ISSUES_IMAGE_DIR / filename
+    if not filepath.is_file():
+        raise HTTPException(status_code=404, detail="Image not found")
+
+    ext = Path(filename).suffix.lstrip(".")
+    media_types = {
+        "png": "image/png",
+        "jpg": "image/jpeg",
+        "gif": "image/gif",
+        "webp": "image/webp",
+    }
+    media_type = media_types.get(ext, "application/octet-stream")
+
+    return FileResponse(filepath, media_type=media_type)
