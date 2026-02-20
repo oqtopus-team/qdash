@@ -46,6 +46,7 @@ TOOL_LABELS: dict[str, str] = {
     "search_task_results": "タスク結果を検索中",
     "get_calibration_notes": "キャリブレーションノートを取得中",
     "get_parameter_lineage": "パラメータ履歴を取得中",
+    "get_provenance_lineage_graph": "プロベナンス系譜グラフを取得中",
 }
 
 STATUS_LABELS: dict[str, str] = {
@@ -1017,6 +1018,95 @@ def _load_calibration_notes(
     return results
 
 
+def _resolve_project_id(chip_id: str) -> str | None:
+    """Resolve project_id from chip_id via ChipDocument."""
+    from qdash.dbmodel.chip import ChipDocument
+
+    doc = ChipDocument.find_one({"chip_id": chip_id}).run()
+    if doc is None:
+        return None
+    return str(doc.project_id)
+
+
+def _get_provenance_service() -> Any:
+    """Build a ProvenanceService instance (same pattern as provenance router)."""
+    from qdash.api.services.provenance_service import ProvenanceService
+    from qdash.repository.provenance import (
+        MongoActivityRepository,
+        MongoParameterVersionRepository,
+        MongoProvenanceRelationRepository,
+    )
+
+    return ProvenanceService(
+        parameter_version_repo=MongoParameterVersionRepository(),
+        provenance_relation_repo=MongoProvenanceRelationRepository(),
+        activity_repo=MongoActivityRepository(),
+    )
+
+
+def _load_provenance_lineage_graph(
+    entity_id: str, chip_id: str, max_depth: int = 5
+) -> dict[str, Any]:
+    """Load the provenance lineage graph and return an LLM-friendly summary."""
+    project_id = _resolve_project_id(chip_id)
+    if project_id is None:
+        return {"error": f"Chip '{chip_id}' not found, cannot resolve project"}
+
+    service = _get_provenance_service()
+    lineage = service.get_lineage(
+        project_id=project_id,
+        entity_id=entity_id,
+        max_depth=max_depth,
+    )
+
+    # Convert to a simplified dict for the LLM
+    nodes: list[dict[str, Any]] = []
+    for n in lineage.nodes:
+        entry: dict[str, Any] = {
+            "node_type": n.node_type,
+            "node_id": n.node_id,
+            "depth": n.depth,
+        }
+        if n.entity:
+            entry["parameter_name"] = n.entity.parameter_name
+            entry["qid"] = n.entity.qid
+            entry["value"] = n.entity.value
+            entry["unit"] = n.entity.unit
+            entry["version"] = n.entity.version
+            entry["task_name"] = n.entity.task_name
+            entry["execution_id"] = n.entity.execution_id
+            if n.entity.valid_from:
+                entry["valid_from"] = n.entity.valid_from.isoformat()
+        if n.activity:
+            entry["task_name"] = n.activity.task_name
+            entry["task_type"] = n.activity.task_type
+            entry["qid"] = n.activity.qid
+            entry["execution_id"] = n.activity.execution_id
+            entry["status"] = n.activity.status
+        if n.latest_version is not None:
+            entry["latest_version"] = n.latest_version
+        nodes.append(entry)
+
+    edges: list[dict[str, str]] = []
+    for e in lineage.edges:
+        edges.append(
+            {
+                "relation_type": e.relation_type,
+                "source": e.source_id,
+                "target": e.target_id,
+            }
+        )
+
+    return {
+        "origin": lineage.origin.node_id,
+        "num_nodes": len(nodes),
+        "num_edges": len(edges),
+        "max_depth": lineage.max_depth,
+        "nodes": nodes,
+        "edges": edges,
+    }
+
+
 def _load_parameter_lineage(
     parameter_name: str, qid: str, chip_id: str, last_n: int = 10
 ) -> list[dict[str, Any]]:
@@ -1104,5 +1194,8 @@ def _build_tool_executors() -> dict[str, Any]:
         ),
         "get_parameter_lineage": lambda args: _load_parameter_lineage(
             args["parameter_name"], args["qid"], args["chip_id"], args.get("last_n", 10)
+        ),
+        "get_provenance_lineage_graph": lambda args: _load_provenance_lineage_graph(
+            args["entity_id"], args["chip_id"], args.get("max_depth", 5)
         ),
     }
