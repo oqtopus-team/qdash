@@ -364,6 +364,41 @@ AGENT_TOOLS: list[dict[str, Any]] = [
             "additionalProperties": False,
         },
     },
+    {
+        "type": "function",
+        "name": "get_provenance_lineage_graph",
+        "description": (
+            "Get the provenance lineage graph for a parameter version entity. "
+            "Returns a DAG of ancestor entities (input parameters) and activities (tasks) "
+            "that contributed to the specified entity. Use this to trace how a parameter "
+            "value was derived — which task produced it and which input parameters were used. "
+            "The entity_id format is 'parameter_name:qid:execution_id:task_id' "
+            "(e.g. 'qubit_frequency:0:exec-123:task-456'). "
+            "You can obtain entity_id values from get_parameter_lineage results."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "entity_id": {
+                    "type": "string",
+                    "description": (
+                        "Entity identifier in format 'parameter_name:qid:execution_id:task_id'. "
+                        "Obtain from get_parameter_lineage results."
+                    ),
+                },
+                "chip_id": {
+                    "type": "string",
+                    "description": "Chip ID (used to resolve the project context)",
+                },
+                "max_depth": {
+                    "type": "integer",
+                    "description": "Maximum traversal depth (default 5, max 20)",
+                },
+            },
+            "required": ["entity_id", "chip_id"],
+            "additionalProperties": False,
+        },
+    },
 ]
 
 ANALYSIS_RESPONSE_SCHEMA: dict[str, Any] = {
@@ -1112,6 +1147,7 @@ You have access to tools that can fetch data from the calibration database:
 ### Provenance & notes
 - get_calibration_notes: Get calibration notes/annotations for a chip
 - get_parameter_lineage: Get version history of a parameter across executions
+- get_provenance_lineage_graph: Get the provenance DAG showing how a parameter was derived (ancestor entities and activities). Use for root cause diagnosis.
 
 ### Analysis
 - execute_python_analysis: Execute Python code for data analysis and visualization (numpy, pandas, scipy available)
@@ -1121,6 +1157,7 @@ IMPORTANT: When calling tools, you need chip_id and often qid.
 - For qid: users may refer to qubits as "Q16", "qubit 16", or just "16". Normalize to the plain number format (e.g. "16") when calling tools.
 - For parameter names in get_parameter_timeseries, use snake_case names like: qubit_frequency, t1, t2_echo, x90_gate_fidelity, resonator_frequency, etc.
 - For chip-wide queries (get_chip_summary, get_execution_history, get_chip_topology), only chip_id is required.
+- For get_provenance_lineage_graph, entity_id format is "parameter_name:qid:execution_id:task_id". First call get_parameter_lineage to obtain entity_id values, then use them with get_provenance_lineage_graph.
 
 When the user asks about parameters or trends, ALWAYS use the tools to retrieve real data.
 When showing data trends, create charts using the blocks response format.
@@ -1144,6 +1181,27 @@ For complex analysis (correlations, statistics, distributions, fitting), use exe
    }
    ```
 5. Include the execution result in your blocks response: text from output, chart from chart field.
+
+## Root cause diagnosis with provenance
+
+When the user asks why a calibration result is bad, or wants to find the cause of a poor parameter value,
+use the provenance lineage graph to trace upstream dependencies:
+
+1. Identify the problematic parameter and get its version history with get_parameter_lineage (parameter_name, qid, chip_id).
+2. From the results, pick the entity_id of the bad version (or the latest version).
+3. Call get_provenance_lineage_graph with that entity_id and chip_id to get the ancestor graph.
+4. In the returned graph, look at ancestor entity nodes (depth > 0, node_type=entity):
+   - Check if any upstream parameter has degraded (compare value to typical/expected ranges).
+   - Check the task (activity node) that produced the bad result and its input parameters.
+   - If an upstream parameter's version has a latest_version field, that means a newer version exists and the input may have been stale.
+5. Report which upstream parameter and calibration task may be the root cause, and recommend re-running the relevant upstream calibration.
+
+Example workflow:
+- User: "Why is X90 gate fidelity bad for Q0?"
+- Step 1: get_parameter_lineage("x90_gate_fidelity", "0", chip_id) → find entity_id of the latest version
+- Step 2: get_provenance_lineage_graph(entity_id, chip_id) → get ancestor graph
+- Step 3: Inspect ancestor entities (e.g., qubit_frequency, pi_amplitude) for degradation
+- Step 4: Conclude "The qubit_frequency input to CreateX90 was degraded (v3, 4.85 GHz → expected ~5.0 GHz). Re-run CheckQubitFrequency first."
 """
 
 
