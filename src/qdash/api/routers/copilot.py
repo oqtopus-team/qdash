@@ -1048,9 +1048,26 @@ def _load_provenance_lineage_graph(
     entity_id: str, chip_id: str, max_depth: int = 5
 ) -> dict[str, Any]:
     """Load the provenance lineage graph and return an LLM-friendly summary."""
+    # Validate entity_id format: parameter_name:qid:execution_id:task_id
+    if not entity_id or entity_id.count(":") != 3:
+        return {
+            "error": (
+                f"Invalid entity_id format: '{entity_id}'. "
+                "Expected 'parameter_name:qid:execution_id:task_id'."
+            )
+        }
+
+    # Clamp max_depth to service limits
+    max_depth = max(1, min(max_depth, 20))
+
     project_id = _resolve_project_id(chip_id)
     if project_id is None:
-        return {"error": f"Chip '{chip_id}' not found, cannot resolve project"}
+        return {
+            "error": (
+                f"Unable to resolve project for chip '{chip_id}'. "
+                "The chip may not exist or may not be associated with a project."
+            )
+        }
 
     service = _get_provenance_service()
     lineage = service.get_lineage(
