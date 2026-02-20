@@ -526,11 +526,17 @@ def _load_task_result(task_id: str) -> dict[str, Any] | None:
     }
 
 
+MAX_FIGURE_SIZE = 5 * 1024 * 1024  # 5MB
+
+
 def _load_figure_as_base64(figure_paths: list[str]) -> str | None:
     """Read the first existing PNG file from figure_paths and return base64."""
     for fp in figure_paths:
         p = Path(fp)
         if p.is_file() and p.suffix.lower() == ".png":
+            if p.stat().st_size > MAX_FIGURE_SIZE:
+                logger.warning("Figure %s exceeds 5MB size limit, skipping", fp)
+                continue
             return base64.b64encode(p.read_bytes()).decode("ascii")
     return None
 
