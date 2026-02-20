@@ -1,12 +1,45 @@
 "use client";
 
+import React, { useState } from "react";
+import { ZoomIn } from "lucide-react";
+
 import { useGetTaskResult } from "@/client/task/task";
+import { FigureLightbox } from "./FigureLightbox";
 
 interface TaskFigureProps {
   path?: string | string[];
   taskId?: string;
   qid: string;
   className?: string;
+}
+
+function ExpandableImage({
+  src,
+  alt,
+  className,
+}: {
+  src: string;
+  alt: string;
+  className: string;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <div className="relative group inline-flex h-full shrink-0">
+      <img src={src} alt={alt} className={className} />
+      <button
+        type="button"
+        onClick={() => setIsOpen(true)}
+        className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity btn btn-xs btn-circle bg-base-100/80 shadow hover:bg-base-200"
+        title="Expand"
+      >
+        <ZoomIn className="h-3 w-3" />
+      </button>
+      {isOpen && (
+        <FigureLightbox src={src} alt={alt} onClose={() => setIsOpen(false)} />
+      )}
+    </div>
+  );
 }
 
 export function TaskFigure({
@@ -58,7 +91,7 @@ export function TaskFigure({
     return (
       <>
         {figurePaths.map((p, i) => (
-          <img
+          <ExpandableImage
             key={i}
             src={`${apiUrl}/executions/figure?path=${encodeURIComponent(p)}`}
             alt={`Result for QID ${qid}`}
@@ -71,7 +104,7 @@ export function TaskFigure({
 
   if (typeof figurePaths === "string") {
     return (
-      <img
+      <ExpandableImage
         src={`${apiUrl}/executions/figure?path=${encodeURIComponent(figurePaths)}`}
         alt={`Result for QID ${qid}`}
         className={className}

@@ -1,0 +1,212 @@
+[
+  {
+    "text": "Box Setup",
+    "collapsed": true,
+    "items": [
+      {
+        "text": "CheckStatus",
+        "link": "/task-knowledge/box-setup/CheckStatus"
+      },
+      {
+        "text": "LinkUp",
+        "link": "/task-knowledge/box-setup/LinkUp"
+      },
+      {
+        "text": "DumpBox",
+        "link": "/task-knowledge/box-setup/DumpBox"
+      },
+      {
+        "text": "CheckNoise",
+        "link": "/task-knowledge/box-setup/CheckNoise"
+      },
+      {
+        "text": "Configure",
+        "link": "/task-knowledge/box-setup/Configure"
+      },
+      {
+        "text": "ReadoutConfigure",
+        "link": "/task-knowledge/box-setup/ReadoutConfigure"
+      }
+    ]
+  },
+  {
+    "text": "System",
+    "collapsed": true,
+    "items": [
+      {
+        "text": "CheckSkew",
+        "link": "/task-knowledge/system/CheckSkew"
+      }
+    ]
+  },
+  {
+    "text": "CW Characterization",
+    "collapsed": true,
+    "items": [
+      {
+        "text": "CheckResonatorFrequencies",
+        "link": "/task-knowledge/cw-characterization/CheckResonatorFrequencies"
+      },
+      {
+        "text": "CheckResonatorSpectroscopy",
+        "link": "/task-knowledge/cw-characterization/CheckResonatorSpectroscopy"
+      },
+      {
+        "text": "CheckReflectionCoefficient",
+        "link": "/task-knowledge/cw-characterization/CheckReflectionCoefficient"
+      },
+      {
+        "text": "CheckElectricalDelay",
+        "link": "/task-knowledge/cw-characterization/CheckElectricalDelay"
+      },
+      {
+        "text": "CheckReadoutAmplitude",
+        "link": "/task-knowledge/cw-characterization/CheckReadoutAmplitude"
+      },
+      {
+        "text": "CheckQubitFrequencies",
+        "link": "/task-knowledge/cw-characterization/CheckQubitFrequencies"
+      },
+      {
+        "text": "CheckQubitSpectroscopy",
+        "link": "/task-knowledge/cw-characterization/CheckQubitSpectroscopy"
+      }
+    ]
+  },
+  {
+    "text": "TD Characterization",
+    "collapsed": true,
+    "items": [
+      {
+        "text": "CheckQubit",
+        "link": "/task-knowledge/td-characterization/CheckQubit"
+      },
+      {
+        "text": "CheckQubitFrequency",
+        "link": "/task-knowledge/td-characterization/CheckQubitFrequency"
+      },
+      {
+        "text": "CheckReadoutFrequency",
+        "link": "/task-knowledge/td-characterization/CheckReadoutFrequency"
+      },
+      {
+        "text": "CheckRabi",
+        "link": "/task-knowledge/td-characterization/CheckRabi"
+      },
+      {
+        "text": "CheckT1",
+        "link": "/task-knowledge/td-characterization/CheckT1"
+      },
+      {
+        "text": "CheckT2Echo",
+        "link": "/task-knowledge/td-characterization/CheckT2Echo"
+      },
+      {
+        "text": "CheckRamsey",
+        "link": "/task-knowledge/td-characterization/CheckRamsey"
+      },
+      {
+        "text": "CheckDispersiveShift",
+        "link": "/task-knowledge/td-characterization/CheckDispersiveShift"
+      },
+      {
+        "text": "CheckOptimalReadoutAmplitude",
+        "link": "/task-knowledge/td-characterization/CheckOptimalReadoutAmplitude"
+      },
+      {
+        "text": "ReadoutClassification",
+        "link": "/task-knowledge/td-characterization/ReadoutClassification"
+      },
+      {
+        "text": "ChevronPattern",
+        "link": "/task-knowledge/td-characterization/ChevronPattern"
+      }
+    ]
+  },
+  {
+    "text": "One-Qubit Gate Calibration",
+    "collapsed": true,
+    "items": [
+      {
+        "text": "CheckPIPulse",
+        "link": "/task-knowledge/one-qubit-gate-calibration/CheckPIPulse"
+      },
+      {
+        "text": "CheckHPIPulse",
+        "link": "/task-knowledge/one-qubit-gate-calibration/CheckHPIPulse"
+      },
+      {
+        "text": "CheckDRAGPIPulse",
+        "link": "/task-knowledge/one-qubit-gate-calibration/CheckDRAGPIPulse"
+      },
+      {
+        "text": "CheckDRAGHPIPulse",
+        "link": "/task-knowledge/one-qubit-gate-calibration/CheckDRAGHPIPulse"
+      },
+      {
+        "text": "CreatePIPulse",
+        "link": "/task-knowledge/one-qubit-gate-calibration/CreatePIPulse"
+      },
+      {
+        "text": "CreateHPIPulse",
+        "link": "/task-knowledge/one-qubit-gate-calibration/CreateHPIPulse"
+      },
+      {
+        "text": "CreateDRAGPIPulse",
+        "link": "/task-knowledge/one-qubit-gate-calibration/CreateDRAGPIPulse"
+      },
+      {
+        "text": "CreateDRAGHPIPulse",
+        "link": "/task-knowledge/one-qubit-gate-calibration/CreateDRAGHPIPulse"
+      }
+    ]
+  },
+  {
+    "text": "Two-Qubit Gate Calibration",
+    "collapsed": true,
+    "items": [
+      {
+        "text": "CheckCrossResonance",
+        "link": "/task-knowledge/two-qubit-gate-calibration/CheckCrossResonance"
+      },
+      {
+        "text": "CheckZX90",
+        "link": "/task-knowledge/two-qubit-gate-calibration/CheckZX90"
+      },
+      {
+        "text": "CreateZX90",
+        "link": "/task-knowledge/two-qubit-gate-calibration/CreateZX90"
+      },
+      {
+        "text": "CheckBellState",
+        "link": "/task-knowledge/two-qubit-gate-calibration/CheckBellState"
+      },
+      {
+        "text": "CheckBellStateTomography",
+        "link": "/task-knowledge/two-qubit-gate-calibration/CheckBellStateTomography"
+      }
+    ]
+  },
+  {
+    "text": "Benchmarking",
+    "collapsed": true,
+    "items": [
+      {
+        "text": "RandomizedBenchmarking",
+        "link": "/task-knowledge/benchmarking/RandomizedBenchmarking"
+      },
+      {
+        "text": "X90InterleavedRandomizedBenchmarking",
+        "link": "/task-knowledge/benchmarking/X90InterleavedRandomizedBenchmarking"
+      },
+      {
+        "text": "X180InterleavedRandomizedBenchmarking",
+        "link": "/task-knowledge/benchmarking/X180InterleavedRandomizedBenchmarking"
+      },
+      {
+        "text": "ZX90InterleavedRandomizedBenchmarking",
+        "link": "/task-knowledge/benchmarking/ZX90InterleavedRandomizedBenchmarking"
+      }
+    ]
+  }
+]

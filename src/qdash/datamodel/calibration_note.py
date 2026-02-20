@@ -47,6 +47,7 @@ class CalibrationNoteModel(BaseModel):
     execution_id: str = Field(..., description="The execution ID associated with this note")
     task_id: str = Field(..., description="The task ID associated with this note")
     note: dict[str, Any] = Field(default_factory=dict, description="The calibration note data")
+    version: int = Field(default=0, description="Version number, incremented on each update")
     timestamp: datetime | None = Field(
         default=None,
         description="The time when the note was last updated",

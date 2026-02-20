@@ -21,7 +21,7 @@ interface MetricsYamlDownloadButtonProps {
   } | null;
   metricConfig: MetricConfig | undefined;
   selectionMode: "latest" | "best" | "average";
-  timeRange: "1d" | "7d" | "30d";
+  timeRange: "1d" | "7d" | "30d" | "custom";
   disabled?: boolean;
 }
 

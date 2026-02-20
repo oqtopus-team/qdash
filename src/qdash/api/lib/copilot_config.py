@@ -19,6 +19,7 @@ class ScoringThreshold(BaseModel):
 
     good: float
     excellent: float
+    bad: float | None = None
     unit: str = ""
     higher_is_better: bool = True
 
@@ -34,9 +35,9 @@ class ModelConfig(BaseModel):
     """Model configuration for CopilotKit."""
 
     provider: str = "openai"
-    name: str = "gpt-4o"
-    temperature: float = 0.7
-    max_tokens: int = 2048
+    name: str = "gpt-4.1"
+    temperature: float | None = 0.7
+    max_output_tokens: int = 2048
 
 
 class Suggestion(BaseModel):
@@ -46,17 +47,27 @@ class Suggestion(BaseModel):
     prompt: str
 
 
+class AnalysisConfig(BaseModel):
+    """Task analysis configuration (side-panel chat in metrics modal)."""
+
+    enabled: bool = True
+    multimodal: bool = True
+    max_conversation_turns: int = 10
+
+
 class CopilotConfig(BaseModel):
     """Copilot configuration."""
 
     enabled: bool = False
-    language: str = "en"
+    response_language: str = "en"
+    thinking_language: str = "en"
     model: ModelConfig = ModelConfig()
     evaluation_metrics: EvaluationMetrics = EvaluationMetrics()
     scoring: dict[str, ScoringThreshold] = {}
     system_prompt: str = ""
     initial_message: str = ""
     suggestions: list[Suggestion] = []
+    analysis: AnalysisConfig = AnalysisConfig()
 
 
 @lru_cache(maxsize=1)

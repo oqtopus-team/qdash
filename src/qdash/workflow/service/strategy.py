@@ -194,6 +194,7 @@ class OneQubitScheduledStrategy(OneQubitStrategy):
             "project_id": config.project_id,
             "muxes": None,
             "execution_id": parent_execution_id,
+            "default_run_parameters": cal_service.default_run_parameters,
         }
 
         # Execute stages grouped by box type (sequentially between box types)
@@ -298,6 +299,7 @@ class OneQubitSynchronizedStrategy(OneQubitStrategy):
             "project_id": config.project_id,
             "muxes": None,
             "execution_id": parent_execution_id,
+            "default_run_parameters": cal_service.default_run_parameters,
         }
 
         all_results: dict[str, Any] = {}

@@ -346,9 +346,9 @@ export function ChipPageContent() {
 
   return (
     <PageContainer>
-      <div className="h-full flex flex-col space-y-4 md:space-y-6">
+      <div className="h-full flex flex-col space-y-3 md:space-y-4">
         {/* Header Section */}
-        <div className="flex flex-col gap-4 md:gap-6">
+        <div className="flex flex-col gap-3 md:gap-4">
           <PageHeader
             title="Chip Experiments"
             description="View calibration tasks and qubit results"
@@ -433,7 +433,7 @@ export function ChipPageContent() {
         </div>
 
         {/* Content Section */}
-        <div className="pt-4">
+        <div className="flex-1 min-h-0">
           {isLoadingMux ? (
             <div className="w-full flex justify-center py-12">
               <QuantumLoader size="lg" />

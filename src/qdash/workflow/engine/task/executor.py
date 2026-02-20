@@ -11,7 +11,7 @@ The TaskExecutor is responsible for the complete task execution lifecycle:
 """
 
 import logging
-from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, ClassVar, Protocol, runtime_checkable
 
 from pydantic import BaseModel, Field
 from qdash.datamodel.task import CalibDataModel, ParameterModel
@@ -40,6 +40,7 @@ class TaskProtocol(Protocol):
     name: str
     r2_threshold: float
     backend: str
+    run_parameters: ClassVar[dict[str, Any]]
 
     def get_name(self) -> str:
         """Get task name."""
@@ -90,6 +91,7 @@ class BackendProtocol(Protocol):
         execution_id: str,
         task_manager_id: str,
         project_id: str | None = None,
+        qid: str | None = None,
     ) -> None:
         """Update calibration note."""
         ...
@@ -239,6 +241,11 @@ class TaskExecutor:
         try:
             # Start task
             self.state_manager.start_task(task_name, task_type, qid)
+
+            # Record run_parameters (experiment configuration used)
+            run_params = {k: v.model_dump() for k, v in task.run_parameters.items()}
+            if run_params:
+                self.state_manager.put_run_parameters(task_name, run_params, task_type, qid)
 
             # Preprocess
             preprocess_result = self._run_preprocess(task, backend, qid)
@@ -580,6 +587,11 @@ class TaskExecutor:
             # 1. Start task
             self.state_manager.start_task(task_name, task_type, qid)
 
+            # Record run_parameters (experiment configuration used)
+            run_params = {k: v.model_dump() for k, v in task.run_parameters.items()}
+            if run_params:
+                self.state_manager.put_run_parameters(task_name, run_params, task_type, qid)
+
             # Record task start to history
             executed_task = self.state_manager.get_task(task_name, task_type, qid)
             self.history_recorder.record_task_result(
@@ -759,6 +771,7 @@ class TaskExecutor:
 
         # 5. Validate R²
         backend_success = True
+        r2_error_msg: str | None = None
         if run_result.has_r2() and run_result.r2 is not None:
             r2_value = run_result.r2.get(qid)
             if r2_value is None:
@@ -770,13 +783,18 @@ class TaskExecutor:
                     # Clear output parameters on R² failure
                     if postprocess_result.output_parameters:
                         self.state_manager.clear_output_parameters(task_name, task_type, qid)
-                    raise ValueError(f"{task_name} R² value too low: {r2_value:.4f}")
+                    backend_success = False
+                    r2_error_msg = f"{task_name} R² value too low: {r2_value:.4f}"
 
             if not backend_success and postprocess_result.output_parameters:
                 self.state_manager.clear_output_parameters(task_name, task_type, qid)
 
-        # 6. Backend-specific save processing
+        # 6. Backend-specific save processing (always runs, even on R² failure)
         self._save_backend_specific(task, execution_service, qid, backend, backend_success)
+
+        # Raise after save so calibration note is updated
+        if r2_error_msg is not None:
+            raise ValueError(r2_error_msg)
 
         return backend_success
 
@@ -848,6 +866,18 @@ class TaskExecutor:
         qubit_repo = MongoQubitCalibrationRepository()
         coupling_repo = MongoCouplingCalibrationRepository()
 
+        # Always update calibration note regardless of success/failure
+        if backend.name == "qubex":
+            backend.update_note(
+                username=self.username,
+                chip_id=execution_service.chip_id,
+                calib_dir=self.calib_dir,
+                execution_id=execution_service.execution_id,
+                task_manager_id=self.task_manager_id,
+                project_id=execution_service.project_id,
+                qid=qid,
+            )
+
         if not success:
             logger.info(
                 "Skipping backend parameter updates for %s due to failed R² validation",
@@ -872,17 +902,6 @@ class TaskExecutor:
                         project_id=execution_service.project_id,
                     )
             return
-
-        # Save calibration note
-        if backend.name == "qubex":
-            backend.update_note(
-                username=self.username,
-                chip_id=execution_service.chip_id,
-                calib_dir=self.calib_dir,
-                execution_id=execution_service.execution_id,
-                task_manager_id=self.task_manager_id,
-                project_id=execution_service.project_id,
-            )
 
         # Update database
         if output_parameters:

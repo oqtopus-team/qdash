@@ -130,6 +130,7 @@ export function TaskDetailModal({
         json_figure_path: fetchedTaskData.json_figure_path,
         input_parameters: fetchedTaskData.input_parameters,
         output_parameters: fetchedTaskData.output_parameters,
+        run_parameters: fetchedTaskData.run_parameters,
         start_at: fetchedTaskData.start_at,
         end_at: fetchedTaskData.end_at,
         elapsed_time: fetchedTaskData.elapsed_time,
@@ -471,6 +472,57 @@ export function TaskDetailModal({
                           </div>
                         </div>
                       )}
+                      {task.run_parameters &&
+                        Object.keys(task.run_parameters).length > 0 && (
+                          <div className="collapse collapse-arrow bg-base-200 rounded-xl">
+                            <input type="checkbox" />
+                            <div className="collapse-title font-medium text-sm py-3">
+                              Run Parameters
+                            </div>
+                            <div className="collapse-content">
+                              <div className="space-y-1">
+                                {Object.entries(task.run_parameters).map(
+                                  ([key, value]) => {
+                                    const paramValue = (
+                                      typeof value === "object" &&
+                                      value !== null &&
+                                      "value" in value
+                                        ? value
+                                        : { value }
+                                    ) as {
+                                      value: number | string | number[] | null;
+                                      unit?: string;
+                                    };
+                                    const displayValue = Array.isArray(
+                                      paramValue.value,
+                                    )
+                                      ? paramValue.value.join(", ")
+                                      : paramValue.value !== null &&
+                                          paramValue.value !== undefined
+                                        ? String(paramValue.value)
+                                        : "-";
+                                    return (
+                                      <div
+                                        key={key}
+                                        className="flex justify-between text-sm"
+                                      >
+                                        <span className="font-medium">
+                                          {key}:
+                                        </span>
+                                        <span className="font-mono">
+                                          {displayValue}
+                                          {paramValue.unit
+                                            ? ` ${paramValue.unit}`
+                                            : ""}
+                                        </span>
+                                      </div>
+                                    );
+                                  },
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       {task.message && (
                         <div className="card bg-base-200 p-4 rounded-xl">
                           <h4 className="font-medium mb-2">Message</h4>
@@ -544,6 +596,66 @@ export function TaskDetailModal({
                     </div>
                   </div>
                 )}
+
+                {/* Run Parameters (Experiment Configuration) */}
+                {task.run_parameters &&
+                  Object.keys(task.run_parameters).length > 0 && (
+                    <div className="mb-6">
+                      <h4 className="text-lg font-semibold mb-3">
+                        Run Parameters
+                      </h4>
+                      <div className="overflow-x-auto">
+                        <table className="table table-zebra table-sm">
+                          <thead>
+                            <tr>
+                              <th>Parameter</th>
+                              <th>Value</th>
+                              <th>Unit</th>
+                              <th>Description</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {Object.entries(task.run_parameters).map(
+                              ([key, value]) => {
+                                const paramValue = (
+                                  typeof value === "object" &&
+                                  value !== null &&
+                                  "value" in value
+                                    ? value
+                                    : { value }
+                                ) as {
+                                  value: number | string | number[] | null;
+                                  unit?: string;
+                                  value_type?: string;
+                                  description?: string;
+                                };
+                                const displayValue = Array.isArray(
+                                  paramValue.value,
+                                )
+                                  ? paramValue.value.join(", ")
+                                  : paramValue.value !== null &&
+                                      paramValue.value !== undefined
+                                    ? String(paramValue.value)
+                                    : "-";
+                                return (
+                                  <tr key={key}>
+                                    <td className="font-medium">{key}</td>
+                                    <td className="font-mono">
+                                      {displayValue}
+                                    </td>
+                                    <td>{paramValue.unit || "-"}</td>
+                                    <td className="text-base-content/70 text-xs">
+                                      {paramValue.description || "-"}
+                                    </td>
+                                  </tr>
+                                );
+                              },
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
 
                 {/* Input Parameters (Calibration Dependencies) - Card View */}
                 {task.input_parameters &&

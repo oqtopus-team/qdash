@@ -4,6 +4,8 @@ This module provides a mock implementation that stores data in memory,
 useful for unit testing without requiring a MongoDB instance.
 """
 
+from typing import Any
+
 from qdash.common.datetime_utils import now
 from qdash.datamodel.calibration_note import CalibrationNoteModel
 
@@ -190,6 +192,82 @@ class InMemoryCalibrationNoteRepository:
 
         self._notes[key] = updated_note
         return updated_note
+
+    def merge_note_fields(
+        self,
+        query_filter: dict[str, str],
+        calib_note: dict[str, Any],
+        max_retries: int = 3,
+    ) -> None:
+        """Atomically merge per-qubit fields into the master note (in-memory version).
+
+        Simulates the MongoDB dot-notation $set behavior by merging
+        per param_type/qubit paths into the existing note.
+
+        Parameters
+        ----------
+        query_filter : dict[str, str]
+            Query filter to identify the document
+        calib_note : dict[str, Any]
+            The calibration note data, structured as {param_type: {qubit: data}}
+        max_retries : int
+            Unused in in-memory implementation, kept for interface compatibility
+
+        """
+        # Find the matching note
+        existing = self.find_one(
+            project_id=query_filter.get("project_id"),
+            chip_id=query_filter.get("chip_id"),
+            task_id=query_filter.get("task_id"),
+        )
+
+        if existing is None:
+            # Create a new note with the calib_note as its content
+            key = self._make_key(
+                query_filter.get("project_id", ""),
+                query_filter.get("username", ""),
+                query_filter.get("chip_id", ""),
+                query_filter.get("execution_id", ""),
+                query_filter.get("task_id", ""),
+            )
+            self._notes[key] = CalibrationNoteModel(
+                project_id=query_filter.get("project_id", ""),
+                username=query_filter.get("username", ""),
+                chip_id=query_filter.get("chip_id", ""),
+                execution_id=query_filter.get("execution_id", ""),
+                task_id=query_filter.get("task_id", ""),
+                note=calib_note,
+                timestamp=now(),
+            )
+            return
+
+        # Merge per-qubit fields into existing note
+        merged = dict(existing.note)
+        for param_type, qubits in calib_note.items():
+            if isinstance(qubits, dict):
+                if param_type not in merged:
+                    merged[param_type] = {}
+                for qubit, data in qubits.items():
+                    merged[param_type][qubit] = data
+
+        # Update the stored note
+        key = self._make_key(
+            existing.project_id,
+            existing.username,
+            existing.chip_id,
+            existing.execution_id,
+            existing.task_id,
+        )
+        self._notes[key] = CalibrationNoteModel(
+            project_id=existing.project_id,
+            username=existing.username,
+            chip_id=existing.chip_id,
+            execution_id=existing.execution_id,
+            task_id=existing.task_id,
+            note=merged,
+            timestamp=now(),
+            system_info=existing.system_info,
+        )
 
     def clear(self) -> None:
         """Clear all stored notes (useful for test setup/teardown)."""

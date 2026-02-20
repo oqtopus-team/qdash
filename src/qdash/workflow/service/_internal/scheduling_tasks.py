@@ -177,6 +177,7 @@ def _create_isolated_session(
         skip_execution=True,  # Don't create new Execution, use parent's
         enable_github_pull=False,  # Parent session handles GitHub pull
         enable_github=False,  # No GitHub operations for isolated sessions
+        default_run_parameters=session_config.get("default_run_parameters"),
     )
 
 

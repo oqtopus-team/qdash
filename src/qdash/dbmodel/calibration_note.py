@@ -1,11 +1,16 @@
+import logging
+import time
 from datetime import datetime
 from typing import Any, ClassVar, cast
 
 from bunnet import Document
 from pydantic import ConfigDict, Field
 from pymongo import ASCENDING, IndexModel
+from pymongo.errors import DuplicateKeyError
 from qdash.common.datetime_utils import now
 from qdash.datamodel.system_info import SystemInfoModel
+
+logger = logging.getLogger(__name__)
 
 
 class CalibrationNoteDocument(Document):
@@ -30,6 +35,7 @@ class CalibrationNoteDocument(Document):
     execution_id: str = Field(..., description="The execution ID associated with this note")
     task_id: str = Field(..., description="The task ID associated with this note")
     note: dict[str, Any] = Field(..., description="The calibration note data")
+    version: int = Field(default=0, description="Version number, incremented on each update")
     timestamp: datetime = Field(
         default_factory=now,
         description="The time when the note was last updated",
@@ -68,11 +74,14 @@ class CalibrationNoteDocument(Document):
         task_id: str,
         note: dict[str, Any],
         project_id: str,
+        max_retries: int = 3,
     ) -> "CalibrationNoteDocument":
-        """Upsert a calibration note atomically.
+        """Upsert a calibration note atomically with retry logic.
 
         Uses MongoDB's find_one_and_update with upsert=True to ensure
         thread-safe operations during parallel calibration task execution.
+        Implements retry logic to handle race conditions when multiple
+        processes attempt to insert the same document simultaneously.
 
         Args:
         ----
@@ -82,6 +91,7 @@ class CalibrationNoteDocument(Document):
             task_id (str): The task ID associated with this note.
             note (dict): The calibration note data.
             project_id (str): The project ID for multi-tenancy.
+            max_retries (int): Maximum retry attempts for DuplicateKeyError.
 
         Returns:
         -------
@@ -106,6 +116,7 @@ class CalibrationNoteDocument(Document):
                 "note": note,
                 "timestamp": timestamp,
             },
+            "$inc": {"version": 1},
             "$setOnInsert": {
                 "project_id": project_id,
                 "execution_id": execution_id,
@@ -116,14 +127,35 @@ class CalibrationNoteDocument(Document):
         }
 
         collection = cls.get_motor_collection()
-        result = collection.find_one_and_update(
-            query,
-            update,
-            upsert=True,
-            return_document=ReturnDocument.AFTER,
-        )
 
-        return cast("CalibrationNoteDocument", cls.model_validate(result))
+        last_error: DuplicateKeyError | None = None
+        for attempt in range(max_retries):
+            try:
+                result = collection.find_one_and_update(
+                    query,
+                    update,
+                    upsert=True,
+                    return_document=ReturnDocument.AFTER,
+                )
+                return cast("CalibrationNoteDocument", cls.model_validate(result))
+            except DuplicateKeyError as e:  # noqa: PERF203
+                last_error = e
+                logger.warning(
+                    "DuplicateKeyError on upsert attempt %d/%d for %s, retrying...",
+                    attempt + 1,
+                    max_retries,
+                    query,
+                )
+                # Brief sleep with exponential backoff before retry
+                time.sleep(0.1 * (2**attempt))
+
+        # All retries exhausted, raise the last error
+        logger.error(
+            "Failed to upsert calibration note after %d attempts: %s",
+            max_retries,
+            query,
+        )
+        raise last_error  # type: ignore[misc]
 
     model_config = ConfigDict(
         from_attributes=True,

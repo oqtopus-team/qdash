@@ -138,5 +138,8 @@ def two_qubit_scheduled(
         tags=tags,
         project_id=project_id,
         skip_execution=True,  # Child sessions create their own Executions
+        default_run_parameters={
+            "interval": {"value": 150 * 1024, "value_type": "int"},
+        },
     )
     return cal.run(targets, steps=steps)

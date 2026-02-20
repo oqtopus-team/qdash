@@ -7,6 +7,7 @@
  */
 import type { SaveFlowRequestFlowFunctionName } from "./saveFlowRequestFlowFunctionName";
 import type { SaveFlowRequestDefaultParameters } from "./saveFlowRequestDefaultParameters";
+import type { SaveFlowRequestDefaultRunParameters } from "./saveFlowRequestDefaultRunParameters";
 
 /**
  * Request to save a Flow.
@@ -24,6 +25,8 @@ export interface SaveFlowRequest {
   chip_id: string;
   /** Default execution parameters */
   default_parameters?: SaveFlowRequestDefaultParameters;
+  /** Default run parameters applied to all tasks (e.g., interval, shots) */
+  default_run_parameters?: SaveFlowRequestDefaultRunParameters;
   /** Tags for categorization */
   tags?: string[];
 }

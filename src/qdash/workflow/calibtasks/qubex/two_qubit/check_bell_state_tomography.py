@@ -9,6 +9,8 @@ from qdash.workflow.calibtasks.base import (
 )
 from qdash.workflow.calibtasks.qubex.base import QubexTask
 from qdash.workflow.engine.backend.qubex import QubexBackend
+from qubex.experiment.experiment_constants import CALIBRATION_SHOTS
+from qubex.measurement.measurement import DEFAULT_INTERVAL
 
 
 class CheckBellStateTomography(QubexTask):
@@ -17,7 +19,20 @@ class CheckBellStateTomography(QubexTask):
     name: str = "CheckBellStateTomography"
     task_type: str = "coupling"
     timeout: int = 60 * 25  # 25 minutes
-    run_parameters: ClassVar[dict[str, RunParameterModel]] = {}
+    run_parameters: ClassVar[dict[str, RunParameterModel]] = {
+        "shots": RunParameterModel(
+            unit="a.u.",
+            value_type="int",
+            value=CALIBRATION_SHOTS,
+            description="Number of shots",
+        ),
+        "interval": RunParameterModel(
+            unit="ns",
+            value_type="int",
+            value=DEFAULT_INTERVAL,
+            description="Time interval",
+        ),
+    }
 
     # Input parameters from control and target qubits
     input_parameters: ClassVar[dict[str, ParameterModel | None]] = {
@@ -185,6 +200,11 @@ class CheckBellStateTomography(QubexTask):
         control, target = (
             exp.get_qubit_label(int(q)) for q in qid.split("-")
         )  # e.g., "0-1" → "Q00","Q01"
-        result = exp.bell_state_tomography(control, target)
+        result = exp.bell_state_tomography(
+            control,
+            target,
+            shots=self.run_parameters["shots"].get_value(),
+            interval=self.run_parameters["interval"].get_value(),
+        )
         self.save_calibration(backend)
         return RunResult(raw_result=result)

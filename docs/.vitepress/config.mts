@@ -1,6 +1,7 @@
 import { defineConfig } from "vitepress";
 import { withMermaid } from "vitepress-plugin-mermaid";
 import { full as emoji } from "markdown-it-emoji";
+import taskKnowledgeSidebar from "./task-knowledge-sidebar.json";
 
 // Convert emoji to Fluent Emoji (flat SVG)
 function emojiToCodePoints(emoji: string): string {
@@ -128,6 +129,23 @@ export default withMermaid(
                 { text: "Testing", link: "/development/workflow/testing" },
               ],
             },
+            {
+              text: "Copilot",
+              collapsed: true,
+              items: [
+                { text: "Architecture", link: "/development/copilot/architecture" },
+                { text: "Sandbox", link: "/development/copilot/sandbox" },
+                { text: "LLM Agent", link: "/development/copilot/agent" },
+                { text: "SSE Streaming", link: "/development/copilot/streaming" },
+              ],
+            },
+            {
+              text: "Issues",
+              collapsed: true,
+              items: [
+                { text: "Architecture", link: "/development/issues/architecture" },
+              ],
+            },
           ],
         },
         {
@@ -141,6 +159,12 @@ export default withMermaid(
             { text: "Database Indexes", link: "/reference/database-indexes" },
             { text: "OpenAPI", link: "/reference/openapi" },
           ],
+        },
+        {
+          text: "Task Knowledge",
+          collapsed: false,
+          link: "/task-knowledge/",
+          items: taskKnowledgeSidebar,
         },
         {
           text: "Architecture Details",

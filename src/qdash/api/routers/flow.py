@@ -353,12 +353,16 @@ async def save_flow(
 
         if existing_flow:
             # Update existing flow
+            logger.info(
+                f"[TRACE] save_flow default_run_parameters={request.default_run_parameters}"
+            )
             flow_repo.update_flow(
                 flow=existing_flow,
                 description=request.description,
                 chip_id=request.chip_id,
                 flow_function_name=request.flow_function_name,
                 default_parameters=request.default_parameters,
+                default_run_parameters=request.default_run_parameters,
                 file_path=file_path_str,
                 deployment_id=deployment_id,
                 tags=request.tags,
@@ -378,6 +382,7 @@ async def save_flow(
                 file_path=file_path_str,
                 deployment_id=deployment_id,
                 tags=request.tags,
+                default_run_parameters=request.default_run_parameters,
             )
             logger.info(f"Created new flow '{request.name}' for user '{username}'")
             message = f"Flow '{request.name}' created successfully"
@@ -931,6 +936,7 @@ async def get_flow(
         logger.error(f"Failed to read flow file: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to read flow file: {e}")
 
+    logger.info(f"[TRACE] get_flow default_run_parameters={flow.default_run_parameters}")
     return GetFlowResponse(
         name=flow.name,
         description=flow.description,
@@ -938,6 +944,7 @@ async def get_flow(
         flow_function_name=flow.flow_function_name,
         chip_id=flow.chip_id,
         default_parameters=flow.default_parameters,
+        default_run_parameters=flow.default_run_parameters,
         file_path=flow.file_path,
         created_at=flow.created_at,
         updated_at=flow.updated_at,

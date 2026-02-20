@@ -3,7 +3,7 @@
 from unittest.mock import MagicMock
 
 import pytest
-from qdash.datamodel.task import ParameterModel, QubitTaskModel, TaskStatusModel
+from qdash.datamodel.task import ParameterModel, QubitTaskModel, RunParameterModel, TaskStatusModel
 from qdash.workflow.calibtasks.base import PostProcessResult, PreProcessResult, RunResult
 from qdash.workflow.engine.task.executor import (
     TaskExecutionError,
@@ -30,6 +30,7 @@ class MockTask:
         self._task_type = task_type
         self.r2_threshold = r2_threshold
         self.backend = backend
+        self.run_parameters = {}
 
     def get_name(self) -> str:
         return self.name
@@ -312,6 +313,36 @@ class TestTaskExecutorExecuteTask:
         result = executor.execute_task(task, session, "0")
 
         assert result["r2"] == {"0": 0.95}
+
+    def test_execute_task_records_run_parameters(self, executor, mock_state_manager):
+        """Test execute_task records run_parameters when present."""
+        task = MockTask()
+        task.run_parameters = {
+            "shots": RunParameterModel(value=1024, value_type="int", description="Number of shots"),
+            "interval": RunParameterModel(value=150, value_type="int", unit="us"),
+        }
+        session = MockSession()
+
+        executor.execute_task(task, session, "0")
+
+        mock_state_manager.put_run_parameters.assert_called_once()
+        call_args = mock_state_manager.put_run_parameters.call_args[0]
+        assert call_args[0] == "CheckRabi"  # task_name
+        assert "shots" in call_args[1]  # run_params dict
+        assert "interval" in call_args[1]
+        assert call_args[1]["shots"]["value"] == 1024
+        assert call_args[2] == "qubit"  # task_type
+        assert call_args[3] == "0"  # qid
+
+    def test_execute_task_skips_empty_run_parameters(self, executor, mock_state_manager):
+        """Test execute_task does not call put_run_parameters when empty."""
+        task = MockTask()
+        task.run_parameters = {}
+        session = MockSession()
+
+        executor.execute_task(task, session, "0")
+
+        mock_state_manager.put_run_parameters.assert_not_called()
 
 
 class TestTaskExecutorHelperMethods:

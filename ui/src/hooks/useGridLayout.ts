@@ -15,6 +15,7 @@ import {
   checkIsMobile,
   getGridGap,
   getGridPadding,
+  getAdaptiveMinCellSize,
   VIEWPORT_HEIGHT_BREAKPOINTS,
 } from "@/utils/gridLayout";
 
@@ -107,6 +108,11 @@ export function useGridLayout({
     );
     const availableHeight = vh - dynamicReserved;
 
+    // Use adaptive minimum cell size for larger grids (e.g., 144Q)
+    const gridSize = Math.max(cols, rows);
+    const adaptiveMinSize =
+      minCellSize ?? getAdaptiveMinCellSize(gridSize, mobile, vh);
+
     const newCellSize = calculateCellSize({
       containerWidth,
       availableHeight,
@@ -114,7 +120,7 @@ export function useGridLayout({
       rows,
       isMobile: mobile,
       viewportHeight: vh,
-      minCellSize,
+      minCellSize: adaptiveMinSize,
     });
 
     setCellSize(newCellSize);

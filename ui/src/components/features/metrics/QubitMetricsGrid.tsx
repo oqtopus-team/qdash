@@ -1,13 +1,6 @@
 "use client";
 
-import React, {
-  useMemo,
-  useState,
-  useRef,
-  useLayoutEffect,
-  useCallback,
-  memo,
-} from "react";
+import React, { useMemo, useState, useRef, useCallback, memo } from "react";
 import Link from "next/link";
 import {
   TransformWrapper,
@@ -27,11 +20,13 @@ import {
 import { calculateGridContainerWidth } from "@/utils/gridLayout";
 
 import { QubitMetricHistoryModal } from "./QubitMetricHistoryModal";
+import { useAnalysisChatContext } from "@/contexts/AnalysisChatContext";
 
 interface MetricValue {
   value: number | null;
   task_id?: string | null;
   execution_id?: string | null;
+  stddev?: number | null;
 }
 
 interface QubitMetricsGridProps {
@@ -85,30 +80,58 @@ function ZoomControls() {
   );
 }
 
+// Dynamic font size calculation based on cell size
+function getCellFontSizes(cellSize: number): {
+  labelSize: string;
+  valueSize: string;
+  unitSize: string;
+} {
+  // Scale font sizes proportionally to cell size
+  // Base reference: 60px cell = 12px label, 16px value, 10px unit
+  if (cellSize >= 60) {
+    return { labelSize: "0.75rem", valueSize: "1rem", unitSize: "0.625rem" };
+  } else if (cellSize >= 50) {
+    return { labelSize: "0.65rem", valueSize: "0.875rem", unitSize: "0.5rem" };
+  } else if (cellSize >= 40) {
+    return { labelSize: "0.55rem", valueSize: "0.75rem", unitSize: "0.45rem" };
+  } else if (cellSize >= 30) {
+    return { labelSize: "0.5rem", valueSize: "0.625rem", unitSize: "0.4rem" };
+  } else {
+    // Very small cells (< 30px)
+    return { labelSize: "0.45rem", valueSize: "0.55rem", unitSize: "0.35rem" };
+  }
+}
+
 // Memoized grid cell component for performance
 interface GridCellProps {
   qid: string;
   value: number | null;
+  stddev?: number | null;
   bgColor: string | null;
   unit: string;
   muxBgClass: string;
   showLabels: boolean;
   showValues: boolean;
   showUnits: boolean;
+  cellSize: number;
   onClick: () => void;
 }
 
 const GridCell = memo(function GridCell({
   qid,
   value,
+  stddev,
   bgColor,
   unit,
   muxBgClass,
   showLabels,
   showValues,
   showUnits,
+  cellSize,
   onClick,
 }: GridCellProps) {
+  const fontSizes = getCellFontSizes(cellSize);
+
   return (
     <button
       onClick={onClick}
@@ -122,11 +145,12 @@ const GridCell = memo(function GridCell({
       {/* QID Label */}
       {showLabels && (
         <div
-          className={`absolute top-0.5 left-0.5 md:top-1 md:left-1 backdrop-blur-sm px-1 py-0.5 md:px-2 rounded text-[0.6rem] md:text-xs font-bold shadow-sm ${
+          className={`absolute top-0.5 left-0.5 backdrop-blur-sm px-0.5 py-px rounded font-bold shadow-sm ${
             value !== null && value !== undefined
               ? "bg-black/30 text-white"
               : "bg-base-content/20 text-base-content"
           }`}
+          style={{ fontSize: fontSizes.labelSize }}
         >
           {qid}
         </div>
@@ -135,11 +159,25 @@ const GridCell = memo(function GridCell({
       {/* Value Display */}
       {value !== null && value !== undefined && showValues && (
         <div className="flex flex-col items-center justify-center h-full">
-          <div className="text-[0.6rem] sm:text-sm md:text-base lg:text-lg font-bold text-white drop-shadow-md">
+          <div
+            className="font-bold text-white drop-shadow-md"
+            style={{ fontSize: fontSizes.valueSize }}
+          >
             {value.toFixed(2)}
           </div>
+          {stddev != null && showUnits && (
+            <div
+              className="text-white/80 font-medium drop-shadow"
+              style={{ fontSize: fontSizes.unitSize }}
+            >
+              ± {stddev.toFixed(2)}
+            </div>
+          )}
           {showUnits && (
-            <div className="text-[0.5rem] md:text-xs text-white/90 font-medium drop-shadow hidden md:block">
+            <div
+              className="text-white/90 font-medium drop-shadow"
+              style={{ fontSize: fontSizes.unitSize }}
+            >
               {unit}
             </div>
           )}
@@ -148,15 +186,20 @@ const GridCell = memo(function GridCell({
 
       {/* No data indicator */}
       {(value === null || value === undefined) && showValues && (
-        <div className="flex flex-col items-center justify-center h-full pt-3 md:pt-4">
-          <div className="text-xs text-base-content/40 font-medium">N/A</div>
+        <div className="flex flex-col items-center justify-center h-full">
+          <div
+            className="text-base-content/40 font-medium"
+            style={{ fontSize: fontSizes.valueSize }}
+          >
+            N/A
+          </div>
         </div>
       )}
 
       {/* Hover tooltip - only render when needed */}
       <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-base-100 text-base-content text-sm rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
         {value !== null && value !== undefined
-          ? `${qid}: ${value.toFixed(4)} ${unit}`
+          ? `${qid}: ${value.toFixed(4)}${stddev != null ? ` ± ${stddev.toFixed(4)}` : ""} ${unit}`
           : `${qid}: No data`}
       </div>
     </button>
@@ -243,8 +286,6 @@ export function QubitMetricsGrid({
   // Modal state
   const [selectedQubitInfo, setSelectedQubitInfo] =
     useState<SelectedQubitInfo | null>(null);
-  const modalRef = useRef<HTMLDialogElement>(null);
-
   // Grid layout
   const displayCols = zoomMode === "region" ? regionSize : gridCols;
   const displayRows = zoomMode === "region" ? regionSize : gridRows;
@@ -256,17 +297,8 @@ export function QubitMetricsGrid({
       deps: [metricData],
     });
 
-  // Modal control
   const isModalOpen = selectedQubitInfo !== null;
-  useLayoutEffect(() => {
-    const modal = modalRef.current;
-    if (!modal) return;
-    if (isModalOpen && !modal.open) {
-      modal.showModal();
-    } else if (!isModalOpen && modal.open) {
-      modal.close();
-    }
-  }, [isModalOpen]);
+  const { isOpen: isSidebarOpen } = useAnalysisChatContext();
 
   const numRegions = Math.floor(effectiveGridSize / regionSize);
   const isSquareGrid = gridRows === gridCols;
@@ -377,6 +409,7 @@ export function QubitMetricsGrid({
       index: number;
       qid: string | undefined;
       value: number | null;
+      stddev: number | null;
       bgColor: string | null;
       muxBgClass: string;
       metric: MetricValue | null;
@@ -411,6 +444,7 @@ export function QubitMetricsGrid({
 
       const metric = qid ? displayData[qid] : null;
       const value = metric?.value ?? null;
+      const stddev = metric?.stddev ?? null;
       const muxBgClass =
         hasMux && showMuxBoundaries
           ? isEvenMux
@@ -419,7 +453,7 @@ export function QubitMetricsGrid({
           : "";
       const bgColor = stats ? getColor(value, stats.min, stats.max) : null;
 
-      cells.push({ index, qid, value, bgColor, muxBgClass, metric });
+      cells.push({ index, qid, value, stddev, bgColor, muxBgClass, metric });
     }
     return cells;
   }, [
@@ -470,12 +504,14 @@ export function QubitMetricsGrid({
               key={cell.qid}
               qid={cell.qid}
               value={cell.value}
+              stddev={cell.stddev}
               bgColor={cell.bgColor}
               unit={unit}
               muxBgClass={cell.muxBgClass}
               showLabels={showLabels}
               showValues={showValues}
               showUnits={showUnits}
+              cellSize={displayCellSize}
               onClick={() =>
                 cell.metric && handleCellClick(cell.qid!, cell.metric)
               }
@@ -706,7 +742,7 @@ export function QubitMetricsGrid({
             maxScale={4}
             wheel={{ step: 0.08, smoothStep: 0.004 }}
             pinch={{ step: 5 }}
-            doubleClick={{ mode: "reset" }}
+            doubleClick={{ mode: "zoomIn", step: 0.7 }}
             panning={{ velocityDisabled: false }}
             smooth={true}
             onTransformed={handleTransform}
@@ -729,12 +765,26 @@ export function QubitMetricsGrid({
       </div>
 
       {/* Qubit Detail Modal */}
-      <dialog
-        ref={modalRef}
-        className="modal modal-bottom sm:modal-middle"
-        onClose={() => setSelectedQubitInfo(null)}
+      <div
+        className={`modal modal-bottom sm:modal-middle ${isModalOpen ? "modal-open" : ""}`}
+        style={{
+          width: isSidebarOpen ? "calc(100% - 20rem)" : "100%",
+          maxWidth: "none",
+          transition: "width 300ms ease",
+        }}
+        onClick={(e) => {
+          if (e.target === e.currentTarget) setSelectedQubitInfo(null);
+        }}
       >
-        <div className="modal-box w-full sm:w-[95vw] max-w-[1800px] bg-base-100 p-0 h-[90vh] sm:h-[95vh] overflow-hidden flex flex-col">
+        <div
+          className="modal-box w-full bg-base-100 p-0 h-[90vh] sm:h-[95vh] overflow-hidden flex flex-col"
+          style={{
+            maxWidth: isSidebarOpen
+              ? "min(calc(100vw - 22rem), 1400px)"
+              : "1800px",
+            transition: "max-width 300ms ease",
+          }}
+        >
           {selectedQubitInfo && (
             <>
               <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-base-300 flex items-center justify-between">
@@ -744,7 +794,7 @@ export function QubitMetricsGrid({
                   </h2>
                   <p className="text-sm sm:text-base text-base-content/70 mt-0.5 sm:mt-1">
                     {selectedQubitInfo.metric.value !== null
-                      ? `${selectedQubitInfo.metric.value.toFixed(4)} ${unit}`
+                      ? `${selectedQubitInfo.metric.value.toFixed(4)}${selectedQubitInfo.metric.stddev != null ? ` ± ${selectedQubitInfo.metric.stddev.toFixed(4)}` : ""} ${unit}`
                       : "No data"}
                   </p>
                 </div>
@@ -789,10 +839,7 @@ export function QubitMetricsGrid({
             </>
           )}
         </div>
-        <form method="dialog" className="modal-backdrop">
-          <button>close</button>
-        </form>
-      </dialog>
+      </div>
     </div>
   );
 }

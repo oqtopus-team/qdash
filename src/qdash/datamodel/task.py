@@ -230,6 +230,7 @@ class BaseTaskResultModel(BaseModel):
     input_parameters: dict[str, Any] = {}
     output_parameters: dict[str, Any] = {}
     output_parameter_names: list[str] = []
+    run_parameters: dict[str, Any] = {}
     note: dict[str, Any] = {}
     figure_path: list[str] = []
     json_figure_path: list[str] = []
@@ -275,6 +276,10 @@ class BaseTaskResultModel(BaseModel):
             else:
                 copied_parameters[key] = item
         self.input_parameters = copied_parameters
+
+    def put_run_parameter(self, run_parameters: dict[str, Any]) -> None:
+        """Put run parameters to the task result."""
+        self.run_parameters = deepcopy(run_parameters)
 
     def put_output_parameter(self, output_parameters: dict[str, Any]) -> None:
         import numpy as np

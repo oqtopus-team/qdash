@@ -216,29 +216,35 @@ function QubitDetailPageContent() {
 
           {/* Controls */}
           <div className="flex gap-4">
-            <ChipSelector
-              selectedChip={chipId}
-              onChipSelect={(newChipId) => {
-                // Navigate to the new chip's qubit detail page
-                window.location.href = `/chip/${newChipId}/qubit/${qubitId}`;
-              }}
-            />
+            <div className="w-full sm:w-auto">
+              <ChipSelector
+                selectedChip={chipId}
+                onChipSelect={(newChipId) => {
+                  // Navigate to the new chip's qubit detail page
+                  window.location.href = `/chip/${newChipId}/qubit/${qubitId}`;
+                }}
+              />
+            </div>
 
             {viewMode !== "history" && (
-              <DateSelector
-                chipId={chipId}
-                selectedDate={selectedDate}
-                onDateSelect={setSelectedDate}
-                disabled={!chipId}
-              />
+              <div className="w-full sm:w-auto">
+                <DateSelector
+                  chipId={chipId}
+                  selectedDate={selectedDate}
+                  onDateSelect={setSelectedDate}
+                  disabled={!chipId}
+                />
+              </div>
             )}
 
-            <TaskSelector
-              tasks={filteredTasks}
-              selectedTask={selectedTask}
-              onTaskSelect={setSelectedTask}
-              disabled={false}
-            />
+            <div className="w-full sm:w-auto">
+              <TaskSelector
+                tasks={filteredTasks}
+                selectedTask={selectedTask}
+                onTaskSelect={setSelectedTask}
+                disabled={false}
+              />
+            </div>
           </div>
         </div>
 

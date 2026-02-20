@@ -27,6 +27,11 @@ tasks:
       - bunx eslint . --fix -c eslint.config.mjs --quiet
     desc: Generate the TypeScript client
 
+  knowledge:
+    desc: Generate task knowledge JSON from markdown files
+    cmds:
+      - uv run scripts/generate_task_knowledge.py
+
   docs:
     dir: docs
     cmds:

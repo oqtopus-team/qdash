@@ -26,7 +26,7 @@ class CreatePIPulse(QubexTask):
         ),
     }
     run_parameters: ClassVar[dict[str, RunParameterModel]] = {
-        "duration": RunParameterModel(
+        "pi_duration": RunParameterModel(
             unit="ns", value_type="int", value=PI_DURATION, description="PI pulse length"
         ),
         "shots": RunParameterModel(
@@ -64,7 +64,7 @@ class CreatePIPulse(QubexTask):
         result = exp.calibrate_pi_pulse(
             targets=labels,
             n_rotations=1,
-            duration=self.run_parameters["duration"].get_value(),
+            duration=self.run_parameters["pi_duration"].get_value(),
             shots=self.run_parameters["shots"].get_value(),
             interval=self.run_parameters["interval"].get_value(),
         )

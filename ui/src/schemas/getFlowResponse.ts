@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.0.1
  */
 import type { GetFlowResponseDefaultParameters } from "./getFlowResponseDefaultParameters";
+import type { GetFlowResponseDefaultRunParameters } from "./getFlowResponseDefaultRunParameters";
 
 /**
  * Response for getting flow details.
@@ -23,6 +24,8 @@ export interface GetFlowResponse {
   chip_id: string;
   /** Default parameters */
   default_parameters: GetFlowResponseDefaultParameters;
+  /** Default run parameters applied to all tasks */
+  default_run_parameters?: GetFlowResponseDefaultRunParameters;
   /** Path to file */
   file_path: string;
   /** Creation timestamp */

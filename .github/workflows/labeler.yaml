@@ -6,6 +6,11 @@ on:
     branches:
       - develop
 
+#Permissions are required for PRs by dependabot.
+permissions:
+  pull-requests: write
+  contents: write
+
 jobs:
   labeler:
     runs-on: ubuntu-latest

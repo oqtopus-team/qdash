@@ -5,20 +5,28 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import type {
   DataTag,
   DefinedInitialDataOptions,
   DefinedUseQueryResult,
+  MutationFunction,
   QueryClient,
   QueryFunction,
   QueryKey,
   UndefinedInitialDataOptions,
+  UseMutationOptions,
+  UseMutationResult,
   UseQueryOptions,
   UseQueryResult,
 } from "@tanstack/react-query";
 
-import type { GetCopilotConfig200 } from "../../schemas";
+import type {
+  AnalysisResponse,
+  AnalyzeRequest,
+  GetCopilotConfig200,
+  HTTPValidationError,
+} from "../../schemas";
 
 import { customInstance } from "../../lib/custom-instance";
 
@@ -180,3 +188,109 @@ export function useGetCopilotConfig<
 
   return query;
 }
+
+/**
+ * Analyze a calibration task result using LLM.
+
+Constructs a rich context from task knowledge, qubit parameters,
+and experimental data, then sends it to the configured LLM for analysis.
+
+Parameters
+----------
+request : AnalyzeRequest
+    The analysis request containing task info, IDs, and user message.
+
+Returns
+-------
+AnalysisResponse
+    Structured analysis from the LLM.
+ * @summary Analyze calibration result with AI
+ */
+export const analyzeCopilot = (
+  analyzeRequest: AnalyzeRequest,
+  options?: SecondParameter<typeof customInstance>,
+  signal?: AbortSignal,
+) => {
+  return customInstance<AnalysisResponse>(
+    {
+      url: `/copilot/analyze`,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      data: analyzeRequest,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getAnalyzeCopilotMutationOptions = <
+  TError = HTTPValidationError,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof analyzeCopilot>>,
+    TError,
+    { data: AnalyzeRequest },
+    TContext
+  >;
+  request?: SecondParameter<typeof customInstance>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof analyzeCopilot>>,
+  TError,
+  { data: AnalyzeRequest },
+  TContext
+> => {
+  const mutationKey = ["analyzeCopilot"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof analyzeCopilot>>,
+    { data: AnalyzeRequest }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return analyzeCopilot(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AnalyzeCopilotMutationResult = NonNullable<
+  Awaited<ReturnType<typeof analyzeCopilot>>
+>;
+export type AnalyzeCopilotMutationBody = AnalyzeRequest;
+export type AnalyzeCopilotMutationError = HTTPValidationError;
+
+/**
+ * @summary Analyze calibration result with AI
+ */
+export const useAnalyzeCopilot = <
+  TError = HTTPValidationError,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof analyzeCopilot>>,
+      TError,
+      { data: AnalyzeRequest },
+      TContext
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof analyzeCopilot>>,
+  TError,
+  { data: AnalyzeRequest },
+  TContext
+> => {
+  const mutationOptions = getAnalyzeCopilotMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};

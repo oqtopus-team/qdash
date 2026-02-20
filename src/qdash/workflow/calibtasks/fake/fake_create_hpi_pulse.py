@@ -48,7 +48,7 @@ class FakeCreateHPIPulse(FakeTask):
             value=(0.1, 0.5, 21),
             description="Amplitude range for HPI calibration",
         ),
-        "duration": RunParameterModel(
+        "hpi_duration": RunParameterModel(
             unit="ns",
             value_type="int",
             value=20,

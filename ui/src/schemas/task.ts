@@ -12,6 +12,7 @@ import type { TaskMessage } from "./taskMessage";
 import type { TaskInputParameters } from "./taskInputParameters";
 import type { TaskOutputParameters } from "./taskOutputParameters";
 import type { TaskOutputParameterNames } from "./taskOutputParameterNames";
+import type { TaskRunParameters } from "./taskRunParameters";
 import type { TaskNote } from "./taskNote";
 import type { TaskFigurePath } from "./taskFigurePath";
 import type { TaskJsonFigurePath } from "./taskJsonFigurePath";
@@ -34,6 +35,7 @@ export interface Task {
   input_parameters?: TaskInputParameters;
   output_parameters?: TaskOutputParameters;
   output_parameter_names?: TaskOutputParameterNames;
+  run_parameters?: TaskRunParameters;
   note?: TaskNote;
   figure_path?: TaskFigurePath;
   json_figure_path?: TaskJsonFigurePath;

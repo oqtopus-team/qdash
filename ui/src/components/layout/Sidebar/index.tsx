@@ -19,9 +19,11 @@ import {
   LayoutGrid,
   ListTodo,
   LogOut,
+  CircleDot,
   Moon,
   Settings,
   ShieldCheck,
+  Bot,
   Sun,
   Workflow,
   X,
@@ -215,6 +217,21 @@ function Sidebar() {
         </li>
         <li>
           <Link
+            href="/chat"
+            className={
+              isMobileOpen
+                ? linkClass(isActive("/chat"))
+                : desktopLinkClass(isActive("/chat"))
+            }
+            title="AI Chat"
+            onClick={handleLinkClick}
+          >
+            <Bot size={18} />
+            {(isOpen || isMobileOpen) && <span className="ml-2">AI Chat</span>}
+          </Link>
+        </li>
+        <li>
+          <Link
             href="/provenance"
             className={
               isMobileOpen
@@ -267,6 +284,21 @@ function Sidebar() {
             {(isOpen || isMobileOpen) && (
               <span className="ml-2">Execution</span>
             )}
+          </Link>
+        </li>
+        <li>
+          <Link
+            href="/issues"
+            className={
+              isMobileOpen
+                ? linkClass(pathname.startsWith("/issues"))
+                : desktopLinkClass(pathname.startsWith("/issues"))
+            }
+            title="Issues"
+            onClick={handleLinkClick}
+          >
+            <CircleDot size={18} />
+            {(isOpen || isMobileOpen) && <span className="ml-2">Issues</span>}
           </Link>
         </li>
         {canEdit && (
