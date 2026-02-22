@@ -4,7 +4,7 @@ import Link from "next/link";
 
 import { useQuery } from "@tanstack/react-query";
 
-import { formatDateTime } from "@/utils/datetime";
+import { formatDateTime } from "@/lib/utils/datetime";
 
 import { listAllFlowSchedules } from "@/client/flow/flow";
 

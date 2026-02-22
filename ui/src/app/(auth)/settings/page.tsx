@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 
-import { useTheme } from "@/app/providers/theme-provider";
-import { PasswordChangeCard } from "@/components/features/setting/PasswordChangeCard";
+import { useTheme } from "@/contexts/ThemeContext";
+import { PasswordChangeCard } from "@/components/features/settings/PasswordChangeCard";
 import { PageContainer } from "@/components/ui/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { useAuth } from "@/contexts/AuthContext";

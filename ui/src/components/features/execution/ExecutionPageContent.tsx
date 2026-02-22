@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useMemo } from "react";
 
 import { ExternalLink } from "lucide-react";
 
-import { formatDateTime } from "@/utils/datetime";
+import { formatDateTime } from "@/lib/utils/datetime";
 
 import { ExecutionStats } from "./ExecutionStats";
 

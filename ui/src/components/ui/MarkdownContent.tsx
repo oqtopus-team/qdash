@@ -74,6 +74,7 @@ function tryParsePlotlyJson(
   return null;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const markdownComponents: Record<string, React.ComponentType<any>> = {
   code({
     className,

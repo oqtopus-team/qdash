@@ -30,7 +30,7 @@ import {
   Zap,
 } from "lucide-react";
 
-import { useTheme } from "@/app/providers/theme-provider";
+import { useTheme } from "@/contexts/ThemeContext";
 import { useLogout } from "@/client/auth/auth";
 import { FluentEmoji, getAvatarEmoji } from "@/components/ui/FluentEmoji";
 import { useAuth } from "@/contexts/AuthContext";
@@ -55,7 +55,7 @@ function SectionHeader({
   );
 }
 
-function Sidebar() {
+export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const modalRef = useRef<HTMLDialogElement>(null);
@@ -103,7 +103,7 @@ function Sidebar() {
     if (isMobileOpen) {
       setMobileSidebarOpen(false);
     }
-    router.push("/setting");
+    router.push("/settings");
   }, [isMobileOpen, setMobileSidebarOpen, router]);
 
   const handleModalLogout = useCallback(async () => {
@@ -349,11 +349,11 @@ function Sidebar() {
         )}
         <li>
           <Link
-            href="/setting"
+            href="/settings"
             className={
               isMobileOpen
-                ? linkClass(isActive("/setting"))
-                : desktopLinkClass(isActive("/setting"))
+                ? linkClass(isActive("/settings"))
+                : desktopLinkClass(isActive("/settings"))
             }
             title="Settings"
             onClick={handleLinkClick}
@@ -593,5 +593,3 @@ function Sidebar() {
     </>
   );
 }
-
-export default Sidebar;

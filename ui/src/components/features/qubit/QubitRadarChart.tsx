@@ -14,9 +14,13 @@ interface QubitParameter {
   icon: string;
 }
 
+interface TaskDataEntry {
+  output_parameters?: Record<string, unknown> | null;
+}
+
 interface QubitRadarChartProps {
   qubitId: string;
-  taskData: Record<string, any>;
+  taskData: Record<string, TaskDataEntry | null>;
   isLoading?: boolean;
   error?: Error | null;
 }
@@ -29,10 +33,13 @@ const PARAMETER_CONFIG = {
     maxValue: 200, // 200µs is excellent T1
     color: "#ff6b6b",
     icon: "⏰",
-    extractValue: (data: any) => {
+    extractValue: (data: TaskDataEntry) => {
       const param = data?.output_parameters?.t1;
       if (typeof param === "number") return param;
-      if (typeof param === "object" && param?.value) return param.value;
+      if (typeof param === "object" && param !== null && "value" in param) {
+        const val = (param as { value?: unknown }).value;
+        if (typeof val === "number") return val;
+      }
       return null;
     },
   },
@@ -42,10 +49,13 @@ const PARAMETER_CONFIG = {
     maxValue: 400, // 400µs is excellent T2 Echo
     color: "#4ecdc4",
     icon: "📡",
-    extractValue: (data: any) => {
+    extractValue: (data: TaskDataEntry) => {
       const param = data?.output_parameters?.t2_echo;
       if (typeof param === "number") return param;
-      if (typeof param === "object" && param?.value) return param.value;
+      if (typeof param === "object" && param !== null && "value" in param) {
+        const val = (param as { value?: unknown }).value;
+        if (typeof val === "number") return val;
+      }
       return null;
     },
   },
@@ -55,10 +65,13 @@ const PARAMETER_CONFIG = {
     maxValue: 100, // 100µs is excellent T2*
     color: "#45b7d1",
     icon: "✨",
-    extractValue: (data: any) => {
+    extractValue: (data: TaskDataEntry) => {
       const param = data?.output_parameters?.t2_star;
       if (typeof param === "number") return param;
-      if (typeof param === "object" && param?.value) return param.value;
+      if (typeof param === "object" && param !== null && "value" in param) {
+        const val = (param as { value?: unknown }).value;
+        if (typeof val === "number") return val;
+      }
       return null;
     },
   },
@@ -68,10 +81,13 @@ const PARAMETER_CONFIG = {
     maxValue: 1.0, // 100% fidelity
     color: "#96ceb4",
     icon: "🎯",
-    extractValue: (data: any) => {
+    extractValue: (data: TaskDataEntry) => {
       const param = data?.output_parameters?.average_gate_fidelity;
       if (typeof param === "number") return param;
-      if (typeof param === "object" && param?.value) return param.value;
+      if (typeof param === "object" && param !== null && "value" in param) {
+        const val = (param as { value?: unknown }).value;
+        if (typeof val === "number") return val;
+      }
       return null;
     },
   },
@@ -81,10 +97,13 @@ const PARAMETER_CONFIG = {
     maxValue: 1.0, // 100% fidelity
     color: "#feca57",
     icon: "📊",
-    extractValue: (data: any) => {
+    extractValue: (data: TaskDataEntry) => {
       const param = data?.output_parameters?.average_readout_fidelity;
       if (typeof param === "number") return param;
-      if (typeof param === "object" && param?.value) return param.value;
+      if (typeof param === "object" && param !== null && "value" in param) {
+        const val = (param as { value?: unknown }).value;
+        if (typeof val === "number") return val;
+      }
       return null;
     },
   },

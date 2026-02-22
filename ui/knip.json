@@ -24,6 +24,9 @@
       "src/middleware.ts"
     ]
   },
+  "vitest": {
+    "entry": ["vitest.config.mts", "vitest.setup.ts", "src/**/*.test.{ts,tsx}"]
+  },
   "eslint": true,
   "postcss": true,
   "typescript": true

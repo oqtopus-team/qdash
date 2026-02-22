@@ -20,7 +20,7 @@ import JsonView from "react18-json-view";
 import type { Node, Edge, NodeProps, NodeTypes } from "@xyflow/react";
 
 import { TaskFigure } from "@/components/charts/TaskFigure";
-import { formatDateTime } from "@/utils/datetime";
+import { formatDateTime } from "@/lib/utils/datetime";
 import "@xyflow/react/dist/style.css";
 
 interface TaskNode {
@@ -258,7 +258,7 @@ function FlowContent({
   );
 }
 
-export default function ExecutionDAG({ tasks }: ExecutionDAGProps) {
+export function ExecutionDAG({ tasks }: ExecutionDAGProps) {
   const [selectedTask, setSelectedTask] = useState<TaskDetails | null>(null);
   const [isMaximized, setIsMaximized] = useState(false);
   const getLayoutedElements = useCallback(() => {

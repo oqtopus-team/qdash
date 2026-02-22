@@ -113,8 +113,11 @@ export function CreateChipModal({
         setError(null);
         onClose();
       },
-      onError: (err: any) => {
-        setError(err.response?.data?.detail || "Failed to create chip");
+      onError: (err: Error) => {
+        const axiosErr = err as Error & {
+          response?: { data?: { detail?: string } };
+        };
+        setError(axiosErr.response?.data?.detail || "Failed to create chip");
       },
     },
   });

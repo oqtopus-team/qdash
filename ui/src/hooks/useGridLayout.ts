@@ -17,7 +17,7 @@ import {
   getGridPadding,
   getAdaptiveMinCellSize,
   VIEWPORT_HEIGHT_BREAKPOINTS,
-} from "@/utils/gridLayout";
+} from "@/lib/utils/grid-layout";
 
 interface UseGridLayoutParams {
   /** Number of columns in the grid */
@@ -124,7 +124,7 @@ export function useGridLayout({
     });
 
     setCellSize(newCellSize);
-  }, [cols, rows, minCellSize, reservedHeight.mobile, reservedHeight.desktop]);
+  }, [cols, rows, minCellSize, reservedHeight]);
 
   // Initial calculation and resize listener
   useEffect(() => {

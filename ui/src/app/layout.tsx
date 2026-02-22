@@ -2,7 +2,7 @@ import "./globals.css";
 import NextTopLoader from "nextjs-toploader";
 import Providers from "./providers";
 
-import AppLayout from "@/components/layout/AppLayout";
+import { AppLayout } from "@/components/layout/AppLayout";
 
 export const metadata = {
   title: "QDash",

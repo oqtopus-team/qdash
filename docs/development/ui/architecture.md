@@ -17,31 +17,38 @@ src/app/
 ├── (auth)/                     # Protected routes
 │   ├── admin/page.tsx          # /admin
 │   ├── analysis/page.tsx       # /analysis
+│   ├── chat/page.tsx           # /chat
 │   ├── chip/
 │   │   ├── page.tsx            # /chip
 │   │   └── [chipId]/
 │   │       └── qubit/
-│   │           └── [qubitsId]/
-│   │               └── page.tsx # /chip/:chipId/qubit/:qubitsId
+│   │           └── [qubitId]/
+│   │               └── page.tsx # /chip/:chipId/qubit/:qubitId
 │   ├── execution/
 │   │   ├── page.tsx            # /execution
-│   │   └── [chip_id]/
-│   │       └── [execute_id]/
-│   │           └── page.tsx    # /execution/:chip_id/:execute_id
+│   │   └── [executionId]/
+│   │       └── page.tsx        # /execution/:executionId
 │   ├── files/page.tsx          # /files
-│   ├── flow/
-│   │   ├── page.tsx            # /flow
-│   │   ├── new/page.tsx        # /flow/new
-│   │   └── [name]/page.tsx     # /flow/:name
+│   ├── inbox/page.tsx          # /inbox (default landing page)
+│   ├── issues/
+│   │   ├── page.tsx            # /issues
+│   │   └── [issueId]/
+│   │       └── page.tsx        # /issues/:issueId
 │   ├── metrics/page.tsx        # /metrics
-│   ├── setting/page.tsx        # /setting
-│   └── tasks/page.tsx          # /tasks
+│   ├── provenance/page.tsx     # /provenance
+│   ├── settings/page.tsx       # /settings
+│   ├── task-results/page.tsx   # /task-results
+│   ├── tasks/page.tsx          # /tasks
+│   └── workflow/
+│       ├── page.tsx            # /workflow
+│       ├── new/page.tsx        # /workflow/new
+│       └── [name]/page.tsx     # /workflow/:name
 ├── (public)/                   # Public routes
 │   └── login/page.tsx          # /login
-├── providers/                  # Provider components
+├── api/                        # API route handlers (SSE streaming)
 ├── globals.css                 # Global styles
 ├── layout.tsx                  # Root layout
-├── page.tsx                    # / (redirects to /metrics)
+├── page.tsx                    # / (redirects to /inbox)
 └── providers.tsx               # Provider composition
 ```
 
@@ -51,8 +58,8 @@ Route groups (parenthesized folders) organize routes without affecting URLs:
 
 ```tsx
 // (auth) group - requires authentication
-// File: src/app/(auth)/metrics/page.tsx
-// URL: /metrics (not /auth/metrics)
+// File: src/app/(auth)/inbox/page.tsx
+// URL: /inbox (not /auth/inbox)
 
 // (public) group - no authentication required
 // File: src/app/(public)/login/page.tsx
@@ -78,11 +85,12 @@ RootLayout (src/app/layout.tsx)
 ```
 components/
 ├── ui/                     # Generic, reusable components
-│   ├── Button.tsx          # Basic button
 │   ├── Card.tsx            # Card container
 │   ├── DataTable.tsx       # Generic data table
 │   ├── LoadingSpinner.tsx  # Loading indicator
-│   └── Modal.tsx           # Modal dialog
+│   ├── FluentEmoji.tsx     # Fluent Emoji component
+│   ├── EmptyState.tsx      # Empty state templates
+│   └── ...                 # Other UI primitives
 │
 ├── charts/                 # Visualization components
 │   ├── Plot.tsx            # Lightweight Plotly wrapper (plotly.js-basic-dist)
@@ -90,26 +98,32 @@ components/
 │   └── TaskFigure.tsx      # Task result figure
 │
 ├── features/               # Feature-specific components
+│   ├── admin/              # Admin page components
 │   ├── analysis/           # Analysis page components
-│   │   ├── HistogramView.tsx
-│   │   ├── CDFView.tsx
-│   │   └── StatisticsPanel.tsx
+│   ├── chat/               # Copilot chat components
 │   ├── chip/               # Chip page components
-│   │   ├── ChipPageContent.tsx
-│   │   └── QubitGrid.tsx
 │   ├── execution/          # Execution page components
+│   ├── files/              # File management components
 │   ├── flow/               # Flow editor components
-│   └── metrics/            # Metrics dashboard components
+│   ├── inbox/              # Inbox components
+│   ├── issues/             # Issue tracking components
+│   ├── metrics/            # Metrics dashboard components
+│   ├── provenance/         # Data provenance components
+│   ├── qubit/              # Qubit detail components
+│   ├── settings/           # Settings page components
+│   ├── task-results/       # Task result components
+│   └── tasks/              # Task management components
 │
 ├── layout/                 # Layout components
 │   ├── AppLayout.tsx       # Main app layout
-│   ├── Navbar.tsx          # Top navigation
-│   └── Sidebar.tsx         # Side navigation
+│   └── AnalysisSidebar.tsx # Analysis page sidebar
 │
 └── selectors/              # Selection/input components
-    ├── ChipSelector.tsx    # Chip dropdown
-    ├── DateRangeSelector.tsx
-    └── ProjectSelector.tsx
+    ├── ChipSelector/       # Chip dropdown
+    ├── DateSelector/       # Date selection
+    ├── ParameterSelector/  # Parameter selection
+    ├── TagSelector/        # Tag selection
+    └── TaskSelector/       # Task selection
 ```
 
 ### Component Responsibility

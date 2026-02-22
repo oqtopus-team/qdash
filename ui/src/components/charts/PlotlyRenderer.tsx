@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import Plot from "@/components/charts/Plot";
 
-export default function PlotlyRenderer({
+export function PlotlyRenderer({
   fullPath,
   className = "",
 }: {

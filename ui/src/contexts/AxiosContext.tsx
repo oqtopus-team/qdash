@@ -4,11 +4,7 @@ import { AXIOS_INSTANCE } from "@/lib/api/custom-instance";
 
 const PROJECT_STORAGE_KEY = "qdash_current_project_id";
 
-export default function AxiosProvider({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export function AxiosProvider({ children }: { children: React.ReactNode }) {
   // Configure base URL - use /api proxy route (handled by Next.js rewrites)
   // Falls back to direct API URL for backward compatibility
   AXIOS_INSTANCE.defaults.baseURL = process.env.NEXT_PUBLIC_API_URL || "/api";

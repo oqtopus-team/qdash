@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 declare module "reagraph" {
   export interface NodePositionArgs {
     nodes: Array<{

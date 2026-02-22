@@ -234,8 +234,8 @@ export function HistogramView() {
     const allValues: HistogramDataPoint[] = [];
 
     Object.entries(rawData).forEach(
-      ([entityId, metricValue]: [string, any]) => {
-        const value = metricValue?.value;
+      ([entityId, metricValue]: [string, unknown]) => {
+        const value = (metricValue as Record<string, unknown>)?.value;
         if (
           value === null ||
           value === undefined ||
@@ -293,14 +293,17 @@ export function HistogramView() {
 
     // Collect all entity IDs
     const entityIds = new Set<string>();
-    Object.values(metricsSource).forEach((metricData: any) => {
-      if (metricData) {
+    Object.values(metricsSource).forEach((metricData: unknown) => {
+      if (metricData && typeof metricData === "object") {
         Object.keys(metricData).forEach((id) => entityIds.add(id));
       }
     });
 
     // Build table data with all metrics for each entity
-    const tableData: Record<string, any>[] = [];
+    const tableData: ({ entityId: string } & Record<
+      string,
+      string | number | null
+    >)[] = [];
 
     entityIds.forEach((entityId) => {
       const formattedId = isCoupling
@@ -309,12 +312,13 @@ export function HistogramView() {
           ? entityId
           : `Q${entityId.padStart(2, "0")}`;
 
-      const row: Record<string, any> = { entityId: formattedId };
+      const row: { entityId: string } & Record<string, string | number | null> =
+        { entityId: formattedId };
 
       metricsConfig.forEach((metric) => {
         const metricData = metricsSource[
           metric.key as keyof typeof metricsSource
-        ] as any;
+        ] as Record<string, { value?: unknown }> | undefined;
         const value = metricData?.[entityId]?.value;
 
         if (
@@ -459,7 +463,7 @@ export function HistogramView() {
       hovertemplate: "Mean: %{y:.4f}<br><extra></extra>",
     };
 
-    const traces: any[] = [barTrace, meanLine];
+    const traces: Record<string, unknown>[] = [barTrace, meanLine];
 
     // Threshold line (if applicable)
     if (activeThreshold) {

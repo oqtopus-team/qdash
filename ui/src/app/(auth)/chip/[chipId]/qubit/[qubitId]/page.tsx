@@ -30,7 +30,7 @@ import { useChipUrlState } from "@/hooks/useUrlState";
 function QubitDetailPageContent() {
   const params = useParams();
   const chipId = params.chipId as string;
-  const qubitId = params.qubitsId as string;
+  const qubitId = params.qubitId as string;
 
   // URL state management
   const {

@@ -21,7 +21,7 @@ import { useCSVExport } from "@/hooks/useCSVExport";
 import { useMetricsConfig } from "@/hooks/useMetricsConfig";
 import { useTimeRange } from "@/hooks/useTimeRange";
 import { useAnalysisUrlState } from "@/hooks/useUrlState";
-import { formatDateTime } from "@/utils/datetime";
+import { formatDateTime } from "@/lib/utils/datetime";
 
 // Color palette for secondary axis traces
 const SECONDARY_AXIS_COLORS = [
@@ -30,6 +30,23 @@ const SECONDARY_AXIS_COLORS = [
   "#bcbd22", // olive
   "#17becf", // cyan
 ];
+
+interface TimeSeriesDataPoint {
+  calibrated_at: string;
+  value: number | string;
+  error?: number;
+  unit?: string;
+  description?: string;
+}
+
+interface TimeSeriesTableRow {
+  qid: string;
+  time: string;
+  parameter: string;
+  value: number;
+  error?: number;
+  unit: string;
+}
 
 export function TimeSeriesView() {
   // URL state management
@@ -235,16 +252,16 @@ export function TimeSeriesView() {
     }
 
     // Table data processing
-    const tableRows: any[] = [];
+    const tableRows: TimeSeriesTableRow[] = [];
     Object.entries(timeseriesResponse.data.data).forEach(
       ([qid, dataPoints]) => {
         if (Array.isArray(dataPoints)) {
-          dataPoints.forEach((point: any) => {
+          (dataPoints as TimeSeriesDataPoint[]).forEach((point) => {
             tableRows.push({
               qid,
               time: formatDateTime(point.calibrated_at),
               parameter: selectedParameter,
-              value: point.value || 0,
+              value: typeof point.value === "number" ? point.value : 0,
               error: point.error,
               unit: point.unit || "a.u.",
             });
@@ -269,19 +286,20 @@ export function TimeSeriesView() {
     Object.entries(timeseriesResponse.data.data).forEach(
       ([qid, dataPoints]) => {
         if (Array.isArray(dataPoints)) {
+          const typedPoints = dataPoints as TimeSeriesDataPoint[];
           qidData[qid] = {
-            x: dataPoints.map(
-              (point: any) =>
+            x: typedPoints.map(
+              (point) =>
                 formatDateTime(point.calibrated_at, "yyyy-MM-dd'T'HH:mm:ss") ||
                 "",
             ),
-            y: dataPoints.map((point: any) => {
+            y: typedPoints.map((point) => {
               const value = point.value;
               if (typeof value === "number") return value;
               if (typeof value === "string") return Number(value) || 0;
               return 0;
             }),
-            error: dataPoints.map((point: any) => point.error || 0),
+            error: typedPoints.map((point) => point.error || 0),
           };
         }
       },
@@ -323,7 +341,7 @@ export function TimeSeriesView() {
       Array.isArray(firstEntry[1]) &&
       firstEntry[1].length > 0
     ) {
-      const firstPoint = firstEntry[1][0] as any;
+      const firstPoint = firstEntry[1][0] as TimeSeriesDataPoint;
       metaInfo = {
         unit: firstPoint.unit || "a.u.",
         description: firstPoint.description || "",
@@ -349,16 +367,16 @@ export function TimeSeriesView() {
       }
 
       // Table data processing
-      const tableRows: any[] = [];
+      const tableRows: TimeSeriesTableRow[] = [];
       Object.entries(secondaryTimeseriesResponse.data.data).forEach(
         ([qid, dataPoints]) => {
           if (Array.isArray(dataPoints)) {
-            dataPoints.forEach((point: any) => {
+            (dataPoints as TimeSeriesDataPoint[]).forEach((point) => {
               tableRows.push({
                 qid,
                 time: formatDateTime(point.calibrated_at),
                 parameter: secondaryParameter,
-                value: point.value || 0,
+                value: typeof point.value === "number" ? point.value : 0,
                 error: point.error,
                 unit: point.unit || "a.u.",
               });
@@ -383,21 +401,22 @@ export function TimeSeriesView() {
       Object.entries(secondaryTimeseriesResponse.data.data).forEach(
         ([qid, dataPoints]) => {
           if (Array.isArray(dataPoints)) {
+            const typedPoints = dataPoints as TimeSeriesDataPoint[];
             qidData[qid] = {
-              x: dataPoints.map(
-                (point: any) =>
+              x: typedPoints.map(
+                (point) =>
                   formatDateTime(
                     point.calibrated_at,
                     "yyyy-MM-dd'T'HH:mm:ss",
                   ) || "",
               ),
-              y: dataPoints.map((point: any) => {
+              y: typedPoints.map((point) => {
                 const value = point.value;
                 if (typeof value === "number") return value;
                 if (typeof value === "string") return Number(value) || 0;
                 return 0;
               }),
-              error: dataPoints.map((point: any) => point.error || 0),
+              error: typedPoints.map((point) => point.error || 0),
             };
           }
         },
@@ -451,7 +470,7 @@ export function TimeSeriesView() {
         Array.isArray(firstEntry[1]) &&
         firstEntry[1].length > 0
       ) {
-        const firstPoint = firstEntry[1][0] as any;
+        const firstPoint = firstEntry[1][0] as TimeSeriesDataPoint;
         metaInfo = {
           unit: firstPoint.unit || "a.u.",
           description: firstPoint.description || "",
@@ -608,7 +627,7 @@ export function TimeSeriesView() {
         label: "Value",
         sortable: false,
         className: "text-center",
-        render: (value: any) =>
+        render: (value: unknown) =>
           typeof value === "number" ? value.toFixed(4) : String(value),
       },
       {
@@ -616,8 +635,10 @@ export function TimeSeriesView() {
         label: "Error",
         sortable: false,
         className: "text-center",
-        render: (value: any) =>
-          value !== undefined && value !== null ? `±${value.toFixed(4)}` : "-",
+        render: (value: unknown) =>
+          value !== undefined && value !== null && typeof value === "number"
+            ? `\u00B1${value.toFixed(4)}`
+            : "-",
       },
       { key: "unit", label: "Unit", sortable: false, className: "text-center" },
     ];

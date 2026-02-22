@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { FluentEmoji } from "./FluentEmoji";
 
 interface LinearGaugeProps {
@@ -21,9 +21,11 @@ export function LinearGauge({
   label = "Data Coverage",
 }: LinearGaugeProps) {
   const [animatedValue, setAnimatedValue] = useState(0);
+  const animatedValueRef = useRef(0);
+  animatedValueRef.current = animatedValue;
 
   useEffect(() => {
-    const startValue = animatedValue;
+    const startValue = animatedValueRef.current;
     const endValue = Math.min(100, Math.max(0, value));
     const startTime = performance.now();
 

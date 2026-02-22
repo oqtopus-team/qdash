@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 
 import type { StylesConfig, GroupBase } from "react-select";
-import { getDaisySelectStyles } from "@/lib/reactSelectTheme";
+import { getDaisySelectStyles } from "@/lib/react-select-theme";
 
 interface UseSelectStylesOptions {
   labels: string[];
@@ -47,7 +47,7 @@ export function useSelectStyles<
         minWidth: "100%",
       }),
     };
-  }, [minWidth]);
+  }, []);
 
   return { minWidth, styles };
 }
