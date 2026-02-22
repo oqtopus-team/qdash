@@ -1,21 +1,4 @@
-# UI Development Guidelines for QDash
-
-This document defines the UI development conventions and standards for the QDash project. All contributors should follow these guidelines when creating new pages, components, or features.
-
-## Table of Contents
-
-1. [Technology Stack](#technology-stack)
-2. [Project Structure](#project-structure)
-3. [Naming Conventions](#naming-conventions)
-4. [Component Design](#component-design)
-5. [State Management](#state-management)
-6. [API Integration](#api-integration)
-7. [Styling Guidelines](#styling-guidelines)
-8. [TypeScript Best Practices](#typescript-best-practices)
-9. [Code Quality](#code-quality)
-10. [Development Workflow](#development-workflow)
-
----
+# UI Development Guidelines
 
 ## Technology Stack
 
@@ -745,47 +728,3 @@ bun run start
 | `bunx tsc --noEmit` | Type check               |
 | `task generate`     | Regenerate API client    |
 
----
-
-## Summary
-
-### Key Principles
-
-1. **Use TypeScript strictly** - No implicit `any`, explicit types for all callbacks
-2. **Follow naming conventions** - PascalCase for components, camelCase for hooks
-3. **Organize by feature** - Group related components together
-4. **Use TanStack Query** - For all server state management
-5. **Use DaisyUI** - For consistent, theme-aware UI components
-6. **Never edit generated code** - `src/client/` and `src/schemas/` are auto-generated
-
-### Quick Reference
-
-```tsx
-// Component template
-import type { SomeType } from "@/schemas";
-
-interface MyComponentProps {
-  data: SomeType;
-  onAction: (id: string) => void;
-}
-
-export function MyComponent({ data, onAction }: MyComponentProps) {
-  const { data: queryData, isLoading } = useQuery({
-    queryKey: ["myData", data.id],
-    queryFn: () => fetchData(data.id),
-  });
-
-  if (isLoading) return <div className="loading loading-spinner" />;
-
-  return (
-    <div className="card bg-base-100">
-      <div className="card-body">
-        <h2 className="card-title">{data.name}</h2>
-        <button className="btn btn-primary" onClick={() => onAction(data.id)}>
-          Action
-        </button>
-      </div>
-    </div>
-  );
-}
-```

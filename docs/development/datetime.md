@@ -1,14 +1,6 @@
 # Datetime Handling
 
-This document describes how datetime values are handled across the QDash application.
-
-## Overview
-
-QDash uses a hybrid approach for datetime handling:
-
-- **Storage**: Native `datetime` objects in MongoDB for efficient querying
-- **API Response**: ISO8601 UTC strings for interoperability
-- **Display**: Converted to Asia/Tokyo timezone in the frontend
+QDash stores native `datetime` objects in MongoDB, returns ISO8601 UTC strings via the API, and converts to Asia/Tokyo timezone for display in the frontend.
 
 ## Data Flow
 
@@ -105,18 +97,16 @@ import { formatDateTime, formatDateTimeCompact } from "@/utils/datetime";
 - `date-fns`: Date manipulation utilities
 - `date-fns-tz`: Timezone conversion with `formatInTimeZone()`
 
-## Best Practices
+## Conventions
 
-1. **Always use utility functions** - Never use `new Date().toLocaleString()` directly
-2. **Handle null/undefined** - API responses may have null datetime fields
-3. **Use appropriate format** - `formatDateTimeCompact()` for space-constrained UIs
-4. **Store elapsed_time as seconds** - Convert to float before MongoDB storage
+- Always use utility functions — never use `new Date().toLocaleString()` directly
+- Handle null/undefined — API responses may have null datetime fields
+- Use `formatDateTimeCompact()` for space-constrained UIs
+- Store `elapsed_time` as seconds (float) before MongoDB storage
 
-## Related Files
+## Implementation Files
 
-| Layer | File |
-|-------|------|
-| Backend utilities | `src/qdash/common/datetime_utils.py` |
-| Frontend utilities | `ui/src/utils/datetime.ts` |
-| API schemas | `src/qdash/api/schemas/*.py` |
-| DB models | `src/qdash/dbmodel/*.py` |
+- `src/qdash/common/datetime_utils.py` — backend utilities
+- `ui/src/utils/datetime.ts` — frontend utilities
+- `src/qdash/api/schemas/*.py` — API schemas
+- `src/qdash/dbmodel/*.py` — DB models

@@ -1,14 +1,6 @@
 # Authentication and User Management
 
-QDash uses JWT-based authentication with a two-tier role system for secure access control. This guide explains how authentication works and how to manage users and passwords.
-
-## Authentication Overview
-
-QDash implements a secure authentication system with the following characteristics:
-
-- **JWT-based sessions**: Access tokens are used for API authentication
-- **Admin-controlled signup**: Only administrators can create new user accounts
-- **Two-tier role system**: System roles (admin/user) and project roles (owner/viewer)
+QDash uses JWT-based authentication with a two-tier role system: system roles (admin/user) and project roles (owner/viewer). Only administrators can create new user accounts.
 
 ## System Roles
 
@@ -173,37 +165,8 @@ curl -X GET "https://your-qdash-instance/auth/me" \
 
 | Action | User | Admin |
 | ------ | :--: | :---: |
-| Login/Logout | :white_check_mark: | :white_check_mark: |
-| View own profile | :white_check_mark: | :white_check_mark: |
-| Change own password | :white_check_mark: | :white_check_mark: |
-| Register new users | :x: | :white_check_mark: |
-| Reset any user's password | :x: | :white_check_mark: |
-
-## Security Best Practices
-
-1. **Use strong passwords**: Ensure all passwords meet complexity requirements
-2. **Protect admin credentials**: Keep admin account credentials secure
-3. **Rotate tokens**: Periodically change passwords to refresh access tokens
-4. **Monitor access**: Review user activity and access patterns regularly
-
-## Troubleshooting
-
-### "Incorrect username or password" error
-
-- Verify the username and password are correct
-- Check if the user account is disabled
-
-### "Only administrators can..." error
-
-- This action requires admin privileges
-- Contact your system administrator
-
-### "User not found" error
-
-- The specified username does not exist
-- Check the username spelling
-
-## Related Documentation
-
-- [Projects and Sharing](./projects-and-sharing.md) - Project-level permissions and collaboration
-- [Database Structure](/reference/database-structure.md) - User and authentication data models
+| Login/Logout | Yes | Yes |
+| View own profile | Yes | Yes |
+| Change own password | Yes | Yes |
+| Register new users | No | Yes |
+| Reset any user's password | No | Yes |

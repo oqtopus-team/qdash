@@ -1,19 +1,4 @@
-# UI Architecture Overview
-
-This document describes the architecture of the QDash frontend application, including its component structure, data flow patterns, and key design decisions.
-
-## Table of Contents
-
-1. [Architecture Overview](#architecture-overview)
-2. [Next.js App Router](#nextjs-app-router)
-3. [Component Architecture](#component-architecture)
-4. [Data Flow](#data-flow)
-5. [Authentication](#authentication)
-6. [API Client Generation](#api-client-generation)
-7. [State Management Patterns](#state-management-patterns)
-8. [Key Components](#key-components)
-
----
+# UI Architecture
 
 ## Architecture Overview
 
@@ -440,26 +425,3 @@ export function ChipSelector({ value, onChange, disabled }: ChipSelectorProps) {
 }
 ```
 
----
-
-## Summary
-
-### Architecture Principles
-
-1. **Separation of Concerns** - Pages handle routing, components handle UI, hooks handle logic
-2. **Type Safety** - Full TypeScript with auto-generated types from backend
-3. **Server State Management** - TanStack Query for all API interactions
-4. **Component Reusability** - Generic components in `ui/`, feature-specific in `features/`
-5. **URL-Driven State** - Shareable/bookmarkable application state via nuqs
-
-### Key Files Reference
-
-| File                             | Purpose                      |
-| -------------------------------- | ---------------------------- |
-| `src/app/layout.tsx`             | Root layout with providers   |
-| `src/app/providers.tsx`          | Provider composition         |
-| `src/middleware.ts`              | Authentication middleware    |
-| `src/lib/api/custom-instance.ts` | Axios configuration          |
-| `orval.config.cjs`               | API client generation config |
-| `eslint.config.mjs`              | ESLint configuration         |
-| `tailwind.config.ts`             | Tailwind CSS configuration   |

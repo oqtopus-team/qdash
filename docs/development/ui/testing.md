@@ -1,18 +1,4 @@
-# UI Testing Guidelines for QDash
-
-This document provides guidelines for testing the QDash frontend application. It covers testing strategies, tools, and best practices.
-
-## Table of Contents
-
-1. [Testing Strategy](#testing-strategy)
-2. [Manual Testing](#manual-testing)
-3. [Type Checking](#type-checking)
-4. [Linting](#linting)
-5. [Build Verification](#build-verification)
-6. [Component Testing Patterns](#component-testing-patterns)
-7. [Testing Checklist](#testing-checklist)
-
----
+# UI Testing Guidelines
 
 ## Testing Strategy
 
@@ -79,45 +65,14 @@ bun run dev
 
 ### Key Test Scenarios
 
-#### Authentication
+Verify the following per page during manual testing:
 
-- [ ] Login page displays correctly
-- [ ] Login redirects to /metrics
-- [ ] Protected routes redirect to /login when not authenticated
-- [ ] Logout clears session
-
-#### Metrics Page (`/metrics`)
-
-- [ ] Page loads without errors
-- [ ] Chip selector works
-- [ ] Data visualizations render
-- [ ] Time range selection works
-
-#### Chip Page (`/chip`)
-
-- [ ] Chip list loads
-- [ ] Chip details page loads
-- [ ] Qubit grid displays correctly
-- [ ] Task results show properly
-
-#### Flow Page (`/flow`)
-
-- [ ] Flow list loads
-- [ ] Create new flow works
-- [ ] Flow editor functions
-- [ ] Execute flow works
-
-#### Execution Page (`/execution`)
-
-- [ ] Execution list loads
-- [ ] Execution details show
-- [ ] Real-time updates work (if applicable)
-
-#### Analysis Page (`/analysis`)
-
-- [ ] Charts render correctly
-- [ ] Filters work
-- [ ] Export functions work
+- **Authentication** — login, redirect to `/metrics`, protected routes redirect to `/login`, logout clears session
+- **Metrics** (`/metrics`) — page loads, chip selector, visualizations, time range
+- **Chip** (`/chip`) — list loads, details page, qubit grid, task results
+- **Flow** (`/flow`) — list loads, create flow, editor, execute
+- **Execution** (`/execution`) — list loads, details, real-time updates
+- **Analysis** (`/analysis`) — charts render, filters, export
 
 ---
 
@@ -437,32 +392,6 @@ describe("useTimeRange", () => {
 
 ---
 
-## Testing Checklist
-
-### Before Committing
-
-- [ ] `bunx tsc --noEmit` passes
-- [ ] `bun run lint` passes (or warnings < 15)
-- [ ] `bun run build` succeeds
-
-### Before Pull Request
-
-- [ ] All type errors fixed
-- [ ] No new lint errors introduced
-- [ ] Manual testing completed for changed features
-- [ ] Build succeeds locally
-- [ ] Responsive design checked (if UI changes)
-
-### Before Release
-
-- [ ] Full manual test of all pages
-- [ ] Docker build succeeds
-- [ ] Performance check (bundle sizes)
-- [ ] Cross-browser testing (Chrome, Firefox, Safari)
-- [ ] Mobile responsiveness verified
-
----
-
 ## Debugging Tips
 
 ### React Query DevTools
@@ -513,23 +442,3 @@ Install React DevTools browser extension to:
 - View props and state
 - Profile rendering performance
 
----
-
-## Summary
-
-### Testing Commands Quick Reference
-
-| Command             | Purpose                                |
-| ------------------- | -------------------------------------- |
-| `bunx tsc --noEmit` | Type checking                          |
-| `bun run lint`      | ESLint checks                          |
-| `bun run fmt`       | Auto-fix lint issues                   |
-| `bun run build`     | Production build (includes type check) |
-| `bun run dev`       | Development server for manual testing  |
-
-### Key Testing Principles
-
-1. **Type Safety First** - TypeScript catches most issues at compile time
-2. **Build Verification** - Production build must pass before merging
-3. **Manual Testing** - Test user flows for changed features
-4. **Progressive Enhancement** - Add automated tests as the codebase grows

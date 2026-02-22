@@ -1,18 +1,6 @@
 # Workflow Engine Architecture
 
-This document explains the architecture of the `qdash.workflow.engine` module,
-which provides the core infrastructure for calibration workflow execution.
-
-## Overview
-
-The engine module is responsible for:
-
-- **Task Execution**: Running calibration tasks with proper lifecycle management
-- **State Management**: Tracking task status, parameters, and results
-- **Execution Tracking**: Managing workflow execution sessions
-- **Scheduling**: Coordinating parallel task execution
-- **Data Persistence**: Saving results to MongoDB and filesystem
-- **Backend Abstraction**: Supporting multiple hardware backends (qubex, fake)
+The `qdash.workflow.engine` module provides the core infrastructure for calibration workflow execution: task lifecycle management, state tracking, scheduling, data persistence (MongoDB + filesystem), and hardware backend abstraction.
 
 ## Architecture Diagram
 
@@ -361,23 +349,3 @@ class YourService:
         self._repo = repo
 ```
 
-## Best Practices
-
-### For Engine Developers
-
-1. **Use Protocols**: Define interfaces before implementations
-2. **Dependency Injection**: Pass repositories/services as constructor args
-3. **State Isolation**: Don't share mutable state between tasks
-4. **Error Handling**: Always update task status on failure
-5. **Logging**: Use structured logging for debugging
-
-### For Service Users
-
-1. **Use CalibService**: Don't directly instantiate engine components
-2. **Handle Exceptions**: Catch `TaskExecutionError`, `R2ValidationError`
-3. **Check Results**: Verify task success before proceeding
-
-## Related Documentation
-
-- [Testing Guidelines](./testing.md): How to test workflow components
-- [CalibService API](https://github.com/oqtopus-team/qdash/blob/develop/src/qdash/workflow/__init__.py): High-level API (source code)

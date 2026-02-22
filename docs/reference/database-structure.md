@@ -1,16 +1,9 @@
-# QDash Database Structure Documentation
+# Database Structure
 
-This document describes the database structure of the QDash project. QDash uses MongoDB as its primary database, managing data through the Bunnet ODM (Object Document Mapper).  
-QDash is moving toward a project-centric multi-tenant model where every piece of calibration data belongs to a project. Users create projects, invite other users as viewers, and all chip/calibration entities inherit the owning `project_id`.
+QDash uses MongoDB via the Bunnet ODM with a project-centric multi-tenant model. The data model has two layers:
 
-## Overview
-
-The QDash data model consists of two layers:
-
-1. **datamodel** (`src/qdash/datamodel/`) - Business logic data models using Pydantic BaseModel
-2. **dbmodel** (`src/qdash/dbmodel/`) - Database persistence document models using Bunnet Document
-
----
+- **datamodel** (`src/qdash/datamodel/`) — Pydantic `BaseModel` for business logic
+- **dbmodel** (`src/qdash/dbmodel/`) — Bunnet `Document` for database persistence
 
 ## MongoDB Collections
 

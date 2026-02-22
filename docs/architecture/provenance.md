@@ -1,17 +1,6 @@
 # Provenance: Calibration Data Lineage
 
-Architecture and implementation guide for the calibration data lineage (Provenance) tracking system in QDash.
-
-## Overview
-
-The Provenance system tracks how calibration parameters are generated and modified. It is designed based on W3C PROV-DM (Provenance Data Model) concepts.
-
-### Goals
-
-- **Traceability**: Complete tracking of parameter value change history
-- **Impact Analysis**: Visualize how changes to one parameter affect others
-- **Debug Support**: Facilitate root cause identification when issues occur
-- **Comparison Analysis**: Detect parameter differences between executions
+The Provenance system tracks how calibration parameters are generated and modified, based on W3C PROV-DM (Provenance Data Model) concepts. It enables tracing parameter value history, impact analysis across parameters, root cause identification, and execution comparison.
 
 ## W3C PROV-DM Concepts
 
@@ -315,9 +304,9 @@ The lineage graph example showing cross-execution parameter tracing (Execution 0
 | `ParameterHistoryPanel` | Parameter history display |
 | `ProvenanceGraph` | Graph visualization |
 
-## Best Practices
+## Implementation Notes
 
-### 1. Entity ID Consistency
+### Entity ID Format
 
 Always generate Entity IDs using the same format:
 
@@ -331,13 +320,13 @@ def generate_entity_id(
     return f"{parameter_name}:{qid}:{execution_id}:{task_id}"
 ```
 
-### 2. Version Management
+### Version Management
 
 - For the same `(parameter_name, qid)` combination, `version` auto-increments
 - `valid_until` is set when the next version is created
 - The currently active version has `valid_until = null`
 
-### 3. Recording Relations
+### Recording Relations
 
 When a calibration task completes, record the following:
 
@@ -345,9 +334,3 @@ When a calibration task completes, record the following:
 2. `used`: Activity → Input parameters used
 3. `wasDerivedFrom`: New version → Previous version (for same parameter)
 
-## Future Enhancements
-
-- [ ] Consider migration to graph database (Neo4j, etc.)
-- [ ] Real-time change notifications (WebSocket)
-- [ ] Automatic anomaly detection (alert on sudden value changes)
-- [ ] Export functionality (PROV-JSON format)
