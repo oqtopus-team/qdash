@@ -87,6 +87,18 @@ tasks:
     cmds:
       - bun run build
 
+  drawio-export:
+    desc: Export .drawio files to .drawio.png (requires draw.io desktop CLI)
+    cmds:
+      - |
+        n=10
+        for f in docs/diagrams/*.drawio; do
+          out="${f}.png"
+          echo "Exporting $f -> $out"
+          xvfb-run -n $n drawio --no-sandbox --export --format png --embed-diagram --scale 2 --output "$out" "$f"
+          n=$((n + 1))
+        done
+
   build-docs:
     dir: docs
     cmds:

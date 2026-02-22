@@ -6,7 +6,7 @@ The Provenance system tracks how calibration parameters are generated and modifi
 
 QDash provenance is based on three core concepts (Entity, Activity, Agent) and their relations. See the diagram below for the full architecture and lineage graph example:
 
-![Provenance Lineage](../diagrams/provenance-lineage.drawio)
+![Provenance Lineage](../diagrams/provenance-lineage.drawio.png)
 
 ### Mapping to QDash
 
@@ -212,7 +212,7 @@ response = {
 
 ## Lineage Graph Visualization
 
-The lineage graph example showing cross-execution parameter tracing (Execution 002 → 003) with wasGeneratedBy, used, and wasDerivedFrom relations is included in the [Provenance Lineage diagram](../diagrams/provenance-lineage.drawio) above.
+The lineage graph example showing cross-execution parameter tracing (Execution 002 → 003) with wasGeneratedBy, used, and wasDerivedFrom relations is included in the [Provenance Lineage diagram](../diagrams/provenance-lineage.drawio.png) above.
 
 ## Database Collections
 

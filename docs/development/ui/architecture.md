@@ -2,7 +2,7 @@
 
 ## Architecture Overview
 
-![UI Architecture](../../diagrams/ui-architecture.drawio)
+![UI Architecture](../../diagrams/ui-architecture.drawio.png)
 
 ---
 
