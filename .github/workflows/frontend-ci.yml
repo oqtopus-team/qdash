@@ -65,3 +65,19 @@ jobs:
 
       - name: Build
         run: task ci-ui-build
+
+  react-doctor:
+    name: React Doctor
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run React Doctor
+        uses: millionco/react-doctor@main
+        with:
+          diff: ${{ github.base_ref }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
