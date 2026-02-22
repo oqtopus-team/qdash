@@ -91,22 +91,3 @@ jobs:
 
       - name: Run knip
         run: task knip
-
-  react-doctor:
-    name: React Doctor
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request' && github.base_ref == 'develop'
-    permissions:
-      pull-requests: write
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          ref: ${{ github.head_ref }}
-
-      - name: Run React Doctor
-        uses: millionco/react-doctor@main
-        with:
-          diff: origin/${{ github.base_ref }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
