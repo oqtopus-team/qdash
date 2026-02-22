@@ -11,8 +11,15 @@ import {
   List,
   ListOrdered,
   ImageIcon,
+  Bot,
 } from "lucide-react";
 import { MarkdownContent } from "./MarkdownContent";
+
+interface MentionCandidate {
+  id: string;
+  label: string;
+  icon?: React.ReactNode;
+}
 
 interface MarkdownEditorProps {
   value: string;
@@ -24,6 +31,7 @@ interface MarkdownEditorProps {
   submitLabel?: string;
   isSubmitting?: boolean;
   onImageUpload?: (file: File) => Promise<string>;
+  mentionCandidates?: MentionCandidate[];
 }
 
 type ToolbarAction = {
@@ -170,12 +178,48 @@ export function MarkdownEditor({
   submitLabel,
   isSubmitting = false,
   onImageUpload,
+  mentionCandidates,
 }: MarkdownEditorProps) {
   const [tab, setTab] = useState<"write" | "preview">("write");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const valueRef = useRef(value);
   valueRef.current = value;
+
+  // Mention autocomplete state
+  const [mentionOpen, setMentionOpen] = useState(false);
+  const [mentionQuery, setMentionQuery] = useState("");
+  const [mentionStart, setMentionStart] = useState(0);
+  const [mentionIndex, setMentionIndex] = useState(0);
+  const mentionRef = useRef<HTMLDivElement>(null);
+
+  const filteredMentions = (mentionCandidates ?? []).filter((c) =>
+    c.id.toLowerCase().startsWith(mentionQuery.toLowerCase()),
+  );
+
+  const closeMention = useCallback(() => {
+    setMentionOpen(false);
+    setMentionQuery("");
+    setMentionIndex(0);
+  }, []);
+
+  const selectMention = useCallback(
+    (candidate: MentionCandidate) => {
+      const textarea = textareaRef.current;
+      if (!textarea) return;
+      const before = valueRef.current.slice(0, mentionStart);
+      const after = valueRef.current.slice(textarea.selectionStart);
+      const inserted = `@${candidate.id} `;
+      onChange(before + inserted + after);
+      closeMention();
+      requestAnimationFrame(() => {
+        textarea.focus();
+        const pos = mentionStart + inserted.length;
+        textarea.setSelectionRange(pos, pos);
+      });
+    },
+    [mentionStart, onChange, closeMention],
+  );
 
   const insertImageMarkdown = useCallback(
     async (file: File) => {
@@ -269,7 +313,57 @@ export function MarkdownEditor({
     [value, onChange],
   );
 
+  const handleTextChange = useCallback(
+    (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+      const newValue = e.target.value;
+      onChange(newValue);
+
+      if (!mentionCandidates?.length) return;
+
+      const cursor = e.target.selectionStart;
+      // Look backwards for @ trigger
+      const textBefore = newValue.slice(0, cursor);
+      const atMatch = textBefore.match(/(^|[\s(])@(\w*)$/);
+      if (atMatch) {
+        const atPos = textBefore.lastIndexOf("@");
+        setMentionStart(atPos);
+        setMentionQuery(atMatch[2]);
+        setMentionOpen(true);
+        setMentionIndex(0);
+      } else {
+        closeMention();
+      }
+    },
+    [onChange, mentionCandidates, closeMention],
+  );
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // Mention popup navigation
+    if (mentionOpen && filteredMentions.length > 0) {
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setMentionIndex((i) => (i + 1) % filteredMentions.length);
+        return;
+      }
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setMentionIndex(
+          (i) => (i - 1 + filteredMentions.length) % filteredMentions.length,
+        );
+        return;
+      }
+      if (e.key === "Enter" || e.key === "Tab") {
+        e.preventDefault();
+        selectMention(filteredMentions[mentionIndex]);
+        return;
+      }
+      if (e.key === "Escape") {
+        e.preventDefault();
+        closeMention();
+        return;
+      }
+    }
+
     if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && onSubmit) {
       e.preventDefault();
       onSubmit();
@@ -338,20 +432,53 @@ export function MarkdownEditor({
             )}
           </div>
 
-          {/* Textarea */}
-          <textarea
-            ref={textareaRef}
-            className="textarea textarea-bordered w-full rounded-t-none border-t-0 text-sm resize-none focus:outline-none"
-            placeholder={placeholder}
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
-            onKeyDown={handleKeyDown}
-            onPaste={handlePaste}
-            onDrop={handleDrop}
-            onDragOver={handleDragOver}
-            rows={rows}
-            disabled={disabled}
-          />
+          {/* Textarea + mention popup */}
+          <div className="relative">
+            <textarea
+              ref={textareaRef}
+              className="textarea textarea-bordered w-full rounded-t-none border-t-0 text-sm resize-none focus:outline-none"
+              placeholder={placeholder}
+              value={value}
+              onChange={handleTextChange}
+              onKeyDown={handleKeyDown}
+              onPaste={handlePaste}
+              onDrop={handleDrop}
+              onDragOver={handleDragOver}
+              onBlur={() => setTimeout(closeMention, 150)}
+              rows={rows}
+              disabled={disabled}
+            />
+            {mentionOpen && filteredMentions.length > 0 && (
+              <div
+                ref={mentionRef}
+                className="absolute bottom-full left-0 mb-1 z-50 bg-base-100 border border-base-300 rounded-lg shadow-lg py-1 min-w-[180px]"
+              >
+                {filteredMentions.map((candidate, i) => (
+                  <button
+                    key={candidate.id}
+                    type="button"
+                    className={`flex items-center gap-2 w-full px-3 py-1.5 text-sm text-left hover:bg-base-200 ${
+                      i === mentionIndex ? "bg-base-200" : ""
+                    }`}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      selectMention(candidate);
+                    }}
+                  >
+                    {candidate.icon ?? (
+                      <Bot className="h-3.5 w-3.5 text-primary" />
+                    )}
+                    <span className="font-medium">@{candidate.id}</span>
+                    {candidate.label && (
+                      <span className="text-base-content/50 text-xs">
+                        {candidate.label}
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       ) : (
         <div className="border border-base-300 rounded-b-lg p-3 min-h-[4rem]">
