@@ -15,6 +15,7 @@ from fastapi.responses import FileResponse
 from git import Repo
 from git.exc import GitCommandError
 from qdash.api.lib.auth import get_current_active_user  # noqa: TCH002
+from qdash.api.lib.file_utils import validate_relative_path
 from qdash.api.schemas.auth import User  # noqa: TCH002
 from qdash.api.schemas.file import (
     FileTreeNode,
@@ -49,18 +50,7 @@ def validate_config_path(relative_path: str) -> Path:
         HTTPException: If validation fails
 
     """
-    # Prevent path traversal
-    if ".." in relative_path:
-        raise HTTPException(status_code=400, detail="Path traversal detected")
-
-    target_path = CONFIG_BASE_PATH / relative_path
-    resolved_path = target_path.resolve()
-
-    # Ensure resolved path is within CONFIG_BASE_PATH
-    if not str(resolved_path).startswith(str(CONFIG_BASE_PATH.resolve())):
-        raise HTTPException(status_code=400, detail="Path outside config directory")
-
-    return resolved_path
+    return validate_relative_path(relative_path, CONFIG_BASE_PATH)
 
 
 def build_file_tree(directory: Path, base_path: Path) -> list[FileTreeNode]:

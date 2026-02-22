@@ -19,6 +19,7 @@ from fastapi.responses import Response, StreamingResponse
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
+from qdash.api.lib.ai_labels import STATUS_LABELS, TOOL_LABELS
 from qdash.api.lib.copilot_analysis import (
     AnalysisResponse,
     AnalyzeRequest,
@@ -31,27 +32,6 @@ from qdash.datamodel.task_knowledge import get_task_knowledge
 router = APIRouter()
 public_router = APIRouter()
 logger = logging.getLogger(__name__)
-
-TOOL_LABELS: dict[str, str] = {
-    "get_qubit_params": "キュービットパラメータを取得中",
-    "get_latest_task_result": "最新タスク結果を取得中",
-    "get_task_history": "タスク履歴を取得中",
-    "get_parameter_timeseries": "パラメータ時系列を取得中",
-    "execute_python_analysis": "Python分析コードを実行中",
-    "get_chip_summary": "チップサマリーを取得中",
-    "get_coupling_params": "カップリングパラメータを取得中",
-    "get_execution_history": "実行履歴を取得中",
-    "compare_qubits": "キュービット比較データを取得中",
-    "get_chip_topology": "チップトポロジーを取得中",
-    "search_task_results": "タスク結果を検索中",
-    "get_calibration_notes": "キャリブレーションノートを取得中",
-    "get_parameter_lineage": "パラメータ履歴を取得中",
-    "get_provenance_lineage_graph": "プロベナンス系譜グラフを取得中",
-}
-
-STATUS_LABELS: dict[str, str] = {
-    "thinking": "AIが考え中...",
-}
 
 
 @router.get(

@@ -8,7 +8,10 @@ from functools import lru_cache
 
 from qdash.api.services.calibration_service import CalibrationService
 from qdash.api.services.chip_service import ChipService
+from qdash.api.services.device_topology_service import DeviceTopologyService
 from qdash.api.services.execution_service import ExecutionService
+from qdash.api.services.metrics_service import MetricsService
+from qdash.api.services.task_result_service import TaskResultService
 from qdash.repository import (
     MongoChipRepository,
     MongoExecutionCounterRepository,
@@ -142,4 +145,51 @@ def get_calibration_service() -> CalibrationService:
     """
     return CalibrationService(
         calibration_note_repository=get_calibration_note_repository(),
+    )
+
+
+@lru_cache(maxsize=1)
+def get_device_topology_service() -> DeviceTopologyService:
+    """Get the device topology service instance.
+
+    Returns
+    -------
+    DeviceTopologyService
+        The device topology service
+
+    """
+    return DeviceTopologyService(
+        chip_repository=get_chip_repository(),
+        calibration_note_repository=get_calibration_note_repository(),
+    )
+
+
+@lru_cache(maxsize=1)
+def get_metrics_service() -> MetricsService:
+    """Get the metrics service instance.
+
+    Returns
+    -------
+    MetricsService
+        The metrics service
+
+    """
+    return MetricsService(
+        task_result_repository=get_task_result_repository(),
+    )
+
+
+@lru_cache(maxsize=1)
+def get_task_result_service() -> TaskResultService:
+    """Get the task result service instance.
+
+    Returns
+    -------
+    TaskResultService
+        The task result service
+
+    """
+    return TaskResultService(
+        chip_repository=get_chip_repository(),
+        task_result_repository=get_task_result_repository(),
     )

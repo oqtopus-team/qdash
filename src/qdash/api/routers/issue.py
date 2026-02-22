@@ -12,6 +12,8 @@ from uuid import uuid4
 
 from fastapi import APIRouter, Depends, Query, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
+from qdash.api.lib.ai_labels import STATUS_LABELS as _AI_STATUS_LABELS
+from qdash.api.lib.ai_labels import TOOL_LABELS as _AI_TOOL_LABELS
 from qdash.api.lib.project import (  # noqa: TCH002
     ProjectContext,
     get_project_context,
@@ -47,6 +49,23 @@ MAX_IMAGE_SIZE = 5 * 1024 * 1024  # 5MB
 FILENAME_PATTERN = re.compile(r"^[0-9a-f\-]{36}\.(png|jpg|gif|webp)$")
 
 logger = logging.getLogger(__name__)
+
+
+def _document_to_issue_response(doc: IssueDocument, reply_count: int = 0) -> IssueResponse:
+    """Convert an IssueDocument to an IssueResponse schema."""
+    return IssueResponse(
+        id=str(doc.id),
+        task_id=doc.task_id,
+        username=doc.username,
+        title=doc.title,
+        content=doc.content,
+        created_at=doc.system_info.created_at,
+        updated_at=doc.system_info.updated_at,
+        parent_id=doc.parent_id,
+        reply_count=reply_count,
+        is_closed=doc.is_closed,
+        is_ai_reply=doc.is_ai_reply,
+    )
 
 
 # =============================================================================
@@ -108,19 +127,7 @@ def list_issues(
             reply_counts[item["_id"]] = item["count"]
 
     issues = [
-        IssueResponse(
-            id=str(doc.id),
-            task_id=doc.task_id,
-            username=doc.username,
-            title=doc.title,
-            content=doc.content,
-            created_at=doc.system_info.created_at,
-            updated_at=doc.system_info.updated_at,
-            parent_id=doc.parent_id,
-            reply_count=reply_counts.get(str(doc.id), 0),
-            is_closed=doc.is_closed,
-            is_ai_reply=doc.is_ai_reply,
-        )
+        _document_to_issue_response(doc, reply_count=reply_counts.get(str(doc.id), 0))
         for doc in docs
     ]
 
@@ -165,19 +172,7 @@ def get_issue(
             },
         ).count()
 
-    return IssueResponse(
-        id=str(doc.id),
-        task_id=doc.task_id,
-        username=doc.username,
-        title=doc.title,
-        content=doc.content,
-        created_at=doc.system_info.created_at,
-        updated_at=doc.system_info.updated_at,
-        parent_id=doc.parent_id,
-        reply_count=reply_count,
-        is_closed=doc.is_closed,
-        is_ai_reply=doc.is_ai_reply,
-    )
+    return _document_to_issue_response(doc, reply_count=reply_count)
 
 
 @router.get(
@@ -202,21 +197,7 @@ def get_issue_replies(
         .to_list()
     )
 
-    return [
-        IssueResponse(
-            id=str(doc.id),
-            task_id=doc.task_id,
-            username=doc.username,
-            title=doc.title,
-            content=doc.content,
-            created_at=doc.system_info.created_at,
-            updated_at=doc.system_info.updated_at,
-            parent_id=doc.parent_id,
-            is_closed=doc.is_closed,
-            is_ai_reply=doc.is_ai_reply,
-        )
-        for doc in docs
-    ]
+    return [_document_to_issue_response(doc) for doc in docs]
 
 
 @router.delete(
@@ -285,18 +266,7 @@ def update_issue(
     doc.system_info.update_time()
     doc.save()
 
-    return IssueResponse(
-        id=str(doc.id),
-        task_id=doc.task_id,
-        username=doc.username,
-        title=doc.title,
-        content=doc.content,
-        created_at=doc.system_info.created_at,
-        updated_at=doc.system_info.updated_at,
-        parent_id=doc.parent_id,
-        is_closed=doc.is_closed,
-        is_ai_reply=doc.is_ai_reply,
-    )
+    return _document_to_issue_response(doc)
 
 
 @router.patch(
@@ -396,21 +366,7 @@ def get_task_result_issues(
         .to_list()
     )
 
-    return [
-        IssueResponse(
-            id=str(doc.id),
-            task_id=doc.task_id,
-            username=doc.username,
-            title=doc.title,
-            content=doc.content,
-            created_at=doc.system_info.created_at,
-            updated_at=doc.system_info.updated_at,
-            parent_id=doc.parent_id,
-            is_closed=doc.is_closed,
-            is_ai_reply=doc.is_ai_reply,
-        )
-        for doc in docs
-    ]
+    return [_document_to_issue_response(doc) for doc in docs]
 
 
 @router.post(
@@ -440,18 +396,7 @@ def create_issue(
     )
     doc.insert()
 
-    return IssueResponse(
-        id=str(doc.id),
-        task_id=doc.task_id,
-        username=doc.username,
-        title=doc.title,
-        content=doc.content,
-        created_at=doc.system_info.created_at,
-        updated_at=doc.system_info.updated_at,
-        parent_id=doc.parent_id,
-        is_closed=doc.is_closed,
-        is_ai_reply=doc.is_ai_reply,
-    )
+    return _document_to_issue_response(doc)
 
 
 # =============================================================================
@@ -519,27 +464,6 @@ def get_issue_image(filename: str) -> FileResponse:
 # =============================================================================
 # AI reply endpoint
 # =============================================================================
-
-_AI_TOOL_LABELS: dict[str, str] = {
-    "get_qubit_params": "キュービットパラメータを取得中",
-    "get_latest_task_result": "最新タスク結果を取得中",
-    "get_task_history": "タスク履歴を取得中",
-    "get_parameter_timeseries": "パラメータ時系列を取得中",
-    "execute_python_analysis": "Python分析コードを実行中",
-    "get_chip_summary": "チップサマリーを取得中",
-    "get_coupling_params": "カップリングパラメータを取得中",
-    "get_execution_history": "実行履歴を取得中",
-    "compare_qubits": "キュービット比較データを取得中",
-    "get_chip_topology": "チップトポロジーを取得中",
-    "search_task_results": "タスク結果を検索中",
-    "get_calibration_notes": "キャリブレーションノートを取得中",
-    "get_parameter_lineage": "パラメータ履歴を取得中",
-    "get_provenance_lineage_graph": "プロベナンス系譜グラフを取得中",
-}
-
-_AI_STATUS_LABELS: dict[str, str] = {
-    "thinking": "AIが考え中...",
-}
 
 
 def _sse_event(event: str, data: dict[str, Any]) -> str:
@@ -769,18 +693,7 @@ async def issue_ai_reply_stream(
         )
         ai_doc.insert()
 
-        saved_response = IssueResponse(
-            id=str(ai_doc.id),
-            task_id=ai_doc.task_id,
-            username=ai_doc.username,
-            title=ai_doc.title,
-            content=ai_doc.content,
-            created_at=ai_doc.system_info.created_at,
-            updated_at=ai_doc.system_info.updated_at,
-            parent_id=ai_doc.parent_id,
-            is_closed=ai_doc.is_closed,
-            is_ai_reply=ai_doc.is_ai_reply,
-        )
+        saved_response = _document_to_issue_response(ai_doc)
 
         yield _sse_event("status", {"step": "complete", "message": "完了"})
         yield _sse_event("result", saved_response.model_dump(mode="json"))

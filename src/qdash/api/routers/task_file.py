@@ -16,6 +16,7 @@ from qdash.api.lib.backend_config import (
     load_backend_config,
 )
 from qdash.api.lib.config_loader import ConfigLoader
+from qdash.api.lib.file_utils import validate_relative_path
 from qdash.api.schemas.auth import User  # noqa: TCH002
 from qdash.api.schemas.task_file import (
     BackendConfigResponse,
@@ -61,18 +62,7 @@ def validate_task_file_path(relative_path: str) -> Path:
         HTTPException: If validation fails
 
     """
-    # Prevent path traversal
-    if ".." in relative_path:
-        raise HTTPException(status_code=400, detail="Path traversal detected")
-
-    target_path = CALIBTASKS_BASE_PATH / relative_path
-    resolved_path = target_path.resolve()
-
-    # Ensure resolved path is within CALIBTASKS_BASE_PATH
-    if not str(resolved_path).startswith(str(CALIBTASKS_BASE_PATH.resolve())):
-        raise HTTPException(status_code=400, detail="Path outside calibtasks directory")
-
-    return resolved_path
+    return validate_relative_path(relative_path, CALIBTASKS_BASE_PATH)
 
 
 def build_task_file_tree(directory: Path, base_path: Path) -> list[TaskFileTreeNode]:
