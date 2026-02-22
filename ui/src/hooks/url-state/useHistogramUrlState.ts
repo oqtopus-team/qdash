@@ -9,7 +9,7 @@ import {
 
 import { URL_DEFAULTS, type TimeRange, type SelectionMode } from "./types";
 
-export interface UseHistogramUrlStateResult {
+interface UseHistogramUrlStateResult {
   selectedChip: string;
   timeRange: TimeRange;
   selectionMode: SelectionMode;

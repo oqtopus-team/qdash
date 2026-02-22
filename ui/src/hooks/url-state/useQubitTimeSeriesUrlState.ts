@@ -2,7 +2,7 @@ import { useCallback, useState, useEffect } from "react";
 
 import { useQueryState, parseAsString } from "nuqs";
 
-export interface UseQubitTimeSeriesUrlStateResult {
+interface UseQubitTimeSeriesUrlStateResult {
   selectedParameter: string;
   selectedTag: string;
   setSelectedParameter: (parameter: string) => void;

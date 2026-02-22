@@ -4,7 +4,7 @@ import { useQueryState, parseAsString } from "nuqs";
 
 import { URL_DEFAULTS } from "./types";
 
-export interface UseChipUrlStateResult {
+interface UseChipUrlStateResult {
   selectedChip: string;
   selectedDate: string;
   selectedTask: string;

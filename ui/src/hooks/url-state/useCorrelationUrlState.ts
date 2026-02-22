@@ -4,7 +4,7 @@ import { useQueryState, parseAsString } from "nuqs";
 
 import { type TimeRange, type SelectionMode } from "./types";
 
-export interface UseCorrelationUrlStateResult {
+interface UseCorrelationUrlStateResult {
   selectedChip: string;
   timeRange: TimeRange;
   selectionMode: SelectionMode;

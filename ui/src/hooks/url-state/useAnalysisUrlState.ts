@@ -2,7 +2,7 @@ import { useCallback, useState, useEffect } from "react";
 
 import { useQueryState, parseAsString, parseAsArrayOf } from "nuqs";
 
-export interface UseAnalysisUrlStateResult {
+interface UseAnalysisUrlStateResult {
   selectedChip: string;
   selectedParameter: string;
   selectedParameters: string[];

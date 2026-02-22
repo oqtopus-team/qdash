@@ -4,7 +4,7 @@ import { useQueryState, parseAsString, parseAsInteger } from "nuqs";
 
 import { type TimeRange, type SelectionMode, type MetricType } from "./types";
 
-export interface UseMetricsUrlStateResult {
+interface UseMetricsUrlStateResult {
   selectedChip: string;
   timeRange: TimeRange;
   selectionMode: SelectionMode;

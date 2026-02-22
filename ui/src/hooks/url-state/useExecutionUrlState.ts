@@ -2,7 +2,7 @@ import { useCallback, useState, useEffect } from "react";
 
 import { useQueryState, parseAsString } from "nuqs";
 
-export interface UseExecutionUrlStateResult {
+interface UseExecutionUrlStateResult {
   selectedChip: string | null;
   setSelectedChip: (chip: string | null) => void;
   isInitialized: boolean;

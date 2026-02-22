@@ -9,7 +9,7 @@ import {
 
 import { URL_DEFAULTS, type TimeRange, type SelectionMode } from "./types";
 
-export interface UseCDFUrlStateResult {
+interface UseCDFUrlStateResult {
   selectedChip: string;
   timeRange: TimeRange;
   selectionMode: SelectionMode;

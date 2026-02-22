@@ -13,7 +13,10 @@ import { useGetCouplingTaskHistory } from "@/client/task-result/task-result";
 import { TaskFigure } from "@/components/charts/TaskFigure";
 
 const PlotlyRenderer = dynamic(
-  () => import("@/components/charts/PlotlyRenderer").then((mod) => mod.default),
+  () =>
+    import("@/components/charts/PlotlyRenderer").then(
+      (mod) => mod.PlotlyRenderer,
+    ),
   { ssr: false },
 );
 

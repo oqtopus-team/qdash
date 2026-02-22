@@ -4,7 +4,7 @@ import { useQueryState, parseAsString } from "nuqs";
 
 import { type ProvenanceTab } from "./types";
 
-export interface UseProvenanceUrlStateResult {
+interface UseProvenanceUrlStateResult {
   activeTab: ProvenanceTab;
   parameter: string;
   qid: string;
