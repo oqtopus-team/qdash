@@ -95,39 +95,3 @@ export function Card({
     </div>
   );
 }
-
-/**
- * Minimal card wrapper without padding - for custom layouts
- */
-export function CardBase({
-  children,
-  variant = "default",
-  className = "",
-}: Pick<CardProps, "children" | "variant" | "className">) {
-  return (
-    <div className={`card ${variantStyles[variant]} ${className}`}>
-      {children}
-    </div>
-  );
-}
-
-/**
- * Card section for dividing card content
- */
-export function CardSection({
-  children,
-  className = "",
-  noBorder = false,
-}: {
-  children: React.ReactNode;
-  className?: string;
-  noBorder?: boolean;
-}) {
-  return (
-    <div
-      className={`py-4 ${noBorder ? "" : "border-t border-base-300"} ${className}`}
-    >
-      {children}
-    </div>
-  );
-}

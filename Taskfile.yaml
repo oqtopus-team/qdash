@@ -159,6 +159,18 @@ tasks:
     cmds:
       - uv run pytest tests/ -v --tb=short --cov=src/qdash --cov-report=xml --cov-report=term
 
+  knip:
+    desc: Check for unused exports, dependencies, and files in UI
+    dir: ui
+    cmds:
+      - bun run knip
+
+  knip-fix:
+    desc: Auto-fix unused exports and dependencies in UI
+    dir: ui
+    cmds:
+      - bun run knip:fix
+
   ci-ui:
     desc: Run all UI CI checks
     dir: ui

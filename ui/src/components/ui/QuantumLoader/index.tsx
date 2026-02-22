@@ -63,25 +63,3 @@ export function QuantumLoader({
     </div>
   );
 }
-
-/**
- * Full page quantum loader with centered positioning
- */
-export function QuantumLoaderPage({
-  label = "Initializing quantum state...",
-}: {
-  label?: string;
-}) {
-  return (
-    <div className="flex justify-center items-center h-full min-h-[200px]">
-      <QuantumLoader size="lg" showLabel label={label} />
-    </div>
-  );
-}
-
-/**
- * Inline quantum loader for smaller spaces
- */
-export function QuantumLoaderInline() {
-  return <QuantumLoader size="sm" />;
-}

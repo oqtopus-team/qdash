@@ -40,7 +40,7 @@ export function buildHeaders(): Record<string, string> {
   return headers;
 }
 
-export interface SSEEvent {
+interface SSEEvent {
   event: string;
   data: string;
 }

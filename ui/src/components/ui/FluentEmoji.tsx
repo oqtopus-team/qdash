@@ -181,6 +181,3 @@ export function FluentEmoji({
     />
   );
 }
-
-// Export available emoji names for reference
-export const FLUENT_EMOJI_NAMES = Object.keys(EMOJI_MAP);

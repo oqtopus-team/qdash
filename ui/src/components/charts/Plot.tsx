@@ -7,5 +7,4 @@ import Plotly from "plotly.js-basic-dist";
 
 const Plot = createPlotlyComponent(Plotly as any);
 
-export { Plot };
 export default Plot;
