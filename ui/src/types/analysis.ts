@@ -19,19 +19,6 @@ export interface CorrelationDataPoint {
   qid?: string;
 }
 
-export interface StatisticalSummary {
-  correlation?: number;
-  xMean: number;
-  yMean: number;
-  xStd: number;
-  yStd: number;
-  xMin: number;
-  xMax: number;
-  yMin: number;
-  yMax: number;
-  dataPoints: number;
-}
-
 export interface TimeRangeState {
   startAt: string;
   endAt: string;

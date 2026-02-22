@@ -15,7 +15,7 @@ QDash consists of three major components.
 - qcflow
   - Component that manages Qubit calibration workflow
 
-![qdash-architecture](../diagrams/qdash-platform-architecture.drawio)
+![qdash-architecture](../diagrams/qdash-platform-architecture.drawio.png)
 
 ## Components
 
@@ -58,4 +58,4 @@ Calibration is performed in the following flow.
 6. When the workflow execution is completed, the results are saved in various DB.
 7. The latest experimental results saved in each DB are used as initial parameters for the next calibration.
 
-![qdash-calibration-flow](../diagrams/calibration-flow.drawio)
+![qdash-calibration-flow](../diagrams/calibration-flow.drawio.png)

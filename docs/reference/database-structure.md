@@ -764,7 +764,7 @@ class FlowDocument(Document):
 
 ## Entity Relationship Diagram (Conceptual)
 
-![Database ER Diagram](../diagrams/database-er.drawio)
+![Database ER Diagram](../diagrams/database-er.drawio.png)
 
 Other project-scoped collections (tasks, tags, backends, flows, counters, locks, histories) all reference `project_id`, ensuring a single sharing boundary per project.
 

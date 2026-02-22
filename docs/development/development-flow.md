@@ -6,7 +6,7 @@ As shown in the diagram below, the `develop` branch is branched off from the `ma
 
 The `develop` branch always maintains the latest merged code, so when performing hotfixes, branches are created from the `develop` branch for the necessary fixes.
 
-![Development Flow](../diagrams/development-flow.drawio)
+![Development Flow](../diagrams/development-flow.drawio.png)
 
 ### Branch Naming
 

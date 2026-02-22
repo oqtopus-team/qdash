@@ -99,12 +99,3 @@ export function formatRelativeTime(
     return "";
   }
 }
-
-/**
- * Get the configured timezone.
- *
- * @returns The timezone string (from env or default "Asia/Tokyo")
- */
-export function getTimezone(): string {
-  return DEFAULT_TIMEZONE;
-}

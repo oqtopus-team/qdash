@@ -93,12 +93,6 @@ interface UseHistogramUrlStateResult {
   isInitialized: boolean;
 }
 
-interface UseDashboardUrlStateResult {
-  selectedChip: string;
-  setSelectedChip: (chip: string) => void;
-  isInitialized: boolean;
-}
-
 export function useChipUrlState(): UseChipUrlStateResult {
   const [isInitialized, setIsInitialized] = useState(false);
 
@@ -636,35 +630,6 @@ export function useHistogramUrlState(): UseHistogramUrlStateResult {
     setSelectedParameter,
     setShowAsErrorRate,
     setCustomThreshold,
-    isInitialized,
-  };
-}
-
-export function useDashboardUrlState(): UseDashboardUrlStateResult {
-  const [isInitialized, setIsInitialized] = useState(false);
-
-  // URL state management for dashboard page
-  const [selectedChip, setSelectedChipState] = useQueryState(
-    "chip",
-    parseAsString,
-  );
-
-  // Mark as initialized after first render
-  useEffect(() => {
-    setIsInitialized(true);
-  }, []);
-
-  // Wrapped setter to handle URL updates
-  const setSelectedChip = useCallback(
-    (chip: string) => {
-      setSelectedChipState(chip || null); // null removes the parameter from URL
-    },
-    [setSelectedChipState],
-  );
-
-  return {
-    selectedChip: selectedChip ?? "",
-    setSelectedChip,
     isInitialized,
   };
 }

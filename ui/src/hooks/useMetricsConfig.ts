@@ -54,7 +54,7 @@ interface MetricsConfig {
   cdf_groups?: CdfGroupsConfig;
 }
 
-export interface CdfGroupConfig {
+interface CdfGroupConfig {
   id: string;
   title: string;
   unit: string;

@@ -3,19 +3,19 @@
  */
 
 /** Grid gap in pixels based on mobile/desktop */
-export const GRID_GAP = {
+const GRID_GAP = {
   mobile: 4,
   desktop: 8,
 } as const;
 
 /** Grid padding in pixels based on mobile/desktop */
-export const GRID_PADDING = {
+const GRID_PADDING = {
   mobile: 16,
   desktop: 32,
 } as const;
 
 /** Minimum cell size in pixels based on mobile/desktop */
-export const MIN_CELL_SIZE = {
+const MIN_CELL_SIZE = {
   mobile: 28,
   desktop: 40,
 } as const;
@@ -48,7 +48,7 @@ export function getAdaptiveMinCellSize(
 }
 
 /** Mobile breakpoint in pixels */
-export const MOBILE_BREAKPOINT = 768;
+const MOBILE_BREAKPOINT = 768;
 
 /** Viewport height breakpoints for responsive grid adaptation */
 export const VIEWPORT_HEIGHT_BREAKPOINTS = {
@@ -70,7 +70,7 @@ const RESPONSIVE_CONFIGS = {
  * Adapts gap, padding, and minCellSize for smaller viewports
  * (e.g. 14" displays with 125% scaling → ~864px effective height).
  */
-export function getResponsiveGridConstants(viewportHeight: number): {
+function getResponsiveGridConstants(viewportHeight: number): {
   gap: number;
   padding: number;
   minCellSize: number;
@@ -112,10 +112,7 @@ export function getGridPadding(
 /**
  * Get the minimum cell size based on mobile state and optional viewport height
  */
-export function getMinCellSize(
-  isMobile: boolean,
-  viewportHeight?: number,
-): number {
+function getMinCellSize(isMobile: boolean, viewportHeight?: number): number {
   if (isMobile) return MIN_CELL_SIZE.mobile;
   if (viewportHeight !== undefined) {
     return getResponsiveGridConstants(viewportHeight).minCellSize;

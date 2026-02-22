@@ -91,5 +91,3 @@ function FilterItem({ children, label, className = "" }: FilterItemProps) {
 // Attach subcomponents
 PageFiltersBar.Group = FilterGroup;
 PageFiltersBar.Item = FilterItem;
-
-export { FilterGroup, FilterItem };

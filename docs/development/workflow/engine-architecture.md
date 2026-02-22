@@ -4,7 +4,7 @@ The `qdash.workflow.engine` module provides the core infrastructure for calibrat
 
 ## Architecture Diagram
 
-![Workflow Engine Architecture](../../diagrams/workflow-engine-architecture.drawio)
+![Workflow Engine Architecture](../../diagrams/workflow-engine-architecture.drawio.png)
 
 ## Module Structure
 
@@ -102,7 +102,7 @@ orchestrator.complete()
 
 See the **Task Executor Flow** diagram for the complete execution lifecycle, state machine, and repository pattern:
 
-![Task Executor Flow](../../diagrams/task-executor-flow.drawio)
+![Task Executor Flow](../../diagrams/task-executor-flow.drawio.png)
 
 ### 4. TaskStateManager
 

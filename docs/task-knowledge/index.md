@@ -83,7 +83,7 @@ Calibration task knowledge base for QDash copilot analysis. Each page describes 
 
 Standard calibration workflows and their task composition. See [workflow task definitions](https://github.com/oqtopus-team/qdash/blob/develop/src/qdash/workflow/service/tasks.py) for the source of truth.
 
-![Calibration Workflow Pipelines](../diagrams/calibration-workflows.drawio)
+![Calibration Workflow Pipelines](../diagrams/calibration-workflows.drawio.png)
 
 ### Bring-up
 

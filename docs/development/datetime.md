@@ -4,7 +4,7 @@ QDash stores native `datetime` objects in MongoDB, returns ISO8601 UTC strings v
 
 ## Data Flow
 
-![Datetime Handling Flow](../diagrams/datetime-flow.drawio)
+![Datetime Handling Flow](../diagrams/datetime-flow.drawio.png)
 
 The diagram above shows the complete datetime and elapsed time handling flow across Backend, API, and Frontend layers.
 

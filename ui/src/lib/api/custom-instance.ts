@@ -1,6 +1,6 @@
 import Axios, { AxiosHeaders } from "axios";
 
-import type { AxiosError, AxiosRequestConfig, AxiosResponse } from "axios";
+import type { AxiosRequestConfig, AxiosResponse } from "axios";
 
 export const AXIOS_INSTANCE = Axios.create({
   // Use /api proxy route (handled by Next.js rewrites)
@@ -32,7 +32,7 @@ AXIOS_INSTANCE.interceptors.request.use((config) => {
   return config;
 });
 
-export interface CancellablePromise<T> extends Promise<T> {
+interface CancellablePromise<T> extends Promise<T> {
   cancel: () => void;
 }
 
@@ -53,7 +53,3 @@ export const customInstance = <T>(
 
   return promise;
 };
-
-export type ErrorType<Error> = AxiosError<Error>;
-
-export type BodyType<BodyData> = BodyData;

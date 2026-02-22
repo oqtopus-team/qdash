@@ -66,21 +66,28 @@ jobs:
       - name: Build
         run: task ci-ui-build
 
-  react-doctor:
-    name: React Doctor
+  knip:
+    name: Knip (unused code)
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
-    permissions:
-      pull-requests: write
+    if: github.event_name == 'pull_request' && github.base_ref == 'develop'
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          ref: ${{ github.head_ref }}
 
-      - name: Run React Doctor
-        uses: millionco/react-doctor@main
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
         with:
-          diff: ${{ github.base_ref }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          bun-version: latest
+
+      - name: Install Go Task
+        uses: arduino/setup-task@v2
+        with:
+          version: 3.x
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install dependencies
+        working-directory: ./ui
+        run: bun install
+
+      - name: Run knip
+        run: task knip
