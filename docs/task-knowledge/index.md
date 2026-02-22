@@ -83,18 +83,11 @@ Calibration task knowledge base for QDash copilot analysis. Each page describes 
 
 Standard calibration workflows and their task composition. See [workflow task definitions](https://github.com/oqtopus-team/qdash/blob/develop/src/qdash/workflow/service/tasks.py) for the source of truth.
 
+![Calibration Workflow Pipelines](../diagrams/calibration-workflows.drawio)
+
 ### Bring-up
 
 MUX-level initial characterization. Identifies resonator and qubit frequencies.
-
-```mermaid
-flowchart LR
-  T0[CheckResonatorSpectroscopy]
-  T1[CheckQubitSpectroscopy]
-  T2[ChevronPattern]
-  T0 --> T1
-  T1 --> T2
-```
 
 1. [CheckResonatorSpectroscopy](./cw-characterization/CheckResonatorSpectroscopy)
 2. [CheckQubitSpectroscopy](./cw-characterization/CheckQubitSpectroscopy)
@@ -103,23 +96,6 @@ flowchart LR
 ### 1Q Check
 
 Basic single-qubit characterization.
-
-```mermaid
-flowchart LR
-  T0[CheckRabi #1]
-  T1[CheckRabi #2]
-  T2[CreateHPIPulse]
-  T3[CheckHPIPulse]
-  T4[CheckT1Average]
-  T5[CheckT2EchoAverage]
-  T6[CheckRamsey]
-  T0 --> T1
-  T1 --> T2
-  T2 --> T3
-  T3 --> T4
-  T4 --> T5
-  T5 --> T6
-```
 
 1. [CheckRabi](./td-characterization/CheckRabi) (#1)
 2. [CheckRabi](./td-characterization/CheckRabi) (#2)
@@ -132,33 +108,6 @@ flowchart LR
 ### 1Q Fine-tune
 
 Advanced single-qubit calibration including DRAG pulse optimization, readout classification, and randomized benchmarking.
-
-```mermaid
-flowchart LR
-  T0[CheckRabi]
-  T1[CreateHPIPulse]
-  T2[CheckHPIPulse]
-  T3[CreatePIPulse]
-  T4[CheckPIPulse]
-  T5[CreateDRAGHPIPulse]
-  T6[CheckDRAGHPIPulse]
-  T7[CreateDRAGPIPulse]
-  T8[CheckDRAGPIPulse]
-  T9[ReadoutClassification]
-  T10[RandomizedBenchmarking]
-  T11[X90InterleavedRandomizedBenchmarking]
-  T0 --> T1
-  T1 --> T2
-  T2 --> T3
-  T3 --> T4
-  T4 --> T5
-  T5 --> T6
-  T6 --> T7
-  T7 --> T8
-  T8 --> T9
-  T9 --> T10
-  T10 --> T11
-```
 
 1. [CheckRabi](./td-characterization/CheckRabi)
 2. [CreateHPIPulse](./one-qubit-gate-calibration/CreateHPIPulse)
@@ -177,21 +126,6 @@ flowchart LR
 
 Two-qubit gate calibration from cross-resonance measurement through ZX90 gate creation to Bell state verification.
 
-```mermaid
-flowchart LR
-  T0[CheckCrossResonance]
-  T1[CreateZX90]
-  T2[CheckZX90]
-  T3[CheckBellState]
-  T4[CheckBellStateTomography]
-  T5[ZX90InterleavedRandomizedBenchmarking]
-  T0 --> T1
-  T1 --> T2
-  T2 --> T3
-  T3 --> T4
-  T4 --> T5
-```
-
 1. [CheckCrossResonance](./two-qubit-gate-calibration/CheckCrossResonance)
 2. [CreateZX90](./two-qubit-gate-calibration/CreateZX90)
 3. [CheckZX90](./two-qubit-gate-calibration/CheckZX90)
@@ -201,14 +135,4 @@ flowchart LR
 
 ### Full Calibration Pipeline
 
-End-to-end calibration runs in the following order: 1Q Check, filter, 1Q Fine-tune, filter, CR schedule generation, then 2Q Calibration.
-
-```mermaid
-flowchart LR
-  A[Bring-up] --> B[1Q Check]
-  B --> C[Filter]
-  C --> D[1Q Fine-tune]
-  D --> E[Filter]
-  E --> F[CR Schedule]
-  F --> G[2Q Calibration]
-```
+End-to-end calibration runs in the following order: Bring-up → 1Q Check → Filter → 1Q Fine-tune → Filter → CR Schedule → 2Q Calibration (see diagram above).

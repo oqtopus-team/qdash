@@ -26,6 +26,12 @@
         "--enable-web-dashboard",
         "false"
       ]
+    },
+    "drawio": {
+      "command": "npx",
+      "args": [
+        "@drawio/mcp"
+      ]
     }
   }
 }

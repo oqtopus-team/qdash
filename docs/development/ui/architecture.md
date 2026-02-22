@@ -17,43 +17,7 @@ This document describes the architecture of the QDash frontend application, incl
 
 ## Architecture Overview
 
-```mermaid
-flowchart TB
-    subgraph Browser["Browser"]
-        subgraph NextJS["Next.js Application"]
-            subgraph Pages["App Router (Pages)"]
-                P1["/metrics"]
-                P2["/chip"]
-                P3["/flow"]
-                P4["/analysis"]
-            end
-
-            subgraph Components["Components Layer"]
-                C1["features"]
-                C2["ui"]
-                C3["charts"]
-                C4["selectors"]
-            end
-
-            subgraph State["State Management Layer"]
-                S1["TanStack Query<br/>(Server State)"]
-                S2["React Context<br/>(Client State)"]
-                S3["nuqs<br/>(URL State)"]
-            end
-
-            subgraph APIClient["API Client Layer"]
-                AC["Auto-generated from OpenAPI (Orval)<br/>src/client/ | src/schemas/"]
-            end
-        end
-    end
-
-    API["QDash API (FastAPI)"]
-
-    Pages --> Components
-    Components --> State
-    State --> APIClient
-    APIClient -->|"HTTP (Axios)"| API
-```
+![UI Architecture](../../diagrams/ui-architecture.drawio)
 
 ---
 
@@ -179,19 +143,7 @@ components/
 
 ### Server State Flow (TanStack Query)
 
-```mermaid
-flowchart TB
-    Component["Component<br/><code>useQuery({ queryKey, queryFn })</code>"]
-    TanStack["TanStack Query<br/>Cache Management | Deduping | Refetch Strategy"]
-    APIClient["Auto-generated API Client<br/><code>getChip(chipId)</code>"]
-    Axios["Custom Axios Instance<br/>Base URL | Auth Headers | Error Handling"]
-    API["QDash API Server"]
-
-    Component --> TanStack
-    TanStack --> APIClient
-    APIClient --> Axios
-    Axios --> API
-```
+The server state flow (Component → TanStack Query → API Client → Axios → API) is shown in the UI Architecture diagram above.
 
 ### Mutation Flow
 
@@ -235,17 +187,7 @@ queryClient.invalidateQueries({ queryKey: ["chips", chipId] });
 
 ### Authentication Flow
 
-```mermaid
-flowchart TB
-    Visit["User visits page"]
-    Middleware["middleware.ts (Edge Runtime)<br/>Check cookie → redirect if missing"]
-    AuthProvider["AuthProvider (Context)<br/>Provide username | Handle login/logout"]
-    APIRequests["API Requests<br/>X-Username header via Axios"]
-
-    Visit --> Middleware
-    Middleware --> AuthProvider
-    AuthProvider --> APIRequests
-```
+The authentication flow (User visit → middleware.ts → AuthProvider → API Requests with X-Username header) is shown in the UI Architecture diagram above.
 
 ### Middleware Implementation
 
@@ -276,22 +218,7 @@ export const config = {
 
 ### Generation Pipeline
 
-```mermaid
-flowchart TB
-    FastAPI["FastAPI Backend<br/>Pydantic models → OpenAPI spec"]
-    OpenAPI["docs/oas/openapi.json<br/>OpenAPI 3.0 specification"]
-    Orval["Orval Generator<br/>Reads spec → generates code"]
-    Generated["Generated Code"]
-
-    FastAPI --> OpenAPI
-    OpenAPI --> Orval
-    Orval --> Generated
-
-    subgraph Generated["Generated Code"]
-        Schemas["src/schemas/<br/>TypeScript types"]
-        Client["src/client/<br/>React Query hooks"]
-    end
-```
+The API client generation pipeline (FastAPI → OpenAPI spec → Orval → Generated Code) is shown in the UI Architecture diagram above.
 
 ### Orval Configuration
 

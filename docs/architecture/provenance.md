@@ -15,25 +15,9 @@ The Provenance system tracks how calibration parameters are generated and modifi
 
 ## W3C PROV-DM Concepts
 
-QDash provenance is based on these three core concepts:
+QDash provenance is based on three core concepts (Entity, Activity, Agent) and their relations. See the diagram below for the full architecture and lineage graph example:
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                     W3C PROV-DM Core                            │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│   Entity                    Activity                   Agent    │
-│   (Data)                    (Process)                (Executor) │
-│      │                         │                         │      │
-│      │  wasGeneratedBy         │                         │      │
-│      ├─────────────────────────┤                         │      │
-│      │                         │  wasAssociatedWith      │      │
-│      │                         ├─────────────────────────┤      │
-│      │  wasDerivedFrom         │                         │      │
-│      ├─────────────────────────┤                         │      │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
-```
+![Provenance Lineage](../diagrams/provenance-lineage.drawio)
 
 ### Mapping to QDash
 
@@ -55,35 +39,7 @@ QDash provenance is based on these three core concepts:
 
 ### Components
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                         API Layer                               │
-│  ┌─────────────────────────────────────────────────────────┐   │
-│  │              provenance.py (Router)                      │   │
-│  │  GET /entities/{id}  GET /lineage/{id}  GET /compare    │   │
-│  └─────────────────────────────────────────────────────────┘   │
-├─────────────────────────────────────────────────────────────────┤
-│                       Service Layer                             │
-│  ┌─────────────────────────────────────────────────────────┐   │
-│  │            ProvenanceService                             │   │
-│  │  - get_lineage()      - compare_executions()            │   │
-│  │  - get_impact()       - get_parameter_history()         │   │
-│  └─────────────────────────────────────────────────────────┘   │
-├─────────────────────────────────────────────────────────────────┤
-│                     Repository Layer                            │
-│  ┌───────────────┐ ┌───────────────┐ ┌───────────────────┐     │
-│  │ParameterVer-  │ │ Provenance-   │ │    Activity-      │     │
-│  │sionRepository │ │ Relation-     │ │    Repository     │     │
-│  │               │ │ Repository    │ │                   │     │
-│  └───────────────┘ └───────────────┘ └───────────────────┘     │
-├─────────────────────────────────────────────────────────────────┤
-│                        MongoDB                                  │
-│  ┌───────────────┐ ┌───────────────┐ ┌───────────────────┐     │
-│  │ parameter_    │ │  provenance_  │ │    activities     │     │
-│  │ versions      │ │  relations    │ │                   │     │
-│  └───────────────┘ └───────────────┘ └───────────────────┘     │
-└─────────────────────────────────────────────────────────────────┘
-```
+The Provenance architecture (API Layer → ProvenanceService → Repositories → MongoDB collections) is shown in the diagram above.
 
 ### Data Models
 
@@ -267,31 +223,7 @@ response = {
 
 ## Lineage Graph Visualization
 
-```mermaid
-graph BT
-    subgraph "Execution 003"
-        T1_v3["t1:Q0:v3<br/>50μs"]
-        T2_v3["t2_star:Q0:v3<br/>30μs"]
-        FREQ_v3["qubit_freq:Q0:v3<br/>5.123GHz"]
-        
-        ACT_T1["CheckT1"]
-        ACT_T2["CheckRamsey"]
-        ACT_FREQ["CheckFrequency"]
-    end
-    
-    subgraph "Execution 002"
-        FREQ_v2["qubit_freq:Q0:v2<br/>5.121GHz"]
-    end
-    
-    T1_v3 -->|wasGeneratedBy| ACT_T1
-    T2_v3 -->|wasGeneratedBy| ACT_T2
-    FREQ_v3 -->|wasGeneratedBy| ACT_FREQ
-    
-    ACT_T1 -->|used| FREQ_v3
-    ACT_T2 -->|used| FREQ_v3
-    
-    FREQ_v3 -->|wasDerivedFrom| FREQ_v2
-```
+The lineage graph example showing cross-execution parameter tracing (Execution 002 → 003) with wasGeneratedBy, used, and wasDerivedFrom relations is included in the [Provenance Lineage diagram](../diagrams/provenance-lineage.drawio) above.
 
 ## Database Collections
 

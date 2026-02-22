@@ -12,43 +12,9 @@ QDash uses a hybrid approach for datetime handling:
 
 ## Data Flow
 
-```mermaid
-flowchart TB
-    subgraph Backend["Backend (Python)"]
-        A["pendulum.now('Asia/Tokyo')"] --> B["datetime (timezone-aware)"]
-        B --> C["MongoDB stores as UTC"]
-        C --> D["ensure_timezone() adds UTC tzinfo"]
-        D --> E["Pydantic serializes to ISO8601"]
-    end
+![Datetime Handling Flow](../diagrams/datetime-flow.drawio)
 
-    subgraph API["API Response"]
-        E --> F["'2025-12-21T01:30:45+00:00'"]
-    end
-
-    subgraph Frontend["Frontend (TypeScript)"]
-        F --> G["formatDateTime() with date-fns-tz"]
-        G --> H["Display: '2025-12-21 10:30:45'<br/>(Asia/Tokyo, +9:00)"]
-    end
-```
-
-## Elapsed Time Handling
-
-MongoDB's BSON format does not support `timedelta` natively:
-
-```mermaid
-flowchart LR
-    subgraph Storage
-        A["timedelta"] --> B["float (seconds)"]
-    end
-
-    subgraph Serialization
-        B --> C["'H:MM:SS' string"]
-    end
-
-    subgraph Display
-        C --> D["'1:23:45'"]
-    end
-```
+The diagram above shows the complete datetime and elapsed time handling flow across Backend, API, and Frontend layers.
 
 ## Backend (Python)
 
