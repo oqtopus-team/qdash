@@ -57,6 +57,7 @@ For detailed setup instructions, see [docs/development/setup.md](docs/developmen
 | API Design         | [docs/development/api/design.md](docs/development/api/design.md)             |
 | Development Flow   | [docs/development/development-flow.md](docs/development/development-flow.md) |
 | Database Structure | [docs/reference/database-structure.md](docs/reference/database-structure.md) |
+| Docs Guidelines    | [docs/development/docs-guidelines.md](docs/development/docs-guidelines.md)   |
 
 ## Claude Code Custom Commands
 
@@ -71,6 +72,7 @@ For detailed setup instructions, see [docs/development/setup.md](docs/developmen
 - **Don't edit generated code**: `ui/src/client/` and `ui/src/schemas/` are auto-generated from OpenAPI
 - **Regenerate after API changes**: Run `task generate` when backend API changes
 - **Follow existing patterns**: Check `docs/development/ui/guidelines.md` for coding standards
+- **Follow docs guidelines**: Check `docs/development/docs-guidelines.md` when writing documentation
 - **Use conventional commits**: See `docs/development/development-flow.md`
 
 ## Useful Links

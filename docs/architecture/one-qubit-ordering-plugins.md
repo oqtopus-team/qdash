@@ -1,10 +1,8 @@
 # 1-Qubit Ordering Plugins
 
-This document describes the ordering plugin system for the 1-qubit calibration scheduler. Ordering plugins control the execution order of qubits within each MUX during parallel calibration.
+Ordering plugins control the execution order of qubits within each MUX during parallel calibration.
 
-## Overview
-
-### Problem
+## Problem
 
 When calibrating multiple qubits in parallel across different MUXes, adjacent qubits (which have similar frequencies) can interfere with each other. The default sequential order `[0, 1, 2, 3]` within each MUX doesn't account for this frequency proximity issue.
 

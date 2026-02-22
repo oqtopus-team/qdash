@@ -1,24 +1,4 @@
-# API Testing Guidelines for QDash
-
-This document defines the testing conventions and standards for the QDash API. All contributors should follow these guidelines when writing tests for API endpoints, database models, and workflow components.
-
-## Table of Contents
-
-1. [Test Directory Structure](#test-directory-structure)
-2. [Test File Naming](#test-file-naming)
-3. [Test Class and Function Naming](#test-class-and-function-naming)
-4. [Test Structure (AAA Pattern)](#test-structure-aaa-pattern)
-5. [Fixtures](#fixtures)
-6. [Database Testing](#database-testing)
-7. [API Endpoint Testing](#api-endpoint-testing)
-8. [Mocking and Patching](#mocking-and-patching)
-9. [Assertions](#assertions)
-10. [Test Data Management](#test-data-management)
-11. [Async Testing](#async-testing)
-12. [Coverage Guidelines](#coverage-guidelines)
-13. [Quick Reference](#quick-reference)
-
----
+# API Testing Guidelines
 
 ## Test Directory Structure
 
@@ -733,53 +713,7 @@ pytest --cov=src/qdash --cov-report=html
 pytest --cov=src/qdash/api tests/qdash/api/
 ```
 
----
-
-## Quick Reference
-
-### Test Structure Checklist
-
-- [ ] Test file named `test_<module>.py`
-- [ ] Test class named `Test<Component>`
-- [ ] Test function named `test_<action>_<scenario>`
-- [ ] Follows AAA pattern (Arrange-Act-Assert)
-- [ ] Has descriptive docstring
-- [ ] Uses appropriate fixtures
-
-### Fixture Checklist
-
-- [ ] Defined at appropriate scope
-- [ ] Has descriptive name
-- [ ] Has docstring explaining purpose
-- [ ] Cleans up resources properly
-
-### API Test Checklist
-
-- [ ] Tests happy path (200 OK)
-- [ ] Tests not found (404)
-- [ ] Tests validation errors (400)
-- [ ] Tests access control
-- [ ] Uses test client fixture
-- [ ] Includes required headers
-
-### Database Test Checklist
-
-- [ ] Uses test database (not production)
-- [ ] Cleans up data after test
-- [ ] Tests CRUD operations
-- [ ] Tests query filters
-- [ ] Tests error cases
-
-### Assertion Checklist
-
-- [ ] Uses descriptive messages
-- [ ] Checks status codes
-- [ ] Verifies response data
-- [ ] Uses `pytest.raises` for exceptions
-
----
-
-## Example Complete Test File
+## Example Test File
 
 ```python
 """Tests for chip router endpoints."""
@@ -851,11 +785,3 @@ class TestChipRouter:
         assert data["size"] == 64
 ```
 
----
-
-## References
-
-- [pytest Documentation](https://docs.pytest.org/)
-- [FastAPI Testing](https://fastapi.tiangolo.com/tutorial/testing/)
-- [pytest-asyncio](https://pytest-asyncio.readthedocs.io/)
-- [Bunnet ODM Testing](https://bunnet-odm.dev/tutorial/testing/)

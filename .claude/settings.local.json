@@ -40,7 +40,8 @@
       "Bash(uv run pytest:*)",
       "Bash(uv run ruff check:*)",
       "Bash(uv run mypy:*)",
-      "Bash(uv run python -m pytest:*)"
+      "Bash(uv run python -m pytest:*)",
+      "mcp__drawio__open_drawio_xml"
     ],
     "deny": []
   },

@@ -2,8 +2,6 @@
 
 ## Prerequisites
 
-Before starting development, you need to install the following tools:
-
 ### Required Tools
 
 | Tool                                                       | Version | Description                              |

@@ -1,15 +1,6 @@
 # Logging
 
-This document describes the structured logging infrastructure for the QDash API.
-
-## Overview
-
-The API uses structured JSON logging with the following features:
-
-- **JSON format** for machine-readable log entries
-- **Request ID correlation** to trace all logs from a single HTTP request
-- **Dual output** to both console (stdout) and a rotating log file
-- **Centralized configuration** via Python `dictConfig`
+The API uses structured JSON logging with request ID correlation, dual output (stdout + rotating file), and centralized `dictConfig` configuration.
 
 ## Configuration
 
@@ -143,26 +134,9 @@ docker compose logs -f api
 tail -f logs/api/api.log | jq 'select(.level == "ERROR")'
 ```
 
-## Best Practices
+## Implementation Files
 
-1. **Use `logging.getLogger(__name__)`** — never instantiate loggers with hard-coded names
-2. **Use structured `extra` fields** — pass context as `extra={"key": value}` instead of string interpolation
-3. **Choose the right level**:
-   - `DEBUG` — detailed diagnostic info (disabled in production)
-   - `INFO` — routine operations (request handled, task completed)
-   - `WARNING` — unexpected but recoverable situations
-   - `ERROR` — failures that need attention
-   - `CRITICAL` — system-level failures
-4. **Never log secrets** — do not log passwords, tokens, API keys, or PII
-5. **Keep messages concise** — use extra fields for variable data rather than long format strings
-6. **Do not configure logging in individual modules** — all configuration is centralized in `logging_config.py`
-
-## Related Files
-
-| File | Description |
-|------|-------------|
-| `src/qdash/api/logging_config.py` | Centralized logging configuration (`setup_logging()`) |
-| `src/qdash/api/middleware/request_id.py` | Request ID middleware and logging filter |
-| `src/qdash/api/main.py` | Middleware registration (`app.add_middleware(RequestIdMiddleware)`) |
-| `src/qdash/api/db/session.py` | Lifespan handler that calls `setup_logging()` |
-| `compose.yaml` | Volume mount for log files (`./logs/api:/app/logs`) |
+- `src/qdash/api/logging_config.py` — centralized `setup_logging()`
+- `src/qdash/api/middleware/request_id.py` — request ID middleware and filter
+- `src/qdash/api/main.py` — middleware registration
+- `src/qdash/api/db/session.py` — lifespan handler calling `setup_logging()`

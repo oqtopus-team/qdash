@@ -1,26 +1,5 @@
 # Workflow Testing Guidelines
 
-This document provides comprehensive guidelines for writing and maintaining tests for the QDash workflow module. Following these guidelines ensures consistent, maintainable, and effective test coverage.
-
-## Table of Contents
-
-1. [Overview](#overview)
-2. [Test Directory Structure](#test-directory-structure)
-3. [Test File Naming Conventions](#test-file-naming-conventions)
-4. [Test Class and Method Naming](#test-class-and-method-naming)
-5. [Test Organization Pattern](#test-organization-pattern)
-6. [Fixture Patterns](#fixture-patterns)
-7. [Mocking Patterns](#mocking-patterns)
-8. [Testing Calibration Engine Components](#testing-calibration-engine-components)
-9. [Testing Flow Components](#testing-flow-components)
-10. [Testing Helper Functions](#testing-helper-functions)
-11. [Database Testing](#database-testing)
-12. [Assertion Patterns](#assertion-patterns)
-13. [Coverage Guidelines](#coverage-guidelines)
-14. [Common Pitfalls](#common-pitfalls)
-
----
-
 ## Overview
 
 The workflow module handles calibration workflow orchestration using Prefect. Tests should verify:
@@ -1108,10 +1087,3 @@ pytest tests/qdash/workflow/ --cov=src/qdash/workflow --cov-report=html
 pytest tests/qdash/workflow/engine/calibration/test_cr_scheduler.py -v -k "parametrize"
 ```
 
----
-
-## Related Documentation
-
-- [API Testing Guidelines](/development/api/testing) - Testing guidelines for API endpoints
-- [CLAUDE.md](https://github.com/oqtopus-team/qdash/blob/develop/CLAUDE.md) - Project reference guide
-- [Engine Architecture](./engine-architecture.md) - Workflow engine architecture

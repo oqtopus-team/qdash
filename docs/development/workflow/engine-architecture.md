@@ -1,60 +1,10 @@
 # Workflow Engine Architecture
 
-This document explains the architecture of the `qdash.workflow.engine` module,
-which provides the core infrastructure for calibration workflow execution.
-
-## Overview
-
-The engine module is responsible for:
-
-- **Task Execution**: Running calibration tasks with proper lifecycle management
-- **State Management**: Tracking task status, parameters, and results
-- **Execution Tracking**: Managing workflow execution sessions
-- **Scheduling**: Coordinating parallel task execution
-- **Data Persistence**: Saving results to MongoDB and filesystem
-- **Backend Abstraction**: Supporting multiple hardware backends (qubex, fake)
+The `qdash.workflow.engine` module provides the core infrastructure for calibration workflow execution: task lifecycle management, state tracking, scheduling, data persistence (MongoDB + filesystem), and hardware backend abstraction.
 
 ## Architecture Diagram
 
-```mermaid
-flowchart TB
-    subgraph API["High-level API"]
-        CalibService["CalibService"]
-    end
-
-    subgraph Orchestration["Session Lifecycle Manager"]
-        CalibOrchestrator["CalibOrchestrator<br/>- Directory structure creation<br/>- Component initialization<br/>- Task execution coordination"]
-    end
-
-    subgraph Components["Core Components"]
-        TaskContext["TaskContext"]
-        ExecutionService["ExecutionService"]
-        Backend["Backend"]
-    end
-
-    subgraph Executor["Task Execution"]
-        TaskExecutor["TaskExecutor<br/>- Preprocess → Run → Postprocess lifecycle<br/>- R² and fidelity validation<br/>- Figure and raw data saving"]
-    end
-
-    subgraph Workers["Worker Components"]
-        TaskStateManager["TaskStateManager"]
-        TaskResultProcessor["TaskResultProcessor"]
-        TaskHistoryRecorder["TaskHistoryRecorder"]
-        FilesystemCalibDataSaver["FilesystemCalibDataSaver"]
-    end
-
-    CalibService --> CalibOrchestrator
-    CalibOrchestrator --> TaskContext
-    CalibOrchestrator --> ExecutionService
-    CalibOrchestrator --> Backend
-    TaskContext --> TaskExecutor
-    ExecutionService --> TaskExecutor
-    Backend --> TaskExecutor
-    TaskExecutor --> TaskStateManager
-    TaskExecutor --> TaskResultProcessor
-    TaskExecutor --> TaskHistoryRecorder
-    TaskExecutor --> FilesystemCalibDataSaver
-```
+![Workflow Engine Architecture](../../diagrams/workflow-engine-architecture.drawio)
 
 ## Module Structure
 
@@ -150,17 +100,9 @@ orchestrator.complete()
 
 **Execution Flow**:
 
-```mermaid
-flowchart TD
-    A["ensure_task_exists<br/><i>Register task in state manager</i>"] --> B
-    B["start_task<br/><i>Set status to RUNNING, record start time</i>"] --> C
-    C["preprocess<br/><i>Extract input parameters from backend</i>"] --> D
-    D["run<br/><i>Execute hardware measurement</i>"] --> E
-    E["postprocess<br/><i>Extract output parameters, generate figures</i>"] --> F
-    F["validate_r2<br/><i>Check R² threshold</i>"] --> G
-    G["save_artifacts<br/><i>Save figures, raw data</i>"] --> H
-    H["end_task<br/><i>Record end time, update status</i>"]
-```
+See the **Task Executor Flow** diagram for the complete execution lifecycle, state machine, and repository pattern:
+
+![Task Executor Flow](../../diagrams/task-executor-flow.drawio)
 
 ### 4. TaskStateManager
 
@@ -168,17 +110,7 @@ flowchart TD
 
 **Purpose**: Manages task state transitions and parameter storage.
 
-**State Transitions**:
-
-```mermaid
-stateDiagram-v2
-    [*] --> SCHEDULED
-    SCHEDULED --> RUNNING
-    RUNNING --> COMPLETED
-    RUNNING --> FAILED
-    COMPLETED --> [*]
-    FAILED --> [*]
-```
+**State Transitions**: SCHEDULED → RUNNING → COMPLETED / FAILED (see Task Executor Flow diagram above)
 
 **Key Methods**:
 - `ensure_task_exists()`: Create task entry if not exists
@@ -236,25 +168,7 @@ The Repository Pattern separates data access logic from business logic, enabling
 - **Flexibility**: Easy to change persistence mechanisms
 - **Clean Architecture**: Business logic doesn't depend on database details
 
-```mermaid
-flowchart TB
-    subgraph Service["Service / Executor Layer"]
-        SE["TaskExecutor, ExecutionService, etc."]
-    end
-
-    subgraph Protocols["Repository Protocols"]
-        RP["ChipRepository, ExecutionRepository, etc."]
-    end
-
-    subgraph Implementations["Implementations"]
-        Mongo["MongoDB Implementations<br/>(MongoChipRepository)<br/><i>Production use</i>"]
-        InMemory["InMemory Implementations<br/>(InMemoryChipRepository)<br/><i>Unit testing</i>"]
-    end
-
-    SE -->|depends on| RP
-    RP -->|implemented by| Mongo
-    RP -->|implemented by| InMemory
-```
+The Repository Pattern is visualized in the Task Executor Flow diagram (see above).
 
 **Protocols** (interfaces in `protocols.py`):
 
@@ -355,47 +269,7 @@ class BaseBackend(ABC):
 
 ## Data Flow
 
-### Task Execution Data Flow
-
-```mermaid
-flowchart LR
-    subgraph Preprocess
-        Backend["Backend<br/>(hardware)"] --> PreProcessResult["PreProcessResult<br/>(from backend)"]
-        PreProcessResult --> InputParams["input_params<br/>(stored)"]
-    end
-
-    subgraph Run
-        RunStep["Run<br/>(measure)"] --> RunResult["RunResult<br/>(raw_result)"]
-        RunResult --> R2["R² value<br/>(validated)"]
-    end
-
-    subgraph Postprocess
-        PostprocStep["Postproc"] --> PostProcessResult["PostProcessResult<br/>(params, figures)"]
-        PostProcessResult --> OutputParams["output_params<br/>figures, data"]
-    end
-
-    Backend --> RunStep
-    RunStep --> PostprocStep
-```
-
-### Persistence Flow
-
-```mermaid
-flowchart LR
-    TaskExecutor["TaskExecutor"]
-
-    TaskExecutor --> TSM["TaskStateManager"]
-    TSM --> InMemory["In-memory state"]
-
-    TaskExecutor --> THR["TaskHistoryRecorder"]
-    THR --> MongoDB1["MongoDB<br/>(TaskResultHistoryDocument)"]
-
-    TaskExecutor --> FCDS["FilesystemCalibDataSaver"]
-    FCDS --> Files["Local files<br/>(fig/, raw_data/)"]
-
-    TaskExecutor --> ES["ExecutionService"]
-    ES --> MongoDB2["MongoDB<br/>(ExecutionDocument)"]
-```
+The data flow (Preprocess → Run → Postprocess) and persistence flow (TaskStateManager, TaskHistoryRecorder, FilesystemCalibDataSaver, ExecutionService) are illustrated in the Task Executor Flow diagram above.
 
 ## Extension Points
 
@@ -475,23 +349,3 @@ class YourService:
         self._repo = repo
 ```
 
-## Best Practices
-
-### For Engine Developers
-
-1. **Use Protocols**: Define interfaces before implementations
-2. **Dependency Injection**: Pass repositories/services as constructor args
-3. **State Isolation**: Don't share mutable state between tasks
-4. **Error Handling**: Always update task status on failure
-5. **Logging**: Use structured logging for debugging
-
-### For Service Users
-
-1. **Use CalibService**: Don't directly instantiate engine components
-2. **Handle Exceptions**: Catch `TaskExecutionError`, `R2ValidationError`
-3. **Check Results**: Verify task success before proceeding
-
-## Related Documentation
-
-- [Testing Guidelines](./testing.md): How to test workflow components
-- [CalibService API](https://github.com/oqtopus-team/qdash/blob/develop/src/qdash/workflow/__init__.py): High-level API (source code)
