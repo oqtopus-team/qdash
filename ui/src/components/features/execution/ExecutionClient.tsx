@@ -38,13 +38,13 @@ type FilterOption = {
 };
 
 interface ExecutionDetailClientProps {
-  chip_id: string;
-  execute_id: string;
+  chipId: string;
+  executionId: string;
 }
 
 export function ExecutionDetailClient({
-  chip_id,
-  execute_id,
+  chipId,
+  executionId,
 }: ExecutionDetailClientProps) {
   const [expandedFigure, setExpandedFigure] = useState<{
     path: string;
@@ -86,7 +86,7 @@ export function ExecutionDetailClient({
     data: executionDetailData,
     isLoading: isDetailLoading,
     isError: isDetailError,
-  } = useGetExecution(execute_id, {
+  } = useGetExecution(executionId, {
     query: {
       // Refresh every 5 seconds
       refetchInterval: 5000,
@@ -308,7 +308,7 @@ export function ExecutionDetailClient({
             </h1>
             <div className="flex flex-col sm:flex-row gap-2 sm:gap-4">
               <a
-                href={`/execution/${execute_id}/experiment`}
+                href={`/execution/${executionId}/experiment`}
                 className="bg-neutral text-neutral-content px-4 py-2 rounded flex items-center justify-center hover:opacity-80 transition-colors text-sm sm:text-base"
               >
                 <ExternalLink className="mr-2" size={16} />
@@ -387,7 +387,7 @@ export function ExecutionDetailClient({
                           const url = URL.createObjectURL(blob);
                           const link = document.createElement("a");
                           link.href = url;
-                          link.download = `execution_note_${chip_id}_${execute_id}.json`;
+                          link.download = `execution_note_${chipId}_${executionId}.json`;
                           document.body.appendChild(link);
                           link.click();
                           document.body.removeChild(link);
@@ -903,7 +903,7 @@ export function ExecutionDetailClient({
             <div className="mt-4">
               <TaskGridView
                 tasks={tasksForGridView}
-                qubitId={chip_id}
+                qubitId={chipId}
                 emptyMessage="No tasks found"
               />
             </div>

@@ -103,7 +103,7 @@ export function Sidebar() {
     if (isMobileOpen) {
       setMobileSidebarOpen(false);
     }
-    router.push("/setting");
+    router.push("/settings");
   }, [isMobileOpen, setMobileSidebarOpen, router]);
 
   const handleModalLogout = useCallback(async () => {
@@ -349,11 +349,11 @@ export function Sidebar() {
         )}
         <li>
           <Link
-            href="/setting"
+            href="/settings"
             className={
               isMobileOpen
-                ? linkClass(isActive("/setting"))
-                : desktopLinkClass(isActive("/setting"))
+                ? linkClass(isActive("/settings"))
+                : desktopLinkClass(isActive("/settings"))
             }
             title="Settings"
             onClick={handleLinkClick}

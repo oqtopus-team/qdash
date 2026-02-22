@@ -2,15 +2,15 @@ import { ExecutionDetailClient } from "@/components/features/execution/Execution
 
 interface ExecutionDetailPageProps {
   params: Promise<{
-    chip_id: string;
-    execute_id: string;
+    chipId: string;
+    executionId: string;
   }>;
 }
 
 export default async function ExecutionDetailPage({
   params,
 }: ExecutionDetailPageProps) {
-  const { chip_id, execute_id } = await params;
+  const { chipId, executionId } = await params;
 
-  return <ExecutionDetailClient chip_id={chip_id} execute_id={execute_id} />;
+  return <ExecutionDetailClient chipId={chipId} executionId={executionId} />;
 }

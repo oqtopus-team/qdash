@@ -21,7 +21,7 @@ import { useMetricsConfig } from "@/hooks/useMetricsConfig";
 import {
   getDaisySelectStyles,
   getDaisySelectStylesSm,
-} from "@/lib/reactSelectTheme";
+} from "@/lib/react-select-theme";
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { formatDateTime } from "@/lib/utils/datetime";
 import type { ParameterVersionResponse } from "@/schemas/parameterVersionResponse";

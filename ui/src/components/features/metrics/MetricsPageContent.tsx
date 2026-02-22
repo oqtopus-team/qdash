@@ -22,7 +22,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { MetricsPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
 import { useMetricsConfig } from "@/hooks/useMetricsConfig";
 import { useMetricsUrlState } from "@/hooks/useUrlState";
-import { getDaisySelectStyles } from "@/lib/reactSelectTheme";
+import { getDaisySelectStyles } from "@/lib/react-select-theme";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PageFiltersBar } from "@/components/ui/PageFiltersBar";

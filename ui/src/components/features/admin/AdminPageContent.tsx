@@ -25,7 +25,7 @@ import {
   useCreateProjectForUser,
 } from "@/client/admin/admin";
 import { useRegisterUser, useResetPassword } from "@/client/auth/auth";
-import { SettingsCard } from "@/components/features/setting/SettingsCard";
+import { SettingsCard } from "@/components/features/settings/SettingsCard";
 import { PageContainer } from "@/components/ui/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { AdminPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
