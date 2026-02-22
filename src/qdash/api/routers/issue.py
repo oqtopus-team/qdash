@@ -12,12 +12,14 @@ from uuid import uuid4
 
 from fastapi import APIRouter, Depends, Query, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
+from qdash.api.dependencies import get_issue_service  # noqa: TCH002
 from qdash.api.lib.ai_labels import STATUS_LABELS as _AI_STATUS_LABELS
 from qdash.api.lib.ai_labels import TOOL_LABELS as _AI_TOOL_LABELS
 from qdash.api.lib.project import (  # noqa: TCH002
     ProjectContext,
     get_project_context,
 )
+from qdash.api.lib.sse import sse_event
 from qdash.api.schemas.issue import (
     IssueAiReplyRequest,
     IssueCreate,
@@ -26,9 +28,8 @@ from qdash.api.schemas.issue import (
     ListIssuesResponse,
 )
 from qdash.api.schemas.success import SuccessResponse
+from qdash.api.services.issue_service import IssueService  # noqa: TCH002
 from qdash.common.paths import CALIB_DATA_BASE
-from qdash.datamodel.project import ProjectRole
-from qdash.dbmodel.issue import IssueDocument
 from starlette.exceptions import HTTPException
 
 if TYPE_CHECKING:
@@ -51,23 +52,6 @@ FILENAME_PATTERN = re.compile(r"^[0-9a-f\-]{36}\.(png|jpg|gif|webp)$")
 logger = logging.getLogger(__name__)
 
 
-def _document_to_issue_response(doc: IssueDocument, reply_count: int = 0) -> IssueResponse:
-    """Convert an IssueDocument to an IssueResponse schema."""
-    return IssueResponse(
-        id=str(doc.id),
-        task_id=doc.task_id,
-        username=doc.username,
-        title=doc.title,
-        content=doc.content,
-        created_at=doc.system_info.created_at,
-        updated_at=doc.system_info.updated_at,
-        parent_id=doc.parent_id,
-        reply_count=reply_count,
-        is_closed=doc.is_closed,
-        is_ai_reply=doc.is_ai_reply,
-    )
-
-
 # =============================================================================
 # Issue endpoints under /issues
 # =============================================================================
@@ -81,6 +65,7 @@ def _document_to_issue_response(doc: IssueDocument, reply_count: int = 0) -> Iss
 )
 def list_issues(
     ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    service: Annotated[IssueService, Depends(get_issue_service)],
     skip: Annotated[int, Query(ge=0, description="Number of items to skip")] = 0,
     limit: Annotated[int, Query(ge=1, le=200, description="Max items to return")] = 50,
     task_id: Annotated[str | None, Query(description="Filter by task ID")] = None,
@@ -92,50 +77,12 @@ def list_issues(
     ] = False,
 ) -> ListIssuesResponse:
     """List all root issues across the project, with reply counts."""
-    query: dict[str, object] = {
-        "project_id": ctx.project_id,
-        "parent_id": None,
-    }
-    if task_id:
-        query["task_id"] = task_id
-    if is_closed is not None:
-        query["is_closed"] = is_closed
-
-    total = IssueDocument.find(query).count()
-
-    docs = (
-        IssueDocument.find(query).sort("-system_info.created_at").skip(skip).limit(limit).to_list()
-    )
-
-    # Collect root issue IDs to get reply counts
-    root_ids = [str(doc.id) for doc in docs]
-
-    # Aggregate reply counts for these root issues
-    reply_counts: dict[str, int] = {}
-    if root_ids:
-        pipeline = [
-            {
-                "$match": {
-                    "project_id": ctx.project_id,
-                    "parent_id": {"$in": root_ids},
-                }
-            },
-            {"$group": {"_id": "$parent_id", "count": {"$sum": 1}}},
-        ]
-        results = IssueDocument.aggregate(pipeline).to_list()
-        for item in results:
-            reply_counts[item["_id"]] = item["count"]
-
-    issues = [
-        _document_to_issue_response(doc, reply_count=reply_counts.get(str(doc.id), 0))
-        for doc in docs
-    ]
-
-    return ListIssuesResponse(
-        issues=issues,
-        total=total,
+    return service.list_issues(
+        project_id=ctx.project_id,
         skip=skip,
         limit=limit,
+        task_id=task_id,
+        is_closed=is_closed,
     )
 
 
@@ -148,31 +95,10 @@ def list_issues(
 def get_issue(
     issue_id: str,
     ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    service: Annotated[IssueService, Depends(get_issue_service)],
 ) -> IssueResponse:
     """Get a single root issue by its ID, including reply count."""
-    from bson import ObjectId
-
-    doc = IssueDocument.find_one(
-        {
-            "_id": ObjectId(issue_id),
-            "project_id": ctx.project_id,
-        },
-    ).run()
-
-    if doc is None:
-        raise HTTPException(status_code=404, detail="Issue not found")
-
-    # Count replies if this is a root issue
-    reply_count = 0
-    if doc.parent_id is None:
-        reply_count = IssueDocument.find(
-            {
-                "project_id": ctx.project_id,
-                "parent_id": issue_id,
-            },
-        ).count()
-
-    return _document_to_issue_response(doc, reply_count=reply_count)
+    return service.get_issue(project_id=ctx.project_id, issue_id=issue_id)
 
 
 @router.get(
@@ -184,20 +110,10 @@ def get_issue(
 def get_issue_replies(
     issue_id: str,
     ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    service: Annotated[IssueService, Depends(get_issue_service)],
 ) -> list[IssueResponse]:
     """List all replies to a specific issue, sorted by creation time ascending."""
-    docs = (
-        IssueDocument.find(
-            {
-                "project_id": ctx.project_id,
-                "parent_id": issue_id,
-            },
-        )
-        .sort("system_info.created_at")
-        .to_list()
-    )
-
-    return [_document_to_issue_response(doc) for doc in docs]
+    return service.get_issue_replies(project_id=ctx.project_id, issue_id=issue_id)
 
 
 @router.delete(
@@ -209,26 +125,14 @@ def get_issue_replies(
 def delete_issue(
     issue_id: str,
     ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    service: Annotated[IssueService, Depends(get_issue_service)],
 ) -> SuccessResponse:
     """Delete an issue. Only the author can delete their own issue."""
-    from bson import ObjectId
-
-    doc = IssueDocument.find_one(
-        {
-            "_id": ObjectId(issue_id),
-            "project_id": ctx.project_id,
-        },
-    ).run()
-
-    if doc is None:
-        raise HTTPException(status_code=404, detail="Issue not found")
-
-    if doc.username != ctx.user.username:
-        raise HTTPException(status_code=403, detail="You can only delete your own issues")
-
-    doc.delete()
-
-    return SuccessResponse(message="Issue deleted")
+    return service.delete_issue(
+        project_id=ctx.project_id,
+        issue_id=issue_id,
+        username=ctx.user.username,
+    )
 
 
 @router.patch(
@@ -241,32 +145,16 @@ def update_issue(
     issue_id: str,
     body: IssueUpdate,
     ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    service: Annotated[IssueService, Depends(get_issue_service)],
 ) -> IssueResponse:
     """Update an issue's content (and title for root issues). Only the author can edit."""
-    from bson import ObjectId
-
-    doc = IssueDocument.find_one(
-        {
-            "_id": ObjectId(issue_id),
-            "project_id": ctx.project_id,
-        },
-    ).run()
-
-    if doc is None:
-        raise HTTPException(status_code=404, detail="Issue not found")
-
-    if doc.username != ctx.user.username:
-        raise HTTPException(status_code=403, detail="You can only edit your own issues")
-
-    # Only update title for root issues
-    if doc.parent_id is None and body.title is not None:
-        doc.title = body.title
-
-    doc.content = body.content
-    doc.system_info.update_time()
-    doc.save()
-
-    return _document_to_issue_response(doc)
+    return service.update_issue(
+        project_id=ctx.project_id,
+        issue_id=issue_id,
+        username=ctx.user.username,
+        title=body.title,
+        content=body.content,
+    )
 
 
 @router.patch(
@@ -278,30 +166,15 @@ def update_issue(
 def close_issue(
     issue_id: str,
     ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    service: Annotated[IssueService, Depends(get_issue_service)],
 ) -> SuccessResponse:
     """Close an issue thread. Only the author or project owner can close."""
-    from bson import ObjectId
-
-    doc = IssueDocument.find_one(
-        {
-            "_id": ObjectId(issue_id),
-            "project_id": ctx.project_id,
-            "parent_id": None,
-        },
-    ).run()
-
-    if doc is None:
-        raise HTTPException(status_code=404, detail="Issue not found")
-
-    if doc.username != ctx.user.username and ctx.role != ProjectRole.OWNER:
-        raise HTTPException(
-            status_code=403, detail="Only the author or project owner can close this issue"
-        )
-
-    doc.is_closed = True
-    doc.save()
-
-    return SuccessResponse(message="Issue closed")
+    return service.close_issue(
+        project_id=ctx.project_id,
+        issue_id=issue_id,
+        username=ctx.user.username,
+        role=ctx.role,
+    )
 
 
 @router.patch(
@@ -313,30 +186,15 @@ def close_issue(
 def reopen_issue(
     issue_id: str,
     ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    service: Annotated[IssueService, Depends(get_issue_service)],
 ) -> SuccessResponse:
     """Reopen a closed issue thread. Only the author or project owner can reopen."""
-    from bson import ObjectId
-
-    doc = IssueDocument.find_one(
-        {
-            "_id": ObjectId(issue_id),
-            "project_id": ctx.project_id,
-            "parent_id": None,
-        },
-    ).run()
-
-    if doc is None:
-        raise HTTPException(status_code=404, detail="Issue not found")
-
-    if doc.username != ctx.user.username and ctx.role != ProjectRole.OWNER:
-        raise HTTPException(
-            status_code=403, detail="Only the author or project owner can reopen this issue"
-        )
-
-    doc.is_closed = False
-    doc.save()
-
-    return SuccessResponse(message="Issue reopened")
+    return service.reopen_issue(
+        project_id=ctx.project_id,
+        issue_id=issue_id,
+        username=ctx.user.username,
+        role=ctx.role,
+    )
 
 
 # =============================================================================
@@ -353,20 +211,10 @@ def reopen_issue(
 def get_task_result_issues(
     task_id: str,
     ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    service: Annotated[IssueService, Depends(get_issue_service)],
 ) -> list[IssueResponse]:
     """List all issues for a task result, sorted by creation time ascending."""
-    docs = (
-        IssueDocument.find(
-            {
-                "project_id": ctx.project_id,
-                "task_id": task_id,
-            },
-        )
-        .sort("system_info.created_at")
-        .to_list()
-    )
-
-    return [_document_to_issue_response(doc) for doc in docs]
+    return service.get_task_result_issues(project_id=ctx.project_id, task_id=task_id)
 
 
 @router.post(
@@ -380,23 +228,17 @@ def create_issue(
     task_id: str,
     body: IssueCreate,
     ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    service: Annotated[IssueService, Depends(get_issue_service)],
 ) -> IssueResponse:
     """Create a new issue on a task result."""
-    # Validate: root issues must have a title
-    if body.parent_id is None and not body.title:
-        raise HTTPException(status_code=422, detail="Title is required for root issues")
-
-    doc = IssueDocument(
+    return service.create_issue(
         project_id=ctx.project_id,
         task_id=task_id,
         username=ctx.user.username,
-        title=body.title if body.parent_id is None else None,
+        title=body.title,
         content=body.content,
         parent_id=body.parent_id,
     )
-    doc.insert()
-
-    return _document_to_issue_response(doc)
 
 
 # =============================================================================
@@ -466,16 +308,12 @@ def get_issue_image(filename: str) -> FileResponse:
 # =============================================================================
 
 
-def _sse_event(event: str, data: dict[str, Any]) -> str:
-    """Format a Server-Sent Event."""
-    return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
-
-
 @router.post("/issues/{issue_id}/ai-reply/stream", include_in_schema=False)
 async def issue_ai_reply_stream(
     issue_id: str,
     body: IssueAiReplyRequest,
     ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    service: Annotated[IssueService, Depends(get_issue_service)],
 ) -> StreamingResponse:
     """SSE endpoint that generates an AI reply in an issue thread.
 
@@ -488,48 +326,36 @@ async def issue_ai_reply_stream(
     """
 
     async def event_generator() -> AsyncGenerator[str, None]:
-        from bson import ObjectId
         from qdash.api.lib.copilot_config import load_copilot_config
 
         config = load_copilot_config()
         if not config.enabled:
-            yield _sse_event("error", {"step": "init", "detail": "Copilot is not enabled"})
+            yield sse_event("error", {"step": "init", "detail": "Copilot is not enabled"})
             return
 
-        # Load root issue
-        yield _sse_event("status", {"step": "load_issue", "message": "Issueを読み込み中..."})
+        # Load root issue and build context
+        yield sse_event("status", {"step": "load_issue", "message": "Issueを読み込み中..."})
         await asyncio.sleep(0)
 
-        root_doc = IssueDocument.find_one(
-            {"_id": ObjectId(issue_id), "project_id": ctx.project_id}
-        ).run()
-        if root_doc is None:
-            yield _sse_event("error", {"step": "load_issue", "detail": "Issue not found"})
+        ai_context = service.build_ai_reply_context(
+            project_id=ctx.project_id,
+            issue_id=issue_id,
+        )
+
+        if ai_context["root_doc"] is None:
+            yield sse_event("error", {"step": "load_issue", "detail": "Issue not found"})
             return
 
         # Build conversation history from thread
-        yield _sse_event("status", {"step": "build_history", "message": "スレッド履歴を構築中..."})
+        yield sse_event("status", {"step": "build_history", "message": "スレッド履歴を構築中..."})
         await asyncio.sleep(0)
 
-        # Get the root issue's parent_id to determine if this IS the root
-        actual_root_id = issue_id if root_doc.parent_id is None else root_doc.parent_id
-
-        reply_docs = (
-            IssueDocument.find({"project_id": ctx.project_id, "parent_id": actual_root_id})
-            .sort("system_info.created_at")
-            .to_list()
-        )
-
-        conversation_history: list[dict[str, str]] = []
-        # Add root issue content
-        if root_doc.parent_id is None:
-            conversation_history.append({"role": "user", "content": root_doc.content})
-        # Add replies — but exclude the latest user reply that matches
-        # body.user_message to avoid duplication (run_chat adds it as the
-        # final user turn automatically).
-        for reply_doc in reply_docs:
-            role = "assistant" if reply_doc.is_ai_reply else "user"
-            conversation_history.append({"role": role, "content": reply_doc.content})
+        conversation_history: list[dict[str, str]] = ai_context["conversation_history"]
+        actual_root_id: str = ai_context["actual_root_id"]
+        chip_id: str | None = ai_context["chip_id"]
+        qid: str | None = ai_context["qid"]
+        qubit_params: dict[str, Any] = ai_context["qubit_params"]
+        task_id: str = ai_context["task_id"]
 
         # Pop the last entry if it is the same user message we'll pass to run_chat
         if (
@@ -539,61 +365,17 @@ async def issue_ai_reply_stream(
         ):
             conversation_history.pop()
 
-        # Strip @qdash mentions from conversation history so the LLM
-        # doesn't see the UI-only trigger text in prior turns either.
-        for entry in conversation_history:
-            if entry["role"] == "user":
-                entry["content"] = re.sub(r"@qdash\b\s*", "", entry["content"]).strip()
-
-        # Resolve chip_id / qid from task result
-        yield _sse_event(
+        # Resolve chip_id / qid context
+        yield sse_event(
             "status", {"step": "load_context", "message": "タスクコンテキストを取得中..."}
         )
         await asyncio.sleep(0)
 
-        chip_id: str | None = None
-        qid: str | None = None
-        task_id = root_doc.task_id
-
-        from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
-
-        task_doc = TaskResultHistoryDocument.find_one({"task_id": task_id}).run()
-        if task_doc:
-            chip_id = task_doc.chip_id
-            qid = task_doc.qid
-
-        # Resolve default chip_id if not available from task result
-        if not chip_id:
-            from qdash.dbmodel.chip import ChipDocument
-
-            chip_doc = ChipDocument.find_one({}, sort=[("installed_at", -1)]).run()
-            if chip_doc:
-                chip_id = str(chip_doc.chip_id)
-
-        # Optionally load qubit params
-        qubit_params: dict[str, Any] = {}
-        if chip_id and qid:
-            from qdash.dbmodel.qubit import QubitDocument
-
-            qubit_doc = QubitDocument.find_one({"chip_id": chip_id, "qid": qid}).run()
-            if qubit_doc:
-                import math
-
-                def _sanitize(obj: Any) -> Any:
-                    if isinstance(obj, float):
-                        return None if not math.isfinite(obj) else obj
-                    if isinstance(obj, dict):
-                        return {k: _sanitize(v) for k, v in obj.items()}
-                    if isinstance(obj, list):
-                        return [_sanitize(v) for v in obj]
-                    return obj
-
-                qubit_params = _sanitize(dict(qubit_doc.data))
-
         # Build tool executors
-        from qdash.api.routers.copilot import _build_tool_executors
+        from qdash.api.services.copilot_data_service import CopilotDataService
 
-        tool_executors = _build_tool_executors()
+        copilot_data_svc = CopilotDataService()
+        tool_executors = copilot_data_svc.build_tool_executors()
 
         # Run AI chat
         # Strip @qdash mention from user message before sending to LLM.
@@ -603,7 +385,7 @@ async def issue_ai_reply_stream(
             clean_message = "この Issue について教えてください"
         logger.info("AI reply: original=%r, clean=%r", body.user_message, clean_message)
 
-        yield _sse_event("status", {"step": "run_chat", "message": "AIが応答中..."})
+        yield sse_event("status", {"step": "run_chat", "message": "AIが応答中..."})
         queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
 
         async def on_tool_call(name: str, args: dict[str, Any]) -> None:
@@ -634,13 +416,13 @@ async def issue_ai_reply_stream(
             while not chat_task.done():
                 try:
                     event = await asyncio.wait_for(queue.get(), timeout=0.3)
-                    yield _sse_event("status", event)
+                    yield sse_event("status", event)
                 except asyncio.TimeoutError:  # noqa: PERF203
                     yield ":\n\n"
 
             result = chat_task.result()
         except ImportError:
-            yield _sse_event(
+            yield sse_event(
                 "error",
                 {
                     "step": "run_chat",
@@ -650,16 +432,16 @@ async def issue_ai_reply_stream(
             return
         except Exception as e:
             logger.exception("AI reply failed")
-            yield _sse_event("error", {"step": "run_chat", "detail": f"AI reply failed: {e}"})
+            yield sse_event("error", {"step": "run_chat", "detail": f"AI reply failed: {e}"})
             return
 
         # Drain remaining queue events
         while not queue.empty():
             event = queue.get_nowait()
-            yield _sse_event("status", event)
+            yield sse_event("status", event)
 
         # Convert blocks to markdown and save as issue reply
-        yield _sse_event("status", {"step": "save_reply", "message": "返信を保存中..."})
+        yield sse_event("status", {"step": "save_reply", "message": "返信を保存中..."})
         await asyncio.sleep(0)
 
         logger.info(
@@ -676,27 +458,21 @@ async def issue_ai_reply_stream(
                 raw_json = json.dumps(result, indent=2, ensure_ascii=False)
                 markdown_content = f"```json\n{raw_json}\n```"
             except Exception:
-                yield _sse_event(
+                yield sse_event(
                     "error",
                     {"step": "save_reply", "detail": "AIが空の応答を返しました"},
                 )
                 return
 
-        ai_doc = IssueDocument(
+        saved_response = service.save_ai_reply(
             project_id=ctx.project_id,
-            task_id=root_doc.task_id,
-            username="qdash-ai",
-            title=None,
-            content=markdown_content,
+            task_id=task_id,
             parent_id=actual_root_id,
-            is_ai_reply=True,
+            content=markdown_content,
         )
-        ai_doc.insert()
 
-        saved_response = _document_to_issue_response(ai_doc)
-
-        yield _sse_event("status", {"step": "complete", "message": "完了"})
-        yield _sse_event("result", saved_response.model_dump(mode="json"))
+        yield sse_event("status", {"step": "complete", "message": "完了"})
+        yield sse_event("result", saved_response.model_dump(mode="json"))
 
     return StreamingResponse(
         event_generator(),

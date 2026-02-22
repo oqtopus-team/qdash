@@ -4,6 +4,7 @@ import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends
+from qdash.api.dependencies import get_backend_repository
 from qdash.api.lib.project import (
     ProjectContext,
     get_project_context,
@@ -13,11 +14,6 @@ from qdash.repository.backend import MongoBackendRepository
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
-
-
-def get_backend_repository() -> MongoBackendRepository:
-    """Get backend repository instance."""
-    return MongoBackendRepository()
 
 
 @router.get(

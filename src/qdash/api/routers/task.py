@@ -6,6 +6,7 @@ import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from qdash.api.dependencies import get_task_definition_repository  # noqa: TCH002
 from qdash.api.lib.project import (  # noqa: TCH002
     ProjectContext,
     get_project_context,
@@ -21,16 +22,11 @@ from qdash.api.schemas.task import (
 from qdash.datamodel.task_knowledge import TaskKnowledge
 from qdash.datamodel.task_knowledge import get_task_knowledge as _lookup_knowledge
 from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
-from qdash.repository.task_definition import MongoTaskDefinitionRepository
+from qdash.repository.task_definition import MongoTaskDefinitionRepository  # noqa: TCH002
 
 router = APIRouter()
 
 logger = logging.getLogger(__name__)
-
-
-def get_task_definition_repository() -> MongoTaskDefinitionRepository:
-    """Get task definition repository instance."""
-    return MongoTaskDefinitionRepository()
 
 
 @router.get(

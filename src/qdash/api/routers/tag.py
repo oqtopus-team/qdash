@@ -6,21 +6,17 @@ import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends
+from qdash.api.dependencies import get_tag_repository  # noqa: TCH002
 from qdash.api.lib.project import (  # noqa: TCH002
     ProjectContext,
     get_project_context,
 )
 from qdash.api.schemas.tag import ListTagResponse, Tag
-from qdash.repository.tag import MongoTagRepository
+from qdash.repository.tag import MongoTagRepository  # noqa: TCH002
 
 router = APIRouter()
 
 logger = logging.getLogger(__name__)
-
-
-def get_tag_repository() -> MongoTagRepository:
-    """Get tag repository instance."""
-    return MongoTagRepository()
 
 
 @router.get(
