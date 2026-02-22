@@ -59,14 +59,30 @@ export function ParameterHistoryPanel({
 }: ParameterHistoryPanelProps) {
   // Use controlled state from URL when callbacks are provided
   const [localParameter, setLocalParameter] = useState(initialParameter);
+  const [prevInitialParameter, setPrevInitialParameter] =
+    useState(initialParameter);
   const [localQid, setLocalQid] = useState(initialQid);
+  const [prevInitialQid, setPrevInitialQid] = useState(initialQid);
   const [isSearching, setIsSearching] = useState(autoSearch);
+
+  // Sync with URL state during render (React recommended pattern)
+  if (initialParameter !== prevInitialParameter) {
+    setPrevInitialParameter(initialParameter);
+    setLocalParameter(initialParameter);
+  }
+  if (initialQid !== prevInitialQid) {
+    setPrevInitialQid(initialQid);
+    setLocalQid(initialQid);
+  }
 
   // Version diff state
   const [diffSelection, setDiffSelection] = useState<[string, string | null]>([
     "",
     null,
   ]);
+  const [prevDiffKey, setPrevDiffKey] = useState(
+    `${initialParameter}:${initialQid}`,
+  );
 
   // Parallel comparison state
   const [compareParameter, setCompareParameter] = useState("");
@@ -118,15 +134,6 @@ export function ParameterHistoryPanel({
     [],
   );
 
-  // Sync with URL state
-  useEffect(() => {
-    setLocalParameter(initialParameter);
-  }, [initialParameter]);
-
-  useEffect(() => {
-    setLocalQid(initialQid);
-  }, [initialQid]);
-
   // Auto-search when coming from URL with params
   useEffect(() => {
     if (autoSearch && initialParameter && initialQid) {
@@ -134,10 +141,12 @@ export function ParameterHistoryPanel({
     }
   }, [autoSearch, initialParameter, initialQid]);
 
-  // Reset diff selection when data changes
-  useEffect(() => {
+  // Reset diff selection when parameter/qid changes (during render)
+  const diffKey = `${localParameter}:${localQid}`;
+  if (diffKey !== prevDiffKey) {
+    setPrevDiffKey(diffKey);
     setDiffSelection(["", null]);
-  }, [localParameter, localQid]);
+  }
 
   const {
     data: response,

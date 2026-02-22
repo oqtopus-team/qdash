@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 
 import { EmptyState } from "./EmptyState";
 
@@ -103,10 +103,10 @@ export function DataTable({
     currentPage * pageSize,
   );
 
-  // Reset page when filter changes
-  useEffect(() => {
+  const handleFilterChange = (value: string) => {
+    setFilter(value);
     setCurrentPage(1);
-  }, [filter]);
+  };
 
   return (
     <div
@@ -128,7 +128,7 @@ export function DataTable({
                 placeholder={searchPlaceholder}
                 className="input input-bordered input-xs sm:input-sm w-full sm:w-64"
                 value={filter}
-                onChange={(e) => setFilter(e.target.value)}
+                onChange={(e) => handleFilterChange(e.target.value)}
               />
             </div>
           )}

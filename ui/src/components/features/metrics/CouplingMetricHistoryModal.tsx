@@ -71,11 +71,12 @@ export function CouplingMetricHistoryModal({
   }, [couplingId]);
   const activeCouplingId = isReversed ? reversedCouplingId : couplingId;
 
-  // Reset selection state when direction changes
-  useEffect(() => {
+  // Toggle direction and reset selection in the same handler
+  const handleDirectionToggle = () => {
+    setIsReversed((prev) => !prev);
     setSelectedExecutionId(null);
     setSelectedTaskIndex(0);
-  }, [isReversed]);
+  };
 
   const { data, isLoading, isError } = useGetCouplingMetricHistory(
     chipId,
@@ -192,7 +193,7 @@ export function CouplingMetricHistoryModal({
   const directionToggle = (
     <div className="flex items-center gap-2">
       <button
-        onClick={() => setIsReversed((prev) => !prev)}
+        onClick={handleDirectionToggle}
         className={`btn btn-sm gap-1.5 ${isReversed ? "btn-secondary" : "btn-outline"}`}
         title={`Switch to ${isReversed ? couplingId : reversedCouplingId}`}
       >

@@ -40,6 +40,21 @@ import { useSidebar } from "@/contexts/SidebarContext";
 const PREFECT_URL =
   process.env.NEXT_PUBLIC_PREFECT_URL || "http://127.0.0.1:4200";
 
+function SectionHeader({
+  label,
+  visible,
+}: {
+  label: string;
+  visible: boolean;
+}) {
+  if (!visible) return null;
+  return (
+    <li className="menu-title text-xs font-semibold text-base-content/50 uppercase tracking-wider px-3 pt-3 pb-1">
+      {label}
+    </li>
+  );
+}
+
 function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
@@ -123,13 +138,7 @@ function Sidebar() {
         : "text-base-content hover:bg-base-300"
     }`;
 
-  // Section header component for sidebar groups
-  const SectionHeader = ({ label }: { label: string }) =>
-    (isOpen || isMobileOpen) && (
-      <li className="menu-title text-xs font-semibold text-base-content/50 uppercase tracking-wider px-3 pt-3 pb-1">
-        {label}
-      </li>
-    );
+  const sectionHeaderVisible = isOpen || isMobileOpen;
 
   const sidebarContent = (
     <>
@@ -154,7 +163,7 @@ function Sidebar() {
         )}
 
         {/* Data & Monitoring Section */}
-        <SectionHeader label="Data" />
+        <SectionHeader visible={sectionHeaderVisible} label="Data" />
         <li>
           <Link
             href="/inbox"
@@ -249,7 +258,7 @@ function Sidebar() {
         </li>
 
         {/* Operations Section */}
-        <SectionHeader label="Operations" />
+        <SectionHeader visible={sectionHeaderVisible} label="Operations" />
         {canEdit && (
           <li>
             <Link
@@ -320,7 +329,7 @@ function Sidebar() {
         )}
 
         {/* Management Section */}
-        <SectionHeader label="Manage" />
+        <SectionHeader visible={sectionHeaderVisible} label="Manage" />
         {canEdit && (
           <li>
             <Link

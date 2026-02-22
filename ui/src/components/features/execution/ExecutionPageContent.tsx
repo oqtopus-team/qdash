@@ -25,6 +25,36 @@ import { ExecutionPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
 import { useDateNavigation } from "@/hooks/useDateNavigation";
 import { useExecutionUrlState } from "@/hooks/useUrlState";
 
+function PaginationControls({
+  currentPage,
+  setCurrentPage,
+  hasMore,
+}: {
+  currentPage: number;
+  setCurrentPage: React.Dispatch<React.SetStateAction<number>>;
+  hasMore: boolean;
+}) {
+  return (
+    <div className="flex justify-center items-center gap-2 sm:gap-4 my-3 sm:my-4 px-4">
+      <button
+        onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+        disabled={currentPage === 1}
+        className="btn btn-xs sm:btn-sm btn-outline"
+      >
+        Prev
+      </button>
+      <span className="text-xs sm:text-sm">Page {currentPage}</span>
+      <button
+        onClick={() => setCurrentPage((prev) => prev + 1)}
+        disabled={!hasMore}
+        className="btn btn-xs sm:btn-sm btn-outline"
+      >
+        Next
+      </button>
+    </div>
+  );
+}
+
 export function ExecutionPageContent() {
   // URL state management
   const { selectedChip, setSelectedChip, isInitialized } =
@@ -40,7 +70,6 @@ export function ExecutionPageContent() {
   const [expandedTaskIndex, setExpandedTaskIndex] = useState<number | null>(
     null,
   );
-  const [cardData, setCardData] = useState<ExecutionResponseSummary[]>([]);
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
 
   // Pagination state
@@ -117,25 +146,18 @@ export function ExecutionPageContent() {
     },
   });
 
-  // Set card data when execution data is fetched (filter by date)
-  useEffect(() => {
-    if (executionData?.data?.executions) {
-      let filteredData = executionData.data.executions;
-
-      // Filter by date if not "latest"
-      if (selectedDate !== "latest") {
-        filteredData = executionData.data.executions.filter((exec) => {
-          if (!exec.start_at) return false;
-          const execDate = new Date(exec.start_at);
-          const execDateStr = `${execDate.getFullYear()}${String(
-            execDate.getMonth() + 1,
-          ).padStart(2, "0")}${String(execDate.getDate()).padStart(2, "0")}`;
-          return execDateStr === selectedDate;
-        });
-      }
-
-      setCardData(filteredData);
-    }
+  // Compute card data from execution data (filter by date)
+  const cardData = useMemo(() => {
+    if (!executionData?.data?.executions) return [];
+    if (selectedDate === "latest") return executionData.data.executions;
+    return executionData.data.executions.filter((exec) => {
+      if (!exec.start_at) return false;
+      const execDate = new Date(exec.start_at);
+      const execDateStr = `${execDate.getFullYear()}${String(
+        execDate.getMonth() + 1,
+      ).padStart(2, "0")}${String(execDate.getDate()).padStart(2, "0")}`;
+      return execDateStr === selectedDate;
+    });
   }, [executionData, selectedDate]);
 
   // Chip selection change handler
@@ -143,14 +165,14 @@ export function ExecutionPageContent() {
     setSelectedChip(chipId || null);
     setSelectedExecutionId(null);
     setIsSidebarOpen(false);
-    setCardData([]);
-    setCurrentPage(1); // Reset to first page when changing chips
+    setCurrentPage(1);
   };
 
-  // Reset page when date changes
-  useEffect(() => {
+  // Wrap date setter to reset page
+  const handleDateChange = (date: string) => {
+    setSelectedDate(date);
     setCurrentPage(1);
-  }, [selectedDate]);
+  };
 
   if (isLoading) return <ExecutionPageSkeleton />;
   if (isError) return <div>Error</div>;
@@ -192,29 +214,9 @@ export function ExecutionPageContent() {
     }
   };
 
-  // Pagination controls component
-  const PaginationControls = () => (
-    <div className="flex justify-center items-center gap-2 sm:gap-4 my-3 sm:my-4 px-4">
-      <button
-        onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
-        disabled={currentPage === 1}
-        className="btn btn-xs sm:btn-sm btn-outline"
-      >
-        Prev
-      </button>
-      <span className="text-xs sm:text-sm">Page {currentPage}</span>
-      <button
-        onClick={() => setCurrentPage((prev) => prev + 1)}
-        disabled={
-          !executionData?.data?.executions ||
-          executionData.data.executions.length < itemsPerPage
-        }
-        className="btn btn-xs sm:btn-sm btn-outline"
-      >
-        Next
-      </button>
-    </div>
-  );
+  const hasMorePages =
+    !!executionData?.data?.executions &&
+    executionData.data.executions.length >= itemsPerPage;
 
   return (
     <PageContainer>
@@ -234,7 +236,7 @@ export function ExecutionPageContent() {
             <DateSelector
               chipId={selectedChip || ""}
               selectedDate={selectedDate}
-              onDateSelect={setSelectedDate}
+              onDateSelect={handleDateChange}
               disabled={!selectedChip}
             />
           </PageFiltersBar.Item>
@@ -247,7 +249,11 @@ export function ExecutionPageContent() {
         onTagSelect={setSelectedTag}
       />
       {/* Pagination controls - Top */}
-      <PaginationControls />
+      <PaginationControls
+        currentPage={currentPage}
+        setCurrentPage={setCurrentPage}
+        hasMore={hasMorePages}
+      />
       <div className="grid grid-cols-1 gap-1.5 sm:gap-2">
         {cardData.map((execution) => {
           const executionKey = getExecutionKey(execution);
@@ -307,7 +313,11 @@ export function ExecutionPageContent() {
         })}
       </div>
       {/* Pagination controls - Bottom */}
-      <PaginationControls />
+      <PaginationControls
+        currentPage={currentPage}
+        setCurrentPage={setCurrentPage}
+        hasMore={hasMorePages}
+      />
       {/* Sidebar */}
       <div
         className={`fixed right-0 top-0 w-full sm:w-3/4 lg:w-2/5 h-full bg-base-100 shadow-xl border-l overflow-y-auto p-4 sm:p-6 transition-transform duration-300 z-50 ${
