@@ -40,20 +40,26 @@ ui/
 ├── src/
 │   ├── app/                    # Next.js App Router (pages and routes ONLY)
 │   │   ├── (auth)/             # Protected routes (require login)
-│   │   │   ├── admin/          # Admin page (thin wrapper → AdminPageContent)
+│   │   │   ├── admin/          # Admin page
 │   │   │   ├── analysis/       # Analysis page
+│   │   │   ├── chat/           # Copilot chat
 │   │   │   ├── chip/           # Chip management
 │   │   │   ├── execution/      # Execution monitoring
-│   │   │   ├── files/          # File management (thin wrapper → FilesPageContent)
-│   │   │   ├── flow/           # Flow editor
+│   │   │   ├── files/          # File management
+│   │   │   ├── inbox/          # Inbox (default landing page)
+│   │   │   ├── issues/         # Issue tracking
 │   │   │   ├── metrics/        # Metrics dashboard
-│   │   │   ├── setting/        # Settings page
-│   │   │   └── tasks/          # Task management (thin wrapper → TasksPageContent)
+│   │   │   ├── provenance/     # Data provenance
+│   │   │   ├── settings/       # Settings page
+│   │   │   ├── task-results/   # Task result viewer
+│   │   │   ├── tasks/          # Task management
+│   │   │   └── workflow/       # Workflow editor
 │   │   ├── (public)/           # Public routes (no auth required)
 │   │   │   └── login/          # Login page
+│   │   ├── api/                # API route handlers (SSE streaming)
 │   │   ├── globals.css         # Global styles
 │   │   ├── layout.tsx          # Root layout
-│   │   ├── page.tsx            # Root page (redirect)
+│   │   ├── page.tsx            # Root page (redirects to /inbox)
 │   │   └── providers.tsx       # Provider composition
 │   ├── client/                 # Auto-generated API client (DO NOT EDIT)
 │   ├── components/             # Reusable components
@@ -63,7 +69,7 @@ ui/
 │   │   │   ├── files/          # Files page content
 │   │   │   ├── tasks/          # Tasks page content
 │   │   │   └── ...             # Other feature directories
-│   │   ├── layout/             # Layout components (Navbar, Sidebar)
+│   │   ├── layout/             # Layout components (AppLayout, AnalysisSidebar)
 │   │   ├── selectors/          # Selection components (dropdowns, etc.)
 │   │   └── ui/                 # Generic UI components
 │   ├── contexts/               # ALL React Context/Provider files
@@ -74,7 +80,9 @@ ui/
 │   │   ├── SidebarContext.tsx   # Sidebar state context
 │   │   └── AnalysisChatContext.tsx
 │   ├── hooks/                  # Custom React hooks
+│   │   ├── __tests__/          # Hook unit tests
 │   │   ├── url-state/          # URL state hooks (split from useUrlState)
+│   │   │   ├── __tests__/      # URL state hook tests
 │   │   │   ├── types.ts        # Shared types (TimeRange, SelectionMode, etc.)
 │   │   │   ├── useChipUrlState.ts
 │   │   │   ├── useExecutionUrlState.ts
@@ -92,9 +100,10 @@ ui/
 │   ├── schemas/                # Auto-generated TypeScript types (DO NOT EDIT)
 │   └── types/                  # Manual type definitions
 ├── public/                     # Static assets
+├── vitest.config.mts           # Vitest test configuration
+├── vitest.setup.ts             # Test setup (jest-dom matchers)
 ├── eslint.config.mjs           # ESLint configuration
 ├── orval.config.cjs            # API client generation config
-├── tailwind.config.ts          # Tailwind CSS configuration
 └── tsconfig.json               # TypeScript configuration
 ```
 
@@ -554,7 +563,7 @@ Use DaisyUI component classes for consistent UI:
 
 ### Theme Support
 
-QDash supports 35+ DaisyUI themes. Users can switch themes in Settings (`/setting`).
+QDash supports 35+ DaisyUI themes. Users can switch themes in Settings (`/settings`).
 
 ```tsx
 // Use semantic color classes (auto-adjust to theme)
@@ -575,7 +584,7 @@ QDash supports 35+ DaisyUI themes. Users can switch themes in Settings (`/settin
 #### Adding New Themes
 
 1. Add the import to `globals.css`: `@import "daisyui/theme/themename.css";`
-2. Add the theme name to the `themes` array in `/ui/src/app/(auth)/setting/page.tsx`
+2. Add the theme name to the `themes` array in `/ui/src/app/(auth)/settings/page.tsx`
 
 ### Rich Interactive Design System
 
@@ -736,9 +745,10 @@ bunx tsc --noEmit
 
 Before committing, ensure:
 
-1. **Type check passes**: `bunx tsc --noEmit`
-2. **Lint passes**: `bun run lint`
-3. **Build succeeds**: `bun run build`
+1. **Tests pass**: `bun run test:run`
+2. **Type check passes**: `bunx tsc --noEmit`
+3. **Lint passes**: `bun run lint`
+4. **Build succeeds**: `bun run build`
 
 ---
 
@@ -777,14 +787,17 @@ bun run start
 
 ### Common Tasks
 
-| Command             | Description              |
-| ------------------- | ------------------------ |
-| `bun run dev`       | Start development server |
-| `bun run build`     | Build for production     |
-| `bun run lint`      | Run ESLint               |
-| `bun run fmt`       | Fix ESLint issues        |
-| `bunx tsc --noEmit` | Type check               |
-| `task generate`     | Regenerate API client    |
+| Command             | Description                          |
+| ------------------- | ------------------------------------ |
+| `bun run dev`       | Start development server             |
+| `bun run build`     | Build for production                 |
+| `bun run test`      | Run tests in watch mode              |
+| `bun run test:run`  | Run tests once (CI-friendly)         |
+| `task test-ui`      | Run UI tests from project root       |
+| `bun run lint`      | Run ESLint                           |
+| `bun run fmt`       | Fix ESLint issues                    |
+| `bunx tsc --noEmit` | Type check                           |
+| `task generate`     | Regenerate API client                |
 
 ## References
 
