@@ -47,7 +47,6 @@ MAX_IMAGE_SIZE = 5 * 1024 * 1024  # 5MB
 FILENAME_PATTERN = re.compile(r"^[0-9a-f\-]{36}\.(png|jpg|gif|webp)$")
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
 
 
 # =============================================================================

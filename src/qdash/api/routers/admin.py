@@ -1,9 +1,9 @@
 """Admin router for user and system management."""
 
+import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.logger import logger
 from qdash.api.lib.auth import get_admin_user
 from qdash.api.lib.config_loader import ConfigLoader
 from qdash.api.lib.copilot_config import clear_copilot_config_cache
@@ -27,6 +27,8 @@ from qdash.datamodel.user import SystemRole
 from qdash.dbmodel.project import ProjectDocument
 from qdash.dbmodel.project_membership import ProjectMembershipDocument
 from qdash.dbmodel.user import UserDocument
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(
     prefix="/admin",

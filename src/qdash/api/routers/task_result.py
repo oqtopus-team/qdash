@@ -41,7 +41,6 @@ if TYPE_CHECKING:
 router = APIRouter()
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
 
 
 # =============================================================================

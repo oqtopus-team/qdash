@@ -1,11 +1,11 @@
 """Authentication router for QDash API."""
 
+import logging
 import os
 import secrets
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Form, HTTPException, status
-from fastapi.logger import logger
 from qdash.api.lib.auth import (
     authenticate_user,
     get_current_active_user,
@@ -26,6 +26,8 @@ from qdash.datamodel.system_info import SystemInfoModel
 from qdash.datamodel.user import SystemRole
 from qdash.dbmodel.user import UserDocument
 from qdash.repository import MongoUserRepository
+
+logger = logging.getLogger(__name__)
 
 
 def _get_system_role_for_user(username: str) -> SystemRole:

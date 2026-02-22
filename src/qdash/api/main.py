@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.routing import APIRoute
 from qdash.api.db.session import lifespan
 from qdash.api.lib.auth import get_current_active_user
+from qdash.api.middleware.request_id import RequestIdMiddleware
 from qdash.api.routers import (
     admin,
     auth,
@@ -75,6 +76,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(RequestIdMiddleware)
 # Auth router without global auth dependency (login/register/logout need to be public)
 app.include_router(auth.router, tags=["auth"])
 

@@ -42,7 +42,6 @@ from qdash.api.services.chip_service import ChipService  # noqa: TCH002
 router = APIRouter()
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
 
 
 # =============================================================================

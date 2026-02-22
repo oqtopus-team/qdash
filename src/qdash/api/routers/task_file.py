@@ -9,7 +9,6 @@ from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.logger import logger
 from qdash.api.lib.auth import get_current_active_user  # noqa: TCH002
 from qdash.api.lib.backend_config import (
     get_task_category,
@@ -34,13 +33,9 @@ from qdash.common.paths import CALIBTASKS_DIR
 if TYPE_CHECKING:
     from pathlib import Path
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter()
-gunicorn_logger = logging.getLogger("gunicorn.error")
-logger.handlers = gunicorn_logger.handlers
-if __name__ != "main":
-    logger.setLevel(gunicorn_logger.level)
-else:
-    logger.setLevel(logging.DEBUG)
 
 # Use centralized path from common module
 CALIBTASKS_BASE_PATH = CALIBTASKS_DIR

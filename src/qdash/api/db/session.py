@@ -178,6 +178,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         FastAPI application instance
 
     """
+    from qdash.api.logging_config import setup_logging
+
+    setup_logging()
     init_db()
     create_initial_admin()
     yield
