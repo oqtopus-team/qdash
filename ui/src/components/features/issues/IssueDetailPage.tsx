@@ -10,12 +10,14 @@ import {
   Trash2,
   MessageSquare,
   Pencil,
+  Bot,
 } from "lucide-react";
 import { useGetTaskResult } from "@/client/task/task";
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { ParametersTable } from "@/components/features/metrics/ParametersTable";
 import { formatDateTime, formatRelativeTime } from "@/utils/datetime";
 import { useIssueReplies } from "@/hooks/useIssues";
+import { useIssueAiReply } from "@/hooks/useIssueAiReply";
 import type { IssueResponse } from "@/schemas";
 import { MarkdownContent } from "@/components/ui/MarkdownContent";
 import { MarkdownEditor } from "@/components/ui/MarkdownEditor";
@@ -91,7 +93,16 @@ export function IssueDetailPage({ issueId }: { issueId: string }) {
     addReply,
     deleteReply,
     editReply,
+    fetchReplies: invalidateReplies,
   } = useIssueReplies(issueId);
+
+  // AI reply
+  const {
+    isGenerating,
+    statusMessage: aiStatus,
+    error: aiError,
+    triggerAiReply,
+  } = useIssueAiReply();
 
   // Close/Reopen mutations
   const closeMutation = useCloseIssue();
@@ -130,6 +141,9 @@ export function IssueDetailPage({ issueId }: { issueId: string }) {
     if (!trimmed || !issue) return;
     await addReply(issue.task_id, trimmed);
     setReplyText("");
+    if (/@qdash\b/i.test(trimmed)) {
+      triggerAiReply(issueId, trimmed, invalidateReplies);
+    }
   };
 
   const handleDeleteReply = async (replyId: string) => {
@@ -424,81 +438,112 @@ export function IssueDetailPage({ issueId }: { issueId: string }) {
             <span className="loading loading-spinner loading-sm"></span>
           </div>
         ) : replies.length > 0 ? (
-          replies.map((reply: IssueResponse) => (
-            <div
-              key={reply.id}
-              className="bg-base-100 rounded-md border border-base-300 px-3 py-2 text-sm"
-            >
-              <div className="flex items-center justify-between mb-1">
-                <div className="flex items-center gap-2">
-                  <span className="badge badge-xs badge-neutral">
-                    {reply.username}
-                  </span>
-                  <span className="text-xs text-base-content/40">
-                    {formatRelativeTime(reply.created_at)}
-                  </span>
-                  {isEdited(reply.created_at, reply.updated_at) && (
-                    <span className="text-xs text-base-content/30 italic">
-                      (edited)
+          replies.map((reply: IssueResponse) => {
+            const isAi = reply.username === "qdash-ai";
+            return (
+              <div
+                key={reply.id}
+                className={`rounded-md px-3 py-2 text-sm ${
+                  isAi
+                    ? "bg-primary/5 border border-primary/30"
+                    : "bg-base-100 border border-base-300"
+                }`}
+              >
+                <div className="flex items-center justify-between mb-1">
+                  <div className="flex items-center gap-2">
+                    {isAi ? (
+                      <span className="badge badge-xs badge-primary gap-1">
+                        <Bot className="h-2.5 w-2.5" />
+                        {reply.username}
+                      </span>
+                    ) : (
+                      <span className="badge badge-xs badge-neutral">
+                        {reply.username}
+                      </span>
+                    )}
+                    <span className="text-xs text-base-content/40">
+                      {formatRelativeTime(reply.created_at)}
                     </span>
-                  )}
+                    {isEdited(reply.created_at, reply.updated_at) && (
+                      <span className="text-xs text-base-content/30 italic">
+                        (edited)
+                      </span>
+                    )}
+                  </div>
+                  {currentUser === reply.username &&
+                    editingReplyId !== reply.id && (
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => handleStartEditReply(reply)}
+                          className="btn btn-ghost btn-xs p-0 h-auto min-h-0 text-base-content/30 hover:text-primary"
+                          title="Edit reply"
+                        >
+                          <Pencil className="h-3 w-3" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteReply(reply.id)}
+                          className="btn btn-ghost btn-xs p-0 h-auto min-h-0 text-base-content/30 hover:text-error"
+                          title="Delete reply"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </button>
+                      </div>
+                    )}
                 </div>
-                {currentUser === reply.username &&
-                  editingReplyId !== reply.id && (
-                    <div className="flex items-center gap-1">
+                {editingReplyId === reply.id ? (
+                  <div className="space-y-2">
+                    <MarkdownEditor
+                      value={editReplyContent}
+                      onChange={setEditReplyContent}
+                      onSubmit={handleSaveEditReply}
+                      placeholder="Edit reply..."
+                      rows={3}
+                      onImageUpload={uploadImage}
+                    />
+                    <div className="flex justify-end gap-2">
                       <button
-                        onClick={() => handleStartEditReply(reply)}
-                        className="btn btn-ghost btn-xs p-0 h-auto min-h-0 text-base-content/30 hover:text-primary"
-                        title="Edit reply"
+                        className="btn btn-sm btn-ghost"
+                        onClick={() => setEditingReplyId(null)}
                       >
-                        <Pencil className="h-3 w-3" />
+                        Cancel
                       </button>
                       <button
-                        onClick={() => handleDeleteReply(reply.id)}
-                        className="btn btn-ghost btn-xs p-0 h-auto min-h-0 text-base-content/30 hover:text-error"
-                        title="Delete reply"
+                        className="btn btn-sm btn-primary"
+                        onClick={handleSaveEditReply}
+                        disabled={!editReplyContent.trim()}
                       >
-                        <Trash2 className="h-3 w-3" />
+                        Save
                       </button>
                     </div>
-                  )}
-              </div>
-              {editingReplyId === reply.id ? (
-                <div className="space-y-2">
-                  <MarkdownEditor
-                    value={editReplyContent}
-                    onChange={setEditReplyContent}
-                    onSubmit={handleSaveEditReply}
-                    placeholder="Edit reply..."
-                    rows={3}
-                    onImageUpload={uploadImage}
-                  />
-                  <div className="flex justify-end gap-2">
-                    <button
-                      className="btn btn-sm btn-ghost"
-                      onClick={() => setEditingReplyId(null)}
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      className="btn btn-sm btn-primary"
-                      onClick={handleSaveEditReply}
-                      disabled={!editReplyContent.trim()}
-                    >
-                      Save
-                    </button>
                   </div>
-                </div>
-              ) : (
-                <MarkdownContent
-                  content={reply.content}
-                  className="text-base-content/80"
-                />
-              )}
-            </div>
-          ))
+                ) : (
+                  <MarkdownContent
+                    content={reply.content}
+                    className="text-base-content/80"
+                  />
+                )}
+              </div>
+            );
+          })
         ) : (
           <p className="text-xs text-base-content/40 py-2">No replies yet</p>
+        )}
+        {/* AI thinking indicator */}
+        {isGenerating && (
+          <div className="rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-sm animate-pulse">
+            <div className="flex items-center gap-2">
+              <span className="badge badge-xs badge-primary gap-1">
+                <Bot className="h-2.5 w-2.5" />
+                qdash-ai
+              </span>
+              <span className="loading loading-dots loading-xs" />
+              <span className="text-xs text-base-content/60">{aiStatus}</span>
+            </div>
+          </div>
+        )}
+        {/* AI error */}
+        {aiError && (
+          <div className="text-xs text-error px-2 py-1">{aiError}</div>
         )}
       </div>
 
@@ -508,11 +553,12 @@ export function IssueDetailPage({ issueId }: { issueId: string }) {
           value={replyText}
           onChange={setReplyText}
           onSubmit={handleAddReply}
-          placeholder="Write a reply... (Ctrl+Enter to submit)"
+          placeholder="Write a reply... (@ to mention AI, Ctrl+Enter to submit)"
           rows={2}
           submitLabel="Reply"
-          isSubmitting={isSubmitting}
+          isSubmitting={isSubmitting || isGenerating}
           onImageUpload={uploadImage}
+          mentionCandidates={[{ id: "qdash", label: "AI Assistant" }]}
         />
       </div>
     </div>

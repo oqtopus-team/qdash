@@ -993,7 +993,30 @@ async def _run_responses_api(
                 await on_status("thinking")
             response = await _create(**kwargs)
 
-    return str(response.output_text)
+    output = response.output_text
+    logger.info(
+        "Responses API output_text length=%s, output items=%d, types=%s",
+        len(output) if output else "None",
+        len(response.output),
+        [getattr(item, "type", "?") for item in response.output],
+    )
+    if output is None:
+        # Model exhausted tool rounds without producing text, or returned empty.
+        # Collect any text items from the last response as fallback.
+        text_items = [
+            getattr(item, "text", None)
+            for item in response.output
+            if getattr(item, "type", None) == "message"
+        ]
+        if text_items:
+            output = " ".join(t for t in text_items if t)
+        else:
+            logger.warning(
+                "Responses API returned no output_text. output types: %s",
+                [getattr(item, "type", "?") for item in response.output],
+            )
+            output = ""
+    return str(output)
 
 
 async def _run_chat_completions(
@@ -1112,6 +1135,32 @@ async def run_analysis(
             on_status=on_status,
         )
         return _parse_blocks_response(content)
+
+
+def blocks_to_markdown(result: dict[str, Any]) -> str:
+    """Convert a blocks-format AI response to markdown for issue replies."""
+    blocks = result.get("blocks", [])
+    if not blocks:
+        logger.warning("blocks_to_markdown: no blocks in result keys=%s", list(result.keys()))
+
+    parts: list[str] = []
+    for block in blocks:
+        block_type = block.get("type")
+        content = block.get("content")
+        # Use `is not None` — empty string "" is falsy but still valid content
+        if block_type == "text" and content is not None and content != "":
+            parts.append(str(content))
+        elif block_type == "chart" and block.get("chart"):
+            chart = block["chart"]
+            title = chart.get("layout", {}).get("title", "Chart")
+            parts.append(
+                f"**{title}**\n```json\n{json.dumps(chart, indent=2, ensure_ascii=False)}\n```"
+            )
+
+    if not parts:
+        logger.warning("blocks_to_markdown: all blocks produced empty output, result=%s", result)
+
+    return "\n\n".join(parts)
 
 
 CHAT_SYSTEM_PROMPT = """\
