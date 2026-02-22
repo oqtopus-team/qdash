@@ -20,7 +20,8 @@ describe("useAnalysisUrlState", () => {
   it("reads initial values from URL params", () => {
     const { result } = renderHook(() => useAnalysisUrlState(), {
       wrapper: withNuqsTestingAdapter({
-        searchParams: "chip=CHIP01&parameter=t2_echo&tag=weekly&aview=correlation",
+        searchParams:
+          "chip=CHIP01&parameter=t2_echo&tag=weekly&aview=correlation",
       }),
     });
 
@@ -66,7 +67,9 @@ describe("useAnalysisUrlState", () => {
 
   it("setSelectedParameters with empty array clears to null", () => {
     const { result } = renderHook(() => useAnalysisUrlState(), {
-      wrapper: withNuqsTestingAdapter({ searchParams: "params=t1&params=t2_echo" }),
+      wrapper: withNuqsTestingAdapter({
+        searchParams: "params=t1&params=t2_echo",
+      }),
     });
 
     act(() => {

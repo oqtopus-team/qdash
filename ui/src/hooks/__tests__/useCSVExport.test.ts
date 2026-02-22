@@ -47,7 +47,10 @@ describe("useCSVExport", () => {
       const blob = createObjectURLMock.mock.calls[0][0] as Blob;
       expect(blob.type).toBe("text/csv;charset=utf-8;");
 
-      expect(mockLink.setAttribute).toHaveBeenCalledWith("download", "test.csv");
+      expect(mockLink.setAttribute).toHaveBeenCalledWith(
+        "download",
+        "test.csv",
+      );
       expect(mockLink.click).toHaveBeenCalledOnce();
     });
 
@@ -184,7 +187,16 @@ describe("useCSVExport", () => {
 
       act(() => {
         result.current.exportCorrelationCSV(
-          [{ time: "2024-06-15T00:00:00Z", x: 100, y: 200, xUnit: "us", yUnit: "us", qid: "Q0" }],
+          [
+            {
+              time: "2024-06-15T00:00:00Z",
+              x: 100,
+              y: 200,
+              xUnit: "us",
+              yUnit: "us",
+              qid: "Q0",
+            },
+          ],
           "t1",
           "t2_echo",
           "CHIP01",

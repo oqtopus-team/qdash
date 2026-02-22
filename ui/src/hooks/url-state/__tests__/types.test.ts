@@ -1,7 +1,12 @@
 import { describe, it, expect } from "vitest";
 
 import { URL_DEFAULTS } from "../types";
-import type { TimeRange, SelectionMode, MetricType, ProvenanceTab } from "../types";
+import type {
+  TimeRange,
+  SelectionMode,
+  MetricType,
+  ProvenanceTab,
+} from "../types";
 
 describe("URL_DEFAULTS", () => {
   it("has expected default values", () => {

@@ -21,7 +21,8 @@ describe("useChipUrlState", () => {
   it("reads initial values from URL params", () => {
     const { result } = renderHook(() => useChipUrlState(), {
       wrapper: withNuqsTestingAdapter({
-        searchParams: "chip=CHIP01&date=2024-01-01&task=CheckT1&view=2q&qview=table",
+        searchParams:
+          "chip=CHIP01&date=2024-01-01&task=CheckT1&view=2q&qview=table",
       }),
     });
 

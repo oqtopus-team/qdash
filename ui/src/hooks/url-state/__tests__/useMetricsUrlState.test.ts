@@ -21,7 +21,8 @@ describe("useMetricsUrlState", () => {
   it("reads initial values from URL params", () => {
     const { result } = renderHook(() => useMetricsUrlState(), {
       wrapper: withNuqsTestingAdapter({
-        searchParams: "chip=CHIP01&range=30d&mode=best&type=coupling&metric=t2_echo&days=14",
+        searchParams:
+          "chip=CHIP01&range=30d&mode=best&type=coupling&metric=t2_echo&days=14",
       }),
     });
 
