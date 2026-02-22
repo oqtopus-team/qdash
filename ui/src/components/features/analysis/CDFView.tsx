@@ -707,7 +707,7 @@ export function CDFView() {
           {/* Row 1: Main Controls */}
           <div className="flex flex-col gap-3 sm:gap-4">
             {/* Row 1a: Type + Chip + Parameters */}
-            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            <div className="flex flex-wrap items-start gap-2 sm:gap-3">
               <div className="tabs tabs-boxed bg-base-200 h-8 sm:h-9">
                 <button
                   className={`tab h-full ${currentMetricType === "qubit" ? "tab-active" : ""}`}
@@ -731,7 +731,7 @@ export function CDFView() {
               </div>
 
               {/* Parameter Selection - inline on mobile */}
-              <div className="w-48 sm:w-80">
+              <div className="w-48 sm:flex-1">
                 <Select<{ value: string; label: string }, true>
                   isMulti
                   options={availableParameters}

@@ -28,7 +28,7 @@ class CreateDRAGPIPulse(QubexTask):
         ),
     }
     run_parameters: ClassVar[dict[str, RunParameterModel]] = {
-        "duration": RunParameterModel(
+        "drag_pi_duration": RunParameterModel(
             unit="ns",
             value_type="int",
             value=DRAG_PI_DURATION,
@@ -75,7 +75,7 @@ class CreateDRAGPIPulse(QubexTask):
             n_rotations=4,
             n_turns=1,
             n_iterations=2,
-            duration=self.run_parameters["duration"].get_value(),
+            duration=self.run_parameters["drag_pi_duration"].get_value(),
             shots=self.run_parameters["shots"].get_value(),
             interval=self.run_parameters["interval"].get_value(),
         )

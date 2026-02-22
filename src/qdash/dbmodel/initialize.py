@@ -57,3 +57,16 @@ def initialize() -> None:
     )
 
     _initialized = True
+
+
+def force_reinitialize() -> None:
+    """Force re-initialization of MongoDB connection.
+
+    This is needed in forked subprocess scenarios (e.g., Dask workers with
+    processes=True) where the parent process's MongoDB client is not fork-safe.
+    The _initialized flag carries over from the parent but the connection is stale.
+    """
+    global _initialized, _client
+    _initialized = False
+    _client = None
+    initialize()

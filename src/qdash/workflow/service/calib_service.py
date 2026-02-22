@@ -148,6 +148,7 @@ class CalibService:
         muxes: list[int] | None = None,
         project_id: str | None = None,
         skip_execution: bool = False,
+        default_run_parameters: dict[str, Any] | None = None,
         *,
         user_repo: UserRepository | None = None,
         lock_repo: ExecutionLockRepository | None = None,
@@ -205,6 +206,7 @@ class CalibService:
         self.backend_name = backend_name or get_default_backend()
         self.use_lock = use_lock
         self.skip_execution = skip_execution
+        self.default_run_parameters = default_run_parameters or {}
         self._lock_acquired = False
 
         # Store injected repositories for later use
@@ -242,6 +244,13 @@ class CalibService:
                 )
         self.project_id = project_id
 
+        # Auto-load default_run_parameters from flow document if not explicitly provided
+        if not self.default_run_parameters and self.flow_name:
+            self._load_default_run_parameters()
+        print(
+            f"[TRACE] CalibService.__init__ flow_name={self.flow_name} default_run_parameters={self.default_run_parameters}"
+        )
+
         # Session state
         self._initialized = False
         self.execution_id: str | None = execution_id
@@ -254,6 +263,26 @@ class CalibService:
         # If qids provided, initialize immediately (low-level API mode)
         if qids is not None:
             self._initialize(qids, tags, note)
+
+    def _load_default_run_parameters(self) -> None:
+        """Load default_run_parameters from the flow document in MongoDB."""
+        try:
+            from qdash.repository.flow import MongoFlowRepository
+
+            flow_repo = MongoFlowRepository()
+            flow_name = self.flow_name or ""
+            flow = flow_repo.find_by_user_and_name(self.username, flow_name, self.project_id)
+            if flow and flow.default_run_parameters:
+                self.default_run_parameters = flow.default_run_parameters
+                logger.info(
+                    f"[TRACE] Loaded default_run_parameters from flow '{self.flow_name}': "
+                    f"{flow.default_run_parameters}"
+                )
+        except Exception:
+            logger.warning(
+                f"Failed to load default_run_parameters for flow '{self.flow_name}'",
+                exc_info=True,
+            )
 
     def _initialize(
         self,
@@ -317,6 +346,7 @@ class CalibService:
         # Wrap all initialization in try/except to ensure lock is released on failure
         try:
             # Create CalibConfig
+            logger.info(f"[TRACE] CalibConfig default_run_parameters={self.default_run_parameters}")
             config = CalibConfig(
                 username=self.username,
                 chip_id=self.chip_id,
@@ -330,6 +360,7 @@ class CalibService:
                 project_id=self.project_id,
                 enable_github_pull=self._enable_github_pull,
                 skip_execution=self.skip_execution,
+                default_run_parameters=self.default_run_parameters,
             )
 
             # Create and initialize CalibOrchestrator

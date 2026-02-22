@@ -1,12 +1,6 @@
 "use client";
 
-import React, {
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-  useCallback,
-} from "react";
+import React, { useMemo, useRef, useState, useCallback } from "react";
 import Link from "next/link";
 import {
   TransformWrapper,
@@ -33,6 +27,28 @@ import {
 import { calculateGridDimension } from "@/utils/gridLayout";
 
 import { CouplingMetricHistoryModal } from "./CouplingMetricHistoryModal";
+import { useAnalysisChatContext } from "@/contexts/AnalysisChatContext";
+
+// Dynamic font size calculation based on cell size
+function getCouplingFontSizes(cellSize: number): {
+  qubitLabelSize: string;
+  valueSize: string;
+} {
+  // Scale font sizes proportionally to cell size
+  // Base reference: 60px cell = 14px label, 12px value
+  if (cellSize >= 60) {
+    return { qubitLabelSize: "0.875rem", valueSize: "0.75rem" };
+  } else if (cellSize >= 50) {
+    return { qubitLabelSize: "0.75rem", valueSize: "0.65rem" };
+  } else if (cellSize >= 40) {
+    return { qubitLabelSize: "0.625rem", valueSize: "0.55rem" };
+  } else if (cellSize >= 30) {
+    return { qubitLabelSize: "0.5rem", valueSize: "0.5rem" };
+  } else {
+    // Very small cells (< 30px)
+    return { qubitLabelSize: "0.45rem", valueSize: "0.4rem" };
+  }
+}
 
 interface MetricValue {
   value: number | null;
@@ -186,20 +202,8 @@ export function CouplingMetricsGrid({
   // Modal state
   const [selectedCouplingInfo, setSelectedCouplingInfo] =
     useState<SelectedCouplingInfo | null>(null);
-  const modalRef = useRef<HTMLDialogElement>(null);
-
-  // Control modal with native dialog API (useLayoutEffect for instant response)
   const isModalOpen = selectedCouplingInfo !== null;
-  useLayoutEffect(() => {
-    const modal = modalRef.current;
-    if (!modal) return;
-
-    if (isModalOpen && !modal.open) {
-      modal.showModal();
-    } else if (!isModalOpen && modal.open) {
-      modal.close();
-    }
-  }, [isModalOpen]);
+  const { isOpen: isSidebarOpen } = useAnalysisChatContext();
 
   // Use grid layout hook for responsive sizing
   const displayCols = zoomMode === "region" ? regionSize : gridCols;
@@ -406,15 +410,17 @@ export function CouplingMetricsGrid({
                   : "ring-2 ring-inset ring-secondary/20"
                 : "";
 
+            const fontSizes = getCouplingFontSizes(displayCellSize);
             return (
               <div
                 key={qid}
-                className={`absolute bg-base-300/30 rounded-lg flex items-center justify-center text-sm text-base-content/30 ${muxBgClass}`}
+                className={`absolute bg-base-300/30 rounded-lg flex items-center justify-center text-base-content/30 ${muxBgClass}`}
                 style={{
                   top: y,
                   left: x,
                   width: displayCellSize,
                   height: displayCellSize,
+                  fontSize: fontSizes.qubitLabelSize,
                 }}
               >
                 {qid}
@@ -524,6 +530,7 @@ export function CouplingMetricsGrid({
             // Angle in degrees: 0=right, 90=down, 180=left, 270=up
             const arrowAngle = (Math.atan2(dy, dx) * 180) / Math.PI;
 
+            const valueFontSizes = getCouplingFontSizes(displayCellSize);
             return (
               <button
                 key={couplingId}
@@ -544,14 +551,20 @@ export function CouplingMetricsGrid({
               >
                 {/* Value Display - LOD controlled */}
                 {value !== null && value !== undefined && showValues && (
-                  <div className="text-[0.6rem] sm:text-xs md:text-sm font-bold text-white drop-shadow-md leading-tight">
+                  <div
+                    className="font-bold text-white drop-shadow-md leading-tight"
+                    style={{ fontSize: valueFontSizes.valueSize }}
+                  >
                     {value.toFixed(showUnits ? 2 : 1)}
                   </div>
                 )}
 
                 {/* No data indicator - LOD controlled */}
                 {(value === null || value === undefined) && showValues && (
-                  <div className="text-xs text-base-content/40 font-medium">
+                  <div
+                    className="text-base-content/40 font-medium"
+                    style={{ fontSize: valueFontSizes.valueSize }}
+                  >
                     —
                   </div>
                 )}
@@ -732,7 +745,7 @@ export function CouplingMetricsGrid({
             maxScale={4}
             wheel={{ step: 0.08, smoothStep: 0.004 }}
             pinch={{ step: 5 }}
-            doubleClick={{ mode: "reset" }}
+            doubleClick={{ mode: "zoomIn", step: 0.7 }}
             panning={{ velocityDisabled: false }}
             smooth={true}
             onTransformed={handleTransform}
@@ -755,12 +768,26 @@ export function CouplingMetricsGrid({
       </div>
 
       {/* Coupling Detail Modal with History */}
-      <dialog
-        ref={modalRef}
-        className="modal modal-bottom sm:modal-middle"
-        onClose={() => setSelectedCouplingInfo(null)}
+      <div
+        className={`modal modal-bottom sm:modal-middle ${isModalOpen ? "modal-open" : ""}`}
+        style={{
+          width: isSidebarOpen ? "calc(100% - 20rem)" : "100%",
+          maxWidth: "none",
+          transition: "width 300ms ease",
+        }}
+        onClick={(e) => {
+          if (e.target === e.currentTarget) setSelectedCouplingInfo(null);
+        }}
       >
-        <div className="modal-box w-full sm:w-[95vw] max-w-[1800px] bg-base-100 p-0 h-[90vh] sm:h-[95vh] overflow-hidden flex flex-col">
+        <div
+          className="modal-box w-full bg-base-100 p-0 h-[90vh] sm:h-[95vh] overflow-hidden flex flex-col"
+          style={{
+            maxWidth: isSidebarOpen
+              ? "min(calc(100vw - 22rem), 1400px)"
+              : "1800px",
+            transition: "max-width 300ms ease",
+          }}
+        >
           {selectedCouplingInfo && (
             <>
               {/* Modal Header */}
@@ -814,10 +841,7 @@ export function CouplingMetricsGrid({
             </>
           )}
         </div>
-        <form method="dialog" className="modal-backdrop">
-          <button>close</button>
-        </form>
-      </dialog>
+      </div>
     </div>
   );
 }

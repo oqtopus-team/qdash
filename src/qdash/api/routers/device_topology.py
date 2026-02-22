@@ -1,7 +1,6 @@
 """Device topology router for QDash API."""
 
 import io
-import re
 from datetime import timedelta
 from typing import Annotated, Any
 
@@ -12,7 +11,6 @@ from fastapi import APIRouter, Depends
 from fastapi.logger import logger
 from fastapi.responses import Response
 from qdash.api.lib.project import ProjectContext, get_project_context
-from qdash.api.lib.topology_config import load_topology
 from qdash.api.schemas.device_topology import (
     Coupling,
     CouplingGateDuration,
@@ -25,6 +23,8 @@ from qdash.api.schemas.device_topology import (
     QubitLifetime,
 )
 from qdash.common.datetime_utils import now, to_datetime
+from qdash.common.qubit_utils import qid_to_label
+from qdash.common.topology_config import load_topology
 from qdash.repository import MongoCalibrationNoteRepository, MongoChipRepository
 
 router = APIRouter()
@@ -45,14 +45,6 @@ def search_coupling_data_by_control_qid(
         if left_side == search_term:
             filtered[key] = value
     return filtered
-
-
-def qid_to_label(qid: str) -> str:
-    """Convert a numeric qid string to a label with at least two digits. e.g. '0' -> 'Q00'."""
-    if re.fullmatch(r"\d+", qid):
-        return "Q" + qid.zfill(2)
-    error_message = "Invalid qid format."
-    raise ValueError(error_message)
 
 
 def is_within_24h(calibrated_at: str | None) -> bool:
@@ -233,8 +225,12 @@ def get_device_topology(
         t2 = get_value_within_24h_fallback(
             t2_data, request.condition.qubit_fidelity.is_within_24h, fallback=100.0
         )
-        drag_hpi_duration = drag_hpi_params.get(qid_to_label(qid), {"duration": 20})["duration"]
-        drag_pi_duration = drag_pi_params.get(qid_to_label(qid), {"duration": 20})["duration"]
+        drag_hpi_duration = drag_hpi_params.get(
+            qid_to_label(qid, topology.num_qubits), {"duration": 20}
+        )["duration"]
+        drag_pi_duration = drag_pi_params.get(
+            qid_to_label(qid, topology.num_qubits), {"duration": 20}
+        )["duration"]
         # readout_fidelity_0 = (
         #     readout_0_data["value"] if is_within_24h(readout_0_data.get("calibrated_at")) else 0.25
         # )
@@ -292,7 +288,9 @@ def get_device_topology(
 
     # Process couplings
     for qid in request.qubits:
-        search_result = search_coupling_data_by_control_qid(cr_params, qid_to_label(qid))
+        search_result = search_coupling_data_by_control_qid(
+            cr_params, qid_to_label(qid, topology.num_qubits)
+        )
         for cr_key, cr_value in search_result.items():
             target = cr_value["target"]
             control, target = split_q_string(cr_key)

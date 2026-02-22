@@ -1,0 +1,159 @@
+"use client";
+
+import React from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import dynamic from "next/dynamic";
+import { CodeBlock } from "@/components/features/chat/CodeBlock";
+
+const ChatPlotlyChart = dynamic(
+  () =>
+    import("@/components/features/chat/ChatPlotlyChart").then(
+      (m) => m.ChatPlotlyChart,
+    ),
+  { ssr: false },
+);
+
+const MENTION_RE = /@(qdash)\b/gi;
+
+/**
+ * Splits text into segments, wrapping @qdash mentions with a highlight span.
+ */
+function highlightMentions(text: string): React.ReactNode {
+  const parts: React.ReactNode[] = [];
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+  const re = new RegExp(MENTION_RE.source, MENTION_RE.flags);
+
+  while ((match = re.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push(text.slice(lastIndex, match.index));
+    }
+    parts.push(
+      <span
+        key={match.index}
+        className="inline-flex items-center bg-primary/15 text-primary font-semibold rounded px-1 py-0.5 text-[0.85em]"
+      >
+        @{match[1]}
+      </span>,
+    );
+    lastIndex = re.lastIndex;
+  }
+
+  if (lastIndex === 0) return text;
+  if (lastIndex < text.length) {
+    parts.push(text.slice(lastIndex));
+  }
+  return <>{parts}</>;
+}
+
+/**
+ * Attempt to parse a JSON code block as a Plotly chart spec.
+ * Returns the parsed data/layout or null.
+ */
+function tryParsePlotlyJson(
+  code: string,
+): { data: Record<string, unknown>[]; layout: Record<string, unknown> } | null {
+  try {
+    const obj = JSON.parse(code);
+    if (
+      obj &&
+      typeof obj === "object" &&
+      Array.isArray(obj.data) &&
+      obj.layout &&
+      typeof obj.layout === "object"
+    ) {
+      return {
+        data: obj.data as Record<string, unknown>[],
+        layout: obj.layout as Record<string, unknown>,
+      };
+    }
+  } catch {
+    // not valid JSON
+  }
+  return null;
+}
+
+const markdownComponents: Record<string, React.ComponentType<any>> = {
+  code({
+    className,
+    children,
+    ...props
+  }: React.ComponentPropsWithoutRef<"code"> & { className?: string }) {
+    const match = /language-(\w+)/.exec(className || "");
+    const codeString = String(children).replace(/\n$/, "");
+
+    // Render Plotly charts from JSON code blocks
+    if (match && match[1] === "json") {
+      const plotly = tryParsePlotlyJson(codeString);
+      if (plotly) {
+        return <ChatPlotlyChart data={plotly.data} layout={plotly.layout} />;
+      }
+    }
+
+    if (match) {
+      return <CodeBlock language={match[1]}>{codeString}</CodeBlock>;
+    }
+    return (
+      <code className="bg-base-200 px-1 py-0.5 rounded text-sm" {...props}>
+        {children}
+      </code>
+    );
+  },
+  img({ src, alt, ...props }: React.ComponentPropsWithoutRef<"img">) {
+    return (
+      <img
+        src={src}
+        alt={alt ?? ""}
+        className="max-w-full h-auto rounded border border-base-300 my-2"
+        loading="lazy"
+        {...props}
+      />
+    );
+  },
+  // Intercept paragraph nodes to highlight @mentions in text
+  p({ children, ...props }: React.ComponentPropsWithoutRef<"p">) {
+    return (
+      <p {...props}>
+        {React.Children.map(children, (child) => {
+          if (typeof child === "string" && MENTION_RE.test(child)) {
+            return highlightMentions(child);
+          }
+          return child;
+        })}
+      </p>
+    );
+  },
+  // Also handle mentions in list items
+  li({ children, ...props }: React.ComponentPropsWithoutRef<"li">) {
+    return (
+      <li {...props}>
+        {React.Children.map(children, (child) => {
+          if (typeof child === "string" && MENTION_RE.test(child)) {
+            return highlightMentions(child);
+          }
+          return child;
+        })}
+      </li>
+    );
+  },
+};
+
+export function MarkdownContent({
+  content,
+  className,
+}: {
+  content: string;
+  className?: string;
+}) {
+  return (
+    <div className={`prose prose-sm max-w-none ${className ?? ""}`}>
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={markdownComponents}
+      >
+        {content}
+      </ReactMarkdown>
+    </div>
+  );
+}

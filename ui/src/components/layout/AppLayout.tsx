@@ -4,9 +4,10 @@ import { usePathname } from "next/navigation";
 
 import Navbar from "./Navbar";
 import Sidebar from "./Sidebar";
+import { AnalysisSidebar } from "./AnalysisSidebar";
 
 import { SidebarProvider } from "@/contexts/SidebarContext";
-import { ChatAssistant } from "@/components/features/chat";
+import { AnalysisChatProvider } from "@/contexts/AnalysisChatContext";
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -14,9 +15,6 @@ interface AppLayoutProps {
 
 // Pages that should not show sidebar and navbar
 const PUBLIC_PATHS = ["/login"];
-
-// Feature flag for chat/AI assistant
-const CHAT_ENABLED = process.env.NEXT_PUBLIC_COPILOT_ENABLED === "true";
 
 export default function AppLayout({ children }: AppLayoutProps) {
   const pathname = usePathname();
@@ -30,19 +28,20 @@ export default function AppLayout({ children }: AppLayoutProps) {
   // Authenticated pages - render with sidebar and navbar
   return (
     <SidebarProvider>
-      <div className="flex w-full h-screen overflow-hidden">
-        <Sidebar />
-        <div className="flex-1 flex flex-col h-screen w-0">
-          <Navbar />
-          <main className="flex-1 overflow-y-auto bg-base-100">
-            <div key={pathname} className="page-transition">
-              {children}
-            </div>
-          </main>
+      <AnalysisChatProvider>
+        <div className="flex w-full h-screen overflow-hidden">
+          <Sidebar />
+          <div className="flex-1 flex flex-col h-screen w-0">
+            <Navbar />
+            <main className="flex-1 overflow-y-auto bg-base-100">
+              <div key={pathname} className="page-transition">
+                {children}
+              </div>
+            </main>
+          </div>
+          <AnalysisSidebar />
         </div>
-      </div>
-      {/* Global AI Chat Assistant */}
-      {CHAT_ENABLED && <ChatAssistant />}
+      </AnalysisChatProvider>
     </SidebarProvider>
   );
 }

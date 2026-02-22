@@ -20,6 +20,33 @@ export const MIN_CELL_SIZE = {
   desktop: 40,
 } as const;
 
+/**
+ * Get adaptive minimum cell size based on grid dimensions.
+ * Larger grids (e.g., 144Q = 12x12) get smaller minimum cell sizes
+ * to ensure the grid fits on screen while remaining readable.
+ */
+export function getAdaptiveMinCellSize(
+  gridSize: number,
+  isMobile: boolean,
+  viewportHeight?: number,
+): number {
+  const baseMin = getMinCellSize(isMobile, viewportHeight);
+
+  // For grids larger than 8x8, progressively reduce minimum cell size
+  if (gridSize <= 8) {
+    return baseMin;
+  } else if (gridSize <= 10) {
+    // 64-100Q: reduce by 20%
+    return Math.max(24, Math.floor(baseMin * 0.8));
+  } else if (gridSize <= 12) {
+    // 100-144Q: reduce by 35%
+    return Math.max(20, Math.floor(baseMin * 0.65));
+  } else {
+    // >144Q: reduce by 50%
+    return Math.max(16, Math.floor(baseMin * 0.5));
+  }
+}
+
 /** Mobile breakpoint in pixels */
 export const MOBILE_BREAKPOINT = 768;
 

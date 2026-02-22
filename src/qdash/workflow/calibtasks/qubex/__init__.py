@@ -1,5 +1,11 @@
 from qdash.workflow.calibtasks.active_protocols import generate_task_instances
 from qdash.workflow.calibtasks.qubex.base import QubexTask
+from qdash.workflow.calibtasks.qubex.benchmark.check_1q_gate_coherence_limit import (
+    Check1QGateCoherenceLimit,
+)
+from qdash.workflow.calibtasks.qubex.benchmark.check_2q_gate_coherence_limit import (
+    Check2QGateCoherenceLimit,
+)
 from qdash.workflow.calibtasks.qubex.benchmark.randomized_benchmarking import RandomizedBenchmarking
 from qdash.workflow.calibtasks.qubex.benchmark.x90_interleaved_randomized_benchmarking import (
     X90InterleavedRandomizedBenchmarking,
@@ -45,11 +51,14 @@ from qdash.workflow.calibtasks.qubex.one_qubit_coarse.check_readout_frequency im
     CheckReadoutFrequency,
 )
 from qdash.workflow.calibtasks.qubex.one_qubit_coarse.check_t1 import CheckT1
+from qdash.workflow.calibtasks.qubex.one_qubit_coarse.check_t1_average import CheckT1Average
 from qdash.workflow.calibtasks.qubex.one_qubit_coarse.check_t2_echo import CheckT2Echo
+from qdash.workflow.calibtasks.qubex.one_qubit_coarse.check_t2_echo_average import (
+    CheckT2EchoAverage,
+)
 from qdash.workflow.calibtasks.qubex.one_qubit_coarse.chevron_pattern import ChevronPattern
 from qdash.workflow.calibtasks.qubex.one_qubit_coarse.create_hpi_pulse import CreateHPIPulse
 from qdash.workflow.calibtasks.qubex.one_qubit_coarse.create_pi_pulse import CreatePIPulse
-from qdash.workflow.calibtasks.qubex.one_qubit_coarse.rabi_oscillation import RabiOscillation
 from qdash.workflow.calibtasks.qubex.one_qubit_fine.check_drag_hpi_pulse import CheckDRAGHPIPulse
 from qdash.workflow.calibtasks.qubex.one_qubit_fine.check_drag_pi_pulse import CheckDRAGPIPulse
 from qdash.workflow.calibtasks.qubex.one_qubit_fine.create_drag_hpi_pulse import CreateDRAGHPIPulse
@@ -78,11 +87,12 @@ __all__ = [
     "CheckRabi",
     "CheckReadoutFrequency",
     "CheckT1",
+    "CheckT1Average",
     "CheckT2Echo",
+    "CheckT2EchoAverage",
     "ChevronPattern",
     "CreateHPIPulse",
     "CreatePIPulse",
-    "RabiOscillation",
     "CheckDRAGHPIPulse",
     "CheckDRAGPIPulse",
     "CreateDRAGHPIPulse",
@@ -91,6 +101,8 @@ __all__ = [
     "CheckZX90",
     "CreateZX90",
     "CheckBellState",
+    "Check1QGateCoherenceLimit",
+    "Check2QGateCoherenceLimit",
     "RandomizedBenchmarking",
     "X90InterleavedRandomizedBenchmarking",
     "X180InterleavedRandomizedBenchmarking",

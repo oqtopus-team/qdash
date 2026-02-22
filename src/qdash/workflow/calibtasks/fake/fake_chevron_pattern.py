@@ -150,9 +150,10 @@ class FakeChevronPattern(FakeTask):
                 },
             )
         )
+        control_amplitude_value = self.run_parameters["control_amplitude"].get_value()
         fig.update_layout(
             title={
-                "text": f"Chevron pattern : Q{qid}<br><sub>control_amplitude=</sub>",
+                "text": f"Chevron pattern : Q{qid}<br><sub>control_amplitude={control_amplitude_value}</sub>",
                 "x": 0.5,
                 "xanchor": "center",
             },

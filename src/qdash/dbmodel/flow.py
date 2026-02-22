@@ -35,6 +35,10 @@ class FlowDocument(Document):
     default_parameters: dict[str, Any] = Field(
         default_factory=dict, description="Default parameters for execution"
     )
+    default_run_parameters: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Default run parameters applied to all tasks (e.g., interval, shots)",
+    )
     file_path: str = Field(..., description="Relative path to .py file")
     deployment_id: str | None = Field(default=None, description="Prefect deployment ID")
     created_at: datetime = Field(

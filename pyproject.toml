@@ -98,7 +98,7 @@ lint.ignore = [
 [tool.mypy]
 strict = true
 ignore_missing_imports = true
-exclude = ["tools", "scripts"]
+exclude = ["tools", "scripts", "user_flows"]
 # Disable error codes for known issues:
 # - misc: FastAPI untyped decorator warnings
 # - override: Liskov substitution violations in calibtasks (design issue)
@@ -198,6 +198,7 @@ dev = [
     "pytest-mock==3.14.1",
     "mongomock==4.1.2",
     "go-task-bin>=3.41.0",
+    "pyyaml==6.0.1",
     "types-pyyaml>=6.0.12.20250809",
     "types-python-dateutil>=2.9.0.20250809",
     "types-croniter>=6.0.0.20250809",

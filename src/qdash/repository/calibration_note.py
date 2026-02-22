@@ -5,8 +5,11 @@ persistence operations. Used by both API and workflow components.
 """
 
 import logging
+import time
+from typing import Any
 
 from bunnet import SortDirection
+from pymongo.errors import DuplicateKeyError
 from qdash.common.datetime_utils import now
 from qdash.datamodel.calibration_note import CalibrationNoteModel
 from qdash.dbmodel.calibration_note import CalibrationNoteDocument
@@ -145,16 +148,20 @@ class MongoCalibrationNoteRepository:
         """
         return self.find_latest_master(project_id=project_id)
 
-    def upsert(self, note: CalibrationNoteModel) -> CalibrationNoteModel:
-        """Create or update a calibration note atomically.
+    def upsert(self, note: CalibrationNoteModel, max_retries: int = 3) -> CalibrationNoteModel:
+        """Create or update a calibration note atomically with retry logic.
 
         Uses MongoDB's find_one_and_update with upsert=True to ensure
         thread-safe operations during parallel calibration task execution.
+        Implements retry logic to handle race conditions when multiple
+        processes attempt to insert the same document simultaneously.
 
         Parameters
         ----------
         note : CalibrationNoteModel
             The note to create or update
+        max_retries : int
+            Maximum number of retry attempts for DuplicateKeyError (default: 3)
 
         Returns
         -------
@@ -182,6 +189,7 @@ class MongoCalibrationNoteRepository:
                 "note": note.note,
                 "timestamp": timestamp,
             },
+            "$inc": {"version": 1},
             "$setOnInsert": {
                 "project_id": note.project_id,
                 "execution_id": note.execution_id,
@@ -192,16 +200,100 @@ class MongoCalibrationNoteRepository:
         }
 
         collection = CalibrationNoteDocument.get_motor_collection()
-        result = collection.find_one_and_update(
-            query,
-            update,
-            upsert=True,
-            return_document=ReturnDocument.AFTER,
-        )
 
-        # Convert raw document to CalibrationNoteDocument then to model
-        doc = CalibrationNoteDocument.model_validate(result)
-        return self._to_model(doc)
+        last_error: DuplicateKeyError | None = None
+        for attempt in range(max_retries):
+            try:
+                result = collection.find_one_and_update(
+                    query,
+                    update,
+                    upsert=True,
+                    return_document=ReturnDocument.AFTER,
+                )
+                # Convert raw document to CalibrationNoteDocument then to model
+                doc = CalibrationNoteDocument.model_validate(result)
+                return self._to_model(doc)
+            except DuplicateKeyError as e:  # noqa: PERF203
+                last_error = e
+                logger.warning(
+                    "DuplicateKeyError on upsert attempt %d/%d for %s, retrying...",
+                    attempt + 1,
+                    max_retries,
+                    query,
+                )
+                # Brief sleep with exponential backoff before retry
+                time.sleep(0.1 * (2**attempt))
+
+        # All retries exhausted, raise the last error
+        logger.error(
+            "Failed to upsert calibration note after %d attempts: %s",
+            max_retries,
+            query,
+        )
+        raise last_error  # type: ignore[misc]
+
+    def merge_note_fields(
+        self,
+        query_filter: dict[str, str],
+        calib_note: dict[str, Any],
+        max_retries: int = 3,
+    ) -> None:
+        """Atomically merge per-qubit fields into the master note.
+
+        Uses $set with dot-notation (e.g., "note.rabi_params.Q024": {...})
+        so each worker only touches its own qubit paths — no read-modify-write needed.
+
+        Parameters
+        ----------
+        query_filter : dict[str, str]
+            MongoDB query filter to identify the document (task_id, chip_id, project_id, etc.)
+        calib_note : dict[str, Any]
+            The calibration note data from the worker, structured as {param_type: {qubit: data}}
+        max_retries : int
+            Maximum number of retry attempts for DuplicateKeyError (default: 3)
+
+        """
+        update_ops: dict[str, Any] = {}
+        for param_type, qubits in calib_note.items():
+            if isinstance(qubits, dict):
+                for qubit, data in qubits.items():
+                    update_ops[f"note.{param_type}.{qubit}"] = data
+
+        if not update_ops:
+            return
+
+        update_ops["timestamp"] = now()
+
+        collection = CalibrationNoteDocument.get_motor_collection()
+
+        last_error: DuplicateKeyError | None = None
+        for attempt in range(max_retries):
+            try:
+                collection.find_one_and_update(
+                    query_filter,
+                    {
+                        "$set": update_ops,
+                        "$inc": {"version": 1},
+                    },
+                    upsert=True,
+                )
+                return
+            except DuplicateKeyError as e:  # noqa: PERF203
+                last_error = e
+                logger.warning(
+                    "DuplicateKeyError on merge_note_fields attempt %d/%d for %s, retrying...",
+                    attempt + 1,
+                    max_retries,
+                    query_filter,
+                )
+                time.sleep(0.1 * (2**attempt))
+
+        logger.error(
+            "Failed to merge_note_fields after %d attempts: %s",
+            max_retries,
+            query_filter,
+        )
+        raise last_error  # type: ignore[misc]
 
     def _to_model(self, doc: CalibrationNoteDocument) -> CalibrationNoteModel:
         """Convert a document to a domain model.
@@ -224,6 +316,7 @@ class MongoCalibrationNoteRepository:
             execution_id=doc.execution_id,
             task_id=doc.task_id,
             note=doc.note,
+            version=doc.version,
             timestamp=doc.timestamp,
             system_info=doc.system_info,
         )

@@ -110,3 +110,34 @@ class TestTaskResultDatetimeFields:
         assert result.name == ""
         assert result.status == "pending"
         assert result.default_view is True
+
+
+class TestTaskResultRunParameters:
+    """Test TaskResult run_parameters field."""
+
+    def test_run_parameters_default_none(self) -> None:
+        """Test run_parameters defaults to None."""
+        result = TaskResult()
+        assert result.run_parameters is None
+
+    def test_run_parameters_accepts_dict(self) -> None:
+        """Test run_parameters accepts a dict."""
+        run_params = {
+            "shots": {"value": 1024, "value_type": "int", "unit": "", "description": ""},
+            "interval": {"value": 150, "value_type": "int", "unit": "us", "description": ""},
+        }
+        result = TaskResult(run_parameters=run_params)
+        assert result.run_parameters == run_params
+
+    def test_run_parameters_serialization(self) -> None:
+        """Test run_parameters is included in model_dump."""
+        run_params = {"shots": {"value": 1024}}
+        result = TaskResult(run_parameters=run_params)
+        data = result.model_dump()
+        assert data["run_parameters"] == run_params
+
+    def test_run_parameters_excluded_when_none(self) -> None:
+        """Test run_parameters is excluded from serialization when None."""
+        result = TaskResult()
+        data = result.model_dump(exclude_none=True)
+        assert "run_parameters" not in data

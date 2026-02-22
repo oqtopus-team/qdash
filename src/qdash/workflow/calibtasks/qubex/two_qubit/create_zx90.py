@@ -7,6 +7,8 @@ from qdash.workflow.calibtasks.base import (
 )
 from qdash.workflow.calibtasks.qubex.base import QubexTask
 from qdash.workflow.engine.backend.qubex import QubexBackend
+from qubex.experiment.experiment_constants import CALIBRATION_SHOTS
+from qubex.measurement.measurement import DEFAULT_INTERVAL
 
 
 class CreateZX90(QubexTask):
@@ -15,7 +17,20 @@ class CreateZX90(QubexTask):
     name: str = "CreateZX90"
     task_type: str = "coupling"
     timeout: int = 60 * 25  # 25 minutes
-    run_parameters: ClassVar[dict[str, RunParameterModel]] = {}
+    run_parameters: ClassVar[dict[str, RunParameterModel]] = {
+        "shots": RunParameterModel(
+            unit="a.u.",
+            value_type="int",
+            value=CALIBRATION_SHOTS,
+            description="Number of shots",
+        ),
+        "interval": RunParameterModel(
+            unit="ns",
+            value_type="int",
+            value=DEFAULT_INTERVAL,
+            description="Time interval",
+        ),
+    }
 
     # Input parameters from control and target qubits
     input_parameters: ClassVar[dict[str, ParameterModel | None]] = {
@@ -97,6 +112,9 @@ class CreateZX90(QubexTask):
         "zx_rotation_rate": ParameterModel(
             qid_role="coupling", unit="a.u.", description="ZX rotation rate."
         ),
+        "zx90_gate_time": ParameterModel(
+            qid_role="coupling", unit="ns", description="Duration of the ZX90 pulse."
+        ),
     }
 
     def postprocess(
@@ -110,6 +128,7 @@ class CreateZX90(QubexTask):
         self.output_parameters["cancel_beta"].value = result["cancel_beta"]
         self.output_parameters["rotary_amplitude"].value = result["rotary_amplitude"]
         self.output_parameters["zx_rotation_rate"].value = result["zx_rotation_rate"]
+        self.output_parameters["zx90_gate_time"].value = result["zx90_gate_time"]
         output_parameters = self.attach_execution_id(execution_id)
         figures: list[Any] = [result["n1"], result["n3"], result["fig"]]
         raw_data: list[Any] = []
@@ -128,6 +147,8 @@ class CreateZX90(QubexTask):
         raw_result = exp.calibrate_zx90(
             control,
             target,
+            shots=self.run_parameters["shots"].get_value(),
+            interval=self.run_parameters["interval"].get_value(),
         )
         fit_result = exp.calib_note.get_cr_param(label)
         if fit_result is None:
@@ -145,6 +166,9 @@ class CreateZX90(QubexTask):
             "n3": raw_result["n3"]["fig"],
             "fig": raw_result["fig"],
         }
+
+        zx90 = exp.zx90(control_qubit=control, target_qubit=target)
+        result["zx90_gate_time"] = zx90.duration
 
         self.save_calibration(backend)
         return RunResult(raw_result=result)

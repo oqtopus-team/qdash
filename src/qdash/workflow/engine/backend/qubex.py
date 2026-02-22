@@ -1,12 +1,14 @@
 import json
+import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from qdash.datamodel.calibration_note import CalibrationNoteModel
 from qdash.datamodel.task import TaskTypes
-from qdash.workflow._internal.merge_notes import merge_notes_by_timestamp
 from qdash.workflow.engine.backend.base import BaseBackend
 from qdash.workflow.engine.backend.qubex_paths import get_qubex_paths
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from qdash.repository.protocols import CalibrationNoteRepository
@@ -122,25 +124,30 @@ class QubexBackend(BaseBackend):
         task_manager_id: str,
         project_id: str,
     ) -> None:
-        """Save the calibration note to the experiment."""
+        """Save the calibration note to the experiment.
+
+        Always creates a new master document for the current execution_id,
+        copying the latest master note content if one exists. This ensures
+        the document is ready before parallel workers start updating it.
+        """
         # Initialize calibration note
         note_path = Path(f"{calib_dir}/calib_note/{task_manager_id}.json")
         note_path.parent.mkdir(parents=True, exist_ok=True)
 
         repo = self.calibration_note_repo
-        master_note = repo.find_latest_master(chip_id=chip_id, project_id=project_id)
+        existing_master = repo.find_latest_master(chip_id=chip_id, project_id=project_id)
+        initial_note = existing_master.note if existing_master is not None else {}
 
-        if master_note is None:
-            master_note = repo.upsert(
-                CalibrationNoteModel(
-                    project_id=project_id,
-                    username=username,
-                    chip_id=chip_id,
-                    execution_id=execution_id,
-                    task_id="master",
-                    note={},
-                )
+        master_note = repo.upsert(
+            CalibrationNoteModel(
+                project_id=project_id,
+                username=username,
+                chip_id=chip_id,
+                execution_id=execution_id,
+                task_id="master",
+                note=initial_note,
             )
+        )
 
         note_path.write_text(json.dumps(master_note.note, indent=2))
 
@@ -152,58 +159,54 @@ class QubexBackend(BaseBackend):
         execution_id: str,
         task_manager_id: str,
         project_id: str,
+        qid: str | None = None,
     ) -> None:
-        """Update the master calibration note in MongoDB only.
+        """Update the master calibration note in MongoDB atomically.
 
-        This method saves calibration notes exclusively to MongoDB, avoiding
-        file I/O operations during task execution. This design:
-        - Eliminates race conditions in thread-based parallel execution
-        - Reduces unnecessary disk I/O
-        - Establishes MongoDB as the single source of truth
-        - Simplified architecture: only master note is maintained (no per-task notes)
+        Uses per-qubit atomic $set operations to avoid TOCTOU race conditions
+        when multiple Dask workers update different qubits in parallel. Each
+        worker only touches its own qubit paths via dot-notation
+        (e.g., "note.rabi_params.Q024"), so concurrent updates don't conflict.
 
-        The calibration note file is only written during initialization (save_note)
-        and optionally during export (finish_calibration with export_note_to_file=True).
+        When ``qid`` is provided, only note entries whose key matches the qid
+        are written.  This prevents a worker from overwriting another worker's
+        freshly-calibrated data with its own stale snapshot.
 
         Note:
         ----
             task_manager_id is kept as a parameter for backward compatibility but not used.
             Only the master note (task_id="master") is updated.
         """
-        calib_note = json.loads(self.get_note())
+        raw_note = self.get_note()
+        calib_note = json.loads(raw_note)
+
+        # Filter to only the calibrated qubit/coupling to avoid TOCTOU.
+        # Each param_type dict is keyed by qubit label (e.g. "Q16", "Q016") or
+        # coupling label (e.g. "Q16-Q22").  We keep only the entry that
+        # matches the qid that was just calibrated.
+        # Note: qid is numeric (e.g. "16") but keys use label format (e.g. "Q16").
+        if qid is not None:
+            from qdash.common.qubit_utils import qid_to_label_from_chip
+
+            label = qid_to_label_from_chip(qid, project_id=project_id, chip_id=chip_id)
+
+            filtered: dict[str, Any] = {}
+            for param_type, qubits in calib_note.items():
+                if isinstance(qubits, dict) and label in qubits:
+                    filtered[param_type] = {label: qubits[label]}
+            calib_note = filtered
 
         repo = self.calibration_note_repo
-        master_note = repo.find_one(
-            task_id="master",
-            chip_id=chip_id,
-            project_id=project_id,
+
+        query_filter = {
+            "task_id": "master",
+            "chip_id": chip_id,
+            "project_id": project_id,
+            "username": username,
+            "execution_id": execution_id,
+        }
+
+        repo.merge_note_fields(
+            query_filter=query_filter,
+            calib_note=calib_note,
         )
-
-        if master_note is None:
-            # Create new master note if it doesn't exist
-            repo.upsert(
-                CalibrationNoteModel(
-                    project_id=project_id,
-                    username=username,
-                    chip_id=chip_id,
-                    execution_id=execution_id,
-                    task_id="master",
-                    note=calib_note,
-                )
-            )
-        else:
-            # Merge with existing master note
-            merged_note = merge_notes_by_timestamp(master_note.note, calib_note)
-            repo.upsert(
-                CalibrationNoteModel(
-                    project_id=project_id,
-                    username=username,
-                    chip_id=chip_id,
-                    execution_id=execution_id,
-                    task_id="master",
-                    note=merged_note,
-                )
-            )
-
-        # File I/O removed - MongoDB is the single source of truth
-        # For file export, use finish_calibration(export_note_to_file=True)

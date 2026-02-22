@@ -9,6 +9,7 @@ This module handles the lifecycle of a calibration session:
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
@@ -22,6 +23,8 @@ if TYPE_CHECKING:
     from qdash.workflow.engine.backend.base import BaseBackend
     from qdash.workflow.engine.config import CalibConfig
     from qdash.workflow.service.github import GitHubIntegration
+
+logger = logging.getLogger(__name__)
 
 
 class CalibOrchestrator:
@@ -138,22 +141,22 @@ class CalibOrchestrator:
         if config.enable_github_pull:
             self._pull_github_config(logger)
 
-        # Initialize ExecutionService (skip if in wrapper mode)
+        # Initialize ExecutionService
+        self._execution_service = ExecutionService.create(
+            username=config.username,
+            execution_id=config.execution_id,
+            calib_data_path=config.calib_data_path,
+            chip_id=config.chip_id,
+            name=config.flow_name or "Python Flow Execution",
+            tags=config.tags,
+            note=config.note,
+            project_id=config.project_id,
+        )
         if not config.skip_execution:
-            self._execution_service = ExecutionService.create(
-                username=config.username,
-                execution_id=config.execution_id,
-                calib_data_path=config.calib_data_path,
-                chip_id=config.chip_id,
-                name=config.flow_name or "Python Flow Execution",
-                tags=config.tags,
-                note=config.note,
-                project_id=config.project_id,
-            )
             self._execution_service.save_with_tags()
             self._execution_service.start_execution()
         else:
-            logger.info("Skipping Execution creation (wrapper mode)")
+            logger.info("Isolated session: ExecutionService created (no save/start)")
 
         # Initialize TaskContext with optional provenance tracking
         self._task_context = TaskContext(
@@ -255,9 +258,9 @@ class CalibOrchestrator:
         logger = get_run_logger()
         config = self.config
 
-        # Skip completion if in wrapper mode (no ExecutionService)
-        if self._execution_service is None:
-            logger.info("Skipping completion (wrapper mode - no Execution)")
+        # Skip execution lifecycle management for isolated sessions
+        if config.skip_execution:
+            logger.info("Skipping finalization (no owned Execution)")
             return
 
         # Reload and complete execution
@@ -285,7 +288,7 @@ class CalibOrchestrator:
 
     def fail(self) -> None:
         """Mark the session as failed."""
-        if self._execution_service is not None:
+        if not self.config.skip_execution and self._execution_service is not None:
             self._execution_service = self._execution_service.reload().fail_execution()
 
     def _export_note_to_file(self, logger: Any) -> None:
@@ -370,6 +373,29 @@ class CalibOrchestrator:
         if task_name not in task_details:
             task_details[task_name] = {}
 
+        # Inject default_run_parameters into task if configured and not already overridden per-task
+        print(
+            f"[TRACE] _create_task_instance({task_name}) default_run_parameters={self.config.default_run_parameters}"
+        )
+        if self.config.default_run_parameters:
+            task_params = task_details[task_name]
+            if "run_parameters" not in task_params:
+                task_params["run_parameters"] = {}
+            for param_name, param_data in self.config.default_run_parameters.items():
+                if not isinstance(param_data, dict):
+                    logger.warning(
+                        "Skipping invalid default_run_parameter '%s': expected dict, got %s",
+                        param_name,
+                        type(param_data).__name__,
+                    )
+                    continue
+                if param_name not in task_params["run_parameters"]:
+                    task_params["run_parameters"][param_name] = param_data
+                    print(
+                        f"[TRACE] Injected default run parameter '{param_name}' "
+                        f"into task '{task_name}': {param_data}"
+                    )
+
         task_instances = generate_task_instances(
             task_names=[task_name],
             task_details=task_details,
@@ -430,11 +456,6 @@ class CalibOrchestrator:
         """Execute task via Prefect and return executed context."""
         from qdash.workflow.engine.task_runner import execute_dynamic_task_by_qid_service
 
-        # Get latest execution service state
-        execution_service = ExecutionService.from_existing(self.config.execution_id)
-        if execution_service is None:
-            execution_service = self.execution_service
-
         # Run Prefect task
         result = execute_dynamic_task_by_qid_service.with_options(
             timeout_seconds=task_instance.timeout,
@@ -442,22 +463,13 @@ class CalibOrchestrator:
             log_prints=True,
         )(
             backend=self.backend,
-            execution_service=execution_service,
+            execution_service=self.execution_service,
             task_context=exec_context,
             task_instance=task_instance,
             qid=qid,
         )
         execution_service, executed_context = result
-
-        # Update execution service reference ONLY if this orchestrator owns
-        # the execution (i.e., it created the ExecutionService).
-        # When skip_execution=True (isolated Dask worker sessions), the
-        # orchestrator borrows the parent's ExecutionService temporarily for
-        # task execution but must NOT store it back — otherwise
-        # finish_calibration() would inadvertently complete the parent's
-        # execution while other workers are still running.
-        if not self.config.skip_execution:
-            self._execution_service = execution_service
+        self._execution_service = execution_service
 
         return cast(TaskContext, executed_context)
 

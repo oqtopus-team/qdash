@@ -58,11 +58,39 @@ qubit_metrics:
         max: 200
         step: 1
 
+  t1_average:
+    title: T1 Average
+    unit: μs
+    scale: 1
+    description: Mean T1 relaxation time over repeated measurements (± std)
+    evaluation:
+      mode: maximize
+    threshold:
+      value: 100
+      range:
+        min: 25
+        max: 200
+        step: 1
+
   t2_echo:
     title: T2 Echo
     unit: μs
     scale: 1
     description: Dephasing time measured with echo sequence
+    evaluation:
+      mode: maximize
+    threshold:
+      value: 200
+      range:
+        min: 50
+        max: 400
+        step: 1
+
+  t2_echo_average:
+    title: T2 Echo Average
+    unit: μs
+    scale: 1
+    description: Mean T2 echo time over repeated measurements (± std)
     evaluation:
       mode: maximize
     threshold:
@@ -182,6 +210,14 @@ qubit_metrics:
     evaluation:
       mode: none
 
+  one_qubit_gate_coherence_limit:
+    title: 1Q Gate Coherence Limit
+    unit: "%"
+    scale: 100
+    description: Theoretical fidelity limit of single-qubit gates from coherence times
+    evaluation:
+      mode: maximize
+
 coupling_metrics:
   zx90_gate_fidelity:
     title: ZX90 Gate Fidelity
@@ -219,6 +255,22 @@ coupling_metrics:
       max: 0.2
       step: 0.001
 
+  zx90_gate_time:
+    title: ZX90 Gate Time
+    unit: ns
+    scale: 1
+    description: Gate time of the ZX90 pulse
+    evaluation:
+      mode: none
+
+  two_qubit_gate_coherence_limit:
+    title: 2Q Gate Coherence Limit
+    unit: "%"
+    scale: 100
+    description: Theoretical fidelity limit of two-qubit gates from coherence times
+    evaluation:
+      mode: maximize
+
   static_zz_interaction:
     title: Static ZZ Interaction
     unit: MHz
@@ -246,7 +298,9 @@ cdf_groups:
       unit: μs
       metrics:
         - t1
+        - t1_average
         - t2_echo
+        - t2_echo_average
         - t2_star
     - id: fidelity
       title: Fidelity
@@ -255,6 +309,7 @@ cdf_groups:
         - average_gate_fidelity
         - x90_gate_fidelity
         - x180_gate_fidelity
+        - one_qubit_gate_coherence_limit
     - id: readout
       title: Readout Fidelity
       unit: "%"

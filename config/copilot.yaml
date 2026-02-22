@@ -13,13 +13,14 @@ response_language: ja
 # Model configuration
 model:
   # Provider: "openai", "anthropic", or "ollama"
-  provider: ollama
-  # Model name (e.g., "gpt-4o", "gpt-4o-mini", "gpt-oss:20b" for Ollama)
-  name: gpt-oss:20b
+  #provider: ollama
+  provider: openai
+  # Model name (e.g., "gpt-4.1", "gpt-4.1-mini", "gpt-oss:20b" for Ollama)
+  name: gpt-4.1
   # Temperature for response generation (0.0 - 2.0)
   temperature: 0.7
   # Maximum tokens for response
-  max_tokens: 2048
+  max_output_tokens: 2048
 
 # Metrics to include in multi-metric evaluation
 # Only these metrics will be used for overall chip health scoring
@@ -29,7 +30,9 @@ evaluation_metrics:
     - qubit_frequency
     - anharmonicity
     - t1
+    - t1_average
     - t2_echo
+    - t2_echo_average
     - t2_star
     - average_readout_fidelity
     - x90_gate_fidelity
@@ -44,31 +47,49 @@ scoring:
   t1:
     good: 50
     excellent: 100
+    bad: 20
+    unit: μs
+    higher_is_better: true
+  t1_average:
+    good: 50
+    excellent: 100
+    bad: 20
     unit: μs
     higher_is_better: true
   t2_echo:
     good: 80
     excellent: 150
+    bad: 30
+    unit: μs
+    higher_is_better: true
+  t2_echo_average:
+    good: 80
+    excellent: 150
+    bad: 30
     unit: μs
     higher_is_better: true
   t2_star:
     good: 20
     excellent: 40
+    bad: 10
     unit: μs
     higher_is_better: true
   average_readout_fidelity:
     good: 95
     excellent: 99
+    bad: 85
     unit: "%"
     higher_is_better: true
   x90_gate_fidelity:
     good: 99.5
     excellent: 99.9
+    bad: 98.0
     unit: "%"
     higher_is_better: true
   x180_gate_fidelity:
     good: 99.5
     excellent: 99.9
+    bad: 98.0
     unit: "%"
     higher_is_better: true
   bare_frequency:
@@ -79,18 +100,29 @@ scoring:
   anharmonicity:
     good: -280
     excellent: -320
+    bad: -250
     unit: MHz
     higher_is_better: false
   zx90_gate_fidelity:
     good: 95
     excellent: 99
+    bad: 85
     unit: "%"
     higher_is_better: true
   bell_state_fidelity:
     good: 90
     excellent: 95
+    bad: 80
     unit: "%"
     higher_is_better: true
+
+# Task analysis configuration (side-panel chat in metrics modal)
+analysis:
+  enabled: true
+  # Whether to send result figures to the LLM (requires multimodal model)
+  multimodal: true
+  # Maximum conversation turns to maintain in context
+  max_conversation_turns: 10
 
 # System prompt for the AI assistant
 # This defines the AI's personality and capabilities

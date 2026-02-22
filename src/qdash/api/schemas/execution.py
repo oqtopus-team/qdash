@@ -25,6 +25,7 @@ class Task(BaseModel):
     input_parameters: dict[str, Any] | None = None
     output_parameters: dict[str, Any] | None = None
     output_parameter_names: list[str] | None = None
+    run_parameters: dict[str, Any] | None = None
     note: dict[str, Any] | None = None
     figure_path: list[str] | None = None
     json_figure_path: list[str] | None = None
