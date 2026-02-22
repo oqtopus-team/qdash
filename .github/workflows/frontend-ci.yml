@@ -108,5 +108,5 @@ jobs:
       - name: Run React Doctor
         uses: millionco/react-doctor@main
         with:
-          diff: ${{ github.base_ref }}
+          diff: origin/${{ github.base_ref }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
