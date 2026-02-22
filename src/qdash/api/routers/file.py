@@ -11,7 +11,6 @@ from typing import Annotated, Any
 
 import yaml
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
-from fastapi.logger import logger
 from fastapi.responses import FileResponse
 from git import Repo
 from git.exc import GitCommandError
@@ -26,13 +25,9 @@ from qdash.api.schemas.file import (
 from qdash.common.datetime_utils import now_iso
 from qdash.common.paths import QUBEX_CONFIG_BASE
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter()
-gunicorn_logger = logging.getLogger("gunicorn.error")
-logger.handlers = gunicorn_logger.handlers
-if __name__ != "main":
-    logger.setLevel(gunicorn_logger.level)
-else:
-    logger.setLevel(logging.DEBUG)
 
 # Use centralized path from common module
 CONFIG_BASE_PATH = QUBEX_CONFIG_BASE

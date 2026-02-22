@@ -1,9 +1,9 @@
 """Project management API router."""
 
+import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.logger import logger
 from qdash.api.lib.auth import get_admin_user, get_current_active_user
 from qdash.api.lib.project import (
     ProjectContext,
@@ -31,6 +31,8 @@ from qdash.repository import (
     MongoProjectRepository,
     MongoUserRepository,
 )
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(
     prefix="/projects",

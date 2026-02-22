@@ -1,6 +1,7 @@
 """Device topology router for QDash API."""
 
 import io
+import logging
 from datetime import timedelta
 from typing import Annotated, Any
 
@@ -8,7 +9,6 @@ import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 import networkx as nx
 from fastapi import APIRouter, Depends
-from fastapi.logger import logger
 from fastapi.responses import Response
 from qdash.api.lib.project import ProjectContext, get_project_context
 from qdash.api.schemas.device_topology import (
@@ -26,6 +26,8 @@ from qdash.common.datetime_utils import now, to_datetime
 from qdash.common.qubit_utils import qid_to_label
 from qdash.common.topology_config import load_topology
 from qdash.repository import MongoCalibrationNoteRepository, MongoChipRepository
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 

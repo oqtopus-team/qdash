@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING, cast
 
-from fastapi.logger import logger
 from qdash.datamodel.project import ProjectRole
 from qdash.dbmodel.project import ProjectDocument
 from qdash.dbmodel.project_membership import ProjectMembershipDocument
@@ -13,6 +13,8 @@ if TYPE_CHECKING:
     from collections.abc import Iterable
 
     from qdash.dbmodel.user import UserDocument
+
+logger = logging.getLogger(__name__)
 
 
 class ProjectService:

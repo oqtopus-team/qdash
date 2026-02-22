@@ -8,9 +8,7 @@ from qdash.datamodel.user import SystemRole
 from qdash.dbmodel.initialize import initialize
 from qdash.dbmodel.user import UserDocument
 
-# Logger configuration
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
 
 # Initialize at module level
 initialize()

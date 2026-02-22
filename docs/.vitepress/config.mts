@@ -103,6 +103,7 @@ export default withMermaid(
             },
             { text: "Setup", link: "/development/setup" },
             { text: "Datetime Handling", link: "/development/datetime" },
+            { text: "Logging", link: "/development/logging" },
             {
               text: "API",
               collapsed: true,

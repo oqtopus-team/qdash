@@ -173,6 +173,8 @@ api = [
     "kaleido>=0.2.1",  # For Plotly image export
     "pillow>=10.0.0",  # For image processing
     "croniter>=6.0.0",  # For cron schedule parsing
+    "python-json-logger>=3.3.0",  # For structured JSON logging
+    "openai>=1.0.0",  # For copilot agent (LLM chat/analysis)
 ]
 workflow = [
     "pymongo==4.8.0",
