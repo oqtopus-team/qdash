@@ -67,6 +67,12 @@ tasks:
     cmds:
       - uv run pytest tests/qdash/workflow/engine/repository/ -v
 
+  test-ui:
+    desc: Run UI tests
+    dir: ui
+    cmds:
+      - bun run test:run
+
   test-coverage:
     desc: Run tests with coverage report
     cmds:
@@ -187,6 +193,7 @@ tasks:
     desc: Run all UI CI checks
     dir: ui
     cmds:
+      - bun run test:run
       - bunx eslint . -c eslint.config.mjs
       - bunx prettier . --check
 
