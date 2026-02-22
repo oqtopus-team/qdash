@@ -288,8 +288,12 @@ export function CorrelationView() {
     ]);
 
     entityIds.forEach((entityId) => {
-      const xMetric = (xRawData as any)[entityId];
-      const yMetric = (yRawData as any)[entityId];
+      const xMetric = (xRawData as Record<string, { value?: unknown }>)[
+        entityId
+      ];
+      const yMetric = (yRawData as Record<string, { value?: unknown }>)[
+        entityId
+      ];
 
       const xValue = xMetric?.value;
       const yValue = yMetric?.value;

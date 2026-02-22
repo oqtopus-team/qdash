@@ -21,7 +21,7 @@ import {
   type TaskResultIssue,
 } from "@/hooks/useTaskResultIssues";
 import { useProject } from "@/contexts/ProjectContext";
-import { formatDateTime, formatRelativeTime } from "@/utils/datetime";
+import { formatDateTime, formatRelativeTime } from "@/lib/utils/datetime";
 
 function getCurrentUsername(): string {
   if (typeof document === "undefined") return "";

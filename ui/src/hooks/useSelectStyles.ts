@@ -47,7 +47,7 @@ export function useSelectStyles<
         minWidth: "100%",
       }),
     };
-  }, [minWidth]);
+  }, []);
 
   return { minWidth, styles };
 }

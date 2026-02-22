@@ -23,7 +23,7 @@ import {
   getDaisySelectStylesSm,
 } from "@/lib/reactSelectTheme";
 import { TaskFigure } from "@/components/charts/TaskFigure";
-import { formatDateTime } from "@/utils/datetime";
+import { formatDateTime } from "@/lib/utils/datetime";
 import type { ParameterVersionResponse } from "@/schemas/parameterVersionResponse";
 
 interface ParameterOption {

@@ -38,20 +38,19 @@
 ```
 ui/
 ├── src/
-│   ├── app/                    # Next.js App Router pages
+│   ├── app/                    # Next.js App Router (pages and routes ONLY)
 │   │   ├── (auth)/             # Protected routes (require login)
-│   │   │   ├── admin/          # Admin page
+│   │   │   ├── admin/          # Admin page (thin wrapper → AdminPageContent)
 │   │   │   ├── analysis/       # Analysis page
 │   │   │   ├── chip/           # Chip management
 │   │   │   ├── execution/      # Execution monitoring
-│   │   │   ├── files/          # File management
+│   │   │   ├── files/          # File management (thin wrapper → FilesPageContent)
 │   │   │   ├── flow/           # Flow editor
 │   │   │   ├── metrics/        # Metrics dashboard
 │   │   │   ├── setting/        # Settings page
-│   │   │   └── tasks/          # Task management
+│   │   │   └── tasks/          # Task management (thin wrapper → TasksPageContent)
 │   │   ├── (public)/           # Public routes (no auth required)
 │   │   │   └── login/          # Login page
-│   │   ├── providers/          # App-level providers
 │   │   ├── globals.css         # Global styles
 │   │   ├── layout.tsx          # Root layout
 │   │   ├── page.tsx            # Root page (redirect)
@@ -60,15 +59,36 @@ ui/
 │   ├── components/             # Reusable components
 │   │   ├── charts/             # Chart components (Plotly wrappers)
 │   │   ├── features/           # Feature-specific components
+│   │   │   ├── admin/          # Admin page content
+│   │   │   ├── files/          # Files page content
+│   │   │   ├── tasks/          # Tasks page content
+│   │   │   └── ...             # Other feature directories
 │   │   ├── layout/             # Layout components (Navbar, Sidebar)
 │   │   ├── selectors/          # Selection components (dropdowns, etc.)
 │   │   └── ui/                 # Generic UI components
-│   ├── contexts/               # React Context providers
+│   ├── contexts/               # ALL React Context/Provider files
+│   │   ├── AxiosContext.tsx     # Axios interceptor provider
+│   │   ├── ThemeContext.tsx     # Theme provider
+│   │   ├── AuthContext.tsx      # Authentication context
+│   │   ├── ProjectContext.tsx   # Project selection context
+│   │   ├── SidebarContext.tsx   # Sidebar state context
+│   │   └── AnalysisChatContext.tsx
 │   ├── hooks/                  # Custom React hooks
+│   │   ├── url-state/          # URL state hooks (split from useUrlState)
+│   │   │   ├── types.ts        # Shared types (TimeRange, SelectionMode, etc.)
+│   │   │   ├── useChipUrlState.ts
+│   │   │   ├── useExecutionUrlState.ts
+│   │   │   ├── useAnalysisUrlState.ts
+│   │   │   ├── use*UrlState.ts # Other URL state hooks
+│   │   │   └── index.ts        # Barrel re-export
+│   │   └── use*.ts             # Other hooks (flat)
 │   ├── lib/                    # Utilities and configurations
 │   │   ├── api/                # API client configuration
-│   │   ├── config/             # App configuration
 │   │   └── utils/              # Utility functions
+│   │       ├── datetime.ts     # Date/time formatting
+│   │       ├── grid-layout.ts  # Grid layout calculations
+│   │       ├── grid-position.ts # Grid position calculations
+│   │       └── qid.ts          # Qubit ID utilities
 │   ├── schemas/                # Auto-generated TypeScript types (DO NOT EDIT)
 │   └── types/                  # Manual type definitions
 ├── public/                     # Static assets
@@ -92,6 +112,40 @@ Next.js App Router uses **route groups** (folders in parentheses) for organizati
 // Example: src/app/(public)/login/page.tsx
 // Accessible at: /login (no auth required)
 ```
+
+### Key Conventions
+
+#### Import Paths
+
+| Module                | Import from              | NOT from                  |
+| --------------------- | ------------------------ | ------------------------- |
+| Utilities             | `@/lib/utils/*`          | ~~`@/utils/*`~~ (removed) |
+| Providers & Contexts  | `@/contexts/*`           | ~~`@/app/providers/*`~~ (removed) |
+| URL State hooks       | `@/hooks/useUrlState` or `@/hooks/url-state` | Direct file paths |
+
+#### Export Rules
+
+| File type               | Export style      | Example                                          |
+| ----------------------- | ----------------- | ------------------------------------------------ |
+| `page.tsx`, `layout.tsx`| `default export`  | `export default function AdminPage() {}`         |
+| All other files         | `named export`    | `export function AdminPageContent() {}`          |
+| Exceptions for `dynamic()` | both           | Named + default for components loaded via `next/dynamic` |
+
+#### Page Pattern
+
+All `page.tsx` files should be thin wrappers that delegate to a `*PageContent` component:
+
+```tsx
+// app/(auth)/admin/page.tsx - Thin wrapper
+"use client";
+import { AdminPageContent } from "@/components/features/admin/AdminPageContent";
+
+export default function AdminPage() {
+  return <AdminPageContent />;
+}
+```
+
+Do NOT put business logic, state management, or large JSX in `page.tsx` files.
 
 ---
 
@@ -656,10 +710,14 @@ export default [
     rules: {
       "react-hooks/rules-of-hooks": "error",
       "react-hooks/exhaustive-deps": "warn",
+      "@typescript-eslint/no-unused-vars": ["warn", { argsIgnorePattern: "^_", varsIgnorePattern: "^_" }],
+      "@typescript-eslint/no-explicit-any": "warn",
     },
   },
 ];
 ```
+
+**Note:** `no-explicit-any` is set to `warn` to encourage proper typing. Prefix unused variables with `_` to suppress `no-unused-vars` warnings.
 
 ### Running Linters
 
@@ -727,4 +785,23 @@ bun run start
 | `bun run fmt`       | Fix ESLint issues        |
 | `bunx tsc --noEmit` | Type check               |
 | `task generate`     | Regenerate API client    |
+
+## References
+
+This guide is based on the following official documentation and best practices:
+
+| Topic | Reference |
+| --- | --- |
+| Project Structure | [Next.js Project Structure](https://nextjs.org/docs/getting-started/project-structure) |
+| App Router | [Next.js App Router](https://nextjs.org/docs/app) |
+| Data Fetching | [Next.js Data Fetching Patterns](https://nextjs.org/docs/app/building-your-application/data-fetching/patterns) |
+| Server/Client Components | [Next.js Server and Client Composition Patterns](https://nextjs.org/docs/app/building-your-application/rendering/composition-patterns) |
+| TanStack Query | [TanStack Query Documentation](https://tanstack.com/query/latest/docs/framework/react/overview) |
+| nuqs (URL State) | [nuqs Documentation](https://nuqs.47ng.com/) |
+| Tailwind CSS | [Tailwind CSS Documentation](https://tailwindcss.com/docs) |
+| DaisyUI | [DaisyUI Components](https://daisyui.com/components/) |
+| TypeScript ESLint | [typescript-eslint Rules](https://typescript-eslint.io/rules/) |
+| React Hooks Rules | [React Rules of Hooks](https://react.dev/reference/rules/rules-of-hooks) |
+| Plotly.js | [Plotly.js Documentation](https://plotly.com/javascript/) |
+| Export Patterns | [Next.js Lazy Loading with dynamic()](https://nextjs.org/docs/app/building-your-application/optimizing/lazy-loading) |
 

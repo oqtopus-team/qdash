@@ -5,7 +5,7 @@ import React, { useState, useEffect } from "react";
 
 import { keepPreviousData } from "@tanstack/react-query";
 
-import { formatDateTime } from "@/utils/datetime";
+import { formatDateTime } from "@/lib/utils/datetime";
 
 import { CouplingGrid } from "./CouplingGrid";
 import { TaskResultGrid } from "./TaskResultGrid";

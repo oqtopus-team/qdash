@@ -852,7 +852,7 @@ export function ProvenanceGraph({
       return {
         ...node,
         data: {
-          ...(node.data as any),
+          ...(node.data as Record<string, unknown>),
           isMatch,
           dimmed,
           isPinned,
@@ -871,7 +871,10 @@ export function ProvenanceGraph({
         );
       return {
         ...edge,
-        style: { ...(edge.style as any), opacity: dimmed ? 0.15 : 1 },
+        style: {
+          ...(edge.style as Record<string, unknown>),
+          opacity: dimmed ? 0.15 : 1,
+        },
       };
     });
 
@@ -898,11 +901,12 @@ export function ProvenanceGraph({
     (_: React.MouseEvent, node: Node) => {
       const apiNode = apiNodes.find((n) => n.node_id === node.id);
       if (apiNode?.node_type === "activity") {
-        const taskId = ((node.data as any)?.taskId as string) || "";
-        const qid = ((node.data as any).qid as string) || "0";
+        const nodeData = node.data as Record<string, unknown>;
+        const taskId = (nodeData?.taskId as string) || "";
+        const qid = (nodeData.qid as string) || "0";
         const taskName =
-          typeof (node.data as any).label === "string"
-            ? ((node.data as any).label as string)
+          typeof nodeData.label === "string"
+            ? (nodeData.label as string)
             : undefined;
         setPinnedTask((prev) => {
           if (prev?.nodeId === node.id) return null;
@@ -917,13 +921,19 @@ export function ProvenanceGraph({
     const entityCount = initialNodes.filter((n) => n.type === "entity").length;
     const taskCount = initialNodes.filter((n) => n.type === "activity").length;
     const failedTasks = initialNodes.filter(
-      (n) => n.type === "activity" && (n.data as any)?.status === "failed",
+      (n) =>
+        n.type === "activity" &&
+        (n.data as Record<string, unknown>)?.status === "failed",
     ).length;
     const lowConfidenceParams = initialNodes.filter(
-      (n) => n.type === "entity" && (n.data as any)?.lowConfidence,
+      (n) =>
+        n.type === "entity" &&
+        (n.data as Record<string, unknown>)?.lowConfidence,
     ).length;
     const staleInputs = initialNodes.filter(
-      (n) => n.type === "entity" && (n.data as any)?.hasNewerVersion,
+      (n) =>
+        n.type === "entity" &&
+        (n.data as Record<string, unknown>)?.hasNewerVersion,
     ).length;
     return {
       entityCount,

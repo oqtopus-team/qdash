@@ -6,7 +6,7 @@ import { GitBranch } from "lucide-react";
 
 import type { Task } from "@/schemas";
 
-import { formatDateTime, formatDateTimeCompact } from "@/utils/datetime";
+import { formatDateTime, formatDateTimeCompact } from "@/lib/utils/datetime";
 
 import { useGetQubitTaskHistory } from "@/client/task-result/task-result";
 import { TaskFigure } from "@/components/charts/TaskFigure";
@@ -496,12 +496,18 @@ export function TaskHistoryModal({
                             ? Object.entries(selectedTask.input_parameters)
                             : [];
                           const [key, paramValue] =
-                            (outputs[0] as [string, any]) ??
-                            (inputs[0] as [string, any]) ??
+                            (outputs[0] as
+                              | [string, Record<string, unknown>]
+                              | undefined) ??
+                            (inputs[0] as
+                              | [string, Record<string, unknown>]
+                              | undefined) ??
                             [];
                           if (key && paramValue) {
                             const parameterName =
-                              paramValue?.parameter_name || key;
+                              (paramValue?.parameter_name as
+                                | string
+                                | undefined) || key;
                             router.push(buildProvenanceUrl(parameterName, qid));
                           } else {
                             router.push("/provenance");

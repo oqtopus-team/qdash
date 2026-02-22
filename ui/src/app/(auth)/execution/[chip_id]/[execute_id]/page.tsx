@@ -1,4 +1,4 @@
-import ExecutionDetailClient from "@/components/features/execution/ExecutionClient";
+import { ExecutionDetailClient } from "@/components/features/execution/ExecutionClient";
 
 interface ExecutionDetailPageProps {
   params: Promise<{

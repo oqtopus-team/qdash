@@ -24,7 +24,7 @@ import { InboxDetailPanel } from "@/components/features/inbox/InboxDetailPanel";
 import { PageContainer } from "@/components/ui/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { useMetricsConfig } from "@/hooks/useMetricsConfig";
-import { formatRelativeTime } from "@/utils/datetime";
+import { formatRelativeTime } from "@/lib/utils/datetime";
 
 type WindowHours = 24 | 48 | 168;
 
@@ -226,8 +226,8 @@ export function InboxPageContent() {
       const as = Math.abs(a.delta_percent ?? 0);
       const bs = Math.abs(b.delta_percent ?? 0);
       if (bs !== as) return bs - as;
-      const at = a.valid_from ? new Date(a.valid_from as any).getTime() : 0;
-      const bt = b.valid_from ? new Date(b.valid_from as any).getTime() : 0;
+      const at = a.valid_from ? new Date(a.valid_from as string).getTime() : 0;
+      const bt = b.valid_from ? new Date(b.valid_from as string).getTime() : 0;
       return bt - at;
     });
 
@@ -241,7 +241,7 @@ export function InboxPageContent() {
     showSignificantOnly,
   ]);
 
-  const formatUncertainty = (change: any) => {
+  const formatUncertainty = (change: { value?: unknown; error?: unknown }) => {
     const value = change?.value;
     const error = change?.error;
     if (typeof value !== "number" || typeof error !== "number" || error === 0) {
@@ -651,10 +651,10 @@ export function InboxPageContent() {
                           change.entity_id === expandedSelection?.entityId;
                         const isSignificant =
                           Math.abs(change.delta_percent ?? 0) > 10;
-                        const uncertainty = formatUncertainty(change as any);
+                        const uncertainty = formatUncertainty(change);
                         const isLowConfidence = (() => {
-                          const value = (change as any)?.value;
-                          const error = (change as any)?.error;
+                          const value = change.value;
+                          const error = change.error;
                           if (
                             typeof value !== "number" ||
                             typeof error !== "number" ||
@@ -696,17 +696,13 @@ export function InboxPageContent() {
                             <td className="hidden sm:table-cell font-mono text-xs">
                               {change.previous_value !== null &&
                               change.previous_value !== undefined ? (
-                                <>
-                                  {formatValue(change.previous_value as any)}{" "}
-                                  →{" "}
-                                </>
+                                <>{formatValue(change.previous_value)} → </>
                               ) : (
                                 <span className="text-base-content/40">
                                   - →{" "}
                                 </span>
                               )}
-                              {formatValue(change.value as any)}{" "}
-                              {change.unit || ""}
+                              {formatValue(change.value)} {change.unit || ""}
                               {uncertainty && (
                                 <span
                                   className={`ml-2 ${
@@ -742,7 +738,11 @@ export function InboxPageContent() {
                               {change.task_name || "-"}
                             </td>
                             <td className="hidden sm:table-cell text-sm text-base-content/70">
-                              {formatRelativeTime(change.valid_from as string)}
+                              {change.valid_from
+                                ? formatRelativeTime(
+                                    change.valid_from as string,
+                                  )
+                                : "-"}
                             </td>
                             <td>
                               <div className="flex gap-1 justify-end">

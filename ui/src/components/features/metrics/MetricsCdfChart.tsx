@@ -96,7 +96,7 @@ export function MetricsCdfChart(props: MetricsCdfChartProps) {
   const isGrouped = isGroupedProps(props);
 
   const plotData = useMemo(() => {
-    const traces: any[] = [];
+    const traces: Record<string, unknown>[] = [];
 
     if (isGrouped) {
       // Grouped metrics mode

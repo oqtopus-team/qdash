@@ -15,7 +15,7 @@ import {
 import { useGetTaskResult } from "@/client/task/task";
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { ParametersTable } from "@/components/features/metrics/ParametersTable";
-import { formatDateTime, formatRelativeTime } from "@/utils/datetime";
+import { formatDateTime, formatRelativeTime } from "@/lib/utils/datetime";
 import { useIssueReplies } from "@/hooks/useIssues";
 import { useIssueAiReply } from "@/hooks/useIssueAiReply";
 import type { IssueResponse } from "@/schemas";

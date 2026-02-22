@@ -19,7 +19,7 @@ import {
   formatDate as formatDateUtil,
   formatTime as formatTimeUtil,
   formatDateTime as formatDateTimeUtil,
-} from "@/utils/datetime";
+} from "@/lib/utils/datetime";
 
 interface TaskDetailModalProps {
   isOpen: boolean;
@@ -834,14 +834,21 @@ export function TaskDetailModal({
                                               <li>
                                                 <button
                                                   onClick={() => {
+                                                    const pv =
+                                                      paramValue as Record<
+                                                        string,
+                                                        unknown
+                                                      >;
                                                     const parameterName =
-                                                      (paramValue as any)
-                                                        ?.parameter_name || key;
+                                                      (pv?.parameter_name as
+                                                        | string
+                                                        | undefined) || key;
                                                     const resolvedQid =
                                                       resolveQid(
                                                         qid,
-                                                        (paramValue as any)
-                                                          ?.qid_role,
+                                                        pv?.qid_role as
+                                                          | string
+                                                          | undefined,
                                                       );
                                                     router.push(
                                                       buildProvenanceUrl(
@@ -883,28 +890,33 @@ export function TaskDetailModal({
                           className="btn btn-ghost btn-sm gap-2 hover:btn-primary"
                           onClick={() => {
                             const outputs =
-                              (task as any)?.output_parameters &&
-                              typeof (task as any).output_parameters ===
-                                "object"
-                                ? Object.entries(
-                                    (task as any).output_parameters,
-                                  )
+                              task?.output_parameters &&
+                              typeof task.output_parameters === "object"
+                                ? Object.entries(task.output_parameters)
                                 : [];
                             const inputs =
-                              (task as any)?.input_parameters &&
-                              typeof (task as any).input_parameters === "object"
-                                ? Object.entries((task as any).input_parameters)
+                              task?.input_parameters &&
+                              typeof task.input_parameters === "object"
+                                ? Object.entries(task.input_parameters)
                                 : [];
 
                             const [key, paramValue] =
-                              (outputs[0] as any) ?? (inputs[0] as any) ?? [];
+                              (outputs[0] as
+                                | [string, Record<string, unknown>]
+                                | undefined) ??
+                              (inputs[0] as
+                                | [string, Record<string, unknown>]
+                                | undefined) ??
+                              [];
 
                             if (key && paramValue) {
+                              const pv = paramValue as Record<string, unknown>;
                               const parameterName =
-                                (paramValue as any)?.parameter_name || key;
+                                (pv?.parameter_name as string | undefined) ||
+                                key;
                               const resolvedQid = resolveQid(
                                 qid,
-                                (paramValue as any)?.qid_role,
+                                pv?.qid_role as string | undefined,
                               );
                               router.push(
                                 buildProvenanceUrl(parameterName, resolvedQid),

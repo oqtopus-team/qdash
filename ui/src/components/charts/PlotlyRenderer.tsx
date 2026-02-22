@@ -2,9 +2,9 @@
 
 import { useQuery } from "@tanstack/react-query";
 
-import Plot from "@/components/charts/Plot";
+import { Plot } from "@/components/charts/Plot";
 
-export default function PlotlyRenderer({
+export function PlotlyRenderer({
   fullPath,
   className = "",
 }: {
@@ -39,3 +39,6 @@ export default function PlotlyRenderer({
     </div>
   );
 }
+
+// Default export needed for next/dynamic() lazy loading
+export default PlotlyRenderer;

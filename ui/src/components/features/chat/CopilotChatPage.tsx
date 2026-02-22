@@ -1,6 +1,12 @@
 "use client";
 
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, {
+  useState,
+  useRef,
+  useEffect,
+  useCallback,
+  useMemo,
+} from "react";
 import {
   Send,
   Bot,
@@ -345,7 +351,10 @@ export function CopilotChatPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  const messages = activeSession?.messages ?? [];
+  const messages = useMemo(
+    () => activeSession?.messages ?? [],
+    [activeSession?.messages],
+  );
 
   // Auto-scroll to bottom
   useEffect(() => {

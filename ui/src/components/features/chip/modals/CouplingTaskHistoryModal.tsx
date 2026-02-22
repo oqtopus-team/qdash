@@ -7,7 +7,7 @@ import { GitBranch } from "lucide-react";
 
 import type { Task } from "@/schemas";
 
-import { formatDateTime, formatDateTimeCompact } from "@/utils/datetime";
+import { formatDateTime, formatDateTimeCompact } from "@/lib/utils/datetime";
 
 import { useGetCouplingTaskHistory } from "@/client/task-result/task-result";
 import { TaskFigure } from "@/components/charts/TaskFigure";
@@ -593,15 +593,20 @@ export function CouplingTaskHistoryModal({
                             ? Object.entries(selectedTask.input_parameters)
                             : [];
                           const [key, paramValue] =
-                            (outputs[0] as [string, any]) ??
-                            (inputs[0] as [string, any]) ??
+                            (outputs[0] as
+                              | [string, Record<string, unknown>]
+                              | undefined) ??
+                            (inputs[0] as
+                              | [string, Record<string, unknown>]
+                              | undefined) ??
                             [];
                           if (key && paramValue) {
+                            const pv = paramValue as Record<string, unknown>;
                             const parameterName =
-                              paramValue?.parameter_name || key;
+                              (pv?.parameter_name as string | undefined) || key;
                             const resolvedQid = resolveQid(
                               couplingId,
-                              paramValue?.qid_role,
+                              pv?.qid_role as string | undefined,
                             );
                             router.push(
                               buildProvenanceUrl(parameterName, resolvedQid),

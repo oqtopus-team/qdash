@@ -8,14 +8,11 @@ interface Column {
   label: string;
   sortable?: boolean;
   className?: string;
-  // Using any here to maintain compatibility with existing render functions
-  // that have specific value types (number, string, etc.)
-  // biome-ignore lint: required for flexible column rendering
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- generic render function for flexible column types
   render?: (value: any, row: any) => ReactNode;
 }
 
-// DataRow uses any to allow for flexible data structures from various sources
-// biome-ignore lint: required for flexible data structures
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- generic data table accepts flexible row structures
 type DataRow = Record<string, any>;
 
 interface DataTableProps {

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-import { useTheme } from "@/app/providers/theme-provider";
+import { useTheme } from "@/contexts/ThemeContext";
 import { PasswordChangeCard } from "@/components/features/setting/PasswordChangeCard";
 import { PageContainer } from "@/components/ui/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";

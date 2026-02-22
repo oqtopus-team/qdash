@@ -30,7 +30,7 @@ import {
   Zap,
 } from "lucide-react";
 
-import { useTheme } from "@/app/providers/theme-provider";
+import { useTheme } from "@/contexts/ThemeContext";
 import { useLogout } from "@/client/auth/auth";
 import { FluentEmoji, getAvatarEmoji } from "@/components/ui/FluentEmoji";
 import { useAuth } from "@/contexts/AuthContext";
@@ -55,7 +55,7 @@ function SectionHeader({
   );
 }
 
-function Sidebar() {
+export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const modalRef = useRef<HTMLDialogElement>(null);
@@ -593,5 +593,3 @@ function Sidebar() {
     </>
   );
 }
-
-export default Sidebar;

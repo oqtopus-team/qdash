@@ -114,7 +114,7 @@ function ProjectSelector() {
   );
 }
 
-function Navbar() {
+export function Navbar() {
   return (
     <nav className="navbar w-full">
       <div className="flex flex-1 md:gap-1 lg:gap-2 items-center">
@@ -125,5 +125,3 @@ function Navbar() {
     </nav>
   );
 }
-
-export default Navbar;

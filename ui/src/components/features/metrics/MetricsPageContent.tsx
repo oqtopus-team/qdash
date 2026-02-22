@@ -87,7 +87,7 @@ export function MetricsPageContent() {
       });
       setSelectedChip(sortedChips[0].chip_id);
     }
-  }, [selectedChip, chipsData]);
+  }, [selectedChip, chipsData, setSelectedChip]);
 
   // Calculate grid size from chip data
   useEffect(() => {
@@ -151,7 +151,7 @@ export function MetricsPageContent() {
     if (!isBestModeSupported && selectionMode === "best") {
       setSelectionMode("latest");
     }
-  }, [isBestModeSupported, selectionMode]);
+  }, [isBestModeSupported, selectionMode, setSelectionMode]);
 
   const metricOptions: MetricOption[] = useMemo(
     () =>
@@ -203,7 +203,7 @@ export function MetricsPageContent() {
         stddev?: number | null;
       };
     } = {};
-    Object.entries(rawData).forEach(([key, metricValue]: [string, any]) => {
+    Object.entries(rawData).forEach(([key, metricValue]) => {
       // Use simple numeric format for qubit metrics (e.g., "0", "1"), keep "0-1" format for coupling
       const formattedKey =
         metricType === "qubit"
@@ -252,7 +252,7 @@ export function MetricsPageContent() {
       if (!rawData) return;
 
       const scaledData: { [key: string]: { value: number | null } } = {};
-      Object.entries(rawData).forEach(([key, metricValue]: [string, any]) => {
+      Object.entries(rawData).forEach(([key, metricValue]) => {
         const formattedKey =
           metricType === "qubit"
             ? key.startsWith("Q")
