@@ -1,5 +1,6 @@
 """TaskStateManager class for managing task state and lifecycle."""
 
+from collections.abc import Iterator
 from typing import Any
 
 from pydantic import BaseModel
@@ -94,7 +95,7 @@ class TaskStateManager(BaseModel):
         """Add a task to the appropriate container."""
         lookup.add_task(self.task_result, task, task_type, qid)
 
-    def _iter_tasks(self, task_type: str, qid: str):
+    def _iter_tasks(self, task_type: str, qid: str) -> Iterator[BaseTaskResultModel]:
         """Iterate over tasks in the appropriate container (read-only)."""
         return lookup.iter_tasks(self.task_result, task_type, qid)
 
