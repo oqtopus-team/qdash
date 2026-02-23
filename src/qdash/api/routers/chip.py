@@ -11,16 +11,12 @@ from functools import lru_cache
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from qdash.api.dependencies import get_chip_service  # noqa: TCH002
+from qdash.api.dependencies import get_chip_service, get_task_file_service
 from qdash.api.lib.config_loader import ConfigLoader
 from qdash.api.lib.project import (  # noqa: TCH002
     ProjectContext,
     get_project_context,
     get_project_context_owner,
-)
-from qdash.api.routers.task_file import (
-    CALIBTASKS_BASE_PATH,
-    collect_tasks_from_directory,
 )
 from qdash.api.schemas.chip import (
     ChipDatesResponse,
@@ -38,6 +34,7 @@ from qdash.api.schemas.chip import (
 )
 from qdash.api.services.chip_initializer import ChipInitializer
 from qdash.api.services.chip_service import ChipService  # noqa: TCH002
+from qdash.common.paths import CALIBTASKS_DIR
 
 router = APIRouter()
 
@@ -187,12 +184,13 @@ def _get_task_names_cached() -> tuple[str, ...]:
         logger.warning(f"Failed to load settings: {e}")
 
     # Get tasks from task files
-    backend_path = CALIBTASKS_BASE_PATH / default_backend
+    backend_path = CALIBTASKS_DIR / default_backend
     if not backend_path.exists() or not backend_path.is_dir():
         logger.warning(f"Backend directory not found: {backend_path}")
         return ()
 
-    tasks = collect_tasks_from_directory(backend_path, backend_path)
+    service = get_task_file_service()
+    tasks = service._collect_tasks_from_directory(backend_path, backend_path)
     return tuple(task.name for task in tasks)
 
 

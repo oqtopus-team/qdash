@@ -5,22 +5,37 @@ repositories and services into route handlers.
 """
 
 from functools import lru_cache
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from qdash.api.services.flow_schedule_service import FlowScheduleService
+    from qdash.api.services.flow_service import FlowService
 
 from qdash.api.services.admin_service import AdminService
+from qdash.api.services.auth_service import AuthService
 from qdash.api.services.calibration_service import CalibrationService
 from qdash.api.services.chip_service import ChipService
+from qdash.api.services.config_service import ConfigService
 from qdash.api.services.copilot_data_service import CopilotDataService
 from qdash.api.services.device_topology_service import DeviceTopologyService
 from qdash.api.services.execution_service import ExecutionService
+from qdash.api.services.file_service import FileService
 from qdash.api.services.issue_service import IssueService
 from qdash.api.services.metrics_service import MetricsService
+from qdash.api.services.project_service import ProjectService
 from qdash.api.services.provenance_service import ProvenanceService
 from qdash.api.services.seed_import_service import SeedImportService
+from qdash.api.services.task_file_service import TaskFileService
 from qdash.api.services.task_result_service import TaskResultService
+from qdash.api.services.task_service import TaskService
 from qdash.repository import (
     MongoChipRepository,
     MongoExecutionCounterRepository,
+    MongoFlowRepository,
+    MongoProjectMembershipRepository,
+    MongoProjectRepository,
     MongoTaskResultHistoryRepository,
+    MongoUserRepository,
 )
 from qdash.repository.backend import MongoBackendRepository
 from qdash.repository.calibration_note import MongoCalibrationNoteRepository
@@ -259,3 +274,91 @@ def get_copilot_data_service() -> CopilotDataService:
 def get_admin_service() -> AdminService:
     """Get the admin service instance."""
     return AdminService()
+
+
+@lru_cache(maxsize=1)
+def get_config_service() -> ConfigService:
+    """Get the config service instance."""
+    return ConfigService()
+
+
+@lru_cache(maxsize=1)
+def get_task_service() -> TaskService:
+    """Get the task service instance."""
+    return TaskService(
+        task_definition_repository=get_task_definition_repository(),
+    )
+
+
+@lru_cache(maxsize=1)
+def get_user_repository() -> MongoUserRepository:
+    """Get the user repository instance."""
+    return MongoUserRepository()
+
+
+@lru_cache(maxsize=1)
+def get_auth_service() -> AuthService:
+    """Get the auth service instance."""
+    return AuthService(
+        user_repository=get_user_repository(),
+    )
+
+
+@lru_cache(maxsize=1)
+def get_project_repository() -> MongoProjectRepository:
+    """Get the project repository instance."""
+    return MongoProjectRepository()
+
+
+@lru_cache(maxsize=1)
+def get_membership_repository() -> MongoProjectMembershipRepository:
+    """Get the project membership repository instance."""
+    return MongoProjectMembershipRepository()
+
+
+@lru_cache(maxsize=1)
+def get_project_service() -> ProjectService:
+    """Get the project service instance."""
+    return ProjectService(
+        project_repo=get_project_repository(),
+        membership_repo=get_membership_repository(),
+        user_repo=get_user_repository(),
+    )
+
+
+@lru_cache(maxsize=1)
+def get_task_file_service() -> TaskFileService:
+    """Get the task file service instance."""
+    return TaskFileService()
+
+
+@lru_cache(maxsize=1)
+def get_file_service() -> FileService:
+    """Get the file service instance."""
+    return FileService()
+
+
+@lru_cache(maxsize=1)
+def get_flow_repository() -> MongoFlowRepository:
+    """Get the flow repository instance."""
+    return MongoFlowRepository()
+
+
+@lru_cache(maxsize=1)
+def get_flow_service() -> "FlowService":
+    """Get the flow service instance."""
+    from qdash.api.services.flow_service import FlowService
+
+    return FlowService(
+        flow_repository=get_flow_repository(),
+    )
+
+
+@lru_cache(maxsize=1)
+def get_flow_schedule_service() -> "FlowScheduleService":
+    """Get the flow schedule service instance."""
+    from qdash.api.services.flow_schedule_service import FlowScheduleService
+
+    return FlowScheduleService(
+        flow_repository=get_flow_repository(),
+    )

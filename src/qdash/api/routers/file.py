@@ -3,19 +3,12 @@
 from __future__ import annotations
 
 import logging
-import os
-import zipfile
-from datetime import datetime, timezone
-from pathlib import Path
 from typing import Annotated, Any
 
-import yaml
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from fastapi.responses import FileResponse
-from git import Repo
-from git.exc import GitCommandError
+from qdash.api.dependencies import get_file_service  # noqa: TCH002
 from qdash.api.lib.auth import get_current_active_user  # noqa: TCH002
-from qdash.api.lib.file_utils import validate_relative_path
 from qdash.api.schemas.auth import User  # noqa: TCH002
 from qdash.api.schemas.file import (
     FileTreeNode,
@@ -23,85 +16,11 @@ from qdash.api.schemas.file import (
     SaveFileRequest,
     ValidateFileRequest,
 )
-from qdash.common.datetime_utils import now_iso
-from qdash.common.paths import QUBEX_CONFIG_BASE
+from qdash.api.services.file_service import FileService  # noqa: TCH002
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
-
-# Use centralized path from common module
-CONFIG_BASE_PATH = QUBEX_CONFIG_BASE
-
-
-def validate_config_path(relative_path: str) -> Path:
-    """Validate relative_path to prevent path traversal attacks.
-
-    Args:
-    ----
-        relative_path: Relative path from CONFIG_BASE_PATH (e.g., "64Qv2/config/chip.yaml")
-
-    Returns:
-    -------
-        Resolved absolute path
-
-    Raises:
-    ------
-        HTTPException: If validation fails
-
-    """
-    return validate_relative_path(relative_path, CONFIG_BASE_PATH)
-
-
-def build_file_tree(directory: Path, base_path: Path) -> list[FileTreeNode]:
-    """Build file tree structure recursively.
-
-    Args:
-    ----
-        directory: Directory to scan
-        base_path: Base path for calculating relative paths
-
-    Returns:
-    -------
-        List of FileTreeNode
-
-    """
-    nodes = []
-
-    try:
-        items = sorted(directory.iterdir(), key=lambda x: (not x.is_dir(), x.name))
-
-        for item in items:
-            # Skip hidden files and __pycache__
-            if item.name.startswith(".") or item.name == "__pycache__":
-                continue
-
-            relative_path = str(item.relative_to(base_path))
-
-            if item.is_dir():
-                children = build_file_tree(item, base_path)
-                nodes.append(
-                    FileTreeNode(
-                        name=item.name,
-                        path=relative_path,
-                        type="directory",
-                        children=children if children else None,
-                    )
-                )
-            else:
-                nodes.append(
-                    FileTreeNode(
-                        name=item.name,
-                        path=relative_path,
-                        type="file",
-                        children=None,
-                    )
-                )
-
-    except PermissionError:
-        logger.warning(f"Permission denied accessing directory: {directory}")
-
-    return nodes
 
 
 @router.get(
@@ -110,11 +29,11 @@ def build_file_tree(directory: Path, base_path: Path) -> list[FileTreeNode]:
     operation_id="downloadFile",
     response_class=FileResponse,
 )
-def download_file(path: str) -> FileResponse:
+def download_file(
+    path: str,
+    service: Annotated[FileService, Depends(get_file_service)],
+) -> FileResponse:
     """Download a raw data file from the server.
-
-    Retrieves a file from the server's filesystem and returns it as a downloadable
-    response.
 
     Parameters
     ----------
@@ -126,16 +45,8 @@ def download_file(path: str) -> FileResponse:
     FileResponse
         The file as a downloadable response
 
-    Raises
-    ------
-    HTTPException
-        404 if the file does not exist at the specified path
-
     """
-    if not Path(path).exists():
-        raise HTTPException(status_code=404, detail=f"File not found: {path}")
-
-    return FileResponse(path=path)
+    return service.download_file(path)
 
 
 @router.get(
@@ -144,12 +55,11 @@ def download_file(path: str) -> FileResponse:
     operation_id="downloadZipFile",
     response_class=FileResponse,
 )
-def download_zip_file(path: str) -> FileResponse:
+def download_zip_file(
+    path: str,
+    service: Annotated[FileService, Depends(get_file_service)],
+) -> FileResponse:
     """Download a file or directory as a ZIP archive.
-
-    Creates a ZIP archive of the specified file or directory and returns it
-    as a downloadable response. The archive is created in a temporary directory
-    and cleaned up after the response is sent.
 
     Parameters
     ----------
@@ -159,68 +69,10 @@ def download_zip_file(path: str) -> FileResponse:
     Returns
     -------
     FileResponse
-        ZIP archive as a downloadable response with media type "application/zip"
-
-    Raises
-    ------
-    HTTPException
-        404 if the path does not exist
-        500 if there is an error creating the ZIP archive
+        ZIP archive as a downloadable response
 
     """
-    import shutil
-    import tempfile
-
-    source_path = Path(path)
-    if not source_path.exists():
-        raise HTTPException(status_code=404, detail=f"Path not found: {path}")
-
-    # Create a temporary directory that will persist until explicitly removed
-    temp_dir = tempfile.mkdtemp()
-    temp_dir_path = Path(temp_dir)
-    timestamp = datetime.now(tz=timezone.utc).strftime("%Y%m%d_%H%M%S")
-    zip_filename = f"{source_path.name}_{timestamp}.zip"
-
-    try:
-        if source_path.is_dir():
-            # If it's a directory, zip its contents
-            # make_archive returns the path to the created zip file
-            actual_zip_path = Path(
-                shutil.make_archive(str(temp_dir_path / source_path.name), "zip", source_path)
-            )
-        else:
-            # If it's a file, create a zip containing just that file
-            actual_zip_path = temp_dir_path / zip_filename
-            with zipfile.ZipFile(actual_zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
-                zf.write(source_path, source_path.name)
-
-        if not actual_zip_path.is_file():
-            raise Exception(f"Failed to create zip file at {actual_zip_path}")
-
-        logger.info(f"Created zip file: {actual_zip_path}")
-
-        # Create a FileResponse with a cleanup callback
-        def cleanup_temp_dir() -> None:
-            try:
-                shutil.rmtree(temp_dir, ignore_errors=True)
-                logger.info(f"Cleaned up temp directory: {temp_dir}")
-            except Exception as e:
-                logger.error(f"Error cleaning up temp directory: {e}")
-
-        background_tasks = BackgroundTasks()
-        background_tasks.add_task(cleanup_temp_dir)
-        return FileResponse(
-            path=str(actual_zip_path),
-            filename=zip_filename,
-            media_type="application/zip",
-            background=background_tasks,
-        )
-
-    except Exception as e:
-        # Clean up temp directory in case of error
-        shutil.rmtree(temp_dir, ignore_errors=True)
-        logger.error(f"Error creating zip file: {e}")
-        raise HTTPException(status_code=500, detail=f"Error creating zip file: {e!s}")
+    return service.download_zip_file(path)
 
 
 @router.get(
@@ -229,20 +81,17 @@ def download_zip_file(path: str) -> FileResponse:
     operation_id="getFileTree",
     response_model=list[FileTreeNode],
 )
-def get_file_tree() -> list[FileTreeNode]:
-    """Get file tree structure for entire config directory (all chips).
+def get_file_tree(
+    service: Annotated[FileService, Depends(get_file_service)],
+) -> list[FileTreeNode]:
+    """Get file tree structure for entire config directory.
 
     Returns
     -------
         File tree structure
 
     """
-    if not CONFIG_BASE_PATH.exists():
-        raise HTTPException(
-            status_code=404, detail=f"Config directory not found: {CONFIG_BASE_PATH}"
-        )
-
-    return build_file_tree(CONFIG_BASE_PATH, CONFIG_BASE_PATH)
+    return service.get_file_tree()
 
 
 @router.get(
@@ -250,42 +99,22 @@ def get_file_tree() -> list[FileTreeNode]:
     summary="Get file content for editing",
     operation_id="getFileContent",
 )
-def get_file_content(path: str) -> dict[str, Any]:
+def get_file_content(
+    path: str,
+    service: Annotated[FileService, Depends(get_file_service)],
+) -> dict[str, Any]:
     """Get file content for editing.
 
     Args:
     ----
-        path: Relative path from CONFIG_BASE_PATH (e.g., "64Qv2/config/chip.yaml")
+        path: Relative path from CONFIG_BASE_PATH
 
     Returns:
     -------
         File content and metadata
 
     """
-    file_path = validate_config_path(path)
-
-    if not file_path.exists():
-        raise HTTPException(status_code=404, detail=f"File not found: {path}")
-
-    if not file_path.is_file():
-        raise HTTPException(status_code=400, detail=f"Not a file: {path}")
-
-    try:
-        content = file_path.read_text(encoding="utf-8")
-        return {
-            "content": content,
-            "path": path,
-            "name": file_path.name,
-            "size": file_path.stat().st_size,
-            "modified": datetime.fromtimestamp(
-                file_path.stat().st_mtime, tz=timezone.utc
-            ).isoformat(),
-        }
-    except UnicodeDecodeError:
-        raise HTTPException(status_code=400, detail="File is not a text file")
-    except Exception as e:
-        logger.error(f"Error reading file {file_path}: {e}")
-        raise HTTPException(status_code=500, detail=f"Error reading file: {e!s}")
+    return service.get_file_content(path)
 
 
 @router.put(
@@ -296,6 +125,7 @@ def get_file_content(path: str) -> dict[str, Any]:
 def save_file_content(
     request: SaveFileRequest,
     _current_user: Annotated[User, Depends(get_current_active_user)],
+    service: Annotated[FileService, Depends(get_file_service)],
 ) -> dict[str, str]:
     """Save file content.
 
@@ -308,23 +138,7 @@ def save_file_content(
         Success message
 
     """
-    file_path = validate_config_path(request.path)
-
-    try:
-        # Create parent directory if it doesn't exist
-        file_path.parent.mkdir(parents=True, exist_ok=True)
-
-        # Write content
-        file_path.write_text(request.content, encoding="utf-8")
-
-        logger.info(f"File saved successfully: {file_path}")
-        return {
-            "message": "File saved successfully",
-            "path": request.path,
-        }
-    except Exception as e:
-        logger.error(f"Error saving file {file_path}: {e}")
-        raise HTTPException(status_code=500, detail=f"Error saving file: {e!s}")
+    return service.save_file_content(request.path, request.content)
 
 
 @router.post(
@@ -332,7 +146,10 @@ def save_file_content(
     summary="Validate file content (YAML/JSON)",
     operation_id="validateFileContent",
 )
-def validate_file_content(request: ValidateFileRequest) -> dict[str, Any]:
+def validate_file_content(
+    request: ValidateFileRequest,
+    service: Annotated[FileService, Depends(get_file_service)],
+) -> dict[str, Any]:
     """Validate YAML or JSON content.
 
     Args:
@@ -344,36 +161,7 @@ def validate_file_content(request: ValidateFileRequest) -> dict[str, Any]:
         Validation result
 
     """
-    import json
-
-    try:
-        if request.file_type.lower() in ["yaml", "yml"]:
-            # Validate YAML
-            yaml.safe_load(request.content)
-            return {"valid": True, "message": "Valid YAML"}
-        elif request.file_type.lower() == "json":
-            # Validate JSON
-            json.loads(request.content)
-            return {"valid": True, "message": "Valid JSON"}
-        else:
-            raise HTTPException(
-                status_code=400, detail="Unsupported file type. Use 'yaml' or 'json'"
-            )
-    except yaml.YAMLError as e:
-        return {
-            "valid": False,
-            "message": f"Invalid YAML: {e!s}",
-            "error": str(e),
-        }
-    except json.JSONDecodeError as e:
-        return {
-            "valid": False,
-            "message": f"Invalid JSON: {e!s}",
-            "error": str(e),
-        }
-    except Exception as e:
-        logger.error(f"Error validating file content: {e}")
-        raise HTTPException(status_code=500, detail=f"Validation error: {e!s}")
+    return service.validate_file_content(request.content, request.file_type)
 
 
 @router.get(
@@ -381,7 +169,9 @@ def validate_file_content(request: ValidateFileRequest) -> dict[str, Any]:
     summary="Get Git status of config directory",
     operation_id="getGitStatus",
 )
-def get_git_status() -> dict[str, Any]:
+def get_git_status(
+    service: Annotated[FileService, Depends(get_file_service)],
+) -> dict[str, Any]:
     """Get Git status of config directory.
 
     Returns
@@ -389,58 +179,7 @@ def get_git_status() -> dict[str, Any]:
         Git status information
 
     """
-    try:
-        if not CONFIG_BASE_PATH.exists():
-            raise HTTPException(
-                status_code=404, detail=f"Config directory not found: {CONFIG_BASE_PATH}"
-            )
-
-        # Check if directory is a Git repository
-        git_dir = CONFIG_BASE_PATH / ".git"
-        if not git_dir.exists():
-            return {
-                "is_git_repo": False,
-                "message": "Config directory is not a Git repository",
-            }
-
-        repo = Repo(CONFIG_BASE_PATH)
-
-        # Get current branch
-        current_branch = repo.active_branch.name
-
-        # Get current commit
-        current_commit = repo.head.commit.hexsha[:8]
-        commit_message = repo.head.commit.message.strip()
-
-        # Check for uncommitted changes
-        is_dirty = repo.is_dirty(untracked_files=True)
-        untracked_files = repo.untracked_files
-        changed_files = [item.a_path for item in repo.index.diff(None)]
-
-        # Check if local is behind remote
-        has_remote_updates = False
-        try:
-            repo.remotes.origin.fetch()
-            local_sha = repo.head.commit.hexsha
-            remote_sha = repo.remotes.origin.refs.main.commit.hexsha
-            has_remote_updates = local_sha != remote_sha
-        except Exception:
-            logger.debug("Failed to fetch remote for update check")
-
-        return {
-            "is_git_repo": True,
-            "branch": current_branch,
-            "commit": current_commit,
-            "commit_message": commit_message,
-            "is_dirty": is_dirty,
-            "changed_files": changed_files,
-            "untracked_files": untracked_files,
-            "has_remote_updates": has_remote_updates,
-        }
-
-    except Exception as e:
-        logger.error(f"Error getting Git status: {e}")
-        raise HTTPException(status_code=500, detail=f"Error getting Git status: {e!s}")
+    return service.get_git_status()
 
 
 @router.post(
@@ -450,6 +189,7 @@ def get_git_status() -> dict[str, Any]:
 )
 def git_pull_config(
     _current_user: Annotated[User, Depends(get_current_active_user)],
+    service: Annotated[FileService, Depends(get_file_service)],
 ) -> dict[str, Any]:
     """Pull latest config from Git repository.
 
@@ -458,74 +198,7 @@ def git_pull_config(
         Pull operation result
 
     """
-    import shutil
-    from urllib.parse import urlparse, urlunparse
-
-    try:
-        # Get authentication details from environment
-        github_user = os.getenv("GITHUB_USER")
-        github_token = os.getenv("GITHUB_TOKEN")
-        repo_url = os.getenv("CONFIG_REPO_URL")
-
-        if not all([github_user, github_token, repo_url]):
-            raise HTTPException(
-                status_code=500,
-                detail="Missing required environment variables: GITHUB_USER, GITHUB_TOKEN, CONFIG_REPO_URL",
-            )
-
-        # Type narrowing for mypy after the all() check
-        assert repo_url is not None
-
-        # Parse and reconstruct URL with authentication
-        parsed = urlparse(repo_url)
-        auth_netloc = f"{github_user}:{github_token}@{parsed.netloc}"
-        auth_url: str = urlunparse((parsed.scheme, auth_netloc, parsed.path, "", "", ""))
-
-        if (CONFIG_BASE_PATH / ".git").exists():
-            # Already a git repo - fetch and reset to match remote exactly
-            logger.info("Fetching latest changes from remote")
-            repo = Repo(CONFIG_BASE_PATH)
-            repo.remotes.origin.set_url(auth_url)
-            repo.remotes.origin.fetch()
-            repo.git.reset("--hard", "origin/main")
-            repo.git.clean("-fd")
-        else:
-            # Not a git repo - clone directly
-            logger.info("Cloning repository to config directory")
-            if CONFIG_BASE_PATH.exists():
-                shutil.rmtree(CONFIG_BASE_PATH)
-            CONFIG_BASE_PATH.parent.mkdir(parents=True, exist_ok=True)
-            repo = Repo.clone_from(auth_url, str(CONFIG_BASE_PATH), depth=1)
-
-        # Log success with commit information
-        current = repo.head.commit
-        commit_sha = current.hexsha[:8]
-        commit_msg = (
-            current.message if isinstance(current.message, str) else current.message.decode("utf-8")
-        ).strip()
-
-        logger.info(f"Updated to commit: {commit_sha} - {commit_msg}")
-        logger.info(f"Config files updated successfully in: {CONFIG_BASE_PATH}")
-
-        return {
-            "success": True,
-            "commit": commit_sha,
-            "commit_message": commit_msg,
-            "message": "Config files updated successfully",
-        }
-
-    except GitCommandError as e:
-        # Mask credentials in error message
-        error_msg = str(e.stderr)
-        parsed_err = urlparse(repo_url or "")
-        masked_url: str = urlunparse(
-            (parsed_err.scheme, str(parsed_err.netloc).split("@")[-1], parsed_err.path, "", "", "")
-        )
-        logger.error(f"Git pull failed for {masked_url}: {error_msg}")
-        raise HTTPException(status_code=500, detail=f"Git pull failed: {error_msg}")
-    except Exception as e:
-        logger.error(f"Error pulling from Git: {e}")
-        raise HTTPException(status_code=500, detail=f"Error pulling from Git: {e!s}")
+    return service.git_pull_config()
 
 
 @router.post(
@@ -536,6 +209,7 @@ def git_pull_config(
 def git_push_config(
     request: GitPushRequest,
     _current_user: Annotated[User, Depends(get_current_active_user)],
+    service: Annotated[FileService, Depends(get_file_service)],
 ) -> dict[str, Any]:
     """Push config changes to Git repository.
 
@@ -548,154 +222,4 @@ def git_push_config(
         Push operation result
 
     """
-    import re
-    import shutil
-    import tempfile
-    from urllib.parse import urlparse, urlunparse
-
-    import httpx
-
-    try:
-        # Get authentication details from environment
-        github_user = os.getenv("GITHUB_USER")
-        github_token = os.getenv("GITHUB_TOKEN")
-        repo_url = os.getenv("CONFIG_REPO_URL")
-
-        if not all([github_user, github_token, repo_url]):
-            raise HTTPException(
-                status_code=500,
-                detail="Missing required environment variables: GITHUB_USER, GITHUB_TOKEN, CONFIG_REPO_URL",
-            )
-
-        # Type narrowing for mypy after the all() check
-        assert repo_url is not None
-
-        # Parse owner/repo from URL for GitHub API
-        match = re.match(r"https?://[^/]+/([^/]+)/([^/]+?)(?:\.git)?$", repo_url)
-        if not match:
-            raise HTTPException(status_code=500, detail="Invalid CONFIG_REPO_URL format")
-        owner = match.group(1)
-        repo_name = match.group(2)
-
-        # Parse and reconstruct URL with authentication
-        parsed = urlparse(repo_url)
-        auth_netloc = f"{github_user}:{github_token}@{parsed.netloc}"
-        auth_url: str = urlunparse((parsed.scheme, auth_netloc, parsed.path, "", "", ""))
-
-        # Create temporary directory and clone repository (shallow clone for efficiency)
-        temp_dir = tempfile.mkdtemp()
-        temp_dir_path = Path(temp_dir)
-
-        try:
-            logger.info("Cloning repository to temporary directory")
-            repo = Repo.clone_from(auth_url, temp_dir, branch="main", depth=1)
-
-            # Create a new branch for the PR
-            branch_name = f"config-update/{datetime.now(tz=timezone.utc).strftime('%Y%m%d-%H%M%S')}"
-            repo.git.checkout("-b", branch_name)
-
-            # Copy all files from CONFIG_BASE_PATH to temp repo (excluding .git)
-            # Track copied files for specific staging (not git add -A)
-            added_files = []
-            for item in CONFIG_BASE_PATH.rglob("*"):
-                if ".git" in item.parts:
-                    continue
-                if item.is_file():
-                    rel_path = item.relative_to(CONFIG_BASE_PATH)
-                    destination = temp_dir_path / rel_path
-                    destination.parent.mkdir(parents=True, exist_ok=True)
-                    shutil.copy2(item, destination)
-                    added_files.append(str(rel_path))
-
-            if not added_files:
-                logger.info("No files to commit")
-                return {
-                    "success": True,
-                    "message": "No files to commit",
-                    "commit": None,
-                }
-
-            # Stage only the files we copied (matching workflow behavior)
-            repo.index.add(added_files)
-
-            # Check if there are changes to commit
-            diff = repo.index.diff("HEAD")
-            if not diff:
-                logger.info("No changes to commit")
-                return {
-                    "success": True,
-                    "message": "No changes to commit",
-                    "commit": None,
-                }
-
-            # Configure git user (matching workflow)
-            repo.git.config("user.name", "github-actions[bot]")
-            repo.git.config("user.email", "github-actions[bot]@users.noreply.github.com")
-
-            # Commit with timestamp
-            now_jst = now_iso()
-            commit_msg = f"{request.commit_message} at {now_jst}"
-            repo.index.commit(commit_msg)
-
-            # Push the new branch to remote
-            logger.info(f"Pushing branch {branch_name} to remote")
-            repo.remotes.origin.push(refspec=f"{branch_name}:{branch_name}")
-
-            commit_sha = repo.head.commit.hexsha[:8]
-
-            # Create Pull Request via GitHub API
-            logger.info("Creating pull request")
-            pr_response = httpx.post(
-                f"https://api.github.com/repos/{owner}/{repo_name}/pulls",
-                headers={
-                    "Authorization": f"token {github_token}",
-                    "Accept": "application/vnd.github.v3+json",
-                },
-                json={
-                    "title": request.commit_message,
-                    "head": branch_name,
-                    "base": "main",
-                    "body": (
-                        f"Config update from QDash UI\n\n"
-                        f"- Commit: `{commit_sha}`\n"
-                        f"- Timestamp: {now_jst}\n"
-                    ),
-                },
-                timeout=30,
-            )
-            pr_response.raise_for_status()
-            pr_data = pr_response.json()
-
-            logger.info(f"Pull request created: {pr_data['html_url']}")
-
-            return {
-                "success": True,
-                "commit": commit_sha,
-                "commit_message": commit_msg,
-                "message": "Pull request created successfully",
-                "pr_url": pr_data["html_url"],
-                "pr_number": pr_data["number"],
-                "branch": branch_name,
-            }
-
-        finally:
-            if temp_dir_path.exists():
-                shutil.rmtree(temp_dir)
-
-    except GitCommandError as e:
-        # Mask credentials in error message
-        error_msg = str(e.stderr)
-        parsed_err = urlparse(repo_url or "")
-        masked_url: str = urlunparse(
-            (parsed_err.scheme, str(parsed_err.netloc).split("@")[-1], parsed_err.path, "", "", "")
-        )
-        logger.error(f"Git push failed for {masked_url}: {error_msg}")
-        raise HTTPException(status_code=500, detail=f"Git push failed: {error_msg}")
-    except httpx.HTTPStatusError as e:
-        logger.error(f"GitHub API error: {e.response.text}")
-        raise HTTPException(
-            status_code=500, detail=f"Failed to create pull request: {e.response.text}"
-        )
-    except Exception as e:
-        logger.error(f"Error pushing to Git: {e}")
-        raise HTTPException(status_code=500, detail=f"Error pushing to Git: {e!s}")
+    return service.git_push_config(request.commit_message)

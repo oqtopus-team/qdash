@@ -78,7 +78,7 @@ lint.ignore = [
 "src/qdash/workflow/service/calib_service.py" = ["E402"]  # Circular import avoidance
 "src/qdash/workflow/paths.py" = ["F401"]  # Re-exports for backward compatibility
 "src/qdash/api/routers/auth.py" = ["S106"]  # "bearer" is standard token type
-"src/qdash/api/routers/flow.py" = ["S603", "S607"]  # ruff format subprocess call
+"src/qdash/api/services/flow_service.py" = ["S603", "S607"]  # ruff format subprocess call
 "src/qdash/api/lib/topology_config.py" = ["S112"]  # Skip invalid config files
 "tests/**" = [
     "ANN201",
