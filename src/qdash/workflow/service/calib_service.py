@@ -58,6 +58,15 @@ from qdash.workflow.service.github import GitHubIntegration, GitHubPushConfig
 
 logger = logging.getLogger(__name__)
 
+__all__ = [
+    "CalibService",
+    "generate_execution_id",
+    # Re-exported for backward compatibility (used by strategy.py, two_qubit.py)
+    "finish_calibration",
+    "get_session",
+    "init_calibration",
+]
+
 
 class CalibService:
     """High-level API for calibration workflows.
@@ -920,7 +929,7 @@ class CalibService:
 # Internal Session Management (re-exported for backward compatibility)
 # =============================================================================
 
-from qdash.workflow.service._internal.session_helpers import (  # noqa: F401
+from qdash.workflow.service._internal.session_helpers import (
     finish_calibration,
     get_session,
     init_calibration,
