@@ -703,7 +703,7 @@ For most unit tests, use InMemory repository implementations instead of MongoDB.
 This approach is faster, doesn't require database setup, and provides better isolation.
 
 ```python
-from qdash.workflow.engine.repository import (
+from qdash.repository.inmemory import (
     InMemoryExecutionRepository,
     InMemoryChipRepository,
     InMemoryCalibrationNoteRepository,

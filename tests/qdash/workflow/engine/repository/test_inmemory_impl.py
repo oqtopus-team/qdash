@@ -5,7 +5,7 @@ from qdash.datamodel.execution import (
     ExecutionModel,
     ExecutionStatusModel,
 )
-from qdash.workflow.engine.repository import (
+from qdash.repository.inmemory import (
     InMemoryExecutionCounterRepository,
     InMemoryExecutionLockRepository,
     InMemoryExecutionRepository,
@@ -391,7 +391,7 @@ class TestInMemoryChipHistoryRepository:
 
     def test_create_history(self):
         """Test creating chip history snapshot."""
-        from qdash.workflow.engine.repository import InMemoryChipHistoryRepository
+        from qdash.repository.inmemory import InMemoryChipHistoryRepository
 
         repo = InMemoryChipHistoryRepository()
 
@@ -404,7 +404,7 @@ class TestInMemoryChipHistoryRepository:
 
     def test_create_history_without_chip_id(self):
         """Test creating history without chip_id."""
-        from qdash.workflow.engine.repository import InMemoryChipHistoryRepository
+        from qdash.repository.inmemory import InMemoryChipHistoryRepository
 
         repo = InMemoryChipHistoryRepository()
 
@@ -417,7 +417,7 @@ class TestInMemoryChipHistoryRepository:
 
     def test_clear(self):
         """Test clearing repository."""
-        from qdash.workflow.engine.repository import InMemoryChipHistoryRepository
+        from qdash.repository.inmemory import InMemoryChipHistoryRepository
 
         repo = InMemoryChipHistoryRepository()
         repo.create_history("alice", "chip_1")
@@ -432,7 +432,7 @@ class TestInMemoryQubitCalibrationRepository:
 
     def test_update_calib_data_creates_new(self):
         """Test updating creates new qubit if not exists."""
-        from qdash.workflow.engine.repository import InMemoryQubitCalibrationRepository
+        from qdash.repository.inmemory import InMemoryQubitCalibrationRepository
 
         repo = InMemoryQubitCalibrationRepository()
 
@@ -450,7 +450,7 @@ class TestInMemoryQubitCalibrationRepository:
 
     def test_update_calib_data_merges_existing(self):
         """Test updating merges into existing qubit."""
-        from qdash.workflow.engine.repository import InMemoryQubitCalibrationRepository
+        from qdash.repository.inmemory import InMemoryQubitCalibrationRepository
 
         repo = InMemoryQubitCalibrationRepository()
 
@@ -477,7 +477,7 @@ class TestInMemoryQubitCalibrationRepository:
 
     def test_find_one(self):
         """Test finding qubit by identifiers."""
-        from qdash.workflow.engine.repository import InMemoryQubitCalibrationRepository
+        from qdash.repository.inmemory import InMemoryQubitCalibrationRepository
 
         repo = InMemoryQubitCalibrationRepository()
         repo.update_calib_data(
@@ -497,7 +497,7 @@ class TestInMemoryQubitCalibrationRepository:
 
     def test_clear(self):
         """Test clearing repository."""
-        from qdash.workflow.engine.repository import InMemoryQubitCalibrationRepository
+        from qdash.repository.inmemory import InMemoryQubitCalibrationRepository
 
         repo = InMemoryQubitCalibrationRepository()
         repo.update_calib_data(
@@ -518,7 +518,7 @@ class TestInMemoryCouplingCalibrationRepository:
 
     def test_update_calib_data_creates_new(self):
         """Test updating creates new coupling if not exists."""
-        from qdash.workflow.engine.repository import InMemoryCouplingCalibrationRepository
+        from qdash.repository.inmemory import InMemoryCouplingCalibrationRepository
 
         repo = InMemoryCouplingCalibrationRepository()
 
@@ -536,7 +536,7 @@ class TestInMemoryCouplingCalibrationRepository:
 
     def test_update_calib_data_merges_existing(self):
         """Test updating merges into existing coupling."""
-        from qdash.workflow.engine.repository import InMemoryCouplingCalibrationRepository
+        from qdash.repository.inmemory import InMemoryCouplingCalibrationRepository
 
         repo = InMemoryCouplingCalibrationRepository()
 
@@ -563,7 +563,7 @@ class TestInMemoryCouplingCalibrationRepository:
 
     def test_find_one(self):
         """Test finding coupling by identifiers."""
-        from qdash.workflow.engine.repository import InMemoryCouplingCalibrationRepository
+        from qdash.repository.inmemory import InMemoryCouplingCalibrationRepository
 
         repo = InMemoryCouplingCalibrationRepository()
         repo.update_calib_data(
@@ -583,7 +583,7 @@ class TestInMemoryCouplingCalibrationRepository:
 
     def test_clear(self):
         """Test clearing repository."""
-        from qdash.workflow.engine.repository import InMemoryCouplingCalibrationRepository
+        from qdash.repository.inmemory import InMemoryCouplingCalibrationRepository
 
         repo = InMemoryCouplingCalibrationRepository()
         repo.update_calib_data(
