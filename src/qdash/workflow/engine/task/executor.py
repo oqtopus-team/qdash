@@ -635,15 +635,18 @@ class TaskExecutor:
 
                 # 5.5 For MUX tasks, process results for other qubits in the MUX
                 is_mux = getattr(task, "is_mux_level", False)
-                print(
-                    f"[MUX DEBUG] Checking MUX distribution: task={task_name}, is_mux_level={is_mux}, qid={qid}"
+                logger.debug(
+                    "Checking MUX distribution: task=%s, is_mux_level=%s, qid=%s",
+                    task_name,
+                    is_mux,
+                    qid,
                 )
                 if is_mux:
-                    print(f"[MUX DEBUG] Starting MUX distribution for task={task_name}, qid={qid}")
+                    logger.debug("Starting MUX distribution for task=%s, qid=%s", task_name, qid)
                     self._process_mux_other_qubits(
                         task, backend, execution_service, run_result, qid
                     )
-                    print(f"[MUX DEBUG] Finished MUX distribution for task={task_name}, qid={qid}")
+                    logger.debug("Finished MUX distribution for task=%s, qid=%s", task_name, qid)
 
             # 6. Complete task
             self._complete_task(task_name, task_type, qid, f"{task_name} is completed")
@@ -878,32 +881,7 @@ class TaskExecutor:
                 qid=qid,
             )
 
-        if not success:
-            logger.info(
-                "Skipping backend parameter updates for %s due to failed R² validation",
-                task_name,
-            )
-            # Still save to database even if R² failed
-            if output_parameters:
-                if task.is_qubit_task():
-                    qubit_repo.update_calib_data(
-                        username=self.username,
-                        qid=qid,
-                        chip_id=execution_service.chip_id,
-                        output_parameters=output_parameters,
-                        project_id=execution_service.project_id,
-                    )
-                elif task.is_coupling_task():
-                    coupling_repo.update_calib_data(
-                        username=self.username,
-                        qid=qid,
-                        chip_id=execution_service.chip_id,
-                        output_parameters=output_parameters,
-                        project_id=execution_service.project_id,
-                    )
-            return
-
-        # Update database
+        # Always save to database (even on R² failure)
         if output_parameters:
             if task.is_qubit_task():
                 qubit_repo.update_calib_data(
@@ -913,7 +891,6 @@ class TaskExecutor:
                     output_parameters=output_parameters,
                     project_id=execution_service.project_id,
                 )
-                self._update_backend_params(backend, execution_service, qid, output_parameters)
             elif task.is_coupling_task():
                 coupling_repo.update_calib_data(
                     username=self.username,
@@ -922,6 +899,17 @@ class TaskExecutor:
                     output_parameters=output_parameters,
                     project_id=execution_service.project_id,
                 )
+
+        # Only update backend params on success
+        if not success:
+            logger.info(
+                "Skipping backend parameter updates for %s due to failed R² validation",
+                task_name,
+            )
+            return
+
+        if output_parameters and task.is_qubit_task():
+            self._update_backend_params(backend, execution_service, qid, output_parameters)
 
     def _update_backend_params(
         self,
@@ -979,9 +967,6 @@ class TaskExecutor:
         representative_qid : str
             The representative qubit ID (the one that executed the task)
         """
-        task_name = task.get_name()
-        task_type = task.get_task_type()
-
         # Calculate other qids in the MUX (assuming 4 qubits per MUX)
         try:
             mux_base_qid = (int(representative_qid) // 4) * 4
@@ -995,94 +980,89 @@ class TaskExecutor:
         for pos_in_mux in range(4):
             target_qid = str(mux_base_qid + pos_in_mux)
             if target_qid == representative_qid:
-                # Skip the representative qubit (already processed)
                 continue
+            self._distribute_mux_result_to_qid(
+                task, backend, execution_service, run_result, target_qid
+            )
 
-            print(f"[MUX DEBUG] Processing MUX result for qid={target_qid} (task={task_name})")
+    def _distribute_mux_result_to_qid(
+        self,
+        task: TaskProtocol,
+        backend: "BaseBackend",
+        execution_service: "ExecutionService",
+        run_result: RunResult,
+        target_qid: str,
+    ) -> None:
+        """Postprocess, save, and record a MUX task result for a single qubit.
 
-            try:
-                # Ensure task exists for this qid
-                self.state_manager.ensure_task_exists(task_name, task_type, target_qid)
-                print(f"[MUX DEBUG] Task exists ensured for qid={target_qid}")
+        Parameters
+        ----------
+        task : TaskProtocol
+            The task instance
+        backend : BaseBackend
+            The backend
+        execution_service : ExecutionService
+            The execution service
+        run_result : RunResult
+            The run result from the representative qubit's execution
+        target_qid : str
+            The qubit ID to distribute results to
+        """
+        task_name = task.get_name()
+        task_type = task.get_task_type()
+        logger.debug("Processing MUX result for qid=%s (task=%s)", target_qid, task_name)
 
-                # Start task for this qid
-                self.state_manager.start_task(task_name, task_type, target_qid)
-                print(f"[MUX DEBUG] Task started for qid={target_qid}")
+        try:
+            self.state_manager.ensure_task_exists(task_name, task_type, target_qid)
+            self.state_manager.start_task(task_name, task_type, target_qid)
 
-                # Call postprocess for this qid (it will extract the correct frequency)
-                postprocess_result = task.postprocess(
-                    backend, self.execution_id, run_result, target_qid
-                )
-                print(
-                    f"[MUX DEBUG] Postprocess result for qid={target_qid}: output_params={bool(postprocess_result.output_parameters) if postprocess_result else None}, figures={len(postprocess_result.figures) if postprocess_result and postprocess_result.figures else 0}"
-                )
+            postprocess_result = task.postprocess(
+                backend, self.execution_id, run_result, target_qid
+            )
 
-                if postprocess_result:
-                    # Process output parameters
-                    if postprocess_result.output_parameters:
-                        task_model = self.state_manager.get_task(task_name, task_type, target_qid)
-                        task.attach_task_id(task_model.task_id)
-                        print(
-                            f"[MUX DEBUG] Processing output params for qid={target_qid}, task_id={task_model.task_id}"
-                        )
+            if postprocess_result:
+                if postprocess_result.output_parameters:
+                    task_model = self.state_manager.get_task(task_name, task_type, target_qid)
+                    task.attach_task_id(task_model.task_id)
+                    processed_params = self.result_processor.process_output_parameters(
+                        postprocess_result.output_parameters,
+                        task_name,
+                        self.execution_id,
+                        task_model.task_id,
+                    )
+                    self.state_manager.put_output_parameters(
+                        task_name, processed_params, task_type, target_qid
+                    )
 
-                        processed_params = self.result_processor.process_output_parameters(
-                            postprocess_result.output_parameters,
-                            task_name,
-                            self.execution_id,
-                            task_model.task_id,
-                        )
-                        self.state_manager.put_output_parameters(
-                            task_name, processed_params, task_type, target_qid
-                        )
-                        print(f"[MUX DEBUG] Output params stored for qid={target_qid}")
+                if postprocess_result.figures:
+                    png_paths, json_paths = self.data_saver.save_figures(
+                        postprocess_result.figures, task_name, task_type, target_qid
+                    )
+                    self.state_manager.set_figure_paths(
+                        task_name, task_type, target_qid, png_paths, json_paths
+                    )
 
-                    # Save figures
-                    if postprocess_result.figures:
-                        print(
-                            f"[MUX DEBUG] Saving {len(postprocess_result.figures)} figures for qid={target_qid}"
-                        )
-                        png_paths, json_paths = self.data_saver.save_figures(
-                            postprocess_result.figures, task_name, task_type, target_qid
-                        )
-                        print(
-                            f"[MUX DEBUG] Figures saved for qid={target_qid}: png_paths={png_paths}, json_paths={json_paths}"
-                        )
-                        self.state_manager.set_figure_paths(
-                            task_name, task_type, target_qid, png_paths, json_paths
-                        )
-                        print(f"[MUX DEBUG] Figure paths set in state_manager for qid={target_qid}")
+                self._save_mux_qid_to_database(task, execution_service, target_qid)
 
-                    # Save to database
-                    print(f"[MUX DEBUG] Saving to database for qid={target_qid}")
-                    self._save_mux_qid_to_database(task, execution_service, target_qid)
-                    print(f"[MUX DEBUG] Database save completed for qid={target_qid}")
+            self._complete_task(
+                task_name, task_type, target_qid, f"{task_name} completed (MUX distribution)"
+            )
 
-                # Complete task for this qid
-                self._complete_task(
-                    task_name, task_type, target_qid, f"{task_name} completed (MUX distribution)"
-                )
-                print(f"[MUX DEBUG] Task completed for qid={target_qid}")
+        except Exception as e:
+            logger.warning(
+                "Failed to process MUX result for qid=%s: %s",
+                target_qid,
+                e,
+                exc_info=True,
+            )
+            self._fail_task(task_name, task_type, target_qid, str(e))
 
-            except Exception as e:
-                logger.warning(
-                    "Failed to process MUX result for qid=%s: %s",
-                    target_qid,
-                    e,
-                    exc_info=True,
-                )
-                self._fail_task(task_name, task_type, target_qid, str(e))
-
-            finally:
-                # End task for this qid
-                self.state_manager.end_task(task_name, task_type, target_qid)
-
-                # Record task history for this qid (so it appears in chip screen)
-                executed_task = self.state_manager.get_task(task_name, task_type, target_qid)
-                self.history_recorder.record_task_result(
-                    executed_task, execution_service.to_datamodel()
-                )
-                print(f"[MUX DEBUG] Task history recorded for qid={target_qid}")
+        finally:
+            self.state_manager.end_task(task_name, task_type, target_qid)
+            executed_task = self.state_manager.get_task(task_name, task_type, target_qid)
+            self.history_recorder.record_task_result(
+                executed_task, execution_service.to_datamodel()
+            )
 
     def _save_mux_qid_to_database(
         self,
