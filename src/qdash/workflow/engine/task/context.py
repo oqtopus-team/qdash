@@ -13,12 +13,11 @@ import json
 import logging
 import uuid
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 from qdash.datamodel.task import (
     CalibDataModel,
     TaskResultModel,
-    TaskStatusModel,
     TaskTypes,
 )
 from qdash.repository import FilesystemCalibDataSaver
@@ -309,135 +308,6 @@ class TaskContext:
         """
         self.state.end_task(task_name, task_type, qid)
 
-    # =========================================================================
-    # State Delegation (prefer `context.state.XXX()` for direct access)
-    # =========================================================================
-    # These methods delegate to TaskStateManager. For more control or
-    # when writing new code, consider using `context.state.XXX()` directly.
-    #
-    # Example:
-    #     # Direct access (preferred for new code)
-    #     context.state.update_task_status_to_completed(task_name, msg, task_type, qid)
-    #
-    #     # Shortcut (kept for backward compatibility)
-    #     context.update_task_status_to_completed(task_name, msg, task_type, qid)
-
-    def update_task_status(
-        self,
-        task_name: str,
-        new_status: TaskStatusModel,
-        message: str = "",
-        task_type: str = TaskTypes.GLOBAL,
-        qid: str = "",
-    ) -> None:
-        """Update task status. See also: `context.state.update_task_status()`."""
-        self.state.update_task_status(task_name, new_status, message, task_type, qid)
-
-    def update_task_status_to_running(
-        self,
-        task_name: str,
-        message: str = "",
-        task_type: str = TaskTypes.GLOBAL,
-        qid: str = "",
-    ) -> None:
-        """Update task status to RUNNING. See also: `context.state.update_task_status_to_running()`."""
-        self.state.update_task_status_to_running(task_name, message, task_type, qid)
-
-    def update_task_status_to_completed(
-        self,
-        task_name: str,
-        message: str = "",
-        task_type: str = TaskTypes.GLOBAL,
-        qid: str = "",
-    ) -> None:
-        """Update task status to COMPLETED. See also: `context.state.update_task_status_to_completed()`."""
-        self.state.update_task_status_to_completed(task_name, message, task_type, qid)
-
-    def update_task_status_to_failed(
-        self,
-        task_name: str,
-        message: str = "",
-        task_type: str = TaskTypes.GLOBAL,
-        qid: str = "",
-    ) -> None:
-        """Update task status to FAILED. See also: `context.state.update_task_status_to_failed()`."""
-        self.state.update_task_status_to_failed(task_name, message, task_type, qid)
-
-    def update_task_status_to_skipped(
-        self,
-        task_name: str,
-        message: str = "",
-        task_type: str = TaskTypes.GLOBAL,
-        qid: str = "",
-    ) -> None:
-        """Update task status to SKIPPED. See also: `context.state.update_task_status_to_skipped()`."""
-        self.state.update_task_status_to_skipped(task_name, message, task_type, qid)
-
-    def put_input_parameters(
-        self,
-        task_name: str,
-        input_parameters: dict[str, Any],
-        task_type: str = TaskTypes.GLOBAL,
-        qid: str = "",
-    ) -> None:
-        """Store input parameters. See also: `context.state.put_input_parameters()`."""
-        self.state.put_input_parameters(task_name, input_parameters, task_type, qid)
-
-    def put_output_parameters(
-        self,
-        task_name: str,
-        output_parameters: dict[str, Any],
-        task_type: str = TaskTypes.GLOBAL,
-        qid: str = "",
-    ) -> None:
-        """Store output parameters. See also: `context.state.put_output_parameters()`."""
-        self.state.put_output_parameters(task_name, output_parameters, task_type, qid)
-
-    # =========================================================================
-    # Data Access (read-only shortcuts)
-    # =========================================================================
-
-    def get_qubit_calib_data(self, qid: str) -> dict[Any, Any]:
-        """Get calibration data for a qubit."""
-        return cast(dict[Any, Any], self.state.get_qubit_calib_data(qid))
-
-    def get_coupling_calib_data(self, qid: str) -> dict[Any, Any]:
-        """Get calibration data for a coupling."""
-        return cast(dict[Any, Any], self.state.get_coupling_calib_data(qid))
-
-    def get_output_parameter_by_task_name(
-        self,
-        task_name: str,
-        task_type: str = TaskTypes.GLOBAL,
-        qid: str = "",
-    ) -> dict[str, Any]:
-        """Get output parameters for a task."""
-        return cast(
-            dict[str, Any],
-            self.state.get_output_parameter_by_task_name(task_name, task_type, qid),
-        )
-
-    def this_task_is_completed(
-        self,
-        task_name: str,
-        task_type: str = TaskTypes.GLOBAL,
-        qid: str = "",
-    ) -> bool:
-        """Check if a task is completed."""
-        return cast(bool, self.state.this_task_is_completed(task_name, task_type, qid))
-
-    def has_only_qubit_or_global_tasks(self, task_names: list[str]) -> bool:
-        """Check if all tasks are qubit or global types."""
-        return cast(bool, self.state.has_only_qubit_or_global_tasks(task_names))
-
-    def has_only_coupling_or_global_tasks(self, task_names: list[str]) -> bool:
-        """Check if all tasks are coupling or global types."""
-        return cast(bool, self.state.has_only_coupling_or_global_tasks(task_names))
-
-    def has_only_system_tasks(self, task_names: list[str]) -> bool:
-        """Check if all tasks are system types."""
-        return cast(bool, self.state.has_only_system_tasks(task_names))
-
     # === Batch Operations ===
 
     def start_all_qid_tasks(
@@ -475,7 +345,7 @@ class TaskContext:
         if qids is None:
             qids = []
         for qid in qids:
-            self.update_task_status_to_running(task_name, message, task_type, qid)
+            self.state.update_task_status_to_running(task_name, message, task_type, qid)
 
     def update_all_qid_task_status_to_completed(
         self,
@@ -488,7 +358,7 @@ class TaskContext:
         if qids is None:
             qids = []
         for qid in qids:
-            self.update_task_status_to_completed(task_name, message, task_type, qid)
+            self.state.update_task_status_to_completed(task_name, message, task_type, qid)
 
     def update_all_qid_task_status_to_failed(
         self,
@@ -501,7 +371,7 @@ class TaskContext:
         if qids is None:
             qids = []
         for qid in qids:
-            self.update_task_status_to_failed(task_name, message, task_type, qid)
+            self.state.update_task_status_to_failed(task_name, message, task_type, qid)
 
     def update_not_executed_tasks_to_skipped(
         self, task_type: str = TaskTypes.GLOBAL, qid: str = ""

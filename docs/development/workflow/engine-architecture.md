@@ -220,13 +220,13 @@ The Repository Pattern is visualized in the Task Executor Flow diagram (see abov
 
 ```python
 # Production code (MongoDB)
-from qdash.workflow.engine.repository import MongoChipRepository
+from qdash.repository import MongoChipRepository
 
 chip_repo = MongoChipRepository()
 chip = chip_repo.get_current_chip(username="alice")
 
 # Test code (InMemory)
-from qdash.workflow.engine.repository import InMemoryChipRepository
+from qdash.repository.inmemory import InMemoryChipRepository
 
 chip_repo = InMemoryChipRepository()
 chip_repo.add_chip("alice", mock_chip)  # Test helper

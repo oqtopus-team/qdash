@@ -51,54 +51,21 @@ if TYPE_CHECKING:
 from prefect import get_run_logger
 from qdash.common.backend_config import get_default_backend
 from qdash.common.datetime_utils import now
-
-logger = logging.getLogger(__name__)
 from qdash.workflow.engine import CalibConfig, CalibOrchestrator
 from qdash.workflow.engine.params_updater import get_params_updater
+from qdash.workflow.service.execution_id import generate_execution_id
 from qdash.workflow.service.github import GitHubIntegration, GitHubPushConfig
 
+logger = logging.getLogger(__name__)
 
-def generate_execution_id(
-    username: str,
-    chip_id: str,
-    project_id: str | None = None,
-    counter_repo: ExecutionCounterRepository | None = None,
-) -> str:
-    """Generate a unique execution ID based on the current date and an execution index.
-
-    This function creates execution IDs in the format YYYYMMDD-NNN, where:
-    - YYYYMMDD is the current date in JST timezone
-    - NNN is a zero-padded 3-digit counter for that day
-
-    Args:
-        username: Username for the execution
-        chip_id: Chip ID for the execution
-        project_id: Project ID for the execution (optional)
-        counter_repo: Repository for counter operations. If None, uses MongoExecutionCounterRepository.
-
-    Returns:
-        Generated execution ID (e.g., "20240101-001")
-
-    Example:
-        ```python
-        exec_id = generate_execution_id("alice", "chip_1")
-        print(exec_id)  # "20240123-001"
-        ```
-
-    """
-    if counter_repo is None:
-        from qdash.repository import MongoExecutionCounterRepository
-
-        counter_repo = MongoExecutionCounterRepository()
-
-    date_str = now().strftime("%Y%m%d")
-    execution_index = counter_repo.get_next_index(
-        date=date_str,
-        username=username,
-        chip_id=chip_id,
-        project_id=project_id,
-    )
-    return f"{date_str}-{execution_index:03d}"
+__all__ = [
+    "CalibService",
+    "generate_execution_id",
+    # Re-exported for backward compatibility (used by strategy.py, two_qubit.py)
+    "finish_calibration",
+    "get_session",
+    "init_calibration",
+]
 
 
 class CalibService:
@@ -247,8 +214,10 @@ class CalibService:
         # Auto-load default_run_parameters from flow document if not explicitly provided
         if not self.default_run_parameters and self.flow_name:
             self._load_default_run_parameters()
-        print(
-            f"[TRACE] CalibService.__init__ flow_name={self.flow_name} default_run_parameters={self.default_run_parameters}"
+        logger.debug(
+            "CalibService.__init__ flow_name=%s default_run_parameters=%s",
+            self.flow_name,
+            self.default_run_parameters,
         )
 
         # Session state
@@ -274,9 +243,10 @@ class CalibService:
             flow = flow_repo.find_by_user_and_name(self.username, flow_name, self.project_id)
             if flow and flow.default_run_parameters:
                 self.default_run_parameters = flow.default_run_parameters
-                logger.info(
-                    f"[TRACE] Loaded default_run_parameters from flow '{self.flow_name}': "
-                    f"{flow.default_run_parameters}"
+                logger.debug(
+                    "Loaded default_run_parameters from flow '%s': %s",
+                    self.flow_name,
+                    flow.default_run_parameters,
                 )
         except Exception:
             logger.warning(
@@ -346,7 +316,7 @@ class CalibService:
         # Wrap all initialization in try/except to ensure lock is released on failure
         try:
             # Create CalibConfig
-            logger.info(f"[TRACE] CalibConfig default_run_parameters={self.default_run_parameters}")
+            logger.debug("CalibConfig default_run_parameters=%s", self.default_run_parameters)
             config = CalibConfig(
                 username=self.username,
                 chip_id=self.chip_id,
@@ -692,95 +662,106 @@ class CalibService:
             assert self.github_push_config is not None, "GitHubPushConfig not initialized"
 
             # Finalize any tasks still in RUNNING status before completing execution.
-            # This can happen when task recording fails during Dask parallel execution
-            # (e.g., MongoDB write failure, Prefect task timeout, or worker crash).
             self._finalize_stale_running_tasks(logger)
 
             # Reload and complete execution
             self.execution_service = self.execution_service.reload().complete_execution()
 
-            # Update chip history for the specific chip being calibrated
             if update_chip_history:
-                try:
-                    from qdash.repository import (
-                        MongoChipHistoryRepository,
-                        MongoChipRepository,
-                    )
+                self._update_chip_history(logger)
 
-                    # Use chip_id from session instead of "current" chip to avoid
-                    # updating wrong chip's history when calibrating older chips
-                    chip_repo = MongoChipRepository()
-                    chip = chip_repo.get_chip_by_id(username=self.username, chip_id=self.chip_id)
-                    if chip is not None:
-                        history_repo = MongoChipHistoryRepository()
-                        history_repo.create_history(username=self.username, chip_id=self.chip_id)
-                    else:
-                        logger.warning(
-                            f"Chip '{self.chip_id}' not found for user '{self.username}', "
-                            "skipping history update"
-                        )
-                except Exception as e:
-                    # If chip history update fails, log but don't fail the calibration
-                    logger.warning(f"Failed to update chip history: {e}")
-
-            # Export calibration note to file if requested
             if export_note_to_file:
-                try:
-                    from qdash.repository import MongoCalibrationNoteRepository
+                self._export_calibration_note(logger)
 
-                    repo = MongoCalibrationNoteRepository()
-                    latest_note = repo.find_one(
-                        username=self.username,
-                        task_id=self.task_context.id,
-                        execution_id=self.execution_id,
-                        chip_id=self.chip_id,
-                    )
-
-                    if latest_note:
-                        note_path = Path(
-                            f"{self.execution_service.calib_data_path}/calib_note/{self.task_context.id}.json"
-                        )
-                        note_path.parent.mkdir(parents=True, exist_ok=True)
-                        note_path.write_text(
-                            json.dumps(latest_note.note, indent=2, ensure_ascii=False)
-                        )
-                        logger.info(f"Exported calibration note to {note_path}")
-                    else:
-                        logger.warning(
-                            f"No calibration note found for task_id={self.task_context.id}"
-                        )
-                except Exception as e:
-                    logger.error(f"Failed to export calibration note: {e}")
-
-            # Push to GitHub if configured
-            should_push = (
-                push_to_github if push_to_github is not None else self.github_push_config.enabled
-            )
-
-            if should_push:
-                self._sync_backend_params_before_push(logger)
-                if GitHubIntegration.check_credentials() and self.github_integration is not None:
-                    try:
-                        push_results = self.github_integration.push_files(self.github_push_config)
-
-                        # Store push results in execution note
-                        if push_results:
-                            self.execution_service.note.github_push_results = push_results
-                            self.execution_service.save()
-                            logger.info(f"GitHub push completed: {push_results}")
-                    except Exception as e:
-                        logger.error(f"Failed to push to GitHub: {e}")
-                        push_results = {"error": str(e)}
-                else:
-                    logger.warning("GitHub credentials not configured, skipping push")
+            push_results = self._push_to_github_if_configured(logger, push_to_github)
 
         finally:
-            # Always release lock if we acquired it
-            if self.use_lock and self._lock_acquired and self._lock_repo is not None:
-                self._lock_repo.unlock(project_id=self.project_id)
-                self._lock_acquired = False
+            self._release_lock_if_acquired()
 
         return push_results
+
+    def _update_chip_history(self, logger: Any) -> None:
+        """Update chip history for the specific chip being calibrated."""
+        try:
+            from qdash.repository import (
+                MongoChipHistoryRepository,
+                MongoChipRepository,
+            )
+
+            chip_repo = MongoChipRepository()
+            chip = chip_repo.get_chip_by_id(username=self.username, chip_id=self.chip_id)
+            if chip is not None:
+                history_repo = MongoChipHistoryRepository()
+                history_repo.create_history(username=self.username, chip_id=self.chip_id)
+            else:
+                logger.warning(
+                    f"Chip '{self.chip_id}' not found for user '{self.username}', "
+                    "skipping history update"
+                )
+        except Exception as e:
+            logger.warning(f"Failed to update chip history: {e}")
+
+    def _export_calibration_note(self, logger: Any) -> None:
+        """Export calibration note to a local JSON file."""
+        assert self.task_context is not None
+        assert self.execution_service is not None
+        try:
+            from qdash.repository import MongoCalibrationNoteRepository
+
+            repo = MongoCalibrationNoteRepository()
+            latest_note = repo.find_one(
+                username=self.username,
+                task_id=self.task_context.id,
+                execution_id=self.execution_id,
+                chip_id=self.chip_id,
+            )
+
+            if latest_note:
+                note_path = Path(
+                    f"{self.execution_service.calib_data_path}/calib_note/{self.task_context.id}.json"
+                )
+                note_path.parent.mkdir(parents=True, exist_ok=True)
+                note_path.write_text(json.dumps(latest_note.note, indent=2, ensure_ascii=False))
+                logger.info(f"Exported calibration note to {note_path}")
+            else:
+                logger.warning(f"No calibration note found for task_id={self.task_context.id}")
+        except Exception as e:
+            logger.error(f"Failed to export calibration note: {e}")
+
+    def _push_to_github_if_configured(
+        self, logger: Any, push_to_github: bool | None
+    ) -> dict[str, Any] | None:
+        """Push results to GitHub if configured."""
+        assert self.github_push_config is not None
+        assert self.execution_service is not None
+
+        should_push = (
+            push_to_github if push_to_github is not None else self.github_push_config.enabled
+        )
+        if not should_push:
+            return None
+
+        self._sync_backend_params_before_push(logger)
+        if GitHubIntegration.check_credentials() and self.github_integration is not None:
+            try:
+                push_results = self.github_integration.push_files(self.github_push_config)
+                if push_results:
+                    self.execution_service.note.github_push_results = push_results
+                    self.execution_service.save()
+                    logger.info(f"GitHub push completed: {push_results}")
+                return push_results
+            except Exception as e:
+                logger.error(f"Failed to push to GitHub: {e}")
+                return {"error": str(e)}
+        else:
+            logger.warning("GitHub credentials not configured, skipping push")
+            return None
+
+    def _release_lock_if_acquired(self) -> None:
+        """Release the execution lock if it was acquired by this session."""
+        if self.use_lock and self._lock_acquired and self._lock_repo is not None:
+            self._lock_repo.unlock(project_id=self.project_id)
+            self._lock_acquired = False
 
     def fail_calibration(self, error_message: str = "") -> None:
         """Mark the calibration as failed and cleanup.
@@ -817,10 +798,7 @@ class CalibService:
             if self.execution_service:
                 self.execution_service = self.execution_service.reload().fail_execution()
         finally:
-            # Always release lock if we acquired it
-            if self.use_lock and self._lock_acquired and self._lock_repo is not None:
-                self._lock_repo.unlock(project_id=self.project_id)
-                self._lock_acquired = False
+            self._release_lock_if_acquired()
             self._initialized = False
 
     # =========================================================================
@@ -948,72 +926,11 @@ class CalibService:
 
 
 # =============================================================================
-# Internal Session Management (for scheduled.py and strategy.py)
+# Internal Session Management (re-exported for backward compatibility)
 # =============================================================================
 
-from qdash.workflow.service.session_context import (
-    clear_current_session,
-    get_current_session,
-    set_current_session,
+from qdash.workflow.service._internal.session_helpers import (
+    finish_calibration,
+    get_session,
+    init_calibration,
 )
-
-
-def init_calibration(
-    username: str,
-    chip_id: str,
-    qids: list[str],
-    execution_id: str | None = None,
-    backend_name: str = "qubex",
-    flow_name: str | None = None,
-    tags: list[str] | None = None,
-    use_lock: bool = True,
-    note: dict[str, Any] | None = None,
-    enable_github_pull: bool = True,
-    github_push_config: GitHubPushConfig | None = None,
-    muxes: list[int] | None = None,
-    project_id: str | None = None,
-) -> CalibService:
-    """Initialize a session and set it in global context (internal use)."""
-    session = CalibService(
-        username=username,
-        chip_id=chip_id,
-        qids=qids,
-        execution_id=execution_id,
-        backend_name=backend_name,
-        flow_name=flow_name,
-        tags=tags,
-        use_lock=use_lock,
-        note=note,
-        enable_github_pull=enable_github_pull,
-        github_push_config=github_push_config,
-        muxes=muxes,
-        project_id=project_id,
-    )
-    set_current_session(session)
-    return session
-
-
-def get_session() -> CalibService:
-    """Get the current session from global context (internal use)."""
-    session = get_current_session()
-    if session is None:
-        msg = "No active calibration session."
-        raise RuntimeError(msg)
-    assert isinstance(session, CalibService), "Session must be a CalibService instance"
-    return session
-
-
-def finish_calibration(
-    update_chip_history: bool = True,
-    push_to_github: bool | None = None,
-    export_note_to_file: bool = False,
-) -> dict[str, Any] | None:
-    """Finish the current session and clear from global context (internal use)."""
-    session = get_session()
-    result = session.finish_calibration(
-        update_chip_history=update_chip_history,
-        push_to_github=push_to_github,
-        export_note_to_file=export_note_to_file,
-    )
-    clear_current_session()
-    return result

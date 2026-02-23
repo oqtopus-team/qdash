@@ -5,15 +5,12 @@ from unittest.mock import MagicMock
 import pytest
 from qdash.datamodel.task import ParameterModel, QubitTaskModel, RunParameterModel, TaskStatusModel
 from qdash.workflow.calibtasks.base import PostProcessResult, PreProcessResult, RunResult
-from qdash.workflow.engine.task.executor import (
-    TaskExecutionError,
-    TaskExecutor,
-    TaskProtocol,
-)
+from qdash.workflow.engine.task.executor import TaskExecutor
 from qdash.workflow.engine.task.result_processor import (
     FidelityValidationError,
     R2ValidationError,
 )
+from qdash.workflow.engine.task.types import TaskExecutionError, TaskProtocol
 
 
 class MockTask:
