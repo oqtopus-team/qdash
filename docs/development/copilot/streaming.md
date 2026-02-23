@@ -25,58 +25,60 @@ All events follow the SSE format: `event: <type>\ndata: <json>\n\n`
 
 | Step | When |
 |------|------|
-| `resolve_knowledge` | Loading TaskKnowledge for the task |
-| `load_qubit_params` | Fetching qubit parameters from DB |
-| `load_task_result` | Fetching task result from DB |
-| `build_context` | Constructing TaskAnalysisContext |
+| `build_context` | Building analysis context (knowledge, qubit params, task result, images) |
+| `load_images` | Sending experiment/reference images to AI |
 | `run_analysis` / `run_chat` | Starting LLM interaction |
 | `tool_call` | Agent is calling a tool |
 | `thinking` | Agent is processing/reasoning |
 | `complete` | All processing finished |
 | `load_config` | Loading copilot config (chat mode) |
+| `load_qubit_params` | Fetching qubit parameters from DB (chat mode) |
+| `load_issue` | Loading issue thread (issue AI reply) |
+| `build_history` | Building conversation history from thread (issue AI reply) |
+| `load_context` | Loading task context (issue AI reply) |
+| `save_reply` | Saving AI reply as issue (issue AI reply) |
 
-## Queue + Task Pattern
+## SSETaskBridge
 
-The streaming endpoints use `asyncio.Queue` + `asyncio.Task` to bridge the async agent execution with the SSE generator:
+All three streaming endpoints (`/copilot/analyze/stream`, `/copilot/chat/stream`, `/issues/{id}/ai-reply/stream`) share the same queue-poll-heartbeat-drain pattern. This is encapsulated in the `SSETaskBridge` dataclass in `lib/sse.py`.
 
 ```python
-# In the SSE event generator (simplified):
+from qdash.api.lib.sse import SSETaskBridge
 
-queue: asyncio.Queue[dict] = asyncio.Queue()
+bridge = SSETaskBridge(tool_labels=TOOL_LABELS, status_labels=STATUS_LABELS)
 
-# Callbacks push events into the queue
-async def on_tool_call(name, args):
-    label = TOOL_LABELS.get(name, name)
-    await queue.put({"step": "tool_call", "tool": name, "message": f"{label}..."})
-
-async def on_status(status):
-    label = STATUS_LABELS.get(status, status)
-    await queue.put({"step": status, "message": label})
-
-# The agent runs as a background task
-analysis_task = asyncio.create_task(
-    run_analysis(..., on_tool_call=on_tool_call, on_status=on_status)
+coro = partial(
+    run_analysis,
+    context=ctx.context,
+    user_message=request.message,
+    config=config,
+    tool_executors=tool_executors,
 )
 
-# The generator polls the queue while the task runs
-while not analysis_task.done():
-    try:
-        event = await asyncio.wait_for(queue.get(), timeout=0.3)
-        yield _sse_event("status", event)
-    except asyncio.TimeoutError:
-        yield ":\n\n"   # heartbeat comment
+result: dict[str, Any] = {}
+async for event in bridge.drain(coro):
+    if isinstance(event, str):
+        yield event          # SSE status event or heartbeat
+    else:
+        result = event       # Final result dict (last yielded value)
 
-# After task completes, drain remaining events
-while not queue.empty():
-    event = queue.get_nowait()
-    yield _sse_event("status", event)
-
-# Send final result
-result = analysis_task.result()
-yield _sse_event("result", result)
+yield sse_event("result", result)
 ```
 
-This pattern allows the SSE generator to yield events in real-time while the agent runs asynchronously. The 0.3-second timeout ensures the generator checks for task completion regularly.
+### How it works
+
+1. `SSETaskBridge` creates an `asyncio.Queue` and builds `on_tool_call` / `on_status` callbacks that push events into it.
+2. `drain(coro)` calls `coro(on_tool_call=..., on_status=...)` as a background `asyncio.Task`.
+3. While the task runs, `drain` polls the queue with a 0.3-second timeout. Each queued event is yielded as a formatted SSE string. On timeout, a heartbeat comment (`:\n\n`) is yielded.
+4. After the task completes, remaining queue events are drained and the task result is yielded as-is (not formatted) so the caller can post-process it.
+
+### Parameters
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `tool_labels` | `dict[str, str]` | `{}` | Tool name to label mapping |
+| `status_labels` | `dict[str, str]` | `{}` | Status key to label mapping |
+| `heartbeat_timeout` | `float` | `0.3` | Seconds before sending heartbeat |
 
 ## Tool Progress Labels
 

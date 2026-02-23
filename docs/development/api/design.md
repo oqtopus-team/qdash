@@ -591,6 +591,63 @@ from project.api.schemas.resource import (
 
 ---
 
+## Service Layer
+
+Business logic lives in service classes under `src/qdash/api/services/`. Routers handle HTTP concerns only (request parsing, response formatting, status codes) and delegate to services.
+
+### File Layout
+
+```
+src/qdash/api/
+├── routers/           # HTTP layer: request/response, DI, status codes
+│   ├── copilot.py
+│   ├── issue.py
+│   └── auth.py
+├── services/          # Business logic: data loading, validation, orchestration
+│   ├── copilot_data_service.py
+│   ├── issue_service.py
+│   └── auth_service.py
+├── lib/               # Shared utilities: SSE formatting, auth helpers, config
+│   ├── sse.py
+│   ├── file_utils.py
+│   └── copilot_analysis.py
+├── schemas/           # Pydantic request/response models
+└── dependencies.py    # DI wiring (@lru_cache singletons)
+```
+
+### Dependency Injection
+
+Services are instantiated as singletons via `@lru_cache` functions in `dependencies.py` and injected into routers with `Depends()`.
+
+```python
+# dependencies.py
+@lru_cache(maxsize=1)
+def get_auth_service() -> AuthService:
+    return AuthService(
+        user_repository=get_user_repository(),
+        project_service=get_project_service(),
+    )
+
+# routers/auth.py
+@router.post("/register")
+def register_user(
+    auth_service: Annotated[AuthService, Depends(get_auth_service)],
+) -> UserWithToken:
+    user, _ = auth_service.register_user(user_data, admin)
+    auth_service.onboard_user(user)
+    return UserWithToken(...)
+```
+
+### Guidelines
+
+- **One service per domain** -- `IssueService` handles issues, `AuthService` handles auth.
+- **Routers stay thin** -- No DB queries, no business rules, no data transformation in routers.
+- **Services are framework-agnostic** -- Services raise `HTTPException` for now but don't depend on `Request`/`Response`.
+- **Static methods for pure logic** -- Use `@staticmethod` for functions that don't need instance state (e.g., `IssueService.strip_mention()`).
+- **Compose via constructor injection** -- If service A needs service B, inject B through `__init__`.
+
+---
+
 ## Migration Strategy
 
 When adding new endpoints or modifying existing ones:

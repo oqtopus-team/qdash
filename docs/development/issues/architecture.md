@@ -10,48 +10,15 @@ QDash Issues is a lightweight discussion system attached to task results. It ena
 
 ## Component Diagram
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│  Frontend (Next.js)                                             │
-│                                                                 │
-│  ┌─────────────────────┐     ┌──────────────────────────┐      │
-│  │ IssuesPage           │     │ IssueDetailPage          │      │
-│  │ (useIssues)          │     │ (useIssueReplies)        │      │
-│  └────────┬─────────────┘     └────────────┬─────────────┘      │
-│           │                               │                     │
-│           │ GET /issues                   │ GET  /issues/:id    │
-│           │                               │ GET  /issues/:id/   │
-│           │                               │       replies       │
-│           │                               │ PATCH /issues/:id   │
-│           │                               │                     │
-│  ┌────────────────────────────────────────────────────────┐     │
-│  │ TaskResultDetailPage / TaskResultIssues                │     │
-│  │ POST /task-results/:taskId/issues                      │     │
-│  └────────────────────────────────────────────────────────┘     │
-└───────────┼───────────────────────────────┼─────────────────────┘
-            │                               │
-┌───────────┼───────────────────────────────┼─────────────────────┐
-│  Backend (FastAPI)                                               │
-│           │                               │                     │
-│  ┌────────▼───────────────────────────────▼──────────────┐      │
-│  │  issue router (routers/issue.py)                      │      │
-│  │  - CRUD + close/reopen + image upload                 │      │
-│  │  - Author-only edit/delete (403)                      │      │
-│  └────────┬──────────────────────────────────────────────┘      │
-│           │                                                     │
-│  ┌────────▼──────────────┐  ┌───────────────────────────┐      │
-│  │  IssueDocument        │  │  ISSUES_IMAGE_DIR         │      │
-│  │  (MongoDB collection) │  │  (filesystem storage)     │      │
-│  └───────────────────────┘  └───────────────────────────┘      │
-└─────────────────────────────────────────────────────────────────┘
-```
+![Issues Architecture](../../diagrams/issues-architecture.drawio.png)
 
 ## Key Files
 
 | File | Responsibility |
 |------|---------------|
-| `src/qdash/api/routers/issue.py` | FastAPI router: list, get, create, update (PATCH), delete, close/reopen endpoints; image upload/serving |
-| `src/qdash/api/schemas/issue.py` | Pydantic schemas: `IssueCreate`, `IssueUpdate`, `IssueResponse`, `ListIssuesResponse` |
+| `src/qdash/api/routers/issue.py` | FastAPI router: CRUD endpoints, AI reply SSE streaming via `SSETaskBridge`, image upload/serving |
+| `src/qdash/api/services/issue_service.py` | Business logic: CRUD operations, permission checks, AI reply context building, mention stripping, message deduplication, markdown formatting |
+| `src/qdash/api/schemas/issue.py` | Pydantic schemas: `IssueCreate`, `IssueUpdate`, `IssueResponse`, `IssueAiReplyRequest`, `ListIssuesResponse` |
 | `src/qdash/dbmodel/issue.py` | Bunnet document model: `IssueDocument` with MongoDB indexes |
 | `ui/src/hooks/useIssues.ts` | React hooks: `useIssues` (list with pagination/filtering), `useIssueReplies` (replies + CRUD) |
 | `ui/src/hooks/useImageUpload.ts` | Image upload hook for drag-and-drop / paste support in MarkdownEditor |
@@ -100,6 +67,7 @@ class IssueDocument(Document):
 | `PATCH` | `/issues/{issue_id}/close` | `closeIssue` | Close a thread. Author or owner |
 | `PATCH` | `/issues/{issue_id}/reopen` | `reopenIssue` | Reopen a thread. Author or owner |
 | `POST` | `/task-results/{task_id}/issues` | `createIssue` | Create a root issue or reply |
+| `POST` | `/issues/{issue_id}/ai-reply/stream` | (hidden) | Generate AI reply via SSE streaming |
 | `POST` | `/issues/upload-image` | (hidden) | Upload an image attachment |
 | `GET` | `/issues/images/{filename}` | (public) | Serve uploaded images |
 
@@ -138,6 +106,19 @@ Images can be attached via the MarkdownEditor toolbar, clipboard paste, or drag-
 3. File is stored to `CALIB_DATA_BASE/issues/{uuid}.{ext}`
 4. Returns URL as `![image](/api/issues/images/{filename})`
 5. Images are served publicly via `GET /issues/images/{filename}`
+
+## AI Reply
+
+Users can mention `@qdash` in a reply to trigger an AI-generated response. The AI reply endpoint (`POST /issues/{issue_id}/ai-reply/stream`) streams progress via SSE using `SSETaskBridge`.
+
+The request processing pipeline in `IssueService`:
+
+1. `build_ai_reply_context()` -- loads the root issue, thread replies, and resolves chip/qubit context from the linked task result. Strips `@qdash` mentions from conversation history via `strip_mention()`.
+2. `deduplicate_last_message()` -- removes the last history entry if it duplicates the current user message (prevents the same message appearing twice in the LLM context).
+3. `strip_mention()` -- removes `@qdash` from the user's message before sending to the LLM.
+4. The router calls `run_chat()` via `SSETaskBridge.drain()` with the cleaned message and conversation history.
+5. `format_ai_response_as_markdown()` -- converts the LLM blocks response to Markdown. Falls back to a JSON code block if the conversion returns empty.
+6. `save_ai_reply()` -- persists the AI response as an `IssueDocument` with `is_ai_reply=True`.
 
 ## Permissions
 
