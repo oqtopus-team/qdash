@@ -11,116 +11,33 @@ The TaskExecutor is responsible for the complete task execution lifecycle:
 """
 
 import logging
-from typing import TYPE_CHECKING, Any, ClassVar, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any
 
-from pydantic import BaseModel, Field
-from qdash.datamodel.task import CalibDataModel, ParameterModel
+from qdash.datamodel.task import ParameterModel
 from qdash.repository import FilesystemCalibDataSaver
 from qdash.workflow.calibtasks.results import PostProcessResult, PreProcessResult, RunResult
 from qdash.workflow.engine.task.backend_saver import BackendSaver
 from qdash.workflow.engine.task.history_recorder import TaskHistoryRecorder
 from qdash.workflow.engine.task.mux_distributor import MuxDistributor
+from qdash.workflow.engine.task.result_pipeline import ResultPipeline
 from qdash.workflow.engine.task.result_processor import (
     FidelityValidationError,
     R2ValidationError,
     TaskResultProcessor,
 )
 from qdash.workflow.engine.task.state_manager import TaskStateManager
+from qdash.workflow.engine.task.types import (
+    BackendProtocol,
+    TaskExecutionError,
+    TaskExecutionResult,
+    TaskProtocol,
+)
 
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from qdash.workflow.engine.backend.base import BaseBackend
     from qdash.workflow.engine.execution.service import ExecutionService
-
-
-@runtime_checkable
-class TaskProtocol(Protocol):
-    """Protocol for task objects."""
-
-    name: str
-    r2_threshold: float
-    backend: str
-    run_parameters: ClassVar[dict[str, Any]]
-
-    def get_name(self) -> str:
-        """Get task name."""
-        ...
-
-    def get_task_type(self) -> str:
-        """Get task type."""
-        ...
-
-    def is_qubit_task(self) -> bool:
-        """Check if qubit task."""
-        ...
-
-    def is_coupling_task(self) -> bool:
-        """Check if coupling task."""
-        ...
-
-    def preprocess(self, backend: Any, qid: str) -> PreProcessResult | None:
-        """Run preprocessing."""
-        ...
-
-    def run(self, backend: Any, qid: str) -> RunResult | None:
-        """Run the task."""
-        ...
-
-    def postprocess(
-        self, backend: Any, execution_id: str, run_result: RunResult, qid: str
-    ) -> PostProcessResult:
-        """Run postprocessing."""
-        ...
-
-    def attach_task_id(self, task_id: str) -> dict[str, ParameterModel]:
-        """Attach task ID to output parameters."""
-        ...
-
-
-@runtime_checkable
-class BackendProtocol(Protocol):
-    """Protocol for backend objects."""
-
-    name: str
-
-    def update_note(
-        self,
-        username: str,
-        chip_id: str,
-        calib_dir: str,
-        execution_id: str,
-        task_manager_id: str,
-        project_id: str | None = None,
-        qid: str | None = None,
-    ) -> None:
-        """Update calibration note."""
-        ...
-
-
-class TaskExecutionError(Exception):
-    """Exception raised when task execution fails."""
-
-
-class TaskExecutionResult(BaseModel):
-    """Result of task execution.
-
-    This class encapsulates the complete result of a task execution,
-    including output parameters, calibration data changes, and metadata.
-    """
-
-    task_name: str
-    task_type: str
-    qid: str
-    success: bool = False
-    message: str = ""
-    output_parameters: dict[str, Any] = Field(default_factory=dict)
-    r2: dict[str, float | None] | None = None
-    calib_data_delta: CalibDataModel = Field(
-        default_factory=lambda: CalibDataModel(qubit={}, coupling={})
-    )
-
-    model_config = {"arbitrary_types_allowed": True}
 
 
 class TaskExecutor:
@@ -199,6 +116,13 @@ class TaskExecutor:
             username=username,
             calib_dir=calib_dir,
             task_manager_id=task_manager_id,
+        )
+        self._result_pipeline = ResultPipeline(
+            state_manager=state_manager,
+            execution_id=execution_id,
+            result_processor=self.result_processor,
+            data_saver=self.data_saver,
+            backend_saver=self._backend_saver,
         )
         self._mux_distributor = MuxDistributor(
             state_manager=state_manager,
@@ -640,7 +564,7 @@ class TaskExecutor:
 
             if postprocess_result:
                 # 5. Process and validate results
-                self._process_results(
+                self._result_pipeline.process(
                     task, execution_service, postprocess_result, qid, run_result, backend
                 )
 
@@ -716,102 +640,3 @@ class TaskExecutor:
         return execution_service.update_with_calib_data(
             calib_data=self.state_manager.calib_data,
         )
-
-    def _process_results(
-        self,
-        task: TaskProtocol,
-        execution_service: "ExecutionService",
-        postprocess_result: PostProcessResult,
-        qid: str,
-        run_result: RunResult,
-        backend: "BaseBackend",
-    ) -> bool:
-        """Process task results using ExecutionService.
-
-        Parameters
-        ----------
-        task : TaskProtocol
-            The task
-        execution_service : ExecutionService
-            The execution service
-        postprocess_result : PostProcessResult
-            The postprocess result
-        qid : str
-            The qubit ID
-        run_result : RunResult
-            The run result
-        backend : BackendProtocol
-            The backend
-
-        Returns
-        -------
-        bool
-            True if backend updates should be applied
-        """
-        task_name = task.get_name()
-        task_type = task.get_task_type()
-
-        # 1. Validate fidelity
-        if postprocess_result.output_parameters:
-            try:
-                self.result_processor.validate_fidelity(
-                    postprocess_result.output_parameters, task_name
-                )
-            except FidelityValidationError as e:
-                raise ValueError(str(e)) from e
-
-        # 2. Process output parameters
-        if postprocess_result.output_parameters:
-            task_model = self.state_manager.get_task(task_name, task_type, qid)
-            task.attach_task_id(task_model.task_id)
-
-            processed_params = self.result_processor.process_output_parameters(
-                postprocess_result.output_parameters,
-                task_name,
-                self.execution_id,
-                task_model.task_id,
-            )
-            self.state_manager.put_output_parameters(task_name, processed_params, task_type, qid)
-
-        # 3. Save figures
-        if postprocess_result.figures:
-            png_paths, json_paths = self.data_saver.save_figures(
-                postprocess_result.figures, task_name, task_type, qid
-            )
-            self.state_manager.set_figure_paths(task_name, task_type, qid, png_paths, json_paths)
-
-        # 4. Save raw data
-        if postprocess_result.raw_data:
-            raw_paths = self.data_saver.save_raw_data(
-                postprocess_result.raw_data, task_name, task_type, qid
-            )
-            self.state_manager.set_raw_data_paths(task_name, task_type, qid, raw_paths)
-
-        # 5. Validate R²
-        backend_success = True
-        r2_error_msg: str | None = None
-        if run_result.has_r2() and run_result.r2 is not None:
-            r2_value = run_result.r2.get(qid)
-            if r2_value is None:
-                backend_success = False
-            else:
-                try:
-                    self.result_processor.validate_r2(run_result.r2, qid, task.r2_threshold)
-                except R2ValidationError:
-                    # Clear output parameters on R² failure
-                    if postprocess_result.output_parameters:
-                        self.state_manager.clear_output_parameters(task_name, task_type, qid)
-                    backend_success = False
-                    r2_error_msg = f"{task_name} R² value too low: {r2_value:.4f}"
-
-            if not backend_success and postprocess_result.output_parameters:
-                self.state_manager.clear_output_parameters(task_name, task_type, qid)
-
-        # 6. Backend-specific save processing (always runs, even on R² failure)
-        self._backend_saver.save(task, execution_service, qid, backend, backend_success)
-
-        # Raise after save so calibration note is updated
-        if r2_error_msg is not None:
-            raise ValueError(r2_error_msg)
-
-        return backend_success

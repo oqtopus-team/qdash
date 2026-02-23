@@ -20,10 +20,10 @@ if TYPE_CHECKING:
     from qdash.workflow.engine.backend.base import BaseBackend
     from qdash.workflow.engine.execution.service import ExecutionService
     from qdash.workflow.engine.task.backend_saver import BackendSaver
-    from qdash.workflow.engine.task.executor import TaskProtocol
     from qdash.workflow.engine.task.history_recorder import TaskHistoryRecorder
     from qdash.workflow.engine.task.result_processor import TaskResultProcessor
     from qdash.workflow.engine.task.state_manager import TaskStateManager
+    from qdash.workflow.engine.task.types import TaskProtocol
 
 logger = logging.getLogger(__name__)
 

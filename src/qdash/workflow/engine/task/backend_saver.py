@@ -14,8 +14,8 @@ from qdash.workflow.engine.params_updater import get_params_updater
 if TYPE_CHECKING:
     from qdash.workflow.engine.backend.base import BaseBackend
     from qdash.workflow.engine.execution.service import ExecutionService
-    from qdash.workflow.engine.task.executor import TaskProtocol
     from qdash.workflow.engine.task.state_manager import TaskStateManager
+    from qdash.workflow.engine.task.types import TaskProtocol
 
 logger = logging.getLogger(__name__)
 

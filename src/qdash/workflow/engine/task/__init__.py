@@ -68,7 +68,7 @@ FidelityValidationError
 
 from qdash.datamodel.task import TaskType, TaskTypes
 from qdash.workflow.engine.task.context import TaskContext
-from qdash.workflow.engine.task.executor import TaskExecutionError, TaskExecutor
+from qdash.workflow.engine.task.executor import TaskExecutor
 from qdash.workflow.engine.task.history_recorder import TaskHistoryRecorder
 from qdash.workflow.engine.task.result_processor import (
     FidelityValidationError,
@@ -76,6 +76,7 @@ from qdash.workflow.engine.task.result_processor import (
     TaskResultProcessor,
 )
 from qdash.workflow.engine.task.state_manager import TaskStateManager
+from qdash.workflow.engine.task.types import TaskExecutionError
 
 __all__ = [
     "TaskContext",
