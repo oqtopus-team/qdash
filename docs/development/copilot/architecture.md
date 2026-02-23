@@ -11,56 +11,18 @@ Both modes use the same underlying LLM agent with tool-calling capabilities, san
 
 ## Component Diagram
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│  Frontend (Next.js)                                             │
-│                                                                 │
-│  ┌─────────────────────┐     ┌──────────────────────────┐      │
-│  │ CopilotChatPage     │     │ AnalysisChatPanel        │      │
-│  │ (useCopilotChat)    │     │ (useAnalysisChat)        │      │
-│  └────────┬────────────┘     └────────────┬─────────────┘      │
-│           │                               │                     │
-│           │ POST /copilot/chat/stream     │ POST /copilot/      │
-│           │ (SSE)                         │   analyze/stream    │
-│           │                               │ (SSE)               │
-└───────────┼───────────────────────────────┼─────────────────────┘
-            │                               │
-┌───────────┼───────────────────────────────┼─────────────────────┐
-│  Backend (FastAPI)                                               │
-│           │                               │                     │
-│  ┌────────▼───────────────────────────────▼──────────────┐      │
-│  │  copilot router (routers/copilot.py)                  │      │
-│  │  - SSE event generator                                │      │
-│  │  - Queue + Task pattern for progress streaming        │      │
-│  │  - Tool executor wiring                               │      │
-│  └────────┬──────────────────────────────────────────────┘      │
-│           │                                                     │
-│  ┌────────▼──────────────┐  ┌───────────────────────────┐      │
-│  │  copilot_agent.py     │  │  copilot_sandbox.py       │      │
-│  │  - OpenAI Responses   │  │  - AST validation         │      │
-│  │    API client         │  │  - Restricted builtins    │      │
-│  │  - Tool call loop     │  │  - Resource limits        │      │
-│  │  - System prompt      │  │  - exec() with timeout    │      │
-│  │    construction       │  └───────────────────────────┘      │
-│  └────────┬──────────────┘                                      │
-│           │                                                     │
-│  ┌────────▼──────────────┐  ┌───────────────────────────┐      │
-│  │  OpenAI API           │  │  MongoDB (via Bunnet)     │      │
-│  │  (gpt-4.1 default)    │  │  - QubitDocument          │      │
-│  │  or Ollama fallback   │  │  - TaskResultHistory      │      │
-│  └───────────────────────┘  │  - ChipDocument           │      │
-│                              └───────────────────────────┘      │
-└─────────────────────────────────────────────────────────────────┘
-```
+![Copilot Architecture](../../diagrams/copilot-architecture.drawio.png)
 
 ## Key Files
 
 | File | Responsibility |
 |------|---------------|
-| `src/qdash/api/routers/copilot.py` | FastAPI router with `/config`, `/analyze`, `/analyze/stream`, `/chat/stream` endpoints; SSE event generation; tool executor wiring |
+| `src/qdash/api/routers/copilot.py` | FastAPI router with `/config`, `/analyze`, `/analyze/stream`, `/chat/stream` endpoints; SSE event generation via `SSETaskBridge` |
+| `src/qdash/api/services/copilot_data_service.py` | Data loading service: `build_analysis_context()`, `build_images_sent_metadata()`, qubit/task/history queries, tool executor wiring |
 | `src/qdash/api/lib/copilot_agent.py` | LLM agent: system prompt construction, OpenAI Responses API calls, tool call loop, response parsing |
 | `src/qdash/api/lib/copilot_sandbox.py` | Sandboxed Python execution: AST validation, restricted builtins, resource limits |
-| `src/qdash/api/lib/copilot_analysis.py` | Pydantic models: `TaskAnalysisContext`, `AnalysisResponse`, `BlocksAnalysisResponse`, request schemas |
+| `src/qdash/api/lib/copilot_analysis.py` | Pydantic models: `TaskAnalysisContext`, `AnalysisResponse`, `AnalysisContextResult`; request schemas |
+| `src/qdash/api/lib/sse.py` | SSE utilities: `sse_event()` formatter, `SSETaskBridge` for queue-poll-heartbeat-drain pattern |
 | `src/qdash/api/lib/copilot_config.py` | Configuration loader: `CopilotConfig`, `ModelConfig`, `ScoringThreshold` models; YAML loading with local override |
 | `src/qdash/datamodel/task_knowledge.py` | `TaskKnowledge` model with domain-specific knowledge per calibration task |
 | `config/copilot.yaml` | Main configuration file for model settings, scoring thresholds, system prompts |

@@ -10,7 +10,8 @@ The protocols follow the Repository pattern, providing:
 """
 
 from collections.abc import Callable
-from typing import Any, Protocol, runtime_checkable
+from datetime import datetime
+from typing import Any, Literal, Protocol, runtime_checkable
 
 from qdash.datamodel.calibration_note import CalibrationNoteModel
 from qdash.datamodel.chip import ChipModel
@@ -62,6 +63,152 @@ class TaskResultHistoryRepository(Protocol):
         -------
         list[Any]
             List of task result documents, sorted by end_at descending
+
+        """
+        ...
+
+    def find(
+        self,
+        query: dict[str, Any],
+        sort: list[tuple[str, Any]] | None = None,
+        limit: int | None = None,
+    ) -> list[Any]:
+        """Find task results matching a query.
+
+        Parameters
+        ----------
+        query : dict[str, Any]
+            MongoDB-style query filter
+        sort : list[tuple[str, Any]] | None
+            Sort specification
+        limit : int | None
+            Maximum number of results
+
+        Returns
+        -------
+        list[Any]
+            List of matching task result documents
+
+        """
+        ...
+
+    def find_with_projection(
+        self,
+        query: dict[str, Any],
+        projection_model: type[Any],
+        sort: list[tuple[str, Any]] | None = None,
+    ) -> list[Any]:
+        """Find task results with a projection model.
+
+        Parameters
+        ----------
+        query : dict[str, Any]
+            MongoDB-style query filter
+        projection_model : type[Any]
+            Projection model class
+        sort : list[tuple[str, Any]] | None
+            Sort specification
+
+        Returns
+        -------
+        list[Any]
+            List of projected results
+
+        """
+        ...
+
+    def aggregate_latest_metrics(
+        self,
+        *,
+        chip_id: str,
+        project_id: str,
+        entity_type: Literal["qubit", "coupling"],
+        metric_keys: set[str],
+        cutoff_time: datetime | None = None,
+    ) -> dict[str, dict[str, Any]]:
+        """Aggregate latest metric values for each entity.
+
+        Parameters
+        ----------
+        chip_id : str
+            The chip identifier
+        project_id : str
+            The project identifier
+        entity_type : Literal["qubit", "coupling"]
+            Entity type to aggregate
+        metric_keys : set[str]
+            Set of metric keys to aggregate
+        cutoff_time : datetime | None
+            Optional cutoff time for filtering
+
+        Returns
+        -------
+        dict[str, dict[str, Any]]
+            Nested dict: metric_name -> entity_id -> result
+
+        """
+        ...
+
+    def aggregate_best_metrics(
+        self,
+        *,
+        chip_id: str,
+        project_id: str,
+        entity_type: Literal["qubit", "coupling"],
+        metric_modes: dict[str, Literal["maximize", "minimize"]],
+        cutoff_time: datetime | None = None,
+    ) -> dict[str, dict[str, Any]]:
+        """Aggregate best metric values for each entity.
+
+        Parameters
+        ----------
+        chip_id : str
+            The chip identifier
+        project_id : str
+            The project identifier
+        entity_type : Literal["qubit", "coupling"]
+            Entity type to aggregate
+        metric_modes : dict[str, Literal["maximize", "minimize"]]
+            Optimization mode per metric
+        cutoff_time : datetime | None
+            Optional cutoff time for filtering
+
+        Returns
+        -------
+        dict[str, dict[str, Any]]
+            Nested dict: metric_name -> entity_id -> result
+
+        """
+        ...
+
+    def aggregate_average_metrics(
+        self,
+        *,
+        chip_id: str,
+        project_id: str,
+        entity_type: Literal["qubit", "coupling"],
+        metric_keys: set[str],
+        cutoff_time: datetime | None = None,
+    ) -> dict[str, dict[str, Any]]:
+        """Aggregate average metric values for each entity.
+
+        Parameters
+        ----------
+        chip_id : str
+            The chip identifier
+        project_id : str
+            The project identifier
+        entity_type : Literal["qubit", "coupling"]
+            Entity type to aggregate
+        metric_keys : set[str]
+            Set of metric keys to aggregate
+        cutoff_time : datetime | None
+            Optional cutoff time for filtering
+
+        Returns
+        -------
+        dict[str, dict[str, Any]]
+            Nested dict: metric_name -> entity_id -> result
 
         """
         ...
@@ -281,6 +428,66 @@ class ChipRepository(Protocol):
 
     def get_qubit_count(self, project_id: str, chip_id: str) -> int:
         """Get the number of qubits for a chip."""
+        ...
+
+    def find_one_document(self, query: dict[str, Any]) -> Any:
+        """Find a single chip document by query.
+
+        Parameters
+        ----------
+        query : dict[str, Any]
+            MongoDB-style query filter
+
+        Returns
+        -------
+        Any
+            The chip document if found, None otherwise
+
+        """
+        ...
+
+    def get_historical_qubit_ids(
+        self, project_id: str, chip_id: str, recorded_date: str
+    ) -> list[str]:
+        """Get historical qubit IDs for a chip at a specific date.
+
+        Parameters
+        ----------
+        project_id : str
+            The project identifier
+        chip_id : str
+            The chip identifier
+        recorded_date : str
+            The date string (e.g., "20240115")
+
+        Returns
+        -------
+        list[str]
+            List of qubit IDs
+
+        """
+        ...
+
+    def get_historical_coupling_ids(
+        self, project_id: str, chip_id: str, recorded_date: str
+    ) -> list[str]:
+        """Get historical coupling IDs for a chip at a specific date.
+
+        Parameters
+        ----------
+        project_id : str
+            The project identifier
+        chip_id : str
+            The chip identifier
+        recorded_date : str
+            The date string (e.g., "20240115")
+
+        Returns
+        -------
+        list[str]
+            List of coupling IDs
+
+        """
         ...
 
 

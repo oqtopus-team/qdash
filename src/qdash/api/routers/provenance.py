@@ -10,6 +10,7 @@ import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
+from qdash.api.dependencies import get_provenance_service  # noqa: TCH002
 from qdash.api.lib.project import (  # noqa: TCH002
     ProjectContext,
     get_project_context,
@@ -27,31 +28,10 @@ from qdash.api.schemas.provenance import (
     RecentChangesResponse,
     RecentExecutionsResponse,
 )
-from qdash.api.services.provenance_service import ProvenanceService
-from qdash.repository.provenance import (
-    MongoActivityRepository,
-    MongoParameterVersionRepository,
-    MongoProvenanceRelationRepository,
-)
+from qdash.api.services.provenance_service import ProvenanceService  # noqa: TCH002
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
-
-
-def get_provenance_service() -> ProvenanceService:
-    """Get the provenance service instance.
-
-    Returns
-    -------
-    ProvenanceService
-        Provenance service instance
-
-    """
-    return ProvenanceService(
-        parameter_version_repo=MongoParameterVersionRepository(),
-        provenance_relation_repo=MongoProvenanceRelationRepository(),
-        activity_repo=MongoActivityRepository(),
-    )
 
 
 @router.get(

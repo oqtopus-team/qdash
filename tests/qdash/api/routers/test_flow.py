@@ -164,7 +164,7 @@ class TestFlowExecution:
         async_cm.__aenter__ = AsyncMock(return_value=mock_client)
         async_cm.__aexit__ = AsyncMock(return_value=None)
 
-        with patch("prefect.get_client", return_value=async_cm):
+        with patch("qdash.api.services.flow_service.get_client", return_value=async_cm):
             # Act
             response = test_client.post(
                 "/flows/test_flow/execute",
@@ -202,7 +202,7 @@ class TestFlowExecution:
         async_cm.__aenter__ = AsyncMock(return_value=mock_client)
         async_cm.__aexit__ = AsyncMock(return_value=None)
 
-        with patch("prefect.get_client", return_value=async_cm):
+        with patch("qdash.api.services.flow_service.get_client", return_value=async_cm):
             # Act: Execute with custom parameters
             response = test_client.post(
                 "/flows/test_flow/execute",

@@ -5,6 +5,7 @@ abstracting away the repository layer from the routers.
 """
 
 import logging
+from functools import lru_cache
 from typing import Any
 
 from qdash.api.lib.metrics_config import load_metrics_config
@@ -24,6 +25,49 @@ from qdash.repository.protocols import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+@lru_cache(maxsize=1)
+def _get_task_names_cached() -> tuple[str, ...]:
+    """Get task names from task files (cached).
+
+    Returns a tuple for cache compatibility.
+    """
+    from qdash.api.dependencies import get_task_file_service
+    from qdash.api.lib.config_loader import ConfigLoader
+    from qdash.common.paths import CALIBTASKS_DIR
+
+    default_backend = "qubex"
+    try:
+        settings = ConfigLoader.load_settings()
+        ui_settings = settings.get("ui", {})
+        task_files_settings = ui_settings.get("task_files", {})
+        default_backend = task_files_settings.get("default_backend", "qubex")
+    except Exception as e:
+        logger.warning(f"Failed to load settings: {e}")
+
+    backend_path = CALIBTASKS_DIR / default_backend
+    if not backend_path.exists() or not backend_path.is_dir():
+        logger.warning(f"Backend directory not found: {backend_path}")
+        return ()
+
+    service = get_task_file_service()
+    tasks = service._collect_tasks_from_directory(backend_path, backend_path)
+    return tuple(task.name for task in tasks)
+
+
+def get_task_names() -> list[str]:
+    """Get task names from task files.
+
+    Uses cached results for performance optimization.
+
+    Returns
+    -------
+    list[str]
+        List of task names from task files.
+
+    """
+    return list(_get_task_names_cached())
 
 
 class ChipService:
@@ -107,7 +151,6 @@ class ChipService:
         project_id: str,
         chip_id: str,
         mux_id: int,
-        task_names: list[str],
     ) -> MuxDetailResponse:
         """Get multiplexer details for a chip.
 
@@ -119,8 +162,6 @@ class ChipService:
             The chip identifier
         mux_id : int
             The multiplexer ID
-        task_names : list[str]
-            List of task names to include
 
         Returns
         -------
@@ -128,6 +169,7 @@ class ChipService:
             The multiplexer details
 
         """
+        task_names = get_task_names()
         qids = [str(mux_id * 4 + i) for i in range(4)]
 
         # Fetch task results
@@ -155,7 +197,6 @@ class ChipService:
         project_id: str,
         chip_id: str,
         chip_size: int,
-        task_names: list[str],
     ) -> dict[int, MuxDetailResponse]:
         """Get all multiplexer details for a chip.
 
@@ -167,8 +208,6 @@ class ChipService:
             The chip identifier
         chip_size : int
             The size of the chip
-        task_names : list[str]
-            List of task names to include
 
         Returns
         -------
@@ -176,6 +215,7 @@ class ChipService:
             Dictionary of mux_id to MuxDetailResponse
 
         """
+        task_names = get_task_names()
         mux_num = int(chip_size // 4)
         qids = [str(i) for i in range(chip_size)]
 

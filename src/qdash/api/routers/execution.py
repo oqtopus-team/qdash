@@ -135,7 +135,11 @@ def list_executions(
 
     """
     logger.debug(
-        f"Listing executions for chip {chip_id}, project: {ctx.project_id}, skip: {skip}, limit: {limit}"
+        "Listing executions for chip %s, project: %s, skip: %s, limit: %s",
+        chip_id,
+        ctx.project_id,
+        skip,
+        limit,
     )
     executions = execution_service.list_executions(
         project_id=ctx.project_id,

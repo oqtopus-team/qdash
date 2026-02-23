@@ -4,7 +4,7 @@ from logging import getLogger
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException
-from qdash.api.dependencies import get_calibration_service
+from qdash.api.dependencies import get_calibration_service, get_seed_import_service
 from qdash.api.lib.project import ProjectContext, get_project_context
 from qdash.api.schemas.calibration import (
     CalibrationNoteResponse,
@@ -16,11 +16,6 @@ from qdash.api.services.seed_import_service import SeedImportService
 
 router = APIRouter()
 logger = getLogger("uvicorn.app")
-
-
-def get_seed_import_service() -> SeedImportService:
-    """Get seed import service instance."""
-    return SeedImportService()
 
 
 @router.get(
