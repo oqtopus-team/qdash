@@ -51,54 +51,12 @@ if TYPE_CHECKING:
 from prefect import get_run_logger
 from qdash.common.backend_config import get_default_backend
 from qdash.common.datetime_utils import now
-
-logger = logging.getLogger(__name__)
 from qdash.workflow.engine import CalibConfig, CalibOrchestrator
 from qdash.workflow.engine.params_updater import get_params_updater
+from qdash.workflow.service.execution_id import generate_execution_id
 from qdash.workflow.service.github import GitHubIntegration, GitHubPushConfig
 
-
-def generate_execution_id(
-    username: str,
-    chip_id: str,
-    project_id: str | None = None,
-    counter_repo: ExecutionCounterRepository | None = None,
-) -> str:
-    """Generate a unique execution ID based on the current date and an execution index.
-
-    This function creates execution IDs in the format YYYYMMDD-NNN, where:
-    - YYYYMMDD is the current date in JST timezone
-    - NNN is a zero-padded 3-digit counter for that day
-
-    Args:
-        username: Username for the execution
-        chip_id: Chip ID for the execution
-        project_id: Project ID for the execution (optional)
-        counter_repo: Repository for counter operations. If None, uses MongoExecutionCounterRepository.
-
-    Returns:
-        Generated execution ID (e.g., "20240101-001")
-
-    Example:
-        ```python
-        exec_id = generate_execution_id("alice", "chip_1")
-        print(exec_id)  # "20240123-001"
-        ```
-
-    """
-    if counter_repo is None:
-        from qdash.repository import MongoExecutionCounterRepository
-
-        counter_repo = MongoExecutionCounterRepository()
-
-    date_str = now().strftime("%Y%m%d")
-    execution_index = counter_repo.get_next_index(
-        date=date_str,
-        username=username,
-        chip_id=chip_id,
-        project_id=project_id,
-    )
-    return f"{date_str}-{execution_index:03d}"
+logger = logging.getLogger(__name__)
 
 
 class CalibService:
@@ -959,72 +917,11 @@ class CalibService:
 
 
 # =============================================================================
-# Internal Session Management (for scheduled.py and strategy.py)
+# Internal Session Management (re-exported for backward compatibility)
 # =============================================================================
 
-from qdash.workflow.service.session_context import (
-    clear_current_session,
-    get_current_session,
-    set_current_session,
+from qdash.workflow.service._internal.session_helpers import (  # noqa: F401
+    finish_calibration,
+    get_session,
+    init_calibration,
 )
-
-
-def init_calibration(
-    username: str,
-    chip_id: str,
-    qids: list[str],
-    execution_id: str | None = None,
-    backend_name: str = "qubex",
-    flow_name: str | None = None,
-    tags: list[str] | None = None,
-    use_lock: bool = True,
-    note: dict[str, Any] | None = None,
-    enable_github_pull: bool = True,
-    github_push_config: GitHubPushConfig | None = None,
-    muxes: list[int] | None = None,
-    project_id: str | None = None,
-) -> CalibService:
-    """Initialize a session and set it in global context (internal use)."""
-    session = CalibService(
-        username=username,
-        chip_id=chip_id,
-        qids=qids,
-        execution_id=execution_id,
-        backend_name=backend_name,
-        flow_name=flow_name,
-        tags=tags,
-        use_lock=use_lock,
-        note=note,
-        enable_github_pull=enable_github_pull,
-        github_push_config=github_push_config,
-        muxes=muxes,
-        project_id=project_id,
-    )
-    set_current_session(session)
-    return session
-
-
-def get_session() -> CalibService:
-    """Get the current session from global context (internal use)."""
-    session = get_current_session()
-    if session is None:
-        msg = "No active calibration session."
-        raise RuntimeError(msg)
-    assert isinstance(session, CalibService), "Session must be a CalibService instance"
-    return session
-
-
-def finish_calibration(
-    update_chip_history: bool = True,
-    push_to_github: bool | None = None,
-    export_note_to_file: bool = False,
-) -> dict[str, Any] | None:
-    """Finish the current session and clear from global context (internal use)."""
-    session = get_session()
-    result = session.finish_calibration(
-        update_chip_history=update_chip_history,
-        push_to_github=push_to_github,
-        export_note_to_file=export_note_to_file,
-    )
-    clear_current_session()
-    return result

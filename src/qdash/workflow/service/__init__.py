@@ -51,10 +51,8 @@ Example:
         return results
 """
 
-from qdash.workflow.service.calib_service import (
-    CalibService,
-    generate_execution_id,
-)
+from qdash.workflow.service.calib_service import CalibService
+from qdash.workflow.service.execution_id import generate_execution_id
 from qdash.workflow.service.github import (
     ConfigFileType,
     GitHubIntegration,
