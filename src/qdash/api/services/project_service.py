@@ -6,6 +6,7 @@ import logging
 from typing import TYPE_CHECKING, Any, cast
 
 from fastapi import HTTPException, status
+from qdash.api.schemas.project import MemberResponse, ProjectResponse
 from qdash.datamodel.project import ProjectRole
 from qdash.dbmodel.project import ProjectDocument
 from qdash.dbmodel.project_membership import ProjectMembershipDocument
@@ -40,6 +41,34 @@ class ProjectService:
         self._project_repo = project_repo or MongoProjectRepository()
         self._membership_repo = membership_repo or MongoProjectMembershipRepository()
         self._user_repo = user_repo or MongoUserRepository()
+
+    @staticmethod
+    def to_project_response(project: ProjectDocument) -> ProjectResponse:
+        """Convert ProjectDocument to ProjectResponse."""
+        return ProjectResponse(
+            project_id=project.project_id,
+            owner_username=project.owner_username,
+            name=project.name,
+            description=project.description,
+            tags=project.tags,
+            default_role=project.default_role,
+            created_at=project.system_info.created_at,
+            updated_at=project.system_info.updated_at,
+        )
+
+    @staticmethod
+    def to_member_response(
+        membership: ProjectMembershipDocument,
+    ) -> MemberResponse:
+        """Convert ProjectMembershipDocument to MemberResponse."""
+        return MemberResponse(
+            project_id=membership.project_id,
+            username=membership.username,
+            role=membership.role,
+            status=membership.status,
+            invited_by=membership.invited_by,
+            last_accessed_at=membership.last_accessed_at,
+        )
 
     def create_project(
         self,

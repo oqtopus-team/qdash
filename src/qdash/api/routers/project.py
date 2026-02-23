@@ -24,8 +24,6 @@ from qdash.api.schemas.project import (
 )
 from qdash.api.services.project_service import ProjectService
 from qdash.datamodel.user import SystemRole
-from qdash.dbmodel.project import ProjectDocument
-from qdash.dbmodel.project_membership import ProjectMembershipDocument
 
 logger = logging.getLogger(__name__)
 
@@ -34,32 +32,6 @@ router = APIRouter(
     tags=["projects"],
     responses={404: {"description": "Not found"}},
 )
-
-
-def _to_project_response(project: ProjectDocument) -> ProjectResponse:
-    """Convert ProjectDocument to ProjectResponse."""
-    return ProjectResponse(
-        project_id=project.project_id,
-        owner_username=project.owner_username,
-        name=project.name,
-        description=project.description,
-        tags=project.tags,
-        default_role=project.default_role,
-        created_at=project.system_info.created_at,
-        updated_at=project.system_info.updated_at,
-    )
-
-
-def _to_member_response(membership: ProjectMembershipDocument) -> MemberResponse:
-    """Convert ProjectMembershipDocument to MemberResponse."""
-    return MemberResponse(
-        project_id=membership.project_id,
-        username=membership.username,
-        role=membership.role,
-        status=membership.status,
-        invited_by=membership.invited_by,
-        last_accessed_at=membership.last_accessed_at,
-    )
 
 
 # --- Project CRUD ---
@@ -93,7 +65,7 @@ def create_project(
         tags=project_data.tags,
     )
 
-    return _to_project_response(project)
+    return ProjectService.to_project_response(project)
 
 
 @router.get(
@@ -112,7 +84,7 @@ def list_projects(
     projects = service.list_projects(current_user.username)
 
     return ProjectListResponse(
-        projects=[_to_project_response(p) for p in projects],
+        projects=[ProjectService.to_project_response(p) for p in projects],
         total=len(projects),
     )
 
@@ -127,7 +99,7 @@ def get_project(
     ctx: Annotated[ProjectContext, Depends(get_project_context_from_path)],
 ) -> ProjectResponse:
     """Get details of a specific project."""
-    return _to_project_response(ctx.project)
+    return ProjectService.to_project_response(ctx.project)
 
 
 @router.patch(
@@ -151,7 +123,7 @@ def update_project(
             "default_role": project_data.default_role,
         },
     )
-    return _to_project_response(project)
+    return ProjectService.to_project_response(project)
 
 
 @router.delete(
@@ -186,7 +158,7 @@ def list_members(
     memberships = service.list_members(ctx.project_id)
 
     return MemberListResponse(
-        members=[_to_member_response(m) for m in memberships],
+        members=[ProjectService.to_member_response(m) for m in memberships],
         total=len(memberships),
     )
 
@@ -211,7 +183,7 @@ def invite_member(
         role=invite_data.role,
         admin_username=admin.username,
     )
-    return _to_member_response(membership)
+    return ProjectService.to_member_response(membership)
 
 
 @router.patch(
@@ -233,7 +205,7 @@ def update_member(
         username=username,
         role=update_data.role,
     )
-    return _to_member_response(membership)
+    return ProjectService.to_member_response(membership)
 
 
 @router.delete(
@@ -277,4 +249,4 @@ def transfer_ownership(
         new_owner_username=new_owner.username,
         admin_username=admin.username,
     )
-    return _to_project_response(project)
+    return ProjectService.to_project_response(project)

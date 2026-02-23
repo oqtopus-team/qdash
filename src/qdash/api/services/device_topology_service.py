@@ -383,8 +383,12 @@ class DeviceTopologyService:
         cbar = plt.colorbar(sm, ax=ax, label="Qubit Fidelity (%)", fraction=0.046, pad=0.04)
         cbar.ax.tick_params(labelsize=12)
 
+        title = (
+            f"Quantum Device: {data['name'].upper()}, "
+            f"qubit: {qubit_number}, coupling: {coupling_number}"
+        )
         ax.set_title(
-            f"Quantum Device: {data['name'].upper()}, qubit: {qubit_number}, coupling: {coupling_number}",
+            title,
             pad=20,
             fontsize=16,
             fontweight="bold",

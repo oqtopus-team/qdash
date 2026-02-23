@@ -2,10 +2,7 @@
 
 from __future__ import annotations
 
-import io
 import logging
-import zipfile
-from pathlib import Path
 from typing import Annotated
 
 from fastapi import APIRouter, Body, Depends, Query
@@ -20,8 +17,7 @@ from qdash.api.schemas.task_result import (
     TaskHistoryResponse,
     TimeSeriesData,
 )
-from qdash.api.services.task_result_service import TaskResultService  # noqa: TCH002
-from starlette.exceptions import HTTPException
+from qdash.api.services.task_result_service import TaskResultService
 
 router = APIRouter()
 
@@ -74,7 +70,10 @@ def get_latest_qubit_task_results(
 
     """
     logger.debug(
-        f"Getting latest qubit task results for chip {chip_id}, task {task}, project: {ctx.project_id}"
+        "Getting latest qubit task results for chip %s, task %s, project: %s",
+        chip_id,
+        task,
+        ctx.project_id,
     )
     return service.get_latest_results(ctx.project_id, chip_id, task, "qubit")
 
@@ -224,7 +223,10 @@ def get_latest_coupling_task_results(
 
     """
     logger.debug(
-        f"Getting latest coupling task results for chip {chip_id}, task {task}, project: {ctx.project_id}"
+        "Getting latest coupling task results for chip %s, task %s, project: %s",
+        chip_id,
+        task,
+        ctx.project_id,
     )
     return service.get_latest_results(ctx.project_id, chip_id, task, "coupling")
 
@@ -382,7 +384,11 @@ def get_timeseries_task_results(
 
     """
     logger.debug(
-        f"Getting timeseries task results for chip {chip_id}, tag {tag}, parameter {parameter}, qid {qid}"
+        "Getting timeseries task results for chip %s, tag %s, parameter %s, qid %s",
+        chip_id,
+        tag,
+        parameter,
+        qid,
     )
     return service.get_timeseries(chip_id, tag, parameter, ctx.project_id, qid, start_at, end_at)
 
@@ -424,36 +430,7 @@ def download_figures_as_zip(
         400 if no paths are provided or if any path does not exist
 
     """
-    if not paths:
-        raise HTTPException(
-            status_code=400,
-            detail="No paths provided",
-        )
-
-    # Validate all paths exist
-    missing_paths = [p for p in paths if not Path(p).exists()]
-    if missing_paths:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Files not found: {', '.join(missing_paths[:5])}{'...' if len(missing_paths) > 5 else ''}",
-        )
-
-    # Create ZIP in memory
-    zip_buffer = io.BytesIO()
-    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
-        for file_path in paths:
-            path = Path(file_path)
-            # Use the filename as the archive name
-            zip_file.write(path, path.name)
-
-    zip_buffer.seek(0)
-
-    # Sanitize filename
-    safe_filename = (
-        "".join(c for c in filename if c.isalnum() or c in "._-").strip() or "figures.zip"
-    )
-    if not safe_filename.endswith(".zip"):
-        safe_filename += ".zip"
+    zip_buffer, safe_filename = TaskResultService.create_figures_zip(paths, filename)
 
     return StreamingResponse(
         zip_buffer,

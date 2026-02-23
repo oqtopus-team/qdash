@@ -4,16 +4,35 @@ from __future__ import annotations
 
 import logging
 import re
+from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 from qdash.api.lib.json_utils import sanitize_for_json
 from qdash.api.schemas.issue import IssueResponse, ListIssuesResponse
 from qdash.api.schemas.success import SuccessResponse
+from qdash.common.paths import CALIB_DATA_BASE
 from qdash.datamodel.project import ProjectRole
 from qdash.dbmodel.issue import IssueDocument
 from starlette.exceptions import HTTPException
 
 logger = logging.getLogger(__name__)
+
+ISSUES_IMAGE_DIR = CALIB_DATA_BASE / "issues"
+ALLOWED_CONTENT_TYPES = {
+    "image/png",
+    "image/jpeg",
+    "image/gif",
+    "image/webp",
+}
+CONTENT_TYPE_TO_EXT: dict[str, str] = {
+    "image/png": ".png",
+    "image/jpeg": ".jpg",
+    "image/gif": ".gif",
+    "image/webp": ".webp",
+}
+MAX_IMAGE_SIZE = 5 * 1024 * 1024  # 5 MB
+FILENAME_PATTERN = re.compile(r"^[0-9a-f\-]{36}\.(png|jpg|gif|webp)$")
 
 
 class IssueService:
@@ -400,3 +419,86 @@ class IssueService:
         ai_doc.insert()
 
         return self._to_response(ai_doc)
+
+    @staticmethod
+    def upload_image(data: bytes, content_type: str) -> str:
+        """Validate and save an uploaded image.
+
+        Parameters
+        ----------
+        data : bytes
+            Raw image bytes.
+        content_type : str
+            MIME type of the uploaded file.
+
+        Returns
+        -------
+        str
+            The URL path for the saved image.
+
+        Raises
+        ------
+        HTTPException
+            If the content type is not allowed or size exceeds the limit.
+
+        """
+        if content_type not in ALLOWED_CONTENT_TYPES:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Unsupported image type: {content_type}. " "Allowed: png, jpeg, gif, webp"
+                ),
+            )
+
+        if len(data) > MAX_IMAGE_SIZE:
+            raise HTTPException(
+                status_code=400,
+                detail="Image exceeds 5MB size limit",
+            )
+
+        ext = CONTENT_TYPE_TO_EXT[content_type]
+        filename = f"{uuid4()}{ext}"
+        dest = ISSUES_IMAGE_DIR / filename
+
+        ISSUES_IMAGE_DIR.mkdir(parents=True, exist_ok=True)
+        dest.write_bytes(data)
+
+        return f"/api/issues/images/{filename}"
+
+    @staticmethod
+    def get_image_path(filename: str) -> tuple[Path, str]:
+        """Resolve and validate an image filename.
+
+        Parameters
+        ----------
+        filename : str
+            The image filename to look up.
+
+        Returns
+        -------
+        tuple[Path, str]
+            (filepath, media_type)
+
+        Raises
+        ------
+        HTTPException
+            If the filename is invalid or the file doesn't exist.
+
+        """
+        if not FILENAME_PATTERN.match(filename):
+            raise HTTPException(status_code=400, detail="Invalid filename")
+
+        filepath = ISSUES_IMAGE_DIR / filename
+        if not filepath.is_file():
+            raise HTTPException(status_code=404, detail="Image not found")
+
+        ext = Path(filename).suffix.lstrip(".")
+        media_types = {
+            "png": "image/png",
+            "jpg": "image/jpeg",
+            "gif": "image/gif",
+            "webp": "image/webp",
+        }
+        media_type = media_types.get(ext, "application/octet-stream")
+
+        return filepath, media_type

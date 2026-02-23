@@ -6,8 +6,11 @@ abstracting away the repository layer from the routers.
 
 from __future__ import annotations
 
+import io
 import logging
+import zipfile
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from bunnet import SortDirection
@@ -343,3 +346,55 @@ class TaskResultService:
             if result.qid is not None and result.qid not in task_results:
                 task_results[result.qid] = result
         return task_results
+
+    @staticmethod
+    def create_figures_zip(
+        paths: list[str],
+        filename: str,
+    ) -> tuple[io.BytesIO, str]:
+        """Create a ZIP archive from the given file paths.
+
+        Parameters
+        ----------
+        paths : list[str]
+            Absolute paths to include in the archive.
+        filename : str
+            Desired archive filename (will be sanitised).
+
+        Returns
+        -------
+        tuple[io.BytesIO, str]
+            (zip_buffer, safe_filename)
+
+        Raises
+        ------
+        HTTPException
+            If no paths are given or any path does not exist.
+
+        """
+        from starlette.exceptions import HTTPException
+
+        if not paths:
+            raise HTTPException(status_code=400, detail="No paths provided")
+
+        missing = [p for p in paths if not Path(p).exists()]
+        if missing:
+            detail = f"Files not found: {', '.join(missing[:5])}"
+            if len(missing) > 5:
+                detail += "..."
+            raise HTTPException(status_code=400, detail=detail)
+
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+            for file_path in paths:
+                path = Path(file_path)
+                zf.write(path, path.name)
+        zip_buffer.seek(0)
+
+        safe_filename = (
+            "".join(c for c in filename if c.isalnum() or c in "._-").strip() or "figures.zip"
+        )
+        if not safe_filename.endswith(".zip"):
+            safe_filename += ".zip"
+
+        return zip_buffer, safe_filename

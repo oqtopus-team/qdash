@@ -56,7 +56,10 @@ async def get_chip_metrics(
     selection_mode: Annotated[
         Literal["latest", "best", "average"],
         Query(
-            description="Selection mode: 'latest' for most recent, 'best' for optimal, 'average' for mean values"
+            description=(
+                "Selection mode: 'latest' for most recent, "
+                "'best' for optimal, 'average' for mean values"
+            )
         ),
     ] = "latest",
 ) -> ChipMetricsResponse:

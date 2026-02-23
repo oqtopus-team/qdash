@@ -6,9 +6,7 @@ import asyncio
 import json
 import logging
 import re
-from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Any
-from uuid import uuid4
 
 from fastapi import APIRouter, Depends, Query, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
@@ -28,26 +26,13 @@ from qdash.api.schemas.issue import (
     ListIssuesResponse,
 )
 from qdash.api.schemas.success import SuccessResponse
-from qdash.api.services.issue_service import IssueService  # noqa: TCH002
-from qdash.common.paths import CALIB_DATA_BASE
-from starlette.exceptions import HTTPException
+from qdash.api.services.issue_service import IssueService
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
 router = APIRouter()
 public_router = APIRouter()
-
-ISSUES_IMAGE_DIR = CALIB_DATA_BASE / "issues"
-ALLOWED_CONTENT_TYPES = {"image/png", "image/jpeg", "image/gif", "image/webp"}
-CONTENT_TYPE_TO_EXT = {
-    "image/png": ".png",
-    "image/jpeg": ".jpg",
-    "image/gif": ".gif",
-    "image/webp": ".webp",
-}
-MAX_IMAGE_SIZE = 5 * 1024 * 1024  # 5MB
-FILENAME_PATTERN = re.compile(r"^[0-9a-f\-]{36}\.(png|jpg|gif|webp)$")
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +57,10 @@ def list_issues(
     is_closed: Annotated[
         bool | None,
         Query(
-            description="Filter by closed status. Default false (open only). Set to true for closed, or omit/null for all."
+            description=(
+                "Filter by closed status. Default false (open only). "
+                "Set to true for closed, or omit/null for all."
+            )
         ),
     ] = False,
 ) -> ListIssuesResponse:
@@ -257,24 +245,9 @@ async def upload_issue_image(
     ctx: Annotated[ProjectContext, Depends(get_project_context)],
 ) -> dict[str, str]:
     """Upload an image to attach to an issue. Returns the image URL."""
-    if file.content_type not in ALLOWED_CONTENT_TYPES:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Unsupported image type: {file.content_type}. Allowed: png, jpeg, gif, webp",
-        )
-
     data = await file.read()
-    if len(data) > MAX_IMAGE_SIZE:
-        raise HTTPException(status_code=400, detail="Image exceeds 5MB size limit")
-
-    ext = CONTENT_TYPE_TO_EXT[file.content_type]
-    filename = f"{uuid4()}{ext}"
-    dest = ISSUES_IMAGE_DIR / filename
-
-    ISSUES_IMAGE_DIR.mkdir(parents=True, exist_ok=True)
-    dest.write_bytes(data)
-
-    return {"url": f"/api/issues/images/{filename}"}
+    url = IssueService.upload_image(data, file.content_type or "")
+    return {"url": url}
 
 
 @public_router.get(
@@ -284,22 +257,7 @@ async def upload_issue_image(
 )
 def get_issue_image(filename: str) -> FileResponse:
     """Serve an uploaded issue image."""
-    if not FILENAME_PATTERN.match(filename):
-        raise HTTPException(status_code=400, detail="Invalid filename")
-
-    filepath = ISSUES_IMAGE_DIR / filename
-    if not filepath.is_file():
-        raise HTTPException(status_code=404, detail="Image not found")
-
-    ext = Path(filename).suffix.lstrip(".")
-    media_types = {
-        "png": "image/png",
-        "jpg": "image/jpeg",
-        "gif": "image/gif",
-        "webp": "image/webp",
-    }
-    media_type = media_types.get(ext, "application/octet-stream")
-
+    filepath, media_type = IssueService.get_image_path(filename)
     return FileResponse(filepath, media_type=media_type)
 
 
