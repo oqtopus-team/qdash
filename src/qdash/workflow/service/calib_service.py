@@ -665,7 +665,7 @@ class CalibService:
             self._finalize_stale_running_tasks(logger)
 
             # Reload and complete execution
-            self.execution_service = self.execution_service.reload().complete_execution()
+            self.execution_service = self.execution_service.reload().complete()
 
             if update_chip_history:
                 self._update_chip_history(logger)
@@ -796,7 +796,7 @@ class CalibService:
                 )
             # Reload and mark as failed
             if self.execution_service:
-                self.execution_service = self.execution_service.reload().fail_execution()
+                self.execution_service = self.execution_service.reload().fail()
         finally:
             self._release_lock_if_acquired()
             self._initialized = False

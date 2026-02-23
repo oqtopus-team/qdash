@@ -153,8 +153,8 @@ class CalibOrchestrator:
             project_id=config.project_id,
         )
         if not config.skip_execution:
-            self._execution_service.save_with_tags()
-            self._execution_service.start_execution()
+            self._execution_service.save()
+            self._execution_service.start()
         else:
             logger.info("Isolated session: ExecutionService created (no save/start)")
 
@@ -264,7 +264,7 @@ class CalibOrchestrator:
             return
 
         # Reload and complete execution
-        self._execution_service = self.execution_service.reload().complete_execution()
+        self._execution_service = self.execution_service.reload().complete()
 
         # Update chip history
         if update_chip_history:
@@ -289,7 +289,7 @@ class CalibOrchestrator:
     def fail(self) -> None:
         """Mark the session as failed."""
         if not self.config.skip_execution and self._execution_service is not None:
-            self._execution_service = self._execution_service.reload().fail_execution()
+            self._execution_service = self._execution_service.reload().fail()
 
     def _export_note_to_file(self, logger: Any) -> None:
         """Export calibration note to a JSON file."""

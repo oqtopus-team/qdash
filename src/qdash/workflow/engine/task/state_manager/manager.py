@@ -42,14 +42,6 @@ class TaskStateManager(BaseModel):
     _upstream_task_id: str = ""
 
     def __init__(self, qids: list[str] | None = None, **data: Any) -> None:
-        """Initialize TaskStateManager.
-
-        Parameters
-        ----------
-        qids : list[str] | None
-            List of qubit IDs to initialize containers for
-
-        """
         super().__init__(**data)
         if qids:
             for qid in qids:
@@ -62,25 +54,11 @@ class TaskStateManager(BaseModel):
     # ------------------------------------------------------------------ #
 
     def set_upstream_task_id(self, task_id: str) -> None:
-        """Set upstream task ID for dependency tracking.
-
-        Parameters
-        ----------
-        task_id : str
-            The upstream task ID
-
-        """
+        """Set upstream task ID for dependency tracking."""
         self._upstream_task_id = task_id
 
     def _get_upstream_task_id(self) -> str:
-        """Get upstream task ID (QDash task_id, not Prefect ID).
-
-        Returns
-        -------
-        str
-            The upstream task ID or empty string if not set
-
-        """
+        """Get upstream task ID or empty string if not set."""
         return self._upstream_task_id
 
     # ------------------------------------------------------------------ #
@@ -110,48 +88,11 @@ class TaskStateManager(BaseModel):
         )
 
     def get_task(self, task_name: str, task_type: str, qid: str) -> BaseTaskResultModel:
-        """Get an existing task.
-
-        Parameters
-        ----------
-        task_name : str
-            Name of the task
-        task_type : str
-            Type of task
-        qid : str
-            Qubit ID
-
-        Returns
-        -------
-        BaseTaskResultModel
-            The task
-
-        Raises
-        ------
-        ValueError
-            If task not found
-
-        """
+        """Get an existing task, raising ValueError if not found."""
         return lookup.get_task(self.task_result, task_name, task_type, qid)
 
     def ensure_task_exists(self, task_name: str, task_type: str, qid: str) -> BaseTaskResultModel:
-        """Public method to ensure a task exists in the appropriate container.
-
-        Parameters
-        ----------
-        task_name : str
-            Name of the task
-        task_type : str
-            Type of task (qubit, coupling, global, system)
-        qid : str
-            Qubit ID (empty for global/system tasks)
-
-        Returns
-        -------
-        BaseTaskResultModel
-            The existing or newly created task
-
-        """
+        """Ensure a task exists, creating it if needed."""
         return self._ensure_task_exists(task_name, task_type, qid)
 
     # ------------------------------------------------------------------ #
