@@ -406,13 +406,13 @@ export function ChipPageContent() {
           {/* Selection Controls */}
           <PageFiltersBar>
             <PageFiltersBar.Group>
-              <PageFiltersBar.Item>
+              <PageFiltersBar.Item className="sm:min-w-48">
                 <ChipSelector
                   selectedChip={selectedChip}
                   onChipSelect={setSelectedChip}
                 />
               </PageFiltersBar.Item>
-              <PageFiltersBar.Item>
+              <PageFiltersBar.Item className="sm:min-w-48">
                 <DateSelector
                   chipId={selectedChip}
                   selectedDate={selectedDate}
@@ -420,7 +420,7 @@ export function ChipPageContent() {
                   disabled={!selectedChip}
                 />
               </PageFiltersBar.Item>
-              <PageFiltersBar.Item>
+              <PageFiltersBar.Item className="sm:min-w-96">
                 <TaskSelector
                   tasks={filteredTasks}
                   selectedTask={selectedTask}
