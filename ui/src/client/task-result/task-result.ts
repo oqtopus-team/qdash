@@ -54,6 +54,8 @@ task : str
     Name of the task to fetch results for
 ctx : ProjectContext
     Project context with user and project information
+service : TaskResultService
+    Injected task result service
 
 Returns
 -------
@@ -242,6 +244,8 @@ date : str
     Date in YYYYMMDD format (JST timezone)
 ctx : ProjectContext
     Project context with user and project information
+service : TaskResultService
+    Injected task result service
 
 Returns
 -------
@@ -431,6 +435,8 @@ task : str
     Name of the task to fetch history for
 ctx : ProjectContext
     Project context with user and project information
+service : TaskResultService
+    Injected task result service
 
 Returns
 -------
@@ -634,6 +640,8 @@ task : str
     Name of the task to fetch results for
 ctx : ProjectContext
     Project context with user and project information
+service : TaskResultService
+    Injected task result service
 
 Returns
 -------
@@ -826,6 +834,8 @@ date : str
     Date in YYYYMMDD format (JST timezone)
 ctx : ProjectContext
     Project context with user and project information
+service : TaskResultService
+    Injected task result service
 
 Returns
 -------
@@ -1019,6 +1029,8 @@ task : str
     Name of the task to fetch history for
 ctx : ProjectContext
     Project context with user and project information
+service : TaskResultService
+    Injected task result service
 
 Returns
 -------
@@ -1233,6 +1245,8 @@ end_at : str
     End time in ISO format for the time range
 ctx : ProjectContext
     Project context with user and project information
+service : TaskResultService
+    Injected task result service
 qid : str | None
     Optional qubit ID to filter results to a specific qubit
 

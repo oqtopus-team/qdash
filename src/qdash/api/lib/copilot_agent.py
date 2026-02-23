@@ -40,7 +40,7 @@ use the available tools to retrieve the data rather than saying it's unavailable
 The current qubit context (chip_id, qid) is provided in the system prompt below.
 """
 
-MAX_TOOL_ROUNDS = 5
+MAX_TOOL_ROUNDS = 10
 
 ToolExecutors = dict[str, Any]
 OnToolCallHook = Callable[[str, dict[str, Any]], Awaitable[None]] | None
@@ -1001,21 +1001,44 @@ async def _run_responses_api(
         [getattr(item, "type", "?") for item in response.output],
     )
     if output is None:
-        # Model exhausted tool rounds without producing text, or returned empty.
-        # Collect any text items from the last response as fallback.
-        text_items = [
-            getattr(item, "text", None)
-            for item in response.output
-            if getattr(item, "type", None) == "message"
-        ]
-        if text_items:
-            output = " ".join(t for t in text_items if t)
-        else:
-            logger.warning(
-                "Responses API returned no output_text. output types: %s",
-                [getattr(item, "type", "?") for item in response.output],
-            )
-            output = ""
+        # Model exhausted tool rounds without producing text.
+        # Re-call the model WITHOUT tools to force a text response
+        # based on the information gathered so far.
+        logger.warning(
+            "Tool rounds exhausted (%d). Retrying without tools to force text output.",
+            MAX_TOOL_ROUNDS,
+        )
+
+        # Build final input with all gathered context
+        final_input = list(kwargs["input"])
+        for item in response.output:
+            dumped = item.model_dump()
+            # Skip function_call items — they can't be included without tools
+            if dumped.get("type") == "function_call":
+                continue
+            final_input.append(dumped)
+
+        final_kwargs = {k: v for k, v in kwargs.items() if k != "tools"}
+        final_kwargs["input"] = final_input
+        if on_status:
+            await on_status("thinking")
+        response = await _create(**final_kwargs)
+        output = response.output_text
+
+        if output is None:
+            text_items = [
+                getattr(item, "text", None)
+                for item in response.output
+                if getattr(item, "type", None) == "message"
+            ]
+            if text_items:
+                output = " ".join(t for t in text_items if t)
+            else:
+                logger.warning(
+                    "Responses API returned no output_text even without tools. output types: %s",
+                    [getattr(item, "type", "?") for item in response.output],
+                )
+                output = ""
     return str(output)
 
 

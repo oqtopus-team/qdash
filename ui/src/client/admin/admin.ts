@@ -124,20 +124,6 @@ export const useReloadConfigCaches = <TError = void, TContext = unknown>(
 };
 /**
  * List all users in the system (admin only).
-
-Parameters
-----------
-admin : User
-    Current admin user (verified by dependency)
-skip : int
-    Number of users to skip for pagination
-limit : int
-    Maximum number of users to return
-
-Returns
--------
-UserListResponse
-    List of users with total count
  * @summary List all users
  */
 export const listAllUsers = (
@@ -275,23 +261,6 @@ export function useListAllUsers<
 
 /**
  * Get detailed information about a specific user (admin only).
-
-Parameters
-----------
-username : str
-    Username to look up
-admin : User
-    Current admin user (verified by dependency)
-
-Returns
--------
-UserDetailResponse
-    Detailed user information
-
-Raises
-------
-HTTPException
-    404 if user not found
  * @summary Get user details
  */
 export const getUserDetails = (
@@ -435,26 +404,6 @@ export function useGetUserDetails<
 
 /**
  * Update user settings (admin only).
-
-Parameters
-----------
-username : str
-    Username to update
-request : UpdateUserRequest
-    Update request with fields to modify
-admin : User
-    Current admin user (verified by dependency)
-
-Returns
--------
-UserDetailResponse
-    Updated user information
-
-Raises
-------
-HTTPException
-    404 if user not found
-    400 if trying to demote the last admin
  * @summary Update user settings
  */
 export const updateUserSettings = (
@@ -546,24 +495,6 @@ export const useUpdateUserSettings = <
 };
 /**
  * Delete a user account (admin only).
-
-Parameters
-----------
-username : str
-    Username to delete
-admin : User
-    Current admin user (verified by dependency)
-
-Returns
--------
-dict[str, str]
-    Success message
-
-Raises
-------
-HTTPException
-    404 if user not found
-    400 if trying to delete self or last admin
  * @summary Delete user
  */
 export const deleteUser = (
@@ -649,20 +580,6 @@ export const useDeleteUser = <
 };
 /**
  * List all projects in the system (admin only).
-
-Parameters
-----------
-admin : User
-    Current admin user (verified by dependency)
-skip : int
-    Number of projects to skip for pagination
-limit : int
-    Maximum number of projects to return
-
-Returns
--------
-ProjectListResponse
-    List of projects with total count
  * @summary List all projects
  */
 export const listAllProjects = (
@@ -820,24 +737,6 @@ export function useListAllProjects<
 
 /**
  * Delete a project and all its memberships (admin only).
-
-Parameters
-----------
-project_id : str
-    Project ID to delete
-admin : User
-    Current admin user (verified by dependency)
-
-Returns
--------
-dict[str, str]
-    Success message
-
-Raises
-------
-HTTPException
-    404 if project not found
-    400 if trying to delete own project
  * @summary Delete project
  */
 export const adminDeleteProject = (
@@ -923,23 +822,6 @@ export const useAdminDeleteProject = <
 };
 /**
  * List all members of a project (admin only).
-
-Parameters
-----------
-project_id : str
-    Project ID to list members for
-admin : User
-    Current admin user (verified by dependency)
-
-Returns
--------
-MemberListResponse
-    List of members with total count
-
-Raises
-------
-HTTPException
-    404 if project not found
  * @summary List project members
  */
 export const listProjectMembersAdmin = (
@@ -1107,26 +989,6 @@ export function useListProjectMembersAdmin<
 
 /**
  * Add a member to a project as viewer (admin only).
-
-Parameters
-----------
-project_id : str
-    Project ID to add member to
-request : AddMemberRequest
-    Member details (username)
-admin : User
-    Current admin user (verified by dependency)
-
-Returns
--------
-MemberItem
-    Created member info
-
-Raises
-------
-HTTPException
-    404 if project or user not found
-    400 if user is already a member
  * @summary Add member to project
  */
 export const addProjectMemberAdmin = (
@@ -1220,26 +1082,6 @@ export const useAddProjectMemberAdmin = <
 };
 /**
  * Remove a member from a project (admin only).
-
-Parameters
-----------
-project_id : str
-    Project ID to remove member from
-username : str
-    Username to remove
-admin : User
-    Current admin user (verified by dependency)
-
-Returns
--------
-dict[str, str]
-    Success message
-
-Raises
-------
-HTTPException
-    404 if project or member not found
-    400 if trying to remove the owner
  * @summary Remove member from project
  */
 export const removeProjectMemberAdmin = (
@@ -1329,24 +1171,6 @@ export const useRemoveProjectMemberAdmin = <
 };
 /**
  * Create a default project for a user who doesn't have one (admin only).
-
-Parameters
-----------
-username : str
-    Username to create project for
-admin : User
-    Current admin user (verified by dependency)
-
-Returns
--------
-UserDetailResponse
-    Updated user information with new project
-
-Raises
-------
-HTTPException
-    404 if user not found
-    400 if user already has a project
  * @summary Create project for user
  */
 export const createProjectForUser = (

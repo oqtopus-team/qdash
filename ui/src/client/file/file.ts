@@ -45,9 +45,6 @@ type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 /**
  * Download a raw data file from the server.
 
-Retrieves a file from the server's filesystem and returns it as a downloadable
-response.
-
 Parameters
 ----------
 path : str
@@ -57,11 +54,6 @@ Returns
 -------
 FileResponse
     The file as a downloadable response
-
-Raises
-------
-HTTPException
-    404 if the file does not exist at the specified path
  * @summary Download file
  */
 export const downloadFile = (
@@ -200,10 +192,6 @@ export function useDownloadFile<
 /**
  * Download a file or directory as a ZIP archive.
 
-Creates a ZIP archive of the specified file or directory and returns it
-as a downloadable response. The archive is created in a temporary directory
-and cleaned up after the response is sent.
-
 Parameters
 ----------
 path : str
@@ -212,13 +200,7 @@ path : str
 Returns
 -------
 FileResponse
-    ZIP archive as a downloadable response with media type "application/zip"
-
-Raises
-------
-HTTPException
-    404 if the path does not exist
-    500 if there is an error creating the ZIP archive
+    ZIP archive as a downloadable response
  * @summary Download file or directory as zip
  */
 export const downloadZipFile = (
@@ -375,7 +357,7 @@ export function useDownloadZipFile<
 }
 
 /**
- * Get file tree structure for entire config directory (all chips).
+ * Get file tree structure for entire config directory.
 
 Returns
 -------
@@ -512,7 +494,7 @@ export function useGetFileTree<
 
 Args:
 ----
-    path: Relative path from CONFIG_BASE_PATH (e.g., "64Qv2/config/chip.yaml")
+    path: Relative path from CONFIG_BASE_PATH
 
 Returns:
 -------
