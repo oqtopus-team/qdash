@@ -301,6 +301,7 @@ def get_auth_service() -> AuthService:
     """Get the auth service instance."""
     return AuthService(
         user_repository=get_user_repository(),
+        project_service=get_project_service(),
     )
 
 

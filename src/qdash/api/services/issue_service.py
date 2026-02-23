@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import re
 from pathlib import Path
@@ -54,6 +55,41 @@ class IssueService:
             is_closed=doc.is_closed,
             is_ai_reply=doc.is_ai_reply,
         )
+
+    @staticmethod
+    def strip_mention(text: str) -> str:
+        """Remove ``@qdash`` mention from text."""
+        return re.sub(r"@qdash\b\s*", "", text).strip()
+
+    @staticmethod
+    def deduplicate_last_message(
+        history: list[dict[str, str]],
+        user_message: str,
+    ) -> list[dict[str, str]]:
+        """Remove the last history entry if it duplicates *user_message*."""
+        if history and history[-1]["role"] == "user" and history[-1]["content"] == user_message:
+            return history[:-1]
+        return history
+
+    @staticmethod
+    def format_ai_response_as_markdown(result: dict[str, Any]) -> str | None:
+        """Convert an AI response dict to Markdown via ``blocks_to_markdown``.
+
+        Falls back to a JSON code block when the conversion returns empty.
+        Returns ``None`` only if even the fallback fails.
+        """
+        from qdash.api.lib.copilot_agent import blocks_to_markdown
+
+        markdown_content = blocks_to_markdown(result)
+        if markdown_content:
+            return markdown_content
+
+        logger.warning("blocks_to_markdown returned empty, full result=%s", result)
+        try:
+            raw_json = json.dumps(result, indent=2, ensure_ascii=False)
+            return f"```json\n{raw_json}\n```"
+        except Exception:
+            return None
 
     def list_issues(
         self,
@@ -358,7 +394,7 @@ class IssueService:
         # Strip @qdash mentions from conversation history
         for entry in conversation_history:
             if entry["role"] == "user":
-                entry["content"] = re.sub(r"@qdash\b\s*", "", entry["content"]).strip()
+                entry["content"] = self.strip_mention(entry["content"])
 
         # Resolve chip_id / qid from task result
         chip_id: str | None = None

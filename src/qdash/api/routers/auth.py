@@ -4,7 +4,7 @@ import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Form, HTTPException, status
-from qdash.api.dependencies import get_auth_service, get_project_service
+from qdash.api.dependencies import get_auth_service
 from qdash.api.lib.auth import authenticate_user, get_current_active_user
 from qdash.api.schemas.auth import (
     PasswordChange,
@@ -15,7 +15,6 @@ from qdash.api.schemas.auth import (
     UserWithToken,
 )
 from qdash.api.services.auth_service import AuthService
-from qdash.api.services.project_service import ProjectService
 from qdash.datamodel.user import SystemRole
 
 logger = logging.getLogger(__name__)
@@ -78,7 +77,6 @@ def register_user(
     user_data: UserCreate,
     current_user: Annotated[User, Depends(get_current_active_user)],
     auth_service: Annotated[AuthService, Depends(get_auth_service)],
-    project_service: Annotated[ProjectService, Depends(get_project_service)],
 ) -> UserWithToken:
     """Register a new user account (admin only).
 
@@ -90,8 +88,6 @@ def register_user(
         Current authenticated admin user
     auth_service : AuthService
         The auth service instance
-    project_service : ProjectService
-        The project service instance
 
     Returns
     -------
@@ -112,14 +108,7 @@ def register_user(
         )
 
     user, _access_token = auth_service.register_user(user_data, current_user.username)
-
-    # Create default project for every user
-    project = project_service.create_project(
-        owner_username=user.username,
-        name=f"{user.username}'s project",
-    )
-    project_service.set_user_default_project(user, project.project_id)
-    logger.info(f"Created default project for user: {user.username}")
+    auth_service.onboard_user(user)
 
     return UserWithToken(
         username=user.username,

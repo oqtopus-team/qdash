@@ -3,9 +3,8 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
-import re
+from functools import partial
 from typing import TYPE_CHECKING, Annotated, Any
 
 from fastapi import APIRouter, Depends, Query, UploadFile
@@ -17,7 +16,7 @@ from qdash.api.lib.project import (  # noqa: TCH002
     ProjectContext,
     get_project_context,
 )
-from qdash.api.lib.sse import sse_event
+from qdash.api.lib.sse import SSETaskBridge, sse_event
 from qdash.api.schemas.issue import (
     IssueAiReplyRequest,
     IssueCreate,
@@ -315,13 +314,11 @@ async def issue_ai_reply_stream(
         qubit_params: dict[str, Any] = ai_context["qubit_params"]
         task_id: str = ai_context["task_id"]
 
-        # Pop the last entry if it is the same user message we'll pass to run_chat
-        if (
-            conversation_history
-            and conversation_history[-1]["role"] == "user"
-            and conversation_history[-1]["content"] == body.user_message
-        ):
-            conversation_history.pop()
+        # Deduplicate last message if it matches user_message
+        conversation_history = IssueService.deduplicate_last_message(
+            conversation_history,
+            body.user_message,
+        )
 
         # Resolve chip_id / qid context
         yield sse_event(
@@ -335,50 +332,38 @@ async def issue_ai_reply_stream(
         copilot_data_svc = CopilotDataService()
         tool_executors = copilot_data_svc.build_tool_executors()
 
-        # Run AI chat
-        # Strip @qdash mention from user message before sending to LLM.
-        # The mention is a UI trigger, not an instruction for the model.
-        clean_message = re.sub(r"@qdash\b\s*", "", body.user_message).strip()
+        # Strip @qdash mention from user message before sending to LLM
+        clean_message = IssueService.strip_mention(body.user_message)
         if not clean_message:
             clean_message = "この Issue について教えてください"
         logger.info("AI reply: original=%r, clean=%r", body.user_message, clean_message)
 
         yield sse_event("status", {"step": "run_chat", "message": "AIが応答中..."})
-        queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
-
-        async def on_tool_call(name: str, args: dict[str, Any]) -> None:
-            label = _AI_TOOL_LABELS.get(name, name)
-            await queue.put({"step": "tool_call", "tool": name, "message": f"{label}..."})
-
-        async def on_status(status: str) -> None:
-            label = _AI_STATUS_LABELS.get(status, status)
-            await queue.put({"step": status, "message": label})
+        bridge = SSETaskBridge(
+            tool_labels=_AI_TOOL_LABELS,
+            status_labels=_AI_STATUS_LABELS,
+        )
 
         try:
-            from qdash.api.lib.copilot_agent import blocks_to_markdown, run_chat
+            from qdash.api.lib.copilot_agent import run_chat
 
-            chat_task = asyncio.create_task(
-                run_chat(
-                    user_message=clean_message,
-                    config=config,
-                    chip_id=chip_id,
-                    qid=qid,
-                    qubit_params=qubit_params if qubit_params else None,
-                    conversation_history=conversation_history,
-                    tool_executors=tool_executors,
-                    on_tool_call=on_tool_call,
-                    on_status=on_status,
-                )
+            coro = partial(
+                run_chat,
+                user_message=clean_message,
+                config=config,
+                chip_id=chip_id,
+                qid=qid,
+                qubit_params=qubit_params if qubit_params else None,
+                conversation_history=conversation_history,
+                tool_executors=tool_executors,
             )
 
-            while not chat_task.done():
-                try:
-                    event = await asyncio.wait_for(queue.get(), timeout=0.3)
-                    yield sse_event("status", event)
-                except asyncio.TimeoutError:  # noqa: PERF203
-                    yield ":\n\n"
-
-            result = chat_task.result()
+            result: dict[str, Any] = {}
+            async for event in bridge.drain(coro):
+                if isinstance(event, str):
+                    yield event
+                else:
+                    result = event
         except ImportError:
             yield sse_event(
                 "error",
@@ -393,11 +378,6 @@ async def issue_ai_reply_stream(
             yield sse_event("error", {"step": "run_chat", "detail": f"AI reply failed: {e}"})
             return
 
-        # Drain remaining queue events
-        while not queue.empty():
-            event = queue.get_nowait()
-            yield sse_event("status", event)
-
         # Convert blocks to markdown and save as issue reply
         yield sse_event("status", {"step": "save_reply", "message": "返信を保存中..."})
         await asyncio.sleep(0)
@@ -407,20 +387,13 @@ async def issue_ai_reply_stream(
             len(result.get("blocks", [])),
             list(result.keys()),
         )
-        markdown_content = blocks_to_markdown(result)
+        markdown_content = IssueService.format_ai_response_as_markdown(result)
         if not markdown_content:
-            logger.warning("blocks_to_markdown returned empty, full result=%s", result)
-            # Last-resort fallback: dump the raw result as JSON so the
-            # frontend MarkdownContent can still render it.
-            try:
-                raw_json = json.dumps(result, indent=2, ensure_ascii=False)
-                markdown_content = f"```json\n{raw_json}\n```"
-            except Exception:
-                yield sse_event(
-                    "error",
-                    {"step": "save_reply", "detail": "AIが空の応答を返しました"},
-                )
-                return
+            yield sse_event(
+                "error",
+                {"step": "save_reply", "detail": "AIが空の応答を返しました"},
+            )
+            return
 
         saved_response = service.save_ai_reply(
             project_id=ctx.project_id,

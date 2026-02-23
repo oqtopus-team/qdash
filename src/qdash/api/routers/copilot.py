@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import logging
+from functools import partial
 from typing import TYPE_CHECKING, Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -23,11 +24,10 @@ from qdash.api.lib.copilot_analysis import (
     AnalysisResponse,
     AnalyzeRequest,
     ChatRequest,
-    TaskAnalysisContext,
 )
 from qdash.api.lib.copilot_config import load_copilot_config
-from qdash.api.lib.sse import sse_event
-from qdash.api.services.copilot_data_service import CopilotDataService  # noqa: TCH002
+from qdash.api.lib.sse import SSETaskBridge, sse_event
+from qdash.api.services.copilot_data_service import CopilotDataService
 from qdash.datamodel.task_knowledge import get_task_knowledge
 
 router = APIRouter()
@@ -102,59 +102,14 @@ async def analyze_task_result(
     if not config.enabled:
         raise HTTPException(status_code=503, detail="Copilot is not enabled")
 
-    # Resolve task knowledge
-    knowledge = get_task_knowledge(request.task_name)
-    knowledge_prompt = knowledge.to_prompt() if knowledge else f"Task: {request.task_name}"
-
-    # Load qubit parameters
-    qubit_params = copilot_data_service.load_qubit_params(request.chip_id, request.qid)
-
-    # Load task result parameters
-    task_result = copilot_data_service.load_task_result(request.task_id)
-    input_params = task_result.get("input_parameters", {}) if task_result else {}
-    output_params = task_result.get("output_parameters", {}) if task_result else {}
-    run_params = task_result.get("run_parameters", {}) if task_result else {}
-
-    # Load dynamic context from TaskKnowledge.related_context
-    history_results: list[dict[str, Any]] = []
-    neighbor_qubit_params: dict[str, dict[str, Any]] = {}
-    coupling_params: dict[str, dict[str, Any]] = {}
-    if knowledge and knowledge.related_context:
-        for rc in knowledge.related_context:
-            if rc.type == "history":
-                history_results = copilot_data_service.load_task_history(
-                    request.task_name, request.chip_id, request.qid, rc.last_n
-                )
-            elif rc.type == "neighbor_qubits":
-                neighbor_qubit_params = copilot_data_service.load_neighbor_qubit_params(
-                    request.chip_id, request.qid, rc.params
-                )
-            elif rc.type == "coupling":
-                coupling_params = copilot_data_service.load_coupling_params(
-                    request.chip_id, request.qid, rc.params
-                )
-
-    # Auto-load experiment figure if not provided and multimodal is enabled
-    image_base64 = request.image_base64
-    expected_images: list[tuple[str, str]] = []
-    figure_paths: list[str] = task_result.get("figure_path", []) if task_result else []
-    if config.analysis.multimodal:
-        if not image_base64 and task_result:
-            image_base64 = copilot_data_service.load_figure_as_base64(figure_paths)
-        expected_images = copilot_data_service.collect_expected_images(knowledge)
-
-    # Build analysis context
-    context = TaskAnalysisContext(
-        task_knowledge_prompt=knowledge_prompt,
+    # Build analysis context (resolves knowledge, qubit params, images, etc.)
+    ctx = copilot_data_service.build_analysis_context(
+        task_name=request.task_name,
         chip_id=request.chip_id,
         qid=request.qid,
-        qubit_params=qubit_params,
-        input_parameters=input_params,
-        output_parameters=output_params,
-        run_parameters=run_params,
-        history_results=history_results,
-        neighbor_qubit_params=neighbor_qubit_params,
-        coupling_params=coupling_params,
+        task_id=request.task_id,
+        image_base64=request.image_base64,
+        config=config,
     )
 
     # Build tool executors for function calling
@@ -165,22 +120,20 @@ async def analyze_task_result(
         from qdash.api.lib.copilot_agent import run_analysis
 
         result = await run_analysis(
-            context=context,
+            context=ctx.context,
             user_message=request.message,
             config=config,
-            image_base64=image_base64,
-            expected_images=expected_images,
+            image_base64=ctx.image_base64,
+            expected_images=ctx.expected_images,
             conversation_history=request.conversation_history,
             tool_executors=tool_executors,
         )
-        result["images_sent"] = {
-            "experiment_figure": bool(image_base64),
-            "experiment_figure_paths": figure_paths if image_base64 else [],
-            "expected_images": [
-                {"alt_text": alt, "index": i} for i, (_, alt) in enumerate(expected_images)
-            ],
-            "task_name": request.task_name,
-        }
+        result["images_sent"] = CopilotDataService.build_images_sent_metadata(
+            ctx.image_base64,
+            ctx.figure_paths,
+            ctx.expected_images,
+            request.task_name,
+        )
         return result
     except ImportError:
         raise HTTPException(
@@ -208,60 +161,24 @@ async def analyze_task_result_stream(
             yield sse_event("error", {"step": "init", "detail": "Copilot is not enabled"})
             return
 
-        # Step 1: Resolve task knowledge
+        # Build analysis context
         yield sse_event(
-            "status", {"step": "resolve_knowledge", "message": "タスク知識を読み込み中..."}
+            "status",
+            {"step": "build_context", "message": "分析コンテキストを構築中..."},
         )
         await asyncio.sleep(0)
-        knowledge = get_task_knowledge(request.task_name)
-        knowledge_prompt = knowledge.to_prompt() if knowledge else f"Task: {request.task_name}"
-
-        # Step 2: Load qubit parameters
-        yield sse_event(
-            "status", {"step": "load_qubit_params", "message": "キュービットパラメータを取得中..."}
+        ctx = copilot_data_service.build_analysis_context(
+            task_name=request.task_name,
+            chip_id=request.chip_id,
+            qid=request.qid,
+            task_id=request.task_id,
+            image_base64=request.image_base64,
+            config=config,
         )
-        await asyncio.sleep(0)
-        qubit_params = copilot_data_service.load_qubit_params(request.chip_id, request.qid)
-
-        # Step 3: Load task result
-        yield sse_event("status", {"step": "load_task_result", "message": "タスク結果を取得中..."})
-        await asyncio.sleep(0)
-        task_result = copilot_data_service.load_task_result(request.task_id)
-        input_params = task_result.get("input_parameters", {}) if task_result else {}
-        output_params = task_result.get("output_parameters", {}) if task_result else {}
-        run_params = task_result.get("run_parameters", {}) if task_result else {}
-
-        # Load dynamic context from related_context
-        history_results: list[dict[str, Any]] = []
-        neighbor_qubit_params: dict[str, dict[str, Any]] = {}
-        coupling_params: dict[str, dict[str, Any]] = {}
-        if knowledge and knowledge.related_context:
-            for rc in knowledge.related_context:
-                if rc.type == "history":
-                    history_results = copilot_data_service.load_task_history(
-                        request.task_name, request.chip_id, request.qid, rc.last_n
-                    )
-                elif rc.type == "neighbor_qubits":
-                    neighbor_qubit_params = copilot_data_service.load_neighbor_qubit_params(
-                        request.chip_id, request.qid, rc.params
-                    )
-                elif rc.type == "coupling":
-                    coupling_params = copilot_data_service.load_coupling_params(
-                        request.chip_id, request.qid, rc.params
-                    )
-
-        # Auto-load experiment figure if not provided and multimodal is enabled
-        image_base64 = request.image_base64
-        expected_images: list[tuple[str, str]] = []
-        figure_paths: list[str] = task_result.get("figure_path", []) if task_result else []
-        if config.analysis.multimodal:
-            if not image_base64 and task_result:
-                image_base64 = copilot_data_service.load_figure_as_base64(figure_paths)
-            expected_images = copilot_data_service.collect_expected_images(knowledge)
 
         # Emit image loading status
-        has_experiment = bool(image_base64)
-        num_expected = len(expected_images)
+        has_experiment = bool(ctx.image_base64)
+        num_expected = len(ctx.expected_images)
         if has_experiment and num_expected > 0:
             img_msg = f"実験結果画像と参照画像{num_expected}枚をAIに送信中..."
         elif has_experiment:
@@ -274,64 +191,31 @@ async def analyze_task_result_stream(
             yield sse_event("status", {"step": "load_images", "message": img_msg})
             await asyncio.sleep(0)
 
-        # Step 4: Build context
-        yield sse_event(
-            "status", {"step": "build_context", "message": "分析コンテキストを構築中..."}
-        )
-        await asyncio.sleep(0)
-        context = TaskAnalysisContext(
-            task_knowledge_prompt=knowledge_prompt,
-            chip_id=request.chip_id,
-            qid=request.qid,
-            qubit_params=qubit_params,
-            input_parameters=input_params,
-            output_parameters=output_params,
-            run_parameters=run_params,
-            history_results=history_results,
-            neighbor_qubit_params=neighbor_qubit_params,
-            coupling_params=coupling_params,
-        )
-
-        # Step 5: Run analysis with tool progress streaming
+        # Run analysis with tool progress streaming
         yield sse_event("status", {"step": "run_analysis", "message": "AIが分析中..."})
         tool_executors = copilot_data_service.build_tool_executors()
-
-        queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
-
-        async def on_tool_call(name: str, args: dict[str, Any]) -> None:
-            label = TOOL_LABELS.get(name, name)
-            await queue.put({"step": "tool_call", "tool": name, "message": f"{label}..."})
-
-        async def on_status(status: str) -> None:
-            label = STATUS_LABELS.get(status, status)
-            await queue.put({"step": status, "message": label})
+        bridge = SSETaskBridge(tool_labels=TOOL_LABELS, status_labels=STATUS_LABELS)
 
         try:
             from qdash.api.lib.copilot_agent import run_analysis
 
-            analysis_task = asyncio.create_task(
-                run_analysis(
-                    context=context,
-                    user_message=request.message,
-                    config=config,
-                    image_base64=image_base64,
-                    expected_images=expected_images,
-                    conversation_history=request.conversation_history,
-                    tool_executors=tool_executors,
-                    on_tool_call=on_tool_call,
-                    on_status=on_status,
-                )
+            coro = partial(
+                run_analysis,
+                context=ctx.context,
+                user_message=request.message,
+                config=config,
+                image_base64=ctx.image_base64,
+                expected_images=ctx.expected_images,
+                conversation_history=request.conversation_history,
+                tool_executors=tool_executors,
             )
 
-            while not analysis_task.done():
-                try:
-                    event = await asyncio.wait_for(queue.get(), timeout=0.3)
-                    yield sse_event("status", event)
-                except asyncio.TimeoutError:  # noqa: PERF203
-                    # Send SSE comment as heartbeat to keep connection alive
-                    yield ":\n\n"
-
-            result = analysis_task.result()
+            result: dict[str, Any] = {}
+            async for event in bridge.drain(coro):
+                if isinstance(event, str):
+                    yield event
+                else:
+                    result = event
         except ImportError:
             yield sse_event(
                 "error",
@@ -346,22 +230,15 @@ async def analyze_task_result_stream(
             yield sse_event("error", {"step": "run_analysis", "detail": f"Analysis failed: {e}"})
             return
 
-        # Drain any remaining events in the queue
-        while not queue.empty():
-            event = queue.get_nowait()
-            yield sse_event("status", event)
-
         # Inject images_sent metadata
-        result["images_sent"] = {
-            "experiment_figure": has_experiment,
-            "experiment_figure_paths": figure_paths if has_experiment else [],
-            "expected_images": [
-                {"alt_text": alt, "index": i} for i, (_, alt) in enumerate(expected_images)
-            ],
-            "task_name": request.task_name,
-        }
+        result["images_sent"] = CopilotDataService.build_images_sent_metadata(
+            ctx.image_base64,
+            ctx.figure_paths,
+            ctx.expected_images,
+            request.task_name,
+        )
 
-        # Step 6: Complete
+        # Complete
         yield sse_event("status", {"step": "complete", "message": "分析完了"})
         yield sse_event("result", result)
 
@@ -388,7 +265,7 @@ async def chat_stream(
             yield sse_event("error", {"step": "init", "detail": "Copilot is not enabled"})
             return
 
-        # Step 1: Load config and resolve default chip_id
+        # Load config and resolve default chip_id
         yield sse_event("status", {"step": "load_config", "message": "設定を読み込み中..."})
         await asyncio.sleep(0)
 
@@ -399,7 +276,7 @@ async def chat_stream(
         if not chip_id:
             chip_id = copilot_data_service.load_default_chip_id()
 
-        # Step 2: Optionally load qubit params
+        # Optionally load qubit params
         qubit_params: dict[str, Any] = {}
         if chip_id and qid:
             yield sse_event(
@@ -409,47 +286,32 @@ async def chat_stream(
             await asyncio.sleep(0)
             qubit_params = copilot_data_service.load_qubit_params(chip_id, qid)
 
-        # Step 3: Run chat with tool progress streaming
+        # Run chat with tool progress streaming
         yield sse_event("status", {"step": "run_chat", "message": "AIが応答中..."})
         tool_executors = copilot_data_service.build_tool_executors()
-
-        queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
-
-        async def on_tool_call(name: str, args: dict[str, Any]) -> None:
-            label = TOOL_LABELS.get(name, name)
-            await queue.put({"step": "tool_call", "tool": name, "message": f"{label}..."})
-
-        async def on_status(status: str) -> None:
-            label = STATUS_LABELS.get(status, status)
-            await queue.put({"step": status, "message": label})
+        bridge = SSETaskBridge(tool_labels=TOOL_LABELS, status_labels=STATUS_LABELS)
 
         try:
             from qdash.api.lib.copilot_agent import run_chat
 
-            chat_task = asyncio.create_task(
-                run_chat(
-                    user_message=request.message,
-                    config=config,
-                    chip_id=chip_id,
-                    qid=qid,
-                    qubit_params=qubit_params if qubit_params else None,
-                    image_base64=request.image_base64,
-                    conversation_history=request.conversation_history,
-                    tool_executors=tool_executors,
-                    on_tool_call=on_tool_call,
-                    on_status=on_status,
-                )
+            coro = partial(
+                run_chat,
+                user_message=request.message,
+                config=config,
+                chip_id=chip_id,
+                qid=qid,
+                qubit_params=qubit_params if qubit_params else None,
+                image_base64=request.image_base64,
+                conversation_history=request.conversation_history,
+                tool_executors=tool_executors,
             )
 
-            while not chat_task.done():
-                try:
-                    event = await asyncio.wait_for(queue.get(), timeout=0.3)
-                    yield sse_event("status", event)
-                except asyncio.TimeoutError:  # noqa: PERF203
-                    # Send SSE comment as heartbeat to keep connection alive
-                    yield ":\n\n"
-
-            result = chat_task.result()
+            result: dict[str, Any] = {}
+            async for event in bridge.drain(coro):
+                if isinstance(event, str):
+                    yield event
+                else:
+                    result = event
         except ImportError:
             yield sse_event(
                 "error",
@@ -464,12 +326,7 @@ async def chat_stream(
             yield sse_event("error", {"step": "run_chat", "detail": f"Chat failed: {e}"})
             return
 
-        # Drain any remaining events in the queue
-        while not queue.empty():
-            event = queue.get_nowait()
-            yield sse_event("status", event)
-
-        # Step 4: Complete
+        # Complete
         yield sse_event("status", {"step": "complete", "message": "完了"})
         yield sse_event("result", result)
 

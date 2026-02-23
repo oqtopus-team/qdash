@@ -10,10 +10,14 @@ import logging
 import math
 import statistics as stats_mod
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from bunnet import SortDirection
 from qdash.api.lib.json_utils import sanitize_for_json
+
+if TYPE_CHECKING:
+    from qdash.api.lib.copilot_analysis import AnalysisContextResult
+    from qdash.api.lib.copilot_config import CopilotConfig
 
 logger = logging.getLogger(__name__)
 
@@ -665,6 +669,98 @@ class CopilotDataService:
                 }
             ]
         return results
+
+    def build_analysis_context(
+        self,
+        task_name: str,
+        chip_id: str,
+        qid: str,
+        task_id: str,
+        image_base64: str | None,
+        config: CopilotConfig,
+    ) -> AnalysisContextResult:
+        """Build a full analysis context from DB data and TaskKnowledge.
+
+        Consolidates the duplicated context-building logic that was
+        previously inlined in both ``analyze_task_result`` and
+        ``analyze_task_result_stream``.
+        """
+        from qdash.api.lib.copilot_analysis import (
+            AnalysisContextResult,
+            TaskAnalysisContext,
+        )
+        from qdash.datamodel.task_knowledge import get_task_knowledge
+
+        # Resolve task knowledge
+        knowledge = get_task_knowledge(task_name)
+        knowledge_prompt = knowledge.to_prompt() if knowledge else f"Task: {task_name}"
+
+        # Load qubit parameters
+        qubit_params = self.load_qubit_params(chip_id, qid)
+
+        # Load task result parameters
+        task_result = self.load_task_result(task_id)
+        input_params = task_result.get("input_parameters", {}) if task_result else {}
+        output_params = task_result.get("output_parameters", {}) if task_result else {}
+        run_params = task_result.get("run_parameters", {}) if task_result else {}
+
+        # Load dynamic context from TaskKnowledge.related_context
+        history_results: list[dict[str, Any]] = []
+        neighbor_qubit_params: dict[str, dict[str, Any]] = {}
+        coupling_params: dict[str, dict[str, Any]] = {}
+        if knowledge and knowledge.related_context:
+            for rc in knowledge.related_context:
+                if rc.type == "history":
+                    history_results = self.load_task_history(task_name, chip_id, qid, rc.last_n)
+                elif rc.type == "neighbor_qubits":
+                    neighbor_qubit_params = self.load_neighbor_qubit_params(chip_id, qid, rc.params)
+                elif rc.type == "coupling":
+                    coupling_params = self.load_coupling_params(chip_id, qid, rc.params)
+
+        # Auto-load experiment figure if not provided and multimodal is enabled
+        expected_images: list[tuple[str, str]] = []
+        figure_paths: list[str] = task_result.get("figure_path", []) if task_result else []
+        if config.analysis.multimodal:
+            if not image_base64 and task_result:
+                image_base64 = self.load_figure_as_base64(figure_paths)
+            expected_images = self.collect_expected_images(knowledge)
+
+        context = TaskAnalysisContext(
+            task_knowledge_prompt=knowledge_prompt,
+            chip_id=chip_id,
+            qid=qid,
+            qubit_params=qubit_params,
+            input_parameters=input_params,
+            output_parameters=output_params,
+            run_parameters=run_params,
+            history_results=history_results,
+            neighbor_qubit_params=neighbor_qubit_params,
+            coupling_params=coupling_params,
+        )
+
+        return AnalysisContextResult(
+            context=context,
+            image_base64=image_base64,
+            expected_images=expected_images,
+            figure_paths=figure_paths,
+        )
+
+    @staticmethod
+    def build_images_sent_metadata(
+        image_base64: str | None,
+        figure_paths: list[str],
+        expected_images: list[tuple[str, str]],
+        task_name: str,
+    ) -> dict[str, Any]:
+        """Build the ``images_sent`` metadata dict for analysis responses."""
+        return {
+            "experiment_figure": bool(image_base64),
+            "experiment_figure_paths": figure_paths if image_base64 else [],
+            "expected_images": [
+                {"alt_text": alt, "index": i} for i, (_, alt) in enumerate(expected_images)
+            ],
+            "task_name": task_name,
+        }
 
     def build_tool_executors(self) -> dict[str, Any]:
         """Build the tool executor mapping for LLM function calling."""

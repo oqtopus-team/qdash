@@ -15,6 +15,7 @@ from qdash.dbmodel.user import UserDocument
 
 if TYPE_CHECKING:
     from qdash.api.schemas.auth import PasswordChange, PasswordReset, UserCreate
+    from qdash.api.services.project_service import ProjectService
     from qdash.repository import MongoUserRepository
 
 logger = logging.getLogger(__name__)
@@ -56,9 +57,11 @@ class AuthService:
     def __init__(
         self,
         user_repository: MongoUserRepository,
+        project_service: ProjectService | None = None,
     ) -> None:
         """Initialize the service with repositories."""
         self._user_repo = user_repository
+        self._project_service = project_service
 
     def register_user(
         self,
@@ -110,6 +113,30 @@ class AuthService:
         logger.info(f"Admin {admin_username} created new user: {user_data.username}")
 
         return user, access_token
+
+    def onboard_user(self, user: UserDocument) -> None:
+        """Create a default project for a newly registered user.
+
+        Parameters
+        ----------
+        user : UserDocument
+            The newly created user document.
+
+        Raises
+        ------
+        RuntimeError
+            If project_service was not injected.
+
+        """
+        if self._project_service is None:
+            raise RuntimeError("ProjectService is required for onboarding")
+
+        project = self._project_service.create_project(
+            owner_username=user.username,
+            name=f"{user.username}'s project",
+        )
+        self._project_service.set_user_default_project(user, project.project_id)
+        logger.info(f"Created default project for user: {user.username}")
 
     def change_password(
         self,

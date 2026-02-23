@@ -5,9 +5,20 @@ Defines the structured context sent to the LLM and the expected response format.
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 from typing import Any
 
 from pydantic import BaseModel, Field
+
+
+@dataclass
+class AnalysisContextResult:
+    """Result of building a full analysis context for a copilot analysis request."""
+
+    context: TaskAnalysisContext
+    image_base64: str | None
+    expected_images: list[tuple[str, str]]
+    figure_paths: list[str] = field(default_factory=list)
 
 
 class TaskAnalysisContext(BaseModel):
