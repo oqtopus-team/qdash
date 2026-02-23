@@ -224,7 +224,7 @@ class TestTaskExecutorExecuteTask:
         task = MockTask()
         session = MockSession()
 
-        with pytest.raises(ValueError, match="Fidelity exceeds 100%"):
+        with pytest.raises(FidelityValidationError, match="Fidelity exceeds 100%"):
             executor.execute_task(task, session, "0")
 
         mock_state_manager.update_task_status_to_failed.assert_called_once()

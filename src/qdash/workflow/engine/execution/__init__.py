@@ -8,15 +8,15 @@ Components
 ExecutionService
     High-level service for managing execution lifecycle:
     - Create new executions with metadata (tags, notes, project_id)
-    - Track execution status (RUNNING → COMPLETED/FAILED)
+    - Track execution status (RUNNING -> COMPLETED/FAILED)
     - Update task results during execution
     - Persist to MongoDB (ExecutionDocument)
 
 ExecutionStateManager
     Low-level state transitions for executions:
-    - start_execution() - Mark as RUNNING with timestamp
-    - complete_execution() - Mark as COMPLETED
-    - fail_execution() - Mark as FAILED
+    - start() - Mark as RUNNING with timestamp
+    - complete() - Mark as COMPLETED
+    - fail() - Mark as FAILED
 
 ExecutionNote
     Data model for execution notes (stage results, metadata).
@@ -28,11 +28,11 @@ Execution Lifecycle
 -------------------
 ::
 
-    create() ──► save() ──► start_execution()
-                               │
-                    ┌──────────┴──────────┐
-                    ▼                     ▼
-             complete_execution()   fail_execution()
+    create() --> save() --> start()
+                              |
+                    +---------+---------+
+                    v                   v
+               complete()           fail()
 
 Usage Example
 -------------
@@ -44,10 +44,10 @@ Usage Example
 ...     calib_data_path="/path/to/data",
 ...     name="1Q Calibration",
 ... )
->>> service.save_with_tags()
->>> service.start_execution()
+>>> service.save()
+>>> service.start()
 >>> # ... run tasks ...
->>> service.complete_execution()
+>>> service.complete()
 
 MongoDB Integration
 -------------------

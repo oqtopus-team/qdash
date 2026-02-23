@@ -30,20 +30,14 @@ class MockExecutionService:
     def save(self):
         return self
 
-    def save_with_tags(self):
+    def start(self):
         return self
 
-    def start_execution(self):
-        return self
-
-    def update_execution_status_to_running(self):
-        return self
-
-    def complete_execution(self):
+    def complete(self):
         self.completed = True
         return self
 
-    def fail_execution(self):
+    def fail(self):
         return self
 
     def reload(self):
@@ -107,10 +101,10 @@ class MockCalibOrchestrator:
         self._initialized = True
 
     def complete(self, update_chip_history=True, export_note_to_file=False):
-        self._execution_service.complete_execution()
+        self._execution_service.complete()
 
     def fail(self):
-        self._execution_service.fail_execution()
+        self._execution_service.fail()
 
 
 class MockGitHubIntegration:

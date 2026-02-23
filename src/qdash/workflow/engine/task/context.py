@@ -91,31 +91,6 @@ class TaskContext:
         history_recorder: TaskHistoryRecorder | None = None,
         context_id: str | None = None,
     ) -> None:
-        """Initialize TaskContext.
-
-        Parameters
-        ----------
-        username : str
-            Username for this session
-        execution_id : str
-            Execution identifier
-        qids : list[str]
-            List of qubit IDs to initialize
-        calib_dir : str
-            Calibration data directory
-        state_manager : TaskStateManager | None
-            Optional injected state manager (for testing)
-        data_saver : FilesystemCalibDataSaver | None
-            Optional injected data saver (for testing)
-        executor : TaskExecutor | None
-            Optional injected executor (for testing)
-        result_processor : TaskResultProcessor | None
-            Optional injected result processor (for testing)
-        history_recorder : TaskHistoryRecorder | None
-            Optional injected history recorder (for testing)
-        context_id : str | None
-            Optional fixed ID (for testing reproducibility)
-        """
         self.id = context_id or str(uuid.uuid4())
         self.username = username
         self.execution_id = execution_id
@@ -171,13 +146,7 @@ class TaskContext:
     # === Upstream Task ID ===
 
     def set_upstream_task_id(self, task_id: str) -> None:
-        """Set upstream task ID for dependency tracking.
-
-        Parameters
-        ----------
-        task_id : str
-            Upstream task ID
-        """
+        """Set upstream task ID for dependency tracking."""
         self.state.set_upstream_task_id(task_id)
 
     # === Figure/Data Saving ===
@@ -190,21 +159,7 @@ class TaskContext:
         savedir: str = "",
         qid: str = "",
     ) -> None:
-        """Save figures for a task.
-
-        Parameters
-        ----------
-        figures : list
-            Figures to save
-        task_name : str
-            Task name
-        task_type : str
-            Task type
-        savedir : str
-            Override output directory
-        qid : str
-            Qubit ID
-        """
+        """Save figures for a task."""
         override_dir = savedir or None
         png_paths, json_paths = self.data_saver.save_figures(
             figures,
@@ -233,19 +188,7 @@ class TaskContext:
         task_type: str = TaskTypes.GLOBAL,
         qid: str = "",
     ) -> None:
-        """Save raw data for a task.
-
-        Parameters
-        ----------
-        raw_data : list
-            Raw data to save
-        task_name : str
-            Task name
-        task_type : str
-            Task type
-        qid : str
-            Qubit ID
-        """
+        """Save raw data for a task."""
         paths = self.data_saver.save_raw_data(
             raw_data,
             task_name,
@@ -258,13 +201,7 @@ class TaskContext:
     # === Persistence ===
 
     def save(self, calib_dir: str = "") -> None:
-        """Save task session state to JSON file.
-
-        Parameters
-        ----------
-        calib_dir : str
-            Override directory for saving
-        """
+        """Save task session state to JSON file."""
         if calib_dir == "":
             calib_dir = f"{self.calib_dir}/task"
 
@@ -307,85 +244,3 @@ class TaskContext:
         This is a core operation used frequently in calibration flows.
         """
         self.state.end_task(task_name, task_type, qid)
-
-    # === Batch Operations ===
-
-    def start_all_qid_tasks(
-        self,
-        task_name: str,
-        task_type: str = TaskTypes.QUBIT,
-        qids: list[str] | None = None,
-    ) -> None:
-        """Start a task for all given qubit IDs."""
-        if qids is None:
-            qids = []
-        for qid in qids:
-            self.start_task(task_name, task_type, qid)
-
-    def end_all_qid_tasks(
-        self,
-        task_name: str,
-        task_type: str = TaskTypes.QUBIT,
-        qids: list[str] | None = None,
-    ) -> None:
-        """End a task for all given qubit IDs."""
-        if qids is None:
-            qids = []
-        for qid in qids:
-            self.end_task(task_name, task_type, qid)
-
-    def update_all_qid_task_status_to_running(
-        self,
-        task_name: str,
-        message: str = "",
-        task_type: str = TaskTypes.QUBIT,
-        qids: list[str] | None = None,
-    ) -> None:
-        """Update task status to RUNNING for all qids."""
-        if qids is None:
-            qids = []
-        for qid in qids:
-            self.state.update_task_status_to_running(task_name, message, task_type, qid)
-
-    def update_all_qid_task_status_to_completed(
-        self,
-        task_name: str,
-        message: str = "",
-        task_type: str = TaskTypes.QUBIT,
-        qids: list[str] | None = None,
-    ) -> None:
-        """Update task status to COMPLETED for all qids."""
-        if qids is None:
-            qids = []
-        for qid in qids:
-            self.state.update_task_status_to_completed(task_name, message, task_type, qid)
-
-    def update_all_qid_task_status_to_failed(
-        self,
-        task_name: str,
-        message: str = "",
-        task_type: str = TaskTypes.QUBIT,
-        qids: list[str] | None = None,
-    ) -> None:
-        """Update task status to FAILED for all qids."""
-        if qids is None:
-            qids = []
-        for qid in qids:
-            self.state.update_task_status_to_failed(task_name, message, task_type, qid)
-
-    def update_not_executed_tasks_to_skipped(
-        self, task_type: str = TaskTypes.GLOBAL, qid: str = ""
-    ) -> None:
-        """Mark unexecuted tasks as skipped."""
-        self.state.update_not_executed_tasks_to_skipped(task_type, qid)
-
-    def put_note_to_task(
-        self,
-        task_name: str,
-        note: dict[str, Any],
-        task_type: str = TaskTypes.GLOBAL,
-        qid: str = "",
-    ) -> None:
-        """Add a note to a task."""
-        task = self.state.get_task(task_name, task_type, qid)
-        task.note.update(note)
