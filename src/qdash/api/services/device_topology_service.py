@@ -38,6 +38,8 @@ logger = logging.getLogger(__name__)
 POSITION_SCALE = 50
 POSITION_DIVISOR = 30
 
+assert POSITION_DIVISOR != 0, "POSITION_DIVISOR must not be zero"
+
 
 def _is_within_24h(calibrated_at: str | None) -> bool:
     """Check if the calibrated timestamp is within 24 hours."""
@@ -313,8 +315,9 @@ class DeviceTopologyService:
             g = nx.Graph()
             for c in filtered_couplings:
                 g.add_edge(c.control, c.target)
-            if g.edges:
-                largest_component = max(nx.connected_components(g), key=len)
+            components = list(nx.connected_components(g))
+            if components:
+                largest_component = max(components, key=len)
                 filtered_qubits = [q for q in filtered_qubits if q.id in largest_component]
                 filtered_couplings = [
                     c
