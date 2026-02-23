@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from qdash.workflow.engine.scheduler.cr_utils import group_cr_pairs_by_conflict
 from qdash.workflow.engine.scheduler.plugins.base import CRSchedulingStrategy, ScheduleContext
 
 logger = logging.getLogger(__name__)
@@ -39,9 +40,7 @@ class MuxConflictScheduler(CRSchedulingStrategy):
 
     def schedule(self, pairs: list[str], context: ScheduleContext) -> list[list[str]]:
         """Schedule pairs using graph coloring."""
-        from qdash.workflow.engine.scheduler.cr_scheduler import CRScheduler
-
-        groups = CRScheduler._group_cr_pairs_by_conflict(
+        groups = group_cr_pairs_by_conflict(
             pairs,
             context.qid_to_mux,
             context.mux_conflict_map,

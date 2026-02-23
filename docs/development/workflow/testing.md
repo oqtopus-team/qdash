@@ -507,6 +507,8 @@ class TestTaskExecutorExecuteTask:
 Test scheduling logic with parameterized tests:
 
 ```python
+from qdash.workflow.engine.scheduler.cr_utils import group_cr_pairs_by_conflict
+
 @pytest.mark.parametrize(
     "cr_pairs,qid_to_mux,expected_min_groups,reason",
     [
@@ -519,7 +521,7 @@ def test_group_cr_pairs_by_conflict(cr_pairs, qid_to_mux, expected_min_groups, r
     """Test CR pair grouping with various conflict scenarios."""
     mux_conflict_map = {}
 
-    groups = CRScheduler._group_cr_pairs_by_conflict(cr_pairs, qid_to_mux, mux_conflict_map)
+    groups = group_cr_pairs_by_conflict(cr_pairs, qid_to_mux, mux_conflict_map)
 
     assert len(groups) >= expected_min_groups, f"Failed: {reason}"
 
@@ -547,7 +549,7 @@ def test_coloring_strategies(strategy):
     qid_to_mux = {"0": 0, "1": 0, "2": 0, "3": 0}
     mux_conflict_map = {}
 
-    groups = CRScheduler._group_cr_pairs_by_conflict(
+    groups = group_cr_pairs_by_conflict(
         cr_pairs, qid_to_mux, mux_conflict_map, coloring_strategy=strategy
     )
 

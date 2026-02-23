@@ -96,11 +96,11 @@ from qdash.workflow.engine.scheduler.one_qubit_plugins import (
     MuxOrderingStrategy,
     OrderingContext,
 )
-from qdash.workflow.engine.scheduler.one_qubit_scheduler import (
+from qdash.workflow.engine.scheduler.one_qubit_scheduler import OneQubitScheduler
+from qdash.workflow.engine.scheduler.one_qubit_types import (
     BOX_A,
     BOX_B,
     BOX_MIXED,
-    OneQubitScheduler,
     OneQubitScheduleResult,
     OneQubitStageInfo,
     SynchronizedOneQubitScheduleResult,

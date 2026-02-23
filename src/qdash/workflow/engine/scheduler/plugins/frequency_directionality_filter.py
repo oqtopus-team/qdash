@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from qdash.workflow.engine.scheduler.cr_utils import infer_direction_from_design
 from qdash.workflow.engine.scheduler.plugins.base import CRPairFilter, FilterContext
 
 logger = logging.getLogger(__name__)
@@ -75,14 +76,12 @@ class FrequencyDirectionalityFilter(CRPairFilter):
 
     def _filter_by_design(self, pairs: list[str], context: FilterContext) -> list[str]:
         """Filter using design-based checkerboard pattern."""
-        from qdash.workflow.engine.scheduler.cr_scheduler import CRScheduler
-
         return [
             pair
             for pair in pairs
             if (qubits := pair.split("-"))
             and len(qubits) == 2
-            and CRScheduler._infer_direction_from_design(qubits[0], qubits[1], context.grid_size)
+            and infer_direction_from_design(qubits[0], qubits[1], context.grid_size)
         ]
 
     def _filter_by_measurement(self, pairs: list[str], context: FilterContext) -> list[str]:

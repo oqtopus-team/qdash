@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from qdash.workflow.engine.scheduler.cr_utils import split_fast_slow_pairs
 from qdash.workflow.engine.scheduler.plugins.base import CRSchedulingStrategy, ScheduleContext
 
 logger = logging.getLogger(__name__)
@@ -36,10 +37,8 @@ class IntraThenInterMuxScheduler(CRSchedulingStrategy):
 
     def schedule(self, pairs: list[str], context: ScheduleContext) -> list[list[str]]:
         """Schedule with intra-MUX pairs first, then inter-MUX pairs."""
-        from qdash.workflow.engine.scheduler.cr_scheduler import CRScheduler
-
         # Split into intra-MUX and inter-MUX pairs
-        intra_mux, inter_mux = CRScheduler._split_fast_slow_pairs(pairs, context.qid_to_mux)
+        intra_mux, inter_mux = split_fast_slow_pairs(pairs, context.qid_to_mux)
         self._fast_count = len(intra_mux)
         self._slow_count = len(inter_mux)
 
