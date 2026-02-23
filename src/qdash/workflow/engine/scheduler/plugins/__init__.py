@@ -54,6 +54,7 @@ from qdash.workflow.engine.scheduler.plugins.intra_then_inter_mux_scheduler impo
     IntraThenInterMuxScheduler,
 )
 from qdash.workflow.engine.scheduler.plugins.mux_conflict_scheduler import MuxConflictScheduler
+from qdash.workflow.engine.scheduler.plugins.mux_membership_filter import MuxMembershipFilter
 
 __all__ = [
     "CRPairFilter",
@@ -64,5 +65,6 @@ __all__ = [
     "FrequencyDirectionalityFilter",
     "IntraThenInterMuxScheduler",
     "MuxConflictScheduler",
+    "MuxMembershipFilter",
     "ScheduleContext",
 ]
