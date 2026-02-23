@@ -17,8 +17,9 @@ from pydantic import BaseModel, Field
 from qdash.datamodel.task import CalibDataModel, ParameterModel
 from qdash.repository import FilesystemCalibDataSaver
 from qdash.workflow.calibtasks.results import PostProcessResult, PreProcessResult, RunResult
-from qdash.workflow.engine.params_updater import get_params_updater
+from qdash.workflow.engine.task.backend_saver import BackendSaver
 from qdash.workflow.engine.task.history_recorder import TaskHistoryRecorder
+from qdash.workflow.engine.task.mux_distributor import MuxDistributor
 from qdash.workflow.engine.task.result_processor import (
     FidelityValidationError,
     R2ValidationError,
@@ -193,6 +194,20 @@ class TaskExecutor:
         self.result_processor = result_processor or TaskResultProcessor()
         self.history_recorder = history_recorder or TaskHistoryRecorder()
         self.data_saver = data_saver or FilesystemCalibDataSaver(calib_dir)
+        self._backend_saver = BackendSaver(
+            state_manager=state_manager,
+            username=username,
+            calib_dir=calib_dir,
+            task_manager_id=task_manager_id,
+        )
+        self._mux_distributor = MuxDistributor(
+            state_manager=state_manager,
+            execution_id=execution_id,
+            result_processor=self.result_processor,
+            data_saver=self.data_saver,
+            history_recorder=self.history_recorder,
+            backend_saver=self._backend_saver,
+        )
 
     def execute_task(
         self,
@@ -643,7 +658,7 @@ class TaskExecutor:
                 )
                 if is_mux:
                     logger.debug("Starting MUX distribution for task=%s, qid=%s", task_name, qid)
-                    self._process_mux_other_qubits(
+                    self._mux_distributor.distribute(
                         task, backend, execution_service, run_result, qid
                     )
                     logger.debug("Finished MUX distribution for task=%s, qid=%s", task_name, qid)
@@ -793,312 +808,10 @@ class TaskExecutor:
                 self.state_manager.clear_output_parameters(task_name, task_type, qid)
 
         # 6. Backend-specific save processing (always runs, even on R² failure)
-        self._save_backend_specific(task, execution_service, qid, backend, backend_success)
+        self._backend_saver.save(task, execution_service, qid, backend, backend_success)
 
         # Raise after save so calibration note is updated
         if r2_error_msg is not None:
             raise ValueError(r2_error_msg)
 
         return backend_success
-
-    def _save_backend_specific(
-        self,
-        task: TaskProtocol,
-        execution_service: "ExecutionService",
-        qid: str,
-        backend: "BaseBackend",
-        success: bool,
-    ) -> None:
-        """Backend-specific save processing using ExecutionService.
-
-        Parameters
-        ----------
-        task : TaskProtocol
-            The task
-        execution_service : ExecutionService
-            The execution service
-        qid : str
-            The qubit ID
-        backend : BaseBackend
-            The backend
-        success : bool
-            Whether backend updates should be applied
-        """
-        if task.backend == "qubex":
-            self._save_qubex_specific(task, execution_service, qid, backend, success)
-        elif task.backend == "fake":
-            # Simulation metadata save (implement as needed)
-            pass
-
-    def _save_qubex_specific(
-        self,
-        task: TaskProtocol,
-        execution_service: "ExecutionService",
-        qid: str,
-        backend: "BaseBackend",
-        success: bool,
-    ) -> None:
-        """Qubex-specific save processing using ExecutionService.
-
-        Parameters
-        ----------
-        task : TaskProtocol
-            The task
-        execution_service : ExecutionService
-            The execution service
-        qid : str
-            The qubit ID
-        backend : BackendProtocol
-            The backend
-        success : bool
-            Whether backend updates should be applied
-        """
-        from qdash.repository import (
-            MongoCouplingCalibrationRepository,
-            MongoQubitCalibrationRepository,
-        )
-
-        task_name = task.get_name()
-        task_type = task.get_task_type()
-
-        # Get output parameters
-        task_model = self.state_manager.get_task(task_name, task_type, qid)
-        output_parameters = dict(task_model.output_parameters)
-
-        # Get repositories
-        qubit_repo = MongoQubitCalibrationRepository()
-        coupling_repo = MongoCouplingCalibrationRepository()
-
-        # Always update calibration note regardless of success/failure
-        if backend.name == "qubex":
-            backend.update_note(
-                username=self.username,
-                chip_id=execution_service.chip_id,
-                calib_dir=self.calib_dir,
-                execution_id=execution_service.execution_id,
-                task_manager_id=self.task_manager_id,
-                project_id=execution_service.project_id,
-                qid=qid,
-            )
-
-        # Always save to database (even on R² failure)
-        if output_parameters:
-            if task.is_qubit_task():
-                qubit_repo.update_calib_data(
-                    username=self.username,
-                    qid=qid,
-                    chip_id=execution_service.chip_id,
-                    output_parameters=output_parameters,
-                    project_id=execution_service.project_id,
-                )
-            elif task.is_coupling_task():
-                coupling_repo.update_calib_data(
-                    username=self.username,
-                    qid=qid,
-                    chip_id=execution_service.chip_id,
-                    output_parameters=output_parameters,
-                    project_id=execution_service.project_id,
-                )
-
-        # Only update backend params on success
-        if not success:
-            logger.info(
-                "Skipping backend parameter updates for %s due to failed R² validation",
-                task_name,
-            )
-            return
-
-        if output_parameters and task.is_qubit_task():
-            self._update_backend_params(backend, execution_service, qid, output_parameters)
-
-    def _update_backend_params(
-        self,
-        backend: "BaseBackend",
-        execution_service: "ExecutionService",
-        qid: str,
-        output_parameters: dict[str, Any],
-    ) -> None:
-        """Update backend parameters using ExecutionService.
-
-        Parameters
-        ----------
-        backend : BaseBackend
-            The backend
-        execution_service : ExecutionService
-            The execution service
-        qid : str
-            The qubit ID
-        output_parameters : dict[str, Any]
-            Output parameters to update
-        """
-        updater = get_params_updater(backend, execution_service.chip_id)
-        if updater is None:
-            return
-        try:
-            updater.update(qid, output_parameters)
-        except Exception as exc:
-            logger.warning("Failed to update backend params for qid=%s: %s", qid, exc)
-
-    def _process_mux_other_qubits(
-        self,
-        task: TaskProtocol,
-        backend: "BaseBackend",
-        execution_service: "ExecutionService",
-        run_result: RunResult,
-        representative_qid: str,
-    ) -> None:
-        """Process MUX task results for other qubits in the MUX.
-
-        For MUX-level tasks like CheckResonatorSpectroscopy, the task runs once
-        for the representative qubit but produces results for all qubits in the MUX.
-        This method calls postprocess for each other qubit to save their figures
-        and output parameters.
-
-        Parameters
-        ----------
-        task : TaskProtocol
-            The task instance
-        backend : BaseBackend
-            The backend
-        execution_service : ExecutionService
-            The execution service
-        run_result : RunResult
-            The run result from the representative qubit's execution
-        representative_qid : str
-            The representative qubit ID (the one that executed the task)
-        """
-        # Calculate other qids in the MUX (assuming 4 qubits per MUX)
-        try:
-            mux_base_qid = (int(representative_qid) // 4) * 4
-        except ValueError:
-            logger.warning(
-                "Could not parse representative_qid=%s as integer, skipping MUX distribution",
-                representative_qid,
-            )
-            return
-
-        for pos_in_mux in range(4):
-            target_qid = str(mux_base_qid + pos_in_mux)
-            if target_qid == representative_qid:
-                continue
-            self._distribute_mux_result_to_qid(
-                task, backend, execution_service, run_result, target_qid
-            )
-
-    def _distribute_mux_result_to_qid(
-        self,
-        task: TaskProtocol,
-        backend: "BaseBackend",
-        execution_service: "ExecutionService",
-        run_result: RunResult,
-        target_qid: str,
-    ) -> None:
-        """Postprocess, save, and record a MUX task result for a single qubit.
-
-        Parameters
-        ----------
-        task : TaskProtocol
-            The task instance
-        backend : BaseBackend
-            The backend
-        execution_service : ExecutionService
-            The execution service
-        run_result : RunResult
-            The run result from the representative qubit's execution
-        target_qid : str
-            The qubit ID to distribute results to
-        """
-        task_name = task.get_name()
-        task_type = task.get_task_type()
-        logger.debug("Processing MUX result for qid=%s (task=%s)", target_qid, task_name)
-
-        try:
-            self.state_manager.ensure_task_exists(task_name, task_type, target_qid)
-            self.state_manager.start_task(task_name, task_type, target_qid)
-
-            postprocess_result = task.postprocess(
-                backend, self.execution_id, run_result, target_qid
-            )
-
-            if postprocess_result:
-                if postprocess_result.output_parameters:
-                    task_model = self.state_manager.get_task(task_name, task_type, target_qid)
-                    task.attach_task_id(task_model.task_id)
-                    processed_params = self.result_processor.process_output_parameters(
-                        postprocess_result.output_parameters,
-                        task_name,
-                        self.execution_id,
-                        task_model.task_id,
-                    )
-                    self.state_manager.put_output_parameters(
-                        task_name, processed_params, task_type, target_qid
-                    )
-
-                if postprocess_result.figures:
-                    png_paths, json_paths = self.data_saver.save_figures(
-                        postprocess_result.figures, task_name, task_type, target_qid
-                    )
-                    self.state_manager.set_figure_paths(
-                        task_name, task_type, target_qid, png_paths, json_paths
-                    )
-
-                self._save_mux_qid_to_database(task, execution_service, target_qid)
-
-            self._complete_task(
-                task_name, task_type, target_qid, f"{task_name} completed (MUX distribution)"
-            )
-
-        except Exception as e:
-            logger.warning(
-                "Failed to process MUX result for qid=%s: %s",
-                target_qid,
-                e,
-                exc_info=True,
-            )
-            self._fail_task(task_name, task_type, target_qid, str(e))
-
-        finally:
-            self.state_manager.end_task(task_name, task_type, target_qid)
-            executed_task = self.state_manager.get_task(task_name, task_type, target_qid)
-            self.history_recorder.record_task_result(
-                executed_task, execution_service.to_datamodel()
-            )
-
-    def _save_mux_qid_to_database(
-        self,
-        task: TaskProtocol,
-        execution_service: "ExecutionService",
-        qid: str,
-    ) -> None:
-        """Save MUX task results for a single qid to database.
-
-        Parameters
-        ----------
-        task : TaskProtocol
-            The task instance
-        execution_service : ExecutionService
-            The execution service
-        qid : str
-            The qubit ID
-        """
-        task_name = task.get_name()
-        task_type = task.get_task_type()
-
-        # Get output parameters from state_manager (already processed and stored)
-        task_model = self.state_manager.get_task(task_name, task_type, qid)
-        output_parameters = dict(task_model.output_parameters)
-
-        if not output_parameters:
-            return
-
-        from qdash.repository import MongoQubitCalibrationRepository
-
-        qubit_repo = MongoQubitCalibrationRepository()
-        qubit_repo.update_calib_data(
-            username=self.username,
-            qid=qid,
-            chip_id=execution_service.chip_id,
-            output_parameters=output_parameters,
-            project_id=execution_service.project_id,
-        )
-        # Note: calib_data is already updated by put_output_parameters
