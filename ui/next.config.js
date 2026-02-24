@@ -12,7 +12,7 @@ const nextConfig = {
       },
     ];
   },
-  transpilePackages: ["react-plotly.js", "plotly.js-basic-dist"],
+  transpilePackages: ["react-plotly.js", "plotly.js-dist-min"],
   images: {
     remotePatterns: [
       {
