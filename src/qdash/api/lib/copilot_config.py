@@ -37,7 +37,7 @@ class ModelConfig(BaseModel):
     provider: str = "openai"
     name: str = "gpt-4.1"
     temperature: float | None = 0.7
-    max_output_tokens: int = 2048
+    max_output_tokens: int = 16384
 
 
 class Suggestion(BaseModel):

@@ -519,6 +519,9 @@ Chart specifications use Plotly.js format:
 - Supported trace types: scatter, bar, histogram, heatmap
 
 Always include at least one text block explaining the chart or analysis.
+When you call `generate_chip_heatmap`, the chart is automatically generated and injected into the response.
+Do NOT reproduce the chart JSON data in your response. Only include text blocks analyzing the statistics.
+Similarly, charts from `execute_python_analysis` are automatically included — do not copy chart data into your response.
 When showing data trends, prefer scatter plots with mode "lines+markers".
 Set "assessment" to "good", "warning", or "bad" when analyzing results. Set to null for informational responses.
 
@@ -949,6 +952,70 @@ def _parse_blocks_response(content: str) -> dict[str, Any]:
         }
 
 
+def _wrap_chart_executors(
+    tool_executors: ToolExecutors,
+) -> tuple[ToolExecutors, list[dict[str, Any]]]:
+    """Wrap tool executors to intercept chart results from chart-generating tools.
+
+    Charts from ``generate_chip_heatmap`` and ``execute_python_analysis`` are
+    collected so they can be injected directly into the blocks response,
+    avoiding the need for the LLM to reproduce large chart JSON.
+    """
+    collected_charts: list[dict[str, Any]] = []
+    wrapped = dict(tool_executors)
+
+    original_heatmap = wrapped.get("generate_chip_heatmap")
+    if original_heatmap:
+
+        def heatmap_wrapper(args: dict[str, Any], _orig: Any = original_heatmap) -> Any:
+            result = _orig(args)
+            if isinstance(result, dict) and "chart" in result:
+                collected_charts.append(result["chart"])
+                return {
+                    "status": "success",
+                    "message": (
+                        "Heatmap chart generated. It will be automatically appended "
+                        "to your response. Do NOT reproduce the chart data."
+                    ),
+                    "statistics": result.get("statistics", {}),
+                }
+            return result
+
+        wrapped["generate_chip_heatmap"] = heatmap_wrapper
+
+    original_python = wrapped.get("execute_python_analysis")
+    if original_python:
+
+        def python_wrapper(args: dict[str, Any], _orig: Any = original_python) -> Any:
+            result = _orig(args)
+            if isinstance(result, dict) and result.get("chart"):
+                collected_charts.append(result["chart"])
+                return {
+                    "output": result.get("output", ""),
+                    "chart": None,
+                    "chart_note": "Chart generated. It will be automatically appended to your response.",
+                }
+            return result
+
+        wrapped["execute_python_analysis"] = python_wrapper
+
+    return wrapped, collected_charts
+
+
+def _inject_collected_charts(
+    result: dict[str, Any],
+    collected_charts: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Append tool-generated charts to the blocks response."""
+    if not collected_charts:
+        return result
+    blocks = result.get("blocks", [])
+    for chart in collected_charts:
+        blocks.append({"type": "chart", "content": None, "chart": chart})
+    result["blocks"] = blocks
+    return result
+
+
 async def _run_responses_api(
     client: AsyncOpenAI,
     system_prompt: str,
@@ -1203,18 +1270,26 @@ async def run_analysis(
         input_items = _build_input(
             user_message, image_base64, conversation_history, expected_images
         )
+
+        # Wrap chart-generating tools to collect charts for direct injection
+        if tool_executors:
+            wrapped_executors: ToolExecutors | None = None
+            wrapped_executors, collected_charts = _wrap_chart_executors(tool_executors)
+        else:
+            wrapped_executors, collected_charts = None, []
+
         content = await _run_responses_api(
             client,
             system_prompt,
             input_items,
             config,
-            tool_executors,
+            wrapped_executors,
             response_schema=BLOCKS_RESPONSE_SCHEMA,
             strict_schema=False,
             on_tool_call=on_tool_call,
             on_status=on_status,
         )
-        return _parse_blocks_response(content)
+        return _inject_collected_charts(_parse_blocks_response(content), collected_charts)
 
 
 def blocks_to_markdown(result: dict[str, Any]) -> str:
@@ -1425,15 +1500,23 @@ async def run_chat(
         return _legacy_to_blocks(response)
     else:
         input_items = _build_input(user_message, image_base64, conversation_history)
+
+        # Wrap chart-generating tools to collect charts for direct injection
+        if tool_executors:
+            wrapped_executors: ToolExecutors | None = None
+            wrapped_executors, collected_charts = _wrap_chart_executors(tool_executors)
+        else:
+            wrapped_executors, collected_charts = None, []
+
         content = await _run_responses_api(
             client,
             system_prompt,
             input_items,
             config,
-            tool_executors,
+            wrapped_executors,
             response_schema=BLOCKS_RESPONSE_SCHEMA,
             strict_schema=False,
             on_tool_call=on_tool_call,
             on_status=on_status,
         )
-        return _parse_blocks_response(content)
+        return _inject_collected_charts(_parse_blocks_response(content), collected_charts)
