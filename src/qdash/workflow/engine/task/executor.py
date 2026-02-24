@@ -410,6 +410,24 @@ class TaskExecutor:
 
         return execution_service, result
 
+    @staticmethod
+    def _reconstruct_param(
+        model_cls: type,
+        key: str,
+        value: Any,
+    ) -> Any | None:
+        """Reconstruct a single parameter model from snapshot data.
+
+        Returns the model instance, or None if the data is invalid.
+        """
+        try:
+            if isinstance(value, dict):
+                return model_cls(**value)
+            return model_cls(value=value)
+        except (TypeError, ValueError) as e:
+            logger.error("Invalid snapshot parameter %s=%r: %s", key, value, e)
+            return None
+
     def _apply_snapshot_overrides(
         self,
         task: TaskProtocol,
@@ -427,7 +445,11 @@ class TaskExecutor:
         assert self._snapshot_loader is not None
         snapshot = self._snapshot_loader.get_snapshot(task_name, qid)
         if snapshot is None:
-            logger.debug("No snapshot found for task=%s, qid=%s", task_name, qid)
+            logger.warning(
+                "No snapshot found for task=%s, qid=%s - continuing with default parameters",
+                task_name,
+                qid,
+            )
             return
 
         snap_input, snap_run = snapshot
@@ -441,24 +463,22 @@ class TaskExecutor:
 
         # Override input_parameters on the task instance
         if snap_input:
-            reconstructed_input = {}
-            for k, v in snap_input.items():
-                if isinstance(v, dict):
-                    reconstructed_input[k] = ParameterModel(**v)
-                else:
-                    reconstructed_input[k] = ParameterModel(value=v)
+            reconstructed_input = {
+                k: m
+                for k, v in snap_input.items()
+                if (m := self._reconstruct_param(ParameterModel, k, v)) is not None
+            }
             task.input_parameters = reconstructed_input  # type: ignore[attr-defined]
             # Re-record in state_manager
             self.state_manager.put_input_parameters(task_name, reconstructed_input, task_type, qid)
 
         # Override run_parameters on the task instance
         if snap_run:
-            reconstructed_run = {}
-            for k, v in snap_run.items():
-                if isinstance(v, dict):
-                    reconstructed_run[k] = RunParameterModel(**v)
-                else:
-                    reconstructed_run[k] = RunParameterModel(value=v)
+            reconstructed_run = {
+                k: m
+                for k, v in snap_run.items()
+                if (m := self._reconstruct_param(RunParameterModel, k, v)) is not None
+            }
             task.run_parameters = reconstructed_run
             # Re-record in state_manager
             run_params_dict = {k: v.model_dump() for k, v in reconstructed_run.items()}

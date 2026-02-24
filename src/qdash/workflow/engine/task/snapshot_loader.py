@@ -58,6 +58,7 @@ class SnapshotParameterLoader:
                     }
                 )
                 .sort([("start_at", SortDirection.ASCENDING)])
+                .limit(10000)
                 .run()
             )
 

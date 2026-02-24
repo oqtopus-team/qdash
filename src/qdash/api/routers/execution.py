@@ -16,6 +16,7 @@ from qdash.api.dependencies import get_execution_service, get_flow_service  # no
 from qdash.api.lib.project import (  # noqa: TCH002
     ProjectContext,
     get_project_context,
+    get_project_context_owner,
 )
 from qdash.api.schemas.error import Detail
 from qdash.api.schemas.execution import (
@@ -201,7 +202,7 @@ def get_execution(
 async def re_execute_from_snapshot(
     execution_id: str,
     request: ReExecuteRequest,
-    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    ctx: Annotated[ProjectContext, Depends(get_project_context_owner)],
     execution_service: Annotated[ExecutionService, Depends(get_execution_service)],
     flow_service: Annotated[FlowService, Depends(get_flow_service)],
 ) -> ExecuteFlowResponse:
