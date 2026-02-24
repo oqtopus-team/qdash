@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useLayoutEffect, useMemo } from "react";
+import React, { useState, useMemo } from "react";
 import Link from "next/link";
 import { ChevronRight, History, FileText, GitBranch, Bot } from "lucide-react";
 
@@ -32,7 +32,6 @@ export function TaskHistoryModal({
   isOpen,
   onClose,
 }: TaskHistoryModalProps) {
-  const modalRef = useRef<HTMLDialogElement>(null);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [mobileTab, setMobileTab] = useState<MobileTab>("history");
   const { openAnalysisChat } = useAnalysisChatContext();
@@ -42,17 +41,6 @@ export function TaskHistoryModal({
     const q = encodeURIComponent(qidValue);
     return `/provenance?tab=lineage&parameter=${p}&qid=${q}`;
   };
-
-  useLayoutEffect(() => {
-    const modal = modalRef.current;
-    if (!modal) return;
-
-    if (isOpen && !modal.open) {
-      modal.showModal();
-    } else if (!isOpen && modal.open) {
-      modal.close();
-    }
-  }, [isOpen]);
 
   const { data, isLoading, isError } = useGetQubitTaskHistory(
     qid,
@@ -371,11 +359,14 @@ export function TaskHistoryModal({
     </div>
   );
 
+  if (!isOpen) return null;
+
   return (
-    <dialog
-      ref={modalRef}
-      className="modal modal-bottom sm:modal-middle"
-      onClose={onClose}
+    <div
+      className="modal modal-open modal-bottom sm:modal-middle"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
     >
       <div className="modal-box w-full sm:w-11/12 max-w-5xl bg-base-100 p-3 sm:p-6">
         <div className="flex justify-between items-center mb-3 sm:mb-4">
@@ -451,9 +442,6 @@ export function TaskHistoryModal({
           </div>
         )}
       </div>
-      <form method="dialog" className="modal-backdrop">
-        <button onClick={onClose}>close</button>
-      </form>
-    </dialog>
+    </div>
   );
 }
