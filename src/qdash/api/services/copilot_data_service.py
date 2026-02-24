@@ -22,6 +22,36 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 MAX_FIGURE_SIZE = 5 * 1024 * 1024  # 5MB
+FALLBACK_QUERY_LIMIT = 500  # Max documents to scan for manual aggregation fallback
+
+
+def _compact_number(value: Any) -> Any:
+    """Round floats to 4 significant figures to save tokens."""
+    if not isinstance(value, float) or not math.isfinite(value):
+        return value
+    if value == 0.0:
+        return 0.0
+    magnitude = math.floor(math.log10(abs(value)))
+    rounded = round(value, -magnitude + 3)  # 4 significant figures
+    # Return int if no fractional part
+    if rounded == int(rounded) and abs(rounded) < 1e15:
+        return int(rounded)
+    return rounded
+
+
+def _compact_timestamp(iso_str: str | None) -> str:
+    """Shorten ISO timestamp: '2026-02-24T02:22:04.211000' -> '02-24 02:22'."""
+    if not iso_str:
+        return ""
+    # Take 'MM-DD HH:MM' from the ISO string
+    try:
+        # "2026-02-24T02:22:04" -> date="2026-02-24", time="02:22:04"
+        date_part, _, time_part = iso_str.partition("T")
+        month_day = date_part[5:10]  # "02-24"
+        hour_min = time_part[:5]  # "02:22"
+        return f"{month_day} {hour_min}"
+    except (IndexError, ValueError):
+        return iso_str[:16]
 
 
 class CopilotDataService:
@@ -246,6 +276,151 @@ class CopilotDataService:
         if not results:
             return [{"error": f"No results found for parameter '{parameter_name}' on qid={qid}"}]
         return results
+
+    def load_chip_parameter_timeseries(
+        self,
+        parameter_name: str,
+        chip_id: str,
+        last_n: int = 10,
+        qids: list[str] | None = None,
+    ) -> dict[str, Any]:
+        """Load per-qubit timeseries and summary for a parameter.
+
+        Single DB query replaces N individual get_parameter_timeseries calls.
+        Returns per-qubit timeseries (value + timestamp), stats, trend,
+        and chip-wide statistics — enough data for charts and tables.
+
+        Parameters
+        ----------
+        qids : list[str] | None
+            Optional list of qubit IDs to fetch. If None, fetches all qubits.
+        """
+        from collections import defaultdict
+
+        from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
+
+        query: dict[str, Any] = {
+            "chip_id": chip_id,
+            "status": "completed",
+            "output_parameter_names": parameter_name,
+        }
+        if qids:
+            query["qid"] = {"$in": qids}
+
+        docs = (
+            TaskResultHistoryDocument.find(query)
+            .sort([("start_at", SortDirection.DESCENDING)])
+            .limit(last_n * (len(qids) if qids else 200))
+            .run()
+        )
+
+        # Group by qid
+        per_qubit: dict[str, list[dict[str, Any]]] = defaultdict(list)
+        unit = ""
+        for doc in docs:
+            param_data = (doc.output_parameters or {}).get(parameter_name)
+            if param_data is None:
+                continue
+            if isinstance(param_data, dict):
+                value = param_data.get("value")
+                if not unit:
+                    unit = param_data.get("unit", "")
+            else:
+                value = param_data
+            if value is not None:
+                per_qubit[doc.qid].append(
+                    {
+                        "value": value,
+                        "start_at": doc.start_at.isoformat() if doc.start_at else None,
+                    }
+                )
+
+        if not per_qubit:
+            return {"error": f"No data for '{parameter_name}' on chip '{chip_id}'"}
+
+        # Build per-qubit data with timeseries + stats
+        qubits: dict[str, dict[str, Any]] = {}
+        all_latest: list[float] = []
+
+        for qid, entries in sorted(
+            per_qubit.items(),
+            key=lambda x: int(x[0]) if x[0].isdigit() else x[0],
+        ):
+            recent = entries[:last_n]  # keep at most last_n per qubit
+            # Chronological order (oldest first) for charting
+            chronological = list(reversed(recent))
+            values = [e["value"] for e in recent]
+            latest = values[0]
+            if isinstance(latest, (int, float)) and math.isfinite(latest):
+                all_latest.append(float(latest))
+
+            # Columnar timeseries: compact format for charting
+            ts_values = [_compact_number(e["value"]) for e in chronological]
+            ts_times = [_compact_timestamp(e["start_at"]) for e in chronological]
+
+            qubit_data: dict[str, Any] = {
+                "latest": _compact_number(latest),
+                "count": len(values),
+                "ts": {"v": ts_values, "t": ts_times},
+            }
+            numeric_values = [v for v in values if isinstance(v, (int, float)) and math.isfinite(v)]
+            if len(numeric_values) >= 2:
+                qubit_data["min"] = _compact_number(min(numeric_values))
+                qubit_data["max"] = _compact_number(max(numeric_values))
+                qubit_data["mean"] = _compact_number(stats_mod.mean(numeric_values))
+                # Simple trend: compare latest vs oldest
+                if numeric_values[0] > numeric_values[-1] * 1.01:
+                    qubit_data["trend"] = "up"
+                elif numeric_values[0] < numeric_values[-1] * 0.99:
+                    qubit_data["trend"] = "down"
+                else:
+                    qubit_data["trend"] = "stable"
+            qubits[qid] = qubit_data
+
+        # Chip-wide statistics
+        chip_stats: dict[str, Any] = {
+            "count": len(all_latest),
+            "mean": stats_mod.mean(all_latest) if all_latest else 0,
+            "median": stats_mod.median(all_latest) if all_latest else 0,
+            "min": min(all_latest) if all_latest else 0,
+            "max": max(all_latest) if all_latest else 0,
+        }
+        if len(all_latest) >= 2:
+            chip_stats["stdev"] = stats_mod.stdev(all_latest)
+
+        result = {
+            "chip_id": chip_id,
+            "parameter_name": parameter_name,
+            "unit": unit,
+            "num_qubits": len(qubits),
+            "qubits": qubits,
+            "statistics": chip_stats,
+        }
+
+        # Guard against exceeding the tool result size limit (30K chars).
+        # If full timeseries makes it too large, drop timeseries arrays
+        # and keep only per-qubit stats so ALL qubits are still represented.
+        import json as _json
+
+        _MAX_SAFE_CHARS = 25000  # leave margin for JSON overhead
+        result_size = len(_json.dumps(result, default=str, ensure_ascii=False))
+        if result_size > _MAX_SAFE_CHARS:
+            logger.info(
+                "Chip parameter timeseries too large (%d chars, %d qubits x last_n=%d), "
+                "dropping timeseries arrays to fit",
+                result_size,
+                len(qubits),
+                last_n,
+            )
+            for qdata in qubits.values():
+                qdata.pop("ts", None)
+            result["_note"] = (
+                "Timeseries arrays omitted because the full result exceeded size limits. "
+                "Per-qubit stats (latest, min, max, mean, trend) and chip-wide statistics "
+                "are still included. To get timeseries, call again with a smaller qids list."
+            )
+
+        return result
 
     def load_chip_summary(
         self, chip_id: str, param_names: list[str] | None = None
@@ -716,14 +891,11 @@ class CopilotDataService:
             try:
                 topology = load_topology(chip.topology_id)
                 geometry = chip_geometry_from_topology(topology)
-            except Exception:
-                import math
-
+            except (FileNotFoundError, ValueError, KeyError) as e:
+                logger.warning("Failed to load topology '%s': %s", chip.topology_id, e)
                 n = chip.size or 0
                 geometry = build_chip_geometry(n, int(math.sqrt(n)) if n else 1)
         else:
-            import math
-
             n = chip.size or 0
             geometry = build_chip_geometry(n, int(math.sqrt(n)) if n else 1)
 
@@ -773,7 +945,8 @@ class CopilotDataService:
                     metric_keys=valid_keys,
                     cutoff_time=cutoff_time,
                 )
-        except Exception as e:
+        except (KeyError, ValueError, TypeError) as e:
+            logger.warning("Metrics aggregation failed for %s/%s: %s", chip_id, metric_name, e)
             return {"error": f"Failed to aggregate metrics: {e}"}
 
         # Build MetricValue-like objects for the chart helper
@@ -839,9 +1012,10 @@ class CopilotDataService:
         collection = TaskResultHistoryDocument.get_motor_collection()
         try:
             names = collection.distinct("output_parameter_names", query)
-        except Exception:
-            # Fallback: manual aggregation
-            docs = TaskResultHistoryDocument.find(query).limit(500).run()
+        except (AttributeError, TypeError) as e:
+            # Fallback: manual aggregation when distinct() is unavailable
+            logger.warning("distinct() failed for output_parameter_names: %s", e)
+            docs = TaskResultHistoryDocument.find(query).limit(FALLBACK_QUERY_LIMIT).run()
             name_set: set[str] = set()
             for doc in docs:
                 if doc.output_parameter_names:
@@ -1015,5 +1189,11 @@ class CopilotDataService:
             ),
             "list_available_parameters": lambda args: self.load_available_parameters(
                 args["chip_id"], args.get("qid")
+            ),
+            "get_chip_parameter_timeseries": lambda args: self.load_chip_parameter_timeseries(
+                args["parameter_name"],
+                args["chip_id"],
+                args.get("last_n", 10),
+                args.get("qids"),
             ),
         }

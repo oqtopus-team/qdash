@@ -41,7 +41,7 @@ use the available tools to retrieve the data rather than saying it's unavailable
 The current qubit context (chip_id, qid) is provided in the system prompt below.
 """
 
-MAX_TOOL_ROUNDS = 10
+MAX_TOOL_ROUNDS = 20
 MAX_TOOL_RESULT_CHARS = 30000
 
 ToolExecutors = dict[str, Any]
@@ -104,12 +104,15 @@ AGENT_TOOLS: list[dict[str, Any]] = [
         "type": "function",
         "name": "get_parameter_timeseries",
         "description": (
-            "Get time series data for a specific output parameter across all task results. "
+            "Get time series data for a specific output parameter for a SINGLE qubit. "
+            "Only use this for ONE specific qubit. "
+            "NEVER call this in a loop for multiple qubits — use get_chip_parameter_timeseries instead. "
+            "If the user asks about a parameter across the chip or multiple qubits, "
+            "call get_chip_parameter_timeseries (one call for all qubits). "
             "Any output parameter name stored in the calibration database can be queried "
             "(e.g. 'qubit_frequency', 't1', 't2_echo', 'x90_gate_fidelity', "
             "'resonator_frequency', 'pi_amplitude', etc.). "
             "If unsure which parameter names are available, call list_available_parameters first. "
-            "Use this when the user asks about trends or history of a specific parameter. "
             "Returns a list of {value, unit, calibrated_at, execution_id, task_id} entries "
             "ordered by time."
         ),
@@ -141,11 +144,12 @@ AGENT_TOOLS: list[dict[str, Any]] = [
             "Execute Python code in a sandboxed environment for data analysis. "
             "Use this when you need to perform calculations, statistical analysis, "
             "or generate Plotly charts from data retrieved by other tools. "
-            "Available libraries: numpy, pandas, scipy, scipy.stats, math, statistics, json, "
-            "datetime, collections. "
+            "Available libraries: numpy, pandas, scipy, scipy.stats, plotly, math, statistics, "
+            "json, datetime, collections. "
             "Pass data from previous tool calls via context_data (accessible as 'data' in code). "
             "Set a 'result' variable as a dict with 'output' (text) and optionally "
-            "'chart' (Plotly spec with 'data' and 'layout' keys)."
+            "'chart' (single Plotly spec or a list of Plotly specs, each with 'data' and 'layout' keys). "
+            "You can use plotly.graph_objects, plotly.express, or plotly.subplots."
         ),
         "parameters": {
             "type": "object",
@@ -155,7 +159,7 @@ AGENT_TOOLS: list[dict[str, Any]] = [
                     "description": (
                         "Python code to execute. Use 'data' to access context_data. "
                         "Set result = {'output': '...', 'chart': {'data': [...], 'layout': {...}}} "
-                        "for structured output."
+                        "for single chart, or 'chart': [chart1, chart2, ...] for multiple charts."
                     ),
                 },
                 "context_data": {
@@ -434,6 +438,42 @@ AGENT_TOOLS: list[dict[str, Any]] = [
                 },
             },
             "required": ["chip_id", "metric_name"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "type": "function",
+        "name": "get_chip_parameter_timeseries",
+        "description": (
+            "Batch version of get_parameter_timeseries — fetches timeseries for multiple "
+            "qubits in one call. Returns per-qubit data including: timeseries array "
+            "(value + start_at in chronological order, suitable for plotting), latest value, "
+            "trend, min/max/mean stats, plus chip-wide statistics. "
+            "Use this instead of calling get_parameter_timeseries for each qubit individually. "
+            "Omit qids to fetch ALL qubits on the chip."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "chip_id": {"type": "string", "description": "Chip ID"},
+                "parameter_name": {
+                    "type": "string",
+                    "description": "Parameter name (e.g. 't1', 'qubit_frequency')",
+                },
+                "qids": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": (
+                        "Optional list of qubit IDs to fetch (e.g. ['0', '1', '5']). "
+                        "If omitted, fetches ALL qubits on the chip."
+                    ),
+                },
+                "last_n": {
+                    "type": "integer",
+                    "description": "Recent values per qubit (default 10)",
+                },
+            },
+            "required": ["chip_id", "parameter_name"],
             "additionalProperties": False,
         },
     },
@@ -991,17 +1031,65 @@ def _wrap_chart_executors(
         def python_wrapper(args: dict[str, Any], _orig: Any = original_python) -> Any:
             result = _orig(args)
             if isinstance(result, dict) and result.get("chart"):
-                collected_charts.append(result["chart"])
+                chart = result["chart"]
+                if isinstance(chart, list):
+                    collected_charts.extend(chart)
+                else:
+                    collected_charts.append(chart)
                 return {
                     "output": result.get("output", ""),
                     "chart": None,
-                    "chart_note": "Chart generated. It will be automatically appended to your response.",
+                    "chart_note": "Chart(s) generated. They will be automatically appended to your response.",
                 }
             return result
 
         wrapped["execute_python_analysis"] = python_wrapper
 
     return wrapped, collected_charts
+
+
+# Maximum number of get_parameter_timeseries calls allowed per conversation turn.
+# Beyond this limit the executor returns an error nudging the LLM to use
+# get_chip_parameter_timeseries instead.
+_TIMESERIES_CALL_LIMIT = 3
+
+
+def _wrap_rate_limited_executors(tool_executors: ToolExecutors) -> ToolExecutors:
+    """Wrap per-qubit tools with a call-count limiter.
+
+    If the LLM calls ``get_parameter_timeseries`` more than
+    ``_TIMESERIES_CALL_LIMIT`` times in a single turn, subsequent calls
+    return an error directing it to ``get_chip_parameter_timeseries``.
+    """
+    wrapped = dict(tool_executors)
+
+    original_ts = wrapped.get("get_parameter_timeseries")
+    if original_ts is None:
+        return wrapped
+
+    call_count = 0
+
+    def timeseries_limiter(args: dict[str, Any], _orig: Any = original_ts) -> Any:
+        nonlocal call_count
+        call_count += 1
+        if call_count > _TIMESERIES_CALL_LIMIT:
+            logger.warning(
+                "get_parameter_timeseries called %d times (limit %d), blocking",
+                call_count,
+                _TIMESERIES_CALL_LIMIT,
+            )
+            return {
+                "error": (
+                    f"Too many get_parameter_timeseries calls ({call_count}). "
+                    "Use get_chip_parameter_timeseries instead — it returns per-qubit "
+                    "timeseries arrays (value + timestamp, suitable for plotting), "
+                    "stats, and trends for ALL qubits in one call."
+                )
+            }
+        return _orig(args)
+
+    wrapped["get_parameter_timeseries"] = timeseries_limiter
+    return wrapped
 
 
 def _sanitize_nan(obj: Any) -> Any:
@@ -1090,6 +1178,14 @@ async def _run_responses_api(
             if not function_calls:
                 break
 
+            logger.info(
+                "Tool round %d/%d: %d call(s) — %s",
+                _round + 1,
+                MAX_TOOL_ROUNDS,
+                len(function_calls),
+                ", ".join(fc.name for fc in function_calls),
+            )
+
             # Build new input: previous input + ALL model output items.
             # All items (reasoning, function_call, message, etc.) must be
             # preserved — omitting reasoning items causes a 400 error.
@@ -1098,11 +1194,14 @@ async def _run_responses_api(
                 new_input.append(item.model_dump())
 
             for fc in function_calls:
+                try:
+                    args = json.loads(fc.arguments)
+                except (json.JSONDecodeError, TypeError):
+                    args = {}
+
+                logger.info("Tool call: %s(%s)", fc.name, json.dumps(args, ensure_ascii=False))
+
                 if on_tool_call:
-                    try:
-                        args = json.loads(fc.arguments)
-                    except (json.JSONDecodeError, TypeError):
-                        args = {}
                     await on_tool_call(fc.name, args)
 
                 executor = tool_executors.get(fc.name)
@@ -1110,7 +1209,6 @@ async def _run_responses_api(
                     tool_result = {"error": f"Unknown tool: {fc.name}"}
                 else:
                     try:
-                        args = json.loads(fc.arguments)
                         tool_result = executor(args)
                     except Exception as e:
                         logger.warning("Tool %s execution failed: %s", fc.name, e)
@@ -1127,11 +1225,21 @@ async def _run_responses_api(
                     output_str = (
                         output_str[:MAX_TOOL_RESULT_CHARS] + '... [TRUNCATED - result too large]"}'
                     )
+
+                # Log result summary
+                result_summary = ""
+                if isinstance(tool_result, dict):
+                    if tool_result.get("error"):
+                        result_summary = f" error={str(tool_result['error'])[:100]}"
+                    elif "num_qubits" in tool_result:
+                        result_summary = f" num_qubits={tool_result['num_qubits']}"
+                elif isinstance(tool_result, list):
+                    result_summary = f" items={len(tool_result)}"
                 logger.info(
-                    "Tool call: %s -> %s (%d chars)",
+                    "Tool result: %s -> %d chars%s",
                     fc.name,
-                    type(tool_result).__name__,
                     len(output_str),
+                    result_summary,
                 )
                 new_input.append(
                     {
@@ -1303,7 +1411,8 @@ async def run_analysis(
         # Wrap chart-generating tools to collect charts for direct injection
         if tool_executors:
             wrapped_executors: ToolExecutors | None = None
-            wrapped_executors, collected_charts = _wrap_chart_executors(tool_executors)
+            rate_limited = _wrap_rate_limited_executors(tool_executors)
+            wrapped_executors, collected_charts = _wrap_chart_executors(rate_limited)
         else:
             wrapped_executors, collected_charts = None, []
 
@@ -1359,19 +1468,22 @@ Your role:
 - Provide actionable insights and recommendations
 - Explain findings clearly to experimentalists
 
-You have access to tools that can fetch data from the calibration database:
+You have access to tools that can fetch data from the calibration database.
 
-### Single-qubit tools
+⚠️ CRITICAL RULE: When analysing a parameter across multiple qubits or the whole chip (e.g. "T1の時系列", "show me T1 trends", "analyse qubit_frequency for all qubits"), you MUST call get_chip_parameter_timeseries ONCE. NEVER call get_parameter_timeseries in a loop for each qubit — that is slow and wasteful. get_parameter_timeseries is ONLY for deep-diving into a single specific qubit the user explicitly asked about.
+
+### Single-qubit tools (use only for ONE specific qubit)
 - get_qubit_params: Get current calibrated parameters for a qubit (chip_id, qid required)
 - get_latest_task_result: Get the latest result for a specific calibration task
 - get_task_history: Get recent historical results for a task
-- get_parameter_timeseries: Get time series data for any output parameter (ideal for trend charts). Use list_available_parameters to discover valid names.
+- get_parameter_timeseries: Get time series for a parameter on a SINGLE qubit only. For multiple/all qubits, use get_chip_parameter_timeseries instead.
 - list_available_parameters: List all output parameter names recorded in the database. Optionally filter by qid.
 
 ### Chip-wide & cross-qubit tools
 - get_chip_summary: Get all qubits on a chip with statistics (mean/median/std/min/max)
 - compare_qubits: Compare parameters across multiple qubits side by side
 - get_chip_topology: Get chip topology (grid size, qubit positions, coupling connections)
+- get_chip_parameter_timeseries: Get per-qubit timeseries + summary for a parameter across ALL qubits in one call. Returns timeseries arrays (for charts), latest values, trends, and chip-wide stats. Use this instead of calling get_parameter_timeseries for each qubit.
 - generate_chip_heatmap: Generate a chip-wide heatmap for a qubit metric (e.g. T1, frequency). Returns a Plotly chart.
 
 ### Coupling & execution tools
@@ -1404,7 +1516,7 @@ For complex analysis (correlations, statistics, distributions, fitting), use exe
 2. Then call execute_python_analysis with:
    - "code": Python code that uses 'data' variable to access context_data
    - "context_data": Pass the retrieved data as a dict
-3. Available libraries: numpy, pandas, scipy, scipy.stats, math, statistics, json, datetime, collections
+3. Available libraries: numpy, pandas, scipy, scipy.stats, plotly (graph_objects, express, subplots), math, statistics, json, datetime, collections
 4. In the code, set a 'result' variable:
    ```python
    result = {
@@ -1437,6 +1549,22 @@ Example workflow:
 - Step 2: get_provenance_lineage_graph(entity_id, chip_id) → get ancestor graph
 - Step 3: Inspect ancestor entities (e.g., qubit_frequency, pi_amplitude) for degradation
 - Step 4: Conclude "The qubit_frequency input to CreateX90 was degraded (v3, 4.85 GHz → expected ~5.0 GHz). Re-run CheckQubitFrequency first."
+
+## Presenting analysis results
+
+When you analyse data, ALWAYS provide evidence with your conclusions:
+
+1. **Summary table**: After calling get_chip_parameter_timeseries or get_chip_summary, present a markdown table of per-qubit values so the user can verify your conclusions. Example:
+   | Qubit | Latest | Trend | Min | Max |
+   |-------|--------|-------|-----|-----|
+   | 0     | 45.2   | stable | 43.1 | 46.0 |
+   | 1     | 38.7   | decreasing | 37.5 | 42.3 |
+
+2. **Charts**: Use execute_python_analysis to create Plotly charts for visual evidence — bar charts comparing qubits, scatter plots for trends, histograms for distributions, etc. Pass the data from previous tool calls via context_data.
+
+3. **Statistics**: Always report chip-wide statistics (mean, median, stdev, min, max) returned by tools. Highlight outliers (values > 2 stdev from mean).
+
+Provide tables first for quick reference, then charts for visual insight, then your interpretation.
 """
 
 
@@ -1533,7 +1661,8 @@ async def run_chat(
         # Wrap chart-generating tools to collect charts for direct injection
         if tool_executors:
             wrapped_executors: ToolExecutors | None = None
-            wrapped_executors, collected_charts = _wrap_chart_executors(tool_executors)
+            rate_limited = _wrap_rate_limited_executors(tool_executors)
+            wrapped_executors, collected_charts = _wrap_chart_executors(rate_limited)
         else:
             wrapped_executors, collected_charts = None, []
 

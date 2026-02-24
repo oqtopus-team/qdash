@@ -87,6 +87,23 @@ def create_data_matrix(
     return matrix
 
 
+def _format_qubit_text(
+    qid: int,
+    scaled_value: float,
+    metric_title: str,
+    metric_unit: str,
+) -> str:
+    """Format qubit label text for heatmap cells."""
+    label = f"Q{qid:03d}"
+    if "fidelity" in metric_title.lower() or "%" in metric_unit:
+        return f"{label}<br>{scaled_value:.2f}%"
+    if metric_unit in ["GHz", "MHz"]:
+        return f"{label}<br>{scaled_value:.3f}<br>{metric_unit}"
+    if metric_unit in ["\u00b5s", "ns"]:
+        return f"{label}<br>{scaled_value:.2f}<br>{metric_unit}"
+    return f"{label}<br>{scaled_value:.3f}<br>{metric_unit}"
+
+
 def create_qubit_heatmap(
     metric_data: dict[str, Any],
     geometry: ChipGeometry,
@@ -132,16 +149,7 @@ def create_qubit_heatmap(
         if metric_value and metric_value.value is not None:
             scaled_value = metric_value.value * metric_scale
             values.append(scaled_value)
-
-            if "fidelity" in metric_title.lower() or "%" in metric_unit:
-                text = f"Q{qid:03d}<br>{scaled_value:.2f}%"
-            elif metric_unit in ["GHz", "MHz"]:
-                text = f"Q{qid:03d}<br>{scaled_value:.3f}<br>{metric_unit}"
-            elif metric_unit in ["\u00b5s", "ns"]:
-                text = f"Q{qid:03d}<br>{scaled_value:.2f}<br>{metric_unit}"
-            else:
-                text = f"Q{qid:03d}<br>{scaled_value:.3f}<br>{metric_unit}"
-            texts.append(text)
+            texts.append(_format_qubit_text(qid, scaled_value, metric_title, metric_unit))
         else:
             values.append(math.nan)
             texts.append("N/A")

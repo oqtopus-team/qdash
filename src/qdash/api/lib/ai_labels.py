@@ -17,6 +17,7 @@ TOOL_LABELS: dict[str, str] = {
     "get_provenance_lineage_graph": "Fetching provenance lineage graph",
     "generate_chip_heatmap": "Generating chip heatmap",
     "list_available_parameters": "Listing available parameters",
+    "get_chip_parameter_timeseries": "Fetching chip-wide parameter timeseries",
 }
 
 STATUS_LABELS: dict[str, str] = {
