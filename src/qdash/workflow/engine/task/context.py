@@ -92,6 +92,7 @@ class TaskContext:
         history_recorder: TaskHistoryRecorder | None = None,
         context_id: str | None = None,
         snapshot_loader: SnapshotParameterLoader | None = None,
+        source_task_id: str | None = None,
     ) -> None:
         self.id = context_id or str(uuid.uuid4())
         self.username = username
@@ -116,6 +117,7 @@ class TaskContext:
             history_recorder=history_recorder or TaskHistoryRecorder(),
             data_saver=self.data_saver,
             snapshot_loader=snapshot_loader,
+            source_task_id=source_task_id,
         )
 
         # Initialize containers for coupling qids (only if state_manager was not injected)

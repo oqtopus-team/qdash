@@ -26,12 +26,21 @@ class SnapshotParameterLoader:
         The execution ID to load snapshot parameters from.
     project_id : str
         The project identifier.
+    parameter_overrides : dict[str, dict[str, Any]] | None
+        Optional user overrides. Shape: ``{"run": {...}, "input": {...}}``.
+        Values are merged on top of snapshot parameters.
 
     """
 
-    def __init__(self, source_execution_id: str, project_id: str) -> None:
+    def __init__(
+        self,
+        source_execution_id: str,
+        project_id: str,
+        parameter_overrides: dict[str, dict[str, Any]] | None = None,
+    ) -> None:
         self._source_execution_id = source_execution_id
         self._project_id = project_id
+        self._parameter_overrides = parameter_overrides
         self._cache: dict[tuple[str, str], tuple[dict[str, Any], dict[str, Any]]] | None = None
 
     def _load(self) -> None:
@@ -92,4 +101,34 @@ class SnapshotParameterLoader:
         """
         self._load()
         assert self._cache is not None
-        return self._cache.get((task_name, qid))
+        result = self._cache.get((task_name, qid))
+        if result is None:
+            return None
+        if not self._parameter_overrides:
+            return result
+        snap_input, snap_run = result
+        merged_input = self._merge_overrides(snap_input, self._parameter_overrides.get("input", {}))
+        merged_run = self._merge_overrides(snap_run, self._parameter_overrides.get("run", {}))
+        return merged_input, merged_run
+
+    @staticmethod
+    def _merge_overrides(
+        snapshot_dict: dict[str, Any], overrides: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Merge user overrides on top of snapshot parameters.
+
+        For each key in *overrides*, if the snapshot entry is a dict with a
+        ``"value"`` key the override replaces only the ``"value"`` field
+        (preserving ``unit``, ``value_type``, ``description``, etc.).
+        Otherwise the entry is replaced entirely.
+        """
+        if not overrides:
+            return snapshot_dict
+        merged = {**snapshot_dict}
+        for key, new_value in overrides.items():
+            existing = merged.get(key)
+            if isinstance(existing, dict) and "value" in existing:
+                merged[key] = {**existing, "value": new_value}
+            else:
+                merged[key] = new_value
+        return merged

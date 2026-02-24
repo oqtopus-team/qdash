@@ -27,6 +27,7 @@ def single_task_executor(
     flow_name: str | None = None,
     tags: list[str] | None = None,
     source_task_id: str | None = None,
+    parameter_overrides: dict[str, dict[str, Any]] | None = None,
 ) -> Any:
     """Execute a single calibration task.
 
@@ -63,15 +64,13 @@ def single_task_executor(
         tags=tags,
         project_id=project_id,
         enable_github=False,
+        parameter_overrides=parameter_overrides,
+        source_task_id=source_task_id,
     )
 
     try:
         result = cal.execute_task(task_name, qid)
         cal.finish_calibration()
-
-        new_task_id = result.get("task_id")
-        if source_task_id and new_task_id:
-            _set_source_task_id(project_id, new_task_id, source_task_id, logger)
 
         logger.info(f"Single-task executor completed: {task_name} / {qid}")
         return result
@@ -80,27 +79,3 @@ def single_task_executor(
         with contextlib.suppress(Exception):
             cal.fail_calibration(str(e))
         raise
-
-
-def _set_source_task_id(
-    project_id: str | None,
-    new_task_id: str,
-    source_task_id: str,
-    logger: Any,
-) -> None:
-    """Set source_task_id on the newly created task result for cross-reference."""
-    try:
-        from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
-
-        doc = TaskResultHistoryDocument.find_one(
-            {"project_id": project_id, "task_id": new_task_id}
-        ).run()
-        if doc is None:
-            logger.warning(f"New task result '{new_task_id}' not found for cross-reference")
-            return
-
-        doc.source_task_id = source_task_id
-        doc.save()
-        logger.info(f"Set source_task_id={source_task_id} on new task result '{new_task_id}'")
-    except Exception as e:
-        logger.warning(f"Failed to set source_task_id: {e}")

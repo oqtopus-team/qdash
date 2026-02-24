@@ -117,6 +117,8 @@ class CalibService:
         skip_execution: bool = False,
         default_run_parameters: dict[str, Any] | None = None,
         source_execution_id: str | None = None,
+        parameter_overrides: dict[str, dict[str, Any]] | None = None,
+        source_task_id: str | None = None,
         *,
         user_repo: UserRepository | None = None,
         lock_repo: ExecutionLockRepository | None = None,
@@ -181,6 +183,8 @@ class CalibService:
         if source_execution_id is None:
             source_execution_id = self._read_source_execution_id_from_context()
         self.source_execution_id = source_execution_id
+        self._parameter_overrides = parameter_overrides
+        self._source_task_id = source_task_id
 
         # Store injected repositories for later use
         self._user_repo = user_repo
@@ -363,6 +367,7 @@ class CalibService:
                 snapshot_loader = SnapshotParameterLoader(
                     source_execution_id=self.source_execution_id,
                     project_id=self.project_id,
+                    parameter_overrides=self._parameter_overrides,
                 )
                 logger.info(
                     "Created SnapshotParameterLoader for source_execution_id=%s",
@@ -375,6 +380,7 @@ class CalibService:
                 github_integration=self.github_integration,
                 snapshot_loader=snapshot_loader,
             )
+            self._orchestrator._source_task_id = self._source_task_id
             self._orchestrator.initialize()
             self._initialized = True
         except Exception:

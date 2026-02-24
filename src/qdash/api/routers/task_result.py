@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Body, Depends, Query
 from fastapi.responses import StreamingResponse
@@ -411,6 +411,13 @@ async def re_execute_task_result(
     ctx: Annotated[ProjectContext, Depends(get_project_context)],
     service: Annotated[TaskResultService, Depends(get_task_result_service)],
     flow_service: Annotated[FlowService, Depends(get_flow_service)],
+    parameter_overrides: Annotated[
+        dict[str, dict[str, Any]] | None,
+        Body(
+            description="Optional parameter overrides: {run: {...}, input: {...}}",
+            embed=True,
+        ),
+    ] = None,
 ) -> ExecuteFlowResponse:
     """Re-execute a single task using the system single-task-executor deployment.
 
@@ -457,6 +464,7 @@ async def re_execute_task_result(
         project_id=ctx.project_id,
         tags=doc.tags,
         source_task_id=task_id,
+        parameter_overrides=parameter_overrides,
     )
 
 

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -12,6 +12,9 @@ import {
   XCircle,
   ExternalLink,
   CheckCircle,
+  ChevronDown,
+  ChevronRight,
+  RotateCcw,
 } from "lucide-react";
 import { useGetTaskResult, getGetTaskResultQueryKey } from "@/client/task/task";
 import {
@@ -33,6 +36,167 @@ import {
 } from "@/hooks/useTaskResultIssues";
 import { useProject } from "@/contexts/ProjectContext";
 import { formatDateTime, formatRelativeTime } from "@/lib/utils/datetime";
+
+/** Extract the display value from a parameter entry (may be a dict with `value` key or a plain value). */
+function extractParamValue(entry: unknown): string {
+  if (
+    entry != null &&
+    typeof entry === "object" &&
+    "value" in (entry as Record<string, unknown>)
+  ) {
+    return String((entry as Record<string, unknown>).value ?? "");
+  }
+  return String(entry ?? "");
+}
+
+/** Extract the unit from a parameter entry. */
+function extractParamUnit(entry: unknown): string {
+  if (
+    entry != null &&
+    typeof entry === "object" &&
+    "unit" in (entry as Record<string, unknown>)
+  ) {
+    return String((entry as Record<string, unknown>).unit ?? "");
+  }
+  return "";
+}
+
+/** Build initial form values from a parameters dict. */
+function buildFormValues(
+  params: Record<string, unknown> | undefined,
+): Record<string, string> {
+  if (!params) return {};
+  const result: Record<string, string> = {};
+  for (const [key, entry] of Object.entries(params)) {
+    result[key] = extractParamValue(entry);
+  }
+  return result;
+}
+
+/** Parse a string back to a number if possible, otherwise keep as string. */
+function parseValue(val: string): string | number | boolean {
+  if (val === "true") return true;
+  if (val === "false") return false;
+  const num = Number(val);
+  if (val.trim() !== "" && !isNaN(num)) return num;
+  return val;
+}
+
+/** Compute changed overrides by comparing current form values to originals. */
+function computeOverrides(
+  original: Record<string, string>,
+  current: Record<string, string>,
+): Record<string, string | number | boolean> {
+  const overrides: Record<string, string | number | boolean> = {};
+  for (const [key, val] of Object.entries(current)) {
+    if (val !== original[key]) {
+      overrides[key] = parseValue(val);
+    }
+  }
+  return overrides;
+}
+
+function ParameterOverrideSection({
+  title,
+  parameters,
+  formValues,
+  originalValues,
+  onChange,
+  onReset,
+  defaultOpen,
+}: {
+  title: string;
+  parameters: Record<string, unknown>;
+  formValues: Record<string, string>;
+  originalValues: Record<string, string>;
+  onChange: (key: string, value: string) => void;
+  onReset: (key: string) => void;
+  defaultOpen: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  const keys = Object.keys(parameters);
+  if (keys.length === 0) return null;
+
+  const modifiedCount = keys.filter(
+    (k) => formValues[k] !== originalValues[k],
+  ).length;
+
+  return (
+    <div className="border border-base-300 rounded-lg">
+      <button
+        type="button"
+        className="flex items-center gap-2 w-full p-3 text-sm font-semibold hover:bg-base-200/50 transition-colors"
+        onClick={() => setOpen(!open)}
+      >
+        {open ? (
+          <ChevronDown className="h-3.5 w-3.5" />
+        ) : (
+          <ChevronRight className="h-3.5 w-3.5" />
+        )}
+        {title}
+        {modifiedCount > 0 && (
+          <span className="badge badge-sm badge-primary">
+            {modifiedCount} modified
+          </span>
+        )}
+      </button>
+      {open && (
+        <div className="px-3 pb-3">
+          <table className="table table-xs w-full">
+            <thead>
+              <tr>
+                <th className="w-1/3">Parameter</th>
+                <th>Value</th>
+                <th className="w-16">Unit</th>
+                <th className="w-10"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {keys.map((key) => {
+                const isModified = formValues[key] !== originalValues[key];
+                return (
+                  <tr key={key} className={isModified ? "bg-primary/5" : ""}>
+                    <td className="font-mono text-xs">
+                      {key}
+                      {isModified && (
+                        <span className="badge badge-xs badge-primary ml-1.5">
+                          edited
+                        </span>
+                      )}
+                    </td>
+                    <td>
+                      <input
+                        type="text"
+                        className={`input input-xs input-bordered w-full font-mono ${isModified ? "input-primary" : ""}`}
+                        value={formValues[key] ?? ""}
+                        onChange={(e) => onChange(key, e.target.value)}
+                      />
+                    </td>
+                    <td className="text-xs text-base-content/50">
+                      {extractParamUnit(parameters[key])}
+                    </td>
+                    <td>
+                      {isModified && (
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-xs btn-square"
+                          title="Reset to original"
+                          onClick={() => onReset(key)}
+                        >
+                          <RotateCcw className="h-3 w-3" />
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function getCurrentUsername(): string {
   if (typeof document === "undefined") return "";
@@ -141,6 +305,22 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
   const [reExecuteLoading, setReExecuteLoading] = useState(false);
   const [reExecuteError, setReExecuteError] = useState<string | null>(null);
   const [reExecuteSuccess, setReExecuteSuccess] = useState<string | null>(null);
+  // Track re_executions count at the moment re-execute was triggered
+  const [reExecCountBefore, setReExecCountBefore] = useState<number>(0);
+
+  // Parameter override form state
+  const [runParamValues, setRunParamValues] = useState<Record<string, string>>(
+    {},
+  );
+  const [inputParamValues, setInputParamValues] = useState<
+    Record<string, string>
+  >({});
+  const [originalRunValues, setOriginalRunValues] = useState<
+    Record<string, string>
+  >({});
+  const [originalInputValues, setOriginalInputValues] = useState<
+    Record<string, string>
+  >({});
 
   // Task result
   const { data: taskResultResponse, isLoading: taskResultLoading } =
@@ -148,6 +328,53 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
       query: { enabled: !!taskId },
     });
   const taskResult = taskResultResponse?.data;
+
+  // Initialize parameter form values when modal opens
+  const initParamForms = useCallback(() => {
+    if (!taskResult) return;
+    const runVals = buildFormValues(
+      taskResult.run_parameters as Record<string, unknown> | undefined,
+    );
+    const inputVals = buildFormValues(
+      taskResult.input_parameters as Record<string, unknown> | undefined,
+    );
+    setRunParamValues(runVals);
+    setInputParamValues(inputVals);
+    setOriginalRunValues(runVals);
+    setOriginalInputValues(inputVals);
+  }, [taskResult]);
+
+  useEffect(() => {
+    if (showReExecuteModal) {
+      initParamForms();
+    }
+  }, [showReExecuteModal, initParamForms]);
+
+  // Detect newly created re-execution task result
+  const newReExecution =
+    reExecuteSuccess &&
+    taskResult?.re_executions &&
+    taskResult.re_executions.length > reExecCountBefore
+      ? taskResult.re_executions[taskResult.re_executions.length - 1]
+      : null;
+
+  // Poll for new re-execution entry until it appears (max 60s)
+  useEffect(() => {
+    if (!reExecuteSuccess || newReExecution) return;
+
+    const interval = setInterval(() => {
+      queryClient.invalidateQueries({
+        queryKey: getGetTaskResultQueryKey(taskId),
+      });
+    }, 3000);
+
+    const timeout = setTimeout(() => clearInterval(interval), 60000);
+
+    return () => {
+      clearInterval(interval);
+      clearTimeout(timeout);
+    };
+  }, [reExecuteSuccess, newReExecution, queryClient, taskId]);
 
   // Issues
   const {
@@ -187,9 +414,34 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
     if (!taskResult) return;
     setReExecuteLoading(true);
     setReExecuteError(null);
+    setReExecCountBefore(taskResult.re_executions?.length ?? 0);
     try {
+      // Build parameter_overrides only with changed values
+      const runOverrides = computeOverrides(originalRunValues, runParamValues);
+      const inputOverrides = computeOverrides(
+        originalInputValues,
+        inputParamValues,
+      );
+      const hasOverrides =
+        Object.keys(runOverrides).length > 0 ||
+        Object.keys(inputOverrides).length > 0;
+
+      const body = hasOverrides
+        ? {
+            parameter_overrides: {
+              ...(Object.keys(runOverrides).length > 0
+                ? { run: runOverrides }
+                : {}),
+              ...(Object.keys(inputOverrides).length > 0
+                ? { input: inputOverrides }
+                : {}),
+            },
+          }
+        : undefined;
+
       const response = await AXIOS_INSTANCE.post(
         `/task-results/${taskId}/re-execute`,
+        body,
       );
       const newExecutionId = response.data.execution_id;
       setShowReExecuteModal(false);
@@ -310,14 +562,23 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
       {reExecuteSuccess && (
         <div className="alert alert-success mb-4 text-sm">
           <CheckCircle className="h-4 w-4" />
-          <span>Re-execution started.</span>
-          <a
-            href={`/execution/${reExecuteSuccess}`}
-            className="link link-primary font-mono text-xs"
-          >
-            {reExecuteSuccess.slice(0, 8)}...
-            <ExternalLink className="h-3 w-3 inline ml-1" />
-          </a>
+          {newReExecution ? (
+            <>
+              <span>Re-execution created.</span>
+              <a
+                href={`/task-results/${newReExecution.task_id}`}
+                className="link link-primary font-mono text-xs"
+              >
+                {newReExecution.task_id.slice(0, 8)}...
+                <ExternalLink className="h-3 w-3 inline ml-1" />
+              </a>
+            </>
+          ) : (
+            <>
+              <span>Re-execution started.</span>
+              <span className="loading loading-spinner loading-xs" />
+            </>
+          )}
           <button
             className="btn btn-ghost btn-xs"
             onClick={() => setReExecuteSuccess(null)}
@@ -505,15 +766,15 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
       {/* Re-execute Confirmation Modal */}
       {showReExecuteModal && taskResult && (
         <div className="modal modal-open">
-          <div className="modal-box">
+          <div className="modal-box max-w-2xl">
             <h3 className="font-bold text-lg">Re-execute Task</h3>
             <div className="py-4 space-y-3">
               <p className="text-sm text-base-content/70">
-                This will re-execute task{" "}
+                Re-execute task{" "}
                 <span className="font-semibold">{taskResult.task_name}</span>{" "}
                 for qubit{" "}
-                <span className="font-semibold">{taskResult.qid}</span> using
-                the input and run parameters from the original execution.
+                <span className="font-semibold">{taskResult.qid}</span>. You can
+                edit parameters below before re-executing.
               </p>
               <div className="bg-base-200 rounded-lg p-3 text-sm">
                 <div>
@@ -528,6 +789,51 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
                   {taskResult.execution_id}
                 </div>
               </div>
+
+              {/* Parameter override sections */}
+              {taskResult.run_parameters &&
+                Object.keys(taskResult.run_parameters).length > 0 && (
+                  <ParameterOverrideSection
+                    title="Run Parameters"
+                    parameters={
+                      taskResult.run_parameters as Record<string, unknown>
+                    }
+                    formValues={runParamValues}
+                    originalValues={originalRunValues}
+                    onChange={(key, val) =>
+                      setRunParamValues((prev) => ({ ...prev, [key]: val }))
+                    }
+                    onReset={(key) =>
+                      setRunParamValues((prev) => ({
+                        ...prev,
+                        [key]: originalRunValues[key],
+                      }))
+                    }
+                    defaultOpen={true}
+                  />
+                )}
+              {taskResult.input_parameters &&
+                Object.keys(taskResult.input_parameters).length > 0 && (
+                  <ParameterOverrideSection
+                    title="Input Parameters"
+                    parameters={
+                      taskResult.input_parameters as Record<string, unknown>
+                    }
+                    formValues={inputParamValues}
+                    originalValues={originalInputValues}
+                    onChange={(key, val) =>
+                      setInputParamValues((prev) => ({ ...prev, [key]: val }))
+                    }
+                    onReset={(key) =>
+                      setInputParamValues((prev) => ({
+                        ...prev,
+                        [key]: originalInputValues[key],
+                      }))
+                    }
+                    defaultOpen={false}
+                  />
+                )}
+
               {reExecuteError && (
                 <div className="alert alert-error text-sm">
                   <XCircle className="h-4 w-4" />

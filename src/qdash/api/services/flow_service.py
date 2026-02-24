@@ -493,6 +493,7 @@ class FlowService:
         project_id: str,
         tags: list[str] | None = None,
         source_task_id: str | None = None,
+        parameter_overrides: dict[str, dict[str, Any]] | None = None,
     ) -> ExecuteFlowResponse:
         """Execute a single task via the system single-task-executor deployment.
 
@@ -546,6 +547,7 @@ class FlowService:
             "flow_name": flow_name,
             "tags": tags or [],
             "source_task_id": source_task_id,
+            "parameter_overrides": parameter_overrides,
         }
 
         logger.info(

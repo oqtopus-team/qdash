@@ -59,6 +59,21 @@ class MongoTaskResultHistoryRepository:
             execution_model=execution_model,
         )
 
+    def set_source_task_id(
+        self,
+        *,
+        project_id: str | None,
+        task_id: str,
+        source_task_id: str,
+    ) -> None:
+        """Set source_task_id on a task result document."""
+        doc = TaskResultHistoryDocument.find_one(
+            {"project_id": project_id, "task_id": task_id}
+        ).run()
+        if doc is not None:
+            doc.source_task_id = source_task_id
+            doc.save()
+
     def find_latest_by_chip_and_qids(
         self,
         *,

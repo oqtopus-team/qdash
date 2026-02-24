@@ -80,6 +80,7 @@ class TaskExecutor:
         history_recorder: TaskHistoryRecorder | None = None,
         data_saver: FilesystemCalibDataSaver | None = None,
         snapshot_loader: SnapshotParameterLoader | None = None,
+        source_task_id: str | None = None,
     ) -> None:
         self.state_manager = state_manager
         self.execution_id = execution_id
@@ -90,6 +91,7 @@ class TaskExecutor:
         self.history_recorder = history_recorder or TaskHistoryRecorder()
         self.data_saver = data_saver or FilesystemCalibDataSaver(calib_dir)
         self._snapshot_loader = snapshot_loader
+        self._source_task_id = source_task_id
         self._backend_saver = BackendSaver(
             state_manager=state_manager,
             username=username,
@@ -242,6 +244,11 @@ class TaskExecutor:
             # 1. Start task
             self.state_manager.start_task(task_name, task_type, qid)
 
+            # 1.5 Apply snapshot overrides early so initial history record
+            #     contains the correct (overridden) parameter values.
+            if self._snapshot_loader is not None:
+                self._apply_snapshot_overrides(task, task_name, task_type, qid)
+
             # Record run_parameters (experiment configuration used)
             run_params = {k: v.model_dump() for k, v in task.run_parameters.items()}
             if run_params:
@@ -253,6 +260,14 @@ class TaskExecutor:
                 self.history_recorder.record_task_result(
                     executed_task, execution_service.to_datamodel()
                 )
+                # Set source_task_id immediately so parent's re_executions
+                # list includes this task while it is still running.
+                if self._source_task_id:
+                    self.history_recorder.set_source_task_id(
+                        project_id=execution_service.project_id,
+                        task_id=executed_task.task_id,
+                        source_task_id=self._source_task_id,
+                    )
                 execution_service = self._update_execution(execution_service)
 
             # 2. Preprocess
@@ -264,7 +279,8 @@ class TaskExecutor:
                 if execution_service is not None:
                     execution_service = self._update_execution(execution_service)
 
-            # 2.5 Apply snapshot overrides (for re-execution from snapshot)
+            # 2.5 Re-apply snapshot overrides (preprocess may have
+            #     overwritten input_parameters with values from chip state).
             if self._snapshot_loader is not None:
                 self._apply_snapshot_overrides(task, task_name, task_type, qid)
 

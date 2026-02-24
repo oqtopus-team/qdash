@@ -31,6 +31,12 @@ class TaskResultHistoryRepoProtocol(Protocol):
         """Save task result."""
         ...
 
+    def set_source_task_id(
+        self, *, project_id: str | None, task_id: str, source_task_id: str
+    ) -> None:
+        """Set source_task_id on a task result document."""
+        ...
+
 
 @runtime_checkable
 class ChipRepoProtocol(Protocol):
@@ -131,6 +137,27 @@ class TaskHistoryRecorder:
             except Exception as e:
                 # Log but don't fail the task - provenance is optional
                 logger.warning(f"Failed to record provenance for task {task.name}: {e}")
+
+    def set_source_task_id(
+        self,
+        project_id: str | None,
+        task_id: str,
+        source_task_id: str,
+    ) -> None:
+        """Set source_task_id on a task result history document.
+
+        Called immediately after the initial recording so that the parent
+        task's ``re_executions`` list includes this task while it is still
+        running.
+        """
+        try:
+            self.task_result_history_repo.set_source_task_id(
+                project_id=project_id,
+                task_id=task_id,
+                source_task_id=source_task_id,
+            )
+        except Exception as e:
+            logger.warning(f"Failed to set source_task_id on {task_id}: {e}")
 
     def update_chip_with_calib_data(
         self,

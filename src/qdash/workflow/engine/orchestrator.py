@@ -70,6 +70,7 @@ class CalibOrchestrator:
         self.config = config
         self.github_integration = github_integration
         self._snapshot_loader = snapshot_loader
+        self._source_task_id: str | None = None
 
         # Session components (initialized in initialize())
         self._execution_service: ExecutionService | None = None
@@ -431,6 +432,7 @@ class CalibOrchestrator:
             calib_dir=self.task_context.calib_dir,
             history_recorder=self._create_history_recorder(),
             snapshot_loader=self._snapshot_loader,
+            source_task_id=self._source_task_id,
         )
 
         # Copy relevant calibration data
