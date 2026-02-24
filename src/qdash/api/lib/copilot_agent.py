@@ -41,7 +41,7 @@ use the available tools to retrieve the data rather than saying it's unavailable
 The current qubit context (chip_id, qid) is provided in the system prompt below.
 """
 
-MAX_TOOL_ROUNDS = 20
+MAX_TOOL_ROUNDS = 10
 MAX_TOOL_RESULT_CHARS = 30000
 
 ToolExecutors = dict[str, Any]

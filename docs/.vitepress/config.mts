@@ -138,6 +138,7 @@ export default withMermaid(
                 { text: "Architecture", link: "/development/copilot/architecture" },
                 { text: "Sandbox", link: "/development/copilot/sandbox" },
                 { text: "LLM Agent", link: "/development/copilot/agent" },
+                { text: "LLM Integration Patterns", link: "/development/copilot/llm-integration-patterns" },
                 { text: "SSE Streaming", link: "/development/copilot/streaming" },
               ],
             },

@@ -9,24 +9,41 @@ The Copilot agent (`src/qdash/api/lib/copilot_agent.py`) uses the OpenAI SDK dir
 
 ## Tool Definitions
 
-The agent has access to five tools defined in `AGENT_TOOLS`:
+The agent has access to 17 tools defined in `AGENT_TOOLS`:
 
-| Tool | Description | Required Parameters |
-|------|-------------|-------------------|
-| `get_qubit_params` | Get current calibrated parameters for a qubit (T1, T2, frequency, etc.) | `chip_id`, `qid` |
-| `get_latest_task_result` | Get the latest result for a specific calibration task on a qubit | `task_name`, `chip_id`, `qid` |
-| `get_task_history` | Get recent historical results for a calibration task | `task_name`, `chip_id`, `qid`, optional `last_n` |
-| `get_parameter_timeseries` | Get time series data for a specific output parameter | `parameter_name`, `chip_id`, `qid`, optional `last_n` |
-| `execute_python_analysis` | Execute Python code in a sandboxed environment | `code`, optional `context_data` |
+| Tool | Description |
+|------|-------------|
+| `get_qubit_params` | Get current calibrated parameters for a qubit |
+| `get_latest_task_result` | Get the latest result for a specific calibration task |
+| `get_task_history` | Get recent historical results for a calibration task |
+| `get_parameter_timeseries` | Get time series data for a single qubit |
+| `execute_python_analysis` | Execute Python code in a sandboxed environment |
+| `get_chip_summary` | Get summary of all qubits on a chip with statistics |
+| `get_coupling_params` | Get calibrated parameters for coupling resonators |
+| `get_execution_history` | Get recent execution history for a chip |
+| `compare_qubits` | Compare parameters across multiple qubits |
+| `get_chip_topology` | Get chip topology information |
+| `search_task_results` | Search task result history with flexible filters |
+| `get_calibration_notes` | Get calibration notes for a chip |
+| `get_parameter_lineage` | Get version history of a calibration parameter |
+| `get_provenance_lineage_graph` | Get provenance lineage graph for a parameter |
+| `generate_chip_heatmap` | Generate chip-wide heatmap for a qubit metric |
+| `get_chip_parameter_timeseries` | Batch timeseries for all qubits on a chip |
+| `list_available_parameters` | List available output parameter names |
 
-Tool executors are wired in `_build_tool_executors()` in the router, mapping each tool name to a Python callable that queries MongoDB or invokes the sandbox.
+Tool executors are built by `CopilotDataService.build_tool_executors()`, mapping each tool name to a Python callable that queries MongoDB or invokes the sandbox. UI display labels are defined in `ai_labels.py`.
 
 ## Tool Call Loop
 
-The agent implements a multi-round tool-calling loop (max `MAX_TOOL_ROUNDS = 3` iterations):
+The agent implements a multi-round tool-calling loop (max `MAX_TOOL_ROUNDS = 10` iterations):
 
 ```
 Build system prompt + input
+        │
+        ▼
+  Apply tool executor wrappers:
+    _wrap_rate_limited_executors  (throttle per-qubit timeseries)
+    _wrap_chart_executors         (intercept charts for direct injection)
         │
         ▼
   Call OpenAI Responses API
@@ -43,7 +60,7 @@ Build system prompt + input
     1. Fire on_tool_call callback (for SSE progress)
     2. Look up executor by name
     3. Parse arguments from JSON
-    4. Execute tool
+    4. Execute tool (through wrappers)
     5. Append function_call_output to input
            │
            ▼
@@ -56,6 +73,9 @@ Build system prompt + input
            ▼
   Call Responses API again ──▶ Loop back to check
   (up to MAX_TOOL_ROUNDS)
+        │
+        ▼
+  Inject collected charts as blocks in response
 ```
 
 Key implementation detail: when feeding tool results back, all model output items (reasoning, function_call, message) must be preserved in the input. Omitting reasoning items causes a 400 error from the OpenAI API.
