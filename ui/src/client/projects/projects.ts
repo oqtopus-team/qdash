@@ -493,9 +493,6 @@ export const useUpdateProject = <
 };
 /**
  * Delete a project. Owner only.
-
-Warning: This will delete the project but NOT the associated data.
-Data cleanup should be handled separately.
  * @summary Delete project
  */
 export const deleteProject = (

@@ -38,8 +38,8 @@ Parameters
 ----------
 ctx : ProjectContext
     The project context with user and project information.
-task_repo : MongoTaskDefinitionRepository
-    Repository for task definition operations.
+service : TaskService
+    The task service instance.
 backend : str | None
     Optional backend name to filter tasks by.
 
@@ -191,6 +191,8 @@ task_id : str
     The task ID to search for.
 ctx : ProjectContext
     The project context with user and project information.
+service : TaskService
+    The task service instance.
 
 Returns
 -------
@@ -346,6 +348,8 @@ Parameters
 ----------
 task_name : str
     The task name (e.g. "CheckT1", "CheckRabi").
+service : TaskService
+    The task service instance.
 backend : str
     The backend name (default "qubex").
 

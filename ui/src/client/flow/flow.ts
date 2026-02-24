@@ -48,14 +48,6 @@ type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 /**
  * Save a Flow to file system and MongoDB.
-
-Steps:
-1. Validate flow name
-2. Validate flow code contains expected function
-3. Create user directory if not exists
-4. Write code to file: user_flows/{username}/{name}.py
-5. Upsert metadata to MongoDB
-6. Return file path and success message
  * @summary Save a flow
  */
 export const saveFlow = (
@@ -145,8 +137,6 @@ export const useSaveFlow = <TError = HTTPValidationError, TContext = unknown>(
 };
 /**
  * List all Flows for the current project.
-
-Returns metadata only (no code content for performance).
  * @summary List all flows
  */
 export const listFlows = (
@@ -276,8 +266,6 @@ export function useListFlows<
 
 /**
  * List all available flow templates.
-
-Returns metadata only (no code content for performance).
  * @summary List all flow templates
  */
 export const listFlowTemplates = (
@@ -427,11 +415,6 @@ export function useListFlowTemplates<
 
 /**
  * Get flow template details including code content.
-
-Steps:
-1. Find template metadata
-2. Read Python file content
-3. Return combined data
  * @summary Get a flow template
  */
 export const getFlowTemplate = (
@@ -595,8 +578,6 @@ export function useGetFlowTemplate<
 
 /**
  * List all Python files in the qdash.workflow.service module.
-
-Returns list of filenames that users can view for reference.
  * @summary List flow helper files
  */
 export const listFlowHelperFiles = (
@@ -746,12 +727,6 @@ export function useListFlowHelperFiles<
 
 /**
  * Get the content of a flow helper file.
-
-Args:
-    filename: Name of the Python file (e.g., "session.py")
-
-Returns:
-    File content as string
  * @summary Get flow helper file content
  */
 export const getFlowHelperFile = (
@@ -915,16 +890,6 @@ export function useGetFlowHelperFile<
 
 /**
  * List all Flow schedules (cron and one-time) for the current project.
-
-Args:
-----
-    ctx: Project context with user and project information
-    limit: Maximum number of schedules to return (max 100)
-    offset: Number of schedules to skip
-
-Returns:
--------
-    List of all flow schedules
  * @summary List all flow schedules for current user
  */
 export const listAllFlowSchedules = (
@@ -1085,23 +1050,6 @@ export function useListAllFlowSchedules<
 
 /**
  * Delete a Flow schedule (cron or one-time).
-
-Schedule ID Types:
-- **Cron schedules**: schedule_id is the deployment_id (UUID format)
-- **One-time schedules**: schedule_id is the flow_run_id (UUID format)
-
-The API automatically determines the type and handles accordingly:
-- Cron: Removes the schedule from the deployment (schedule=None)
-- One-time: Deletes the scheduled flow run
-
-Args:
-----
-    schedule_id: Schedule ID (deployment_id for cron, flow_run_id for one-time)
-    ctx: Project context with user and project information
-
-Returns:
--------
-    Standardized response with schedule type information
  * @summary Delete a flow schedule
  */
 export const deleteFlowSchedule = (
@@ -1187,18 +1135,6 @@ export const useDeleteFlowSchedule = <
 };
 /**
  * Update a Flow schedule (cron schedules only).
-
-Can update: active status, cron expression, parameters.
-
-Args:
-----
-    schedule_id: Schedule ID (deployment_id)
-    request: Update request
-    ctx: Project context with user and project information
-
-Returns:
--------
-    Success message
  * @summary Update a flow schedule
  */
 export const updateFlowSchedule = (
@@ -1290,11 +1226,6 @@ export const useUpdateFlowSchedule = <
 };
 /**
  * Get Flow details including code content.
-
-Steps:
-1. Find metadata in MongoDB
-2. Read code from file
-3. Return combined data
  * @summary Get flow details
  */
 export const getFlow = (
@@ -1435,11 +1366,6 @@ export function useGetFlow<
 
 /**
  * Delete a Flow.
-
-Steps:
-1. Delete Prefect deployment
-2. Delete file from user_flows/{username}/{name}.py
-3. Delete metadata from MongoDB
  * @summary Delete a flow
  */
 export const deleteFlow = (
@@ -1522,12 +1448,6 @@ export const useDeleteFlow = <TError = HTTPValidationError, TContext = unknown>(
 };
 /**
  * Execute a Flow via Prefect deployment.
-
-Steps:
-1. Find flow metadata in MongoDB
-2. Merge request parameters with default_parameters
-3. Create flow run via Prefect Client
-4. Return execution_id and URLs
  * @summary Execute a flow
  */
 export const executeFlow = (
@@ -1621,16 +1541,6 @@ export const useExecuteFlow = <
 };
 /**
  * Schedule a Flow execution with cron or one-time schedule.
-
-Args:
-----
-    name: Flow name
-    request: Schedule request (must provide either cron or scheduled_time)
-    ctx: Project context with user and project information
-
-Returns:
--------
-    Schedule response with schedule_id and details
  * @summary Schedule a flow execution (cron or one-time)
  */
 export const scheduleFlow = (
@@ -1724,17 +1634,6 @@ export const useScheduleFlow = <
 };
 /**
  * List all schedules (cron and one-time) for a specific Flow.
-
-Args:
-----
-    name: Flow name
-    ctx: Project context with user and project information
-    limit: Maximum number of schedules to return (max 100)
-    offset: Number of schedules to skip
-
-Returns:
--------
-    List of schedules for the flow
  * @summary List schedules for a specific flow
  */
 export const listFlowSchedules = (

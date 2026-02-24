@@ -19,6 +19,8 @@ import {
   CheckCircle2,
   XCircle,
   ImageIcon,
+  Check,
+  Loader2,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -338,6 +340,7 @@ export function CopilotChatPage() {
     activeSessionId,
     isLoading,
     statusMessage,
+    completedTools,
     error,
     createSession,
     switchSession,
@@ -507,27 +510,26 @@ export function CopilotChatPage() {
                   <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0 animate-pulse">
                     <Bot className="w-4 h-4 text-primary" />
                   </div>
-                  <div className="flex items-center gap-2 py-2">
-                    {statusMessage ? (
-                      <span className="text-sm text-base-content/60">
-                        {statusMessage}
-                      </span>
-                    ) : (
-                      <>
-                        <span
-                          className="w-2 h-2 bg-primary/60 rounded-full animate-bounce"
-                          style={{ animationDelay: "0ms" }}
-                        />
-                        <span
-                          className="w-2 h-2 bg-primary/60 rounded-full animate-bounce"
-                          style={{ animationDelay: "150ms" }}
-                        />
-                        <span
-                          className="w-2 h-2 bg-primary/60 rounded-full animate-bounce"
-                          style={{ animationDelay: "300ms" }}
-                        />
-                      </>
+                  <div className="flex flex-col gap-1 py-2 min-w-0">
+                    {completedTools.length > 0 && (
+                      <div className="flex flex-col gap-0.5">
+                        {completedTools.map((tool, i) => (
+                          <div
+                            key={i}
+                            className="flex items-center gap-1.5 text-xs text-base-content/40"
+                          >
+                            <Check className="w-3 h-3 text-success flex-shrink-0" />
+                            <span>{tool}</span>
+                          </div>
+                        ))}
+                      </div>
                     )}
+                    <div className="flex items-center gap-1.5">
+                      <Loader2 className="w-3.5 h-3.5 text-primary animate-spin flex-shrink-0" />
+                      <span className="text-sm text-base-content/60">
+                        {statusMessage || "Thinking..."}
+                      </span>
+                    </div>
                   </div>
                 </div>
               )}

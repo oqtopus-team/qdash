@@ -4,11 +4,23 @@ from __future__ import annotations
 
 import asyncio
 import json
+import math
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Awaitable, Callable
+
+
+def _sanitize_for_json(obj: Any) -> Any:
+    """Recursively replace NaN/Inf float values with None for valid JSON."""
+    if isinstance(obj, float) and (math.isnan(obj) or math.isinf(obj)):
+        return None
+    if isinstance(obj, dict):
+        return {k: _sanitize_for_json(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_sanitize_for_json(v) for v in obj]
+    return obj
 
 
 def sse_event(event: str, data: dict[str, Any]) -> str:
@@ -27,7 +39,7 @@ def sse_event(event: str, data: dict[str, Any]) -> str:
         Formatted SSE string
 
     """
-    return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
+    return f"event: {event}\ndata: {json.dumps(_sanitize_for_json(data), ensure_ascii=False)}\n\n"
 
 
 @dataclass
@@ -62,14 +74,20 @@ class SSETaskBridge:
         Callable[[str], Awaitable[None]],
     ]:
         """Create on_tool_call and on_status callbacks that push to *queue*."""
+        completed_tools: list[str] = []
 
         async def on_tool_call(name: str, args: dict[str, Any]) -> None:
             label = self.tool_labels.get(name, name)
             await queue.put({"step": "tool_call", "tool": name, "message": f"{label}..."})
+            completed_tools.append(label)
 
         async def on_status(status: str) -> None:
             label = self.status_labels.get(status, status)
-            await queue.put({"step": status, "message": label})
+            if status == "thinking" and completed_tools:
+                label = f"Analyzing {completed_tools[-1].lower().rstrip('.')} results..."
+            await queue.put(
+                {"step": status, "message": label, "completed_tools": list(completed_tools)}
+            )
 
         return on_tool_call, on_status
 

@@ -42,9 +42,6 @@ type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 /**
  * Authenticate user and return access token.
 
-Validates user credentials against the database and returns an access token
-for subsequent authenticated requests.
-
 Parameters
 ----------
 username : str
@@ -158,15 +155,14 @@ export const useLogin = <
 /**
  * Register a new user account (admin only).
 
-Creates a new user in the database with hashed password and generates
-an access token for immediate use. Only admin users can create new accounts.
-
 Parameters
 ----------
 user_data : UserCreate
     User registration data including username, password, and optional full_name
 current_user : User
     Current authenticated admin user
+auth_service : AuthService
+    The auth service instance
 
 Returns
 -------
@@ -271,9 +267,6 @@ export const useRegisterUser = <
 /**
  * Get current authenticated user information.
 
-Returns the profile information of the currently authenticated user
-based on the provided access token.
-
 Parameters
 ----------
 current_user : User
@@ -282,8 +275,7 @@ current_user : User
 Returns
 -------
 User
-    Current user's profile information including username, full_name,
-    and disabled status
+    Current user's profile information
  * @summary Get current user
  */
 export const getCurrentUser = (
@@ -414,10 +406,6 @@ export function useGetCurrentUser<
 /**
  * Logout the current user.
 
-This endpoint serves as a logout confirmation. Since authentication tokens
-are managed client-side (via cookies), no server-side session invalidation
-is required. The client is responsible for removing the stored credentials.
-
 Returns
 -------
 dict[str, str]
@@ -503,25 +491,19 @@ export const useLogout = <TError = void, TContext = unknown>(
 /**
  * Change the current user's password.
 
-Validates the current password and updates to the new password.
-
 Parameters
 ----------
 password_data : PasswordChange
     Contains current_password and new_password
 current_user : User
     Current authenticated user injected via dependency
+auth_service : AuthService
+    The auth service instance
 
 Returns
 -------
 dict[str, str]
     Success message confirming password change
-
-Raises
-------
-HTTPException
-    400 if current password is incorrect
-    400 if new password is empty
  * @summary Change user password
  */
 export const changePassword = (
@@ -615,15 +597,14 @@ export const useChangePassword = <
 /**
  * Reset a user's password (admin only).
 
-Allows administrators to reset any user's password without knowing
-the current password. This is useful for password recovery scenarios.
-
 Parameters
 ----------
 password_data : PasswordReset
     Contains username and new_password
 current_user : User
     Current authenticated admin user
+auth_service : AuthService
+    The auth service instance
 
 Returns
 -------
@@ -634,8 +615,6 @@ Raises
 ------
 HTTPException
     403 if the current user is not an admin
-    404 if the target user is not found
-    400 if new password is empty
  * @summary Reset user password (admin only)
  */
 export const resetPassword = (
