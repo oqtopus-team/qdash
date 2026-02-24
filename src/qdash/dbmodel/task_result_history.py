@@ -57,6 +57,11 @@ class TaskResultHistoryDocument(Document):
     tags: list[str] = Field(..., description="The tags")
     chip_id: str = Field(..., description="The chip ID")
 
+    source_task_id: str | None = Field(
+        None,
+        description="Task result ID that triggered this re-execution (cross-reference to parent)",
+    )
+
     model_config = ConfigDict(
         from_attributes=True,
     )
@@ -134,6 +139,11 @@ class TaskResultHistoryDocument(Document):
                     ("status", ASCENDING),
                     ("start_at", DESCENDING),
                 ]
+            ),
+            # Index for re-execution cross-reference queries
+            IndexModel(
+                [("project_id", ASCENDING), ("source_task_id", ASCENDING)],
+                sparse=True,
             ),
         ]
 

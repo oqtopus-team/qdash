@@ -12,7 +12,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import FileResponse
-from qdash.api.dependencies import get_execution_service  # noqa: TCH002
+from qdash.api.dependencies import get_execution_service, get_flow_service  # noqa: TCH002
 from qdash.api.lib.project import (  # noqa: TCH002
     ProjectContext,
     get_project_context,
@@ -22,8 +22,11 @@ from qdash.api.schemas.execution import (
     ExecutionLockStatusResponse,
     ExecutionResponseDetail,
     ListExecutionsResponse,
+    ReExecuteRequest,
 )
+from qdash.api.schemas.flow import ExecuteFlowResponse
 from qdash.api.services.execution_service import ExecutionService  # noqa: TCH002
+from qdash.api.services.flow_service import FlowService  # noqa: TCH002
 from starlette.exceptions import HTTPException
 
 router = APIRouter()
@@ -187,3 +190,58 @@ def get_execution(
     if execution is None:
         raise HTTPException(status_code=404, detail=f"Execution {execution_id} not found")
     return execution
+
+
+@router.post(
+    "/executions/{execution_id}/re-execute",
+    response_model=ExecuteFlowResponse,
+    summary="Re-execute a flow from snapshot parameters",
+    operation_id="reExecuteFromSnapshot",
+)
+async def re_execute_from_snapshot(
+    execution_id: str,
+    request: ReExecuteRequest,
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    execution_service: Annotated[ExecutionService, Depends(get_execution_service)],
+    flow_service: Annotated[FlowService, Depends(get_flow_service)],
+) -> ExecuteFlowResponse:
+    """Re-execute a flow using snapshot parameters from a previous execution.
+
+    Parameters
+    ----------
+    execution_id : str
+        ID of the source execution to snapshot parameters from
+    request : ReExecuteRequest
+        Re-execution request with flow_name and optional parameter_overrides
+    ctx : ProjectContext
+        Project context with user and project information
+    execution_service : ExecutionService
+        Service for execution operations
+    flow_service : FlowService
+        Service for flow operations
+
+    Returns
+    -------
+    ExecuteFlowResponse
+        Execution result with IDs and URLs
+
+    """
+    # Validate source execution exists
+    metadata = execution_service.get_execution_metadata(ctx.project_id, execution_id)
+    if metadata is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Source execution {execution_id} not found",
+        )
+
+    # Use the original execution's username for flow lookup,
+    # since the flow is owned by whoever created and ran it.
+    flow_owner = metadata["username"]
+
+    return await flow_service.re_execute_from_snapshot(
+        flow_name=request.flow_name,
+        source_execution_id=execution_id,
+        parameter_overrides=request.parameter_overrides,
+        username=flow_owner,
+        project_id=ctx.project_id,
+    )

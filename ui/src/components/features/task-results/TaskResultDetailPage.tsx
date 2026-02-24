@@ -2,8 +2,18 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, MessageSquare, Plus, Lock, Unlock } from "lucide-react";
-import { useGetTaskResult } from "@/client/task/task";
+import {
+  ArrowLeft,
+  MessageSquare,
+  Plus,
+  Lock,
+  Unlock,
+  RefreshCw,
+  XCircle,
+  ExternalLink,
+  CheckCircle,
+} from "lucide-react";
+import { useGetTaskResult, getGetTaskResultQueryKey } from "@/client/task/task";
 import {
   useCreateIssue,
   getGetTaskResultIssuesQueryKey,
@@ -15,6 +25,7 @@ import { MarkdownContent } from "@/components/ui/MarkdownContent";
 import { MarkdownEditor } from "@/components/ui/MarkdownEditor";
 import { useImageUpload } from "@/hooks/useImageUpload";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { AXIOS_INSTANCE } from "@/lib/api/custom-instance";
 import {
   useTaskResultIssues,
   type StatusFilter,
@@ -126,6 +137,10 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
   const [newIssueTitle, setNewIssueTitle] = useState("");
   const [newIssueContent, setNewIssueContent] = useState("");
   const { uploadImage } = useImageUpload();
+  const [showReExecuteModal, setShowReExecuteModal] = useState(false);
+  const [reExecuteLoading, setReExecuteLoading] = useState(false);
+  const [reExecuteError, setReExecuteError] = useState<string | null>(null);
+  const [reExecuteSuccess, setReExecuteSuccess] = useState<string | null>(null);
 
   // Task result
   const { data: taskResultResponse, isLoading: taskResultLoading } =
@@ -164,6 +179,35 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
     queryClient.invalidateQueries({
       queryKey: getGetTaskResultIssuesQueryKey(taskId),
     });
+  };
+
+  const canReExecute = !!taskResult;
+
+  const handleReExecute = async () => {
+    if (!taskResult) return;
+    setReExecuteLoading(true);
+    setReExecuteError(null);
+    try {
+      const response = await AXIOS_INSTANCE.post(
+        `/task-results/${taskId}/re-execute`,
+      );
+      const newExecutionId = response.data.execution_id;
+      setShowReExecuteModal(false);
+      setReExecuteSuccess(newExecutionId);
+      // Refetch task result to update re_executions list
+      queryClient.invalidateQueries({
+        queryKey: getGetTaskResultQueryKey(taskId),
+      });
+    } catch (err: unknown) {
+      const axiosDetail = (err as { response?: { data?: { detail?: string } } })
+        ?.response?.data?.detail;
+      const message =
+        axiosDetail ??
+        (err instanceof Error ? err.message : "Failed to re-execute");
+      setReExecuteError(message);
+    } finally {
+      setReExecuteLoading(false);
+    }
   };
 
   // Loading
@@ -211,6 +255,15 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
           </span>
           <span className="badge badge-sm badge-neutral">{taskResult.qid}</span>
           <StatusBadge status={taskResult.status} />
+          {canReExecute && (
+            <button
+              onClick={() => setShowReExecuteModal(true)}
+              className="btn btn-sm btn-primary gap-1 ml-auto"
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+              Re-execute
+            </button>
+          )}
         </div>
       </div>
 
@@ -252,6 +305,76 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
           </div>
         </div>
       </div>
+
+      {/* Re-execute success alert */}
+      {reExecuteSuccess && (
+        <div className="alert alert-success mb-4 text-sm">
+          <CheckCircle className="h-4 w-4" />
+          <span>Re-execution started.</span>
+          <a
+            href={`/execution/${reExecuteSuccess}`}
+            className="link link-primary font-mono text-xs"
+          >
+            {reExecuteSuccess.slice(0, 8)}...
+            <ExternalLink className="h-3 w-3 inline ml-1" />
+          </a>
+          <button
+            className="btn btn-ghost btn-xs"
+            onClick={() => setReExecuteSuccess(null)}
+          >
+            <XCircle className="h-3 w-3" />
+          </button>
+        </div>
+      )}
+
+      {/* Cross-references: parent and children */}
+      {(taskResult.source_task_id ||
+        (taskResult.re_executions && taskResult.re_executions.length > 0)) && (
+        <div className="bg-base-200/50 rounded-lg p-4 mb-4 space-y-3">
+          {/* Parent: re-executed from */}
+          {taskResult.source_task_id && (
+            <div className="flex items-center gap-2 text-xs">
+              <span className="text-base-content/50">Re-executed from:</span>
+              <a
+                href={`/task-results/${taskResult.source_task_id}`}
+                className="font-mono text-primary hover:underline"
+              >
+                {taskResult.source_task_id.slice(0, 8)}...
+                <ExternalLink className="h-3 w-3 inline ml-1" />
+              </a>
+            </div>
+          )}
+          {/* Children: re-executions from this task */}
+          {taskResult.re_executions && taskResult.re_executions.length > 0 && (
+            <div>
+              <h3 className="text-xs font-semibold text-base-content/50 mb-2 flex items-center gap-1.5">
+                <RefreshCw className="h-3 w-3" />
+                Re-executions ({taskResult.re_executions.length})
+              </h3>
+              <div className="space-y-1">
+                {taskResult.re_executions.map((re) => (
+                  <a
+                    key={re.task_id}
+                    href={`/task-results/${re.task_id}`}
+                    className="flex items-center gap-2 text-xs p-2 rounded hover:bg-base-200 transition-colors"
+                  >
+                    <span className="font-mono text-primary">
+                      {re.task_id.slice(0, 8)}...
+                    </span>
+                    <StatusBadge status={re.status} />
+                    <span className="text-base-content/40">
+                      {re.start_at
+                        ? formatRelativeTime(re.start_at as string)
+                        : ""}
+                    </span>
+                    <ExternalLink className="h-3 w-3 text-base-content/30 ml-auto" />
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Figure */}
       {((taskResult.figure_path && taskResult.figure_path.length > 0) ||
@@ -376,6 +499,78 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
               canManage={isOwner || currentUser === issue.username}
             />
           ))}
+        </div>
+      )}
+
+      {/* Re-execute Confirmation Modal */}
+      {showReExecuteModal && taskResult && (
+        <div className="modal modal-open">
+          <div className="modal-box">
+            <h3 className="font-bold text-lg">Re-execute Task</h3>
+            <div className="py-4 space-y-3">
+              <p className="text-sm text-base-content/70">
+                This will re-execute task{" "}
+                <span className="font-semibold">{taskResult.task_name}</span>{" "}
+                for qubit{" "}
+                <span className="font-semibold">{taskResult.qid}</span> using
+                the input and run parameters from the original execution.
+              </p>
+              <div className="bg-base-200 rounded-lg p-3 text-sm">
+                <div>
+                  <span className="font-medium">Task:</span>{" "}
+                  {taskResult.task_name}
+                </div>
+                <div>
+                  <span className="font-medium">Qubit:</span> {taskResult.qid}
+                </div>
+                <div>
+                  <span className="font-medium">Source Execution:</span>{" "}
+                  {taskResult.execution_id}
+                </div>
+              </div>
+              {reExecuteError && (
+                <div className="alert alert-error text-sm">
+                  <XCircle className="h-4 w-4" />
+                  <span>{reExecuteError}</span>
+                </div>
+              )}
+            </div>
+            <div className="modal-action">
+              <button
+                className="btn btn-ghost"
+                onClick={() => {
+                  setShowReExecuteModal(false);
+                  setReExecuteError(null);
+                }}
+                disabled={reExecuteLoading}
+              >
+                Cancel
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={handleReExecute}
+                disabled={reExecuteLoading}
+              >
+                {reExecuteLoading ? (
+                  <span className="loading loading-spinner loading-sm" />
+                ) : (
+                  <>
+                    <RefreshCw className="h-4 w-4" />
+                    Confirm Re-execute
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+          <div
+            className="modal-backdrop"
+            onClick={() => {
+              if (!reExecuteLoading) {
+                setShowReExecuteModal(false);
+                setReExecuteError(null);
+              }
+            }}
+          />
         </div>
       )}
     </div>

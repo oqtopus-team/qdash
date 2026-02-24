@@ -116,6 +116,7 @@ class CalibService:
         project_id: str | None = None,
         skip_execution: bool = False,
         default_run_parameters: dict[str, Any] | None = None,
+        source_execution_id: str | None = None,
         *,
         user_repo: UserRepository | None = None,
         lock_repo: ExecutionLockRepository | None = None,
@@ -176,6 +177,11 @@ class CalibService:
         self.default_run_parameters = default_run_parameters or {}
         self._lock_acquired = False
 
+        # Resolve source_execution_id from Prefect runtime context if not provided
+        if source_execution_id is None:
+            source_execution_id = self._read_source_execution_id_from_context()
+        self.source_execution_id = source_execution_id
+
         # Store injected repositories for later use
         self._user_repo = user_repo
         self._lock_repo = lock_repo
@@ -232,6 +238,20 @@ class CalibService:
         # If qids provided, initialize immediately (low-level API mode)
         if qids is not None:
             self._initialize(qids, tags, note)
+
+    @staticmethod
+    def _read_source_execution_id_from_context() -> str | None:
+        """Try to read source_execution_id from Prefect flow run parameters."""
+        try:
+            from prefect.context import get_run_context
+
+            ctx = get_run_context()
+            if ctx and ctx.flow_run and ctx.flow_run.parameters:
+                value = ctx.flow_run.parameters.get("source_execution_id")
+                return str(value) if value is not None else None
+        except Exception:
+            logger.debug("No Prefect run context available for source_execution_id")
+        return None
 
     def _load_default_run_parameters(self) -> None:
         """Load default_run_parameters from the flow document in MongoDB."""
@@ -333,10 +353,27 @@ class CalibService:
                 default_run_parameters=self.default_run_parameters,
             )
 
+            # Create snapshot loader if re-executing from a previous execution
+            snapshot_loader = None
+            if self.source_execution_id:
+                from qdash.workflow.engine.task.snapshot_loader import (
+                    SnapshotParameterLoader,
+                )
+
+                snapshot_loader = SnapshotParameterLoader(
+                    source_execution_id=self.source_execution_id,
+                    project_id=self.project_id,
+                )
+                logger.info(
+                    "Created SnapshotParameterLoader for source_execution_id=%s",
+                    self.source_execution_id,
+                )
+
             # Create and initialize CalibOrchestrator
             self._orchestrator = CalibOrchestrator(
                 config=config,
                 github_integration=self.github_integration,
+                snapshot_loader=snapshot_loader,
             )
             self._orchestrator.initialize()
             self._initialized = True

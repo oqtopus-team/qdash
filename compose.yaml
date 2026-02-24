@@ -111,6 +111,7 @@ services:
     working_dir: /app/qdash/workflow
     command: >
       sh -c "python setup_work_pool.py &&
+             python register_system_flows.py &&
              prefect worker start --pool user-flows-pool"
     environment:
       - PREFECT_API_URL=http://prefect-server:4200/api

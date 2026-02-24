@@ -81,6 +81,16 @@ class TaskKnowledgeResponse(BaseModel):
     prompt_text: str
 
 
+class ReExecutionEntry(BaseModel):
+    """A child task result created by re-execution."""
+
+    task_id: str
+    task_name: str
+    qid: str
+    status: str
+    start_at: datetime | None = None
+
+
 class TaskResultResponse(BaseModel):
     """Response model for task result by task_id.
 
@@ -98,6 +108,8 @@ class TaskResultResponse(BaseModel):
         start_at (datetime | None): Start time.
         end_at (datetime | None): End time.
         elapsed_time (timedelta | None): Elapsed time.
+        source_task_id (str | None): Parent task ID this was re-executed from.
+        re_executions (list[ReExecutionEntry]): Child task results from re-executions.
 
     """
 
@@ -106,11 +118,15 @@ class TaskResultResponse(BaseModel):
     qid: str
     status: str
     execution_id: str
+    flow_name: str = ""
     figure_path: list[str]
     json_figure_path: list[str]
     input_parameters: dict[str, Any]
     output_parameters: dict[str, Any]
     run_parameters: dict[str, Any] = {}
+    tags: list[str] = []
+    source_task_id: str | None = None
+    re_executions: list[ReExecutionEntry] = []
     start_at: datetime | None = None
     end_at: datetime | None = None
     elapsed_time: timedelta | None = None

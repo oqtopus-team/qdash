@@ -96,7 +96,11 @@ export function ExecutionDetailClient({
   });
 
   const execution = executionDetailData?.data as
-    | ExecutionResponseDetail
+    | (ExecutionResponseDetail & {
+        tags?: string[];
+        chip_id?: string;
+        flow_name?: string;
+      })
     | undefined;
 
   // Extract unique qubit IDs and task names for filtering
