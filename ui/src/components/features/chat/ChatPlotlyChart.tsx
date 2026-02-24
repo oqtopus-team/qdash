@@ -79,7 +79,24 @@ export function ChatPlotlyChart({ data, layout }: ChatPlotlyChartProps) {
   return (
     <>
       <ChartErrorBoundary>
-        <div className="relative w-full my-2 rounded-lg border border-base-300 overflow-hidden group">
+        <div className="w-full my-2 rounded-lg border border-base-300 overflow-hidden">
+          <div className="flex justify-end px-2 pt-1">
+            <button
+              type="button"
+              onClick={openLightbox}
+              className="btn btn-xs btn-ghost"
+              title="Expand chart"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+                className="w-4 h-4"
+              >
+                <path d="M13.28 7.78l3.22-3.22v2.69a.75.75 0 001.5 0v-4.5a.75.75 0 00-.75-.75h-4.5a.75.75 0 000 1.5h2.69l-3.22 3.22a.75.75 0 001.06 1.06zM2 17.25v-4.5a.75.75 0 011.5 0v2.69l3.22-3.22a.75.75 0 011.06 1.06L4.56 16.5h2.69a.75.75 0 010 1.5h-4.5a.75.75 0 01-.75-.75z" />
+              </svg>
+            </button>
+          </div>
           <Plot
             data={data as Plotly.Data[]}
             layout={mergedLayout as Partial<Plotly.Layout>}
@@ -92,21 +109,6 @@ export function ChatPlotlyChart({ data, layout }: ChatPlotlyChartProps) {
             useResizeHandler
             style={{ width: "100%", height: "300px" }}
           />
-          <button
-            type="button"
-            onClick={openLightbox}
-            className="absolute top-2 right-2 z-20 btn btn-xs btn-ghost bg-base-100/80 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity"
-            title="Expand chart"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 20 20"
-              fill="currentColor"
-              className="w-4 h-4"
-            >
-              <path d="M13.28 7.78l3.22-3.22v2.69a.75.75 0 001.5 0v-4.5a.75.75 0 00-.75-.75h-4.5a.75.75 0 000 1.5h2.69l-3.22 3.22a.75.75 0 001.06 1.06zM2 17.25v-4.5a.75.75 0 011.5 0v2.69l3.22-3.22a.75.75 0 011.06 1.06L4.56 16.5h2.69a.75.75 0 010 1.5h-4.5a.75.75 0 01-.75-.75z" />
-            </svg>
-          </button>
         </div>
       </ChartErrorBoundary>
 

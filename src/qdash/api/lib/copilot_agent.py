@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import os
 from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING, Any
@@ -1002,6 +1003,17 @@ def _wrap_chart_executors(
     return wrapped, collected_charts
 
 
+def _sanitize_nan(obj: Any) -> Any:
+    """Recursively replace NaN/Inf float values with None for valid JSON."""
+    if isinstance(obj, float) and (math.isnan(obj) or math.isinf(obj)):
+        return None
+    if isinstance(obj, dict):
+        return {k: _sanitize_nan(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_sanitize_nan(v) for v in obj]
+    return obj
+
+
 def _inject_collected_charts(
     result: dict[str, Any],
     collected_charts: list[dict[str, Any]],
@@ -1011,7 +1023,7 @@ def _inject_collected_charts(
         return result
     blocks = result.get("blocks", [])
     for chart in collected_charts:
-        blocks.append({"type": "chart", "content": None, "chart": chart})
+        blocks.append({"type": "chart", "content": None, "chart": _sanitize_nan(chart)})
     result["blocks"] = blocks
     return result
 
