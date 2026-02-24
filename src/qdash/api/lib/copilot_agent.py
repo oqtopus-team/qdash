@@ -42,6 +42,7 @@ The current qubit context (chip_id, qid) is provided in the system prompt below.
 """
 
 MAX_TOOL_ROUNDS = 10
+MAX_TOOL_RESULT_CHARS = 30000
 
 ToolExecutors = dict[str, Any]
 OnToolCallHook = Callable[[str, dict[str, Any]], Awaitable[None]] | None
@@ -1115,14 +1116,28 @@ async def _run_responses_api(
                         logger.warning("Tool %s execution failed: %s", fc.name, e)
                         tool_result = {"error": str(e)}
 
-                logger.info("Tool call: %s -> %s", fc.name, type(tool_result).__name__)
+                output_str = json.dumps(_sanitize_nan(tool_result), default=str, ensure_ascii=False)
+                if len(output_str) > MAX_TOOL_RESULT_CHARS:
+                    logger.warning(
+                        "Tool %s result truncated: %d -> %d chars",
+                        fc.name,
+                        len(output_str),
+                        MAX_TOOL_RESULT_CHARS,
+                    )
+                    output_str = (
+                        output_str[:MAX_TOOL_RESULT_CHARS] + '... [TRUNCATED - result too large]"}'
+                    )
+                logger.info(
+                    "Tool call: %s -> %s (%d chars)",
+                    fc.name,
+                    type(tool_result).__name__,
+                    len(output_str),
+                )
                 new_input.append(
                     {
                         "type": "function_call_output",
                         "call_id": fc.call_id,
-                        "output": json.dumps(
-                            _sanitize_nan(tool_result), default=str, ensure_ascii=False
-                        ),
+                        "output": output_str,
                     }
                 )
 

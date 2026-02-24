@@ -74,14 +74,20 @@ class SSETaskBridge:
         Callable[[str], Awaitable[None]],
     ]:
         """Create on_tool_call and on_status callbacks that push to *queue*."""
+        completed_tools: list[str] = []
 
         async def on_tool_call(name: str, args: dict[str, Any]) -> None:
             label = self.tool_labels.get(name, name)
             await queue.put({"step": "tool_call", "tool": name, "message": f"{label}..."})
+            completed_tools.append(label)
 
         async def on_status(status: str) -> None:
             label = self.status_labels.get(status, status)
-            await queue.put({"step": status, "message": label})
+            if status == "thinking" and completed_tools:
+                label = f"Analyzing {completed_tools[-1].lower().rstrip('.')} results..."
+            await queue.put(
+                {"step": status, "message": label, "completed_tools": list(completed_tools)}
+            )
 
         return on_tool_call, on_status
 

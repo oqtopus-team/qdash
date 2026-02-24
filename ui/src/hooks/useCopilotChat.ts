@@ -27,6 +27,7 @@ export function useCopilotChat() {
 
   const [isLoading, setIsLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [completedTools, setCompletedTools] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -67,6 +68,7 @@ export function useCopilotChat() {
 
       setError(null);
       setStatusMessage("応答を準備中...");
+      setCompletedTools([]);
       setIsLoading(true);
 
       const userMsg: CopilotMessage = { role: "user", content: userMessage };
@@ -119,6 +121,12 @@ export function useCopilotChat() {
             if (evt.event === "status") {
               const payload = JSON.parse(evt.data);
               setStatusMessage(payload.message);
+              if (
+                payload.completed_tools &&
+                Array.isArray(payload.completed_tools)
+              ) {
+                setCompletedTools(payload.completed_tools);
+              }
             } else if (evt.event === "result") {
               const result = JSON.parse(evt.data);
               const assistantContent =
@@ -157,6 +165,7 @@ export function useCopilotChat() {
       } finally {
         setIsLoading(false);
         setStatusMessage(null);
+        setCompletedTools([]);
         abortRef.current = null;
       }
     },
@@ -182,6 +191,7 @@ export function useCopilotChat() {
     activeSessionId,
     isLoading,
     statusMessage,
+    completedTools,
     error,
     createSession,
     switchSession: handleSwitchSession,
