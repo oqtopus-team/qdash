@@ -1120,7 +1120,9 @@ async def _run_responses_api(
                     {
                         "type": "function_call_output",
                         "call_id": fc.call_id,
-                        "output": json.dumps(tool_result, default=str, ensure_ascii=False),
+                        "output": json.dumps(
+                            _sanitize_nan(tool_result), default=str, ensure_ascii=False
+                        ),
                     }
                 )
 
