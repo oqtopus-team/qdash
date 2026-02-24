@@ -478,7 +478,12 @@ export function QubitMetricHistoryModal({
           {selectedTask.task_id && (
             <div className="flex items-center gap-2">
               <span className="font-semibold">Task ID:</span>
-              <span className="font-mono truncate">{selectedTask.task_id}</span>
+              <a
+                href={`/task-results/${selectedTask.task_id}`}
+                className="font-mono truncate link link-primary"
+              >
+                {selectedTask.task_id}
+              </a>
             </div>
           )}
           {selectedTask.start_at != null && (
