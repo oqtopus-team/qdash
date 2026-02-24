@@ -15,6 +15,13 @@ from typing import TYPE_CHECKING, Any, Literal
 import numpy as np
 import plotly.graph_objects as go
 from PIL import Image
+from qdash.api.lib.metrics_chart import (
+    ChipGeometry,
+    build_chip_geometry,
+    chip_geometry_from_topology,
+    create_qubit_heatmap,
+    get_qubit_position,
+)
 from qdash.api.lib.metrics_config import load_metrics_config
 from qdash.common.topology_config import TopologyDefinition, load_topology
 from reportlab.lib import colors
@@ -67,16 +74,20 @@ class MetricsPDFGenerator:
             except Exception as e:
                 logger.warning(f"Failed to load topology {topology_id}: {e}")
 
-        # Calculate grid dimensions
-        # Use topology num_qubits when available (metrics qubit_count may exceed grid capacity)
+        # Build shared ChipGeometry used by chart helpers
         if self.topology:
-            self.n_qubits = self.topology.num_qubits
-            self.grid_size = self.topology.grid_size
-            self.mux_size = self.topology.mux.size if self.topology.mux.enabled else 2
+            self._geometry: ChipGeometry = chip_geometry_from_topology(self.topology)
         else:
-            self.n_qubits = metrics_response.qubit_count
-            self.grid_size = int(math.sqrt(self.n_qubits))
-            self.mux_size = 2
+            n = metrics_response.qubit_count
+            self._geometry = build_chip_geometry(
+                n_qubits=n,
+                grid_size=int(math.sqrt(n)),
+            )
+
+        # Convenience aliases kept for internal PDF methods
+        self.n_qubits = self._geometry.n_qubits
+        self.grid_size = self._geometry.grid_size
+        self.mux_size = self._geometry.mux_size
 
     def generate_pdf(self) -> io.BytesIO:
         """Generate the complete PDF report.
@@ -468,8 +479,9 @@ class MetricsPDFGenerator:
 
         # Generate Plotly figure
         if metric_type == "qubit":
-            fig = self._create_qubit_heatmap(
+            fig = create_qubit_heatmap(
                 metric_data=metric_data,
+                geometry=self._geometry,
                 metric_scale=metric_scale,
                 metric_title=metric_title,
                 metric_unit=metric_unit,
@@ -673,126 +685,6 @@ class MetricsPDFGenerator:
 
         return {k: v for k, v in metric_data.items() if k in valid_keys}
 
-    def _get_qubit_position(self, qid: int) -> tuple[int, int]:
-        """Get the grid position (row, col) for a qubit ID using MUX-based layout."""
-        if self.topology and self.topology.qubits:
-            pos = self.topology.qubits.get(qid)
-            if pos:
-                return pos.row, pos.col
-
-        # MUX-based calculation
-        mux_size = self.mux_size
-        qubits_per_mux = mux_size * mux_size
-        muxes_per_row = self.grid_size // mux_size
-
-        mux_index = qid // qubits_per_mux
-        mux_row = mux_index // muxes_per_row
-        mux_col = mux_index % muxes_per_row
-
-        local_index = qid % qubits_per_mux
-        local_row = local_index // mux_size
-        local_col = local_index % mux_size
-
-        return mux_row * mux_size + local_row, mux_col * mux_size + local_col
-
-    def _create_data_matrix(self, values: list[Any], default: Any = math.nan) -> list[list[Any]]:
-        """Create a 2D matrix from a list of values using MUX-based positioning."""
-        matrix = [[default] * self.grid_size for _ in range(self.grid_size)]
-
-        for qid, value in enumerate(values):
-            if qid >= self.n_qubits:
-                break
-            row, col = self._get_qubit_position(qid)
-            if 0 <= row < self.grid_size and 0 <= col < self.grid_size:
-                matrix[row][col] = value
-
-        return matrix
-
-    def _create_qubit_heatmap(
-        self,
-        metric_data: dict[str, Any],
-        metric_scale: float,
-        metric_title: str,
-        metric_unit: str,
-    ) -> go.Figure:
-        """Create a Plotly heatmap for qubit metrics."""
-        # Build values and texts lists
-        values = []
-        texts = []
-
-        for qid in range(self.n_qubits):
-            qid_str = str(qid)
-            metric_value = metric_data.get(qid_str)
-
-            if metric_value and metric_value.value is not None:
-                scaled_value = metric_value.value * metric_scale
-                values.append(scaled_value)
-
-                # Format text based on metric type
-                if "fidelity" in metric_title.lower() or "%" in metric_unit:
-                    text = f"Q{qid:03d}<br>{scaled_value:.2f}%"
-                elif metric_unit in ["GHz", "MHz"]:
-                    text = f"Q{qid:03d}<br>{scaled_value:.3f}<br>{metric_unit}"
-                elif metric_unit in ["μs", "ns"]:
-                    text = f"Q{qid:03d}<br>{scaled_value:.2f}<br>{metric_unit}"
-                else:
-                    text = f"Q{qid:03d}<br>{scaled_value:.3f}<br>{metric_unit}"
-                texts.append(text)
-            else:
-                values.append(math.nan)
-                texts.append("N/A")
-
-        # Create matrices
-        value_matrix = self._create_data_matrix(values)
-        text_matrix = self._create_data_matrix(texts, default="N/A")
-
-        # Create heatmap figure
-        fig = go.Figure(
-            go.Heatmap(
-                z=value_matrix,
-                text=text_matrix,
-                colorscale="Viridis",
-                hoverinfo="text",
-                hovertext=text_matrix,
-                texttemplate="%{text}",
-                showscale=False,
-                textfont={
-                    "family": "monospace",
-                    "size": TEXT_SIZE,
-                    "weight": "bold",
-                },
-            )
-        )
-
-        # Calculate figure size
-        width = 3 * NODE_SIZE * self.grid_size
-        height = 3 * NODE_SIZE * self.grid_size
-
-        fig.update_layout(
-            title=None,  # Title is in PDF header
-            showlegend=False,
-            margin={"b": 20, "l": 20, "r": 20, "t": 20},
-            xaxis={
-                "ticks": "",
-                "linewidth": 1,
-                "showgrid": False,
-                "zeroline": False,
-                "showticklabels": False,
-            },
-            yaxis={
-                "ticks": "",
-                "autorange": "reversed",
-                "linewidth": 1,
-                "showgrid": False,
-                "zeroline": False,
-                "showticklabels": False,
-            },
-            width=width,
-            height=height,
-        )
-
-        return fig
-
     def _create_coupling_graph(
         self,
         metric_data: dict[str, Any],
@@ -889,7 +781,7 @@ class MetricsPDFGenerator:
         texts = []
 
         for qid in range(self.n_qubits):
-            row, col = self._get_qubit_position(qid)
+            row, col = get_qubit_position(self._geometry, qid)
             x_coords.append(col)
             y_coords.append(row)
             texts.append(str(qid))
@@ -946,8 +838,8 @@ class MetricsPDFGenerator:
         val_range = max_val - min_val if max_val != min_val else 1
 
         for (qid1, qid2), value in coupling_values.items():
-            row1, col1 = self._get_qubit_position(qid1)
-            row2, col2 = self._get_qubit_position(qid2)
+            row1, col1 = get_qubit_position(self._geometry, qid1)
+            row2, col2 = get_qubit_position(self._geometry, qid2)
 
             # Normalize value for color
             normalized = (value - min_val) / val_range

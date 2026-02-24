@@ -670,6 +670,197 @@ class CopilotDataService:
             ]
         return results
 
+    def load_chip_heatmap(
+        self,
+        chip_id: str,
+        metric_name: str,
+        selection_mode: str = "latest",
+        within_hours: int | None = None,
+    ) -> dict[str, Any]:
+        """Generate a chip-wide heatmap for a qubit metric.
+
+        Returns a Plotly figure dict suitable for the chat UI.
+        """
+        from datetime import timedelta
+
+        from qdash.api.lib.metrics_chart import (
+            build_chip_geometry,
+            chip_geometry_from_topology,
+            create_qubit_heatmap,
+        )
+        from qdash.api.lib.metrics_config import get_qubit_metric_metadata, load_metrics_config
+        from qdash.common.topology_config import load_topology
+        from qdash.dbmodel.chip import ChipDocument
+        from qdash.repository.task_result_history import MongoTaskResultHistoryRepository
+
+        # Validate metric name
+        meta = get_qubit_metric_metadata(metric_name)
+        if meta is None:
+            config = load_metrics_config()
+            available = sorted(config.qubit_metrics.keys())
+            return {
+                "error": (
+                    f"Unknown qubit metric '{metric_name}'. "
+                    f"Available metrics: {', '.join(available)}"
+                )
+            }
+
+        # Resolve chip
+        chip = ChipDocument.find_one({"chip_id": chip_id}).run()
+        if chip is None:
+            return {"error": f"Chip '{chip_id}' not found"}
+        project_id = str(chip.project_id)
+
+        # Build geometry
+        if chip.topology_id:
+            try:
+                topology = load_topology(chip.topology_id)
+                geometry = chip_geometry_from_topology(topology)
+            except Exception:
+                import math
+
+                n = chip.size or 0
+                geometry = build_chip_geometry(n, int(math.sqrt(n)) if n else 1)
+        else:
+            import math
+
+            n = chip.size or 0
+            geometry = build_chip_geometry(n, int(math.sqrt(n)) if n else 1)
+
+        # Cutoff time
+        cutoff_time = None
+        if within_hours:
+            from qdash.common.datetime_utils import now
+
+            cutoff_time = now() - timedelta(hours=within_hours)
+
+        # Aggregate metrics
+        repo = MongoTaskResultHistoryRepository()
+        valid_keys = {metric_name}
+
+        try:
+            if selection_mode == "best":
+                eval_mode = meta.evaluation.mode
+                if eval_mode == "maximize" or eval_mode == "minimize":
+                    agg = repo.aggregate_best_metrics(
+                        chip_id=chip_id,
+                        project_id=project_id,
+                        entity_type="qubit",
+                        metric_modes={metric_name: eval_mode},
+                        cutoff_time=cutoff_time,
+                    )
+                else:
+                    agg = repo.aggregate_latest_metrics(
+                        chip_id=chip_id,
+                        project_id=project_id,
+                        entity_type="qubit",
+                        metric_keys=valid_keys,
+                        cutoff_time=cutoff_time,
+                    )
+            elif selection_mode == "average":
+                agg = repo.aggregate_average_metrics(
+                    chip_id=chip_id,
+                    project_id=project_id,
+                    entity_type="qubit",
+                    metric_keys=valid_keys,
+                    cutoff_time=cutoff_time,
+                )
+            else:
+                agg = repo.aggregate_latest_metrics(
+                    chip_id=chip_id,
+                    project_id=project_id,
+                    entity_type="qubit",
+                    metric_keys=valid_keys,
+                    cutoff_time=cutoff_time,
+                )
+        except Exception as e:
+            return {"error": f"Failed to aggregate metrics: {e}"}
+
+        # Build MetricValue-like objects for the chart helper
+        from qdash.api.schemas.metrics import MetricValue
+
+        metric_data: dict[str, MetricValue] = {}
+        for entity_id, result in agg.get(metric_name, {}).items():
+            metric_data[entity_id] = MetricValue(
+                value=result["value"],
+                task_id=result.get("task_id"),
+                execution_id=result["execution_id"],
+                stddev=result.get("stddev"),
+            )
+
+        if not metric_data:
+            return {"error": f"No data found for metric '{metric_name}' on chip '{chip_id}'"}
+
+        fig = create_qubit_heatmap(
+            metric_data=metric_data,
+            geometry=geometry,
+            metric_scale=meta.scale,
+            metric_title=meta.title,
+            metric_unit=meta.unit,
+            compact=True,
+        )
+
+        # Compute basic statistics
+        raw_values = [mv.value * meta.scale for mv in metric_data.values() if mv.value is not None]
+        statistics: dict[str, Any] = {}
+        if raw_values:
+            import numpy as np
+
+            statistics = {
+                "count": len(raw_values),
+                "total_qubits": geometry.n_qubits,
+                "coverage": f"{len(raw_values) / geometry.n_qubits * 100:.1f}%",
+                "median": float(np.median(raw_values)),
+                "mean": float(np.mean(raw_values)),
+                "min": float(np.min(raw_values)),
+                "max": float(np.max(raw_values)),
+                "unit": meta.unit,
+            }
+
+        fig_dict = fig.to_dict()
+        return {
+            "chart": {"data": fig_dict["data"], "layout": fig_dict["layout"]},
+            "statistics": statistics,
+        }
+
+    def load_available_parameters(
+        self,
+        chip_id: str,
+        qid: str | None = None,
+    ) -> dict[str, Any]:
+        """List distinct output parameter names recorded for a chip."""
+        from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
+
+        query: dict[str, Any] = {"chip_id": chip_id, "status": "completed"}
+        if qid:
+            query["qid"] = qid
+
+        # Use MongoDB distinct on the output_parameter_names array field
+        collection = TaskResultHistoryDocument.get_motor_collection()
+        try:
+            names = collection.distinct("output_parameter_names", query)
+        except Exception:
+            # Fallback: manual aggregation
+            docs = TaskResultHistoryDocument.find(query).limit(500).run()
+            name_set: set[str] = set()
+            for doc in docs:
+                if doc.output_parameter_names:
+                    name_set.update(doc.output_parameter_names)
+            names = sorted(name_set)
+
+        if not names:
+            return {
+                "error": f"No output parameters found for chip_id={chip_id}"
+                + (f", qid={qid}" if qid else "")
+            }
+
+        return {
+            "chip_id": chip_id,
+            "qid": qid,
+            "parameter_names": sorted(names),
+            "count": len(names),
+        }
+
     def build_analysis_context(
         self,
         task_name: str,
@@ -815,5 +1006,14 @@ class CopilotDataService:
             ),
             "get_provenance_lineage_graph": lambda args: self.load_provenance_lineage_graph(
                 args["entity_id"], args["chip_id"], args.get("max_depth", 5)
+            ),
+            "generate_chip_heatmap": lambda args: self.load_chip_heatmap(
+                args["chip_id"],
+                args["metric_name"],
+                args.get("selection_mode", "latest"),
+                args.get("within_hours"),
+            ),
+            "list_available_parameters": lambda args: self.load_available_parameters(
+                args["chip_id"], args.get("qid")
             ),
         }

@@ -103,8 +103,10 @@ AGENT_TOOLS: list[dict[str, Any]] = [
         "name": "get_parameter_timeseries",
         "description": (
             "Get time series data for a specific output parameter across all task results. "
-            "This queries by parameter name (e.g. 'qubit_frequency', 't1', 't2_echo', "
-            "'x90_gate_fidelity', 'resonator_frequency') rather than by task name. "
+            "Any output parameter name stored in the calibration database can be queried "
+            "(e.g. 'qubit_frequency', 't1', 't2_echo', 'x90_gate_fidelity', "
+            "'resonator_frequency', 'pi_amplitude', etc.). "
+            "If unsure which parameter names are available, call list_available_parameters first. "
             "Use this when the user asks about trends or history of a specific parameter. "
             "Returns a list of {value, unit, calibrated_at, execution_id, task_id} entries "
             "ordered by time."
@@ -115,8 +117,8 @@ AGENT_TOOLS: list[dict[str, Any]] = [
                 "parameter_name": {
                     "type": "string",
                     "description": (
-                        "The output parameter name to query "
-                        "(e.g. 'qubit_frequency', 't1', 't2_echo', 'x90_gate_fidelity')"
+                        "The output parameter name to query. "
+                        "Use list_available_parameters to discover valid names."
                     ),
                 },
                 "chip_id": {"type": "string", "description": "Chip ID"},
@@ -396,6 +398,61 @@ AGENT_TOOLS: list[dict[str, Any]] = [
                 },
             },
             "required": ["entity_id", "chip_id"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "type": "function",
+        "name": "generate_chip_heatmap",
+        "description": (
+            "Generate a chip-wide heatmap for a qubit metric. "
+            "Returns a Plotly chart showing per-qubit values arranged on the chip grid layout. "
+            "Use this when the user wants to visualise a metric across the entire chip "
+            "(e.g. 'Show me a T1 heatmap', 'Visualise qubit frequencies on the chip')."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "chip_id": {"type": "string", "description": "Chip ID"},
+                "metric_name": {
+                    "type": "string",
+                    "description": (
+                        "Qubit metric key as defined in the metrics configuration "
+                        "(e.g. 't1', 't2_echo', 'qubit_frequency', 'x90_gate_fidelity')"
+                    ),
+                },
+                "selection_mode": {
+                    "type": "string",
+                    "enum": ["latest", "best", "average"],
+                    "description": "Value selection strategy (default: 'latest')",
+                },
+                "within_hours": {
+                    "type": "integer",
+                    "description": "Optional time range filter in hours",
+                },
+            },
+            "required": ["chip_id", "metric_name"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "type": "function",
+        "name": "list_available_parameters",
+        "description": (
+            "List all output parameter names that have been recorded in the calibration database. "
+            "Use this to discover valid parameter names for get_parameter_timeseries. "
+            "Optionally filter by a specific qubit."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "chip_id": {"type": "string", "description": "Chip ID"},
+                "qid": {
+                    "type": "string",
+                    "description": "Optional qubit ID to filter parameters for a specific qubit",
+                },
+            },
+            "required": ["chip_id"],
             "additionalProperties": False,
         },
     },
@@ -1204,12 +1261,14 @@ You have access to tools that can fetch data from the calibration database:
 - get_qubit_params: Get current calibrated parameters for a qubit (chip_id, qid required)
 - get_latest_task_result: Get the latest result for a specific calibration task
 - get_task_history: Get recent historical results for a task
-- get_parameter_timeseries: Get time series data for a parameter (ideal for trend charts)
+- get_parameter_timeseries: Get time series data for any output parameter (ideal for trend charts). Use list_available_parameters to discover valid names.
+- list_available_parameters: List all output parameter names recorded in the database. Optionally filter by qid.
 
 ### Chip-wide & cross-qubit tools
 - get_chip_summary: Get all qubits on a chip with statistics (mean/median/std/min/max)
 - compare_qubits: Compare parameters across multiple qubits side by side
 - get_chip_topology: Get chip topology (grid size, qubit positions, coupling connections)
+- generate_chip_heatmap: Generate a chip-wide heatmap for a qubit metric (e.g. T1, frequency). Returns a Plotly chart.
 
 ### Coupling & execution tools
 - get_coupling_params: Get coupling resonator parameters by coupling_id or qubit_id
@@ -1227,7 +1286,7 @@ You have access to tools that can fetch data from the calibration database:
 IMPORTANT: When calling tools, you need chip_id and often qid.
 - The default chip_id is provided in the context below. Always use it unless the user specifies a different chip.
 - For qid: users may refer to qubits as "Q16", "qubit 16", or just "16". Normalize to the plain number format (e.g. "16") when calling tools.
-- For parameter names in get_parameter_timeseries, use snake_case names like: qubit_frequency, t1, t2_echo, x90_gate_fidelity, resonator_frequency, etc.
+- For parameter names in get_parameter_timeseries, use snake_case names (e.g. qubit_frequency, t1, t2_echo, x90_gate_fidelity). If unsure, call list_available_parameters first to discover valid names.
 - For chip-wide queries (get_chip_summary, get_execution_history, get_chip_topology), only chip_id is required.
 - For get_provenance_lineage_graph, entity_id format is "parameter_name:qid:execution_id:task_id". First call get_parameter_lineage to obtain entity_id values, then use them with get_provenance_lineage_graph.
 
