@@ -23,6 +23,7 @@ import type {
 
 import type {
   BodyDownloadFiguresAsZip,
+  BodyReExecuteTaskResult,
   ExecuteFlowResponse,
   GetCouplingTaskHistoryParams,
   GetHistoricalCouplingTaskResultsParams,
@@ -1440,11 +1441,18 @@ ExecuteFlowResponse
  */
 export const reExecuteTaskResult = (
   taskId: string,
+  bodyReExecuteTaskResult: BodyReExecuteTaskResult,
   options?: SecondParameter<typeof customInstance>,
   signal?: AbortSignal,
 ) => {
   return customInstance<ExecuteFlowResponse>(
-    { url: `/task-results/${taskId}/re-execute`, method: "POST", signal },
+    {
+      url: `/task-results/${taskId}/re-execute`,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      data: bodyReExecuteTaskResult,
+      signal,
+    },
     options,
   );
 };
@@ -1456,14 +1464,14 @@ export const getReExecuteTaskResultMutationOptions = <
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof reExecuteTaskResult>>,
     TError,
-    { taskId: string },
+    { taskId: string; data: BodyReExecuteTaskResult },
     TContext
   >;
   request?: SecondParameter<typeof customInstance>;
 }): UseMutationOptions<
   Awaited<ReturnType<typeof reExecuteTaskResult>>,
   TError,
-  { taskId: string },
+  { taskId: string; data: BodyReExecuteTaskResult },
   TContext
 > => {
   const mutationKey = ["reExecuteTaskResult"];
@@ -1477,11 +1485,11 @@ export const getReExecuteTaskResultMutationOptions = <
 
   const mutationFn: MutationFunction<
     Awaited<ReturnType<typeof reExecuteTaskResult>>,
-    { taskId: string }
+    { taskId: string; data: BodyReExecuteTaskResult }
   > = (props) => {
-    const { taskId } = props ?? {};
+    const { taskId, data } = props ?? {};
 
-    return reExecuteTaskResult(taskId, requestOptions);
+    return reExecuteTaskResult(taskId, data, requestOptions);
   };
 
   return { mutationFn, ...mutationOptions };
@@ -1490,7 +1498,7 @@ export const getReExecuteTaskResultMutationOptions = <
 export type ReExecuteTaskResultMutationResult = NonNullable<
   Awaited<ReturnType<typeof reExecuteTaskResult>>
 >;
-
+export type ReExecuteTaskResultMutationBody = BodyReExecuteTaskResult;
 export type ReExecuteTaskResultMutationError = HTTPValidationError;
 
 /**
@@ -1504,7 +1512,7 @@ export const useReExecuteTaskResult = <
     mutation?: UseMutationOptions<
       Awaited<ReturnType<typeof reExecuteTaskResult>>,
       TError,
-      { taskId: string },
+      { taskId: string; data: BodyReExecuteTaskResult },
       TContext
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -1513,7 +1521,7 @@ export const useReExecuteTaskResult = <
 ): UseMutationResult<
   Awaited<ReturnType<typeof reExecuteTaskResult>>,
   TError,
-  { taskId: string },
+  { taskId: string; data: BodyReExecuteTaskResult },
   TContext
 > => {
   const mutationOptions = getReExecuteTaskResultMutationOptions(options);
