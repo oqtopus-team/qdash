@@ -732,7 +732,7 @@ export function TimeSeriesView() {
             Refresh
           </button>
         </div>
-        <div className="flex flex-col sm:flex-row child w-full gap-4 sm:gap-6">
+        <div className="flex flex-col sm:flex-row w-full gap-4 sm:gap-6">
           <div className="flex-1">
             <label className="text-sm font-medium text-base-content/70">
               Chip
@@ -809,7 +809,7 @@ export function TimeSeriesView() {
 
         {/* Secondary Axis Section */}
         <div className="mt-4 pt-4 border-t border-base-300">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
+          <div className="flex flex-col sm:flex-row w-full gap-4 sm:gap-6">
             <div className="space-y-1">
               <label className="text-sm font-medium text-base-content/70">
                 Secondary Parameter
