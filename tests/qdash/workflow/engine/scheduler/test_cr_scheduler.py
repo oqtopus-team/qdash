@@ -242,7 +242,7 @@ def test_candidate_qubit_filter(scheduler):
 )
 def test_group_cr_pairs_by_conflict(cr_pairs, qid_to_mux, expected_min_groups, reason):
     """Test CR pair grouping with various conflict scenarios."""
-    mux_conflict_map = {}
+    mux_conflict_map: dict[int, set[int]] = {}
 
     groups = group_cr_pairs_by_conflict(cr_pairs, qid_to_mux, mux_conflict_map)
 
@@ -271,7 +271,7 @@ def test_coloring_strategies(strategy):
     """Test different coloring strategies produce valid results."""
     cr_pairs = ["0-1", "1-2", "2-3"]
     qid_to_mux = {"0": 0, "1": 0, "2": 0, "3": 0}
-    mux_conflict_map = {}
+    mux_conflict_map: dict[int, set[int]] = {}
 
     groups = group_cr_pairs_by_conflict(
         cr_pairs, qid_to_mux, mux_conflict_map, coloring_strategy=strategy

@@ -392,6 +392,7 @@ class TestAdminMembersEndpoints:
         membership = ProjectMembershipDocument.find_one(
             {"project_id": test_project.project_id, "username": "memberuser"}
         ).run()
+        assert membership is not None
         assert membership.status == "revoked"
 
     def test_cannot_remove_project_owner(

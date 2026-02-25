@@ -109,6 +109,12 @@ explicit_package_bases = true
 mypy_path = "src"
 plugins = ["pydantic.mypy"]
 
+[[tool.mypy.overrides]]
+module = "tests.*"
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+disallow_untyped_decorators = false
+
 [tool.pydantic-mypy]
 init_forbid_extra = true
 init_typed = true
