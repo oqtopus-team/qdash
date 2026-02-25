@@ -2,16 +2,18 @@
 
 This service runs in the Workflow container and provides a single endpoint
 to register user flows as Prefect deployments.
+
+Compatible with Prefect 3.x.
 """
 
 import os
+import uuid as uuid_module
 from logging import getLogger
 from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, HTTPException
 from prefect.client.orchestration import get_client
-from prefect.deployments import Deployment
 from pydantic import BaseModel
 from qdash.workflow.paths import get_path_resolver
 
@@ -108,19 +110,21 @@ async def register_deployment(request: RegisterDeploymentRequest) -> RegisterDep
                     f"Failed to delete old deployment {request.old_deployment_id}: {type(e).__name__}: {e}"
                 )
 
-        # Build deployment using the flow object with work pool
-        logger.info(f"Building deployment with work pool: {WORK_POOL_NAME}")
-        deployment = await Deployment.build_from_flow(
-            flow=flow_obj,
-            name=deployment_name,
-            work_pool_name=WORK_POOL_NAME,
-            entrypoint=entrypoint,
-            path=str(working_dir),
-        )
+        # Register flow and create deployment using Prefect 3 client API
+        logger.info(f"Creating deployment with work pool: {WORK_POOL_NAME}")
+        async with get_client() as client:
+            # Register the flow (returns existing if same name)
+            flow_id = await client.create_flow(flow_obj)
+            logger.info(f"Flow registered with ID: {flow_id}")
 
-        # Apply to Prefect Server
-        logger.info(f"Applying deployment to Prefect Server at {PREFECT_API_URL}")
-        deployment_id = await deployment.apply()
+            # Create deployment via client API
+            deployment_id = await client.create_deployment(
+                flow_id=flow_id,
+                name=deployment_name,
+                work_pool_name=WORK_POOL_NAME,
+                entrypoint=entrypoint,
+                path=str(working_dir),
+            )
 
         logger.info(f"Deployment created successfully: {deployment_id}")
 
@@ -192,6 +196,9 @@ class CreateScheduledRunResponse(BaseModel):
 async def set_schedule(request: SetScheduleRequest) -> SetScheduleResponse:
     """Set or update a cron schedule on a deployment.
 
+    In Prefect 3, schedules are managed via dedicated schedule APIs
+    rather than the deployment update API.
+
     Args:
     ----
         request: Schedule configuration request
@@ -208,11 +215,12 @@ async def set_schedule(request: SetScheduleRequest) -> SetScheduleResponse:
         logger.info(f"Cron: {request.cron}, Timezone: {request.timezone}, Active: {request.active}")
 
         cron_schedule = CronSchedule(cron=request.cron, timezone=request.timezone)
+        deployment_id = uuid_module.UUID(request.deployment_id)
 
         async with get_client() as client:
-            # Read existing deployment
+            # Read existing deployment to verify it exists
             try:
-                target_deployment = await client.read_deployment(request.deployment_id)
+                target_deployment = await client.read_deployment(deployment_id)
                 logger.info(f"Found deployment: {target_deployment.name}")
             except Exception as e:
                 logger.error(f"Failed to read deployment {request.deployment_id}: {e}")
@@ -220,14 +228,19 @@ async def set_schedule(request: SetScheduleRequest) -> SetScheduleResponse:
                     status_code=404, detail=f"Deployment not found: {request.deployment_id}"
                 )
 
-            # Update schedule and parameters
             try:
-                await client.update_deployment(
-                    deployment=target_deployment,
-                    schedule=cron_schedule,
-                    is_schedule_active=request.active,
+                # Delete existing schedules first
+                existing_schedules = await client.read_deployment_schedules(deployment_id)
+                for existing in existing_schedules:
+                    await client.delete_deployment_schedule(deployment_id, existing.id)
+                    logger.info(f"Deleted existing schedule: {existing.id}")
+
+                # Create new schedule
+                await client.create_deployment_schedules(
+                    deployment_id,
+                    [(cron_schedule, request.active)],
                 )
-                logger.info("Successfully updated deployment schedule")
+                logger.info("Successfully created deployment schedule")
 
                 # Update parameters via direct API call if provided
                 if request.parameters:

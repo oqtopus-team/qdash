@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Any
 
 import httpx
 from fastapi import HTTPException
-from prefect import get_client
+from prefect.client.orchestration import get_client
 from qdash.api.schemas.flow import (
     ExecuteFlowRequest,
     ExecuteFlowResponse,

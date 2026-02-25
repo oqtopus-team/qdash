@@ -47,7 +47,7 @@ services:
     networks:
       - custom_net
   prefect-server:
-    image: prefecthq/prefect:2.20-python3.11
+    image: prefecthq/prefect:3-python3.11
     restart: always
     env_file:
       - .env
