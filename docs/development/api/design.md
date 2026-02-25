@@ -71,6 +71,7 @@ For actions that don't fit standard CRUD operations, use verbs as sub-resources.
 # ✅ Good
 POST /flows/{name}/execute                    # Execute a flow
 POST /flows/{name}/schedule                   # Schedule a flow
+POST /executions/{flow_run_id}/cancel         # Cancel a running execution
 
 # ❌ Bad
 POST /execute-flow/{name}                     # Verb in wrong position

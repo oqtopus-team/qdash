@@ -271,6 +271,63 @@ class BaseBackend(ABC):
 
 The data flow (Preprocess → Run → Postprocess) and persistence flow (TaskStateManager, TaskHistoryRecorder, FilesystemCalibDataSaver, ExecutionService) are illustrated in the Task Executor Flow diagram above.
 
+## Cancellation
+
+### Overview
+
+Flow cancellation allows users to stop a running calibration from the UI. The cancellation lifecycle involves the API, Prefect, and the workflow engine.
+
+### Mechanism
+
+Prefect 3 cancels flows by sending **SIGTERM** to the worker process. This means Python `except` blocks do not execute when a flow is cancelled. Instead, Prefect provides an `on_cancellation` hook that runs in a separate process after the SIGTERM kill.
+
+### Implementation
+
+All top-level `@flow` decorators register the `on_flow_cancellation` hook:
+
+```python
+from qdash.workflow.service.calib_service import on_flow_cancellation
+
+@flow(on_cancellation=[on_flow_cancellation])
+def my_calibration_flow(...):
+    ...
+```
+
+The hook:
+
+1. Reads flow run parameters (`project_id`, `flow_run_id`) from the Prefect flow run context
+2. Initializes the database connection (since it runs in a new process)
+3. Finds the execution by `note.flow_run_id` in `execution_history`
+4. Updates all non-terminal tasks (running/scheduled/pending) to `cancelled`
+5. Sets the execution status to `cancelled`
+6. Releases the execution lock
+
+### flow_run_id Bridge
+
+QDash uses date-based execution IDs (`YYYYMMDD-NNN`), while Prefect uses UUIDs for flow runs. The bridge is:
+
+- At flow start, `CalibService._store_flow_run_id()` stores the Prefect UUID in `execution.note["flow_run_id"]`
+- The cancel API accepts the Prefect `flow_run_id` (UUID) directly
+- The `on_cancellation` hook uses `flow_run_id` to look up the QDash execution
+
+### Status Transitions on Cancel
+
+| Entity    | Before Cancel                          | After Cancel  |
+|-----------|----------------------------------------|---------------|
+| Execution | `running`                              | `cancelled`   |
+| Task      | `running` / `scheduled` / `pending`    | `cancelled`   |
+| Task      | `completed` / `failed` / `skipped`     | *(unchanged)* |
+
+### CalibService Methods
+
+| Method                                | Purpose                                     |
+|---------------------------------------|---------------------------------------------|
+| `on_flow_cancellation()`              | Prefect hook — runs after SIGTERM            |
+| `cancel_calibration()`                | In-process cancellation (for exception path) |
+| `_cancel_executions_by_flow_run_id()` | Direct MongoDB update by flow_run_id         |
+| `_finalize_tasks_on_cancel()`         | Batch-update non-terminal tasks              |
+| `_is_cancellation(e)`                 | Detect CancelledRun/CancelledError exception |
+
 ## Extension Points
 
 ### Adding a New Backend

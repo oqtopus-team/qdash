@@ -57,5 +57,6 @@ Calibration is performed in the following flow.
 5. execution_id is generated from the execution_run_counter based on the execution date/time and execution count, and the workflow is executed. The execution_id is used to link the data for each execution.
 6. When the workflow execution is completed, the results are saved in various DB.
 7. The latest experimental results saved in each DB are used as initial parameters for the next calibration.
+8. If a user cancels a running execution, the API sends a cancel request to Prefect, which terminates the worker process via SIGTERM. The `on_cancellation` hook then updates the execution and task statuses to `cancelled` and releases the execution lock.
 
 ![qdash-calibration-flow](../diagrams/calibration-flow.drawio.png)

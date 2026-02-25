@@ -89,6 +89,38 @@ config = CalibConfig(
 
 See [Testing Guidelines](./testing.md) for more details.
 
+## Cancellation Support
+
+All top-level `@flow` decorators must register the `on_flow_cancellation` hook to support cancellation from the UI:
+
+```python
+from qdash.workflow.service.calib_service import on_flow_cancellation
+
+@flow(on_cancellation=[on_flow_cancellation])
+def my_calibration_flow(
+    username: str,
+    chip_id: str,
+    project_id: str | None = None,
+    flow_name: str | None = None,
+    ...
+):
+    cal = CalibService(username, chip_id, ...)
+    try:
+        # ... run tasks ...
+        cal.finish_calibration()
+    except BaseException as e:
+        from qdash.workflow.service.calib_service import _is_cancellation
+        if _is_cancellation(e):
+            cal.cancel_calibration()
+        else:
+            cal.fail_calibration(str(e))
+        raise
+```
+
+When cancelled, Prefect kills the process with SIGTERM and runs the `on_cancellation` hook. The hook updates the execution and task statuses to `cancelled` and releases the execution lock.
+
+See [Engine Architecture — Cancellation](./engine-architecture.md#cancellation) for implementation details.
+
 ## Next Steps
 
 - [Engine Architecture](./engine-architecture.md) - Deep dive into components

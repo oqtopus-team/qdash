@@ -966,7 +966,8 @@ Each component should have tests for:
 
 ### Critical Paths to Test
 
-- Task status transitions (SCHEDULED → RUNNING → COMPLETED/FAILED)
+- Task status transitions (SCHEDULED → RUNNING → COMPLETED/FAILED/CANCELLED)
+- Cancellation handling (on_cancellation hook, status updates, lock release)
 - R² validation and rollback behavior
 - Fidelity validation (> 100% rejection)
 - Parameter propagation (input → output → calib_data)
