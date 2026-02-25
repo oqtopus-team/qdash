@@ -55,7 +55,9 @@ class GitHubPushConfig(BaseModel):
     """
 
     enabled: bool = False
-    file_types: list[ConfigFileType] = Field(default_factory=lambda: [ConfigFileType.CALIB_NOTE, ConfigFileType.ALL_PARAMS])
+    file_types: list[ConfigFileType] = Field(
+        default_factory=lambda: [ConfigFileType.CALIB_NOTE, ConfigFileType.ALL_PARAMS]
+    )
     commit_message: str | None = None
     branch: str = "main"
     props_within_24hrs: bool = False

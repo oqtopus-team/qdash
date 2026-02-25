@@ -1,3 +1,4 @@
+import logging
 import os
 import shutil
 import tempfile
@@ -5,17 +6,22 @@ from pathlib import Path
 from urllib.parse import urlparse, urlunparse
 
 from git import Repo
-from git.exc import GitCommandError
+from git.exc import GitCommandError, InvalidGitRepositoryError
 from prefect import get_run_logger, task
 from qdash.common.datetime_utils import now_iso
 from qdash.common.paths import QUBEX_CONFIG_BASE
 
 
-def _sync_local_repo(branch: str, logger: object) -> None:
+def _sync_local_repo(branch: str, logger: logging.Logger) -> None:
     """Sync the local qubex-config git repository to match the remote after push.
 
-    This resets the local .git state so that `git status` shows clean
+    This resets the local .git state so that ``git status`` shows clean
     after parameters have been pushed to the remote.
+
+    Note: This intentionally uses ``git reset --hard`` because the local
+    working tree changes have already been pushed to the remote via a
+    temporary clone.  The reset simply brings the local .git state in line
+    with what was just pushed.
     """
     local_repo_path = QUBEX_CONFIG_BASE
     git_dir = local_repo_path / ".git"
@@ -27,8 +33,11 @@ def _sync_local_repo(branch: str, logger: object) -> None:
         repo.remotes.origin.fetch()
         repo.git.reset("--hard", f"origin/{branch}")
         logger.info(f"Synced local qubex-config repo to origin/{branch}")
-    except Exception as e:
+    except (GitCommandError, InvalidGitRepositoryError) as e:
         logger.warning(f"Failed to sync local qubex-config repo: {e}")
+    except Exception as e:
+        logger.error(f"Unexpected error during local repo sync: {e}")
+
 
 # Default source path for calib_note.json (example chip: 64Qv1)
 DEFAULT_CALIB_NOTE_PATH = str(QUBEX_CONFIG_BASE / "64Qv1" / "calibration" / "calib_note.json")
