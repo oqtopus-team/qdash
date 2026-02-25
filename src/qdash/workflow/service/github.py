@@ -39,7 +39,7 @@ class GitHubPushConfig(BaseModel):
 
     Attributes:
         enabled: Whether to push to GitHub on finish_calibration()
-        file_types: List of file types to push (default: [CALIB_NOTE])
+        file_types: List of file types to push (default: [CALIB_NOTE, ALL_PARAMS])
         commit_message: Custom commit message (default: auto-generated)
         branch: Target branch (default: "main")
         props_within_24hrs: For PROPS type, only include data from last 24 hours
@@ -55,7 +55,7 @@ class GitHubPushConfig(BaseModel):
     """
 
     enabled: bool = False
-    file_types: list[ConfigFileType] = Field(default_factory=lambda: [ConfigFileType.CALIB_NOTE])
+    file_types: list[ConfigFileType] = Field(default_factory=lambda: [ConfigFileType.CALIB_NOTE, ConfigFileType.ALL_PARAMS])
     commit_message: str | None = None
     branch: str = "main"
     props_within_24hrs: bool = False
