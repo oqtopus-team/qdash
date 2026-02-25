@@ -61,6 +61,12 @@ const getStatusStyles = (status: string) => {
         borderColor: "hsl(0 91% 71%)",
         color: "hsl(0 91% 71%)",
       };
+    case "cancelled":
+      return {
+        background: "hsl(220 9% 46% / 0.1)",
+        borderColor: "hsl(220 9% 46%)",
+        color: "hsl(220 9% 46%)",
+      };
     default:
       return {
         background: "hsl(220 13% 91%)",
@@ -419,7 +425,9 @@ export function ExecutionDAG({ tasks }: ExecutionDAGProps) {
                       ? "text-success"
                       : selectedTask.status === "scheduled"
                         ? "text-warning"
-                        : "text-error"
+                        : selectedTask.status === "cancelled"
+                          ? "text-neutral"
+                          : "text-error"
                 }`}
               >
                 {selectedTask.status}

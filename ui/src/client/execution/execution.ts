@@ -22,6 +22,7 @@ import type {
 } from "@tanstack/react-query";
 
 import type {
+  CancelExecutionResponse,
   Detail,
   ExecuteFlowResponse,
   ExecutionLockStatusResponse,
@@ -689,6 +690,111 @@ export function useGetExecution<
   return query;
 }
 
+/**
+ * Cancel a running or scheduled execution via Prefect.
+
+Sends a cancellation request to Prefect for the specified flow run.
+The flow_run_id is the Prefect flow run UUID, which can be obtained from
+the execution detail's note.flow_run_id field.
+Only executions in SCHEDULED, PENDING, RUNNING, or PAUSED state can be cancelled.
+
+Parameters
+----------
+flow_run_id : str
+    Prefect flow run UUID
+ctx : ProjectContext
+    Project context with user and project information
+execution_service : ExecutionService
+    Service for execution operations
+
+Returns
+-------
+CancelExecutionResponse
+    Cancellation result with status
+ * @summary Cancel a running or scheduled execution
+ */
+export const cancelExecution = (
+  flowRunId: string,
+  options?: SecondParameter<typeof customInstance>,
+  signal?: AbortSignal,
+) => {
+  return customInstance<CancelExecutionResponse>(
+    { url: `/executions/${flowRunId}/cancel`, method: "POST", signal },
+    options,
+  );
+};
+
+export const getCancelExecutionMutationOptions = <
+  TError = HTTPValidationError,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof cancelExecution>>,
+    TError,
+    { flowRunId: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customInstance>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof cancelExecution>>,
+  TError,
+  { flowRunId: string },
+  TContext
+> => {
+  const mutationKey = ["cancelExecution"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof cancelExecution>>,
+    { flowRunId: string }
+  > = (props) => {
+    const { flowRunId } = props ?? {};
+
+    return cancelExecution(flowRunId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CancelExecutionMutationResult = NonNullable<
+  Awaited<ReturnType<typeof cancelExecution>>
+>;
+
+export type CancelExecutionMutationError = HTTPValidationError;
+
+/**
+ * @summary Cancel a running or scheduled execution
+ */
+export const useCancelExecution = <
+  TError = HTTPValidationError,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof cancelExecution>>,
+      TError,
+      { flowRunId: string },
+      TContext
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof cancelExecution>>,
+  TError,
+  { flowRunId: string },
+  TContext
+> => {
+  const mutationOptions = getCancelExecutionMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
 /**
  * Re-execute a flow using snapshot parameters from a previous execution.
 

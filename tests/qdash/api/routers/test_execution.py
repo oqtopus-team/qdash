@@ -131,6 +131,130 @@ def sample_flow(test_project: ProjectDocument) -> FlowDocument:
     return flow
 
 
+CANCEL_FLOW_RUN_ID = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+
+
+class TestCancelExecution:
+    """Tests for POST /executions/{flow_run_id}/cancel endpoint."""
+
+    def test_cancel_success(
+        self,
+        test_client: TestClient,
+        test_project: ProjectDocument,
+        auth_headers: dict[str, str],
+    ) -> None:
+        """Test successful cancellation of a running execution."""
+        mock_state = MagicMock()
+        mock_state.type.value = "RUNNING"
+
+        mock_flow_run = MagicMock()
+        mock_flow_run.state = mock_state
+        mock_flow_run.parameters = {"project_id": "test_project"}
+
+        mock_client = MagicMock()
+        mock_client.read_flow_run = AsyncMock(return_value=mock_flow_run)
+        mock_client.set_flow_run_state = AsyncMock(return_value=None)
+
+        async_cm = MagicMock()
+        async_cm.__aenter__ = AsyncMock(return_value=mock_client)
+        async_cm.__aexit__ = AsyncMock(return_value=None)
+
+        with patch("qdash.api.services.execution_service.get_client", return_value=async_cm):
+            response = test_client.post(
+                f"/executions/{CANCEL_FLOW_RUN_ID}/cancel",
+                headers=auth_headers,
+            )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["execution_id"] == CANCEL_FLOW_RUN_ID
+        assert data["status"] == "cancelling"
+
+    def test_cancel_invalid_uuid_returns_400(
+        self,
+        test_client: TestClient,
+        test_project: ProjectDocument,
+        auth_headers: dict[str, str],
+    ) -> None:
+        """Test cancelling with non-UUID returns 400."""
+        response = test_client.post(
+            "/executions/not-a-uuid/cancel",
+            headers=auth_headers,
+        )
+        assert response.status_code == 400
+        assert "Invalid flow run ID" in response.json()["detail"]
+
+    def test_cancel_wrong_project_returns_403(
+        self,
+        test_client: TestClient,
+        test_project: ProjectDocument,
+        auth_headers: dict[str, str],
+    ) -> None:
+        """Test cancelling a flow run from another project returns 403."""
+        mock_state = MagicMock()
+        mock_state.type.value = "RUNNING"
+
+        mock_flow_run = MagicMock()
+        mock_flow_run.state = mock_state
+        mock_flow_run.parameters = {"project_id": "other_project"}
+
+        mock_client = MagicMock()
+        mock_client.read_flow_run = AsyncMock(return_value=mock_flow_run)
+
+        async_cm = MagicMock()
+        async_cm.__aenter__ = AsyncMock(return_value=mock_client)
+        async_cm.__aexit__ = AsyncMock(return_value=None)
+
+        with patch("qdash.api.services.execution_service.get_client", return_value=async_cm):
+            response = test_client.post(
+                f"/executions/{CANCEL_FLOW_RUN_ID}/cancel",
+                headers=auth_headers,
+            )
+
+        assert response.status_code == 403
+
+    def test_cancel_completed_execution_returns_409(
+        self,
+        test_client: TestClient,
+        test_project: ProjectDocument,
+        auth_headers: dict[str, str],
+    ) -> None:
+        """Test cancelling a completed execution returns 409."""
+        mock_state = MagicMock()
+        mock_state.type.value = "COMPLETED"
+
+        mock_flow_run = MagicMock()
+        mock_flow_run.state = mock_state
+        mock_flow_run.parameters = {"project_id": "test_project"}
+
+        mock_client = MagicMock()
+        mock_client.read_flow_run = AsyncMock(return_value=mock_flow_run)
+
+        async_cm = MagicMock()
+        async_cm.__aenter__ = AsyncMock(return_value=mock_client)
+        async_cm.__aexit__ = AsyncMock(return_value=None)
+
+        with patch("qdash.api.services.execution_service.get_client", return_value=async_cm):
+            response = test_client.post(
+                f"/executions/{CANCEL_FLOW_RUN_ID}/cancel",
+                headers=auth_headers,
+            )
+
+        assert response.status_code == 409
+        assert "cannot be cancelled" in response.json()["detail"]
+
+    def test_cancel_requires_authentication(
+        self,
+        test_client: TestClient,
+        test_project: ProjectDocument,
+    ) -> None:
+        """Test cancellation without auth returns 401."""
+        response = test_client.post(
+            f"/executions/{CANCEL_FLOW_RUN_ID}/cancel",
+        )
+        assert response.status_code == 401
+
+
 class TestReExecuteFromSnapshot:
     """Tests for POST /executions/{execution_id}/re-execute endpoint."""
 

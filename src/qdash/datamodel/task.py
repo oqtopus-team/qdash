@@ -16,6 +16,7 @@ COMPLETED = "completed"
 FAILED = "failed"
 PENDING = "pending"
 SKIPPED = "skipped"
+CANCELLED = "cancelled"
 
 # Task type definitions
 TaskType = Literal["qubit", "coupling", "global", "system", "mux"]
@@ -167,6 +168,7 @@ class TaskStatusModel(str, Enum):
     FAILED = FAILED
     PENDING = PENDING
     SKIPPED = SKIPPED
+    CANCELLED = CANCELLED
 
 
 class CalibDataModel(BaseModel):

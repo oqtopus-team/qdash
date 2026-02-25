@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo } from "react";
 
-import { ExternalLink, ArrowUpRight } from "lucide-react";
+import { ExternalLink, ArrowUpRight, StopCircle } from "lucide-react";
 import Link from "next/link";
 
 import { formatDateTime } from "@/lib/utils/datetime";
@@ -15,6 +15,7 @@ import { useListChips } from "@/client/chip/chip";
 import {
   useListExecutions,
   useGetExecution,
+  useCancelExecution,
 } from "@/client/execution/execution";
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { ChipSelector } from "@/components/selectors/ChipSelector";
@@ -131,6 +132,8 @@ export function ExecutionPageContent() {
     },
   );
 
+  const cancelMutation = useCancelExecution();
+
   // Fetch task list for the selected execution_id
   const {
     data: executionDetailData,
@@ -210,6 +213,8 @@ export function ExecutionPageContent() {
         return "border-l-4 border-warning";
       case "failed":
         return "border-l-4 border-error";
+      case "cancelled":
+        return "border-l-4 border-neutral";
       default:
         return "border-l-4 border-base-300";
     }
@@ -285,7 +290,9 @@ export function ExecutionPageContent() {
                           ? "text-success"
                           : execution.status === "scheduled"
                             ? "text-warning"
-                            : "text-error"
+                            : execution.status === "cancelled"
+                              ? "text-neutral"
+                              : "text-error"
                     }`}
                   >
                     {execution.status === "running"
@@ -294,7 +301,9 @@ export function ExecutionPageContent() {
                         ? "Completed"
                         : execution.status === "scheduled"
                           ? "Scheduled"
-                          : "Failed"}
+                          : execution.status === "cancelled"
+                            ? "Cancelled"
+                            : "Failed"}
                   </span>
                 </div>
                 <div className="flex flex-wrap items-center gap-x-2 sm:gap-x-3 gap-y-0.5 mt-0.5 sm:mt-1 text-xs sm:text-sm text-base-content/60">
@@ -344,7 +353,7 @@ export function ExecutionPageContent() {
                   )?.name
                 }
               </h2>
-              <div className="mt-3 sm:mt-4">
+              <div className="mt-3 sm:mt-4 flex flex-wrap gap-2">
                 <a
                   href={`/execution/${selectedChip || ""}/${selectedExecutionId}`}
                   className="btn btn-primary btn-sm sm:btn-md"
@@ -352,6 +361,36 @@ export function ExecutionPageContent() {
                   <ExternalLink className="w-3 h-3 sm:w-4 sm:h-4" />
                   View Details
                 </a>
+                {(() => {
+                  const selectedExec = cardData.find(
+                    (exec) => getExecutionKey(exec) === selectedExecutionId,
+                  );
+                  const detailFlowRunId = executionDetailData?.data?.note
+                    ?.flow_run_id as string | undefined;
+                  const isCancellable =
+                    !!detailFlowRunId &&
+                    (selectedExec?.status === "running" ||
+                      selectedExec?.status === "scheduled" ||
+                      selectedExec?.status === "pending");
+                  return (
+                    isCancellable && (
+                      <button
+                        onClick={() => {
+                          if (detailFlowRunId) {
+                            cancelMutation.mutate({
+                              flowRunId: detailFlowRunId,
+                            });
+                          }
+                        }}
+                        disabled={cancelMutation.isPending}
+                        className="btn btn-error btn-sm sm:btn-md"
+                      >
+                        <StopCircle className="w-3 h-3 sm:w-4 sm:h-4" />
+                        {cancelMutation.isPending ? "Cancelling..." : "Cancel"}
+                      </button>
+                    )
+                  );
+                })()}
               </div>
             </div>
             <div>
@@ -400,7 +439,9 @@ export function ExecutionPageContent() {
                                 ? "text-success"
                                 : detailTask.status === "scheduled"
                                   ? "text-warning"
-                                  : "text-error"
+                                  : detailTask.status === "cancelled"
+                                    ? "text-neutral"
+                                    : "text-error"
                           }`}
                         >
                           {detailTask.status === "running"
@@ -409,7 +450,9 @@ export function ExecutionPageContent() {
                               ? "Completed"
                               : detailTask.status === "scheduled"
                                 ? "Scheduled"
-                                : "Failed"}
+                                : detailTask.status === "cancelled"
+                                  ? "Cancelled"
+                                  : "Failed"}
                         </span>
                       </div>
                       <div className="text-xs sm:text-sm text-base-content/60 mt-1">

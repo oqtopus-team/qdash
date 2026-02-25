@@ -20,6 +20,7 @@ from qdash.api.lib.project import (  # noqa: TCH002
 )
 from qdash.api.schemas.error import Detail
 from qdash.api.schemas.execution import (
+    CancelExecutionResponse,
     ExecutionLockStatusResponse,
     ExecutionResponseDetail,
     ListExecutionsResponse,
@@ -191,6 +192,45 @@ def get_execution(
     if execution is None:
         raise HTTPException(status_code=404, detail=f"Execution {execution_id} not found")
     return execution
+
+
+@router.post(
+    "/executions/{flow_run_id}/cancel",
+    response_model=CancelExecutionResponse,
+    summary="Cancel a running or scheduled execution",
+    operation_id="cancelExecution",
+)
+async def cancel_execution(
+    flow_run_id: str,
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    execution_service: Annotated[ExecutionService, Depends(get_execution_service)],
+) -> CancelExecutionResponse:
+    """Cancel a running or scheduled execution via Prefect.
+
+    Sends a cancellation request to Prefect for the specified flow run.
+    The flow_run_id is the Prefect flow run UUID, which can be obtained from
+    the execution detail's note.flow_run_id field.
+    Only executions in SCHEDULED, PENDING, RUNNING, or PAUSED state can be cancelled.
+
+    Parameters
+    ----------
+    flow_run_id : str
+        Prefect flow run UUID
+    ctx : ProjectContext
+        Project context with user and project information
+    execution_service : ExecutionService
+        Service for execution operations
+
+    Returns
+    -------
+    CancelExecutionResponse
+        Cancellation result with status
+
+    """
+    return await execution_service.cancel_execution(
+        flow_run_id=flow_run_id,
+        project_id=ctx.project_id,
+    )
 
 
 @router.post(

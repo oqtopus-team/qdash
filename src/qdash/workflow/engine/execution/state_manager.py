@@ -105,6 +105,23 @@ class ExecutionStateManager(BaseModel):
         self.system_info.update_time()
         return self
 
+    def cancel(self) -> "ExecutionStateManager":
+        """Set execution to cancelled state.
+
+        Returns
+        -------
+        ExecutionStateManager
+            Self for method chaining
+
+        """
+        end_at = now()
+        self.end_at = end_at
+        if self.start_at is not None:
+            self.elapsed_time = calculate_elapsed_time(self.start_at, end_at)
+        self.status = ExecutionStatusModel.CANCELLED
+        self.system_info.update_time()
+        return self
+
     def update_status(self, new_status: ExecutionStatusModel) -> "ExecutionStateManager":
         """Update execution status.
 

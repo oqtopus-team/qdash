@@ -182,6 +182,11 @@ class ExecutionService:
         self.state_manager.fail()
         return self.save()
 
+    def cancel(self) -> "ExecutionService":
+        """Cancel the execution and persist."""
+        self.state_manager.cancel()
+        return self.save()
+
     def reload(self) -> "ExecutionService":
         """Reload state from repository, preserving in-memory calib_data."""
         # Preserve in-memory calib_data before reload
