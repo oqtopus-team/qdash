@@ -83,6 +83,8 @@ services:
       - ./src/qdash/common:/app/qdash/common
       - ./src/qdash/repository:/app/qdash/repository
       - ./src/qdash/config.py:/app/qdash/config.py
+      - ./config:/app/config
+      - ./logs/deployment:/app/logs
     working_dir: /app/qdash/workflow
     command: uvicorn deployment_service:app --host 0.0.0.0 --port 8001
     ports:
@@ -112,13 +114,13 @@ services:
       - ./src/qdash/config.py:/app/qdash/config.py
       - ${CALIB_DATA_PATH:-./calib_data}:/app/calib_data
       - ${CONFIG_PATH:-./config/qubex-config}:/app/config/qubex-config
+      - ./config:/app/config
+      - ./logs/worker:/app/logs
     working_dir: /app/qdash/workflow
-    command: >
-      sh -c "python setup_work_pool.py &&
-             python register_system_flows.py &&
-             prefect worker start --pool user-flows-pool"
+    command: python start_worker.py
     environment:
       - PREFECT_API_URL=http://prefect-server:4200/api
+      - PREFECT_LOGGING_SETTINGS_PATH=/app/config/logging/prefect.yaml
       - PYTHONPATH=/app:/app/qdash/workflow:/app/qdash/dbmodel:/app/qdash
       - DEFAULT_BACKEND=${DEFAULT_BACKEND:-qubex}
     networks:
