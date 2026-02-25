@@ -103,7 +103,7 @@ function QubitDetailPageContent() {
 
         {/* Header Section */}
         <div className="flex flex-col gap-6">
-          <div className="flex justify-between items-center">
+          <div className="flex flex-col sm:flex-row sm:justify-between items-start gap-4">
             <h1 className="text-2xl font-bold">
               Qubit {qubitId} Analysis - {chipData?.data?.chip_id || chipId}
             </h1>
