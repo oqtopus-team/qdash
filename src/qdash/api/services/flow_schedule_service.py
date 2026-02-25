@@ -16,6 +16,7 @@ from fastapi import HTTPException
 from prefect.client.orchestration import get_client
 from prefect.client.schemas.filters import (
     DeploymentFilter,
+    DeploymentFilterId,
     FlowRunFilter,
     FlowRunFilterState,
     FlowRunFilterStateType,
@@ -40,7 +41,7 @@ DEPLOYMENT_SERVICE_URL = os.getenv("DEPLOYMENT_SERVICE_URL", "http://deployment-
 DEFAULT_TIMEOUT = httpx.Timeout(connect=5.0, read=30.0, write=10.0, pool=5.0)
 
 
-def _get_cron_from_schedules(schedules: list) -> tuple[str | None, bool]:
+def _get_cron_from_schedules(schedules: list[Any]) -> tuple[str | None, bool]:
     """Extract cron expression and active status from deployment schedules.
 
     In Prefect 3, schedules is a list of DeploymentSchedule objects.
@@ -211,7 +212,7 @@ class FlowScheduleService:
                     state_filter = FlowRunFilterStateType(any_=[StateType.SCHEDULED])
                     flow_runs = await client.read_flow_runs(
                         deployment_filter=DeploymentFilter(
-                            id={"any_": [uuid.UUID(flow.deployment_id)]}
+                            id=DeploymentFilterId(any_=[uuid.UUID(flow.deployment_id)])
                         ),
                         flow_run_filter=FlowRunFilter(state=FlowRunFilterState(type=state_filter)),
                         limit=limit,
@@ -312,7 +313,7 @@ class FlowScheduleService:
                 state_filter = FlowRunFilterStateType(any_=[StateType.SCHEDULED])
                 flow_runs = await client.read_flow_runs(
                     deployment_filter=DeploymentFilter(
-                        id={"any_": [uuid.UUID(flow.deployment_id)]}
+                        id=DeploymentFilterId(any_=[uuid.UUID(flow.deployment_id)])
                     ),
                     flow_run_filter=FlowRunFilter(state=FlowRunFilterState(type=state_filter)),
                     limit=limit,

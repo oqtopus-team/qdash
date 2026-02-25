@@ -44,6 +44,11 @@ services:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - ${POSTGRES_DATA_PATH:-./postgres_data}:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
     networks:
       - custom_net
   prefect-migrate:
@@ -54,7 +59,8 @@ services:
     environment:
       - PREFECT_API_DATABASE_CONNECTION_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     networks:
       - custom_net
   prefect-server:
@@ -70,8 +76,10 @@ services:
       - PREFECT_API_DATABASE_CONNECTION_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       - PREFECT_API_DATABASE_MIGRATE_ON_START=false
     depends_on:
-      - postgres
-      - prefect-migrate
+      postgres:
+        condition: service_healthy
+      prefect-migrate:
+        condition: service_completed_successfully
     networks:
       - custom_net
   deployment-service:

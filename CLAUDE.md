@@ -18,7 +18,7 @@ See [docs/getting-started/architecture.md](docs/getting-started/architecture.md)
 | --------------- | ---------------------- | ----------------------------------------------- |
 | Frontend (UI)   | `/ui/`                 | Next.js 14, TypeScript, DaisyUI, TanStack Query |
 | Backend (API)   | `/src/qdash/api/`      | FastAPI, Python 3.10-3.12, MongoDB, PostgreSQL  |
-| Workflow Engine | `/src/qdash/workflow/` | Prefect 2.20, qubex                             |
+| Workflow Engine | `/src/qdash/workflow/` | Prefect 3, qubex                                |
 
 ## Directory Structure
 

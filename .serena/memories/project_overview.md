@@ -27,7 +27,7 @@ QDash is a comprehensive web platform for managing and monitoring qubit calibrat
 ### Workflow Engine
 
 - **Location**: `/src/qdash/workflow/`
-- **Technology**: Prefect 2.20
+- **Technology**: Prefect 3
 - **Purpose**: Manages qubit calibration workflows
 - **Integration**: Uses qubex library (v1.4.1b1) for quantum experiments
 

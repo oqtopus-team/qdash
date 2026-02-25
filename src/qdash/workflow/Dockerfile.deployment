@@ -29,7 +29,7 @@ RUN uv pip install --system --no-cache-dir -r requirements.txt
 # Upgrade pydantic to be compatible with Prefect 3
 RUN uv pip install --upgrade --system --no-cache-dir \
     pydantic==2.10.6 \
-    pydantic-settings==2.3.4
+    pydantic-settings
 
 # Install FastAPI and uvicorn
 RUN uv pip install --system --no-cache-dir \

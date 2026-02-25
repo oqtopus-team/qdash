@@ -370,7 +370,7 @@ class FlowService:
 
                 execution_id = str(flow_run.id)
                 flow_run_url = (
-                    f"http://localhost:{settings.prefect_port}/flow-runs/flow-run/{execution_id}"
+                    f"http://localhost:{settings.prefect_port}/runs/flow-run/{execution_id}"
                 )
                 qdash_ui_url = f"http://localhost:{settings.ui_port}/execution/{execution_id}"
 
@@ -466,7 +466,7 @@ class FlowService:
 
                 execution_id = str(flow_run.id)
                 flow_run_url = (
-                    f"http://localhost:{settings.prefect_port}/flow-runs/flow-run/{execution_id}"
+                    f"http://localhost:{settings.prefect_port}/runs/flow-run/{execution_id}"
                 )
                 qdash_ui_url = f"http://localhost:{settings.ui_port}/execution/{execution_id}"
 
@@ -564,8 +564,7 @@ class FlowService:
 
                 execution_id = str(flow_run.id)
                 flow_run_url = (
-                    f"http://localhost:{settings.prefect_port}"
-                    f"/flow-runs/flow-run/{execution_id}"
+                    f"http://localhost:{settings.prefect_port}" f"/runs/flow-run/{execution_id}"
                 )
                 qdash_ui_url = f"http://localhost:{settings.ui_port}/execution/{execution_id}"
 
