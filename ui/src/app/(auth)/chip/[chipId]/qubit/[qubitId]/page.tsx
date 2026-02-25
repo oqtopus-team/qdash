@@ -6,9 +6,8 @@ import React, { useEffect, Suspense } from "react";
 
 import { ArrowLeft, Clock, Eye, TrendingUp } from "lucide-react";
 
-import type { Task, TaskInfo } from "@/schemas";
+import type { TaskInfo } from "@/schemas";
 
-import { FluentEmoji } from "@/components/ui/FluentEmoji";
 import { QubitDetailPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
 
 import { useGetChip } from "@/client/chip/chip";
@@ -16,15 +15,13 @@ import {
   useListTaskInfo,
   useGetTaskFileSettings,
 } from "@/client/task-file/task-file";
-import { TaskFigure } from "@/components/charts/TaskFigure";
-import { QubitRadarChart } from "@/components/features/qubit/QubitRadarChart";
+import { QubitTaskCard } from "@/components/features/qubit/QubitTaskCard";
 import { QubitTimeSeriesView } from "@/components/features/qubit/QubitTimeSeriesView";
 import { TaskHistoryViewer } from "@/components/features/qubit/TaskHistoryViewer";
 import { ChipSelector } from "@/components/selectors/ChipSelector";
 import { DateSelector } from "@/components/selectors/DateSelector";
 import { TaskSelector } from "@/components/selectors/TaskSelector";
 import { useDateNavigation } from "@/hooks/useDateNavigation";
-import { useQubitTaskResults } from "@/hooks/useQubitTaskResults";
 import { useChipUrlState } from "@/hooks/useUrlState";
 
 function QubitDetailPageContent() {
@@ -45,11 +42,7 @@ function QubitDetailPageContent() {
     isInitialized,
   } = useChipUrlState();
 
-  const viewMode = qubitViewMode as
-    | "dashboard"
-    | "timeseries"
-    | "radar"
-    | "history";
+  const viewMode = qubitViewMode as "dashboard" | "timeseries" | "history";
   const setViewMode = setQubitViewMode;
 
   const { data: chipData, isLoading: isChipLoading } = useGetChip(chipId);
@@ -82,58 +75,10 @@ function QubitDetailPageContent() {
     (task: TaskInfo) => task.task_type === "qubit",
   );
 
-  // Get data for common qubit tasks for dashboard
-  const { data: rabiData } = useQubitTaskResults({
-    chipId,
-    task: "CheckRabi",
-    selectedDate,
-  });
-
-  const { data: ramseyData } = useQubitTaskResults({
-    chipId,
-    task: "CheckRamsey",
-    selectedDate,
-  });
-
-  const { data: t1Data } = useQubitTaskResults({
-    chipId,
-    task: "CheckT1",
-    selectedDate,
-  });
-
-  // Additional data for radar chart
-  const { data: t2EchoData } = useQubitTaskResults({
-    chipId,
-    task: "CheckT2Echo",
-    selectedDate,
-  });
-
-  const { data: gateFidelityData } = useQubitTaskResults({
-    chipId,
-    task: "RandomizedBenchmarking",
-    selectedDate,
-  });
-
-  const { data: readoutFidelityData } = useQubitTaskResults({
-    chipId,
-    task: "ReadoutClassification",
-    selectedDate,
-  });
-
-  // Collect all task data
-  const allTasksData: Record<string, Task | null> = {
-    CheckRabi: rabiData?.data?.result?.[qubitId] || null,
-    CheckRamsey: ramseyData?.data?.result?.[qubitId] || null,
-    CheckT1: t1Data?.data?.result?.[qubitId] || null,
-    CheckT2Echo: t2EchoData?.data?.result?.[qubitId] || null,
-    RandomizedBenchmarking: gateFidelityData?.data?.result?.[qubitId] || null,
-    ReadoutClassification: readoutFidelityData?.data?.result?.[qubitId] || null,
-  };
-
   // Set default task if none selected
   useEffect(() => {
     if (isInitialized && !selectedTask && filteredTasks.length > 0) {
-      setSelectedTask("CheckRabi");
+      setSelectedTask(filteredTasks[0].name);
     }
   }, [isInitialized, selectedTask, filteredTasks, setSelectedTask]);
 
@@ -189,27 +134,6 @@ function QubitDetailPageContent() {
               >
                 <TrendingUp size={18} />
                 <span className="ml-2">Time Series</span>
-              </button>
-              <button
-                className={`join-item btn btn-sm ${
-                  viewMode === "radar" ? "btn-active" : ""
-                }`}
-                onClick={() => setViewMode("radar")}
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="text-lg w-4 h-4"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5 12 2"></polygon>
-                  <circle cx="12" cy="12" r="2"></circle>
-                </svg>
-                <span className="ml-2">Radar</span>
               </button>
             </div>
           </div>
@@ -275,137 +199,35 @@ function QubitDetailPageContent() {
                 <div className="stat">
                   <div className="stat-title">Experiments</div>
                   <div className="stat-value text-sm">
-                    {Object.values(allTasksData).filter(Boolean).length} /{" "}
-                    {Object.keys(allTasksData).length}
+                    {filteredTasks.length}
                   </div>
                 </div>
               </div>
 
               {/* Experiments Grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                {Object.entries(allTasksData).map(([taskName, taskData]) => (
-                  <div
-                    key={taskName}
-                    className="card bg-base-100 shadow-xl hover:shadow-2xl transition-shadow"
-                  >
-                    <div className="card-body p-4">
-                      <h3 className="card-title text-lg flex items-center justify-between">
-                        {taskName.replace("Check", "")}
-                        <div
-                          className={`badge ${
-                            taskData?.status === "completed"
-                              ? "badge-success"
-                              : taskData?.status === "failed"
-                                ? "badge-error"
-                                : "badge-ghost"
-                          }`}
-                        >
-                          {taskData?.status || "No Data"}
-                        </div>
-                      </h3>
-
-                      {taskData ? (
-                        <div className="space-y-3">
-                          {taskData.figure_path && (
-                            <div className="relative h-32 bg-base-200 rounded-lg overflow-hidden">
-                              <TaskFigure
-                                path={
-                                  Array.isArray(taskData.figure_path)
-                                    ? taskData.figure_path[0]
-                                    : taskData.figure_path
-                                }
-                                qid={qubitId}
-                                className="w-full h-full object-contain"
-                              />
-                            </div>
-                          )}
-
-                          {taskData.output_parameters && (
-                            <div className="bg-base-200 p-2 rounded">
-                              {Object.entries(taskData.output_parameters)
-                                .slice(0, 3)
-                                .map(([key, value]) => {
-                                  const paramValue = (
-                                    typeof value === "object" &&
-                                    value !== null &&
-                                    "value" in value
-                                      ? value
-                                      : { value }
-                                  ) as {
-                                    value: number | string;
-                                    unit?: string;
-                                  };
-                                  return (
-                                    <div
-                                      key={key}
-                                      className="text-xs flex justify-between"
-                                    >
-                                      <span className="font-medium">
-                                        {key}:
-                                      </span>
-                                      <span>
-                                        {typeof paramValue.value === "number"
-                                          ? paramValue.value.toFixed(4)
-                                          : String(paramValue.value)}
-                                        {paramValue.unit
-                                          ? ` ${paramValue.unit}`
-                                          : ""}
-                                      </span>
-                                    </div>
-                                  );
-                                })}
-                              {Object.keys(taskData.output_parameters).length >
-                                3 && (
-                                <div className="text-xs text-center text-base-content/60 mt-1">
-                                  +
-                                  {Object.keys(taskData.output_parameters)
-                                    .length - 3}{" "}
-                                  more...
-                                </div>
-                              )}
-                            </div>
-                          )}
-
-                          <div className="card-actions justify-end">
-                            <button
-                              className="btn btn-sm btn-primary"
-                              onClick={() => {
-                                setSelectedTask(taskName);
-                                setViewMode("history");
-                              }}
-                            >
-                              View Details
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="text-center text-base-content/60 py-8">
-                          <FluentEmoji
-                            name="prohibited"
-                            size={48}
-                            className="mb-2"
-                          />
-                          <div className="text-sm">No data available</div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                {filteredTasks.map((task: TaskInfo) => (
+                  <QubitTaskCard
+                    key={task.name}
+                    task={task}
+                    chipId={chipId}
+                    qubitId={qubitId}
+                    selectedDate={selectedDate}
+                    onViewDetails={(taskName) => {
+                      setSelectedTask(taskName);
+                      setViewMode("history");
+                    }}
+                  />
                 ))}
               </div>
             </div>
           ) : viewMode === "timeseries" ? (
             <QubitTimeSeriesView chipId={chipId} qubitId={qubitId} />
-          ) : viewMode === "radar" ? (
-            <QubitRadarChart
-              qubitId={qubitId}
-              taskData={allTasksData}
-              isLoading={false}
-            />
           ) : (
             <TaskHistoryViewer
               chipId={chipId}
               qubitId={qubitId}
-              taskName={selectedTask || "CheckRabi"}
+              taskName={selectedTask || filteredTasks[0]?.name || ""}
             />
           )}
         </div>
