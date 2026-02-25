@@ -13,6 +13,10 @@ from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
 logger = logging.getLogger(__name__)
 
 
+DEFAULT_SNAPSHOT_LIMIT = 10_000
+"""Maximum number of task result documents to load from a single execution."""
+
+
 class SnapshotParameterLoader:
     """Loads parameters from a previous execution's task results.
 
@@ -29,6 +33,9 @@ class SnapshotParameterLoader:
     parameter_overrides : dict[str, dict[str, Any]] | None
         Optional user overrides. Shape: ``{"run": {...}, "input": {...}}``.
         Values are merged on top of snapshot parameters.
+    limit : int
+        Maximum number of task result documents to load. Defaults to
+        ``DEFAULT_SNAPSHOT_LIMIT`` (10 000).
 
     """
 
@@ -37,10 +44,12 @@ class SnapshotParameterLoader:
         source_execution_id: str,
         project_id: str,
         parameter_overrides: dict[str, dict[str, Any]] | None = None,
+        limit: int = DEFAULT_SNAPSHOT_LIMIT,
     ) -> None:
         self._source_execution_id = source_execution_id
         self._project_id = project_id
         self._parameter_overrides = parameter_overrides
+        self._limit = limit
         self._cache: dict[tuple[str, str], tuple[dict[str, Any], dict[str, Any]]] | None = None
 
     def _load(self) -> None:
@@ -58,7 +67,7 @@ class SnapshotParameterLoader:
                     }
                 )
                 .sort([("start_at", SortDirection.ASCENDING)])
-                .limit(10000)
+                .limit(self._limit)
                 .run()
             )
 
