@@ -74,7 +74,7 @@ class MockBackend:
 class MockCalibOrchestrator:
     """Mock CalibOrchestrator for testing."""
 
-    def __init__(self, config, github_integration=None):
+    def __init__(self, config, github_integration=None, snapshot_loader=None):
         self.config = config
         self._initialized = False
         self._execution_service = MockExecutionService(tags=config.tags or [])

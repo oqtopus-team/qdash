@@ -99,16 +99,21 @@ class ExecutionResponseDetail(BaseModel):
         elapsed_time (timedelta | None): The total elapsed time of the execution.
         task (list[Task]): List of tasks in the execution.
         note (dict): Notes for the execution.
+        tags (list[str]): Tags associated with the execution.
+        chip_id (str): The chip ID for the execution.
 
     """
 
     name: str
     status: str
+    flow_name: str = ""
     start_at: datetime | None = None
     end_at: datetime | None = None
     elapsed_time: timedelta | None = None
     task: list[Task]
     note: dict[str, Any]
+    tags: list[str] = []
+    chip_id: str = ""
 
     @field_validator("elapsed_time", mode="before")
     @classmethod
@@ -121,6 +126,13 @@ class ExecutionResponseDetail(BaseModel):
     def _serialize_elapsed_time(cls, v: timedelta | None) -> str | None:
         """Serialize elapsed_time to H:MM:SS format."""
         return format_elapsed_time(v) if v else None
+
+
+class ReExecuteRequest(BaseModel):
+    """Request model for re-executing an execution from snapshot parameters."""
+
+    flow_name: str
+    parameter_overrides: dict[str, Any] = {}
 
 
 class ListExecutionsResponse(BaseModel):

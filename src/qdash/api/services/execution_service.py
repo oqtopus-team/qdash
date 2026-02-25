@@ -120,12 +120,45 @@ class ExecutionService:
         return ExecutionResponseDetail(
             name=f"{execution.name}-{execution.execution_id}",
             status=execution.status,
+            flow_name=execution.name,
             start_at=execution.start_at,
             end_at=execution.end_at,
             elapsed_time=execution.elapsed_time,
             task=tasks,
             note=execution.note,
+            tags=execution.tags,
+            chip_id=execution.chip_id,
         )
+
+    def get_execution_metadata(
+        self,
+        project_id: str,
+        execution_id: str,
+    ) -> dict[str, Any] | None:
+        """Get raw execution metadata fields for re-execution.
+
+        Parameters
+        ----------
+        project_id : str
+            The project identifier
+        execution_id : str
+            The execution identifier
+
+        Returns
+        -------
+        dict[str, Any] | None
+            Dictionary with chip_id, name, tags, username, or None if not found
+
+        """
+        execution = self._history_repo.find_by_id(project_id, execution_id)
+        if execution is None:
+            return None
+        return {
+            "chip_id": execution.chip_id,
+            "name": execution.name,
+            "tags": execution.tags,
+            "username": execution.username,
+        }
 
     def get_lock_status(self, project_id: str) -> ExecutionLockStatusResponse:
         """Get the execution lock status.

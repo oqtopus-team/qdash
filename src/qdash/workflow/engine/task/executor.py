@@ -23,6 +23,7 @@ from qdash.workflow.engine.task.result_processor import (
     R2ValidationError,
     TaskResultProcessor,
 )
+from qdash.workflow.engine.task.snapshot_loader import SnapshotParameterLoader
 from qdash.workflow.engine.task.state_manager import TaskStateManager
 from qdash.workflow.engine.task.types import (
     BackendProtocol,
@@ -78,6 +79,8 @@ class TaskExecutor:
         result_processor: TaskResultProcessor | None = None,
         history_recorder: TaskHistoryRecorder | None = None,
         data_saver: FilesystemCalibDataSaver | None = None,
+        snapshot_loader: SnapshotParameterLoader | None = None,
+        source_task_id: str | None = None,
     ) -> None:
         self.state_manager = state_manager
         self.execution_id = execution_id
@@ -87,6 +90,8 @@ class TaskExecutor:
         self.result_processor = result_processor or TaskResultProcessor()
         self.history_recorder = history_recorder or TaskHistoryRecorder()
         self.data_saver = data_saver or FilesystemCalibDataSaver(calib_dir)
+        self._snapshot_loader = snapshot_loader
+        self._source_task_id = source_task_id
         self._backend_saver = BackendSaver(
             state_manager=state_manager,
             username=username,
@@ -239,6 +244,11 @@ class TaskExecutor:
             # 1. Start task
             self.state_manager.start_task(task_name, task_type, qid)
 
+            # 1.5 Apply snapshot overrides early so initial history record
+            #     contains the correct (overridden) parameter values.
+            if self._snapshot_loader is not None:
+                self._apply_snapshot_overrides(task, task_name, task_type, qid)
+
             # Record run_parameters (experiment configuration used)
             run_params = {k: v.model_dump() for k, v in task.run_parameters.items()}
             if run_params:
@@ -250,6 +260,14 @@ class TaskExecutor:
                 self.history_recorder.record_task_result(
                     executed_task, execution_service.to_datamodel()
                 )
+                # Set source_task_id immediately so parent's re_executions
+                # list includes this task while it is still running.
+                if self._source_task_id:
+                    self.history_recorder.set_source_task_id(
+                        project_id=execution_service.project_id,
+                        task_id=executed_task.task_id,
+                        source_task_id=self._source_task_id,
+                    )
                 execution_service = self._update_execution(execution_service)
 
             # 2. Preprocess
@@ -260,6 +278,11 @@ class TaskExecutor:
                 )
                 if execution_service is not None:
                     execution_service = self._update_execution(execution_service)
+
+            # 2.5 Re-apply snapshot overrides (preprocess may have
+            #     overwritten input_parameters with values from chip state).
+            if self._snapshot_loader is not None:
+                self._apply_snapshot_overrides(task, task_name, task_type, qid)
 
             # 3. Run
             run_result = self._run_task(task, backend, qid)
@@ -386,6 +409,80 @@ class TaskExecutor:
         result.calib_data_delta = self.state_manager.calib_data
 
         return execution_service, result
+
+    @staticmethod
+    def _reconstruct_param(
+        model_cls: type,
+        key: str,
+        value: Any,
+    ) -> Any | None:
+        """Reconstruct a single parameter model from snapshot data.
+
+        Returns the model instance, or None if the data is invalid.
+        """
+        try:
+            if isinstance(value, dict):
+                return model_cls(**value)
+            return model_cls(value=value)
+        except (TypeError, ValueError) as e:
+            logger.error("Invalid snapshot parameter %s=%r: %s", key, value, e)
+            return None
+
+    def _apply_snapshot_overrides(
+        self,
+        task: TaskProtocol,
+        task_name: str,
+        task_type: str,
+        qid: str,
+    ) -> None:
+        """Apply snapshot parameter overrides from a previous execution.
+
+        Replaces the task's input_parameters and run_parameters with values
+        from the snapshot, and updates state_manager accordingly.
+        """
+        from qdash.datamodel.task import ParameterModel, RunParameterModel
+
+        assert self._snapshot_loader is not None
+        snapshot = self._snapshot_loader.get_snapshot(task_name, qid)
+        if snapshot is None:
+            logger.warning(
+                "No snapshot found for task=%s, qid=%s - continuing with default parameters",
+                task_name,
+                qid,
+            )
+            return
+
+        snap_input, snap_run = snapshot
+        logger.info(
+            "Applying snapshot overrides for task=%s, qid=%s " "(input_params=%d, run_params=%d)",
+            task_name,
+            qid,
+            len(snap_input),
+            len(snap_run),
+        )
+
+        # Override input_parameters on the task instance
+        if snap_input:
+            reconstructed_input = {
+                k: m
+                for k, v in snap_input.items()
+                if (m := self._reconstruct_param(ParameterModel, k, v)) is not None
+            }
+            task.input_parameters = reconstructed_input  # type: ignore[attr-defined]
+            # Re-record in state_manager
+            self.state_manager.put_input_parameters(task_name, reconstructed_input, task_type, qid)
+
+        # Override run_parameters on the task instance
+        if snap_run:
+            reconstructed_run = {
+                k: m
+                for k, v in snap_run.items()
+                if (m := self._reconstruct_param(RunParameterModel, k, v)) is not None
+            }
+            task.run_parameters = reconstructed_run
+            # Re-record in state_manager
+            run_params_dict = {k: v.model_dump() for k, v in reconstructed_run.items()}
+            self.state_manager.put_run_parameters(task_name, run_params_dict, task_type, qid)
 
     def _update_execution(self, execution_service: "ExecutionService") -> "ExecutionService":
         """Update execution service with current calibration data."""

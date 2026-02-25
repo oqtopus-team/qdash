@@ -23,13 +23,18 @@ Attributes
     elapsed_time (timedelta | None): The total elapsed time of the execution.
     task (list[Task]): List of tasks in the execution.
     note (dict): Notes for the execution.
+    tags (list[str]): Tags associated with the execution.
+    chip_id (str): The chip ID for the execution.
  */
 export interface ExecutionResponseDetail {
   name: string;
   status: string;
+  flow_name?: string;
   start_at?: ExecutionResponseDetailStartAt;
   end_at?: ExecutionResponseDetailEndAt;
   elapsed_time?: ExecutionResponseDetailElapsedTime;
   task: Task[];
   note: ExecutionResponseDetailNote;
+  tags?: string[];
+  chip_id?: string;
 }

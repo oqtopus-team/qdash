@@ -5,27 +5,32 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import type {
   DataTag,
   DefinedInitialDataOptions,
   DefinedUseQueryResult,
+  MutationFunction,
   QueryClient,
   QueryFunction,
   QueryKey,
   UndefinedInitialDataOptions,
+  UseMutationOptions,
+  UseMutationResult,
   UseQueryOptions,
   UseQueryResult,
 } from "@tanstack/react-query";
 
 import type {
   Detail,
+  ExecuteFlowResponse,
   ExecutionLockStatusResponse,
   ExecutionResponseDetail,
   GetFigureByPathParams,
   HTTPValidationError,
   ListExecutionsParams,
   ListExecutionsResponse,
+  ReExecuteRequest,
 } from "../../schemas";
 
 import { customInstance } from "../../lib/custom-instance";
@@ -683,3 +688,115 @@ export function useGetExecution<
 
   return query;
 }
+
+/**
+ * Re-execute a flow using snapshot parameters from a previous execution.
+
+Parameters
+----------
+execution_id : str
+    ID of the source execution to snapshot parameters from
+request : ReExecuteRequest
+    Re-execution request with flow_name and optional parameter_overrides
+ctx : ProjectContext
+    Project context with user and project information
+execution_service : ExecutionService
+    Service for execution operations
+flow_service : FlowService
+    Service for flow operations
+
+Returns
+-------
+ExecuteFlowResponse
+    Execution result with IDs and URLs
+ * @summary Re-execute a flow from snapshot parameters
+ */
+export const reExecuteFromSnapshot = (
+  executionId: string,
+  reExecuteRequest: ReExecuteRequest,
+  options?: SecondParameter<typeof customInstance>,
+  signal?: AbortSignal,
+) => {
+  return customInstance<ExecuteFlowResponse>(
+    {
+      url: `/executions/${executionId}/re-execute`,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      data: reExecuteRequest,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getReExecuteFromSnapshotMutationOptions = <
+  TError = HTTPValidationError,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof reExecuteFromSnapshot>>,
+    TError,
+    { executionId: string; data: ReExecuteRequest },
+    TContext
+  >;
+  request?: SecondParameter<typeof customInstance>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof reExecuteFromSnapshot>>,
+  TError,
+  { executionId: string; data: ReExecuteRequest },
+  TContext
+> => {
+  const mutationKey = ["reExecuteFromSnapshot"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof reExecuteFromSnapshot>>,
+    { executionId: string; data: ReExecuteRequest }
+  > = (props) => {
+    const { executionId, data } = props ?? {};
+
+    return reExecuteFromSnapshot(executionId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ReExecuteFromSnapshotMutationResult = NonNullable<
+  Awaited<ReturnType<typeof reExecuteFromSnapshot>>
+>;
+export type ReExecuteFromSnapshotMutationBody = ReExecuteRequest;
+export type ReExecuteFromSnapshotMutationError = HTTPValidationError;
+
+/**
+ * @summary Re-execute a flow from snapshot parameters
+ */
+export const useReExecuteFromSnapshot = <
+  TError = HTTPValidationError,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof reExecuteFromSnapshot>>,
+      TError,
+      { executionId: string; data: ReExecuteRequest },
+      TContext
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof reExecuteFromSnapshot>>,
+  TError,
+  { executionId: string; data: ReExecuteRequest },
+  TContext
+> => {
+  const mutationOptions = getReExecuteFromSnapshotMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};

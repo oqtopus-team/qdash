@@ -24,6 +24,7 @@ from qdash.repository import FilesystemCalibDataSaver
 from qdash.workflow.engine.task.executor import TaskExecutor
 from qdash.workflow.engine.task.history_recorder import TaskHistoryRecorder
 from qdash.workflow.engine.task.result_processor import TaskResultProcessor
+from qdash.workflow.engine.task.snapshot_loader import SnapshotParameterLoader
 from qdash.workflow.engine.task.state_manager import TaskStateManager
 
 logger = logging.getLogger(__name__)
@@ -90,6 +91,8 @@ class TaskContext:
         result_processor: TaskResultProcessor | None = None,
         history_recorder: TaskHistoryRecorder | None = None,
         context_id: str | None = None,
+        snapshot_loader: SnapshotParameterLoader | None = None,
+        source_task_id: str | None = None,
     ) -> None:
         self.id = context_id or str(uuid.uuid4())
         self.username = username
@@ -113,6 +116,8 @@ class TaskContext:
             result_processor=result_processor or TaskResultProcessor(),
             history_recorder=history_recorder or TaskHistoryRecorder(),
             data_saver=self.data_saver,
+            snapshot_loader=snapshot_loader,
+            source_task_id=source_task_id,
         )
 
         # Initialize containers for coupling qids (only if state_manager was not injected)

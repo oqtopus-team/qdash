@@ -10,11 +10,13 @@ from qdash.api.schemas.task import (
     ExpectedResultResponse,
     InputParameterModel,
     ListTaskResponse,
+    ReExecutionEntry,
     TaskKnowledgeResponse,
     TaskResponse,
     TaskResultResponse,
 )
 from qdash.datamodel.task_knowledge import get_task_knowledge as _lookup_knowledge
+from qdash.dbmodel.execution_history import ExecutionHistoryDocument
 from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
 
 if TYPE_CHECKING:
@@ -100,17 +102,44 @@ class TaskService:
                 status_code=404, detail=f"Task result with task_id {task_id} not found"
             )
 
+        # Look up execution to get flow_name
+        flow_name = ""
+        exec_doc = ExecutionHistoryDocument.find_one(
+            {"project_id": project_id, "execution_id": task_result.execution_id}
+        ).run()
+        if exec_doc:
+            flow_name = exec_doc.name
+
+        # Cross-reference: find child task results re-executed from this one
+        children = TaskResultHistoryDocument.find(
+            {"project_id": project_id, "source_task_id": task_id}
+        ).run()
+        re_executions = [
+            ReExecutionEntry(
+                task_id=child.task_id,
+                task_name=child.name,
+                qid=child.qid,
+                status=child.status,
+                start_at=child.start_at,
+            )
+            for child in children
+        ]
+
         return TaskResultResponse(
             task_id=task_result.task_id,
             task_name=task_result.name,
             qid=task_result.qid,
             status=task_result.status,
             execution_id=task_result.execution_id,
+            flow_name=flow_name,
             figure_path=task_result.figure_path,
             json_figure_path=task_result.json_figure_path,
             input_parameters=task_result.input_parameters,
             output_parameters=task_result.output_parameters,
             run_parameters=task_result.run_parameters,
+            tags=task_result.tags,
+            source_task_id=task_result.source_task_id,
+            re_executions=re_executions,
             start_at=task_result.start_at,
             end_at=task_result.end_at,
             elapsed_time=task_result.elapsed_time,

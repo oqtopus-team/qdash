@@ -3,20 +3,23 @@
 from __future__ import annotations
 
 import logging
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Body, Depends, Query
 from fastapi.responses import StreamingResponse
-from qdash.api.dependencies import get_task_result_service  # noqa: TCH002
+from qdash.api.dependencies import get_flow_service, get_task_result_service  # noqa: TCH002
 from qdash.api.lib.project import (  # noqa: TCH002
     ProjectContext,
     get_project_context,
+    get_project_context_owner,
 )
+from qdash.api.schemas.flow import ExecuteFlowResponse
 from qdash.api.schemas.task_result import (
     LatestTaskResultResponse,
     TaskHistoryResponse,
     TimeSeriesData,
 )
+from qdash.api.services.flow_service import FlowService  # noqa: TCH002
 from qdash.api.services.task_result_service import TaskResultService
 
 router = APIRouter()
@@ -391,6 +394,86 @@ def get_timeseries_task_results(
         qid,
     )
     return service.get_timeseries(chip_id, tag, parameter, ctx.project_id, qid, start_at, end_at)
+
+
+# =============================================================================
+# Single-Task Re-execution
+# =============================================================================
+
+
+@router.post(
+    "/task-results/{task_id}/re-execute",
+    response_model=ExecuteFlowResponse,
+    summary="Re-execute a single task from its task result",
+    operation_id="reExecuteTaskResult",
+)
+async def re_execute_task_result(
+    task_id: str,
+    ctx: Annotated[ProjectContext, Depends(get_project_context_owner)],
+    service: Annotated[TaskResultService, Depends(get_task_result_service)],
+    flow_service: Annotated[FlowService, Depends(get_flow_service)],
+    parameter_overrides: Annotated[
+        dict[str, dict[str, Any]] | None,
+        Body(
+            description="Optional parameter overrides: {run: {...}, input: {...}}",
+            embed=True,
+        ),
+    ] = None,
+) -> ExecuteFlowResponse:
+    """Re-execute a single task using the system single-task-executor deployment.
+
+    Looks up the TaskResultHistoryDocument to extract task_name, qid, chip_id,
+    execution_id, and tags, then delegates to FlowService to create a Prefect
+    flow run via the system deployment.
+
+    Parameters
+    ----------
+    task_id : str
+        The task result ID to re-execute
+    ctx : ProjectContext
+        Project context with user and project information
+    service : TaskResultService
+        Injected task result service
+    flow_service : FlowService
+        Injected flow service
+
+    Returns
+    -------
+    ExecuteFlowResponse
+        Execution result with IDs and URLs
+
+    """
+    from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
+    from starlette.exceptions import HTTPException
+
+    doc = TaskResultHistoryDocument.find_one(
+        {"project_id": ctx.project_id, "task_id": task_id}
+    ).run()
+
+    if doc is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Task result '{task_id}' not found",
+        )
+
+    # Verify the requesting user owns the source task result.
+    if doc.username != ctx.user.username:
+        raise HTTPException(
+            status_code=403,
+            detail="You can only re-execute your own task results",
+        )
+
+    return await flow_service.execute_single_task_from_snapshot(
+        task_name=doc.name,
+        qid=doc.qid,
+        chip_id=doc.chip_id,
+        source_execution_id=doc.execution_id,
+        username=ctx.user.username,
+        project_id=ctx.project_id,
+        tags=doc.tags,
+        source_task_id=task_id,
+        parameter_overrides=parameter_overrides,
+    )
 
 
 # =============================================================================

@@ -1677,6 +1677,80 @@
         }
       }
     },
+    "/executions/{execution_id}/re-execute": {
+      "post": {
+        "tags": [
+          "execution"
+        ],
+        "summary": "Re-execute a flow from snapshot parameters",
+        "description": "Re-execute a flow using snapshot parameters from a previous execution.\n\nParameters\n----------\nexecution_id : str\n    ID of the source execution to snapshot parameters from\nrequest : ReExecuteRequest\n    Re-execution request with flow_name and optional parameter_overrides\nctx : ProjectContext\n    Project context with user and project information\nexecution_service : ExecutionService\n    Service for execution operations\nflow_service : FlowService\n    Service for flow operations\n\nReturns\n-------\nExecuteFlowResponse\n    Execution result with IDs and URLs",
+        "operationId": "reExecuteFromSnapshot",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "execution_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Execution Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReExecuteRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExecuteFlowResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/files/raw-data": {
       "get": {
         "tags": [
@@ -4363,6 +4437,70 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/TimeSeriesData"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/task-results/{task_id}/re-execute": {
+      "post": {
+        "tags": [
+          "task-result"
+        ],
+        "summary": "Re-execute a single task from its task result",
+        "description": "Re-execute a single task using the system single-task-executor deployment.\n\nLooks up the TaskResultHistoryDocument to extract task_name, qid, chip_id,\nexecution_id, and tags, then delegates to FlowService to create a Prefect\nflow run via the system deployment.\n\nParameters\n----------\ntask_id : str\n    The task result ID to re-execute\nctx : ProjectContext\n    Project context with user and project information\nservice : TaskResultService\n    Injected task result service\nflow_service : FlowService\n    Injected flow service\n\nReturns\n-------\nExecuteFlowResponse\n    Execution result with IDs and URLs",
+        "operationId": "reExecuteTaskResult",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Task Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExecuteFlowResponse"
                 }
               }
             }
@@ -8840,6 +8978,11 @@
             "type": "string",
             "title": "Status"
           },
+          "flow_name": {
+            "type": "string",
+            "title": "Flow Name",
+            "default": ""
+          },
           "start_at": {
             "anyOf": [
               {
@@ -8887,6 +9030,19 @@
             "additionalProperties": true,
             "type": "object",
             "title": "Note"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tags",
+            "default": []
+          },
+          "chip_id": {
+            "type": "string",
+            "title": "Chip Id",
+            "default": ""
           }
         },
         "type": "object",
@@ -8897,7 +9053,7 @@
           "note"
         ],
         "title": "ExecutionResponseDetail",
-        "description": "ExecutionResponseDetail is a Pydantic model that represents the detail of an execution response.\n\nAttributes\n----------\n    name (str): The name of the execution.\n    status (str): The current status of the execution.\n    start_at (datetime | None): The start time of the execution.\n    end_at (datetime | None): The end time of the execution.\n    elapsed_time (timedelta | None): The total elapsed time of the execution.\n    task (list[Task]): List of tasks in the execution.\n    note (dict): Notes for the execution."
+        "description": "ExecutionResponseDetail is a Pydantic model that represents the detail of an execution response.\n\nAttributes\n----------\n    name (str): The name of the execution.\n    status (str): The current status of the execution.\n    start_at (datetime | None): The start time of the execution.\n    end_at (datetime | None): The end time of the execution.\n    elapsed_time (timedelta | None): The total elapsed time of the execution.\n    task (list[Task]): List of tasks in the execution.\n    note (dict): Notes for the execution.\n    tags (list[str]): Tags associated with the execution.\n    chip_id (str): The chip ID for the execution."
       },
       "ExecutionResponseSummary": {
         "properties": {
@@ -11739,6 +11895,67 @@
         "title": "QubitResponse",
         "description": "Response model for a single qubit."
       },
+      "ReExecuteRequest": {
+        "properties": {
+          "flow_name": {
+            "type": "string",
+            "title": "Flow Name"
+          },
+          "parameter_overrides": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Parameter Overrides",
+            "default": {}
+          }
+        },
+        "type": "object",
+        "required": [
+          "flow_name"
+        ],
+        "title": "ReExecuteRequest",
+        "description": "Request model for re-executing an execution from snapshot parameters."
+      },
+      "ReExecutionEntry": {
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "title": "Task Id"
+          },
+          "task_name": {
+            "type": "string",
+            "title": "Task Name"
+          },
+          "qid": {
+            "type": "string",
+            "title": "Qid"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "start_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "task_id",
+          "task_name",
+          "qid",
+          "status"
+        ],
+        "title": "ReExecutionEntry",
+        "description": "A child task result created by re-execution."
+      },
       "RecalibrationRecommendationResponse": {
         "properties": {
           "source_entity_id": {
@@ -13262,6 +13479,11 @@
             "type": "string",
             "title": "Execution Id"
           },
+          "flow_name": {
+            "type": "string",
+            "title": "Flow Name",
+            "default": ""
+          },
           "figure_path": {
             "items": {
               "type": "string"
@@ -13291,6 +13513,33 @@
             "type": "object",
             "title": "Run Parameters",
             "default": {}
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tags",
+            "default": []
+          },
+          "source_task_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Task Id"
+          },
+          "re_executions": {
+            "items": {
+              "$ref": "#/components/schemas/ReExecutionEntry"
+            },
+            "type": "array",
+            "title": "Re Executions",
+            "default": []
           },
           "start_at": {
             "anyOf": [
@@ -13342,7 +13591,7 @@
           "output_parameters"
         ],
         "title": "TaskResultResponse",
-        "description": "Response model for task result by task_id.\n\nAttributes\n----------\n    task_id (str): The task ID.\n    task_name (str): The name of the task.\n    qid (str): The qubit or coupling ID.\n    status (str): The task status.\n    execution_id (str): The execution ID.\n    figure_path (list[str]): List of figure paths.\n    json_figure_path (list[str]): List of JSON figure paths.\n    input_parameters (dict): Input parameters.\n    output_parameters (dict): Output parameters.\n    start_at (datetime | None): Start time.\n    end_at (datetime | None): End time.\n    elapsed_time (timedelta | None): Elapsed time."
+        "description": "Response model for task result by task_id.\n\nAttributes\n----------\n    task_id (str): The task ID.\n    task_name (str): The name of the task.\n    qid (str): The qubit or coupling ID.\n    status (str): The task status.\n    execution_id (str): The execution ID.\n    figure_path (list[str]): List of figure paths.\n    json_figure_path (list[str]): List of JSON figure paths.\n    input_parameters (dict): Input parameters.\n    output_parameters (dict): Output parameters.\n    start_at (datetime | None): Start time.\n    end_at (datetime | None): End time.\n    elapsed_time (timedelta | None): Elapsed time.\n    source_task_id (str | None): Parent task ID this was re-executed from.\n    re_executions (list[ReExecutionEntry]): Child task results from re-executions."
       },
       "TimeSeriesData": {
         "properties": {

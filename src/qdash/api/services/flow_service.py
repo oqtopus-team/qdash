@@ -387,6 +387,207 @@ class FlowService:
             logger.error(f"Failed to execute flow: {e}")
             raise HTTPException(status_code=500, detail=f"Failed to execute flow: {e}")
 
+    async def re_execute_from_snapshot(
+        self,
+        flow_name: str,
+        source_execution_id: str,
+        parameter_overrides: dict[str, Any],
+        username: str,
+        project_id: str,
+    ) -> ExecuteFlowResponse:
+        """Re-execute a flow using snapshot parameters from a previous execution.
+
+        Parameters
+        ----------
+        flow_name : str
+            Name of the flow to execute.
+        source_execution_id : str
+            Execution ID to load snapshot parameters from.
+        parameter_overrides : dict[str, Any]
+            Additional parameter overrides.
+        username : str
+            The username.
+        project_id : str
+            The project ID.
+
+        Returns
+        -------
+        ExecuteFlowResponse
+            Execution result with IDs and URLs.
+
+        """
+        settings = get_settings()
+
+        # Try username-specific lookup first, then fallback to project-wide lookup.
+        # The executor username may differ from the flow owner (e.g. shared flows).
+        flow = self._flow_repo.find_by_user_and_name(username, flow_name, project_id)
+        if not flow:
+            logger.info(
+                f"Flow '{flow_name}' not found for user '{username}', "
+                f"trying project-wide lookup (project_id={project_id})"
+            )
+            flow = self._flow_repo.find_one({"project_id": project_id, "name": flow_name})
+        if not flow:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Flow '{flow_name}' not found (user={username}, project={project_id})",
+            )
+
+        if not flow.deployment_id:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Flow '{flow_name}' has no deployment."
+                    " Please re-save the flow to register a deployment."
+                ),
+            )
+
+        parameters: dict[str, Any] = {
+            **flow.default_parameters,
+            **parameter_overrides,
+            "flow_name": flow_name,
+            "project_id": project_id,
+            "source_execution_id": source_execution_id,
+        }
+        if "tags" not in parameters and flow.tags:
+            parameters["tags"] = flow.tags
+
+        logger.info(
+            f"Re-executing flow '{flow_name}' from snapshot {source_execution_id} "
+            f"(deployment={flow.deployment_id}) with parameters: {parameters}"
+        )
+
+        try:
+            async with get_client() as client:
+                flow_run = await client.create_flow_run_from_deployment(
+                    deployment_id=flow.deployment_id,
+                    parameters=parameters,
+                )
+
+                execution_id = str(flow_run.id)
+                flow_run_url = (
+                    f"http://localhost:{settings.prefect_port}/flow-runs/flow-run/{execution_id}"
+                )
+                qdash_ui_url = f"http://localhost:{settings.ui_port}/execution/{execution_id}"
+
+                logger.info(f"Re-execution flow run created: {execution_id}")
+
+                return ExecuteFlowResponse(
+                    execution_id=execution_id,
+                    flow_run_url=flow_run_url,
+                    qdash_ui_url=qdash_ui_url,
+                    message=f"Flow '{flow_name}' re-execution started from snapshot {source_execution_id}",
+                )
+
+        except Exception as e:
+            logger.error(f"Failed to re-execute flow: {e}")
+            raise HTTPException(status_code=500, detail=f"Failed to re-execute flow: {e}")
+
+    async def execute_single_task_from_snapshot(
+        self,
+        task_name: str,
+        qid: str,
+        chip_id: str,
+        source_execution_id: str,
+        username: str,
+        project_id: str,
+        tags: list[str] | None = None,
+        source_task_id: str | None = None,
+        parameter_overrides: dict[str, dict[str, Any]] | None = None,
+    ) -> ExecuteFlowResponse:
+        """Execute a single task via the system single-task-executor deployment.
+
+        This method looks up the system deployment by name (no FlowDocument needed)
+        and creates a Prefect flow run to re-execute one task for one qubit.
+
+        Parameters
+        ----------
+        task_name : str
+            Name of the task to execute (e.g., 'CheckRabi')
+        qid : str
+            Qubit ID to calibrate
+        chip_id : str
+            Chip ID
+        source_execution_id : str
+            Execution ID to load snapshot parameters from
+        username : str
+            The username
+        project_id : str
+            The project ID
+        tags : list[str] | None
+            Tags for categorization
+
+        Returns
+        -------
+        ExecuteFlowResponse
+            Execution result with IDs and URLs
+
+        """
+        settings = get_settings()
+        deployment_name = "single-task-executor/system-single-task"
+
+        try:
+            async with get_client() as client:
+                deployment = await client.read_deployment_by_name(deployment_name)
+        except Exception:
+            logger.error(f"System deployment '{deployment_name}' not found")
+            raise HTTPException(
+                status_code=503,
+                detail=("System deployment not available. " "The worker may not have started yet."),
+            )
+
+        flow_name = f"re-execute:{task_name}"
+        parameters: dict[str, Any] = {
+            "username": username,
+            "chip_id": chip_id,
+            "qid": qid,
+            "task_name": task_name,
+            "source_execution_id": source_execution_id,
+            "project_id": project_id,
+            "flow_name": flow_name,
+            "tags": tags or [],
+            "source_task_id": source_task_id,
+            "parameter_overrides": parameter_overrides,
+        }
+
+        logger.info(
+            f"Executing single task '{task_name}' for qid={qid} "
+            f"(deployment={deployment.id}) with parameters: {parameters}"
+        )
+
+        try:
+            async with get_client() as client:
+                flow_run = await client.create_flow_run_from_deployment(
+                    deployment_id=deployment.id,
+                    parameters=parameters,
+                )
+
+                execution_id = str(flow_run.id)
+                flow_run_url = (
+                    f"http://localhost:{settings.prefect_port}"
+                    f"/flow-runs/flow-run/{execution_id}"
+                )
+                qdash_ui_url = f"http://localhost:{settings.ui_port}/execution/{execution_id}"
+
+                logger.info(f"Single-task flow run created: {execution_id}")
+
+                return ExecuteFlowResponse(
+                    execution_id=execution_id,
+                    flow_run_url=flow_run_url,
+                    qdash_ui_url=qdash_ui_url,
+                    message=(
+                        f"Single task '{task_name}' (qid={qid}) "
+                        f"re-execution started from snapshot {source_execution_id}"
+                    ),
+                )
+
+        except Exception as e:
+            logger.error(f"Failed to execute single task: {e}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to execute single task: {e}",
+            )
+
     async def list_templates(self) -> list[FlowTemplate]:
         """List all available flow templates.
 

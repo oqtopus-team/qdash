@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useRef, useMemo } from "react";
 
-import { ExternalLink } from "lucide-react";
+import { ExternalLink, ArrowUpRight } from "lucide-react";
+import Link from "next/link";
 
 import { formatDateTime } from "@/lib/utils/datetime";
 
@@ -374,9 +375,22 @@ export function ExecutionPageContent() {
                     >
                       <div className="flex items-start justify-between gap-2">
                         <h4 className="text-sm sm:text-lg font-semibold text-left truncate flex-1">
-                          {detailTask.qid
-                            ? `${detailTask.qid}-${detailTask.name}`
-                            : detailTask.name}
+                          {detailTask.task_id ? (
+                            <Link
+                              href={`/task-results/${detailTask.task_id}`}
+                              className="hover:text-primary inline-flex items-center gap-1"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              {detailTask.qid
+                                ? `${detailTask.qid}-${detailTask.name}`
+                                : detailTask.name}
+                              <ArrowUpRight className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0 opacity-50" />
+                            </Link>
+                          ) : detailTask.qid ? (
+                            `${detailTask.qid}-${detailTask.name}`
+                          ) : (
+                            detailTask.name
+                          )}
                         </h4>
                         <span
                           className={`text-xs sm:text-sm font-semibold flex-shrink-0 ${

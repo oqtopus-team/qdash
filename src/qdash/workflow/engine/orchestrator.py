@@ -22,6 +22,7 @@ from qdash.workflow.engine.task.history_recorder import TaskHistoryRecorder
 if TYPE_CHECKING:
     from qdash.workflow.engine.backend.base import BaseBackend
     from qdash.workflow.engine.config import CalibConfig
+    from qdash.workflow.engine.task.snapshot_loader import SnapshotParameterLoader
     from qdash.workflow.service.github import GitHubIntegration
 
 logger = logging.getLogger(__name__)
@@ -57,15 +58,19 @@ class CalibOrchestrator:
         self,
         config: CalibConfig,
         github_integration: GitHubIntegration | None = None,
+        snapshot_loader: SnapshotParameterLoader | None = None,
     ) -> None:
         """Initialize the session manager.
 
         Args:
             config: Session configuration
             github_integration: Optional GitHub integration for config pull
+            snapshot_loader: Optional snapshot parameter loader for re-execution
         """
         self.config = config
         self.github_integration = github_integration
+        self._snapshot_loader = snapshot_loader
+        self._source_task_id: str | None = None
 
         # Session components (initialized in initialize())
         self._execution_service: ExecutionService | None = None
@@ -426,6 +431,8 @@ class CalibOrchestrator:
             qids=[qid],
             calib_dir=self.task_context.calib_dir,
             history_recorder=self._create_history_recorder(),
+            snapshot_loader=self._snapshot_loader,
+            source_task_id=self._source_task_id,
         )
 
         # Copy relevant calibration data

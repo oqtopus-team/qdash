@@ -96,7 +96,11 @@ export function ExecutionDetailClient({
   });
 
   const execution = executionDetailData?.data as
-    | ExecutionResponseDetail
+    | (ExecutionResponseDetail & {
+        tags?: string[];
+        chip_id?: string;
+        flow_name?: string;
+      })
     | undefined;
 
   // Extract unique qubit IDs and task names for filtering
@@ -556,9 +560,19 @@ export function ExecutionDetailClient({
 
                                   <div className="flex-1 min-w-0">
                                     <div className="flex items-center justify-between mb-1">
-                                      <div className="text-sm font-semibold truncate">
-                                        {task.name}
-                                      </div>
+                                      {task.task_id ? (
+                                        <Link
+                                          href={`/task-results/${task.task_id}`}
+                                          className="text-sm font-semibold truncate text-primary hover:underline"
+                                          onClick={(e) => e.stopPropagation()}
+                                        >
+                                          {task.name}
+                                        </Link>
+                                      ) : (
+                                        <div className="text-sm font-semibold truncate">
+                                          {task.name}
+                                        </div>
+                                      )}
                                       {getStatusBadge(task.status)}
                                     </div>
 
