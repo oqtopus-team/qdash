@@ -110,7 +110,7 @@ See the **Task Executor Flow** diagram for the complete execution lifecycle, sta
 
 **Purpose**: Manages task state transitions and parameter storage.
 
-**State Transitions**: SCHEDULED → RUNNING → COMPLETED / FAILED (see Task Executor Flow diagram above)
+**State Transitions**: SCHEDULED → RUNNING → COMPLETED / FAILED / CANCELLED (see Task Executor Flow diagram above)
 
 **Key Methods**:
 - `ensure_task_exists()`: Create task entry if not exists
