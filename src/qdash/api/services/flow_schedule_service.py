@@ -13,9 +13,10 @@ from zoneinfo import ZoneInfo
 import httpx
 from croniter import croniter
 from fastapi import HTTPException
-from prefect import get_client
+from prefect.client.orchestration import get_client
 from prefect.client.schemas.filters import (
     DeploymentFilter,
+    DeploymentFilterId,
     FlowRunFilter,
     FlowRunFilterState,
     FlowRunFilterStateType,
@@ -38,6 +39,22 @@ logger = logging.getLogger("uvicorn.app")
 
 DEPLOYMENT_SERVICE_URL = os.getenv("DEPLOYMENT_SERVICE_URL", "http://deployment-service:8001")
 DEFAULT_TIMEOUT = httpx.Timeout(connect=5.0, read=30.0, write=10.0, pool=5.0)
+
+
+def _get_cron_from_schedules(schedules: list[Any]) -> tuple[str | None, bool]:
+    """Extract cron expression and active status from deployment schedules.
+
+    In Prefect 3, schedules is a list of DeploymentSchedule objects.
+    Each has a .schedule attribute (CronSchedule/IntervalSchedule/etc.) and an .active attribute.
+
+    Returns:
+        Tuple of (cron_expression, is_active). Returns (None, False) if no cron schedule found.
+    """
+    for sched in schedules:
+        schedule_obj = sched.schedule
+        if hasattr(schedule_obj, "cron"):
+            return schedule_obj.cron, sched.active
+    return None, False
 
 
 class FlowScheduleService:
@@ -170,21 +187,23 @@ class FlowScheduleService:
                 if not flow.deployment_id:
                     continue
 
-                # Get cron schedule
+                # Get cron schedule (Prefect 3: deployment.schedules is a list)
                 try:
                     deployment = await client.read_deployment(flow.deployment_id)
-                    if deployment.schedule and hasattr(deployment.schedule, "cron"):
-                        all_schedules.append(
-                            FlowScheduleSummary(
-                                schedule_id=flow.deployment_id,
-                                flow_name=flow.name,
-                                schedule_type="cron",
-                                cron=deployment.schedule.cron,
-                                next_run=None,
-                                active=deployment.is_schedule_active,
-                                created_at=deployment.created or datetime.now(timezone.utc),
+                    if deployment.schedules:
+                        cron_expr, is_active = _get_cron_from_schedules(deployment.schedules)
+                        if cron_expr:
+                            all_schedules.append(
+                                FlowScheduleSummary(
+                                    schedule_id=flow.deployment_id,
+                                    flow_name=flow.name,
+                                    schedule_type="cron",
+                                    cron=cron_expr,
+                                    next_run=None,
+                                    active=is_active,
+                                    created_at=deployment.created or datetime.now(timezone.utc),
+                                )
                             )
-                        )
                 except Exception as e:
                     logger.warning(f"Failed to read deployment schedule for {flow.name}: {e}")
 
@@ -193,7 +212,7 @@ class FlowScheduleService:
                     state_filter = FlowRunFilterStateType(any_=[StateType.SCHEDULED])
                     flow_runs = await client.read_flow_runs(
                         deployment_filter=DeploymentFilter(
-                            id={"any_": [uuid.UUID(flow.deployment_id)]}
+                            id=DeploymentFilterId(any_=[uuid.UUID(flow.deployment_id)])
                         ),
                         flow_run_filter=FlowRunFilter(state=FlowRunFilterState(type=state_filter)),
                         limit=limit,
@@ -270,20 +289,23 @@ class FlowScheduleService:
         schedules: list[FlowScheduleSummary] = []
 
         async with get_client() as client:
+            # Get cron schedule (Prefect 3: deployment.schedules is a list)
             try:
                 deployment = await client.read_deployment(flow.deployment_id)
-                if deployment.schedule and hasattr(deployment.schedule, "cron"):
-                    schedules.append(
-                        FlowScheduleSummary(
-                            schedule_id=flow.deployment_id,
-                            flow_name=name,
-                            schedule_type="cron",
-                            cron=deployment.schedule.cron,
-                            next_run=None,
-                            active=deployment.is_schedule_active,
-                            created_at=deployment.created or datetime.now(timezone.utc),
+                if deployment.schedules:
+                    cron_expr, is_active = _get_cron_from_schedules(deployment.schedules)
+                    if cron_expr:
+                        schedules.append(
+                            FlowScheduleSummary(
+                                schedule_id=flow.deployment_id,
+                                flow_name=name,
+                                schedule_type="cron",
+                                cron=cron_expr,
+                                next_run=None,
+                                active=is_active,
+                                created_at=deployment.created or datetime.now(timezone.utc),
+                            )
                         )
-                    )
             except Exception as e:
                 logger.warning(f"Failed to read deployment schedule: {e}")
 
@@ -291,7 +313,7 @@ class FlowScheduleService:
                 state_filter = FlowRunFilterStateType(any_=[StateType.SCHEDULED])
                 flow_runs = await client.read_flow_runs(
                     deployment_filter=DeploymentFilter(
-                        id={"any_": [uuid.UUID(flow.deployment_id)]}
+                        id=DeploymentFilterId(any_=[uuid.UUID(flow.deployment_id)])
                     ),
                     flow_run_filter=FlowRunFilter(state=FlowRunFilterState(type=state_filter)),
                     limit=limit,
@@ -329,6 +351,8 @@ class FlowScheduleService:
     ) -> UpdateScheduleResponse:
         """Update a Flow schedule (cron schedules only).
 
+        In Prefect 3, schedules are managed via dedicated schedule APIs.
+
         Parameters
         ----------
         schedule_id : str
@@ -357,20 +381,32 @@ class FlowScheduleService:
                         detail="You don't have permission to update this schedule",
                     )
 
-                deployment = await client.read_deployment(schedule_id)
+                deployment_uuid = uuid.UUID(schedule_id)
 
-                schedule_to_update = deployment.schedule
                 if request.cron:
                     from prefect.client.schemas.schedules import CronSchedule
 
                     self._validate_cron(request.cron)
-                    schedule_to_update = CronSchedule(cron=request.cron, timezone=request.timezone)
+                    cron_schedule = CronSchedule(cron=request.cron, timezone=request.timezone)
 
-                await client.update_deployment(
-                    deployment=deployment,
-                    schedule=schedule_to_update,
-                    is_schedule_active=request.active,
-                )
+                    # Delete existing schedules and create new one
+                    existing_schedules = await client.read_deployment_schedules(deployment_uuid)
+                    for existing in existing_schedules:
+                        await client.delete_deployment_schedule(deployment_uuid, existing.id)
+
+                    await client.create_deployment_schedules(
+                        deployment_uuid,
+                        [(cron_schedule, request.active)],
+                    )
+                else:
+                    # Just update active status on existing schedules
+                    existing_schedules = await client.read_deployment_schedules(deployment_uuid)
+                    for existing in existing_schedules:
+                        await client.update_deployment_schedule(
+                            deployment_uuid,
+                            existing.id,
+                            active=request.active,
+                        )
 
                 logger.info(f"Updated schedule: {schedule_id}")
                 return UpdateScheduleResponse(
@@ -378,6 +414,8 @@ class FlowScheduleService:
                     schedule_id=schedule_id,
                 )
 
+            except HTTPException:
+                raise
             except Exception as e:
                 logger.error(f"Failed to update schedule: {e}")
                 raise HTTPException(status_code=500, detail=f"Failed to update schedule: {e}")
@@ -408,7 +446,8 @@ class FlowScheduleService:
         async with get_client() as client:
             # Try as deployment ID (cron schedule)
             try:
-                _ = await client.read_deployment(schedule_id)
+                deployment_uuid = uuid.UUID(schedule_id)
+                _ = await client.read_deployment(deployment_uuid)
 
                 flow = self._flow_repo.find_one(
                     {"project_id": project_id, "deployment_id": schedule_id, "username": username}
@@ -419,12 +458,10 @@ class FlowScheduleService:
                         detail="You don't have permission to delete this schedule",
                     )
 
-                deployment = await client.read_deployment(schedule_id)
-                await client.update_deployment(
-                    deployment=deployment,
-                    schedule=None,
-                    is_schedule_active=False,
-                )
+                # Delete all schedules on this deployment
+                existing_schedules = await client.read_deployment_schedules(deployment_uuid)
+                for existing in existing_schedules:
+                    await client.delete_deployment_schedule(deployment_uuid, existing.id)
 
                 logger.info(f"Deleted cron schedule: {schedule_id}")
                 return DeleteScheduleResponse(

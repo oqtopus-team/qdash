@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Any
 
 import httpx
 from fastapi import HTTPException
-from prefect import get_client
+from prefect.client.orchestration import get_client
 from qdash.api.schemas.flow import (
     ExecuteFlowRequest,
     ExecuteFlowResponse,
@@ -370,7 +370,7 @@ class FlowService:
 
                 execution_id = str(flow_run.id)
                 flow_run_url = (
-                    f"http://localhost:{settings.prefect_port}/flow-runs/flow-run/{execution_id}"
+                    f"http://localhost:{settings.prefect_port}/runs/flow-run/{execution_id}"
                 )
                 qdash_ui_url = f"http://localhost:{settings.ui_port}/execution/{execution_id}"
 
@@ -466,7 +466,7 @@ class FlowService:
 
                 execution_id = str(flow_run.id)
                 flow_run_url = (
-                    f"http://localhost:{settings.prefect_port}/flow-runs/flow-run/{execution_id}"
+                    f"http://localhost:{settings.prefect_port}/runs/flow-run/{execution_id}"
                 )
                 qdash_ui_url = f"http://localhost:{settings.ui_port}/execution/{execution_id}"
 
@@ -564,8 +564,7 @@ class FlowService:
 
                 execution_id = str(flow_run.id)
                 flow_run_url = (
-                    f"http://localhost:{settings.prefect_port}"
-                    f"/flow-runs/flow-run/{execution_id}"
+                    f"http://localhost:{settings.prefect_port}" f"/runs/flow-run/{execution_id}"
                 )
                 qdash_ui_url = f"http://localhost:{settings.ui_port}/execution/{execution_id}"
 
