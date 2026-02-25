@@ -81,12 +81,12 @@ export function TaskGridView({
     <>
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         {tasks.map((task) => {
-          const figurePath =
-            task.figure_path && task.figure_path.length > 0
-              ? Array.isArray(task.figure_path)
-                ? task.figure_path[0]
-                : task.figure_path
-              : null;
+          const figurePaths = task.figure_path
+            ? Array.isArray(task.figure_path)
+              ? task.figure_path
+              : [task.figure_path]
+            : [];
+          const figurePath = figurePaths.length > 0 ? figurePaths[0] : null;
 
           return (
             <div
