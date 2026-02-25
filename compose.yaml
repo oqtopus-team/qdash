@@ -51,18 +51,6 @@ services:
       retries: 5
     networks:
       - custom_net
-  prefect-migrate:
-    image: prefecthq/prefect:3-python3.11
-    env_file:
-      - .env
-    command: prefect server database upgrade -y
-    environment:
-      - PREFECT_API_DATABASE_CONNECTION_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
-    depends_on:
-      postgres:
-        condition: service_healthy
-    networks:
-      - custom_net
   prefect-server:
     image: prefecthq/prefect:3-python3.11
     restart: always
@@ -74,12 +62,9 @@ services:
       - "${PREFECT_PORT:-4200}:4200"
     environment:
       - PREFECT_API_DATABASE_CONNECTION_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
-      - PREFECT_API_DATABASE_MIGRATE_ON_START=false
     depends_on:
       postgres:
         condition: service_healthy
-      prefect-migrate:
-        condition: service_completed_successfully
     networks:
       - custom_net
   deployment-service:

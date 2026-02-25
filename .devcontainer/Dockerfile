@@ -86,7 +86,7 @@ WORKDIR /workspace/qdash
 # Install Python dependencies (copy only requirements.txt)
 COPY ./.devcontainer/requirements.txt ./requirements.txt
 RUN uv pip install --system --no-cache -r requirements.txt && \
-    uv pip install --system --no-cache prefect==2.20.0
+    uv pip install --system --no-cache "prefect>=3.0.0"
 
 # ========================================
 # Stage 3: Node.js environment
