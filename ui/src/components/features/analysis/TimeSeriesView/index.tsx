@@ -732,7 +732,10 @@ export function TimeSeriesView() {
             Refresh
           </button>
         </div>
-        <div className="flex flex-col sm:flex-row w-full gap-4 sm:gap-6" role="group">
+        <div
+          className="flex flex-col sm:flex-row w-full gap-4 sm:gap-6"
+          role="group"
+        >
           <div className="flex-1">
             <label className="text-sm font-medium text-base-content/70">
               Chip
