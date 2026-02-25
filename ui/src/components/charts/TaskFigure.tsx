@@ -25,7 +25,7 @@ function ExpandableImage({
   const [isOpen, setIsOpen] = useState(false);
 
   return (
-    <div className="relative group inline-flex h-full shrink-0">
+    <div className="relative group inline-flex h-full min-w-0 min-h-0">
       <img src={src} alt={alt} className={className} />
       <button
         type="button"
@@ -88,17 +88,26 @@ export function TaskFigure({
     path || taskResult?.figure_path || taskResult?.json_figure_path || [];
 
   if (Array.isArray(figurePaths) && figurePaths.length > 0) {
+    if (figurePaths.length === 1) {
+      return (
+        <ExpandableImage
+          src={`${apiUrl}/executions/figure?path=${encodeURIComponent(figurePaths[0])}`}
+          alt={`Result for QID ${qid}`}
+          className={className}
+        />
+      );
+    }
     return (
-      <>
+      <div className="flex flex-wrap gap-2 overflow-hidden w-full h-full">
         {figurePaths.map((p, i) => (
           <ExpandableImage
             key={i}
             src={`${apiUrl}/executions/figure?path=${encodeURIComponent(p)}`}
-            alt={`Result for QID ${qid}`}
-            className={className}
+            alt={`Result for QID ${qid} (${i + 1})`}
+            className={`${className} max-w-full max-h-full`}
           />
         ))}
-      </>
+      </div>
     );
   }
 
