@@ -15,10 +15,13 @@ from typing import Any
 from fastapi import FastAPI, HTTPException
 from prefect.client.orchestration import get_client
 from pydantic import BaseModel
+from qdash.workflow.logging_config import setup_logging
 from qdash.workflow.paths import get_path_resolver
 
+setup_logging(service_name="deployment")
+
 app = FastAPI(title="QDash Deployment Service")
-logger = getLogger("uvicorn.app")
+logger = getLogger(__name__)
 
 # Work pool name for user flows
 WORK_POOL_NAME = "user-flows-pool"

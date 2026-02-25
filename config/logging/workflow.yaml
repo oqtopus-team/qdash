@@ -1,0 +1,45 @@
+# Logging configuration for QDash Workflow services (deployment-service, worker).
+#
+# Loaded by qdash.common.logging.setup_logging().
+# Environment variable substitution:
+#   ${LOG_LEVEL}  -> resolved at load time (default: INFO)
+#   ${LOG_FILE}   -> resolved at load time
+
+version: 1
+disable_existing_loggers: false
+
+formatters:
+  json:
+    (): pythonjsonlogger.json.JsonFormatter
+    fmt: "%(asctime)s %(name)s %(levelname)s %(message)s"
+    rename_fields:
+      asctime: timestamp
+      levelname: level
+
+handlers:
+  console:
+    class: logging.StreamHandler
+    stream: ext://sys.stdout
+    formatter: json
+  file:
+    class: logging.handlers.RotatingFileHandler
+    filename: "${LOG_FILE}"
+    maxBytes: 10485760  # 10 MB
+    backupCount: 5
+    formatter: json
+
+root:
+  level: "${LOG_LEVEL}"
+  handlers: [console, file]
+
+loggers:
+  uvicorn:
+    level: WARNING
+  uvicorn.access:
+    level: WARNING
+  uvicorn.error:
+    level: WARNING
+  httpx:
+    level: WARNING
+  httpcore:
+    level: WARNING
