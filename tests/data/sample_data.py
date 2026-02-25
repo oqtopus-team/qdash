@@ -228,7 +228,8 @@ def get_sample_data(category: str, key: str) -> dict[str, Any]:
     if key not in data_maps[category]:
         raise ValueError(f"Unknown key '{key}' in category '{category}'")
 
-    return data_maps[category][key].copy()
+    result: dict[str, Any] = data_maps[category][key]
+    return result.copy()
 
 
 def get_all_sample_data(category: str) -> dict[str, Any]:

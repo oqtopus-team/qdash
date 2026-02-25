@@ -1,6 +1,6 @@
 """Tests for TaskExecutor."""
 
-from typing import Any
+from typing import Any, ClassVar
 from unittest.mock import MagicMock
 
 import pytest
@@ -17,6 +17,8 @@ from qdash.workflow.engine.task.types import TaskExecutionError, TaskProtocol
 class MockTask:
     """Mock task for testing."""
 
+    run_parameters: ClassVar[dict[str, Any]] = {}
+
     def __init__(
         self,
         name: str = "CheckRabi",
@@ -28,7 +30,6 @@ class MockTask:
         self._task_type = task_type
         self.r2_threshold = r2_threshold
         self.backend = backend
-        self.run_parameters: dict[str, Any] = {}
         self.input_parameters: dict[str, Any] = {}
 
     def get_name(self) -> str:
@@ -66,6 +67,9 @@ class MockSession:
     """Mock session for testing."""
 
     name = "test-session"
+
+    def update_note(self, key: str, value: Any) -> None:
+        pass
 
 
 class TestTaskExecutorInit:
@@ -164,7 +168,7 @@ class TestTaskExecutorExecuteTask:
     ) -> None:
         """Test successful task execution."""
         task = MockTask()
-        session = MockSession()
+        session: Any = MockSession()
 
         result = executor.execute_task(task, session, "0")
 
@@ -179,7 +183,7 @@ class TestTaskExecutorExecuteTask:
     ) -> None:
         """Test execute_task calls preprocess and stores input parameters."""
         task = MockTask()
-        session = MockSession()
+        session: Any = MockSession()
 
         executor.execute_task(task, session, "0")
 
@@ -195,7 +199,7 @@ class TestTaskExecutorExecuteTask:
         """Test execute_task handles task with no run result."""
         task = MockTask()
         task.run = MagicMock(return_value=None)  # type: ignore[method-assign]
-        session = MockSession()
+        session: Any = MockSession()
 
         result = executor.execute_task(task, session, "0")
 
@@ -208,7 +212,7 @@ class TestTaskExecutorExecuteTask:
     ) -> None:
         """Test execute_task validates R² values."""
         task = MockTask()
-        session = MockSession()
+        session: Any = MockSession()
 
         executor.execute_task(task, session, "0")
 
@@ -227,7 +231,7 @@ class TestTaskExecutorExecuteTask:
         """Test execute_task raises on R² validation failure."""
         mock_result_processor.validate_r2.side_effect = R2ValidationError("R² value too low")
         task = MockTask()
-        session = MockSession()
+        session: Any = MockSession()
 
         with pytest.raises(ValueError, match="R² value too low"):
             executor.execute_task(task, session, "0")
@@ -245,7 +249,7 @@ class TestTaskExecutorExecuteTask:
             "Fidelity exceeds 100%"
         )
         task = MockTask()
-        session = MockSession()
+        session: Any = MockSession()
 
         with pytest.raises(FidelityValidationError, match="Fidelity exceeds 100%"):
             executor.execute_task(task, session, "0")
@@ -258,7 +262,7 @@ class TestTaskExecutorExecuteTask:
         """Test execute_task raises TaskExecutionError on unexpected exception."""
         task = MockTask()
         task.run = MagicMock(side_effect=RuntimeError("Unexpected error"))  # type: ignore[method-assign]
-        session = MockSession()
+        session: Any = MockSession()
 
         with pytest.raises(TaskExecutionError, match="Task CheckRabi failed"):
             executor.execute_task(task, session, "0")
@@ -271,7 +275,7 @@ class TestTaskExecutorExecuteTask:
         """Test execute_task always calls end_task even on failure."""
         task = MockTask()
         task.run = MagicMock(side_effect=RuntimeError("Error"))  # type: ignore[method-assign]
-        session = MockSession()
+        session: Any = MockSession()
 
         with pytest.raises(TaskExecutionError):
             executor.execute_task(task, session, "0")
@@ -294,7 +298,7 @@ class TestTaskExecutorExecuteTask:
                 raw_data=[],
             )
         )
-        session = MockSession()
+        session: Any = MockSession()
 
         executor.execute_task(task, session, "0")
 
@@ -312,7 +316,7 @@ class TestTaskExecutorExecuteTask:
                 raw_data=[{"x": [1, 2], "y": [3, 4]}],
             )
         )
-        session = MockSession()
+        session: Any = MockSession()
 
         executor.execute_task(task, session, "0")
 
@@ -326,7 +330,7 @@ class TestTaskExecutorExecuteTask:
     ) -> None:
         """Test execute_task processes and stores output parameters."""
         task = MockTask()
-        session = MockSession()
+        session: Any = MockSession()
 
         result = executor.execute_task(task, session, "0")
 
@@ -337,7 +341,7 @@ class TestTaskExecutorExecuteTask:
     def test_execute_task_returns_r2_in_result(self, executor: TaskExecutor) -> None:
         """Test execute_task returns R² value in result."""
         task = MockTask()
-        session = MockSession()
+        session: Any = MockSession()
 
         result = executor.execute_task(task, session, "0")
 
@@ -348,13 +352,16 @@ class TestTaskExecutorExecuteTask:
     ) -> None:
         """Test execute_task records run_parameters when present."""
         task = MockTask()
-        task.run_parameters = {
+        MockTask.run_parameters = {
             "shots": RunParameterModel(value=1024, value_type="int", description="Number of shots"),
             "interval": RunParameterModel(value=150, value_type="int", unit="us"),
         }
-        session = MockSession()
+        session: Any = MockSession()
 
         executor.execute_task(task, session, "0")
+
+        # Reset class variable
+        MockTask.run_parameters = {}
 
         mock_state_manager.put_run_parameters.assert_called_once()
         call_args = mock_state_manager.put_run_parameters.call_args[0]
@@ -370,8 +377,8 @@ class TestTaskExecutorExecuteTask:
     ) -> None:
         """Test execute_task does not call put_run_parameters when empty."""
         task = MockTask()
-        task.run_parameters = {}
-        session = MockSession()
+        MockTask.run_parameters = {}
+        session: Any = MockSession()
 
         executor.execute_task(task, session, "0")
 
@@ -401,7 +408,7 @@ class TestTaskExecutorHelperMethods:
     def test_run_preprocess_returns_result(self, executor: TaskExecutor) -> None:
         """Test _run_preprocess returns preprocess result."""
         task = MockTask()
-        session = MockSession()
+        session: Any = MockSession()
 
         result = executor._run_preprocess(task, session, "0")
 
@@ -415,7 +422,7 @@ class TestTaskExecutorHelperMethods:
         """Test _run_preprocess handles exception gracefully."""
         task = MockTask()
         task.preprocess = MagicMock(side_effect=RuntimeError("Preprocess failed"))  # type: ignore[method-assign]
-        session = MockSession()
+        session: Any = MockSession()
 
         result = executor._run_preprocess(task, session, "0")
 
@@ -424,7 +431,7 @@ class TestTaskExecutorHelperMethods:
     def test_run_task_returns_result(self, executor: TaskExecutor) -> None:
         """Test _run_task returns run result."""
         task = MockTask()
-        session = MockSession()
+        session: Any = MockSession()
 
         result = executor._run_task(task, session, "0")
 
@@ -435,7 +442,7 @@ class TestTaskExecutorHelperMethods:
     def test_run_postprocess_returns_result(self, executor: TaskExecutor) -> None:
         """Test _run_postprocess returns postprocess result."""
         task = MockTask()
-        session = MockSession()
+        session: Any = MockSession()
         run_result = RunResult(raw_result={}, r2={})
 
         result = executor._run_postprocess(task, session, run_result, "0")
@@ -491,7 +498,7 @@ class TestCouplingTask:
     def test_execute_coupling_task(self, executor: TaskExecutor) -> None:
         """Test executing a coupling task."""
         task = MockTask(name="CheckCoupling", task_type="coupling")
-        session = MockSession()
+        session: Any = MockSession()
 
         result = executor.execute_task(task, session, "0-1")
 
@@ -580,7 +587,7 @@ class TestSnapshotOverrides:
         mock_snapshot_loader.get_snapshot.return_value = (snap_input, snap_run)
 
         task = MockTask()
-        executor_with_snapshot._apply_snapshot_overrides(task, "CheckRabi", "qubit", "0")  # type: ignore[arg-type]
+        executor_with_snapshot._apply_snapshot_overrides(task, "CheckRabi", "qubit", "0")
 
         # Verify input_parameters were set on the task
         assert "freq" in task.input_parameters
@@ -606,7 +613,7 @@ class TestSnapshotOverrides:
         task = MockTask()
         original_run_params = task.run_parameters
 
-        executor_with_snapshot._apply_snapshot_overrides(task, "CheckRabi", "qubit", "0")  # type: ignore[arg-type]
+        executor_with_snapshot._apply_snapshot_overrides(task, "CheckRabi", "qubit", "0")
 
         # Task parameters should be unchanged
         assert task.run_parameters == original_run_params
@@ -623,7 +630,7 @@ class TestSnapshotOverrides:
         mock_snapshot_loader.get_snapshot.return_value = ({}, {})
 
         task = MockTask()
-        executor_with_snapshot._apply_snapshot_overrides(task, "CheckRabi", "qubit", "0")  # type: ignore[arg-type]
+        executor_with_snapshot._apply_snapshot_overrides(task, "CheckRabi", "qubit", "0")
 
         # With empty dicts, no state updates should occur
         mock_state_manager.put_input_parameters.assert_not_called()
@@ -643,7 +650,7 @@ class TestSnapshotOverrides:
         mock_snapshot_loader.get_snapshot.return_value = (snap_input, {})
 
         task = MockTask()
-        executor_with_snapshot._apply_snapshot_overrides(task, "CheckRabi", "qubit", "0")  # type: ignore[arg-type]
+        executor_with_snapshot._apply_snapshot_overrides(task, "CheckRabi", "qubit", "0")
 
         # Only good_param should survive
         assert "good_param" in task.input_parameters
@@ -677,7 +684,7 @@ class TestSnapshotOverrides:
         )
 
         task = MockTask()
-        session = MockSession()
+        session: Any = MockSession()
 
         result = executor.execute_task(task, session, "0")
 
@@ -707,7 +714,7 @@ class TestSnapshotOverrides:
         )
 
         task = MockTask()
-        session = MockSession()
+        session: Any = MockSession()
 
         result = executor.execute_task(task, session, "0")
 

@@ -1,7 +1,9 @@
 """Tests for ExecutionStateManager."""
 
 from qdash.datamodel.execution import ExecutionStatusModel
+from qdash.datamodel.system_info import SystemInfoModel
 from qdash.datamodel.task import CalibDataModel, ParameterModel
+from qdash.workflow.engine.execution.models import ExecutionNote
 from qdash.workflow.engine.execution.state_manager import (
     ExecutionStateManager,
 )
@@ -28,7 +30,7 @@ class TestExecutionStateManagerInit:
             name="Test Execution",
             execution_id="exec-001",
             calib_data_path="/tmp/calib",
-            note={"key": "value"},
+            note=ExecutionNote(extra={"key": "value"}),
             tags=["tag1", "tag2"],
             chip_id="chip-001",
         )
@@ -88,7 +90,7 @@ class TestExecutionLifecycle:
         assert manager.status == ExecutionStatusModel.RUNNING
 
         manager.update_status(ExecutionStatusModel.COMPLETED)
-        assert manager.status == ExecutionStatusModel.COMPLETED
+        assert manager.status == ExecutionStatusModel.COMPLETED  # type: ignore[comparison-overlap]
 
 
 class TestCalibDataMerging:
@@ -180,7 +182,7 @@ class TestDatamodelConversion:
             end_at=None,
             elapsed_time=None,
             message="",
-            system_info={},
+            system_info=SystemInfoModel(),
         )
 
         manager = ExecutionStateManager.from_datamodel(model)

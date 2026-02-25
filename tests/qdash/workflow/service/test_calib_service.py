@@ -145,13 +145,13 @@ def clear_session_state():
     import qdash.workflow.service.calib_service as session_module
 
     # Clear before test
-    session_module._current_session = None
+    session_module._current_session = None  # type: ignore[attr-defined]
     clear_current_session()
 
     yield
 
     # Clear after test
-    session_module._current_session = None
+    session_module._current_session = None  # type: ignore[attr-defined]
     clear_current_session()
 
 
@@ -230,6 +230,7 @@ class TestCalibServiceInitialization:
             user_repo=mock_user_repo,
         )
 
+        assert session.execution_service is not None
         assert "python_flow" in session.execution_service.tags
 
 
@@ -318,4 +319,5 @@ class TestGlobalSessionHelpers:
 
         finish_calibration()
 
-        assert session.execution_service.completed is True
+        assert session.execution_service is not None
+        assert session.execution_service.completed is True  # type: ignore[attr-defined]

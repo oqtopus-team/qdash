@@ -215,7 +215,7 @@ class TestProvenanceService:
         """Returns empty list when policy has no rules."""
 
         class _Policy:
-            rules: list = []
+            rules: list[object] = []
 
         monkeypatch.setattr(
             "qdash.api.services.provenance_service.load_policy_config",

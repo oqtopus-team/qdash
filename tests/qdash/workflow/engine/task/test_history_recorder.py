@@ -56,11 +56,9 @@ class TestTaskHistoryRecorder:
             tags=[],
             note={},
             status=ExecutionStatusModel.RUNNING,
-            task_results={},
             start_at=None,
             end_at=None,
             elapsed_time=None,
-            calib_data=CalibDataModel(qubit={}, coupling={}),
             message="",
             system_info=SystemInfoModel(),
         )

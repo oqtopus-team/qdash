@@ -7,7 +7,9 @@ from qdash.datamodel.execution import (
     ExecutionModel,
     ExecutionStatusModel,
 )
+from qdash.datamodel.system_info import SystemInfoModel
 from qdash.datamodel.task import CalibDataModel, ParameterModel
+from qdash.workflow.engine.execution.models import ExecutionNote
 from qdash.workflow.engine.execution.service import ExecutionService
 
 
@@ -34,8 +36,10 @@ class MockExecutionRepository:
         if self.stored_model is None and initial_model:
             self.stored_model = initial_model
 
-        if self.stored_model:
-            update_func(self.stored_model)
+        if self.stored_model is None:
+            raise ValueError(f"Execution {execution_id} not found")
+
+        update_func(self.stored_model)
 
         return self.stored_model
 
@@ -195,6 +199,7 @@ class TestExecutionServiceReload:
         service.save()
 
         # Modify stored model directly
+        assert mock_repo.stored_model is not None
         mock_repo.stored_model.status = ExecutionStatusModel.RUNNING
 
         result = service.reload()
@@ -239,7 +244,7 @@ class TestExecutionServiceFromExisting:
             end_at=None,
             elapsed_time=None,
             message="",
-            system_info={},
+            system_info=SystemInfoModel(),
         )
 
         service = ExecutionService.from_existing("exec-001", repository=mock_repo)
@@ -293,7 +298,7 @@ class TestExecutionServiceProperties:
             repository=mock_repo,
         )
 
-        service.note = {"new_key": "new_value"}
+        service.note = ExecutionNote(extra={"new_key": "new_value"})
 
         # Dict values are converted to ExecutionNote with data in .extra
         assert service.note.extra == {"new_key": "new_value"}

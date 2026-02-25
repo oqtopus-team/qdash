@@ -3,11 +3,15 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import TYPE_CHECKING
 from unittest.mock import MagicMock, patch
 
 from qdash.api.lib.ai_labels import TOOL_LABELS
 from qdash.api.lib.copilot_agent import AGENT_TOOLS
 from qdash.api.services.copilot_data_service import CopilotDataService
+
+if TYPE_CHECKING:
+    from qdash.api.schemas.provenance import LineageResponse
 
 
 class TestProvenanceLineageGraphValidation:
@@ -183,7 +187,7 @@ class TestToolRegistration:
 # --------------- helpers ---------------
 
 
-def _make_empty_lineage(origin_id: str) -> MagicMock:
+def _make_empty_lineage(origin_id: str) -> LineageResponse:
     """Create a minimal LineageResponse mock with no nodes/edges."""
     from qdash.api.schemas.provenance import LineageNodeResponse, LineageResponse
 
@@ -191,7 +195,7 @@ def _make_empty_lineage(origin_id: str) -> MagicMock:
     return LineageResponse(origin=origin, nodes=[], edges=[], max_depth=5)
 
 
-def _make_lineage_with_entity_and_activity() -> MagicMock:
+def _make_lineage_with_entity_and_activity() -> LineageResponse:
     """Create a LineageResponse with one entity node and one activity node."""
     from qdash.api.schemas.provenance import (
         ActivityResponse,

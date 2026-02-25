@@ -64,7 +64,7 @@ os.environ.setdefault("SLACK_APP_TOKEN", "test-app-token")
 os.environ.setdefault("OPENAI_API_KEY", "test-openai-key")
 
 
-def _patched_command(self: Any, command: dict | str, **kwargs: Any) -> dict:
+def _patched_command(self: Any, command: dict[str, Any] | str, **kwargs: Any) -> dict[str, Any]:
     """Patch mongomock's command method to support Bunnet's buildInfo call."""
     if isinstance(command, str):
         command = {command: 1}
@@ -91,7 +91,7 @@ def _patched_command(self: Any, command: dict | str, **kwargs: Any) -> dict:
 
 
 @pytest.fixture
-def init_db() -> Generator[Database, None, None]:
+def init_db() -> Generator[Database[Any], None, None]:
     """Initialize Bunnet with in-memory mongomock database.
 
     This fixture sets up an in-memory MongoDB using mongomock,
@@ -110,7 +110,7 @@ def init_db() -> Generator[Database, None, None]:
     db_session._database = None
 
     # Create in-memory MongoDB client using mongomock
-    client = mongomock.MongoClient()
+    client: mongomock.MongoClient = mongomock.MongoClient()  # type: ignore[type-arg]
     db_name = "qdash_test"
 
     # Patch mongomock's command method to support Bunnet

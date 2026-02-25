@@ -5,6 +5,7 @@ from qdash.datamodel.execution import (
     ExecutionModel,
     ExecutionStatusModel,
 )
+from qdash.datamodel.system_info import SystemInfoModel
 from qdash.repository.inmemory import (
     InMemoryExecutionCounterRepository,
     InMemoryExecutionLockRepository,
@@ -27,15 +28,13 @@ class TestInMemoryExecutionRepository:
             calib_data_path="/tmp",
             note={},
             status=ExecutionStatusModel.SCHEDULED,
-            task_results={},
             tags=[],
             chip_id="chip_1",
             start_at=None,
             end_at=None,
             elapsed_time=None,
-            calib_data={"qubit": {}, "coupling": {}},
             message="",
-            system_info={},
+            system_info=SystemInfoModel(),
         )
 
         repo.save(model)
@@ -61,15 +60,13 @@ class TestInMemoryExecutionRepository:
             calib_data_path="/tmp",
             note={},
             status=ExecutionStatusModel.SCHEDULED,
-            task_results={},
             tags=[],
             chip_id="chip_1",
             start_at=None,
             end_at=None,
             elapsed_time=None,
-            calib_data={"qubit": {}, "coupling": {}},
             message="",
-            system_info={},
+            system_info=SystemInfoModel(),
         )
         repo.save(model)
 
@@ -90,15 +87,13 @@ class TestInMemoryExecutionRepository:
             calib_data_path="/tmp",
             note={},
             status=ExecutionStatusModel.SCHEDULED,
-            task_results={},
             tags=[],
             chip_id="chip_1",
             start_at=None,
             end_at=None,
             elapsed_time=None,
-            calib_data={"qubit": {}, "coupling": {}},
             message="",
-            system_info={},
+            system_info=SystemInfoModel(),
         )
 
         def update_status(m: ExecutionModel) -> None:
@@ -128,15 +123,13 @@ class TestInMemoryExecutionRepository:
             calib_data_path="/tmp",
             note={},
             status=ExecutionStatusModel.SCHEDULED,
-            task_results={},
             tags=[],
             chip_id="chip_1",
             start_at=None,
             end_at=None,
             elapsed_time=None,
-            calib_data={"qubit": {}, "coupling": {}},
             message="",
-            system_info={},
+            system_info=SystemInfoModel(),
         )
         repo.save(model)
 
@@ -328,15 +321,13 @@ class TestInMemoryTaskResultHistoryRepository:
             calib_data_path="/tmp",
             note={},
             status=ExecutionStatusModel.RUNNING,
-            task_results={},
             tags=[],
             chip_id="chip_1",
             start_at=None,
             end_at=None,
             elapsed_time=None,
-            calib_data={"qubit": {}, "coupling": {}},
             message="",
-            system_info={},
+            system_info=SystemInfoModel(),
             project_id="proj-1",
         )
 
@@ -367,15 +358,13 @@ class TestInMemoryTaskResultHistoryRepository:
             calib_data_path="/tmp",
             note={},
             status=ExecutionStatusModel.RUNNING,
-            task_results={},
             tags=[],
             chip_id="chip_1",
             start_at=None,
             end_at=None,
             elapsed_time=None,
-            calib_data={"qubit": {}, "coupling": {}},
             message="",
-            system_info={},
+            system_info=SystemInfoModel(),
             project_id="proj-1",
         )
         task_result = QubitTaskModel(name="Test", qid="0", project_id="proj-1")

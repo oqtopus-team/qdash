@@ -14,7 +14,7 @@ class ConcreteQubexTask(QubexTask):
     name: str = "TestTask"
 
     def run(self, backend: Any, qid: str) -> RunResult:
-        return RunResult(output_parameters={})
+        return RunResult(raw_result={})
 
     def postprocess(self, backend: Any, qid: str, result: RunResult) -> None:
         pass
@@ -51,7 +51,9 @@ class TestLoadParametersFromDbQubitTask:
             MockQubitRepo.return_value.get_calibration_data.return_value = qubit_data
             task._load_parameters_from_db(backend, "0")
 
-        assert task.input_parameters["control_qubit_frequency"].value == 5.2
+        param = task.input_parameters["control_qubit_frequency"]
+        assert param is not None
+        assert param.value == 5.2
 
     def test_qubit_task_falls_back_to_dict_key_when_no_parameter_name(self):
         """When parameter_name is empty, dict key is used as lookup."""
@@ -71,7 +73,9 @@ class TestLoadParametersFromDbQubitTask:
             MockQubitRepo.return_value.get_calibration_data.return_value = qubit_data
             task._load_parameters_from_db(backend, "0")
 
-        assert task.input_parameters["qubit_frequency"].value == 4.8
+        param = task.input_parameters["qubit_frequency"]
+        assert param is not None
+        assert param.value == 4.8
 
 
 class TestLoadParametersFromDbCouplingTask:
@@ -93,7 +97,7 @@ class TestLoadParametersFromDbCouplingTask:
         target_qubit_data = {
             "qubit_frequency": {"value": 6.0, "unit": "GHz"},
         }
-        coupling_data: dict = {}
+        coupling_data: dict[str, Any] = {}
 
         backend = _make_backend()
         with (
@@ -113,7 +117,9 @@ class TestLoadParametersFromDbCouplingTask:
 
             task._load_parameters_from_db(backend, "0-1")
 
-        assert task.input_parameters["control_qubit_frequency"].value == 5.0
+        param = task.input_parameters["control_qubit_frequency"]
+        assert param is not None
+        assert param.value == 5.0
 
     def test_target_qubit_param_loaded_from_qubit_document(self):
         """For qid_role='target', parameter should be loaded from target qubit's
@@ -125,11 +131,11 @@ class TestLoadParametersFromDbCouplingTask:
             ),
         }
 
-        control_qubit_data: dict = {}
+        control_qubit_data: dict[str, Any] = {}
         target_qubit_data = {
             "qubit_frequency": {"value": 6.5, "unit": "GHz"},
         }
-        coupling_data: dict = {}
+        coupling_data: dict[str, Any] = {}
 
         backend = _make_backend()
         with (
@@ -149,7 +155,9 @@ class TestLoadParametersFromDbCouplingTask:
 
             task._load_parameters_from_db(backend, "0-1")
 
-        assert task.input_parameters["target_qubit_frequency"].value == 6.5
+        param = task.input_parameters["target_qubit_frequency"]
+        assert param is not None
+        assert param.value == 6.5
 
     def test_cr_amplitude_falls_back_to_coupling_document(self):
         """cr_amplitude has qid_role='control' but data lives in CouplingDocument.
@@ -162,8 +170,8 @@ class TestLoadParametersFromDbCouplingTask:
         }
 
         # cr_amplitude is NOT in control qubit data
-        control_qubit_data: dict = {}
-        target_qubit_data: dict = {}
+        control_qubit_data: dict[str, Any] = {}
+        target_qubit_data: dict[str, Any] = {}
         # But IS in coupling data
         coupling_data = {
             "cr_amplitude": {"value": 0.45, "unit": "a.u."},
@@ -187,7 +195,9 @@ class TestLoadParametersFromDbCouplingTask:
 
             task._load_parameters_from_db(backend, "0-1")
 
-        assert task.input_parameters["cr_amplitude"].value == 0.45
+        param = task.input_parameters["cr_amplitude"]
+        assert param is not None
+        assert param.value == 0.45
 
     def test_coupling_role_param_loaded_from_coupling_document(self):
         """For qid_role='coupling', parameter should be loaded directly from
@@ -199,8 +209,8 @@ class TestLoadParametersFromDbCouplingTask:
             ),
         }
 
-        control_qubit_data: dict = {}
-        target_qubit_data: dict = {}
+        control_qubit_data: dict[str, Any] = {}
+        target_qubit_data: dict[str, Any] = {}
         coupling_data = {
             "zx_rotation_rate": {"value": 1.23, "unit": "a.u."},
         }
@@ -223,7 +233,9 @@ class TestLoadParametersFromDbCouplingTask:
 
             task._load_parameters_from_db(backend, "0-1")
 
-        assert task.input_parameters["zx_rotation_rate"].value == 1.23
+        param = task.input_parameters["zx_rotation_rate"]
+        assert param is not None
+        assert param.value == 1.23
 
     def test_parameter_not_found_creates_empty_parameter_model(self):
         """When a parameter (with value None) is not found in any source,
@@ -233,9 +245,9 @@ class TestLoadParametersFromDbCouplingTask:
             "missing_param": None,
         }
 
-        control_qubit_data: dict = {}
-        target_qubit_data: dict = {}
-        coupling_data: dict = {}
+        control_qubit_data: dict[str, Any] = {}
+        target_qubit_data: dict[str, Any] = {}
+        coupling_data: dict[str, Any] = {}
 
         backend = _make_backend()
         with (
@@ -303,7 +315,15 @@ class TestLoadParametersFromDbCouplingTask:
 
             task._load_parameters_from_db(backend, "0-1")
 
-        assert task.input_parameters["control_qubit_frequency"].value == 5.0
-        assert task.input_parameters["target_qubit_frequency"].value == 6.0
-        assert task.input_parameters["zx_rotation_rate"].value == 1.5
-        assert task.input_parameters["cr_amplitude"].value == 0.3
+        p1 = task.input_parameters["control_qubit_frequency"]
+        assert p1 is not None
+        assert p1.value == 5.0
+        p2 = task.input_parameters["target_qubit_frequency"]
+        assert p2 is not None
+        assert p2.value == 6.0
+        p3 = task.input_parameters["zx_rotation_rate"]
+        assert p3 is not None
+        assert p3.value == 1.5
+        p4 = task.input_parameters["cr_amplitude"]
+        assert p4 is not None
+        assert p4.value == 0.3
