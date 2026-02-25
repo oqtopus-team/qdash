@@ -1,11 +1,9 @@
 """Tests for push_github module, focusing on _sync_local_repo."""
 
 import logging
-import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pytest
 from git import Repo
 from git.exc import GitCommandError, InvalidGitRepositoryError
 
