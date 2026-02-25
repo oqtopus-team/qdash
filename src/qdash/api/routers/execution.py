@@ -235,9 +235,13 @@ async def re_execute_from_snapshot(
             detail=f"Source execution {execution_id} not found",
         )
 
-    # Use the original execution's username for flow lookup,
-    # since the flow is owned by whoever created and ran it.
+    # Verify the requesting user owns the source execution.
     flow_owner = metadata["username"]
+    if flow_owner != ctx.user.username:
+        raise HTTPException(
+            status_code=403,
+            detail="You can only re-execute your own executions",
+        )
 
     return await flow_service.re_execute_from_snapshot(
         flow_name=request.flow_name,

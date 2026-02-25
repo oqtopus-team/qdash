@@ -456,6 +456,13 @@ async def re_execute_task_result(
             detail=f"Task result '{task_id}' not found",
         )
 
+    # Verify the requesting user owns the source task result.
+    if doc.username != ctx.user.username:
+        raise HTTPException(
+            status_code=403,
+            detail="You can only re-execute your own task results",
+        )
+
     return await flow_service.execute_single_task_from_snapshot(
         task_name=doc.name,
         qid=doc.qid,
