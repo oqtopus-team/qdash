@@ -545,7 +545,7 @@ export function Sidebar() {
       {/* Desktop Sidebar */}
       <aside
         className={`bg-base-200 h-full transition-all duration-300 hidden lg:flex lg:flex-col ${
-          isOpen ? "w-52" : "w-16"
+          isOpen ? "w-44" : "w-16"
         }`}
       >
         <div className="flex justify-end p-2">
@@ -571,7 +571,7 @@ export function Sidebar() {
 
       {/* Mobile Sidebar Drawer */}
       <aside
-        className={`fixed top-0 left-0 h-full w-56 bg-base-200 z-50 transform transition-transform duration-300 lg:hidden flex flex-col ${
+        className={`fixed top-0 left-0 h-full w-48 bg-base-200 z-50 transform transition-transform duration-300 lg:hidden flex flex-col ${
           isMobileOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >

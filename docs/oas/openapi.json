@@ -4494,6 +4494,15 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_reExecuteTaskResult"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -8264,6 +8273,28 @@
           "password"
         ],
         "title": "Body_login"
+      },
+      "Body_reExecuteTaskResult": {
+        "properties": {
+          "parameter_overrides": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parameter Overrides",
+            "description": "Optional parameter overrides: {run: {...}, input: {...}}"
+          }
+        },
+        "type": "object",
+        "title": "Body_reExecuteTaskResult"
       },
       "CalibrationNoteResponse": {
         "properties": {
