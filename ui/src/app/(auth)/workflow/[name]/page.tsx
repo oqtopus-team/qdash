@@ -13,7 +13,10 @@ import { useToast } from "@/components/ui/Toast";
 
 import { useGetCurrentUser } from "@/client/auth/auth";
 import { useListChips } from "@/client/chip/chip";
-import { useGetExecutionLockStatus } from "@/client/execution/execution";
+import {
+  useGetExecutionLockStatus,
+  useCancelExecution,
+} from "@/client/execution/execution";
 import {
   getFlow,
   saveFlow,
@@ -30,6 +33,7 @@ import {
   Plus,
   Save,
   Settings,
+  StopCircle,
   Trash2,
   X,
 } from "lucide-react";
@@ -59,6 +63,7 @@ export default function EditFlowPage() {
   const [defaultInterval, setDefaultInterval] = useState("");
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showExecuteConfirm, setShowExecuteConfirm] = useState(false);
+  const [lastExecutionId, setLastExecutionId] = useState<string | null>(null);
   const [cursorPosition, setCursorPosition] = useState({ line: 1, column: 1 });
   const [activeTab, setActiveTab] = useState<"code" | "helpers">("code");
   const [showPropertiesModal, setShowPropertiesModal] = useState(false);
@@ -116,12 +121,31 @@ export default function EditFlowPage() {
   const executeMutation = useExecuteFlow({
     mutation: {
       onSuccess: (response: AxiosResponse<ExecuteFlowResponse>) => {
+        const execId = response.data.execution_id || null;
+        setLastExecutionId(execId);
         toast.success(
-          `Flow execution started! Execution ID: ${response.data.execution_id || "N/A"}`,
+          `Flow execution started! Execution ID: ${execId || "N/A"}`,
         );
       },
     },
   });
+
+  const cancelMutation = useCancelExecution({
+    mutation: {
+      onSuccess: () => {
+        toast.success("Cancellation requested successfully");
+        setLastExecutionId(null);
+      },
+      onError: (error: unknown) => {
+        const detail =
+          (error as { response?: { data?: { detail?: string } } })?.response
+            ?.data?.detail || "Failed to cancel execution";
+        toast.error(detail);
+      },
+    },
+  });
+
+  const canCancel = !!lastExecutionId && !!lockStatus?.data.lock;
 
   useEffect(() => {
     if (data?.data) {
@@ -313,6 +337,24 @@ export default function EditFlowPage() {
                 {lockStatus?.data.lock ? "Locked" : "Execute"}
               </span>
             </button>
+            {canCancel && (
+              <button
+                onClick={() =>
+                  lastExecutionId &&
+                  cancelMutation.mutate({ flowRunId: lastExecutionId })
+                }
+                className="btn btn-sm btn-error btn-outline"
+                disabled={cancelMutation.isPending}
+                title="Cancel the running execution"
+              >
+                {cancelMutation.isPending ? (
+                  <span className="loading loading-spinner loading-xs"></span>
+                ) : (
+                  <StopCircle size={16} />
+                )}
+                <span className="ml-1">Cancel</span>
+              </button>
+            )}
             <button
               onClick={() => setShowDeleteConfirm(true)}
               className="btn btn-sm btn-error"
@@ -524,6 +566,28 @@ export default function EditFlowPage() {
               )}
             </button>
           </div>
+          {/* Cancel Button (mobile) */}
+          {canCancel && (
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium bg-base-100 px-2 py-1 rounded shadow">
+                Cancel
+              </span>
+              <button
+                onClick={() =>
+                  lastExecutionId &&
+                  cancelMutation.mutate({ flowRunId: lastExecutionId })
+                }
+                className="btn btn-circle btn-error btn-outline shadow-lg"
+                disabled={cancelMutation.isPending}
+              >
+                {cancelMutation.isPending ? (
+                  <span className="loading loading-spinner loading-sm"></span>
+                ) : (
+                  <StopCircle size={20} />
+                )}
+              </button>
+            </div>
+          )}
           {/* Save Button */}
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium bg-base-100 px-2 py-1 rounded shadow">

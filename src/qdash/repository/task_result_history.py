@@ -231,6 +231,59 @@ class MongoTaskResultHistoryRepository:
         # Return the number of documents modified
         return result.modified_count if result else 0
 
+    def finalize_tasks_on_cancel(
+        self,
+        *,
+        project_id: str,
+        execution_id: str,
+        message: str = "Execution was cancelled",
+    ) -> int:
+        """Mark non-terminal tasks as cancelled for the given execution.
+
+        When an execution is cancelled, tasks in running/scheduled/pending
+        status should be marked as cancelled to distinguish from real failures.
+
+        Parameters
+        ----------
+        project_id : str
+            The project identifier
+        execution_id : str
+            The execution identifier
+        message : str
+            The cancellation message to set on affected tasks
+
+        Returns
+        -------
+        int
+            Number of tasks that were updated
+
+        """
+        from qdash.common.datetime_utils import now
+
+        end_time = now()
+
+        result = (
+            TaskResultHistoryDocument.find(
+                {
+                    "project_id": project_id,
+                    "execution_id": execution_id,
+                    "status": {"$in": ["running", "scheduled", "pending"]},
+                }
+            )
+            .update_many(
+                {
+                    "$set": {
+                        "status": "cancelled",
+                        "message": message,
+                        "end_at": end_time,
+                    }
+                }
+            )
+            .run()
+        )
+
+        return result.modified_count if result else 0
+
     def aggregate_latest_metrics(
         self,
         *,

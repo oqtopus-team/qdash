@@ -162,6 +162,7 @@ class ExecutionStatusModel(str, Enum):
     RUNNING = "running"
     COMPLETED = "completed"
     FAILED = "failed"
+    CANCELLED = "cancelled"
 
 class ExecutionModel(BaseModel):
     project_id: str        # Owning project ID
@@ -194,6 +195,7 @@ class TaskStatusModel(str, Enum):
     FAILED = "failed"
     PENDING = "pending"
     SKIPPED = "skipped"
+    CANCELLED = "cancelled"
 
 class RunParameterModel(BaseModel):
     """Experiment configuration parameters (shots, ranges, etc.)."""
@@ -784,6 +786,23 @@ Other project-scoped collections (tasks, tags, backends, flows, counters, locks,
 4. Save execution metadata to **ExecutionHistoryDocument** (status, timing, notes only)
 5. Save chip snapshot to **ChipHistoryDocument**
 6. Release **ExecutionLock**
+
+### During Cancellation
+
+When a user cancels a running execution via the UI:
+
+1. UI sends `POST /executions/{flow_run_id}/cancel` with the Prefect flow run UUID
+2. API sets the Prefect flow run to `Cancelling` state via the Prefect client
+3. Prefect sends SIGTERM to the worker process running the flow
+4. Prefect triggers the `on_cancellation` hook registered on the `@flow` decorator
+5. The hook reads `flow_run_id` from the execution's `note` field to locate the execution
+6. All non-terminal tasks (running/scheduled/pending) are set to `cancelled`
+7. The execution status is set to `cancelled`
+8. The **ExecutionLock** is released
+
+> **Note**: The `flow_run_id` (Prefect UUID) is stored in `ExecutionHistoryDocument.note["flow_run_id"]`
+> at the start of each flow run. This bridges the QDash execution ID (`YYYYMMDD-NNN`) with
+> the Prefect flow run UUID, enabling the cancel operation.
 
 ### Data Architecture (256+ Qubit Support)
 

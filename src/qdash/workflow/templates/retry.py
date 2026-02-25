@@ -28,9 +28,10 @@ from typing import Any
 
 from prefect import flow, get_run_logger
 from qdash.workflow.service import CalibService
+from qdash.workflow.service.calib_service import on_flow_cancellation
 
 
-@flow
+@flow(on_cancellation=[on_flow_cancellation])
 def parallel_retry_calibration(
     username: str,
     chip_id: str,
@@ -125,7 +126,13 @@ def parallel_retry_calibration(
         cal.finish_calibration()
         return results
 
-    except Exception as e:
-        logger.error(f"Calibration failed: {e}")
-        cal.fail_calibration(str(e))
+    except BaseException as e:
+        from qdash.workflow.service.calib_service import _is_cancellation
+
+        if _is_cancellation(e):
+            logger.info("Calibration was cancelled")
+            cal.cancel_calibration()
+        else:
+            logger.error(f"Calibration failed: {e}")
+            cal.fail_calibration(str(e))
         raise

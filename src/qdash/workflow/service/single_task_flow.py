@@ -13,10 +13,10 @@ import contextlib
 from typing import Any
 
 from prefect import flow, get_run_logger
-from qdash.workflow.service.calib_service import CalibService
+from qdash.workflow.service.calib_service import CalibService, on_flow_cancellation
 
 
-@flow(name="single-task-executor")
+@flow(name="single-task-executor", on_cancellation=[on_flow_cancellation])
 def single_task_executor(
     username: str,
     chip_id: str,
@@ -74,8 +74,15 @@ def single_task_executor(
 
         logger.info(f"Single-task executor completed: {task_name} / {qid}")
         return result
-    except Exception as e:
-        logger.error(f"Single-task executor failed: {e}")
-        with contextlib.suppress(Exception):
-            cal.fail_calibration(str(e))
+    except BaseException as e:
+        from qdash.workflow.service.calib_service import _is_cancellation
+
+        if _is_cancellation(e):
+            logger.info("Single-task executor was cancelled")
+            with contextlib.suppress(Exception):
+                cal.cancel_calibration()
+        else:
+            logger.error(f"Single-task executor failed: {e}")
+            with contextlib.suppress(Exception):
+                cal.fail_calibration(str(e))
         raise

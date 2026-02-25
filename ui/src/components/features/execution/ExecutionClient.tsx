@@ -12,6 +12,7 @@ import {
   ExternalLink,
   LayoutGrid,
   List,
+  StopCircle,
   XCircle,
 } from "lucide-react";
 import Select, { type SingleValue, type StylesConfig } from "react-select";
@@ -26,7 +27,10 @@ import { ExecutionDAG } from "./ExecutionDAG";
 
 import type { ExecutionResponseDetail, Task } from "@/schemas";
 
-import { useGetExecution } from "@/client/execution/execution";
+import {
+  useGetExecution,
+  useCancelExecution,
+} from "@/client/execution/execution";
 import { InteractiveFigureModal } from "@/components/charts/InteractiveFigureModal";
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { TaskGridView } from "@/components/features/chip/TaskGridView";
@@ -58,6 +62,7 @@ export function ExecutionDetailClient({
   );
   const [filterQubitId, setFilterQubitId] = useState<string>("all");
   const [filterTaskName, setFilterTaskName] = useState<string>("all");
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
 
   const calculateDetailedDuration = (
     start: string | null | undefined,
@@ -95,6 +100,8 @@ export function ExecutionDetailClient({
     },
   });
 
+  const cancelMutation = useCancelExecution();
+
   const execution = executionDetailData?.data as
     | (ExecutionResponseDetail & {
         tags?: string[];
@@ -102,6 +109,29 @@ export function ExecutionDetailClient({
         flow_name?: string;
       })
     | undefined;
+
+  const flowRunId = execution?.note?.flow_run_id as string | undefined;
+
+  const isCancellable =
+    !!flowRunId &&
+    (execution?.status === "running" ||
+      execution?.status === "scheduled" ||
+      execution?.status === "pending");
+
+  const handleCancel = () => {
+    if (!flowRunId) return;
+    cancelMutation.mutate(
+      { flowRunId },
+      {
+        onSuccess: () => {
+          setShowCancelConfirm(false);
+        },
+        onError: () => {
+          setShowCancelConfirm(false);
+        },
+      },
+    );
+  };
 
   // Extract unique qubit IDs and task names for filtering
   const uniqueQubitIds = useMemo(() => {
@@ -252,6 +282,8 @@ export function ExecutionDetailClient({
         return <CheckCircle className="text-success" size={18} />;
       case "failed":
         return <XCircle className="text-error" size={18} />;
+      case "cancelled":
+        return <StopCircle className="text-neutral" size={18} />;
       case "running":
         return <Clock className="text-info" size={18} />;
       default:
@@ -265,6 +297,8 @@ export function ExecutionDetailClient({
         return <span className="badge badge-success badge-sm">Completed</span>;
       case "failed":
         return <span className="badge badge-error badge-sm">Failed</span>;
+      case "cancelled":
+        return <span className="badge badge-neutral badge-sm">Cancelled</span>;
       case "running":
         return (
           <span className="badge badge-info badge-sm status-pulse">
@@ -311,6 +345,18 @@ export function ExecutionDetailClient({
               {execution.name}
             </h1>
             <div className="flex flex-col sm:flex-row gap-2 sm:gap-4">
+              {isCancellable && (
+                <button
+                  onClick={() => setShowCancelConfirm(true)}
+                  disabled={cancelMutation.isPending}
+                  className="bg-error text-error-content px-4 py-2 rounded flex items-center justify-center hover:opacity-80 transition-colors text-sm sm:text-base disabled:opacity-50"
+                >
+                  <StopCircle className="mr-2" size={16} />
+                  {cancelMutation.isPending
+                    ? "Cancelling..."
+                    : "Cancel Execution"}
+                </button>
+              )}
               <a
                 href={`/execution/${executionId}/experiment`}
                 className="bg-neutral text-neutral-content px-4 py-2 rounded flex items-center justify-center hover:opacity-80 transition-colors text-sm sm:text-base"
@@ -924,6 +970,67 @@ export function ExecutionDetailClient({
           )}
         </div>
       </div>
+
+      {/* Cancel Confirmation Modal */}
+      {showCancelConfirm && (
+        <div className="modal modal-open">
+          <div className="modal-box">
+            <h3 className="font-bold text-lg">Cancel Execution</h3>
+            <p className="py-4">
+              Are you sure you want to cancel this execution? This action cannot
+              be undone.
+            </p>
+            {cancelMutation.isError && (
+              <div className="alert alert-error mb-4">
+                <XCircle size={16} />
+                <span>
+                  {(
+                    cancelMutation.error as {
+                      response?: { data?: { detail?: string } };
+                    }
+                  )?.response?.data?.detail || "Failed to cancel execution"}
+                </span>
+              </div>
+            )}
+            <div className="modal-action">
+              <button
+                className="btn btn-ghost"
+                onClick={() => setShowCancelConfirm(false)}
+                disabled={cancelMutation.isPending}
+              >
+                Close
+              </button>
+              <button
+                className="btn btn-error"
+                onClick={handleCancel}
+                disabled={cancelMutation.isPending}
+              >
+                {cancelMutation.isPending ? (
+                  <span className="loading loading-spinner loading-sm" />
+                ) : (
+                  "Cancel Execution"
+                )}
+              </button>
+            </div>
+          </div>
+          <div
+            className="modal-backdrop"
+            onClick={() =>
+              !cancelMutation.isPending && setShowCancelConfirm(false)
+            }
+          />
+        </div>
+      )}
+
+      {/* Cancel success alert */}
+      {cancelMutation.isSuccess && (
+        <div className="toast toast-end">
+          <div className="alert alert-success">
+            <CheckCircle size={16} />
+            <span>Cancellation requested successfully</span>
+          </div>
+        </div>
+      )}
 
       {/* Figure Expansion Modal - Interactive View Only */}
       <InteractiveFigureModal

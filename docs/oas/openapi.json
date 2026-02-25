@@ -14,11 +14,6 @@
     },
     "version": "0.0.1"
   },
-  "servers": [
-    {
-      "url": "/api"
-    }
-  ],
   "paths": {
     "/auth/login": {
       "post": {
@@ -1660,6 +1655,70 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ExecutionResponseDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/executions/{flow_run_id}/cancel": {
+      "post": {
+        "tags": [
+          "execution"
+        ],
+        "summary": "Cancel a running or scheduled execution",
+        "description": "Cancel a running or scheduled execution via Prefect.\n\nSends a cancellation request to Prefect for the specified flow run.\nThe flow_run_id is the Prefect flow run UUID, which can be obtained from\nthe execution detail's note.flow_run_id field.\nOnly executions in SCHEDULED, PENDING, RUNNING, or PAUSED state can be cancelled.\n\nParameters\n----------\nflow_run_id : str\n    Prefect flow run UUID\nctx : ProjectContext\n    Project context with user and project information\nexecution_service : ExecutionService\n    Service for execution operations\n\nReturns\n-------\nCancelExecutionResponse\n    Cancellation result with status",
+        "operationId": "cancelExecution",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "flow_run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Flow Run Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CancelExecutionResponse"
                 }
               }
             }
@@ -8338,6 +8397,30 @@
         "title": "CalibrationNoteResponse",
         "description": "CalibrationNote is a subclass of BaseModel."
       },
+      "CancelExecutionResponse": {
+        "properties": {
+          "execution_id": {
+            "type": "string",
+            "title": "Execution Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "execution_id",
+          "status",
+          "message"
+        ],
+        "title": "CancelExecutionResponse",
+        "description": "Response model for cancelling an execution."
+      },
       "ChipDatesResponse": {
         "properties": {
           "data": {
@@ -14148,6 +14231,13 @@
           "type": {
             "type": "string",
             "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
           }
         },
         "type": "object",
@@ -14253,5 +14343,10 @@
         "scheme": "bearer"
       }
     }
-  }
+  },
+  "servers": [
+    {
+      "url": "/api"
+    }
+  ]
 }

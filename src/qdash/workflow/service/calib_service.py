@@ -58,8 +58,131 @@ from qdash.workflow.service.github import GitHubIntegration, GitHubPushConfig
 
 logger = logging.getLogger(__name__)
 
+
+def _is_cancellation(exc: BaseException) -> bool:
+    """Check if an exception represents a Prefect cancellation.
+
+    Prefect 3 raises ``prefect.exceptions.CancelledRun`` (a ``BaseException``
+    subclass) when a flow run is cancelled.  We check by class name to avoid
+    a hard import dependency on prefect in non-workflow contexts.
+    """
+    return any(cls.__name__ in ("CancelledRun", "CancelledError") for cls in type(exc).__mro__)
+
+
+def on_flow_cancellation(flow: Any, flow_run: Any, state: Any) -> None:
+    """Prefect on_cancellation hook for flow runs.
+
+    Called by Prefect after the flow process is killed (SIGTERM).
+    This runs in a *separate* process, so it cannot access in-memory state.
+    Instead, it reads the flow_run parameters and updates MongoDB directly.
+
+    Usage::
+
+        @flow(on_cancellation=[on_flow_cancellation])
+        def my_flow(username, chip_id, ...):
+            ...
+
+    """
+    _logger = logging.getLogger(__name__)
+    try:
+        params = flow_run.parameters or {}
+        project_id = params.get("project_id")
+        flow_run_id = str(flow_run.id)
+
+        if not project_id:
+            _logger.warning("on_flow_cancellation: no project_id in parameters, skipping")
+            return
+
+        from qdash.dbmodel.initialize import initialize
+
+        initialize()
+
+        _cancel_executions_by_flow_run_id(flow_run_id, project_id, _logger)
+    except Exception:
+        _logger.error("on_flow_cancellation failed", exc_info=True)
+
+
+def _cancel_executions_by_flow_run_id(
+    flow_run_id: str,
+    project_id: str,
+    _logger: Any,
+) -> None:
+    """Find executions with the given flow_run_id in note and mark as cancelled."""
+    from qdash.common.datetime_utils import now
+    from qdash.dbmodel.execution_history import ExecutionHistoryDocument
+    from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
+
+    end_time = now()
+
+    # Find executions that have this flow_run_id in their note
+    executions = ExecutionHistoryDocument.find(
+        {
+            "project_id": project_id,
+            "note.flow_run_id": flow_run_id,
+            "status": {"$in": ["running", "scheduled"]},
+        }
+    ).run()
+
+    if not executions:
+        _logger.info(
+            "on_flow_cancellation: no active executions found for flow_run_id=%s",
+            flow_run_id,
+        )
+        return
+
+    for execution in executions:
+        execution_id = execution.execution_id
+        _logger.info("Cancelling execution %s (flow_run_id=%s)", execution_id, flow_run_id)
+
+        # Update execution status to cancelled
+        ExecutionHistoryDocument.find(
+            {"project_id": project_id, "execution_id": execution_id}
+        ).update_many({"$set": {"status": "cancelled", "end_at": end_time}}).run()
+
+        # Update non-terminal tasks to cancelled
+        result = (
+            TaskResultHistoryDocument.find(
+                {
+                    "project_id": project_id,
+                    "execution_id": execution_id,
+                    "status": {"$in": ["running", "scheduled", "pending"]},
+                }
+            )
+            .update_many(
+                {
+                    "$set": {
+                        "status": "cancelled",
+                        "message": "Execution was cancelled",
+                        "end_at": end_time,
+                    }
+                }
+            )
+            .run()
+        )
+
+        task_count = result.modified_count if result else 0
+        _logger.info(
+            "Cancelled execution %s: %d task(s) updated",
+            execution_id,
+            task_count,
+        )
+
+    # Also release execution lock
+    try:
+        from qdash.dbmodel.execution_lock import ExecutionLockDocument
+
+        lock_doc = ExecutionLockDocument.find_one({"project_id": project_id}).run()
+        if lock_doc and lock_doc.locked:
+            lock_doc.locked = False
+            lock_doc.save()
+            _logger.info("Released execution lock for project %s", project_id)
+    except Exception:
+        _logger.warning("Failed to release execution lock", exc_info=True)
+
+
 __all__ = [
     "CalibService",
+    "on_flow_cancellation",
     "generate_execution_id",
     # Re-exported for backward compatibility (used by strategy.py, two_qubit.py)
     "finish_calibration",
@@ -257,6 +380,23 @@ class CalibService:
             logger.debug("No Prefect run context available for source_execution_id")
         return None
 
+    def _store_flow_run_id(self) -> None:
+        """Store Prefect flow_run_id in execution note for cancel support."""
+        if self.skip_execution:
+            return
+        try:
+            from prefect.context import get_run_context
+
+            ctx = get_run_context()
+            if ctx and ctx.flow_run:
+                flow_run_id = str(ctx.flow_run.id)
+                es = self.execution_service
+                if es is not None:
+                    es.update_note("flow_run_id", flow_run_id)
+                    logger.info("Stored flow_run_id=%s in execution note", flow_run_id)
+        except Exception:
+            logger.debug("Could not store flow_run_id in execution note", exc_info=True)
+
     def _load_default_run_parameters(self) -> None:
         """Load default_run_parameters from the flow document in MongoDB."""
         try:
@@ -382,6 +522,10 @@ class CalibService:
             )
             self._orchestrator._source_task_id = self._source_task_id
             self._orchestrator.initialize()
+
+            # Store Prefect flow_run_id in execution note for cancel support
+            self._store_flow_run_id()
+
             self._initialized = True
         except Exception:
             # Release lock if initialization fails
@@ -633,6 +777,58 @@ class CalibService:
         except Exception as e:
             logger.warning(f"Failed to finalize stale running tasks: {e}")
 
+    def _finalize_tasks_on_cancel(
+        self,
+        logger: Any,
+        message: str = "Execution was cancelled",
+    ) -> None:
+        """Mark non-terminal tasks as cancelled for this execution.
+
+        Unlike _finalize_stale_running_tasks which only targets RUNNING tasks,
+        this method also marks SCHEDULED and PENDING tasks as cancelled.
+
+        Args:
+            logger: Logger instance for output
+            message: Cancellation message to set on tasks
+
+        """
+        if self.execution_service is None or self.execution_id is None:
+            return
+
+        project_id = self.execution_service.project_id
+        if project_id is None:
+            return
+
+        try:
+            from qdash.repository import MongoTaskResultHistoryRepository
+
+            repo = MongoTaskResultHistoryRepository()
+
+            retry_delays = [0.5, 1, 2, 3, 5]
+
+            for attempt, delay in enumerate(retry_delays):
+                count = repo.finalize_tasks_on_cancel(
+                    project_id=project_id,
+                    execution_id=self.execution_id,
+                    message=message,
+                )
+                if count > 0:
+                    logger.warning(
+                        f"[attempt {attempt + 1}/{len(retry_delays)}] "
+                        f"Cancelled {count} non-terminal task(s) "
+                        f"for execution {self.execution_id}"
+                    )
+                    if attempt < len(retry_delays) - 1:
+                        time.sleep(delay)
+                else:
+                    if attempt == 0:
+                        logger.info(
+                            f"All tasks in terminal state for execution {self.execution_id}"
+                        )
+                    break
+        except Exception as e:
+            logger.warning(f"Failed to finalize tasks on cancel: {e}")
+
     def _sync_backend_params_before_push(self, logger: Any) -> None:
         """Sync recent calibration results into backend YAML params prior to GitHub push."""
         assert self.execution_service is not None, "ExecutionService not initialized"
@@ -844,6 +1040,28 @@ class CalibService:
             self._release_lock_if_acquired()
             self._initialized = False
 
+    def cancel_calibration(self) -> None:
+        """Mark the calibration as cancelled and cleanup.
+
+        This should be called when a Prefect CancelledRun exception is caught
+        to properly distinguish cancellation from failure.
+        """
+        run_logger = get_run_logger()
+        try:
+            if self.skip_execution:
+                return
+
+            # Mark non-terminal tasks as cancelled
+            if self.execution_service:
+                self._finalize_tasks_on_cancel(run_logger)
+
+            # Reload and mark execution as cancelled
+            if self.execution_service:
+                self.execution_service = self.execution_service.reload().cancel()
+        finally:
+            self._release_lock_if_acquired()
+            self._initialized = False
+
     # =========================================================================
     # High-level API Methods
     # =========================================================================
@@ -938,10 +1156,15 @@ class CalibService:
 
             # Finalize execution (mark as completed, update chip history)
             self.finish_calibration()
-        except Exception:
-            # Mark execution as failed on error and release lock (best effort)
+        except BaseException as exc:
+            # Distinguish cancellation from failure.
+            # Prefect 3 raises CancelledRun (subclass of BaseException) on cancel.
             with contextlib.suppress(Exception):
-                self.fail_calibration()
+                if _is_cancellation(exc):
+                    logger.info("Execution was cancelled")
+                    self.cancel_calibration()
+                else:
+                    self.fail_calibration()
             raise
         finally:
             # Clear session when done

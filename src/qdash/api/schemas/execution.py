@@ -135,6 +135,14 @@ class ReExecuteRequest(BaseModel):
     parameter_overrides: dict[str, Any] = {}
 
 
+class CancelExecutionResponse(BaseModel):
+    """Response model for cancelling an execution."""
+
+    execution_id: str
+    status: str
+    message: str
+
+
 class ListExecutionsResponse(BaseModel):
     """Response model for listing executions.
 

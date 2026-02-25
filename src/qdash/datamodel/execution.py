@@ -16,6 +16,7 @@ RUNNING = "running"
 COMPLETED = "completed"
 FAILED = "failed"
 PENDING = "pending"
+CANCELLED = "cancelled"
 
 
 class ExecutionStatusModel(str, Enum):
@@ -25,6 +26,7 @@ class ExecutionStatusModel(str, Enum):
     RUNNING = RUNNING
     COMPLETED = COMPLETED
     FAILED = FAILED
+    CANCELLED = CANCELLED
 
 
 class ExecutionModel(BaseModel):
