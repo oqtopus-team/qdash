@@ -30,6 +30,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     make \
     cmake \
     pkg-config \
+    bash \
     && rm -rf /var/lib/apt/lists/*
 
 # 2. Python-related dependencies (Change frequency: Low)
@@ -126,10 +127,9 @@ FROM node-env as final
 RUN echo "umask 022" >> /etc/profile && \
     echo "umask 022" >> /etc/bash.bashrc
 
-# Install Claude Code
-ARG CLAUDE_CODE_VERSION=latest
-RUN npm install -g @anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}
-
+# Install Claude Code (native install)
+RUN curl -fsSL https://claude.ai/install.sh | bash
+ENV PATH="/root/.local/bin:${PATH}"
 
 # Configure Zsh (execute last)
 ENV SHELL=/bin/zsh
