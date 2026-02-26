@@ -2,46 +2,29 @@
 
 from __future__ import annotations
 
-import io
 import logging
-import zipfile
-from datetime import datetime, timedelta
-from pathlib import Path
-from typing import TYPE_CHECKING, Annotated
+from typing import Annotated, Any
 
-from bunnet import SortDirection
 from fastapi import APIRouter, Body, Depends, Query
 from fastapi.responses import StreamingResponse
+from qdash.api.dependencies import get_flow_service, get_task_result_service  # noqa: TCH002
 from qdash.api.lib.project import (  # noqa: TCH002
     ProjectContext,
     get_project_context,
+    get_project_context_owner,
 )
+from qdash.api.schemas.flow import ExecuteFlowResponse
 from qdash.api.schemas.task_result import (
     LatestTaskResultResponse,
     TaskHistoryResponse,
-    TaskResult,
     TimeSeriesData,
-    TimeSeriesProjection,
 )
-from qdash.common.datetime_utils import (
-    end_of_day,
-    now,
-    parse_date,
-    parse_elapsed_time,
-    start_of_day,
-)
-from qdash.datamodel.task import ParameterModel
-from qdash.repository.chip import MongoChipRepository
-from qdash.repository.task_result_history import MongoTaskResultHistoryRepository
-from starlette.exceptions import HTTPException
-
-if TYPE_CHECKING:
-    from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
+from qdash.api.services.flow_service import FlowService  # noqa: TCH002
+from qdash.api.services.task_result_service import TaskResultService
 
 router = APIRouter()
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
 
 
 # =============================================================================
@@ -60,6 +43,7 @@ def get_latest_qubit_task_results(
     chip_id: Annotated[str, Query(description="Chip ID")],
     task: Annotated[str, Query(description="Task name")],
     ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    service: Annotated[TaskResultService, Depends(get_task_result_service)],
 ) -> LatestTaskResultResponse:
     """Get the latest qubit task results for all qubits on a chip.
 
@@ -74,6 +58,8 @@ def get_latest_qubit_task_results(
         Name of the task to fetch results for
     ctx : ProjectContext
         Project context with user and project information
+    service : TaskResultService
+        Injected task result service
 
     Returns
     -------
@@ -87,63 +73,12 @@ def get_latest_qubit_task_results(
 
     """
     logger.debug(
-        f"Getting latest qubit task results for chip {chip_id}, task {task}, project: {ctx.project_id}"
+        "Getting latest qubit task results for chip %s, task %s, project: %s",
+        chip_id,
+        task,
+        ctx.project_id,
     )
-
-    # Use individual QubitDocument collection for scalability
-    chip_repo = MongoChipRepository()
-
-    # Get qubit IDs from QubitDocument collection
-    qids = chip_repo.get_qubit_ids(ctx.project_id, chip_id)
-    if not qids:
-        raise ValueError(f"Chip {chip_id} not found or has no qubits in project {ctx.project_id}")
-
-    # Fetch all task results in one query (scoped by project)
-    task_result_repo = MongoTaskResultHistoryRepository()
-    all_results = task_result_repo.find(
-        {
-            "project_id": ctx.project_id,
-            "chip_id": chip_id,
-            "name": task,
-            "qid": {"$in": qids},
-        },
-        sort=[("end_at", SortDirection.DESCENDING)],
-    )
-
-    # Organize results by qid
-    task_results: dict[str, TaskResultHistoryDocument] = {}
-    for result in all_results:
-        if result.qid is not None and result.qid not in task_results:
-            task_results[result.qid] = result
-
-    # Build response
-    results = {}
-    for qid in qids:
-        task_result_doc = task_results.get(qid)
-        if task_result_doc is not None:
-            task_result = TaskResult(
-                task_id=task_result_doc.task_id,
-                name=task_result_doc.name,
-                status=task_result_doc.status,
-                message=task_result_doc.message,
-                input_parameters=task_result_doc.input_parameters,
-                output_parameters=task_result_doc.output_parameters,
-                output_parameter_names=task_result_doc.output_parameter_names,
-                run_parameters=task_result_doc.run_parameters,
-                note=task_result_doc.note,
-                figure_path=task_result_doc.figure_path,
-                json_figure_path=task_result_doc.json_figure_path,
-                raw_data_path=task_result_doc.raw_data_path,
-                start_at=task_result_doc.start_at,
-                end_at=task_result_doc.end_at,
-                elapsed_time=parse_elapsed_time(task_result_doc.elapsed_time),
-                task_type=task_result_doc.task_type,
-            )
-        else:
-            task_result = TaskResult(name=task)
-        results[qid] = task_result
-
-    return LatestTaskResultResponse(task_name=task, result=results)
+    return service.get_latest_results(ctx.project_id, chip_id, task, "qubit")
 
 
 @router.get(
@@ -158,6 +93,7 @@ def get_historical_qubit_task_results(
     task: Annotated[str, Query(description="Task name")],
     date: Annotated[str, Query(description="Date in YYYYMMDD format")],
     ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    service: Annotated[TaskResultService, Depends(get_task_result_service)],
 ) -> LatestTaskResultResponse:
     """Get historical qubit task results for a specific date.
 
@@ -175,6 +111,8 @@ def get_historical_qubit_task_results(
         Date in YYYYMMDD format (JST timezone)
     ctx : ProjectContext
         Project context with user and project information
+    service : TaskResultService
+        Injected task result service
 
     Returns
     -------
@@ -190,64 +128,7 @@ def get_historical_qubit_task_results(
     logger.debug(
         f"Getting historical qubit task results for chip {chip_id}, task {task}, date {date}"
     )
-
-    # Use QubitHistoryDocument for historical data (scalable approach)
-    chip_repo = MongoChipRepository()
-    parsed_date = parse_date(date, "YYYYMMDD")
-    start_time = start_of_day(parsed_date)
-    end_time = end_of_day(parsed_date)
-
-    # Get qubit IDs from QubitHistoryDocument
-    qids = chip_repo.get_historical_qubit_ids(ctx.project_id, chip_id, date)
-    if not qids:
-        raise ValueError(f"Chip {chip_id} not found or has no qubits for date {date}")
-
-    # Fetch task results
-    task_result_repo = MongoTaskResultHistoryRepository()
-    all_results = task_result_repo.find(
-        {
-            "project_id": ctx.project_id,
-            "chip_id": chip_id,
-            "name": task,
-            "qid": {"$in": qids},
-            "start_at": {"$gte": start_time, "$lt": end_time},
-        },
-        sort=[("end_at", SortDirection.DESCENDING)],
-    )
-    # Organize results by qid
-    task_results: dict[str, TaskResultHistoryDocument] = {}
-    for result in all_results:
-        if result.qid is not None and result.qid not in task_results:
-            task_results[result.qid] = result
-
-    # Build response
-    results = {}
-    for qid in qids:
-        task_result_doc = task_results.get(qid)
-        if task_result_doc is not None:
-            task_result = TaskResult(
-                task_id=task_result_doc.task_id,
-                name=task_result_doc.name,
-                status=task_result_doc.status,
-                message=task_result_doc.message,
-                input_parameters=task_result_doc.input_parameters,
-                output_parameters=task_result_doc.output_parameters,
-                output_parameter_names=task_result_doc.output_parameter_names,
-                run_parameters=task_result_doc.run_parameters,
-                note=task_result_doc.note,
-                figure_path=task_result_doc.figure_path,
-                json_figure_path=task_result_doc.json_figure_path,
-                raw_data_path=task_result_doc.raw_data_path,
-                start_at=task_result_doc.start_at,
-                end_at=task_result_doc.end_at,
-                elapsed_time=parse_elapsed_time(task_result_doc.elapsed_time),
-                task_type=task_result_doc.task_type,
-            )
-        else:
-            task_result = TaskResult(name=task)
-        results[qid] = task_result
-
-    return LatestTaskResultResponse(task_name=task, result=results)
+    return service.get_historical_results(ctx.project_id, chip_id, task, "qubit", date)
 
 
 @router.get(
@@ -262,6 +143,7 @@ def get_qubit_task_history(
     chip_id: Annotated[str, Query(description="Chip ID")],
     task: Annotated[str, Query(description="Task name")],
     ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    service: Annotated[TaskResultService, Depends(get_task_result_service)],
 ) -> TaskHistoryResponse:
     """Get complete task history for a specific qubit.
 
@@ -279,6 +161,8 @@ def get_qubit_task_history(
         Name of the task to fetch history for
     ctx : ProjectContext
         Project context with user and project information
+    service : TaskResultService
+        Injected task result service
 
     Returns
     -------
@@ -292,47 +176,7 @@ def get_qubit_task_history(
 
     """
     logger.debug(f"Getting qubit task history for chip {chip_id}, qid {qid}, task {task}")
-
-    # Get chip info (scoped by project)
-    chip_repo = MongoChipRepository()
-    chip = chip_repo.find_one_document({"project_id": ctx.project_id, "chip_id": chip_id})
-    if chip is None:
-        raise ValueError(f"Chip {chip_id} not found in project {ctx.project_id}")
-    # Fetch all task results in one query (scoped by project)
-    task_result_repo = MongoTaskResultHistoryRepository()
-    all_results = task_result_repo.find(
-        {
-            "project_id": ctx.project_id,
-            "chip_id": chip_id,
-            "name": task,
-            "qid": qid,
-        },
-        sort=[("end_at", SortDirection.DESCENDING)],
-    )
-
-    # Organize results by task_id
-    data = {}
-    for result in all_results:
-        data[result.task_id] = TaskResult(
-            task_id=result.task_id,
-            name=result.name,
-            status=result.status,
-            message=result.message,
-            input_parameters=result.input_parameters,
-            output_parameters=result.output_parameters,
-            output_parameter_names=result.output_parameter_names,
-            run_parameters=result.run_parameters,
-            note=result.note,
-            figure_path=result.figure_path,
-            json_figure_path=result.json_figure_path,
-            raw_data_path=result.raw_data_path,
-            start_at=result.start_at,
-            end_at=result.end_at,
-            elapsed_time=parse_elapsed_time(result.elapsed_time),
-            task_type=result.task_type,
-        )
-
-    return TaskHistoryResponse(name=task, data=data)
+    return service.get_history(ctx.project_id, chip_id, task, qid)
 
 
 # =============================================================================
@@ -351,6 +195,7 @@ def get_latest_coupling_task_results(
     chip_id: Annotated[str, Query(description="Chip ID")],
     task: Annotated[str, Query(description="Task name")],
     ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    service: Annotated[TaskResultService, Depends(get_task_result_service)],
 ) -> LatestTaskResultResponse:
     """Get the latest coupling task results for all couplings on a chip.
 
@@ -366,6 +211,8 @@ def get_latest_coupling_task_results(
         Name of the task to fetch results for
     ctx : ProjectContext
         Project context with user and project information
+    service : TaskResultService
+        Injected task result service
 
     Returns
     -------
@@ -379,65 +226,12 @@ def get_latest_coupling_task_results(
 
     """
     logger.debug(
-        f"Getting latest coupling task results for chip {chip_id}, task {task}, project: {ctx.project_id}"
+        "Getting latest coupling task results for chip %s, task %s, project: %s",
+        chip_id,
+        task,
+        ctx.project_id,
     )
-
-    # Use individual CouplingDocument collection for scalability
-    chip_repo = MongoChipRepository()
-
-    # Get coupling IDs from CouplingDocument collection
-    qids = chip_repo.get_coupling_ids(ctx.project_id, chip_id)
-    if not qids:
-        raise ValueError(
-            f"Chip {chip_id} not found or has no couplings in project {ctx.project_id}"
-        )
-
-    # Fetch all task results in one query (scoped by project)
-    task_result_repo = MongoTaskResultHistoryRepository()
-    all_results = task_result_repo.find(
-        {
-            "project_id": ctx.project_id,
-            "chip_id": chip_id,
-            "name": task,
-            "qid": {"$in": qids},
-        },
-        sort=[("end_at", SortDirection.DESCENDING)],
-    )
-
-    # Organize results by qid
-    task_results: dict[str, TaskResultHistoryDocument] = {}
-    for result in all_results:
-        if result.qid is not None and result.qid not in task_results:
-            task_results[result.qid] = result
-
-    # Build response
-    results = {}
-    for qid in qids:
-        task_result_doc = task_results.get(qid)
-        if task_result_doc is not None:
-            task_result = TaskResult(
-                task_id=task_result_doc.task_id,
-                name=task_result_doc.name,
-                status=task_result_doc.status,
-                message=task_result_doc.message,
-                input_parameters=task_result_doc.input_parameters,
-                output_parameters=task_result_doc.output_parameters,
-                output_parameter_names=task_result_doc.output_parameter_names,
-                run_parameters=task_result_doc.run_parameters,
-                note=task_result_doc.note,
-                figure_path=task_result_doc.figure_path,
-                json_figure_path=task_result_doc.json_figure_path,
-                raw_data_path=task_result_doc.raw_data_path,
-                start_at=task_result_doc.start_at,
-                end_at=task_result_doc.end_at,
-                elapsed_time=parse_elapsed_time(task_result_doc.elapsed_time),
-                task_type=task_result_doc.task_type,
-            )
-        else:
-            task_result = TaskResult(name=task, default_view=False)
-        results[qid] = task_result
-
-    return LatestTaskResultResponse(task_name=task, result=results)
+    return service.get_latest_results(ctx.project_id, chip_id, task, "coupling")
 
 
 @router.get(
@@ -452,6 +246,7 @@ def get_historical_coupling_task_results(
     task: Annotated[str, Query(description="Task name")],
     date: Annotated[str, Query(description="Date in YYYYMMDD format")],
     ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    service: Annotated[TaskResultService, Depends(get_task_result_service)],
 ) -> LatestTaskResultResponse:
     """Get historical coupling task results for a specific date.
 
@@ -469,6 +264,8 @@ def get_historical_coupling_task_results(
         Date in YYYYMMDD format (JST timezone)
     ctx : ProjectContext
         Project context with user and project information
+    service : TaskResultService
+        Injected task result service
 
     Returns
     -------
@@ -484,64 +281,7 @@ def get_historical_coupling_task_results(
     logger.debug(
         f"Getting historical coupling task results for chip {chip_id}, task {task}, date {date}"
     )
-
-    # Use CouplingHistoryDocument for historical data (scalable approach)
-    chip_repo = MongoChipRepository()
-    parsed_date = parse_date(date, "YYYYMMDD")
-    start_time = start_of_day(parsed_date)
-    end_time = end_of_day(parsed_date)
-
-    # Get coupling IDs from CouplingHistoryDocument
-    qids = chip_repo.get_historical_coupling_ids(ctx.project_id, chip_id, date)
-    if not qids:
-        raise ValueError(f"Chip {chip_id} not found or has no couplings for date {date}")
-
-    # Fetch task results
-    task_result_repo = MongoTaskResultHistoryRepository()
-    all_results = task_result_repo.find(
-        {
-            "project_id": ctx.project_id,
-            "chip_id": chip_id,
-            "name": task,
-            "qid": {"$in": qids},
-            "start_at": {"$gte": start_time, "$lt": end_time},
-        },
-        sort=[("end_at", SortDirection.DESCENDING)],
-    )
-    # Organize results by qid
-    task_results: dict[str, TaskResultHistoryDocument] = {}
-    for result in all_results:
-        if result.qid is not None and result.qid not in task_results:
-            task_results[result.qid] = result
-
-    # Build response
-    results = {}
-    for qid in qids:
-        task_result_doc = task_results.get(qid)
-        if task_result_doc is not None:
-            task_result = TaskResult(
-                task_id=task_result_doc.task_id,
-                name=task_result_doc.name,
-                status=task_result_doc.status,
-                message=task_result_doc.message,
-                input_parameters=task_result_doc.input_parameters,
-                output_parameters=task_result_doc.output_parameters,
-                output_parameter_names=task_result_doc.output_parameter_names,
-                run_parameters=task_result_doc.run_parameters,
-                note=task_result_doc.note,
-                figure_path=task_result_doc.figure_path,
-                json_figure_path=task_result_doc.json_figure_path,
-                raw_data_path=task_result_doc.raw_data_path,
-                start_at=task_result_doc.start_at,
-                end_at=task_result_doc.end_at,
-                elapsed_time=parse_elapsed_time(task_result_doc.elapsed_time),
-                task_type=task_result_doc.task_type,
-            )
-        else:
-            task_result = TaskResult(name=task, default_view=False)
-        results[qid] = task_result
-
-    return LatestTaskResultResponse(task_name=task, result=results)
+    return service.get_historical_results(ctx.project_id, chip_id, task, "coupling", date)
 
 
 @router.get(
@@ -556,6 +296,7 @@ def get_coupling_task_history(
     chip_id: Annotated[str, Query(description="Chip ID")],
     task: Annotated[str, Query(description="Task name")],
     ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    service: Annotated[TaskResultService, Depends(get_task_result_service)],
 ) -> TaskHistoryResponse:
     """Get complete task history for a specific coupling.
 
@@ -573,6 +314,8 @@ def get_coupling_task_history(
         Name of the task to fetch history for
     ctx : ProjectContext
         Project context with user and project information
+    service : TaskResultService
+        Injected task result service
 
     Returns
     -------
@@ -588,137 +331,12 @@ def get_coupling_task_history(
     logger.debug(
         f"Getting coupling task history for chip {chip_id}, coupling {coupling_id}, task {task}"
     )
-
-    # Get chip info (scoped by project)
-    chip_repo = MongoChipRepository()
-    chip = chip_repo.find_one_document({"project_id": ctx.project_id, "chip_id": chip_id})
-    if chip is None:
-        raise ValueError(f"Chip {chip_id} not found in project {ctx.project_id}")
-
-    # Fetch all task results in one query (scoped by project)
-    task_result_repo = MongoTaskResultHistoryRepository()
-    all_results = task_result_repo.find(
-        {
-            "project_id": ctx.project_id,
-            "chip_id": chip_id,
-            "name": task,
-            "qid": coupling_id,
-        },
-        sort=[("end_at", SortDirection.DESCENDING)],
-    )
-
-    # Organize results by task_id
-    data = {}
-    for result in all_results:
-        data[result.task_id] = TaskResult(
-            task_id=result.task_id,
-            name=result.name,
-            status=result.status,
-            message=result.message,
-            input_parameters=result.input_parameters,
-            output_parameters=result.output_parameters,
-            output_parameter_names=result.output_parameter_names,
-            run_parameters=result.run_parameters,
-            note=result.note,
-            figure_path=result.figure_path,
-            json_figure_path=result.json_figure_path,
-            raw_data_path=result.raw_data_path,
-            start_at=result.start_at,
-            end_at=result.end_at,
-            elapsed_time=parse_elapsed_time(result.elapsed_time),
-            task_type=result.task_type,
-        )
-
-    return TaskHistoryResponse(name=task, data=data)
+    return service.get_history(ctx.project_id, chip_id, task, coupling_id)
 
 
 # =============================================================================
 # Time Series
 # =============================================================================
-
-
-def _fetch_timeseries_data(
-    chip_id: str,
-    tag: str,
-    parameter: str,
-    project_id: str,
-    target_qid: str | None = None,
-    start_at: str | None = None,
-    end_at: str | None = None,
-) -> TimeSeriesData:
-    """Fetch timeseries data for all qids or a specific qid.
-
-    Parameters
-    ----------
-    chip_id : str
-        The ID of the chip to fetch data for
-    tag : str
-        The tag to filter by
-    parameter : str
-        The parameter to fetch
-    project_id : str
-        The project ID for scoping the query
-    target_qid : str | None
-        If provided, only return data for this specific qid
-    start_at : str | None
-        The start time in ISO format (optional, defaults to 7 days ago)
-    end_at : str | None
-        The end time in ISO format (optional, defaults to now)
-
-    Returns
-    -------
-    TimeSeriesData
-        The timeseries data
-
-    """
-    if start_at is None or end_at is None:
-        end_at_dt = now()
-        start_at_dt = now() - timedelta(days=7)
-    else:
-        start_at_dt = datetime.fromisoformat(start_at)
-        end_at_dt = datetime.fromisoformat(end_at)
-    # Find all task results for the given tag and parameter (scoped by project)
-    task_result_repo = MongoTaskResultHistoryRepository()
-    task_results = task_result_repo.find_with_projection(
-        {
-            "project_id": project_id,
-            "chip_id": chip_id,
-            "tags": tag,
-            "output_parameter_names": parameter,
-            "start_at": {"$gte": start_at_dt, "$lte": end_at_dt},
-        },
-        projection_model=TimeSeriesProjection,
-        sort=[("start_at", SortDirection.ASCENDING)],
-    )
-
-    # Create a dictionary to store time series data for each qid
-    timeseries_by_qid: dict[str, list[ParameterModel]] = {}
-
-    # Process task results
-    for task_result in task_results:
-        qid = task_result.qid
-        # Skip if we're looking for a specific qid and this isn't it
-        if target_qid is not None and qid != target_qid:
-            continue
-
-        if qid not in timeseries_by_qid:
-            timeseries_by_qid[qid] = []
-
-        # Skip if the parameter is not in output_parameters (data inconsistency)
-        if parameter not in task_result.output_parameters:
-            logger.warning(
-                f"Parameter '{parameter}' not found in output_parameters for task_result "
-                f"(qid={qid}, start_at={task_result.start_at}), skipping"
-            )
-            continue
-
-        param_data = task_result.output_parameters[parameter]
-        if isinstance(param_data, dict):
-            timeseries_by_qid[qid].append(ParameterModel(**param_data))
-        else:
-            timeseries_by_qid[qid].append(param_data)
-
-    return TimeSeriesData(data=timeseries_by_qid)
 
 
 @router.get(
@@ -734,6 +352,7 @@ def get_timeseries_task_results(
     start_at: Annotated[str, Query(description="Start time in ISO format")],
     end_at: Annotated[str, Query(description="End time in ISO format")],
     ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    service: Annotated[TaskResultService, Depends(get_task_result_service)],
     qid: Annotated[str | None, Query(description="Optional qubit ID to filter by")] = None,
 ) -> TimeSeriesData:
     """Get timeseries task results filtered by tag and parameter.
@@ -755,6 +374,8 @@ def get_timeseries_task_results(
         End time in ISO format for the time range
     ctx : ProjectContext
         Project context with user and project information
+    service : TaskResultService
+        Injected task result service
     qid : str | None
         Optional qubit ID to filter results to a specific qubit
 
@@ -766,9 +387,93 @@ def get_timeseries_task_results(
 
     """
     logger.debug(
-        f"Getting timeseries task results for chip {chip_id}, tag {tag}, parameter {parameter}, qid {qid}"
+        "Getting timeseries task results for chip %s, tag %s, parameter %s, qid %s",
+        chip_id,
+        tag,
+        parameter,
+        qid,
     )
-    return _fetch_timeseries_data(chip_id, tag, parameter, ctx.project_id, qid, start_at, end_at)
+    return service.get_timeseries(chip_id, tag, parameter, ctx.project_id, qid, start_at, end_at)
+
+
+# =============================================================================
+# Single-Task Re-execution
+# =============================================================================
+
+
+@router.post(
+    "/task-results/{task_id}/re-execute",
+    response_model=ExecuteFlowResponse,
+    summary="Re-execute a single task from its task result",
+    operation_id="reExecuteTaskResult",
+)
+async def re_execute_task_result(
+    task_id: str,
+    ctx: Annotated[ProjectContext, Depends(get_project_context_owner)],
+    service: Annotated[TaskResultService, Depends(get_task_result_service)],
+    flow_service: Annotated[FlowService, Depends(get_flow_service)],
+    parameter_overrides: Annotated[
+        dict[str, dict[str, Any]] | None,
+        Body(
+            description="Optional parameter overrides: {run: {...}, input: {...}}",
+            embed=True,
+        ),
+    ] = None,
+) -> ExecuteFlowResponse:
+    """Re-execute a single task using the system single-task-executor deployment.
+
+    Looks up the TaskResultHistoryDocument to extract task_name, qid, chip_id,
+    execution_id, and tags, then delegates to FlowService to create a Prefect
+    flow run via the system deployment.
+
+    Parameters
+    ----------
+    task_id : str
+        The task result ID to re-execute
+    ctx : ProjectContext
+        Project context with user and project information
+    service : TaskResultService
+        Injected task result service
+    flow_service : FlowService
+        Injected flow service
+
+    Returns
+    -------
+    ExecuteFlowResponse
+        Execution result with IDs and URLs
+
+    """
+    from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
+    from starlette.exceptions import HTTPException
+
+    doc = TaskResultHistoryDocument.find_one(
+        {"project_id": ctx.project_id, "task_id": task_id}
+    ).run()
+
+    if doc is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Task result '{task_id}' not found",
+        )
+
+    # Verify the requesting user owns the source task result.
+    if doc.username != ctx.user.username:
+        raise HTTPException(
+            status_code=403,
+            detail="You can only re-execute your own task results",
+        )
+
+    return await flow_service.execute_single_task_from_snapshot(
+        task_name=doc.name,
+        qid=doc.qid,
+        chip_id=doc.chip_id,
+        source_execution_id=doc.execution_id,
+        username=ctx.user.username,
+        project_id=ctx.project_id,
+        tags=doc.tags,
+        source_task_id=task_id,
+        parameter_overrides=parameter_overrides,
+    )
 
 
 # =============================================================================
@@ -808,36 +513,7 @@ def download_figures_as_zip(
         400 if no paths are provided or if any path does not exist
 
     """
-    if not paths:
-        raise HTTPException(
-            status_code=400,
-            detail="No paths provided",
-        )
-
-    # Validate all paths exist
-    missing_paths = [p for p in paths if not Path(p).exists()]
-    if missing_paths:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Files not found: {', '.join(missing_paths[:5])}{'...' if len(missing_paths) > 5 else ''}",
-        )
-
-    # Create ZIP in memory
-    zip_buffer = io.BytesIO()
-    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
-        for file_path in paths:
-            path = Path(file_path)
-            # Use the filename as the archive name
-            zip_file.write(path, path.name)
-
-    zip_buffer.seek(0)
-
-    # Sanitize filename
-    safe_filename = (
-        "".join(c for c in filename if c.isalnum() or c in "._-").strip() or "figures.zip"
-    )
-    if not safe_filename.endswith(".zip"):
-        safe_filename += ".zip"
+    zip_buffer, safe_filename = TaskResultService.create_figures_zip(paths, filename)
 
     return StreamingResponse(
         zip_buffer,

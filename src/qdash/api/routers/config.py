@@ -6,11 +6,12 @@ enabling the frontend to initialize with a single API call.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Annotated, Any
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
-from qdash.api.lib.config_loader import ConfigLoader
+from qdash.api.dependencies import get_config_service  # noqa: TCH002
+from qdash.api.services.config_service import ConfigService  # noqa: TCH002
 
 router = APIRouter(tags=["config"])
 
@@ -44,16 +45,13 @@ class AllConfigResponse(BaseModel):
     description="Fetch all application configuration in a single request",
     operation_id="getConfigAll",
 )
-def get_config_all() -> AllConfigResponse:
+def get_config_all(
+    service: Annotated[ConfigService, Depends(get_config_service)],
+) -> AllConfigResponse:
     """Get all application configuration.
 
     This endpoint returns all configuration needed by the frontend in a single
     request, including UI settings, metrics configuration, and copilot settings.
-
-    Configuration is loaded from YAML files with support for local overrides:
-    - settings.yaml + settings.local.yaml
-    - metrics.yaml + metrics.local.yaml
-    - copilot.yaml + copilot.local.yaml
 
     Returns
     -------
@@ -61,13 +59,9 @@ def get_config_all() -> AllConfigResponse:
         All application configuration
 
     """
-    settings = ConfigLoader.load_settings()
-    metrics = ConfigLoader.load_metrics()
-    copilot = ConfigLoader.load_copilot()
-
-    # Extract UI settings
-    ui_config = settings.get("ui", {})
-    task_files = ui_config.get("task_files", {})
+    config = service.get_all_config()
+    ui = config["ui"]
+    task_files = ui["task_files"]
 
     return AllConfigResponse(
         ui=UISettings(
@@ -77,6 +71,6 @@ def get_config_all() -> AllConfigResponse:
                 sort_order=task_files.get("sort_order"),
             )
         ),
-        metrics=metrics,
-        copilot=copilot,
+        metrics=config["metrics"],
+        copilot=config["copilot"],
     )

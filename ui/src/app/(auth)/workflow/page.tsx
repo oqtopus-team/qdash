@@ -11,7 +11,7 @@ import { FlowSchedulesSection } from "@/components/features/flow/FlowSchedulesSe
 import { PageContainer } from "@/components/ui/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { WorkflowListPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
-import { formatDateTime } from "@/utils/datetime";
+import { formatDateTime } from "@/lib/utils/datetime";
 
 export default function FlowListPage() {
   const { data, isLoading, error } = useQuery({

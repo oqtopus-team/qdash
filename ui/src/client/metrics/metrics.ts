@@ -204,6 +204,7 @@ Args:
 ----
     chip_id: The chip identifier
     ctx: Project context with user and project information
+    metrics_service: Injected metrics service
     within_hours: Optional filter to only include data from last N hours (e.g., 24)
     selection_mode: "latest" to get most recent values, "best" to get optimal values
 
@@ -375,6 +376,7 @@ Args:
     chip_id: The chip identifier
     qid: The qubit identifier (e.g., "0", "Q00")
     ctx: Project context with user and project information
+    metrics_service: Injected metrics service
     metric: Metric name to retrieve history for
     limit: Maximum number of history items (None for unlimited within time range)
     within_days: Optional filter to only include data from last N days
@@ -586,6 +588,7 @@ Args:
     chip_id: The chip identifier
     coupling_id: The coupling identifier (e.g., "0-1", "2-3")
     ctx: Project context with user and project information
+    metrics_service: Injected metrics service
     metric: Metric name to retrieve history for
     limit: Maximum number of history items (None for unlimited within time range)
     within_days: Optional filter to only include data from last N days

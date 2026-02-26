@@ -32,6 +32,43 @@ tasks:
     cmds:
       - uv run scripts/generate_task_knowledge.py
 
+  knowledge-pull:
+    desc: Pull task-knowledge.json from the knowledge repository (KNOWLEDGE_REPO_URL)
+    dotenv: [.env]
+    cmds:
+      - |
+        KNOWLEDGE_DIR="config/task-knowledge"
+        if [ -z "$KNOWLEDGE_REPO_URL" ]; then
+          echo "KNOWLEDGE_REPO_URL not set, skipping pull"
+          exit 0
+        fi
+        # Build auth URL if credentials available
+        AUTH_URL="$KNOWLEDGE_REPO_URL"
+        if [ -n "$GITHUB_USER" ] && [ -n "$GITHUB_TOKEN" ]; then
+          AUTH_URL=$(echo "$KNOWLEDGE_REPO_URL" | sed "s|https://|https://${GITHUB_USER}:${GITHUB_TOKEN}@|")
+        fi
+        # Clone or pull
+        if [ -d "$KNOWLEDGE_DIR/.git" ]; then
+          echo "Pulling latest from $KNOWLEDGE_REPO_URL..."
+          git -C "$KNOWLEDGE_DIR" remote set-url origin "$AUTH_URL"
+          git -C "$KNOWLEDGE_DIR" fetch origin && git -C "$KNOWLEDGE_DIR" reset --hard origin/main || {
+            echo "Pull failed, re-cloning..."
+            rm -rf "$KNOWLEDGE_DIR"
+            git clone --depth 1 "$AUTH_URL" "$KNOWLEDGE_DIR"
+          }
+        else
+          echo "Cloning $KNOWLEDGE_REPO_URL..."
+          rm -rf "$KNOWLEDGE_DIR"
+          mkdir -p config
+          git clone --depth 1 "$AUTH_URL" "$KNOWLEDGE_DIR"
+        fi
+        # Verify JSON exists in the cloned repo
+        if [ -f "$KNOWLEDGE_DIR/task-knowledge.json" ]; then
+          echo "task-knowledge.json ready ($(du -h "$KNOWLEDGE_DIR/task-knowledge.json" | cut -f1))"
+        else
+          echo "WARNING: task-knowledge.json not found in repo; it will be generated on next PR merge" >&2
+        fi
+
   docs:
     dir: docs
     cmds:
@@ -67,6 +104,12 @@ tasks:
     cmds:
       - uv run pytest tests/qdash/workflow/engine/repository/ -v
 
+  test-ui:
+    desc: Run UI tests
+    dir: ui
+    cmds:
+      - bun run test:run
+
   test-coverage:
     desc: Run tests with coverage report
     cmds:
@@ -86,6 +129,18 @@ tasks:
     dir: ui
     cmds:
       - bun run build
+
+  drawio-export:
+    desc: Export .drawio files to .drawio.png (requires draw.io desktop CLI)
+    cmds:
+      - |
+        n=10
+        for f in docs/diagrams/*.drawio; do
+          out="${f}.png"
+          echo "Exporting $f -> $out"
+          xvfb-run -n $n drawio --no-sandbox --export --format png --embed-diagram --scale 2 --output "$out" "$f"
+          n=$((n + 1))
+        done
 
   build-docs:
     dir: docs
@@ -152,17 +207,30 @@ tasks:
   ci-typecheck:
     desc: Run mypy type checking
     cmds:
-      - uv run mypy src/qdash/common src/qdash/datamodel src/qdash/dbmodel src/qdash/repository src/qdash/api src/qdash/workflow
+      - uv run mypy src/qdash/common src/qdash/datamodel src/qdash/dbmodel src/qdash/repository src/qdash/api src/qdash/workflow tests
 
   ci-test:
     desc: Run all tests with coverage
     cmds:
       - uv run pytest tests/ -v --tb=short --cov=src/qdash --cov-report=xml --cov-report=term
 
+  knip:
+    desc: Check for unused exports, dependencies, and files in UI
+    dir: ui
+    cmds:
+      - bun run knip
+
+  knip-fix:
+    desc: Auto-fix unused exports and dependencies in UI
+    dir: ui
+    cmds:
+      - bun run knip:fix
+
   ci-ui:
     desc: Run all UI CI checks
     dir: ui
     cmds:
+      - bun run test:run
       - bunx eslint . -c eslint.config.mjs
       - bunx prettier . --check
 
@@ -220,11 +288,13 @@ tasks:
 
   deploy-local:
     cmds:
+      - task: knowledge-pull
       - docker compose up -d --build
     desc: Deploy the application with Docker Compose in dev mode
 
   deploy:
     cmds:
+      - task: knowledge-pull
       - docker compose --profile tunnel up -d --build
       - sleep 3
       - docker compose restart api

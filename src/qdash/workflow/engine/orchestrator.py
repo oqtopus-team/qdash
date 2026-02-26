@@ -22,6 +22,7 @@ from qdash.workflow.engine.task.history_recorder import TaskHistoryRecorder
 if TYPE_CHECKING:
     from qdash.workflow.engine.backend.base import BaseBackend
     from qdash.workflow.engine.config import CalibConfig
+    from qdash.workflow.engine.task.snapshot_loader import SnapshotParameterLoader
     from qdash.workflow.service.github import GitHubIntegration
 
 logger = logging.getLogger(__name__)
@@ -57,15 +58,19 @@ class CalibOrchestrator:
         self,
         config: CalibConfig,
         github_integration: GitHubIntegration | None = None,
+        snapshot_loader: SnapshotParameterLoader | None = None,
     ) -> None:
         """Initialize the session manager.
 
         Args:
             config: Session configuration
             github_integration: Optional GitHub integration for config pull
+            snapshot_loader: Optional snapshot parameter loader for re-execution
         """
         self.config = config
         self.github_integration = github_integration
+        self._snapshot_loader = snapshot_loader
+        self._source_task_id: str | None = None
 
         # Session components (initialized in initialize())
         self._execution_service: ExecutionService | None = None
@@ -153,8 +158,8 @@ class CalibOrchestrator:
             project_id=config.project_id,
         )
         if not config.skip_execution:
-            self._execution_service.save_with_tags()
-            self._execution_service.start_execution()
+            self._execution_service.save()
+            self._execution_service.start()
         else:
             logger.info("Isolated session: ExecutionService created (no save/start)")
 
@@ -264,7 +269,7 @@ class CalibOrchestrator:
             return
 
         # Reload and complete execution
-        self._execution_service = self.execution_service.reload().complete_execution()
+        self._execution_service = self.execution_service.reload().complete()
 
         # Update chip history
         if update_chip_history:
@@ -289,7 +294,7 @@ class CalibOrchestrator:
     def fail(self) -> None:
         """Mark the session as failed."""
         if not self.config.skip_execution and self._execution_service is not None:
-            self._execution_service = self._execution_service.reload().fail_execution()
+            self._execution_service = self._execution_service.reload().fail()
 
     def _export_note_to_file(self, logger: Any) -> None:
         """Export calibration note to a JSON file."""
@@ -374,8 +379,10 @@ class CalibOrchestrator:
             task_details[task_name] = {}
 
         # Inject default_run_parameters into task if configured and not already overridden per-task
-        print(
-            f"[TRACE] _create_task_instance({task_name}) default_run_parameters={self.config.default_run_parameters}"
+        logger.debug(
+            "_create_task_instance(%s) default_run_parameters=%s",
+            task_name,
+            self.config.default_run_parameters,
         )
         if self.config.default_run_parameters:
             task_params = task_details[task_name]
@@ -391,9 +398,11 @@ class CalibOrchestrator:
                     continue
                 if param_name not in task_params["run_parameters"]:
                     task_params["run_parameters"][param_name] = param_data
-                    print(
-                        f"[TRACE] Injected default run parameter '{param_name}' "
-                        f"into task '{task_name}': {param_data}"
+                    logger.debug(
+                        "Injected default run parameter '%s' into task '%s': %s",
+                        param_name,
+                        task_name,
+                        param_data,
                     )
 
         task_instances = generate_task_instances(
@@ -422,6 +431,8 @@ class CalibOrchestrator:
             qids=[qid],
             calib_dir=self.task_context.calib_dir,
             history_recorder=self._create_history_recorder(),
+            snapshot_loader=self._snapshot_loader,
+            source_task_id=self._source_task_id,
         )
 
         # Copy relevant calibration data
@@ -432,11 +443,11 @@ class CalibOrchestrator:
                 for q in relevant_qids
                 if q in self.task_context.calib_data.qubit
             },
-            coupling={
-                c: deepcopy(self.task_context.calib_data.coupling[c])
-                for c in [qid]
+            coupling=(
+                {qid: deepcopy(self.task_context.calib_data.coupling[qid])}
                 if qid in self.task_context.calib_data.coupling
-            },
+                else {}
+            ),
         )
         # Set upstream task dependency
         if upstream_id is not None:
@@ -489,7 +500,7 @@ class CalibOrchestrator:
         self._last_executed_task_id_by_qid[qid] = executed_task.task_id
 
         # Extract and return output parameters
-        result = executed_context.get_output_parameter_by_task_name(
+        result = executed_context.state.get_output_parameter_by_task_name(
             task_name, task_type=task_type, qid=qid
         )
         result["task_id"] = executed_task.task_id
@@ -505,33 +516,31 @@ class CalibOrchestrator:
             SystemTaskModel,
         )
 
-        # Check if task already exists
-        if task_type == "qubit":
-            if qid in self.task_context.task_result.qubit_tasks:
-                existing_tasks = [t.name for t in self.task_context.task_result.qubit_tasks[qid]]
-                if task_name in existing_tasks:
-                    return
-            task = QubitTaskModel(name=task_name, upstream_id="", qid=qid)
-            self.task_context.task_result.qubit_tasks.setdefault(qid, []).append(task)
-        elif task_type == "coupling":
-            if qid in self.task_context.task_result.coupling_tasks:
-                existing_tasks = [t.name for t in self.task_context.task_result.coupling_tasks[qid]]
-                if task_name in existing_tasks:
-                    return
-            coupling_task = CouplingTaskModel(name=task_name, upstream_id="", qid=qid)
-            self.task_context.task_result.coupling_tasks.setdefault(qid, []).append(coupling_task)
-        elif task_type == "global":
-            existing_tasks = [t.name for t in self.task_context.task_result.global_tasks]
-            if task_name in existing_tasks:
+        # Mapping: task_type -> (model_class, collection_attr, uses_qid_key)
+        _type_map: dict[str, tuple[type, str, bool]] = {
+            "qubit": (QubitTaskModel, "qubit_tasks", True),
+            "coupling": (CouplingTaskModel, "coupling_tasks", True),
+            "global": (GlobalTaskModel, "global_tasks", False),
+            "system": (SystemTaskModel, "system_tasks", False),
+        }
+
+        entry = _type_map.get(task_type)
+        if entry is None:
+            return
+
+        model_cls, attr, uses_qid_key = entry
+        collection = getattr(self.task_context.task_result, attr)
+
+        if uses_qid_key:
+            if qid in collection and task_name in [t.name for t in collection[qid]]:
                 return
-            global_task = GlobalTaskModel(name=task_name, upstream_id="")
-            self.task_context.task_result.global_tasks.append(global_task)
-        elif task_type == "system":
-            existing_tasks = [t.name for t in self.task_context.task_result.system_tasks]
-            if task_name in existing_tasks:
+            new_task = model_cls(name=task_name, upstream_id="", qid=qid)
+            collection.setdefault(qid, []).append(new_task)
+        else:
+            if task_name in [t.name for t in collection]:
                 return
-            system_task = SystemTaskModel(name=task_name, upstream_id="")
-            self.task_context.task_result.system_tasks.append(system_task)
+            new_task = model_cls(name=task_name, upstream_id="")
+            collection.append(new_task)
 
         # Save updated workflow
         self.task_context.save()

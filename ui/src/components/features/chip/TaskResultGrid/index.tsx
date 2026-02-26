@@ -28,8 +28,8 @@ import { useTopologyConfig } from "@/hooks/useTopologyConfig";
 import {
   getQubitGridPosition,
   type TopologyLayoutParams,
-} from "@/utils/gridPosition";
-import { calculateGridContainerWidth } from "@/utils/gridLayout";
+} from "@/lib/utils/grid-position";
+import { calculateGridContainerWidth } from "@/lib/utils/grid-layout";
 
 interface TaskResultGridProps {
   chipId: string;

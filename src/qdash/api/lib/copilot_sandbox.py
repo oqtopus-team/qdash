@@ -18,7 +18,6 @@ logger = logging.getLogger(__name__)
 
 EXECUTION_TIMEOUT_SECONDS = 5
 MAX_OUTPUT_BYTES = 100 * 1024  # 100KB
-MEMORY_LIMIT_BYTES = 256 * 1024 * 1024  # 256MB
 
 ALLOWED_MODULES = frozenset(
     {
@@ -29,10 +28,15 @@ ALLOWED_MODULES = frozenset(
         "scipy.optimize",
         "scipy.signal",
         "scipy.interpolate",
+        "plotly",
+        "plotly.graph_objects",
+        "plotly.express",
+        "plotly.subplots",
         "math",
         "statistics",
         "json",
         "datetime",
+        "_strptime",
         "collections",
     }
 )
@@ -159,6 +163,22 @@ def _validate_ast(code: str) -> str | None:
     return None
 
 
+def _ensure_serializable(obj: Any) -> Any:
+    """Convert Plotly objects (Figure, Scatter, etc.) to plain dicts.
+
+    LLM-generated code may set ``result['chart']`` containing raw Plotly
+    objects that are not JSON-serializable.  This recursively converts them
+    using Plotly's own ``to_plotly_json()`` method.
+    """
+    if hasattr(obj, "to_plotly_json") and callable(obj.to_plotly_json):
+        return obj.to_plotly_json()
+    if isinstance(obj, dict):
+        return {k: _ensure_serializable(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_ensure_serializable(item) for item in obj]
+    return obj
+
+
 def execute_python_analysis(
     code: str, context_data: dict[str, Any] | None = None
 ) -> dict[str, Any]:
@@ -202,16 +222,6 @@ def execute_python_analysis(
         old_handler = signal.signal(signal.SIGALRM, _timeout_handler)
         signal.alarm(EXECUTION_TIMEOUT_SECONDS)
 
-    # Set up memory limit (Linux only)
-    old_mem_limit = None
-    try:
-        import resource
-
-        old_mem_limit = resource.getrlimit(resource.RLIMIT_AS)
-        resource.setrlimit(resource.RLIMIT_AS, (MEMORY_LIMIT_BYTES, old_mem_limit[1]))
-    except (ImportError, ValueError, OSError):
-        old_mem_limit = None
-
     try:
         with redirect_stdout(stdout_capture):
             exec(code, restricted_globals)  # noqa: S102
@@ -235,9 +245,16 @@ def execute_python_analysis(
         if len(output_str) > MAX_OUTPUT_BYTES:
             output_str = output_str[:MAX_OUTPUT_BYTES] + "\n... (output truncated)"
 
-        # Validate chart structure
+        # Convert any Plotly objects to plain dicts before validation
         if chart is not None:
-            if not isinstance(chart, dict) or "data" not in chart:
+            chart = _ensure_serializable(chart)
+
+        # Validate chart structure (single dict or list of dicts)
+        if chart is not None:
+            if isinstance(chart, list):
+                validated = [c for c in chart if isinstance(c, dict) and "data" in c]
+                chart = validated if validated else None
+            elif not isinstance(chart, dict) or "data" not in chart:
                 chart = None
 
         return {"output": output_str, "chart": chart, "error": None}
@@ -252,7 +269,7 @@ def execute_python_analysis(
         return {
             "output": None,
             "chart": None,
-            "error": f"Memory limit exceeded ({MEMORY_LIMIT_BYTES // (1024 * 1024)}MB)",
+            "error": "Memory limit exceeded",
         }
     except ImportError as e:
         return {"output": None, "chart": None, "error": str(e)}
@@ -263,11 +280,4 @@ def execute_python_analysis(
             signal.alarm(0)
             if old_handler is not None:
                 signal.signal(signal.SIGALRM, old_handler)
-        if old_mem_limit is not None:
-            try:
-                import resource
-
-                resource.setrlimit(resource.RLIMIT_AS, old_mem_limit)
-            except (ImportError, ValueError, OSError):
-                pass
         stdout_capture.close()

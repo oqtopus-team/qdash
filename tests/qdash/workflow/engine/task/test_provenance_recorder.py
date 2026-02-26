@@ -7,7 +7,6 @@ import pytest
 from qdash.datamodel.execution import ExecutionModel, ExecutionStatusModel
 from qdash.datamodel.system_info import SystemInfoModel
 from qdash.datamodel.task import (
-    CalibDataModel,
     ParameterModel,
     QubitTaskModel,
     TaskStatusModel,
@@ -72,11 +71,9 @@ class TestProvenanceRecorder:
             tags=[],
             note={},
             status=ExecutionStatusModel.RUNNING,
-            task_results={},
             start_at=None,
             end_at=None,
             elapsed_time=None,
-            calib_data=CalibDataModel(qubit={}, coupling={}),
             message="",
             system_info=SystemInfoModel(),
         )
@@ -384,11 +381,9 @@ class TestTaskHistoryRecorderWithProvenance:
             tags=[],
             note={},
             status=ExecutionStatusModel.RUNNING,
-            task_results={},
             start_at=None,
             end_at=None,
             elapsed_time=None,
-            calib_data=CalibDataModel(qubit={}, coupling={}),
             message="",
             system_info=SystemInfoModel(),
         )

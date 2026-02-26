@@ -6,34 +6,7 @@ As shown in the diagram below, the `develop` branch is branched off from the `ma
 
 The `develop` branch always maintains the latest merged code, so when performing hotfixes, branches are created from the `develop` branch for the necessary fixes.
 
-```mermaid
-gitGraph LR:
-    commit tag:"release-v1.0.0"
-    branch develop
-    commit
-    branch feature/xxx
-    commit
-    commit
-    checkout develop
-    branch feature/yyy
-    commit
-    checkout develop
-    merge feature/yyy
-    checkout feature/xxx
-    commit
-    checkout develop
-    merge feature/xxx
-    checkout main
-    merge develop tag:"release-v1.1.0"
-    checkout develop
-    branch hotfix/zzz
-    commit
-    commit
-    checkout develop
-    merge hotfix/zzz
-    checkout main
-    merge develop tag:"release-v1.2.0"
-```
+![Development Flow](../diagrams/development-flow.drawio.png)
 
 ### Branch Naming
 

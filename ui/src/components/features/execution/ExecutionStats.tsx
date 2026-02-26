@@ -48,6 +48,9 @@ export function ExecutionStats({
     const runningExecutions = filteredExecutions.filter(
       (exec) => exec.status === "running",
     ).length;
+    const cancelledExecutions = filteredExecutions.filter(
+      (exec) => exec.status === "cancelled",
+    ).length;
 
     // Calculate execution times (only completed executions)
     const completedExecutionTimes = filteredExecutions
@@ -92,6 +95,7 @@ export function ExecutionStats({
       totalExecutions,
       completedExecutions,
       failedExecutions,
+      cancelledExecutions,
       runningExecutions,
       averageTime,
       maxTime,
@@ -147,6 +151,8 @@ export function ExecutionStats({
           </div>
           <div className="text-xs">
             <span className="text-error">{stats.failedExecutions}F</span>
+            {" / "}
+            <span className="text-neutral">{stats.cancelledExecutions}C</span>
             {" / "}
             <span className="text-info">{stats.runningExecutions}R</span>
           </div>
@@ -205,6 +211,14 @@ export function ExecutionStats({
                   duration={800}
                 />{" "}
                 Failed
+              </span>{" "}
+              /{" "}
+              <span className="text-neutral">
+                <AnimatedCounter
+                  value={stats.cancelledExecutions}
+                  duration={800}
+                />{" "}
+                Cancelled
               </span>{" "}
               /{" "}
               <span className="text-info">

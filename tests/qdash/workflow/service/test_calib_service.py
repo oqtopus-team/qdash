@@ -30,20 +30,14 @@ class MockExecutionService:
     def save(self):
         return self
 
-    def save_with_tags(self):
+    def start(self):
         return self
 
-    def start_execution(self):
-        return self
-
-    def update_execution_status_to_running(self):
-        return self
-
-    def complete_execution(self):
+    def complete(self):
         self.completed = True
         return self
 
-    def fail_execution(self):
+    def fail(self):
         return self
 
     def reload(self):
@@ -80,7 +74,7 @@ class MockBackend:
 class MockCalibOrchestrator:
     """Mock CalibOrchestrator for testing."""
 
-    def __init__(self, config, github_integration=None):
+    def __init__(self, config, github_integration=None, snapshot_loader=None):
         self.config = config
         self._initialized = False
         self._execution_service = MockExecutionService(tags=config.tags or [])
@@ -107,10 +101,10 @@ class MockCalibOrchestrator:
         self._initialized = True
 
     def complete(self, update_chip_history=True, export_note_to_file=False):
-        self._execution_service.complete_execution()
+        self._execution_service.complete()
 
     def fail(self):
-        self._execution_service.fail_execution()
+        self._execution_service.fail()
 
 
 class MockGitHubIntegration:
@@ -151,13 +145,13 @@ def clear_session_state():
     import qdash.workflow.service.calib_service as session_module
 
     # Clear before test
-    session_module._current_session = None
+    session_module._current_session = None  # type: ignore[attr-defined]
     clear_current_session()
 
     yield
 
     # Clear after test
-    session_module._current_session = None
+    session_module._current_session = None  # type: ignore[attr-defined]
     clear_current_session()
 
 
@@ -236,6 +230,7 @@ class TestCalibServiceInitialization:
             user_repo=mock_user_repo,
         )
 
+        assert session.execution_service is not None
         assert "python_flow" in session.execution_service.tags
 
 
@@ -324,4 +319,5 @@ class TestGlobalSessionHelpers:
 
         finish_calibration()
 
-        assert session.execution_service.completed is True
+        assert session.execution_service is not None
+        assert session.execution_service.completed is True  # type: ignore[attr-defined]

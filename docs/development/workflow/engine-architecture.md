@@ -1,60 +1,10 @@
 # Workflow Engine Architecture
 
-This document explains the architecture of the `qdash.workflow.engine` module,
-which provides the core infrastructure for calibration workflow execution.
-
-## Overview
-
-The engine module is responsible for:
-
-- **Task Execution**: Running calibration tasks with proper lifecycle management
-- **State Management**: Tracking task status, parameters, and results
-- **Execution Tracking**: Managing workflow execution sessions
-- **Scheduling**: Coordinating parallel task execution
-- **Data Persistence**: Saving results to MongoDB and filesystem
-- **Backend Abstraction**: Supporting multiple hardware backends (qubex, fake)
+The `qdash.workflow.engine` module provides the core infrastructure for calibration workflow execution: task lifecycle management, state tracking, scheduling, data persistence (MongoDB + filesystem), and hardware backend abstraction.
 
 ## Architecture Diagram
 
-```mermaid
-flowchart TB
-    subgraph API["High-level API"]
-        CalibService["CalibService"]
-    end
-
-    subgraph Orchestration["Session Lifecycle Manager"]
-        CalibOrchestrator["CalibOrchestrator<br/>- Directory structure creation<br/>- Component initialization<br/>- Task execution coordination"]
-    end
-
-    subgraph Components["Core Components"]
-        TaskContext["TaskContext"]
-        ExecutionService["ExecutionService"]
-        Backend["Backend"]
-    end
-
-    subgraph Executor["Task Execution"]
-        TaskExecutor["TaskExecutor<br/>- Preprocess → Run → Postprocess lifecycle<br/>- R² and fidelity validation<br/>- Figure and raw data saving"]
-    end
-
-    subgraph Workers["Worker Components"]
-        TaskStateManager["TaskStateManager"]
-        TaskResultProcessor["TaskResultProcessor"]
-        TaskHistoryRecorder["TaskHistoryRecorder"]
-        FilesystemCalibDataSaver["FilesystemCalibDataSaver"]
-    end
-
-    CalibService --> CalibOrchestrator
-    CalibOrchestrator --> TaskContext
-    CalibOrchestrator --> ExecutionService
-    CalibOrchestrator --> Backend
-    TaskContext --> TaskExecutor
-    ExecutionService --> TaskExecutor
-    Backend --> TaskExecutor
-    TaskExecutor --> TaskStateManager
-    TaskExecutor --> TaskResultProcessor
-    TaskExecutor --> TaskHistoryRecorder
-    TaskExecutor --> FilesystemCalibDataSaver
-```
+![Workflow Engine Architecture](../../diagrams/workflow-engine-architecture.drawio.png)
 
 ## Module Structure
 
@@ -150,17 +100,9 @@ orchestrator.complete()
 
 **Execution Flow**:
 
-```mermaid
-flowchart TD
-    A["ensure_task_exists<br/><i>Register task in state manager</i>"] --> B
-    B["start_task<br/><i>Set status to RUNNING, record start time</i>"] --> C
-    C["preprocess<br/><i>Extract input parameters from backend</i>"] --> D
-    D["run<br/><i>Execute hardware measurement</i>"] --> E
-    E["postprocess<br/><i>Extract output parameters, generate figures</i>"] --> F
-    F["validate_r2<br/><i>Check R² threshold</i>"] --> G
-    G["save_artifacts<br/><i>Save figures, raw data</i>"] --> H
-    H["end_task<br/><i>Record end time, update status</i>"]
-```
+See the **Task Executor Flow** diagram for the complete execution lifecycle, state machine, and repository pattern:
+
+![Task Executor Flow](../../diagrams/task-executor-flow.drawio.png)
 
 ### 4. TaskStateManager
 
@@ -168,17 +110,7 @@ flowchart TD
 
 **Purpose**: Manages task state transitions and parameter storage.
 
-**State Transitions**:
-
-```mermaid
-stateDiagram-v2
-    [*] --> SCHEDULED
-    SCHEDULED --> RUNNING
-    RUNNING --> COMPLETED
-    RUNNING --> FAILED
-    COMPLETED --> [*]
-    FAILED --> [*]
-```
+**State Transitions**: SCHEDULED → RUNNING → COMPLETED / FAILED / CANCELLED (see Task Executor Flow diagram above)
 
 **Key Methods**:
 - `ensure_task_exists()`: Create task entry if not exists
@@ -236,25 +168,7 @@ The Repository Pattern separates data access logic from business logic, enabling
 - **Flexibility**: Easy to change persistence mechanisms
 - **Clean Architecture**: Business logic doesn't depend on database details
 
-```mermaid
-flowchart TB
-    subgraph Service["Service / Executor Layer"]
-        SE["TaskExecutor, ExecutionService, etc."]
-    end
-
-    subgraph Protocols["Repository Protocols"]
-        RP["ChipRepository, ExecutionRepository, etc."]
-    end
-
-    subgraph Implementations["Implementations"]
-        Mongo["MongoDB Implementations<br/>(MongoChipRepository)<br/><i>Production use</i>"]
-        InMemory["InMemory Implementations<br/>(InMemoryChipRepository)<br/><i>Unit testing</i>"]
-    end
-
-    SE -->|depends on| RP
-    RP -->|implemented by| Mongo
-    RP -->|implemented by| InMemory
-```
+The Repository Pattern is visualized in the Task Executor Flow diagram (see above).
 
 **Protocols** (interfaces in `protocols.py`):
 
@@ -306,13 +220,13 @@ flowchart TB
 
 ```python
 # Production code (MongoDB)
-from qdash.workflow.engine.repository import MongoChipRepository
+from qdash.repository import MongoChipRepository
 
 chip_repo = MongoChipRepository()
 chip = chip_repo.get_current_chip(username="alice")
 
 # Test code (InMemory)
-from qdash.workflow.engine.repository import InMemoryChipRepository
+from qdash.repository.inmemory import InMemoryChipRepository
 
 chip_repo = InMemoryChipRepository()
 chip_repo.add_chip("alice", mock_chip)  # Test helper
@@ -355,47 +269,64 @@ class BaseBackend(ABC):
 
 ## Data Flow
 
-### Task Execution Data Flow
+The data flow (Preprocess → Run → Postprocess) and persistence flow (TaskStateManager, TaskHistoryRecorder, FilesystemCalibDataSaver, ExecutionService) are illustrated in the Task Executor Flow diagram above.
 
-```mermaid
-flowchart LR
-    subgraph Preprocess
-        Backend["Backend<br/>(hardware)"] --> PreProcessResult["PreProcessResult<br/>(from backend)"]
-        PreProcessResult --> InputParams["input_params<br/>(stored)"]
-    end
+## Cancellation
 
-    subgraph Run
-        RunStep["Run<br/>(measure)"] --> RunResult["RunResult<br/>(raw_result)"]
-        RunResult --> R2["R² value<br/>(validated)"]
-    end
+### Overview
 
-    subgraph Postprocess
-        PostprocStep["Postproc"] --> PostProcessResult["PostProcessResult<br/>(params, figures)"]
-        PostProcessResult --> OutputParams["output_params<br/>figures, data"]
-    end
+Flow cancellation allows users to stop a running calibration from the UI. The cancellation lifecycle involves the API, Prefect, and the workflow engine.
 
-    Backend --> RunStep
-    RunStep --> PostprocStep
+### Mechanism
+
+Prefect 3 cancels flows by sending **SIGTERM** to the worker process. This means Python `except` blocks do not execute when a flow is cancelled. Instead, Prefect provides an `on_cancellation` hook that runs in a separate process after the SIGTERM kill.
+
+### Implementation
+
+All top-level `@flow` decorators register the `on_flow_cancellation` hook:
+
+```python
+from qdash.workflow.service.calib_service import on_flow_cancellation
+
+@flow(on_cancellation=[on_flow_cancellation])
+def my_calibration_flow(...):
+    ...
 ```
 
-### Persistence Flow
+The hook:
 
-```mermaid
-flowchart LR
-    TaskExecutor["TaskExecutor"]
+1. Reads flow run parameters (`project_id`, `flow_run_id`) from the Prefect flow run context
+2. Initializes the database connection (since it runs in a new process)
+3. Finds the execution by `note.flow_run_id` in `execution_history`
+4. Updates all non-terminal tasks (running/scheduled/pending) to `cancelled`
+5. Sets the execution status to `cancelled`
+6. Releases the execution lock
 
-    TaskExecutor --> TSM["TaskStateManager"]
-    TSM --> InMemory["In-memory state"]
+### flow_run_id Bridge
 
-    TaskExecutor --> THR["TaskHistoryRecorder"]
-    THR --> MongoDB1["MongoDB<br/>(TaskResultHistoryDocument)"]
+QDash uses date-based execution IDs (`YYYYMMDD-NNN`), while Prefect uses UUIDs for flow runs. The bridge is:
 
-    TaskExecutor --> FCDS["FilesystemCalibDataSaver"]
-    FCDS --> Files["Local files<br/>(fig/, raw_data/)"]
+- At flow start, `CalibService._store_flow_run_id()` stores the Prefect UUID in `execution.note["flow_run_id"]`
+- The cancel API accepts the Prefect `flow_run_id` (UUID) directly
+- The `on_cancellation` hook uses `flow_run_id` to look up the QDash execution
 
-    TaskExecutor --> ES["ExecutionService"]
-    ES --> MongoDB2["MongoDB<br/>(ExecutionDocument)"]
-```
+### Status Transitions on Cancel
+
+| Entity    | Before Cancel                          | After Cancel  |
+|-----------|----------------------------------------|---------------|
+| Execution | `running`                              | `cancelled`   |
+| Task      | `running` / `scheduled` / `pending`    | `cancelled`   |
+| Task      | `completed` / `failed` / `skipped`     | *(unchanged)* |
+
+### CalibService Methods
+
+| Method                                | Purpose                                     |
+|---------------------------------------|---------------------------------------------|
+| `on_flow_cancellation()`              | Prefect hook — runs after SIGTERM            |
+| `cancel_calibration()`                | In-process cancellation (for exception path) |
+| `_cancel_executions_by_flow_run_id()` | Direct MongoDB update by flow_run_id         |
+| `_finalize_tasks_on_cancel()`         | Batch-update non-terminal tasks              |
+| `_is_cancellation(e)`                 | Detect CancelledRun/CancelledError exception |
 
 ## Extension Points
 
@@ -475,23 +406,3 @@ class YourService:
         self._repo = repo
 ```
 
-## Best Practices
-
-### For Engine Developers
-
-1. **Use Protocols**: Define interfaces before implementations
-2. **Dependency Injection**: Pass repositories/services as constructor args
-3. **State Isolation**: Don't share mutable state between tasks
-4. **Error Handling**: Always update task status on failure
-5. **Logging**: Use structured logging for debugging
-
-### For Service Users
-
-1. **Use CalibService**: Don't directly instantiate engine components
-2. **Handle Exceptions**: Catch `TaskExecutionError`, `R2ValidationError`
-3. **Check Results**: Verify task success before proceeding
-
-## Related Documentation
-
-- [Testing Guidelines](./testing.md): How to test workflow components
-- [CalibService API](https://github.com/oqtopus-team/qdash/blob/develop/src/qdash/workflow/__init__.py): High-level API (source code)

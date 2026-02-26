@@ -13,6 +13,15 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from qdash.workflow.engine.scheduler.cr_scheduler import CRScheduler, CRScheduleResult
+from qdash.workflow.engine.scheduler.cr_utils import (
+    build_mux_conflict_map,
+    build_qubit_to_mux_map,
+    extract_qubit_frequency,
+    group_cr_pairs_by_conflict,
+    infer_direction_from_design,
+    qid_to_coords,
+    split_fast_slow_pairs,
+)
 
 
 @pytest.fixture
@@ -110,7 +119,7 @@ def test_scheduler_default_wiring_path():
 # MUX conflict detection tests
 def test_build_mux_conflict_map(mock_wiring_config):
     """Test MUX conflict map construction."""
-    conflict_map = CRScheduler._build_mux_conflict_map(mock_wiring_config)
+    conflict_map = build_mux_conflict_map(mock_wiring_config)
 
     # MUX 0 and MUX 1 should conflict (same readout module)
     assert 1 in conflict_map[0]
@@ -122,7 +131,7 @@ def test_build_mux_conflict_map(mock_wiring_config):
 
 def test_build_qubit_to_mux_map(mock_wiring_config):
     """Test qubit-to-MUX mapping."""
-    qid_to_mux = CRScheduler._build_qubit_to_mux_map(mock_wiring_config)
+    qid_to_mux = build_qubit_to_mux_map(mock_wiring_config)
 
     # MUX 0 controls qubits 0-3
     assert qid_to_mux["0"] == 0
@@ -139,16 +148,16 @@ def test_build_qubit_to_mux_map(mock_wiring_config):
 def test_qid_to_coords():
     """Test qubit ID to coordinate conversion."""
     # 64-qubit chip (8x8 grid)
-    assert CRScheduler._qid_to_coords(0, 8) == (0, 0)  # MUX 0, TL
-    assert CRScheduler._qid_to_coords(1, 8) == (0, 1)  # MUX 0, TR
-    assert CRScheduler._qid_to_coords(2, 8) == (1, 0)  # MUX 0, BL
-    assert CRScheduler._qid_to_coords(3, 8) == (1, 1)  # MUX 0, BR
-    assert CRScheduler._qid_to_coords(4, 8) == (0, 2)  # MUX 1, TL
-    assert CRScheduler._qid_to_coords(16, 8) == (2, 0)  # MUX 4, TL
+    assert qid_to_coords(0, 8) == (0, 0)  # MUX 0, TL
+    assert qid_to_coords(1, 8) == (0, 1)  # MUX 0, TR
+    assert qid_to_coords(2, 8) == (1, 0)  # MUX 0, BL
+    assert qid_to_coords(3, 8) == (1, 1)  # MUX 0, BR
+    assert qid_to_coords(4, 8) == (0, 2)  # MUX 1, TL
+    assert qid_to_coords(16, 8) == (2, 0)  # MUX 4, TL
 
     # 144-qubit chip (12x12 grid)
-    assert CRScheduler._qid_to_coords(0, 12) == (0, 0)
-    assert CRScheduler._qid_to_coords(1, 12) == (0, 1)
+    assert qid_to_coords(0, 12) == (0, 0)
+    assert qid_to_coords(1, 12) == (0, 1)
 
 
 def test_infer_direction_from_design():
@@ -156,25 +165,25 @@ def test_infer_direction_from_design():
     # 64-qubit chip (8x8 grid)
     # Qubit 0: (0,0) → sum=0 (even) → low freq
     # Qubit 1: (0,1) → sum=1 (odd) → high freq
-    assert CRScheduler._infer_direction_from_design("0", "1", 8) is True  # 0→1 valid (low→high)
+    assert infer_direction_from_design("0", "1", 8) is True  # 0→1 valid (low→high)
 
     # Qubit 0: (0,0) → sum=0 (even) → low freq
     # Qubit 2: (1,0) → sum=1 (odd) → high freq
-    assert CRScheduler._infer_direction_from_design("0", "2", 8) is True  # 0→2 valid (low→high)
+    assert infer_direction_from_design("0", "2", 8) is True  # 0→2 valid (low→high)
 
     # Qubit 1: (0,1) → sum=1 (odd) → high freq
     # Qubit 0: (0,0) → sum=0 (even) → low freq
-    assert CRScheduler._infer_direction_from_design("1", "0", 8) is False  # 1→0 invalid (high→low)
+    assert infer_direction_from_design("1", "0", 8) is False  # 1→0 invalid (high→low)
 
     # Qubit 2: (1,0) → sum=1 (odd) → high freq
     # Qubit 3: (1,1) → sum=2 (even) → low freq
-    assert CRScheduler._infer_direction_from_design("2", "3", 8) is False  # 2→3 invalid (high→low)
+    assert infer_direction_from_design("2", "3", 8) is False  # 2→3 invalid (high→low)
 
 
 # Frequency filtering tests
 def test_extract_qubit_frequency(mock_qubit_models):
     """Test frequency extraction from qubit models."""
-    frequencies = CRScheduler._extract_qubit_frequency(mock_qubit_models)
+    frequencies = extract_qubit_frequency(mock_qubit_models)
 
     assert frequencies["0"] == 5.0
     assert frequencies["1"] == 5.1
@@ -186,7 +195,7 @@ def test_frequency_directionality_filter(scheduler):
     all_pairs = ["0-1", "1-0", "1-2", "2-1"]
 
     # Load frequency data from qubit models
-    frequencies = CRScheduler._extract_qubit_frequency(scheduler._qubit_models)
+    frequencies = extract_qubit_frequency(scheduler._qubit_models)
 
     # Filter by frequency directionality (control < target)
     filtered = [
@@ -233,9 +242,9 @@ def test_candidate_qubit_filter(scheduler):
 )
 def test_group_cr_pairs_by_conflict(cr_pairs, qid_to_mux, expected_min_groups, reason):
     """Test CR pair grouping with various conflict scenarios."""
-    mux_conflict_map = {}
+    mux_conflict_map: dict[int, set[int]] = {}
 
-    groups = CRScheduler._group_cr_pairs_by_conflict(cr_pairs, qid_to_mux, mux_conflict_map)
+    groups = group_cr_pairs_by_conflict(cr_pairs, qid_to_mux, mux_conflict_map)
 
     assert len(groups) >= expected_min_groups, f"Failed: {reason}"
 
@@ -262,9 +271,9 @@ def test_coloring_strategies(strategy):
     """Test different coloring strategies produce valid results."""
     cr_pairs = ["0-1", "1-2", "2-3"]
     qid_to_mux = {"0": 0, "1": 0, "2": 0, "3": 0}
-    mux_conflict_map = {}
+    mux_conflict_map: dict[int, set[int]] = {}
 
-    groups = CRScheduler._group_cr_pairs_by_conflict(
+    groups = group_cr_pairs_by_conflict(
         cr_pairs, qid_to_mux, mux_conflict_map, coloring_strategy=strategy
     )
 
@@ -404,7 +413,7 @@ def test_split_fast_slow_pairs():
     cr_pairs = ["0-1", "0-4", "4-5"]  # 0-1 intra, 0-4 inter, 4-5 intra
     qid_to_mux = {"0": 0, "1": 0, "4": 1, "5": 1}
 
-    fast, slow = CRScheduler._split_fast_slow_pairs(cr_pairs, qid_to_mux)
+    fast, slow = split_fast_slow_pairs(cr_pairs, qid_to_mux)
 
     assert "0-1" in fast  # Same MUX
     assert "4-5" in fast  # Same MUX

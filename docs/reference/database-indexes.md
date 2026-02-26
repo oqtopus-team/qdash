@@ -1,10 +1,6 @@
 # Database Index Recommendations
 
-This document outlines recommended database indexes for optimal query performance in QDash with multi-tenancy support.
-
-## Overview
-
-All collections use `project_id` as the leading key in their indexes to support multi-tenant data isolation. This ensures efficient queries within project boundaries while maintaining proper data separation.
+All collections use `project_id` as the leading key to support multi-tenant data isolation.
 
 ## MongoDB Collections
 

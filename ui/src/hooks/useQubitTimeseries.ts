@@ -11,7 +11,7 @@ import type {
 import { useListTags } from "@/client/tag/tag";
 import { useGetTimeseriesTaskResults } from "@/client/task-result/task-result";
 import { useMetricsConfig } from "@/hooks/useMetricsConfig";
-import { formatDateTime } from "@/utils/datetime";
+import { formatDateTime } from "@/lib/utils/datetime";
 
 interface UseQubitTimeseriesOptions {
   chipId: string;

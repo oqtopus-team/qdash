@@ -21,7 +21,7 @@ import { useCSVExport } from "@/hooks/useCSVExport";
 import { useMetricsConfig } from "@/hooks/useMetricsConfig";
 import { useTimeRange } from "@/hooks/useTimeRange";
 import { useAnalysisUrlState } from "@/hooks/useUrlState";
-import { formatDateTime } from "@/utils/datetime";
+import { formatDateTime } from "@/lib/utils/datetime";
 
 // Color palette for secondary axis traces
 const SECONDARY_AXIS_COLORS = [
@@ -30,6 +30,23 @@ const SECONDARY_AXIS_COLORS = [
   "#bcbd22", // olive
   "#17becf", // cyan
 ];
+
+interface TimeSeriesDataPoint {
+  calibrated_at: string;
+  value: number | string;
+  error?: number;
+  unit?: string;
+  description?: string;
+}
+
+interface TimeSeriesTableRow {
+  qid: string;
+  time: string;
+  parameter: string;
+  value: number;
+  error?: number;
+  unit: string;
+}
 
 export function TimeSeriesView() {
   // URL state management
@@ -235,16 +252,16 @@ export function TimeSeriesView() {
     }
 
     // Table data processing
-    const tableRows: any[] = [];
+    const tableRows: TimeSeriesTableRow[] = [];
     Object.entries(timeseriesResponse.data.data).forEach(
       ([qid, dataPoints]) => {
         if (Array.isArray(dataPoints)) {
-          dataPoints.forEach((point: any) => {
+          (dataPoints as TimeSeriesDataPoint[]).forEach((point) => {
             tableRows.push({
               qid,
               time: formatDateTime(point.calibrated_at),
               parameter: selectedParameter,
-              value: point.value || 0,
+              value: typeof point.value === "number" ? point.value : 0,
               error: point.error,
               unit: point.unit || "a.u.",
             });
@@ -269,19 +286,20 @@ export function TimeSeriesView() {
     Object.entries(timeseriesResponse.data.data).forEach(
       ([qid, dataPoints]) => {
         if (Array.isArray(dataPoints)) {
+          const typedPoints = dataPoints as TimeSeriesDataPoint[];
           qidData[qid] = {
-            x: dataPoints.map(
-              (point: any) =>
+            x: typedPoints.map(
+              (point) =>
                 formatDateTime(point.calibrated_at, "yyyy-MM-dd'T'HH:mm:ss") ||
                 "",
             ),
-            y: dataPoints.map((point: any) => {
+            y: typedPoints.map((point) => {
               const value = point.value;
               if (typeof value === "number") return value;
               if (typeof value === "string") return Number(value) || 0;
               return 0;
             }),
-            error: dataPoints.map((point: any) => point.error || 0),
+            error: typedPoints.map((point) => point.error || 0),
           };
         }
       },
@@ -323,7 +341,7 @@ export function TimeSeriesView() {
       Array.isArray(firstEntry[1]) &&
       firstEntry[1].length > 0
     ) {
-      const firstPoint = firstEntry[1][0] as any;
+      const firstPoint = firstEntry[1][0] as TimeSeriesDataPoint;
       metaInfo = {
         unit: firstPoint.unit || "a.u.",
         description: firstPoint.description || "",
@@ -349,16 +367,16 @@ export function TimeSeriesView() {
       }
 
       // Table data processing
-      const tableRows: any[] = [];
+      const tableRows: TimeSeriesTableRow[] = [];
       Object.entries(secondaryTimeseriesResponse.data.data).forEach(
         ([qid, dataPoints]) => {
           if (Array.isArray(dataPoints)) {
-            dataPoints.forEach((point: any) => {
+            (dataPoints as TimeSeriesDataPoint[]).forEach((point) => {
               tableRows.push({
                 qid,
                 time: formatDateTime(point.calibrated_at),
                 parameter: secondaryParameter,
-                value: point.value || 0,
+                value: typeof point.value === "number" ? point.value : 0,
                 error: point.error,
                 unit: point.unit || "a.u.",
               });
@@ -383,21 +401,22 @@ export function TimeSeriesView() {
       Object.entries(secondaryTimeseriesResponse.data.data).forEach(
         ([qid, dataPoints]) => {
           if (Array.isArray(dataPoints)) {
+            const typedPoints = dataPoints as TimeSeriesDataPoint[];
             qidData[qid] = {
-              x: dataPoints.map(
-                (point: any) =>
+              x: typedPoints.map(
+                (point) =>
                   formatDateTime(
                     point.calibrated_at,
                     "yyyy-MM-dd'T'HH:mm:ss",
                   ) || "",
               ),
-              y: dataPoints.map((point: any) => {
+              y: typedPoints.map((point) => {
                 const value = point.value;
                 if (typeof value === "number") return value;
                 if (typeof value === "string") return Number(value) || 0;
                 return 0;
               }),
-              error: dataPoints.map((point: any) => point.error || 0),
+              error: typedPoints.map((point) => point.error || 0),
             };
           }
         },
@@ -451,7 +470,7 @@ export function TimeSeriesView() {
         Array.isArray(firstEntry[1]) &&
         firstEntry[1].length > 0
       ) {
-        const firstPoint = firstEntry[1][0] as any;
+        const firstPoint = firstEntry[1][0] as TimeSeriesDataPoint;
         metaInfo = {
           unit: firstPoint.unit || "a.u.",
           description: firstPoint.description || "",
@@ -608,7 +627,7 @@ export function TimeSeriesView() {
         label: "Value",
         sortable: false,
         className: "text-center",
-        render: (value: any) =>
+        render: (value: unknown) =>
           typeof value === "number" ? value.toFixed(4) : String(value),
       },
       {
@@ -616,8 +635,10 @@ export function TimeSeriesView() {
         label: "Error",
         sortable: false,
         className: "text-center",
-        render: (value: any) =>
-          value !== undefined && value !== null ? `±${value.toFixed(4)}` : "-",
+        render: (value: unknown) =>
+          value !== undefined && value !== null && typeof value === "number"
+            ? `\u00B1${value.toFixed(4)}`
+            : "-",
       },
       { key: "unit", label: "Unit", sortable: false, className: "text-center" },
     ];
@@ -711,96 +732,87 @@ export function TimeSeriesView() {
             Refresh
           </button>
         </div>
-        <div className="child w-full">
-          <table className="w-full table-auto">
-            <tr>
-              <th className="px-4 text-left">
-                <label className="text-sm font-medium text-base-content/70">
-                  Chip
-                </label>
-              </th>
-              <th className="px-4 text-left">
-                <label className="text-sm font-medium text-base-content/70">
-                  Parameter
-                  <span className="ml-1 text-xs text-primary">(Left Y)</span>
-                </label>
-              </th>
-              <th className="px-4 text-left">
-                <label className="text-sm font-medium text-base-content/70">
-                  Tag
-                </label>
-              </th>
-            </tr>
-            <tr>
-              <td className="px-4">
-                <div>
-                  <ChipSelector
-                    selectedChip={selectedChip}
-                    onChipSelect={setSelectedChip}
-                  />
-                </div>
-              </td>
-              <td className="px-4">
-                <div className="space-y-1">
-                  <Select<{ value: string; label: string }, false>
-                    options={availableParameters}
-                    value={
-                      currentMetricConfig
-                        ? {
-                            value: currentMetricConfig.key,
-                            label: currentMetricConfig.title,
-                          }
-                        : null
-                    }
-                    onChange={(option) => {
-                      if (option) {
-                        setSelectedParameter(option.value);
-                        // Clear secondary if it's the same as new primary
-                        if (secondaryParameter === option.value) {
-                          handleRemoveSecondaryAxis();
-                        }
+        <div
+          className="flex flex-col sm:flex-row w-full gap-4 sm:gap-6"
+          role="group"
+        >
+          <div className="flex-1">
+            <label className="text-sm font-medium text-base-content/70">
+              Chip
+            </label>
+            <div>
+              <ChipSelector
+                selectedChip={selectedChip}
+                onChipSelect={setSelectedChip}
+              />
+            </div>
+          </div>
+          <div className="flex-1">
+            <label className="text-sm font-medium text-base-content/70">
+              Parameter
+              <span className="ml-1 text-xs text-primary">(Left Y)</span>
+            </label>
+            <div className="space-y-1">
+              <Select<{ value: string; label: string }, false>
+                options={availableParameters}
+                value={
+                  currentMetricConfig
+                    ? {
+                        value: currentMetricConfig.key,
+                        label: currentMetricConfig.title,
                       }
-                    }}
-                    placeholder="Select parameter"
-                    className="text-base-content"
-                    styles={{
-                      control: (base) => ({
-                        ...base,
-                        minHeight: "38px",
-                        height: "auto",
-                        borderRadius: "0.5rem",
-                        borderColor: "#1f77b4",
-                        borderWidth: "2px",
-                      }),
-                      valueContainer: (base) => ({
-                        ...base,
-                        padding: "2px 8px",
-                      }),
-                      menu: (base) => ({
-                        ...base,
-                        zIndex: 50,
-                      }),
-                    }}
-                  />
-                </div>
-              </td>
-              <td className="px-4">
-                <div>
-                  <TagSelector
-                    tags={tags}
-                    selectedTag={selectedTag}
-                    onTagSelect={setSelectedTag}
-                    disabled={isLoadingTags}
-                  />
-                </div>
-              </td>
-            </tr>
-          </table>
+                    : null
+                }
+                onChange={(option) => {
+                  if (option) {
+                    setSelectedParameter(option.value);
+                    // Clear secondary if it's the same as new primary
+                    if (secondaryParameter === option.value) {
+                      handleRemoveSecondaryAxis();
+                    }
+                  }
+                }}
+                placeholder="Select parameter"
+                className="text-base-content"
+                styles={{
+                  control: (base) => ({
+                    ...base,
+                    minHeight: "38px",
+                    height: "auto",
+                    borderRadius: "0.5rem",
+                    borderColor: "#1f77b4",
+                    borderWidth: "2px",
+                  }),
+                  valueContainer: (base) => ({
+                    ...base,
+                    padding: "2px 8px",
+                  }),
+                  menu: (base) => ({
+                    ...base,
+                    zIndex: 50,
+                  }),
+                }}
+              />
+            </div>
+          </div>
+          <div className="flex-1">
+            <label className="text-sm font-medium text-base-content/70">
+              Tag
+            </label>
+            <div>
+              <TagSelector
+                tags={tags}
+                selectedTag={selectedTag}
+                onTagSelect={setSelectedTag}
+                disabled={isLoadingTags}
+              />
+            </div>
+          </div>
         </div>
 
         {/* Secondary Axis Section */}
         <div className="mt-4 pt-4 border-t border-base-300">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
+          <div className="flex flex-col sm:flex-row w-full gap-4 sm:gap-6">
             <div className="space-y-1">
               <label className="text-sm font-medium text-base-content/70">
                 Secondary Parameter

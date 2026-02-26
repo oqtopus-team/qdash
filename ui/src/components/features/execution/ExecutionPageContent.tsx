@@ -2,9 +2,10 @@
 
 import { useState, useEffect, useRef, useMemo } from "react";
 
-import { ExternalLink } from "lucide-react";
+import { ExternalLink, ArrowUpRight, StopCircle } from "lucide-react";
+import Link from "next/link";
 
-import { formatDateTime } from "@/utils/datetime";
+import { formatDateTime } from "@/lib/utils/datetime";
 
 import { ExecutionStats } from "./ExecutionStats";
 
@@ -14,6 +15,7 @@ import { useListChips } from "@/client/chip/chip";
 import {
   useListExecutions,
   useGetExecution,
+  useCancelExecution,
 } from "@/client/execution/execution";
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { ChipSelector } from "@/components/selectors/ChipSelector";
@@ -24,6 +26,36 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { ExecutionPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
 import { useDateNavigation } from "@/hooks/useDateNavigation";
 import { useExecutionUrlState } from "@/hooks/useUrlState";
+
+function PaginationControls({
+  currentPage,
+  setCurrentPage,
+  hasMore,
+}: {
+  currentPage: number;
+  setCurrentPage: React.Dispatch<React.SetStateAction<number>>;
+  hasMore: boolean;
+}) {
+  return (
+    <div className="flex justify-center items-center gap-2 sm:gap-4 my-3 sm:my-4 px-4">
+      <button
+        onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+        disabled={currentPage === 1}
+        className="btn btn-xs sm:btn-sm btn-outline"
+      >
+        Prev
+      </button>
+      <span className="text-xs sm:text-sm">Page {currentPage}</span>
+      <button
+        onClick={() => setCurrentPage((prev) => prev + 1)}
+        disabled={!hasMore}
+        className="btn btn-xs sm:btn-sm btn-outline"
+      >
+        Next
+      </button>
+    </div>
+  );
+}
 
 export function ExecutionPageContent() {
   // URL state management
@@ -40,7 +72,6 @@ export function ExecutionPageContent() {
   const [expandedTaskIndex, setExpandedTaskIndex] = useState<number | null>(
     null,
   );
-  const [cardData, setCardData] = useState<ExecutionResponseSummary[]>([]);
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
 
   // Pagination state
@@ -101,6 +132,8 @@ export function ExecutionPageContent() {
     },
   );
 
+  const cancelMutation = useCancelExecution();
+
   // Fetch task list for the selected execution_id
   const {
     data: executionDetailData,
@@ -117,25 +150,18 @@ export function ExecutionPageContent() {
     },
   });
 
-  // Set card data when execution data is fetched (filter by date)
-  useEffect(() => {
-    if (executionData?.data?.executions) {
-      let filteredData = executionData.data.executions;
-
-      // Filter by date if not "latest"
-      if (selectedDate !== "latest") {
-        filteredData = executionData.data.executions.filter((exec) => {
-          if (!exec.start_at) return false;
-          const execDate = new Date(exec.start_at);
-          const execDateStr = `${execDate.getFullYear()}${String(
-            execDate.getMonth() + 1,
-          ).padStart(2, "0")}${String(execDate.getDate()).padStart(2, "0")}`;
-          return execDateStr === selectedDate;
-        });
-      }
-
-      setCardData(filteredData);
-    }
+  // Compute card data from execution data (filter by date)
+  const cardData = useMemo(() => {
+    if (!executionData?.data?.executions) return [];
+    if (selectedDate === "latest") return executionData.data.executions;
+    return executionData.data.executions.filter((exec) => {
+      if (!exec.start_at) return false;
+      const execDate = new Date(exec.start_at);
+      const execDateStr = `${execDate.getFullYear()}${String(
+        execDate.getMonth() + 1,
+      ).padStart(2, "0")}${String(execDate.getDate()).padStart(2, "0")}`;
+      return execDateStr === selectedDate;
+    });
   }, [executionData, selectedDate]);
 
   // Chip selection change handler
@@ -143,14 +169,14 @@ export function ExecutionPageContent() {
     setSelectedChip(chipId || null);
     setSelectedExecutionId(null);
     setIsSidebarOpen(false);
-    setCardData([]);
-    setCurrentPage(1); // Reset to first page when changing chips
+    setCurrentPage(1);
   };
 
-  // Reset page when date changes
-  useEffect(() => {
+  // Wrap date setter to reset page
+  const handleDateChange = (date: string) => {
+    setSelectedDate(date);
     setCurrentPage(1);
-  }, [selectedDate]);
+  };
 
   if (isLoading) return <ExecutionPageSkeleton />;
   if (isError) return <div>Error</div>;
@@ -187,34 +213,16 @@ export function ExecutionPageContent() {
         return "border-l-4 border-warning";
       case "failed":
         return "border-l-4 border-error";
+      case "cancelled":
+        return "border-l-4 border-neutral";
       default:
         return "border-l-4 border-base-300";
     }
   };
 
-  // Pagination controls component
-  const PaginationControls = () => (
-    <div className="flex justify-center items-center gap-2 sm:gap-4 my-3 sm:my-4 px-4">
-      <button
-        onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
-        disabled={currentPage === 1}
-        className="btn btn-xs sm:btn-sm btn-outline"
-      >
-        Prev
-      </button>
-      <span className="text-xs sm:text-sm">Page {currentPage}</span>
-      <button
-        onClick={() => setCurrentPage((prev) => prev + 1)}
-        disabled={
-          !executionData?.data?.executions ||
-          executionData.data.executions.length < itemsPerPage
-        }
-        className="btn btn-xs sm:btn-sm btn-outline"
-      >
-        Next
-      </button>
-    </div>
-  );
+  const hasMorePages =
+    !!executionData?.data?.executions &&
+    executionData.data.executions.length >= itemsPerPage;
 
   return (
     <PageContainer>
@@ -234,7 +242,7 @@ export function ExecutionPageContent() {
             <DateSelector
               chipId={selectedChip || ""}
               selectedDate={selectedDate}
-              onDateSelect={setSelectedDate}
+              onDateSelect={handleDateChange}
               disabled={!selectedChip}
             />
           </PageFiltersBar.Item>
@@ -247,7 +255,11 @@ export function ExecutionPageContent() {
         onTagSelect={setSelectedTag}
       />
       {/* Pagination controls - Top */}
-      <PaginationControls />
+      <PaginationControls
+        currentPage={currentPage}
+        setCurrentPage={setCurrentPage}
+        hasMore={hasMorePages}
+      />
       <div className="grid grid-cols-1 gap-1.5 sm:gap-2">
         {cardData.map((execution) => {
           const executionKey = getExecutionKey(execution);
@@ -278,7 +290,9 @@ export function ExecutionPageContent() {
                           ? "text-success"
                           : execution.status === "scheduled"
                             ? "text-warning"
-                            : "text-error"
+                            : execution.status === "cancelled"
+                              ? "text-neutral"
+                              : "text-error"
                     }`}
                   >
                     {execution.status === "running"
@@ -287,7 +301,9 @@ export function ExecutionPageContent() {
                         ? "Completed"
                         : execution.status === "scheduled"
                           ? "Scheduled"
-                          : "Failed"}
+                          : execution.status === "cancelled"
+                            ? "Cancelled"
+                            : "Failed"}
                   </span>
                 </div>
                 <div className="flex flex-wrap items-center gap-x-2 sm:gap-x-3 gap-y-0.5 mt-0.5 sm:mt-1 text-xs sm:text-sm text-base-content/60">
@@ -307,7 +323,11 @@ export function ExecutionPageContent() {
         })}
       </div>
       {/* Pagination controls - Bottom */}
-      <PaginationControls />
+      <PaginationControls
+        currentPage={currentPage}
+        setCurrentPage={setCurrentPage}
+        hasMore={hasMorePages}
+      />
       {/* Sidebar */}
       <div
         className={`fixed right-0 top-0 w-full sm:w-3/4 lg:w-2/5 h-full bg-base-100 shadow-xl border-l overflow-y-auto p-4 sm:p-6 transition-transform duration-300 z-50 ${
@@ -333,7 +353,7 @@ export function ExecutionPageContent() {
                   )?.name
                 }
               </h2>
-              <div className="mt-3 sm:mt-4">
+              <div className="mt-3 sm:mt-4 flex flex-wrap gap-2">
                 <a
                   href={`/execution/${selectedChip || ""}/${selectedExecutionId}`}
                   className="btn btn-primary btn-sm sm:btn-md"
@@ -341,6 +361,36 @@ export function ExecutionPageContent() {
                   <ExternalLink className="w-3 h-3 sm:w-4 sm:h-4" />
                   View Details
                 </a>
+                {(() => {
+                  const selectedExec = cardData.find(
+                    (exec) => getExecutionKey(exec) === selectedExecutionId,
+                  );
+                  const detailFlowRunId = executionDetailData?.data?.note
+                    ?.flow_run_id as string | undefined;
+                  const isCancellable =
+                    !!detailFlowRunId &&
+                    (selectedExec?.status === "running" ||
+                      selectedExec?.status === "scheduled" ||
+                      selectedExec?.status === "pending");
+                  return (
+                    isCancellable && (
+                      <button
+                        onClick={() => {
+                          if (detailFlowRunId) {
+                            cancelMutation.mutate({
+                              flowRunId: detailFlowRunId,
+                            });
+                          }
+                        }}
+                        disabled={cancelMutation.isPending}
+                        className="btn btn-error btn-sm sm:btn-md"
+                      >
+                        <StopCircle className="w-3 h-3 sm:w-4 sm:h-4" />
+                        {cancelMutation.isPending ? "Cancelling..." : "Cancel"}
+                      </button>
+                    )
+                  );
+                })()}
               </div>
             </div>
             <div>
@@ -364,9 +414,22 @@ export function ExecutionPageContent() {
                     >
                       <div className="flex items-start justify-between gap-2">
                         <h4 className="text-sm sm:text-lg font-semibold text-left truncate flex-1">
-                          {detailTask.qid
-                            ? `${detailTask.qid}-${detailTask.name}`
-                            : detailTask.name}
+                          {detailTask.task_id ? (
+                            <Link
+                              href={`/task-results/${detailTask.task_id}`}
+                              className="hover:text-primary inline-flex items-center gap-1"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              {detailTask.qid
+                                ? `${detailTask.qid}-${detailTask.name}`
+                                : detailTask.name}
+                              <ArrowUpRight className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0 opacity-50" />
+                            </Link>
+                          ) : detailTask.qid ? (
+                            `${detailTask.qid}-${detailTask.name}`
+                          ) : (
+                            detailTask.name
+                          )}
                         </h4>
                         <span
                           className={`text-xs sm:text-sm font-semibold flex-shrink-0 ${
@@ -376,7 +439,9 @@ export function ExecutionPageContent() {
                                 ? "text-success"
                                 : detailTask.status === "scheduled"
                                   ? "text-warning"
-                                  : "text-error"
+                                  : detailTask.status === "cancelled"
+                                    ? "text-neutral"
+                                    : "text-error"
                           }`}
                         >
                           {detailTask.status === "running"
@@ -385,7 +450,9 @@ export function ExecutionPageContent() {
                               ? "Completed"
                               : detailTask.status === "scheduled"
                                 ? "Scheduled"
-                                : "Failed"}
+                                : detailTask.status === "cancelled"
+                                  ? "Cancelled"
+                                  : "Failed"}
                         </span>
                       </div>
                       <div className="text-xs sm:text-sm text-base-content/60 mt-1">

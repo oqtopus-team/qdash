@@ -7,7 +7,7 @@ import { CheckCircle, XCircle, Clock, List, Grid3x3 } from "lucide-react";
 import type { Task } from "@/schemas";
 
 import { useGetQubitTaskHistory } from "@/client/task-result/task-result";
-import PlotlyRenderer from "@/components/charts/PlotlyRenderer";
+import { PlotlyRenderer } from "@/components/charts/PlotlyRenderer";
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { TaskGridView } from "@/components/features/chip/TaskGridView";
 

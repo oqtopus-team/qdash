@@ -1,21 +1,4 @@
-# UI Development Guidelines for QDash
-
-This document defines the UI development conventions and standards for the QDash project. All contributors should follow these guidelines when creating new pages, components, or features.
-
-## Table of Contents
-
-1. [Technology Stack](#technology-stack)
-2. [Project Structure](#project-structure)
-3. [Naming Conventions](#naming-conventions)
-4. [Component Design](#component-design)
-5. [State Management](#state-management)
-6. [API Integration](#api-integration)
-7. [Styling Guidelines](#styling-guidelines)
-8. [TypeScript Best Practices](#typescript-best-practices)
-9. [Code Quality](#code-quality)
-10. [Development Workflow](#development-workflow)
-
----
+# UI Development Guidelines
 
 ## Technology Stack
 
@@ -55,43 +38,72 @@ This document defines the UI development conventions and standards for the QDash
 ```
 ui/
 ├── src/
-│   ├── app/                    # Next.js App Router pages
+│   ├── app/                    # Next.js App Router (pages and routes ONLY)
 │   │   ├── (auth)/             # Protected routes (require login)
 │   │   │   ├── admin/          # Admin page
 │   │   │   ├── analysis/       # Analysis page
+│   │   │   ├── chat/           # Copilot chat
 │   │   │   ├── chip/           # Chip management
 │   │   │   ├── execution/      # Execution monitoring
 │   │   │   ├── files/          # File management
-│   │   │   ├── flow/           # Flow editor
+│   │   │   ├── inbox/          # Inbox (default landing page)
+│   │   │   ├── issues/         # Issue tracking
 │   │   │   ├── metrics/        # Metrics dashboard
-│   │   │   ├── setting/        # Settings page
-│   │   │   └── tasks/          # Task management
+│   │   │   ├── provenance/     # Data provenance
+│   │   │   ├── settings/       # Settings page
+│   │   │   ├── task-results/   # Task result viewer
+│   │   │   ├── tasks/          # Task management
+│   │   │   └── workflow/       # Workflow editor
 │   │   ├── (public)/           # Public routes (no auth required)
 │   │   │   └── login/          # Login page
-│   │   ├── providers/          # App-level providers
+│   │   ├── api/                # API route handlers (SSE streaming)
 │   │   ├── globals.css         # Global styles
 │   │   ├── layout.tsx          # Root layout
-│   │   ├── page.tsx            # Root page (redirect)
+│   │   ├── page.tsx            # Root page (redirects to /inbox)
 │   │   └── providers.tsx       # Provider composition
 │   ├── client/                 # Auto-generated API client (DO NOT EDIT)
 │   ├── components/             # Reusable components
 │   │   ├── charts/             # Chart components (Plotly wrappers)
 │   │   ├── features/           # Feature-specific components
-│   │   ├── layout/             # Layout components (Navbar, Sidebar)
+│   │   │   ├── admin/          # Admin page content
+│   │   │   ├── files/          # Files page content
+│   │   │   ├── tasks/          # Tasks page content
+│   │   │   └── ...             # Other feature directories
+│   │   ├── layout/             # Layout components (AppLayout, AnalysisSidebar)
 │   │   ├── selectors/          # Selection components (dropdowns, etc.)
 │   │   └── ui/                 # Generic UI components
-│   ├── contexts/               # React Context providers
+│   ├── contexts/               # ALL React Context/Provider files
+│   │   ├── AxiosContext.tsx     # Axios interceptor provider
+│   │   ├── ThemeContext.tsx     # Theme provider
+│   │   ├── AuthContext.tsx      # Authentication context
+│   │   ├── ProjectContext.tsx   # Project selection context
+│   │   ├── SidebarContext.tsx   # Sidebar state context
+│   │   └── AnalysisChatContext.tsx
 │   ├── hooks/                  # Custom React hooks
+│   │   ├── __tests__/          # Hook unit tests
+│   │   ├── url-state/          # URL state hooks (split from useUrlState)
+│   │   │   ├── __tests__/      # URL state hook tests
+│   │   │   ├── types.ts        # Shared types (TimeRange, SelectionMode, etc.)
+│   │   │   ├── useChipUrlState.ts
+│   │   │   ├── useExecutionUrlState.ts
+│   │   │   ├── useAnalysisUrlState.ts
+│   │   │   ├── use*UrlState.ts # Other URL state hooks
+│   │   │   └── index.ts        # Barrel re-export
+│   │   └── use*.ts             # Other hooks (flat)
 │   ├── lib/                    # Utilities and configurations
 │   │   ├── api/                # API client configuration
-│   │   ├── config/             # App configuration
 │   │   └── utils/              # Utility functions
+│   │       ├── datetime.ts     # Date/time formatting
+│   │       ├── grid-layout.ts  # Grid layout calculations
+│   │       ├── grid-position.ts # Grid position calculations
+│   │       └── qid.ts          # Qubit ID utilities
 │   ├── schemas/                # Auto-generated TypeScript types (DO NOT EDIT)
 │   └── types/                  # Manual type definitions
 ├── public/                     # Static assets
+├── vitest.config.mts           # Vitest test configuration
+├── vitest.setup.ts             # Test setup (jest-dom matchers)
 ├── eslint.config.mjs           # ESLint configuration
 ├── orval.config.cjs            # API client generation config
-├── tailwind.config.ts          # Tailwind CSS configuration
 └── tsconfig.json               # TypeScript configuration
 ```
 
@@ -109,6 +121,40 @@ Next.js App Router uses **route groups** (folders in parentheses) for organizati
 // Example: src/app/(public)/login/page.tsx
 // Accessible at: /login (no auth required)
 ```
+
+### Key Conventions
+
+#### Import Paths
+
+| Module                | Import from              | NOT from                  |
+| --------------------- | ------------------------ | ------------------------- |
+| Utilities             | `@/lib/utils/*`          | ~~`@/utils/*`~~ (removed) |
+| Providers & Contexts  | `@/contexts/*`           | ~~`@/app/providers/*`~~ (removed) |
+| URL State hooks       | `@/hooks/useUrlState` or `@/hooks/url-state` | Direct file paths |
+
+#### Export Rules
+
+| File type               | Export style      | Example                                          |
+| ----------------------- | ----------------- | ------------------------------------------------ |
+| `page.tsx`, `layout.tsx`| `default export`  | `export default function AdminPage() {}`         |
+| All other files         | `named export`    | `export function AdminPageContent() {}`          |
+| Exceptions for `dynamic()` | both           | Named + default for components loaded via `next/dynamic` |
+
+#### Page Pattern
+
+All `page.tsx` files should be thin wrappers that delegate to a `*PageContent` component:
+
+```tsx
+// app/(auth)/admin/page.tsx - Thin wrapper
+"use client";
+import { AdminPageContent } from "@/components/features/admin/AdminPageContent";
+
+export default function AdminPage() {
+  return <AdminPageContent />;
+}
+```
+
+Do NOT put business logic, state management, or large JSX in `page.tsx` files.
 
 ---
 
@@ -517,7 +563,7 @@ Use DaisyUI component classes for consistent UI:
 
 ### Theme Support
 
-QDash supports 35+ DaisyUI themes. Users can switch themes in Settings (`/setting`).
+QDash supports 35+ DaisyUI themes. Users can switch themes in Settings (`/settings`).
 
 ```tsx
 // Use semantic color classes (auto-adjust to theme)
@@ -538,7 +584,7 @@ QDash supports 35+ DaisyUI themes. Users can switch themes in Settings (`/settin
 #### Adding New Themes
 
 1. Add the import to `globals.css`: `@import "daisyui/theme/themename.css";`
-2. Add the theme name to the `themes` array in `/ui/src/app/(auth)/setting/page.tsx`
+2. Add the theme name to the `themes` array in `/ui/src/app/(auth)/settings/page.tsx`
 
 ### Rich Interactive Design System
 
@@ -673,10 +719,14 @@ export default [
     rules: {
       "react-hooks/rules-of-hooks": "error",
       "react-hooks/exhaustive-deps": "warn",
+      "@typescript-eslint/no-unused-vars": ["warn", { argsIgnorePattern: "^_", varsIgnorePattern: "^_" }],
+      "@typescript-eslint/no-explicit-any": "warn",
     },
   },
 ];
 ```
+
+**Note:** `no-explicit-any` is set to `warn` to encourage proper typing. Prefix unused variables with `_` to suppress `no-unused-vars` warnings.
 
 ### Running Linters
 
@@ -695,9 +745,10 @@ bunx tsc --noEmit
 
 Before committing, ensure:
 
-1. **Type check passes**: `bunx tsc --noEmit`
-2. **Lint passes**: `bun run lint`
-3. **Build succeeds**: `bun run build`
+1. **Tests pass**: `bun run test:run`
+2. **Type check passes**: `bunx tsc --noEmit`
+3. **Lint passes**: `bun run lint`
+4. **Build succeeds**: `bun run build`
 
 ---
 
@@ -736,56 +787,34 @@ bun run start
 
 ### Common Tasks
 
-| Command             | Description              |
-| ------------------- | ------------------------ |
-| `bun run dev`       | Start development server |
-| `bun run build`     | Build for production     |
-| `bun run lint`      | Run ESLint               |
-| `bun run fmt`       | Fix ESLint issues        |
-| `bunx tsc --noEmit` | Type check               |
-| `task generate`     | Regenerate API client    |
+| Command             | Description                          |
+| ------------------- | ------------------------------------ |
+| `bun run dev`       | Start development server             |
+| `bun run build`     | Build for production                 |
+| `bun run test`      | Run tests in watch mode              |
+| `bun run test:run`  | Run tests once (CI-friendly)         |
+| `task test-ui`      | Run UI tests from project root       |
+| `bun run lint`      | Run ESLint                           |
+| `bun run fmt`       | Fix ESLint issues                    |
+| `bunx tsc --noEmit` | Type check                           |
+| `task generate`     | Regenerate API client                |
 
----
+## References
 
-## Summary
+This guide is based on the following official documentation and best practices:
 
-### Key Principles
+| Topic | Reference |
+| --- | --- |
+| Project Structure | [Next.js Project Structure](https://nextjs.org/docs/getting-started/project-structure) |
+| App Router | [Next.js App Router](https://nextjs.org/docs/app) |
+| Data Fetching | [Next.js Data Fetching Patterns](https://nextjs.org/docs/app/building-your-application/data-fetching/patterns) |
+| Server/Client Components | [Next.js Server and Client Composition Patterns](https://nextjs.org/docs/app/building-your-application/rendering/composition-patterns) |
+| TanStack Query | [TanStack Query Documentation](https://tanstack.com/query/latest/docs/framework/react/overview) |
+| nuqs (URL State) | [nuqs Documentation](https://nuqs.47ng.com/) |
+| Tailwind CSS | [Tailwind CSS Documentation](https://tailwindcss.com/docs) |
+| DaisyUI | [DaisyUI Components](https://daisyui.com/components/) |
+| TypeScript ESLint | [typescript-eslint Rules](https://typescript-eslint.io/rules/) |
+| React Hooks Rules | [React Rules of Hooks](https://react.dev/reference/rules/rules-of-hooks) |
+| Plotly.js | [Plotly.js Documentation](https://plotly.com/javascript/) |
+| Export Patterns | [Next.js Lazy Loading with dynamic()](https://nextjs.org/docs/app/building-your-application/optimizing/lazy-loading) |
 
-1. **Use TypeScript strictly** - No implicit `any`, explicit types for all callbacks
-2. **Follow naming conventions** - PascalCase for components, camelCase for hooks
-3. **Organize by feature** - Group related components together
-4. **Use TanStack Query** - For all server state management
-5. **Use DaisyUI** - For consistent, theme-aware UI components
-6. **Never edit generated code** - `src/client/` and `src/schemas/` are auto-generated
-
-### Quick Reference
-
-```tsx
-// Component template
-import type { SomeType } from "@/schemas";
-
-interface MyComponentProps {
-  data: SomeType;
-  onAction: (id: string) => void;
-}
-
-export function MyComponent({ data, onAction }: MyComponentProps) {
-  const { data: queryData, isLoading } = useQuery({
-    queryKey: ["myData", data.id],
-    queryFn: () => fetchData(data.id),
-  });
-
-  if (isLoading) return <div className="loading loading-spinner" />;
-
-  return (
-    <div className="card bg-base-100">
-      <div className="card-body">
-        <h2 className="card-title">{data.name}</h2>
-        <button className="btn btn-primary" onClick={() => onAction(data.id)}>
-          Action
-        </button>
-      </div>
-    </div>
-  );
-}
-```

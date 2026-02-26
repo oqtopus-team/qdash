@@ -311,37 +311,6 @@ export function EditorPageSkeleton() {
 }
 
 /**
- * Skeleton for Settings page
- */
-export function SettingPageSkeleton() {
-  return (
-    <div className="w-full px-3 sm:px-6">
-      {/* Header */}
-      <div className="skeleton h-8 w-32 mb-6" />
-
-      {/* Tabs */}
-      <div className="tabs tabs-boxed mb-6 w-fit">
-        <div className="skeleton h-10 w-24 mx-1 rounded" />
-        <div className="skeleton h-10 w-20 mx-1 rounded" />
-        <div className="skeleton h-10 w-24 mx-1 rounded" />
-      </div>
-
-      {/* Content Card */}
-      <div className="card bg-base-200 shadow-lg">
-        <div className="card-body">
-          <div className="skeleton h-6 w-36 mb-4" />
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {Array.from({ length: 8 }).map((_, i) => (
-              <div key={i} className="skeleton h-10 w-full rounded-lg" />
-            ))}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/**
  * Skeleton for Qubit detail page
  */
 export function QubitDetailPageSkeleton() {
@@ -438,21 +407,6 @@ export function ExecutionDetailPageSkeleton() {
             <div className="skeleton h-96 w-full rounded-lg" />
           </div>
         </div>
-      </div>
-    </div>
-  );
-}
-
-/**
- * Generic page skeleton
- */
-export function GenericPageSkeleton() {
-  return (
-    <div className="w-full flex justify-center py-12">
-      <div className="w-full max-w-4xl px-4 space-y-6">
-        <div className="skeleton h-8 w-48 mb-4" />
-        <div className="skeleton h-48 w-full rounded-lg" />
-        <div className="skeleton h-36 w-full rounded-lg" />
       </div>
     </div>
   );

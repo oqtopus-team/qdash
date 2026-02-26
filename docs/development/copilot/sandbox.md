@@ -8,7 +8,7 @@ The sandbox enforces multiple layers of security:
 1. **AST validation** -- Static analysis before execution
 2. **Module whitelist** -- Only numerical/statistical imports allowed
 3. **Restricted builtins** -- No `eval`, `exec`, `open`, etc.
-4. **Resource limits** -- Timeout and memory caps
+4. **Timeout** -- Execution time cap via `signal.SIGALRM`
 
 ## Security Model
 
@@ -33,15 +33,21 @@ Only the following modules can be imported:
 | Module | Purpose |
 |--------|---------|
 | `numpy` | Numerical arrays and operations |
+| `pandas` | DataFrames and data manipulation |
 | `scipy` | Scientific computing |
 | `scipy.stats` | Statistical distributions and tests |
 | `scipy.optimize` | Curve fitting and optimization |
 | `scipy.signal` | Signal processing |
 | `scipy.interpolate` | Interpolation |
+| `plotly` | Base Plotly module |
+| `plotly.graph_objects` | Plotly graph objects (go.Scatter, go.Figure, etc.) |
+| `plotly.express` | High-level Plotly charting |
+| `plotly.subplots` | Subplot creation |
 | `math` | Basic math functions |
 | `statistics` | Statistical measures |
 | `json` | JSON serialization |
 | `datetime` | Date/time handling |
+| `_strptime` | Internal module required by `datetime.strptime()` |
 | `collections` | Data structures (Counter, defaultdict, etc.) |
 
 A custom `__import__` function (`_safe_import`) enforces this whitelist at runtime, providing a second layer of defense beyond AST validation.
@@ -74,10 +80,9 @@ Access to these attributes is blocked to prevent sandbox escapes via Python's in
 | Limit | Value | Mechanism |
 |-------|-------|-----------|
 | Execution timeout | 5 seconds | `signal.SIGALRM` (Unix) |
-| Memory limit | 256 MB | `resource.setrlimit(RLIMIT_AS)` (Linux) |
 | Output size | 100 KB | String truncation after execution |
 
-Resource limits are restored to their previous values in a `finally` block after execution.
+The alarm handler is restored in a `finally` block after execution. No `RLIMIT_AS` memory cap is set because it limits the entire process address space, which would affect the API server itself (see [LLM Integration Patterns](./llm-integration-patterns.md#resource-limits-in-shared-processes)).
 
 ## Execution Flow
 
@@ -97,8 +102,7 @@ LLM generates Python code
   Inject context_data as 'data' variable
         │
         ▼
-  Set resource limits
-  (SIGALRM timeout, RLIMIT_AS memory)
+  Set SIGALRM timeout
         │
         ▼
   exec(code, restricted_globals)
@@ -110,6 +114,10 @@ LLM generates Python code
         │ No
         ▼
   Use captured stdout as output
+        │
+        ▼
+  _ensure_serializable(chart)
+  (convert Plotly objects to plain dicts)
         │
         ▼
   Validate chart structure (must have 'data' key)
@@ -126,7 +134,7 @@ The `execute_python_analysis` function returns a dict with three keys:
 ```python
 {
     "output": str | None,   # Text output (stdout or result["output"])
-    "chart": dict | None,   # Plotly chart spec {"data": [...], "layout": {...}}
+    "chart": dict | list[dict] | None,  # Plotly chart spec(s) {"data": [...], "layout": {...}}
     "error": str | None      # Error message if execution failed
 }
 ```
@@ -148,7 +156,6 @@ If no `result` variable is set, captured `stdout` becomes the output.
 ## Known Limitations
 
 - **Unix-only timeout**: `signal.SIGALRM` is not available on Windows. Timeout enforcement is skipped on non-Unix platforms.
-- **Linux-only memory limit**: `resource.RLIMIT_AS` is Linux-specific. Memory limiting is skipped on other platforms.
 - **No network access**: The sandbox cannot make HTTP requests or access external services.
-- **No matplotlib/plotly import**: Chart generation must use raw Plotly JSON specs (dict format), not the Plotly Python library. The LLM is instructed to construct chart specs as dicts.
+- **No matplotlib**: Only Plotly is supported for chart generation. Plotly objects (`go.Figure`, `go.Scatter`, etc.) are auto-converted to JSON-serializable dicts via `_ensure_serializable()`.
 - **Single-threaded**: Code runs synchronously in the main process. The 5-second timeout prevents blocking.

@@ -1,28 +1,15 @@
-# UI Testing Guidelines for QDash
-
-This document provides guidelines for testing the QDash frontend application. It covers testing strategies, tools, and best practices.
-
-## Table of Contents
-
-1. [Testing Strategy](#testing-strategy)
-2. [Manual Testing](#manual-testing)
-3. [Type Checking](#type-checking)
-4. [Linting](#linting)
-5. [Build Verification](#build-verification)
-6. [Component Testing Patterns](#component-testing-patterns)
-7. [Testing Checklist](#testing-checklist)
-
----
+# UI Testing Guidelines
 
 ## Testing Strategy
 
 ### Current Testing Approach
 
-QDash UI currently uses a combination of:
+QDash UI uses a layered testing approach:
 
-1. **Static Analysis** - TypeScript type checking and ESLint
-2. **Build Verification** - Production build validation
-3. **Manual Testing** - Feature testing in development environment
+1. **Unit Tests** - Vitest + React Testing Library for hooks and utilities
+2. **Static Analysis** - TypeScript type checking and ESLint
+3. **Build Verification** - Production build validation
+4. **Manual Testing** - Feature testing in development environment
 
 ### Testing Pyramid for QDash UI
 
@@ -32,16 +19,185 @@ flowchart TB
         E2EContent["Manual testing now"]
     end
 
-    subgraph Integration["Integration Tests (Future: Testing Library)"]
-        IntContent["Component + API"]
+    subgraph Unit["Unit Tests (Vitest + React Testing Library)"]
+        UnitContent["Hooks, utilities, components"]
     end
 
-    subgraph Static["Static Analysis (Current)"]
+    subgraph Static["Static Analysis"]
         StaticContent["TypeScript + ESLint + Build Check"]
     end
 
-    E2E --- Integration
-    Integration --- Static
+    E2E --- Unit
+    Unit --- Static
+```
+
+---
+
+## Unit Testing
+
+### Test Runner: Vitest
+
+QDash uses [Vitest](https://vitest.dev/) with React Testing Library for unit testing.
+
+**Configuration files:**
+
+| File | Purpose |
+| --- | --- |
+| `vitest.config.mts` | Vitest config (jsdom, react plugin, tsconfig paths) |
+| `vitest.setup.ts` | Setup file (`@testing-library/jest-dom` matchers) |
+
+### Running Tests
+
+```bash
+# From project root
+task test-ui
+
+# From ui/ directory
+bun run test:run    # Single run (CI-friendly)
+bun run test        # Watch mode (development)
+```
+
+### Test File Location
+
+Tests live alongside the code they test in `__tests__/` directories:
+
+```
+src/hooks/
+├── __tests__/
+│   ├── useTimeRange.test.ts
+│   └── useCSVExport.test.ts
+├── url-state/
+│   ├── __tests__/
+│   │   ├── types.test.ts
+│   │   ├── useAnalysisUrlState.test.ts
+│   │   ├── useChipUrlState.test.ts
+│   │   ├── useMetricsUrlState.test.ts
+│   │   ├── useCDFUrlState.test.ts
+│   │   └── useExecutionUrlState.test.ts
+│   ├── types.ts
+│   └── use*UrlState.ts
+└── use*.ts
+```
+
+### Writing Tests
+
+#### Hook Tests
+
+Use `renderHook` from React Testing Library:
+
+```tsx
+import { describe, it, expect } from "vitest";
+import { renderHook, act } from "@testing-library/react";
+
+import { useTimeRange } from "../useTimeRange";
+
+describe("useTimeRange", () => {
+  it("returns default time range", () => {
+    const { result } = renderHook(() => useTimeRange());
+
+    expect(result.current.timeRange.startAt).toBeDefined();
+    expect(result.current.timeRange.endAt).toBeDefined();
+  });
+
+  it("updates start time and locks it", () => {
+    const { result } = renderHook(() => useTimeRange());
+
+    act(() => {
+      result.current.updateStartAt("2024-01-01T00:00:00.000+09:00");
+    });
+
+    expect(result.current.timeRange.startAt).toBe("2024-01-01T00:00:00.000+09:00");
+    expect(result.current.timeRange.isStartAtLocked).toBe(true);
+  });
+});
+```
+
+#### URL State Hook Tests
+
+Use `withNuqsTestingAdapter` from `nuqs/adapters/testing`:
+
+```tsx
+import { describe, it, expect } from "vitest";
+import { renderHook, act } from "@testing-library/react";
+import { withNuqsTestingAdapter } from "nuqs/adapters/testing";
+
+import { useChipUrlState } from "../useChipUrlState";
+
+describe("useChipUrlState", () => {
+  it("returns defaults when no URL params are set", () => {
+    const { result } = renderHook(() => useChipUrlState(), {
+      wrapper: withNuqsTestingAdapter({ searchParams: "" }),
+    });
+
+    expect(result.current.selectedChip).toBe("");
+    expect(result.current.selectedDate).toBe("latest");
+  });
+
+  it("reads initial values from URL params", () => {
+    const { result } = renderHook(() => useChipUrlState(), {
+      wrapper: withNuqsTestingAdapter({
+        searchParams: "chip=CHIP01&date=2024-01-01",
+      }),
+    });
+
+    expect(result.current.selectedChip).toBe("CHIP01");
+    expect(result.current.selectedDate).toBe("2024-01-01");
+  });
+});
+```
+
+> **Note:** For array parameters using `parseAsArrayOf`, nuqs uses comma-separated values (e.g., `params=t1,t2_echo`), not repeated keys.
+
+#### Mocking
+
+Use Vitest's built-in mocking:
+
+```tsx
+import { vi } from "vitest";
+
+// Mock a module
+vi.mock("@/client/chip/chip", () => ({
+  getChipList: vi.fn().mockResolvedValue({
+    chips: [{ chip_id: "chip-001" }],
+  }),
+}));
+
+// Fake timers
+vi.useFakeTimers();
+vi.setSystemTime(new Date("2024-06-15T12:00:00.000Z"));
+// ... run tests ...
+vi.useRealTimers();
+
+// Spies
+vi.spyOn(document, "createElement");
+```
+
+#### Testing with React Query (Future)
+
+```tsx
+import { describe, it, expect } from "vitest";
+import { render, screen, waitFor } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+
+describe("ChipList", () => {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+    },
+  });
+
+  const wrapper = ({ children }: { children: React.ReactNode }) => (
+    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+  );
+
+  it("renders chips from API", async () => {
+    render(<ChipList />, { wrapper });
+
+    await waitFor(() => {
+      expect(screen.getByText("chip-001")).toBeInTheDocument();
+    });
+  });
+});
 ```
 
 ---
@@ -79,45 +235,13 @@ bun run dev
 
 ### Key Test Scenarios
 
-#### Authentication
+Verify the following per page during manual testing:
 
-- [ ] Login page displays correctly
-- [ ] Login redirects to /metrics
-- [ ] Protected routes redirect to /login when not authenticated
-- [ ] Logout clears session
-
-#### Metrics Page (`/metrics`)
-
-- [ ] Page loads without errors
-- [ ] Chip selector works
-- [ ] Data visualizations render
-- [ ] Time range selection works
-
-#### Chip Page (`/chip`)
-
-- [ ] Chip list loads
-- [ ] Chip details page loads
-- [ ] Qubit grid displays correctly
-- [ ] Task results show properly
-
-#### Flow Page (`/flow`)
-
-- [ ] Flow list loads
-- [ ] Create new flow works
-- [ ] Flow editor functions
-- [ ] Execute flow works
-
-#### Execution Page (`/execution`)
-
-- [ ] Execution list loads
-- [ ] Execution details show
-- [ ] Real-time updates work (if applicable)
-
-#### Analysis Page (`/analysis`)
-
-- [ ] Charts render correctly
-- [ ] Filters work
-- [ ] Export functions work
+- **Authentication** — login, redirect to `/inbox`, protected routes redirect to `/login`, logout clears session
+- **Metrics** (`/metrics`) — page loads, chip selector, visualizations, time range
+- **Chip** (`/chip`) — list loads, details page, qubit grid, task results
+- **Execution** (`/execution`) — list loads, details, real-time updates
+- **Analysis** (`/analysis`) — charts render, filters, export
 
 ---
 
@@ -219,8 +343,11 @@ export default [
     rules: {
       "react-hooks/rules-of-hooks": "error",
       "react-hooks/exhaustive-deps": "warn",
-      "@typescript-eslint/no-unused-vars": "off",
-      "@typescript-eslint/no-explicit-any": "off",
+      "@typescript-eslint/no-unused-vars": [
+        "warn",
+        { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
+      ],
+      "@typescript-eslint/no-explicit-any": "warn",
     },
   },
 ];
@@ -329,140 +456,6 @@ Monitor for:
 
 ---
 
-## Component Testing Patterns
-
-### Testing with React Testing Library (Future)
-
-While not currently implemented, here are patterns for future testing:
-
-#### Basic Component Test
-
-```tsx
-// __tests__/components/ChipCard.test.tsx
-import { render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
-import { ChipCard } from "@/components/ui/ChipCard";
-
-describe("ChipCard", () => {
-  const mockChip = {
-    chip_id: "chip-001",
-    status: "active",
-  };
-
-  it("renders chip information", () => {
-    render(<ChipCard chip={mockChip} onSelect={jest.fn()} />);
-
-    expect(screen.getByText("chip-001")).toBeInTheDocument();
-    expect(screen.getByText("active")).toBeInTheDocument();
-  });
-
-  it("calls onSelect when clicked", async () => {
-    const onSelect = jest.fn();
-    render(<ChipCard chip={mockChip} onSelect={onSelect} />);
-
-    await userEvent.click(screen.getByRole("button"));
-
-    expect(onSelect).toHaveBeenCalledWith("chip-001");
-  });
-});
-```
-
-#### Testing with React Query
-
-```tsx
-// __tests__/components/ChipList.test.tsx
-import { render, screen, waitFor } from "@testing-library/react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { ChipList } from "@/components/features/chip/ChipList";
-
-// Mock API
-jest.mock("@/client/chip/chip", () => ({
-  getChipList: jest.fn().mockResolvedValue({
-    chips: [
-      { chip_id: "chip-001", status: "active" },
-      { chip_id: "chip-002", status: "inactive" },
-    ],
-  }),
-}));
-
-describe("ChipList", () => {
-  const queryClient = new QueryClient({
-    defaultOptions: {
-      queries: { retry: false },
-    },
-  });
-
-  const wrapper = ({ children }) => (
-    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-  );
-
-  it("renders chips from API", async () => {
-    render(<ChipList />, { wrapper });
-
-    await waitFor(() => {
-      expect(screen.getByText("chip-001")).toBeInTheDocument();
-      expect(screen.getByText("chip-002")).toBeInTheDocument();
-    });
-  });
-});
-```
-
-#### Testing Hooks
-
-```tsx
-// __tests__/hooks/useTimeRange.test.ts
-import { renderHook, act } from "@testing-library/react";
-import { useTimeRange } from "@/hooks/useTimeRange";
-
-describe("useTimeRange", () => {
-  it("returns default time range", () => {
-    const { result } = renderHook(() => useTimeRange());
-
-    expect(result.current.startDate).toBeDefined();
-    expect(result.current.endDate).toBeDefined();
-  });
-
-  it("updates time range", () => {
-    const { result } = renderHook(() => useTimeRange());
-    const newStart = new Date("2024-01-01");
-
-    act(() => {
-      result.current.setStartDate(newStart);
-    });
-
-    expect(result.current.startDate).toEqual(newStart);
-  });
-});
-```
-
----
-
-## Testing Checklist
-
-### Before Committing
-
-- [ ] `bunx tsc --noEmit` passes
-- [ ] `bun run lint` passes (or warnings < 15)
-- [ ] `bun run build` succeeds
-
-### Before Pull Request
-
-- [ ] All type errors fixed
-- [ ] No new lint errors introduced
-- [ ] Manual testing completed for changed features
-- [ ] Build succeeds locally
-- [ ] Responsive design checked (if UI changes)
-
-### Before Release
-
-- [ ] Full manual test of all pages
-- [ ] Docker build succeeds
-- [ ] Performance check (bundle sizes)
-- [ ] Cross-browser testing (Chrome, Firefox, Safari)
-- [ ] Mobile responsiveness verified
-
----
-
 ## Debugging Tips
 
 ### React Query DevTools
@@ -512,24 +505,3 @@ Install React DevTools browser extension to:
 - Inspect component tree
 - View props and state
 - Profile rendering performance
-
----
-
-## Summary
-
-### Testing Commands Quick Reference
-
-| Command             | Purpose                                |
-| ------------------- | -------------------------------------- |
-| `bunx tsc --noEmit` | Type checking                          |
-| `bun run lint`      | ESLint checks                          |
-| `bun run fmt`       | Auto-fix lint issues                   |
-| `bun run build`     | Production build (includes type check) |
-| `bun run dev`       | Development server for manual testing  |
-
-### Key Testing Principles
-
-1. **Type Safety First** - TypeScript catches most issues at compile time
-2. **Build Verification** - Production build must pass before merging
-3. **Manual Testing** - Test user flows for changed features
-4. **Progressive Enhancement** - Add automated tests as the codebase grows

@@ -16,7 +16,7 @@ import {
 import { useGetCouplingMetricHistory } from "@/client/metrics/metrics";
 import { useGetExecution } from "@/client/execution/execution";
 import { TaskFigure } from "@/components/charts/TaskFigure";
-import { formatDateTime, formatDateTimeCompact } from "@/utils/datetime";
+import { formatDateTime, formatDateTimeCompact } from "@/lib/utils/datetime";
 
 import { ParametersTable } from "./ParametersTable";
 import { TaskResultIssues } from "./TaskResultIssues";
@@ -71,11 +71,12 @@ export function CouplingMetricHistoryModal({
   }, [couplingId]);
   const activeCouplingId = isReversed ? reversedCouplingId : couplingId;
 
-  // Reset selection state when direction changes
-  useEffect(() => {
+  // Toggle direction and reset selection in the same handler
+  const handleDirectionToggle = () => {
+    setIsReversed((prev) => !prev);
     setSelectedExecutionId(null);
     setSelectedTaskIndex(0);
-  }, [isReversed]);
+  };
 
   const { data, isLoading, isError } = useGetCouplingMetricHistory(
     chipId,
@@ -192,7 +193,7 @@ export function CouplingMetricHistoryModal({
   const directionToggle = (
     <div className="flex items-center gap-2">
       <button
-        onClick={() => setIsReversed((prev) => !prev)}
+        onClick={handleDirectionToggle}
         className={`btn btn-sm gap-1.5 ${isReversed ? "btn-secondary" : "btn-outline"}`}
         title={`Switch to ${isReversed ? couplingId : reversedCouplingId}`}
       >
@@ -516,7 +517,12 @@ export function CouplingMetricHistoryModal({
           {selectedTask.task_id && (
             <div className="flex items-center gap-2">
               <span className="font-semibold">Task ID:</span>
-              <span className="font-mono truncate">{selectedTask.task_id}</span>
+              <a
+                href={`/task-results/${selectedTask.task_id}`}
+                className="font-mono truncate link link-primary"
+              >
+                {selectedTask.task_id}
+              </a>
             </div>
           )}
           {selectedTask.start_at != null && (

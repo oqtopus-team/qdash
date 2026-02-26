@@ -16,8 +16,8 @@ COPY ./src/qdash/api/requirements.txt ./
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 RUN uv pip install --system --no-cache-dir -r requirements.txt
-RUN uv pip install --upgrade --system --no-cache-dir pydantic-settings==2.3.4
-RUN uv pip install --upgrade --system --no-cache-dir prefect-client==2.19.9
+RUN uv pip install --upgrade --system --no-cache-dir pydantic-settings
+RUN uv pip install --upgrade --system --no-cache-dir prefect-client>=3.0.0
 RUN uv pip install --system --no-cache-dir "openai>=1.75.0"
 
 FROM python:3.10.14-slim-bookworm

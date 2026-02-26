@@ -1,39 +1,12 @@
 # Provenance: Calibration Data Lineage
 
-Architecture and implementation guide for the calibration data lineage (Provenance) tracking system in QDash.
-
-## Overview
-
-The Provenance system tracks how calibration parameters are generated and modified. It is designed based on W3C PROV-DM (Provenance Data Model) concepts.
-
-### Goals
-
-- **Traceability**: Complete tracking of parameter value change history
-- **Impact Analysis**: Visualize how changes to one parameter affect others
-- **Debug Support**: Facilitate root cause identification when issues occur
-- **Comparison Analysis**: Detect parameter differences between executions
+The Provenance system tracks how calibration parameters are generated and modified, based on W3C PROV-DM (Provenance Data Model) concepts. It enables tracing parameter value history, impact analysis across parameters, root cause identification, and execution comparison.
 
 ## W3C PROV-DM Concepts
 
-QDash provenance is based on these three core concepts:
+QDash provenance is based on three core concepts (Entity, Activity, Agent) and their relations. See the diagram below for the full architecture and lineage graph example:
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                     W3C PROV-DM Core                            │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│   Entity                    Activity                   Agent    │
-│   (Data)                    (Process)                (Executor) │
-│      │                         │                         │      │
-│      │  wasGeneratedBy         │                         │      │
-│      ├─────────────────────────┤                         │      │
-│      │                         │  wasAssociatedWith      │      │
-│      │                         ├─────────────────────────┤      │
-│      │  wasDerivedFrom         │                         │      │
-│      ├─────────────────────────┤                         │      │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
-```
+![Provenance Lineage](../diagrams/provenance-lineage.drawio.png)
 
 ### Mapping to QDash
 
@@ -55,35 +28,7 @@ QDash provenance is based on these three core concepts:
 
 ### Components
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                         API Layer                               │
-│  ┌─────────────────────────────────────────────────────────┐   │
-│  │              provenance.py (Router)                      │   │
-│  │  GET /entities/{id}  GET /lineage/{id}  GET /compare    │   │
-│  └─────────────────────────────────────────────────────────┘   │
-├─────────────────────────────────────────────────────────────────┤
-│                       Service Layer                             │
-│  ┌─────────────────────────────────────────────────────────┐   │
-│  │            ProvenanceService                             │   │
-│  │  - get_lineage()      - compare_executions()            │   │
-│  │  - get_impact()       - get_parameter_history()         │   │
-│  └─────────────────────────────────────────────────────────┘   │
-├─────────────────────────────────────────────────────────────────┤
-│                     Repository Layer                            │
-│  ┌───────────────┐ ┌───────────────┐ ┌───────────────────┐     │
-│  │ParameterVer-  │ │ Provenance-   │ │    Activity-      │     │
-│  │sionRepository │ │ Relation-     │ │    Repository     │     │
-│  │               │ │ Repository    │ │                   │     │
-│  └───────────────┘ └───────────────┘ └───────────────────┘     │
-├─────────────────────────────────────────────────────────────────┤
-│                        MongoDB                                  │
-│  ┌───────────────┐ ┌───────────────┐ ┌───────────────────┐     │
-│  │ parameter_    │ │  provenance_  │ │    activities     │     │
-│  │ versions      │ │  relations    │ │                   │     │
-│  └───────────────┘ └───────────────┘ └───────────────────┘     │
-└─────────────────────────────────────────────────────────────────┘
-```
+The Provenance architecture (API Layer → ProvenanceService → Repositories → MongoDB collections) is shown in the diagram above.
 
 ### Data Models
 
@@ -267,31 +212,7 @@ response = {
 
 ## Lineage Graph Visualization
 
-```mermaid
-graph BT
-    subgraph "Execution 003"
-        T1_v3["t1:Q0:v3<br/>50μs"]
-        T2_v3["t2_star:Q0:v3<br/>30μs"]
-        FREQ_v3["qubit_freq:Q0:v3<br/>5.123GHz"]
-        
-        ACT_T1["CheckT1"]
-        ACT_T2["CheckRamsey"]
-        ACT_FREQ["CheckFrequency"]
-    end
-    
-    subgraph "Execution 002"
-        FREQ_v2["qubit_freq:Q0:v2<br/>5.121GHz"]
-    end
-    
-    T1_v3 -->|wasGeneratedBy| ACT_T1
-    T2_v3 -->|wasGeneratedBy| ACT_T2
-    FREQ_v3 -->|wasGeneratedBy| ACT_FREQ
-    
-    ACT_T1 -->|used| FREQ_v3
-    ACT_T2 -->|used| FREQ_v3
-    
-    FREQ_v3 -->|wasDerivedFrom| FREQ_v2
-```
+The lineage graph example showing cross-execution parameter tracing (Execution 002 → 003) with wasGeneratedBy, used, and wasDerivedFrom relations is included in the [Provenance Lineage diagram](../diagrams/provenance-lineage.drawio.png) above.
 
 ## Database Collections
 
@@ -383,9 +304,9 @@ graph BT
 | `ParameterHistoryPanel` | Parameter history display |
 | `ProvenanceGraph` | Graph visualization |
 
-## Best Practices
+## Implementation Notes
 
-### 1. Entity ID Consistency
+### Entity ID Format
 
 Always generate Entity IDs using the same format:
 
@@ -399,13 +320,13 @@ def generate_entity_id(
     return f"{parameter_name}:{qid}:{execution_id}:{task_id}"
 ```
 
-### 2. Version Management
+### Version Management
 
 - For the same `(parameter_name, qid)` combination, `version` auto-increments
 - `valid_until` is set when the next version is created
 - The currently active version has `valid_until = null`
 
-### 3. Recording Relations
+### Recording Relations
 
 When a calibration task completes, record the following:
 
@@ -413,9 +334,3 @@ When a calibration task completes, record the following:
 2. `used`: Activity → Input parameters used
 3. `wasDerivedFrom`: New version → Previous version (for same parameter)
 
-## Future Enhancements
-
-- [ ] Consider migration to graph database (Neo4j, etc.)
-- [ ] Real-time change notifications (WebSocket)
-- [ ] Automatic anomaly detection (alert on sudden value changes)
-- [ ] Export functionality (PROV-JSON format)

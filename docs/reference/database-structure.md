@@ -1,16 +1,9 @@
-# QDash Database Structure Documentation
+# Database Structure
 
-This document describes the database structure of the QDash project. QDash uses MongoDB as its primary database, managing data through the Bunnet ODM (Object Document Mapper).  
-QDash is moving toward a project-centric multi-tenant model where every piece of calibration data belongs to a project. Users create projects, invite other users as viewers, and all chip/calibration entities inherit the owning `project_id`.
+QDash uses MongoDB via the Bunnet ODM with a project-centric multi-tenant model. The data model has two layers:
 
-## Overview
-
-The QDash data model consists of two layers:
-
-1. **datamodel** (`src/qdash/datamodel/`) - Business logic data models using Pydantic BaseModel
-2. **dbmodel** (`src/qdash/dbmodel/`) - Database persistence document models using Bunnet Document
-
----
+- **datamodel** (`src/qdash/datamodel/`) — Pydantic `BaseModel` for business logic
+- **dbmodel** (`src/qdash/dbmodel/`) — Bunnet `Document` for database persistence
 
 ## MongoDB Collections
 
@@ -169,6 +162,7 @@ class ExecutionStatusModel(str, Enum):
     RUNNING = "running"
     COMPLETED = "completed"
     FAILED = "failed"
+    CANCELLED = "cancelled"
 
 class ExecutionModel(BaseModel):
     project_id: str        # Owning project ID
@@ -201,6 +195,7 @@ class TaskStatusModel(str, Enum):
     FAILED = "failed"
     PENDING = "pending"
     SKIPPED = "skipped"
+    CANCELLED = "cancelled"
 
 class RunParameterModel(BaseModel):
     """Experiment configuration parameters (shots, ranges, etc.)."""
@@ -771,50 +766,7 @@ class FlowDocument(Document):
 
 ## Entity Relationship Diagram (Conceptual)
 
-```mermaid
-erDiagram
-    User ||--o{ ProjectMembership : has
-    Project ||--o{ ProjectMembership : has
-    Project ||--o{ Chip : contains
-    Project ||--o{ ExecutionHistory : contains
-    Chip ||--o{ Qubit : contains
-    Chip ||--o{ Coupling : contains
-    ExecutionHistory ||--o{ TaskResultHistory : contains
-
-    User {
-        string username PK
-        string default_project
-    }
-    ProjectMembership {
-        string project_id FK
-        string username FK
-        string role
-        string status
-    }
-    Project {
-        string project_id PK
-        string owner_user
-    }
-    Chip {
-        string chip_id PK
-        string project_id FK
-    }
-    ExecutionHistory {
-        string execution_id PK
-        string project_id FK
-    }
-    Qubit {
-        string qid
-        string chip_id FK
-    }
-    Coupling {
-        string coupling_id
-        string chip_id FK
-    }
-    TaskResultHistory {
-        string execution_id FK
-    }
-```
+![Database ER Diagram](../diagrams/database-er.drawio.png)
 
 Other project-scoped collections (tasks, tags, backends, flows, counters, locks, histories) all reference `project_id`, ensuring a single sharing boundary per project.
 
@@ -834,6 +786,23 @@ Other project-scoped collections (tasks, tags, backends, flows, counters, locks,
 4. Save execution metadata to **ExecutionHistoryDocument** (status, timing, notes only)
 5. Save chip snapshot to **ChipHistoryDocument**
 6. Release **ExecutionLock**
+
+### During Cancellation
+
+When a user cancels a running execution via the UI:
+
+1. UI sends `POST /executions/{flow_run_id}/cancel` with the Prefect flow run UUID
+2. API sets the Prefect flow run to `Cancelling` state via the Prefect client
+3. Prefect sends SIGTERM to the worker process running the flow
+4. Prefect triggers the `on_cancellation` hook registered on the `@flow` decorator
+5. The hook reads `flow_run_id` from the execution's `note` field to locate the execution
+6. All non-terminal tasks (running/scheduled/pending) are set to `cancelled`
+7. The execution status is set to `cancelled`
+8. The **ExecutionLock** is released
+
+> **Note**: The `flow_run_id` (Prefect UUID) is stored in `ExecutionHistoryDocument.note["flow_run_id"]`
+> at the start of each flow run. This bridges the QDash execution ID (`YYYYMMDD-NNN`) with
+> the Prefect flow run UUID, enabling the cancel operation.
 
 ### Data Architecture (256+ Qubit Support)
 

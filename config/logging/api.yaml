@@ -1,0 +1,63 @@
+# Logging configuration for QDash API.
+#
+# Loaded by qdash.common.logging.setup_logging().
+# Environment variable substitution:
+#   ${LOG_LEVEL}  -> resolved at load time (default: INFO)
+#   ${LOG_FILE}   -> resolved at load time (default: /app/logs/api.log)
+
+version: 1
+disable_existing_loggers: false
+
+formatters:
+  json:
+    (): pythonjsonlogger.json.JsonFormatter
+    fmt: "%(asctime)s %(name)s %(levelname)s %(message)s %(request_id)s"
+    rename_fields:
+      asctime: timestamp
+      levelname: level
+    defaults:
+      request_id: ""
+
+filters:
+  request_id:
+    (): qdash.api.middleware.request_id.RequestIdFilter
+
+handlers:
+  console:
+    class: logging.StreamHandler
+    stream: ext://sys.stdout
+    formatter: json
+    filters: [request_id]
+  file:
+    class: logging.handlers.RotatingFileHandler
+    filename: "${LOG_FILE}"
+    maxBytes: 10485760  # 10 MB
+    backupCount: 5
+    formatter: json
+    filters: [request_id]
+
+root:
+  level: "${LOG_LEVEL}"
+  handlers: [console, file]
+
+loggers:
+  uvicorn:
+    level: WARNING
+  uvicorn.access:
+    level: WARNING
+  uvicorn.error:
+    level: WARNING
+  gunicorn:
+    level: WARNING
+  gunicorn.access:
+    level: WARNING
+  gunicorn.error:
+    level: WARNING
+  pymongo:
+    level: WARNING
+  pymongo.command:
+    level: WARNING
+  pymongo.topology:
+    level: WARNING
+  pymongo.connection:
+    level: WARNING

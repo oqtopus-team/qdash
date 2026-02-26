@@ -59,6 +59,21 @@ class MongoTaskResultHistoryRepository:
             execution_model=execution_model,
         )
 
+    def set_source_task_id(
+        self,
+        *,
+        project_id: str | None,
+        task_id: str,
+        source_task_id: str,
+    ) -> None:
+        """Set source_task_id on a task result document."""
+        doc = TaskResultHistoryDocument.find_one(
+            {"project_id": project_id, "task_id": task_id}
+        ).run()
+        if doc is not None:
+            doc.source_task_id = source_task_id
+            doc.save()
+
     def find_latest_by_chip_and_qids(
         self,
         *,
@@ -214,6 +229,59 @@ class MongoTaskResultHistoryRepository:
         )
 
         # Return the number of documents modified
+        return result.modified_count if result else 0
+
+    def finalize_tasks_on_cancel(
+        self,
+        *,
+        project_id: str,
+        execution_id: str,
+        message: str = "Execution was cancelled",
+    ) -> int:
+        """Mark non-terminal tasks as cancelled for the given execution.
+
+        When an execution is cancelled, tasks in running/scheduled/pending
+        status should be marked as cancelled to distinguish from real failures.
+
+        Parameters
+        ----------
+        project_id : str
+            The project identifier
+        execution_id : str
+            The execution identifier
+        message : str
+            The cancellation message to set on affected tasks
+
+        Returns
+        -------
+        int
+            Number of tasks that were updated
+
+        """
+        from qdash.common.datetime_utils import now
+
+        end_time = now()
+
+        result = (
+            TaskResultHistoryDocument.find(
+                {
+                    "project_id": project_id,
+                    "execution_id": execution_id,
+                    "status": {"$in": ["running", "scheduled", "pending"]},
+                }
+            )
+            .update_many(
+                {
+                    "$set": {
+                        "status": "cancelled",
+                        "message": message,
+                        "end_at": end_time,
+                    }
+                }
+            )
+            .run()
+        )
+
         return result.modified_count if result else 0
 
     def aggregate_latest_metrics(

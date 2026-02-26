@@ -588,9 +588,15 @@ class CheckSkew(CalibrationStep):
             )
 
             service.finish_calibration()
-        except Exception as e:
-            logger.error(f"[{self.name}] Failed: {e}")
-            service.fail_calibration(str(e))
+        except BaseException as e:
+            from qdash.workflow.service.calib_service import _is_cancellation
+
+            if _is_cancellation(e):
+                logger.info(f"[{self.name}] Cancelled")
+                service.cancel_calibration()
+            else:
+                logger.error(f"[{self.name}] Failed: {e}")
+                service.fail_calibration(str(e))
             raise
 
         logger.info(f"[{self.name}] Completed")

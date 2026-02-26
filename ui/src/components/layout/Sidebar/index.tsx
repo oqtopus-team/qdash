@@ -7,6 +7,7 @@ import { useCallback, useRef } from "react";
 
 import {
   BarChart3,
+  BookMarked,
   BookOpen,
   ChevronLeft,
   ChevronRight,
@@ -19,6 +20,7 @@ import {
   LayoutGrid,
   ListTodo,
   LogOut,
+  Brain,
   CircleDot,
   Moon,
   Settings,
@@ -30,7 +32,7 @@ import {
   Zap,
 } from "lucide-react";
 
-import { useTheme } from "@/app/providers/theme-provider";
+import { useTheme } from "@/contexts/ThemeContext";
 import { useLogout } from "@/client/auth/auth";
 import { FluentEmoji, getAvatarEmoji } from "@/components/ui/FluentEmoji";
 import { useAuth } from "@/contexts/AuthContext";
@@ -40,7 +42,22 @@ import { useSidebar } from "@/contexts/SidebarContext";
 const PREFECT_URL =
   process.env.NEXT_PUBLIC_PREFECT_URL || "http://127.0.0.1:4200";
 
-function Sidebar() {
+function SectionHeader({
+  label,
+  visible,
+}: {
+  label: string;
+  visible: boolean;
+}) {
+  if (!visible) return null;
+  return (
+    <li className="menu-title text-xs font-semibold text-base-content/50 uppercase tracking-wider px-3 pt-3 pb-1">
+      {label}
+    </li>
+  );
+}
+
+export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const modalRef = useRef<HTMLDialogElement>(null);
@@ -88,7 +105,7 @@ function Sidebar() {
     if (isMobileOpen) {
       setMobileSidebarOpen(false);
     }
-    router.push("/setting");
+    router.push("/settings");
   }, [isMobileOpen, setMobileSidebarOpen, router]);
 
   const handleModalLogout = useCallback(async () => {
@@ -123,13 +140,7 @@ function Sidebar() {
         : "text-base-content hover:bg-base-300"
     }`;
 
-  // Section header component for sidebar groups
-  const SectionHeader = ({ label }: { label: string }) =>
-    (isOpen || isMobileOpen) && (
-      <li className="menu-title text-xs font-semibold text-base-content/50 uppercase tracking-wider px-3 pt-3 pb-1">
-        {label}
-      </li>
-    );
+  const sectionHeaderVisible = isOpen || isMobileOpen;
 
   const sidebarContent = (
     <>
@@ -154,7 +165,7 @@ function Sidebar() {
         )}
 
         {/* Data & Monitoring Section */}
-        <SectionHeader label="Data" />
+        <SectionHeader visible={sectionHeaderVisible} label="Data" />
         <li>
           <Link
             href="/inbox"
@@ -248,8 +259,26 @@ function Sidebar() {
           </Link>
         </li>
 
+        <li>
+          <Link
+            href="/task-knowledge"
+            className={
+              isMobileOpen
+                ? linkClass(pathname.startsWith("/task-knowledge"))
+                : desktopLinkClass(pathname.startsWith("/task-knowledge"))
+            }
+            title="Task Knowledge"
+            onClick={handleLinkClick}
+          >
+            <BookMarked size={18} />
+            {(isOpen || isMobileOpen) && (
+              <span className="ml-2">Task Knowledge</span>
+            )}
+          </Link>
+        </li>
+
         {/* Operations Section */}
-        <SectionHeader label="Operations" />
+        <SectionHeader visible={sectionHeaderVisible} label="Operations" />
         {canEdit && (
           <li>
             <Link
@@ -301,6 +330,23 @@ function Sidebar() {
             {(isOpen || isMobileOpen) && <span className="ml-2">Issues</span>}
           </Link>
         </li>
+        <li>
+          <Link
+            href="/issue-knowledge"
+            className={
+              isMobileOpen
+                ? linkClass(pathname.startsWith("/issue-knowledge"))
+                : desktopLinkClass(pathname.startsWith("/issue-knowledge"))
+            }
+            title="Knowledge"
+            onClick={handleLinkClick}
+          >
+            <Brain size={18} />
+            {(isOpen || isMobileOpen) && (
+              <span className="ml-2">Knowledge</span>
+            )}
+          </Link>
+        </li>
         {canEdit && (
           <li>
             <Link
@@ -320,7 +366,7 @@ function Sidebar() {
         )}
 
         {/* Management Section */}
-        <SectionHeader label="Manage" />
+        <SectionHeader visible={sectionHeaderVisible} label="Manage" />
         {canEdit && (
           <li>
             <Link
@@ -340,11 +386,11 @@ function Sidebar() {
         )}
         <li>
           <Link
-            href="/setting"
+            href="/settings"
             className={
               isMobileOpen
-                ? linkClass(isActive("/setting"))
-                : desktopLinkClass(isActive("/setting"))
+                ? linkClass(isActive("/settings"))
+                : desktopLinkClass(isActive("/settings"))
             }
             title="Settings"
             onClick={handleLinkClick}
@@ -536,7 +582,7 @@ function Sidebar() {
       {/* Desktop Sidebar */}
       <aside
         className={`bg-base-200 h-full transition-all duration-300 hidden lg:flex lg:flex-col ${
-          isOpen ? "w-52" : "w-16"
+          isOpen ? "w-44" : "w-16"
         }`}
       >
         <div className="flex justify-end p-2">
@@ -562,7 +608,7 @@ function Sidebar() {
 
       {/* Mobile Sidebar Drawer */}
       <aside
-        className={`fixed top-0 left-0 h-full w-56 bg-base-200 z-50 transform transition-transform duration-300 lg:hidden flex flex-col ${
+        className={`fixed top-0 left-0 h-full w-48 bg-base-200 z-50 transform transition-transform duration-300 lg:hidden flex flex-col ${
           isMobileOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
@@ -584,5 +630,3 @@ function Sidebar() {
     </>
   );
 }
-
-export default Sidebar;

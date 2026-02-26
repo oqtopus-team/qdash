@@ -2,135 +2,26 @@
 
 from __future__ import annotations
 
-import ast
-import contextlib
 import logging
-from datetime import datetime, timezone
-from typing import TYPE_CHECKING, Annotated, Any
+from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException
-from fastapi.logger import logger
+from fastapi import APIRouter, Depends
+from qdash.api.dependencies import get_task_file_service  # noqa: TCH002
 from qdash.api.lib.auth import get_current_active_user  # noqa: TCH002
-from qdash.api.lib.backend_config import (
-    get_task_category,
-    get_tasks,
-    load_backend_config,
-)
-from qdash.api.lib.config_loader import ConfigLoader
 from qdash.api.schemas.auth import User  # noqa: TCH002
 from qdash.api.schemas.task_file import (
     BackendConfigResponse,
-    FileNodeType,
     ListTaskFileBackendsResponse,
     ListTaskInfoResponse,
     SaveTaskFileRequest,
-    TaskFileBackend,
     TaskFileSettings,
     TaskFileTreeNode,
-    TaskInfo,
 )
-from qdash.common.paths import CALIBTASKS_DIR
+from qdash.api.services.task_file_service import TaskFileService  # noqa: TCH002
 
-if TYPE_CHECKING:
-    from pathlib import Path
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
-gunicorn_logger = logging.getLogger("gunicorn.error")
-logger.handlers = gunicorn_logger.handlers
-if __name__ != "main":
-    logger.setLevel(gunicorn_logger.level)
-else:
-    logger.setLevel(logging.DEBUG)
-
-# Use centralized path from common module
-CALIBTASKS_BASE_PATH = CALIBTASKS_DIR
-
-# Cache for task metadata: {backend: (mtime_sum, tasks)}
-# Cache is invalidated when sum of file modification times changes
-_task_cache: dict[str, tuple[float, list[TaskInfo]]] = {}
-
-
-def validate_task_file_path(relative_path: str) -> Path:
-    """Validate relative_path to prevent path traversal attacks.
-
-    Args:
-    ----
-        relative_path: Relative path from CALIBTASKS_BASE_PATH (e.g., "qubex/one_qubit_coarse/check_rabi.py")
-
-    Returns:
-    -------
-        Resolved absolute path
-
-    Raises:
-    ------
-        HTTPException: If validation fails
-
-    """
-    # Prevent path traversal
-    if ".." in relative_path:
-        raise HTTPException(status_code=400, detail="Path traversal detected")
-
-    target_path = CALIBTASKS_BASE_PATH / relative_path
-    resolved_path = target_path.resolve()
-
-    # Ensure resolved path is within CALIBTASKS_BASE_PATH
-    if not str(resolved_path).startswith(str(CALIBTASKS_BASE_PATH.resolve())):
-        raise HTTPException(status_code=400, detail="Path outside calibtasks directory")
-
-    return resolved_path
-
-
-def build_task_file_tree(directory: Path, base_path: Path) -> list[TaskFileTreeNode]:
-    """Build task file tree structure recursively.
-
-    Args:
-    ----
-        directory: Directory to scan
-        base_path: Base path for calculating relative paths
-
-    Returns:
-    -------
-        List of TaskFileTreeNode
-
-    """
-    nodes = []
-
-    try:
-        items = sorted(directory.iterdir(), key=lambda x: (not x.is_dir(), x.name))
-
-        for item in items:
-            # Skip hidden files and __pycache__
-            if item.name.startswith(".") or item.name == "__pycache__":
-                continue
-
-            relative_path = str(item.relative_to(base_path))
-
-            if item.is_dir():
-                children = build_task_file_tree(item, base_path)
-                nodes.append(
-                    TaskFileTreeNode(
-                        name=item.name,
-                        path=relative_path,
-                        type=FileNodeType.DIRECTORY,
-                        children=children if children else None,
-                    )
-                )
-            else:
-                # Only include Python files
-                if item.suffix == ".py":
-                    nodes.append(
-                        TaskFileTreeNode(
-                            name=item.name,
-                            path=relative_path,
-                            type=FileNodeType.FILE,
-                            children=None,
-                        )
-                    )
-
-    except PermissionError:
-        logger.warning(f"Permission denied accessing directory: {directory}")
-
-    return nodes
 
 
 @router.get(
@@ -139,29 +30,17 @@ def build_task_file_tree(directory: Path, base_path: Path) -> list[TaskFileTreeN
     summary="Get task file settings",
     operation_id="getTaskFileSettings",
 )
-def get_task_file_settings() -> TaskFileSettings:
+def get_task_file_settings(
+    service: Annotated[TaskFileService, Depends(get_task_file_service)],
+) -> TaskFileSettings:
     """Get task file settings from config/settings.yaml.
-
-    Uses ConfigLoader for unified loading with local override support.
 
     Returns
     -------
         Task file settings including default backend
 
     """
-    try:
-        settings = ConfigLoader.load_settings()
-        ui_settings = settings.get("ui", {})
-        task_files_settings = ui_settings.get("task_files", {})
-        return TaskFileSettings(
-            default_backend=task_files_settings.get("default_backend"),
-            default_view_mode=task_files_settings.get("default_view_mode"),
-            sort_order=task_files_settings.get("sort_order"),
-        )
-    except Exception as e:
-        logger.warning(f"Failed to load task file settings: {e}")
-
-    return TaskFileSettings()
+    return service.get_settings()
 
 
 @router.get(
@@ -170,7 +49,9 @@ def get_task_file_settings() -> TaskFileSettings:
     summary="List available task file backends",
     operation_id="listTaskFileBackends",
 )
-def list_task_file_backends() -> ListTaskFileBackendsResponse:
+def list_task_file_backends(
+    service: Annotated[TaskFileService, Depends(get_task_file_service)],
+) -> ListTaskFileBackendsResponse:
     """List all available backend directories in calibtasks.
 
     Returns
@@ -178,22 +59,7 @@ def list_task_file_backends() -> ListTaskFileBackendsResponse:
         List of backend names and paths
 
     """
-    if not CALIBTASKS_BASE_PATH.exists():
-        raise HTTPException(
-            status_code=404, detail=f"Caltasks directory not found: {CALIBTASKS_BASE_PATH}"
-        )
-
-    backends = []
-    try:
-        for item in sorted(CALIBTASKS_BASE_PATH.iterdir()):
-            # Skip hidden files, __pycache__, and non-directories
-            if item.name.startswith(".") or item.name == "__pycache__" or not item.is_dir():
-                continue
-            backends.append(TaskFileBackend(name=item.name, path=item.name))
-    except PermissionError:
-        logger.warning(f"Permission denied accessing directory: {CALIBTASKS_BASE_PATH}")
-
-    return ListTaskFileBackendsResponse(backends=backends)
+    return service.list_backends()
 
 
 @router.get(
@@ -202,7 +68,10 @@ def list_task_file_backends() -> ListTaskFileBackendsResponse:
     operation_id="getTaskFileTree",
     response_model=list[TaskFileTreeNode],
 )
-def get_task_file_tree(backend: str) -> list[TaskFileTreeNode]:
+def get_task_file_tree(
+    backend: str,
+    service: Annotated[TaskFileService, Depends(get_task_file_service)],
+) -> list[TaskFileTreeNode]:
     """Get file tree structure for a specific backend directory.
 
     Args:
@@ -214,15 +83,7 @@ def get_task_file_tree(backend: str) -> list[TaskFileTreeNode]:
         File tree structure for the backend
 
     """
-    backend_path = CALIBTASKS_BASE_PATH / backend
-
-    if not backend_path.exists():
-        raise HTTPException(status_code=404, detail=f"Backend directory not found: {backend}")
-
-    if not backend_path.is_dir():
-        raise HTTPException(status_code=400, detail=f"Not a directory: {backend}")
-
-    return build_task_file_tree(backend_path, backend_path)
+    return service.get_file_tree(backend)
 
 
 @router.get(
@@ -230,46 +91,22 @@ def get_task_file_tree(backend: str) -> list[TaskFileTreeNode]:
     summary="Get task file content for viewing/editing",
     operation_id="getTaskFileContent",
 )
-def get_task_file_content(path: str) -> dict[str, Any]:
+def get_task_file_content(
+    path: str,
+    service: Annotated[TaskFileService, Depends(get_task_file_service)],
+) -> dict[str, Any]:
     """Get task file content for viewing/editing.
 
     Args:
     ----
-        path: Relative path from CALIBTASKS_BASE_PATH (e.g., "qubex/one_qubit_coarse/check_rabi.py")
+        path: Relative path from CALIBTASKS_BASE_PATH
 
     Returns:
     -------
         File content and metadata
 
     """
-    file_path = validate_task_file_path(path)
-
-    if not file_path.exists():
-        raise HTTPException(status_code=404, detail=f"File not found: {path}")
-
-    if not file_path.is_file():
-        raise HTTPException(status_code=400, detail=f"Not a file: {path}")
-
-    # Only allow Python files
-    if file_path.suffix != ".py":
-        raise HTTPException(status_code=400, detail="Only Python files are allowed")
-
-    try:
-        content = file_path.read_text(encoding="utf-8")
-        return {
-            "content": content,
-            "path": path,
-            "name": file_path.name,
-            "size": file_path.stat().st_size,
-            "modified": datetime.fromtimestamp(
-                file_path.stat().st_mtime, tz=timezone.utc
-            ).isoformat(),
-        }
-    except UnicodeDecodeError:
-        raise HTTPException(status_code=400, detail="File is not a text file")
-    except Exception as e:
-        logger.error(f"Error reading file {file_path}: {e}")
-        raise HTTPException(status_code=500, detail=f"Error reading file: {e!s}")
+    return service.get_file_content(path)
 
 
 @router.put(
@@ -280,6 +117,7 @@ def get_task_file_content(path: str) -> dict[str, Any]:
 def save_task_file_content(
     request: SaveTaskFileRequest,
     _current_user: Annotated[User, Depends(get_current_active_user)],
+    service: Annotated[TaskFileService, Depends(get_task_file_service)],
 ) -> dict[str, str]:
     """Save task file content.
 
@@ -292,222 +130,7 @@ def save_task_file_content(
         Success message
 
     """
-    file_path = validate_task_file_path(request.path)
-
-    # Only allow Python files
-    if not request.path.endswith(".py"):
-        raise HTTPException(status_code=400, detail="Only Python files are allowed")
-
-    # Only allow editing existing files (no creating new files)
-    if not file_path.exists():
-        raise HTTPException(status_code=404, detail=f"File not found: {request.path}")
-
-    try:
-        # Write content
-        file_path.write_text(request.content, encoding="utf-8")
-
-        logger.info(f"Task file saved successfully: {file_path}")
-        return {
-            "message": "File saved successfully",
-            "path": request.path,
-        }
-    except Exception as e:
-        logger.error(f"Error saving file {file_path}: {e}")
-        raise HTTPException(status_code=500, detail=f"Error saving file: {e!s}")
-
-
-def _extract_string_value(node: ast.expr | None) -> str | None:
-    """Extract string value from AST node, handling various assignment patterns.
-
-    Handles:
-    - Simple constants: name = "CheckRabi"
-    - Annotated assignments: name: str = "CheckRabi"
-
-    Does NOT handle (returns None):
-    - Dynamic assignments: name = get_task_name()
-    - Complex expressions: name = PREFIX + "_task"
-    - f-strings: name = f"{prefix}_task"
-
-    Args:
-    ----
-        node: AST expression node
-
-    Returns:
-    -------
-        String value if extractable, None otherwise
-
-    """
-    if node is None:
-        return None
-
-    # Handle simple string constants
-    if isinstance(node, ast.Constant) and isinstance(node.value, str):
-        return node.value
-
-    return None
-
-
-def _is_valid_python_file(file_path: Path) -> bool:
-    """Check if a file is a valid Python file that can be parsed.
-
-    Args:
-    ----
-        file_path: Path to the file
-
-    Returns:
-    -------
-        True if file is valid Python, False otherwise
-
-    """
-    if not file_path.exists():
-        return False
-
-    if not file_path.is_file():
-        return False
-
-    if file_path.suffix != ".py":
-        return False
-
-    # Check file size (skip very large files > 1MB)
-    try:
-        if file_path.stat().st_size > 1_000_000:
-            logger.warning(f"Skipping large file: {file_path}")
-            return False
-    except OSError:
-        return False
-
-    return True
-
-
-def extract_task_info_from_file(file_path: Path, relative_path: str) -> list[TaskInfo]:
-    """Extract task information from a Python file using AST parsing.
-
-    Args:
-    ----
-        file_path: Absolute path to the Python file
-        relative_path: Relative path for display
-
-    Returns:
-    -------
-        List of TaskInfo objects found in the file
-
-    """
-    tasks: list[TaskInfo] = []
-
-    # Validate file before parsing
-    if not _is_valid_python_file(file_path):
-        return tasks
-
-    try:
-        content = file_path.read_text(encoding="utf-8")
-    except (OSError, UnicodeDecodeError):
-        # Log without exposing file details
-        logger.warning(f"Failed to read file: {relative_path}")
-        return tasks
-
-    try:
-        tree = ast.parse(content)
-    except SyntaxError:
-        # Log without exposing syntax error details
-        logger.warning(f"Invalid Python syntax in file: {relative_path}")
-        return tasks
-
-    for node in ast.walk(tree):
-        if not isinstance(node, ast.ClassDef):
-            continue
-
-        # Look for classes that might be tasks
-        name_value = None
-        task_type_value = None
-        docstring = ast.get_docstring(node)
-
-        for item in node.body:
-            # Handle annotated assignments: name: str = "value"
-            if isinstance(item, ast.AnnAssign) and isinstance(item.target, ast.Name):
-                if item.target.id == "name":
-                    name_value = _extract_string_value(item.value)
-                elif item.target.id == "task_type":
-                    task_type_value = _extract_string_value(item.value)
-
-            # Handle simple assignments: name = "value"
-            elif isinstance(item, ast.Assign):
-                for target in item.targets:
-                    if isinstance(target, ast.Name):
-                        if target.id == "name":
-                            name_value = _extract_string_value(item.value)
-                        elif target.id == "task_type":
-                            task_type_value = _extract_string_value(item.value)
-
-        # Only include if it has a valid string name attribute (indicating it's a task)
-        if name_value and isinstance(name_value, str):
-            tasks.append(
-                TaskInfo(
-                    name=name_value,
-                    class_name=node.name,
-                    task_type=task_type_value,
-                    description=docstring,
-                    file_path=relative_path,
-                )
-            )
-
-    return tasks
-
-
-def collect_tasks_from_directory(directory: Path, base_path: Path) -> list[TaskInfo]:
-    """Recursively collect task info from all Python files in a directory.
-
-    Args:
-    ----
-        directory: Directory to scan
-        base_path: Base path for calculating relative paths
-
-    Returns:
-    -------
-        List of TaskInfo objects
-
-    """
-    tasks = []
-
-    try:
-        for item in directory.iterdir():
-            if item.name.startswith(".") or item.name == "__pycache__":
-                continue
-
-            if item.is_dir():
-                tasks.extend(collect_tasks_from_directory(item, base_path))
-            elif item.suffix == ".py" and item.name != "__init__.py":
-                relative_path = str(item.relative_to(base_path))
-                tasks.extend(extract_task_info_from_file(item, relative_path))
-    except PermissionError:
-        logger.warning(f"Permission denied accessing directory: {directory}")
-
-    return tasks
-
-
-def _get_directory_mtime_sum(directory: Path) -> float:
-    """Calculate sum of modification times for all Python files in directory.
-
-    Used for cache invalidation.
-
-    Args:
-    ----
-        directory: Directory to scan
-
-    Returns:
-    -------
-        Sum of file modification times
-
-    """
-    mtime_sum = 0.0
-    try:
-        for item in directory.rglob("*.py"):
-            if item.name.startswith(".") or "__pycache__" in str(item):
-                continue
-            with contextlib.suppress(OSError):
-                mtime_sum += item.stat().st_mtime
-    except PermissionError:
-        pass
-    return mtime_sum
+    return service.save_file_content(request)
 
 
 @router.get(
@@ -516,29 +139,17 @@ def _get_directory_mtime_sum(directory: Path) -> float:
     summary="Get backend configuration",
     operation_id="getBackendConfig",
 )
-def get_backend_config() -> BackendConfigResponse:
+def get_backend_config(
+    service: Annotated[TaskFileService, Depends(get_task_file_service)],
+) -> BackendConfigResponse:
     """Get backend configuration from backend.yaml.
-
-    Returns backend definitions, tasks, and categories.
 
     Returns
     -------
         Backend configuration
 
     """
-    try:
-        config = load_backend_config()
-        return BackendConfigResponse(
-            default_backend=config.default_backend,
-            backends={
-                name: {"description": b.description, "tasks": b.tasks}
-                for name, b in config.backends.items()
-            },
-            categories=config.categories,
-        )
-    except Exception as e:
-        logger.warning(f"Failed to load backend config: {e}")
-        return BackendConfigResponse()
+    return service.get_backend_config()
 
 
 @router.get(
@@ -549,75 +160,21 @@ def get_backend_config() -> BackendConfigResponse:
 )
 def list_task_info(
     backend: str,
+    service: Annotated[TaskFileService, Depends(get_task_file_service)],
     sort_order: str | None = None,
     enabled_only: bool = False,
 ) -> ListTaskInfoResponse:
     """List all task definitions found in a backend directory.
 
-    Parses Python files to extract task names, types, and descriptions.
-    Results are cached and invalidated when files are modified.
-
     Args:
     ----
         backend: Backend name (e.g., "qubex", "fake")
-        sort_order: Sort order for tasks ("type_then_name", "name_only", "file_path")
-        enabled_only: If True, only return tasks that are enabled in backend.yaml
+        sort_order: Sort order for tasks
+        enabled_only: If True, only return tasks that are enabled
 
     Returns:
     -------
         List of task information
 
     """
-    backend_path = CALIBTASKS_BASE_PATH / backend
-
-    if not backend_path.exists():
-        raise HTTPException(status_code=404, detail=f"Backend directory not found: {backend}")
-
-    if not backend_path.is_dir():
-        raise HTTPException(status_code=400, detail=f"Not a directory: {backend}")
-
-    # Check cache (include sort_order and enabled_only in cache key)
-    cache_key = f"{backend}:{sort_order or 'default'}:{enabled_only}"
-    current_mtime = _get_directory_mtime_sum(backend_path)
-    cached = _task_cache.get(cache_key)
-
-    if cached is not None:
-        cached_mtime, cached_tasks = cached
-        if cached_mtime == current_mtime:
-            logger.debug(f"Using cached task list for backend: {backend}")
-            return ListTaskInfoResponse(tasks=cached_tasks)
-
-    # Parse files and update cache
-    logger.debug(f"Parsing task files for backend: {backend}")
-    tasks = collect_tasks_from_directory(backend_path, backend_path)
-
-    # Get available tasks from backend.yaml
-    available_tasks = set(get_tasks(backend))
-
-    # Enrich tasks with category and enabled status
-    enriched_tasks = []
-    for task in tasks:
-        task.category = get_task_category(task.name)
-        task.enabled = task.name in available_tasks
-        enriched_tasks.append(task)
-
-    # Filter if enabled_only is True
-    if enabled_only:
-        enriched_tasks = [t for t in enriched_tasks if t.enabled]
-
-    # Sort based on sort_order parameter
-    if sort_order == "name_only":
-        enriched_tasks.sort(key=lambda t: t.name)
-    elif sort_order == "file_path":
-        enriched_tasks.sort(key=lambda t: (t.file_path, t.name))
-    elif sort_order == "category":
-        # Sort by category, then by name within category
-        enriched_tasks.sort(key=lambda t: (t.category or "zzz", t.name))
-    else:
-        # Default: type_then_name
-        enriched_tasks.sort(key=lambda t: (t.task_type or "", t.name))
-
-    # Update cache
-    _task_cache[cache_key] = (current_mtime, enriched_tasks)
-
-    return ListTaskInfoResponse(tasks=enriched_tasks)
+    return service.list_task_info(backend, sort_order=sort_order, enabled_only=enabled_only)

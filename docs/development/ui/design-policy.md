@@ -1,22 +1,4 @@
-# UI Design Policy for QDash
-
-This document defines the visual design conventions and standards for the QDash project. All contributors should follow these guidelines when creating new UI components or features.
-
-## Table of Contents
-
-1. [Icon System](#icon-system)
-2. [Emoji & Illustrations](#emoji--illustrations)
-3. [Color System](#color-system)
-4. [Component Design](#component-design)
-5. [Empty States](#empty-states)
-6. [Loading States](#loading-states)
-7. [Feedback & Notifications](#feedback--notifications)
-8. [Animation & Transitions](#animation--transitions)
-9. [Accessibility](#accessibility)
-10. [Acceptable Exceptions](#acceptable-exceptions)
-11. [Quick Reference](#quick-reference)
-
----
+# UI Design Policy
 
 ## Icon System
 
@@ -573,55 +555,3 @@ const ranks = {
 <span className="text-green-500">Success!</span>      // Use text-success
 ```
 
----
-
-## Quick Reference
-
-### Icon Checklist
-
-- [ ] Use `lucide-react` for all icons
-- [ ] Use consistent sizes (18px nav, 20px buttons, 24px headers)
-- [ ] Import only the icons you need
-
-### Emoji Checklist
-
-- [ ] Use `FluentEmoji` for empty states and decorative elements
-- [ ] Use `getAvatarEmoji()` for user avatars
-- [ ] Match emoji to context (status, empty state, decorative)
-
-### Color Checklist
-
-- [ ] Use semantic colors (`text-primary`, `bg-base-100`)
-- [ ] Avoid hardcoded colors unless in [Acceptable Exceptions](#acceptable-exceptions)
-- [ ] Use opacity modifiers for subtle text (`text-base-content/70`)
-
-### Component Checklist
-
-- [ ] Use DaisyUI component classes
-- [ ] Don't override Rich Interactive Design System styles
-- [ ] Use `card-hover` for clickable cards
-- [ ] Use `EmptyState` for empty state handling
-
-### Animation Checklist
-
-- [ ] Don't add `transition-all` to list items
-- [ ] Use `page-transition` for page-level animations
-- [ ] Use `stagger-item` for sequential list animations
-- [ ] Let globals.css handle interactive element transitions
-
-### Accessibility Checklist
-
-- [ ] Add `aria-label` to icon-only buttons
-- [ ] Ensure sufficient color contrast
-- [ ] Test with keyboard navigation
-- [ ] Respect reduced motion preferences
-
----
-
-## References
-
-- [Lucide React](https://lucide.dev/guide/packages/lucide-react)
-- [Microsoft Fluent Emoji](https://github.com/microsoft/fluentui-emoji)
-- [DaisyUI Components](https://daisyui.com/components/)
-- [Tailwind CSS](https://tailwindcss.com/docs)
-- [WCAG 2.1 Guidelines](https://www.w3.org/WAI/WCAG21/quickref/)

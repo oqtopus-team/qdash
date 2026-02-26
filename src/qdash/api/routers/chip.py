@@ -7,20 +7,14 @@ Business logic is delegated to ChipService for better testability.
 from __future__ import annotations
 
 import logging
-from functools import lru_cache
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from qdash.api.dependencies import get_chip_service  # noqa: TCH002
-from qdash.api.lib.config_loader import ConfigLoader
 from qdash.api.lib.project import (  # noqa: TCH002
     ProjectContext,
     get_project_context,
     get_project_context_owner,
-)
-from qdash.api.routers.task_file import (
-    CALIBTASKS_BASE_PATH,
-    collect_tasks_from_directory,
 )
 from qdash.api.schemas.chip import (
     ChipDatesResponse,
@@ -42,7 +36,6 @@ from qdash.api.services.chip_service import ChipService  # noqa: TCH002
 router = APIRouter()
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
 
 
 # =============================================================================
@@ -166,50 +159,6 @@ def get_chip_dates(
 # =============================================================================
 
 
-@lru_cache(maxsize=1)
-def _get_task_names_cached() -> tuple[str, ...]:
-    """Get task names from task files (cached).
-
-    Returns a tuple for cache compatibility. Internal function.
-
-    Returns
-    -------
-        Tuple of task names from task files
-
-    """
-    # Get default backend from settings
-    default_backend = "qubex"  # fallback default
-    try:
-        settings = ConfigLoader.load_settings()
-        ui_settings = settings.get("ui", {})
-        task_files_settings = ui_settings.get("task_files", {})
-        default_backend = task_files_settings.get("default_backend", "qubex")
-    except Exception as e:
-        logger.warning(f"Failed to load settings: {e}")
-
-    # Get tasks from task files
-    backend_path = CALIBTASKS_BASE_PATH / default_backend
-    if not backend_path.exists() or not backend_path.is_dir():
-        logger.warning(f"Backend directory not found: {backend_path}")
-        return ()
-
-    tasks = collect_tasks_from_directory(backend_path, backend_path)
-    return tuple(task.name for task in tasks)
-
-
-def _get_task_names_from_files() -> list[str]:
-    """Get task names from task files instead of database.
-
-    Uses cached results for performance optimization.
-
-    Returns
-    -------
-        List of task names from task files
-
-    """
-    return list(_get_task_names_cached())
-
-
 @router.get(
     "/chips/{chip_id}/muxes/{mux_id}",
     response_model=MuxDetailResponse,
@@ -243,15 +192,10 @@ def get_chip_mux(
     """
     logger.debug(f"Fetching mux details for chip {chip_id}, project: {ctx.project_id}")
 
-    # Get task names from task files instead of database
-    task_names = _get_task_names_from_files()
-    logger.debug("Task names from files: %s", task_names)
-
     return chip_service.get_mux_detail(
         project_id=ctx.project_id,
         chip_id=chip_id,
         mux_id=mux_id,
-        task_names=task_names,
     )
 
 
@@ -284,21 +228,18 @@ def list_chip_muxes(
         List of multiplexer details
 
     """
-    # Get task names from task files instead of database
-    task_names = _get_task_names_from_files()
-
     # Get chip size
     chip_size = chip_service.get_chip_size(ctx.project_id, chip_id)
     if chip_size is None:
         raise HTTPException(
-            status_code=404, detail=f"Chip {chip_id} not found in project {ctx.project_id}"
+            status_code=404,
+            detail=f"Chip {chip_id} not found in project {ctx.project_id}",
         )
 
     muxes = chip_service.get_all_mux_details(
         project_id=ctx.project_id,
         chip_id=chip_id,
         chip_size=chip_size,
-        task_names=task_names,
     )
 
     return ListMuxResponse(muxes=muxes)

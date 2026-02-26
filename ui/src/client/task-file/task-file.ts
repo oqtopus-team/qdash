@@ -43,8 +43,6 @@ type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 /**
  * Get task file settings from config/settings.yaml.
 
-Uses ConfigLoader for unified loading with local override support.
-
 Returns
 -------
     Task file settings including default backend
@@ -518,7 +516,7 @@ export function useGetTaskFileTree<
 
 Args:
 ----
-    path: Relative path from CALIBTASKS_BASE_PATH (e.g., "qubex/one_qubit_coarse/check_rabi.py")
+    path: Relative path from CALIBTASKS_BASE_PATH
 
 Returns:
 -------
@@ -782,8 +780,6 @@ export const useSaveTaskFileContent = <
 /**
  * Get backend configuration from backend.yaml.
 
-Returns backend definitions, tasks, and categories.
-
 Returns
 -------
     Backend configuration
@@ -933,14 +929,11 @@ export function useGetBackendConfig<
 /**
  * List all task definitions found in a backend directory.
 
-Parses Python files to extract task names, types, and descriptions.
-Results are cached and invalidated when files are modified.
-
 Args:
 ----
     backend: Backend name (e.g., "qubex", "fake")
-    sort_order: Sort order for tasks ("type_then_name", "name_only", "file_path")
-    enabled_only: If True, only return tasks that are enabled in backend.yaml
+    sort_order: Sort order for tasks
+    enabled_only: If True, only return tasks that are enabled
 
 Returns:
 -------

@@ -8,7 +8,7 @@ export interface ChatMessage {
   content: string;
 }
 
-export interface AnalysisResult {
+interface AnalysisResult {
   summary: string;
   assessment: "good" | "warning" | "bad";
   explanation: string;
@@ -16,7 +16,7 @@ export interface AnalysisResult {
   recommendations: string[];
 }
 
-export interface ContentBlock {
+interface ContentBlock {
   type: "text" | "chart";
   content: string | null;
   chart: {

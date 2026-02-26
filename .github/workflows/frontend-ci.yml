@@ -65,3 +65,29 @@ jobs:
 
       - name: Build
         run: task ci-ui-build
+
+  knip:
+    name: Knip (unused code)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' && github.base_ref == 'develop'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install Go Task
+        uses: arduino/setup-task@v2
+        with:
+          version: 3.x
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install dependencies
+        working-directory: ./ui
+        run: bun install
+
+      - name: Run knip
+        run: task knip

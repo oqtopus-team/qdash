@@ -59,11 +59,11 @@ BOX_MIXED : str
 """
 
 from qdash.workflow.engine.scheduler.cr_scheduler import CRScheduler, CRScheduleResult
-from qdash.workflow.engine.scheduler.one_qubit_scheduler import (
+from qdash.workflow.engine.scheduler.one_qubit_scheduler import OneQubitScheduler
+from qdash.workflow.engine.scheduler.one_qubit_types import (
     BOX_A,
     BOX_B,
     BOX_MIXED,
-    OneQubitScheduler,
     OneQubitScheduleResult,
     OneQubitStageInfo,
 )

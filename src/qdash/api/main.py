@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.routing import APIRoute
 from qdash.api.db.session import lifespan
 from qdash.api.lib.auth import get_current_active_user
+from qdash.api.middleware.request_id import RequestIdMiddleware
 from qdash.api.routers import (
     admin,
     auth,
@@ -16,6 +17,7 @@ from qdash.api.routers import (
     file,
     flow,
     issue,
+    issue_knowledge,
     metrics,
     project,
     provenance,
@@ -75,6 +77,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(RequestIdMiddleware)
 # Auth router without global auth dependency (login/register/logout need to be public)
 app.include_router(auth.router, tags=["auth"])
 
@@ -103,6 +106,7 @@ app.include_router(task.router, tags=["task"], dependencies=auth_dependency)
 app.include_router(task_file.router, tags=["task-file"], dependencies=auth_dependency)
 app.include_router(task_result.router, tags=["task-result"], dependencies=auth_dependency)
 app.include_router(issue.router, tags=["issue"], dependencies=auth_dependency)
+app.include_router(issue_knowledge.router, tags=["issue-knowledge"], dependencies=auth_dependency)
 app.include_router(tag.router, tags=["tag"], dependencies=auth_dependency)
 app.include_router(device_topology.router, tags=["device-topology"], dependencies=auth_dependency)
 app.include_router(backend.router, tags=["backend"], dependencies=auth_dependency)

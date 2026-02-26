@@ -5,32 +5,24 @@ from __future__ import annotations
 import logging
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
+from fastapi.responses import Response
+from qdash.api.dependencies import get_task_service  # noqa: TCH002
 from qdash.api.lib.project import (  # noqa: TCH002
     ProjectContext,
     get_project_context,
 )
 from qdash.api.schemas.task import (
-    ExpectedResultResponse,
-    InputParameterModel,
+    ListTaskKnowledgeResponse,
     ListTaskResponse,
     TaskKnowledgeResponse,
-    TaskResponse,
     TaskResultResponse,
 )
-from qdash.datamodel.task_knowledge import TaskKnowledge
-from qdash.datamodel.task_knowledge import get_task_knowledge as _lookup_knowledge
-from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
-from qdash.repository.task_definition import MongoTaskDefinitionRepository
+from qdash.api.services.task_service import TaskService  # noqa: TCH002
 
 router = APIRouter()
 
 logger = logging.getLogger(__name__)
-
-
-def get_task_definition_repository() -> MongoTaskDefinitionRepository:
-    """Get task definition repository instance."""
-    return MongoTaskDefinitionRepository()
 
 
 @router.get(
@@ -41,7 +33,7 @@ def get_task_definition_repository() -> MongoTaskDefinitionRepository:
 )
 def list_tasks(
     ctx: Annotated[ProjectContext, Depends(get_project_context)],
-    task_repo: Annotated[MongoTaskDefinitionRepository, Depends(get_task_definition_repository)],
+    service: Annotated[TaskService, Depends(get_task_service)],
     backend: str | None = Query(None, description="Optional backend name to filter tasks by"),
 ) -> ListTaskResponse:
     """List all tasks.
@@ -50,8 +42,8 @@ def list_tasks(
     ----------
     ctx : ProjectContext
         The project context with user and project information.
-    task_repo : MongoTaskDefinitionRepository
-        Repository for task definition operations.
+    service : TaskService
+        The task service instance.
     backend : str | None
         Optional backend name to filter tasks by.
 
@@ -61,26 +53,7 @@ def list_tasks(
         The list of tasks.
 
     """
-    tasks = task_repo.list_by_project(ctx.project_id, backend=backend)
-    return ListTaskResponse(
-        tasks=[
-            TaskResponse(
-                name=task["name"],
-                description=task["description"],
-                task_type=task["task_type"],
-                backend=task["backend"],
-                input_parameters={
-                    name: InputParameterModel(**param)
-                    for name, param in task["input_parameters"].items()
-                },
-                output_parameters={
-                    name: InputParameterModel(**param)
-                    for name, param in task["output_parameters"].items()
-                },
-            )
-            for task in tasks
-        ]
-    )
+    return service.list_tasks(ctx.project_id, backend=backend)
 
 
 @router.get(
@@ -92,6 +65,7 @@ def list_tasks(
 def get_task_result(
     task_id: str,
     ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    service: Annotated[TaskService, Depends(get_task_service)],
 ) -> TaskResultResponse:
     """Get task result by task_id.
 
@@ -101,6 +75,8 @@ def get_task_result(
         The task ID to search for.
     ctx : ProjectContext
         The project context with user and project information.
+    service : TaskService
+        The task service instance.
 
     Returns
     -------
@@ -108,49 +84,39 @@ def get_task_result(
         The task result information including figure paths.
 
     """
-    # Find task result by task_id (scoped to project)
-    # Note: This still uses TaskResultHistoryDocument directly as
-    # the find_one operation is specific to this use case
-    task_result = TaskResultHistoryDocument.find_one(
-        {"project_id": ctx.project_id, "task_id": task_id}
-    ).run()
-
-    if not task_result:
-        raise HTTPException(status_code=404, detail=f"Task result with task_id {task_id} not found")
-
-    return TaskResultResponse(
-        task_id=task_result.task_id,
-        task_name=task_result.name,
-        qid=task_result.qid,
-        status=task_result.status,
-        execution_id=task_result.execution_id,
-        figure_path=task_result.figure_path,
-        json_figure_path=task_result.json_figure_path,
-        input_parameters=task_result.input_parameters,
-        output_parameters=task_result.output_parameters,
-        run_parameters=task_result.run_parameters,
-        start_at=task_result.start_at,
-        end_at=task_result.end_at,
-        elapsed_time=task_result.elapsed_time,
-    )
+    return service.get_task_result(ctx.project_id, task_id)
 
 
-def _get_task_knowledge(task_name: str) -> TaskKnowledge:
-    """Resolve TaskKnowledge from the central registry.
+@router.get(
+    "/task-knowledge",
+    response_model=ListTaskKnowledgeResponse,
+    summary="List all task knowledge entries",
+    operation_id="listTaskKnowledge",
+)
+def list_task_knowledge(
+    service: Annotated[TaskService, Depends(get_task_service)],
+) -> ListTaskKnowledgeResponse:
+    """List all available task knowledge entries with summary info."""
+    return service.list_task_knowledge()
 
-    Raises
-    ------
-    HTTPException
-        If knowledge not defined for the given task name.
 
+@router.get(
+    "/tasks/{task_name}/knowledge/markdown",
+    summary="Get raw markdown for a task knowledge entry",
+    operation_id="getTaskKnowledgeMarkdown",
+    response_class=Response,
+)
+def get_task_knowledge_markdown(
+    task_name: str,
+    service: Annotated[TaskService, Depends(get_task_service)],
+) -> Response:
+    """Get raw markdown content for a task knowledge entry.
+
+    Returns the index.md content with image references replaced
+    by inline base64 data URIs for self-contained rendering.
     """
-    knowledge = _lookup_knowledge(task_name)
-    if knowledge is None:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Task '{task_name}' does not have knowledge defined",
-        )
-    return knowledge
+    content = service.get_task_knowledge_markdown(task_name)
+    return Response(content=content, media_type="text/markdown; charset=utf-8")
 
 
 @router.get(
@@ -161,6 +127,7 @@ def _get_task_knowledge(task_name: str) -> TaskKnowledge:
 )
 def get_task_knowledge(
     task_name: str,
+    service: Annotated[TaskService, Depends(get_task_service)],
     backend: str = Query("qubex", description="Backend name"),
 ) -> TaskKnowledgeResponse:
     """Get structured domain knowledge for a calibration task.
@@ -172,6 +139,8 @@ def get_task_knowledge(
     ----------
     task_name : str
         The task name (e.g. "CheckT1", "CheckRabi").
+    service : TaskService
+        The task service instance.
     backend : str
         The backend name (default "qubex").
 
@@ -181,19 +150,4 @@ def get_task_knowledge(
         Structured task knowledge.
 
     """
-    knowledge = _get_task_knowledge(task_name)
-    return TaskKnowledgeResponse(
-        name=knowledge.name,
-        summary=knowledge.summary,
-        what_it_measures=knowledge.what_it_measures,
-        physical_principle=knowledge.physical_principle,
-        expected_result=ExpectedResultResponse(**knowledge.expected_result.model_dump()),
-        evaluation_criteria=knowledge.evaluation_criteria,
-        check_questions=knowledge.check_questions,
-        failure_modes=[fm.model_dump() for fm in knowledge.failure_modes],
-        tips=knowledge.tips,
-        output_parameters_info=[p.model_dump() for p in knowledge.output_parameters_info],
-        analysis_guide=knowledge.analysis_guide,
-        prerequisites=knowledge.prerequisites,
-        prompt_text=knowledge.to_prompt(),
-    )
+    return service.get_task_knowledge(task_name)

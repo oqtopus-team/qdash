@@ -23,8 +23,8 @@ import { useTopologyConfig } from "@/hooks/useTopologyConfig";
 import {
   getQubitGridPosition,
   type TopologyLayoutParams,
-} from "@/utils/gridPosition";
-import { calculateGridDimension } from "@/utils/gridLayout";
+} from "@/lib/utils/grid-position";
+import { calculateGridDimension } from "@/lib/utils/grid-layout";
 
 import { CouplingMetricHistoryModal } from "./CouplingMetricHistoryModal";
 import { useAnalysisChatContext } from "@/contexts/AnalysisChatContext";
@@ -116,7 +116,6 @@ export function CouplingMetricsGrid({
   gridSize = 8,
   chipId,
   topologyId,
-  selectedDate: _selectedDate,
 }: CouplingMetricsGridProps) {
   // Get topology configuration
   const {

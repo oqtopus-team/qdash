@@ -79,7 +79,7 @@ Here are some screenshots of QDash in action:
 
 ### Workflow Engine
 
-- **Orchestration**: Prefect 2.20
+- **Orchestration**: Prefect 3
 - **Quantum Library**: qubex
 
 ## Learn More

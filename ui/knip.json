@@ -1,6 +1,6 @@
 {
   "$schema": "https://unpkg.com/knip@5/schema.json",
-  "entry": ["src/app/**/*.{ts,tsx}", "src/pages/**/*.{ts,tsx}"],
+  "entry": ["src/app/**/*.{ts,tsx}"],
   "project": ["src/**/*.{ts,tsx,js,jsx}"],
   "ignore": [
     "**/*.d.ts",
@@ -11,8 +11,13 @@
     "src/client/**/*.ts",
     "src/schemas/**/*.ts"
   ],
-  "ignoreDependencies": ["sharp", "daisyui", "tailwindcss", "autoprefixer"],
-  "ignoreBinaries": ["jq", "python"],
+  "ignoreDependencies": [
+    "sharp",
+    "daisyui",
+    "tailwindcss",
+    "autoprefixer",
+    "@tailwindcss/typography"
+  ],
   "next": {
     "entry": [
       "next.config.js",
@@ -24,6 +29,9 @@
       "src/app/**/route.ts",
       "src/middleware.ts"
     ]
+  },
+  "vitest": {
+    "entry": ["vitest.config.mts", "vitest.setup.ts", "src/**/*.test.{ts,tsx}"]
   },
   "eslint": true,
   "postcss": true,

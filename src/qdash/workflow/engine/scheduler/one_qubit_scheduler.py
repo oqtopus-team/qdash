@@ -47,12 +47,20 @@ from __future__ import annotations
 
 import logging
 import re
-from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import yaml
 from qdash.workflow.engine.backend.qubex_paths import get_qubex_paths
+from qdash.workflow.engine.scheduler.one_qubit_types import (
+    BOX_A,
+    BOX_B,
+    BOX_MIXED,
+    OneQubitScheduleResult,
+    OneQubitStageInfo,
+    SynchronizedOneQubitScheduleResult,
+    SynchronizedStepInfo,
+)
 
 if TYPE_CHECKING:
     from qdash.workflow.engine.scheduler.one_qubit_plugins import (
@@ -60,173 +68,6 @@ if TYPE_CHECKING:
     )
 
 logger = logging.getLogger(__name__)
-
-
-# Box type constants
-BOX_A = "A"
-BOX_B = "B"
-BOX_MIXED = "MIXED"  # Uses both A and B
-
-
-@dataclass
-class OneQubitStageInfo:
-    """Information about a single execution stage.
-
-    Attributes:
-        box_type: Type of box ("A", "B", or "MIXED")
-        qids: List of qubit IDs in this stage (executed sequentially if not using parallel_groups)
-        mux_ids: Set of MUX IDs included in this stage
-        parallel_groups: MUX-based parallel groups. Each group (list of qids) can run in parallel
-                        with other groups, but qubits within the same group run sequentially.
-                        Format: [[mux0_qids], [mux1_qids], ...]
-    """
-
-    box_type: str
-    qids: list[str]
-    mux_ids: set[int] = field(default_factory=set)
-    parallel_groups: list[list[str]] = field(default_factory=list)
-
-    def __repr__(self) -> str:
-        """String representation."""
-        return f"Stage(type={self.box_type}, qids={self.qids}, parallel_groups={len(self.parallel_groups)})"
-
-
-@dataclass
-class OneQubitScheduleResult:
-    """Result object containing 1-qubit schedule and metadata.
-
-    Attributes:
-        stages: List of execution stages (executed sequentially between stages,
-                qubits within each stage also executed sequentially due to box constraints)
-        metadata: Statistics about the schedule
-        mux_box_map: Mapping from MUX ID to box type(s)
-        qid_to_mux: Mapping from qubit ID to MUX ID
-    """
-
-    stages: list[OneQubitStageInfo]
-    metadata: dict[str, Any]
-    mux_box_map: dict[int, set[str]]
-    qid_to_mux: dict[str, int]
-
-    def to_dict(self) -> dict[str, Any]:
-        """Convert to dictionary format for serialization."""
-        return {
-            "stages": [
-                {
-                    "box_type": stage.box_type,
-                    "qids": stage.qids,
-                    "mux_ids": list(stage.mux_ids),
-                    "parallel_groups": stage.parallel_groups,
-                }
-                for stage in self.stages
-            ],
-            "metadata": self.metadata,
-        }
-
-    def __repr__(self) -> str:
-        """String representation."""
-        total_qubits = sum(len(stage.qids) for stage in self.stages)
-        return f"OneQubitScheduleResult(qubits={total_qubits}, stages={len(self.stages)})"
-
-
-@dataclass
-class SynchronizedStepInfo:
-    """Information about a single synchronized execution step.
-
-    Each step contains qubits that can be executed simultaneously across
-    all participating MUXes.
-
-    Attributes:
-        step_index: Index of this step within the stage (0-3)
-        box_type: Type of box ("A", "B", or "MIXED")
-        parallel_qids: List of qubit IDs to execute simultaneously in this step
-    """
-
-    step_index: int
-    box_type: str
-    parallel_qids: list[str]
-
-    def __repr__(self) -> str:
-        """String representation."""
-        return f"Step({self.step_index}, {self.box_type}, qids={len(self.parallel_qids)})"
-
-
-@dataclass
-class SynchronizedOneQubitScheduleResult:
-    """Result object for synchronized 1-qubit scheduling.
-
-    This result format provides step-based parallelism where each step contains
-    qubits that can be executed simultaneously. Unlike the original format where
-    MUXes execute independently, this ensures all MUXes are synchronized at each step.
-
-    Structure:
-        - steps: List of synchronized steps, each with qubits to execute in parallel
-        - Grouped by box_type (A, B, MIXED) - execute stages sequentially
-        - Within each box stage, execute steps sequentially
-        - Within each step, execute all qubits in parallel
-
-    Execution Flow:
-        For Box A with checkerboard strategy:
-        - Step 1: Execute [0, 6, 8, 14, ...] simultaneously (16 qubits)
-        - Step 2: Execute [1, 7, 9, 15, ...] simultaneously (16 qubits)
-        - Step 3: Execute [2, 4, 10, 12, ...] simultaneously (16 qubits)
-        - Step 4: Execute [3, 5, 11, 13, ...] simultaneously (16 qubits)
-
-    Attributes:
-        steps: List of synchronized steps grouped by box type
-        metadata: Statistics about the schedule
-        mux_box_map: Mapping from MUX ID to box type(s)
-        qid_to_mux: Mapping from qubit ID to MUX ID
-    """
-
-    steps: list[SynchronizedStepInfo]
-    metadata: dict[str, Any]
-    mux_box_map: dict[int, set[str]]
-    qid_to_mux: dict[str, int]
-
-    def to_dict(self) -> dict[str, Any]:
-        """Convert to dictionary format for serialization."""
-        return {
-            "steps": [
-                {
-                    "step_index": step.step_index,
-                    "box_type": step.box_type,
-                    "parallel_qids": step.parallel_qids,
-                }
-                for step in self.steps
-            ],
-            "metadata": self.metadata,
-        }
-
-    def get_steps_by_box(self, box_type: str) -> list[SynchronizedStepInfo]:
-        """Get steps for a specific box type.
-
-        Args:
-            box_type: "A", "B", or "MIXED"
-
-        Returns:
-            List of steps for the specified box type
-        """
-        return [step for step in self.steps if step.box_type == box_type]
-
-    @property
-    def total_steps(self) -> int:
-        """Total number of synchronized steps."""
-        return len(self.steps)
-
-    @property
-    def box_types(self) -> list[str]:
-        """List of unique box types in execution order."""
-        seen = []
-        for step in self.steps:
-            if step.box_type not in seen:
-                seen.append(step.box_type)
-        return seen
-
-    def __repr__(self) -> str:
-        """String representation."""
-        total_qubits = sum(len(step.parallel_qids) for step in self.steps)
-        return f"SynchronizedOneQubitScheduleResult(qubits={total_qubits}, steps={len(self.steps)})"
 
 
 class OneQubitScheduler:
@@ -599,6 +440,74 @@ class OneQubitScheduler:
         else:
             return BOX_MIXED
 
+    def _classify_qubits(
+        self,
+        qids: list[str],
+        qid_to_mux: dict[str, int],
+        mux_box_map: dict[int, set[str]],
+    ) -> tuple[list[str], list[str], list[str]]:
+        """Classify qubits into Box A, Box B, and MIXED groups.
+
+        Args:
+            qids: List of qubit IDs to classify
+            qid_to_mux: Mapping from qubit ID to MUX ID
+            mux_box_map: Mapping from MUX ID to box types
+
+        Returns:
+            Tuple of (box_a_qids, box_b_qids, mixed_qids)
+        """
+        box_a_qids: list[str] = []
+        box_b_qids: list[str] = []
+        mixed_qids: list[str] = []
+        for qid in qids:
+            box_type = self._get_qubit_box_type(qid, qid_to_mux, mux_box_map)
+            if box_type == BOX_A:
+                box_a_qids.append(qid)
+            elif box_type == BOX_B:
+                box_b_qids.append(qid)
+            else:
+                mixed_qids.append(qid)
+        return box_a_qids, box_b_qids, mixed_qids
+
+    @staticmethod
+    def _mux_ids_to_qids(
+        mux_ids: list[int],
+        exclude_qids: list[str] | None = None,
+    ) -> list[str]:
+        """Convert MUX IDs to qubit IDs, optionally excluding specified qubits.
+
+        Each MUX controls 4 qubits: MUX_N → qubits [4N, 4N+1, 4N+2, 4N+3].
+
+        Args:
+            mux_ids: List of MUX IDs to convert
+            exclude_qids: Optional list of qubit IDs to exclude
+
+        Returns:
+            List of qubit ID strings
+
+        Raises:
+            ValueError: If no MUX IDs provided or all qubits excluded
+        """
+        if len(mux_ids) == 0:
+            msg = "No MUX IDs provided"
+            raise ValueError(msg)
+        qids = []
+        for mux_id in mux_ids:
+            for offset in range(4):
+                qids.append(str(mux_id * 4 + offset))
+        if exclude_qids:
+            exclude_set = set(exclude_qids)
+            original_count = len(qids)
+            qids = [qid for qid in qids if qid not in exclude_set]
+            excluded_count = original_count - len(qids)
+            if excluded_count > 0:
+                logger.info(f"Excluded {excluded_count} qubits from {len(mux_ids)} MUXes")
+            if len(qids) == 0:
+                msg = "All qubits were excluded"
+                raise ValueError(msg)
+        logger.info(f"Converting {len(mux_ids)} MUX IDs to {len(qids)} qubit IDs")
+        return qids
+
     def generate(
         self,
         qids: list[str],
@@ -660,18 +569,7 @@ class OneQubitScheduler:
         qid_to_mux = self._build_qubit_to_mux_map(wiring_config)
 
         # Classify qubits by box type
-        box_a_qids: list[str] = []
-        box_b_qids: list[str] = []
-        mixed_qids: list[str] = []
-
-        for qid in qids:
-            box_type = self._get_qubit_box_type(qid, qid_to_mux, mux_box_map)
-            if box_type == BOX_A:
-                box_a_qids.append(qid)
-            elif box_type == BOX_B:
-                box_b_qids.append(qid)
-            else:
-                mixed_qids.append(qid)
+        box_a_qids, box_b_qids, mixed_qids = self._classify_qubits(qids, qid_to_mux, mux_box_map)
 
         logger.info(f"  Box A qubits: {box_a_qids}")
         logger.info(f"  Box B qubits: {box_b_qids}")
@@ -811,31 +709,7 @@ class OneQubitScheduler:
             )
             ```
         """
-        if len(mux_ids) == 0:
-            msg = "No MUX IDs provided"
-            raise ValueError(msg)
-
-        # Convert MUX IDs to qubit IDs
-        qids = []
-        for mux_id in mux_ids:
-            for offset in range(4):
-                qids.append(str(mux_id * 4 + offset))
-
-        # Exclude specified qubit IDs
-        if exclude_qids:
-            exclude_set = set(exclude_qids)
-            original_count = len(qids)
-            qids = [qid for qid in qids if qid not in exclude_set]
-            excluded_count = original_count - len(qids)
-            logger.info(
-                f"Excluded {excluded_count} qubits: {sorted(exclude_set & {str(mux_id * 4 + o) for mux_id in mux_ids for o in range(4)})}"
-            )
-
-            if len(qids) == 0:
-                msg = "All qubits were excluded"
-                raise ValueError(msg)
-
-        logger.info(f"Converting {len(mux_ids)} MUX IDs to {len(qids)} qubit IDs")
+        qids = self._mux_ids_to_qids(mux_ids, exclude_qids)
         return self.generate(qids=qids, ordering_strategy=ordering_strategy)
 
     def get_mux_info(self) -> dict[int, dict[str, Any]]:
@@ -972,18 +846,7 @@ class OneQubitScheduler:
             strategy = DefaultSynchronizedStrategy()
 
         # Classify qubits by box type
-        box_a_qids: list[str] = []
-        box_b_qids: list[str] = []
-        mixed_qids: list[str] = []
-
-        for qid in qids:
-            box_type = self._get_qubit_box_type(qid, qid_to_mux, mux_box_map)
-            if box_type == BOX_A:
-                box_a_qids.append(qid)
-            elif box_type == BOX_B:
-                box_b_qids.append(qid)
-            else:
-                mixed_qids.append(qid)
+        box_a_qids, box_b_qids, mixed_qids = self._classify_qubits(qids, qid_to_mux, mux_box_map)
 
         logger.info(f"  Box A qubits: {len(box_a_qids)}")
         logger.info(f"  Box B qubits: {len(box_b_qids)}")
@@ -1129,27 +992,5 @@ class OneQubitScheduler:
                 print(f"Step {step.step_index}: {step.parallel_qids}")
             ```
         """
-        if len(mux_ids) == 0:
-            msg = "No MUX IDs provided"
-            raise ValueError(msg)
-
-        # Convert MUX IDs to qubit IDs
-        qids = []
-        for mux_id in mux_ids:
-            for offset in range(4):
-                qids.append(str(mux_id * 4 + offset))
-
-        # Exclude specified qubit IDs
-        if exclude_qids:
-            exclude_set = set(exclude_qids)
-            original_count = len(qids)
-            qids = [qid for qid in qids if qid not in exclude_set]
-            excluded_count = original_count - len(qids)
-            logger.info(f"Excluded {excluded_count} qubits")
-
-            if len(qids) == 0:
-                msg = "All qubits were excluded"
-                raise ValueError(msg)
-
-        logger.info(f"Converting {len(mux_ids)} MUX IDs to {len(qids)} qubit IDs")
+        qids = self._mux_ids_to_qids(mux_ids, exclude_qids)
         return self.generate_synchronized(qids=qids, use_checkerboard=use_checkerboard)

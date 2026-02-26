@@ -14,6 +14,7 @@ function emojiToCodePoints(emoji: string): string {
 // https://vitepress.dev/reference/site-config
 export default withMermaid(
   defineConfig({
+    vite: {},
     base: "/qdash/",
     title: "QDash",
     description: "Qubit Calibration Management Platform",
@@ -103,6 +104,7 @@ export default withMermaid(
             },
             { text: "Setup", link: "/development/setup" },
             { text: "Datetime Handling", link: "/development/datetime" },
+            { text: "Logging", link: "/development/logging" },
             {
               text: "API",
               collapsed: true,
@@ -136,6 +138,7 @@ export default withMermaid(
                 { text: "Architecture", link: "/development/copilot/architecture" },
                 { text: "Sandbox", link: "/development/copilot/sandbox" },
                 { text: "LLM Agent", link: "/development/copilot/agent" },
+                { text: "LLM Integration Patterns", link: "/development/copilot/llm-integration-patterns" },
                 { text: "SSE Streaming", link: "/development/copilot/streaming" },
               ],
             },

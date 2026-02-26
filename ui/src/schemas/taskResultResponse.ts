@@ -8,6 +8,8 @@
 import type { TaskResultResponseInputParameters } from "./taskResultResponseInputParameters";
 import type { TaskResultResponseOutputParameters } from "./taskResultResponseOutputParameters";
 import type { TaskResultResponseRunParameters } from "./taskResultResponseRunParameters";
+import type { TaskResultResponseSourceTaskId } from "./taskResultResponseSourceTaskId";
+import type { ReExecutionEntry } from "./reExecutionEntry";
 import type { TaskResultResponseStartAt } from "./taskResultResponseStartAt";
 import type { TaskResultResponseEndAt } from "./taskResultResponseEndAt";
 import type { TaskResultResponseElapsedTime } from "./taskResultResponseElapsedTime";
@@ -29,6 +31,8 @@ Attributes
     start_at (datetime | None): Start time.
     end_at (datetime | None): End time.
     elapsed_time (timedelta | None): Elapsed time.
+    source_task_id (str | None): Parent task ID this was re-executed from.
+    re_executions (list[ReExecutionEntry]): Child task results from re-executions.
  */
 export interface TaskResultResponse {
   task_id: string;
@@ -36,11 +40,15 @@ export interface TaskResultResponse {
   qid: string;
   status: string;
   execution_id: string;
+  flow_name?: string;
   figure_path: string[];
   json_figure_path: string[];
   input_parameters: TaskResultResponseInputParameters;
   output_parameters: TaskResultResponseOutputParameters;
   run_parameters?: TaskResultResponseRunParameters;
+  tags?: string[];
+  source_task_id?: TaskResultResponseSourceTaskId;
+  re_executions?: ReExecutionEntry[];
   start_at?: TaskResultResponseStartAt;
   end_at?: TaskResultResponseEndAt;
   elapsed_time?: TaskResultResponseElapsedTime;

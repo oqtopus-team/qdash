@@ -1,7 +1,6 @@
 import os
 import shutil
 import tempfile
-from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlparse, urlunparse
 
@@ -48,15 +47,6 @@ def pull_github(target_dir: str | Path = QUBEX_CONFIG_BASE) -> str:
         temp_dir = tempfile.mkdtemp()
         logger.info("Cloning repository to temporary directory")
         repo = Repo.clone_from(auth_url, temp_dir, depth=1)
-
-        # Create backup of current config if it exists
-        if target_dir.exists():
-            backup_dir = (
-                target_dir.parent
-                / f"config_backup_{datetime.now(tz=timezone.utc).strftime('%Y%m%d_%H%M%S')}"
-            )
-            shutil.copytree(target_dir, backup_dir)
-            logger.info(f"Created backup at: {backup_dir}")
 
         # Get latest changes
         logger.info("Fetching latest changes")

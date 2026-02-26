@@ -12,6 +12,12 @@ git clone https://github.com/oqtopus-team/qdash.git
 
 ## Initial Setup
 
+Create a directory for PostgreSQL.
+
+```bash
+mkdir postgres_data
+```
+
 Create the environment file from the example.
 
 ```bash

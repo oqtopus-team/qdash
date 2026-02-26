@@ -11,7 +11,7 @@ import {
   useGetProvenanceLineage,
 } from "@/client/provenance/provenance";
 import { RecalibrationRecommendationsPanel } from "@/components/features/provenance/RecalibrationRecommendationsPanel";
-import { formatRelativeTime } from "@/utils/datetime";
+import { formatRelativeTime } from "@/lib/utils/datetime";
 
 const Plot = dynamic(() => import("@/components/charts/Plot"), {
   ssr: false,
@@ -143,7 +143,7 @@ export function InboxDetailPanel({
                   <div className="text-sm mt-1 text-base-content/70">
                     Current:{" "}
                     <span className="font-mono font-medium text-base-content">
-                      {formatValue(currentVersion.value as any)}{" "}
+                      {formatValue(currentVersion.value)}{" "}
                       {currentVersion.unit || ""}
                     </span>
                   </div>
@@ -176,7 +176,7 @@ export function InboxDetailPanel({
                         {
                           x: chartVersions.map((v) =>
                             v.valid_from
-                              ? new Date(v.valid_from as any).toISOString()
+                              ? new Date(v.valid_from as string).toISOString()
                               : "",
                           ),
                           y: chartVersions.map((v) =>
@@ -252,7 +252,7 @@ export function InboxDetailPanel({
                               v{v.version}
                             </span>
                             <span className="ml-2 font-mono text-xs">
-                              {formatValue(v.value as any)}
+                              {formatValue(v.value)}
                             </span>
                             {v.task_name && (
                               <span className="ml-2 text-xs text-base-content/60 truncate">
@@ -310,7 +310,7 @@ export function InboxDetailPanel({
                               ({e.qid || "-"})
                             </span>
                             <span className="ml-2 font-mono text-xs text-base-content/70">
-                              {formatValue(e.value as any)}
+                              {formatValue(e.value)}
                             </span>
                           </div>
                         </div>

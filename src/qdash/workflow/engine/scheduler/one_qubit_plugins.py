@@ -301,11 +301,11 @@ class CheckerboardOrderingStrategy(MuxOrderingStrategy):
         return [step for step in steps if step]
 
 
-class DefaultSynchronizedStrategy(MuxOrderingStrategy):
-    """Default strategy for synchronized step generation.
+class DefaultSynchronizedStrategy(DefaultOrderingStrategy):
+    """Synchronized strategy using natural qubit order.
 
-    Uses natural ordering [0, 1, 2, 3] for all MUXes, generating 4 synchronized
-    steps without frequency-aware optimization.
+    Inherits ordering and synchronized step generation from DefaultOrderingStrategy.
+    Exists as a named strategy for use when only synchronized execution is needed.
 
     Example:
         For MUXes [0, 1]:
@@ -315,50 +315,12 @@ class DefaultSynchronizedStrategy(MuxOrderingStrategy):
         - Step 3: [3, 7]  (offset 3 from each MUX)
     """
 
-    def order_qids_in_mux(
-        self,
-        mux_id: int,
-        qids: list[str],
-        context: OrderingContext,
-    ) -> list[str]:
-        """Return qubits in natural order."""
-        return sorted(qids, key=lambda x: int(x))
-
     def get_metadata(self) -> dict[str, Any]:
         """Return strategy metadata."""
         return {
             "strategy_name": "default_synchronized",
             "description": "Natural order synchronized steps",
         }
-
-    def generate_synchronized_steps(
-        self,
-        mux_ids: list[int],
-        qids: list[str],
-        context: OrderingContext,
-    ) -> list[list[str]]:
-        """Generate synchronized steps with natural ordering.
-
-        Args:
-            mux_ids: List of MUX IDs to include
-            qids: List of all qubit IDs
-            context: Context object
-
-        Returns:
-            List of 4 steps with natural ordering
-        """
-        qid_set = set(qids)
-        steps: list[list[str]] = [[] for _ in range(4)]
-
-        for mux_id in sorted(mux_ids):
-            base_qid = mux_id * 4
-
-            for offset in range(4):
-                target_qid = str(base_qid + offset)
-                if target_qid in qid_set:
-                    steps[offset].append(target_qid)
-
-        return [step for step in steps if step]
 
     def __repr__(self) -> str:
         """String representation."""

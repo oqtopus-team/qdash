@@ -13,6 +13,10 @@ interface TaskFigureProps {
   className?: string;
 }
 
+function figureUrl(path: string): string {
+  return `/api/executions/figure?path=${encodeURIComponent(path)}`;
+}
+
 function ExpandableImage({
   src,
   alt,
@@ -23,13 +27,30 @@ function ExpandableImage({
   className: string;
 }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [hasError, setHasError] = useState(false);
+
+  if (hasError) {
+    return (
+      <div className="flex items-center justify-center h-full text-base-content/40 text-xs">
+        Failed to load image
+      </div>
+    );
+  }
 
   return (
-    <div className="relative group inline-flex h-full shrink-0">
-      <img src={src} alt={alt} className={className} />
+    <div className="relative group inline-flex h-full min-w-0 min-h-0">
+      <img
+        src={src}
+        alt={alt}
+        className={className}
+        onError={() => setHasError(true)}
+      />
       <button
         type="button"
-        onClick={() => setIsOpen(true)}
+        onClick={(e) => {
+          e.stopPropagation();
+          setIsOpen(true);
+        }}
         className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity btn btn-xs btn-circle bg-base-100/80 shadow hover:bg-base-200"
         title="Expand"
       >
@@ -48,9 +69,6 @@ export function TaskFigure({
   qid,
   className = "",
 }: TaskFigureProps) {
-  // Use /api proxy route (handled by Next.js rewrites)
-  const apiUrl = "/api";
-
   // Use generated API client hook when taskId is provided
   const {
     data: taskResultResponse,
@@ -65,7 +83,6 @@ export function TaskFigure({
   const taskResult = taskResultResponse?.data;
   const error = (fetchError as Error)?.message || null;
 
-  // Loading state
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -74,7 +91,6 @@ export function TaskFigure({
     );
   }
 
-  // Error state
   if (error) {
     return (
       <div className="alert alert-error">
@@ -83,39 +99,43 @@ export function TaskFigure({
     );
   }
 
-  // Use fetched task result if available (prefer static images over JSON)
-  const figurePaths =
+  // Normalize to string array
+  const raw =
     path || taskResult?.figure_path || taskResult?.json_figure_path || [];
+  const normalizedPaths = Array.isArray(raw)
+    ? raw
+    : typeof raw === "string"
+      ? [raw]
+      : [];
 
-  if (Array.isArray(figurePaths) && figurePaths.length > 0) {
+  if (normalizedPaths.length === 0) {
     return (
-      <>
-        {figurePaths.map((p, i) => (
-          <ExpandableImage
-            key={i}
-            src={`${apiUrl}/executions/figure?path=${encodeURIComponent(p)}`}
-            alt={`Result for QID ${qid}`}
-            className={className}
-          />
-        ))}
-      </>
+      <div className="alert alert-info">
+        <span>No figure available for this task</span>
+      </div>
     );
   }
 
-  if (typeof figurePaths === "string") {
+  if (normalizedPaths.length === 1) {
     return (
       <ExpandableImage
-        src={`${apiUrl}/executions/figure?path=${encodeURIComponent(figurePaths)}`}
+        src={figureUrl(normalizedPaths[0])}
         alt={`Result for QID ${qid}`}
         className={className}
       />
     );
   }
 
-  // No figure available
   return (
-    <div className="alert alert-info">
-      <span>No figure available for this task</span>
+    <div className="flex flex-wrap gap-2 overflow-hidden w-full h-full">
+      {normalizedPaths.map((p) => (
+        <ExpandableImage
+          key={p}
+          src={figureUrl(p)}
+          alt={`Result for QID ${qid}`}
+          className={`${className} max-w-full max-h-full`}
+        />
+      ))}
     </div>
   );
 }

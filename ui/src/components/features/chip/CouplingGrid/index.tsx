@@ -28,8 +28,8 @@ import { useTopologyConfig } from "@/hooks/useTopologyConfig";
 import {
   getQubitGridPosition,
   type TopologyLayoutParams,
-} from "@/utils/gridPosition";
-import { calculateGridDimension } from "@/utils/gridLayout";
+} from "@/lib/utils/grid-position";
+import { calculateGridDimension } from "@/lib/utils/grid-layout";
 
 interface CouplingGridProps {
   chipId: string;

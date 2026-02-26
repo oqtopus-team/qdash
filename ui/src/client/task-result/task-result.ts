@@ -23,6 +23,8 @@ import type {
 
 import type {
   BodyDownloadFiguresAsZip,
+  BodyReExecuteTaskResult,
+  ExecuteFlowResponse,
   GetCouplingTaskHistoryParams,
   GetHistoricalCouplingTaskResultsParams,
   GetHistoricalQubitTaskResultsParams,
@@ -54,6 +56,8 @@ task : str
     Name of the task to fetch results for
 ctx : ProjectContext
     Project context with user and project information
+service : TaskResultService
+    Injected task result service
 
 Returns
 -------
@@ -242,6 +246,8 @@ date : str
     Date in YYYYMMDD format (JST timezone)
 ctx : ProjectContext
     Project context with user and project information
+service : TaskResultService
+    Injected task result service
 
 Returns
 -------
@@ -431,6 +437,8 @@ task : str
     Name of the task to fetch history for
 ctx : ProjectContext
     Project context with user and project information
+service : TaskResultService
+    Injected task result service
 
 Returns
 -------
@@ -634,6 +642,8 @@ task : str
     Name of the task to fetch results for
 ctx : ProjectContext
     Project context with user and project information
+service : TaskResultService
+    Injected task result service
 
 Returns
 -------
@@ -826,6 +836,8 @@ date : str
     Date in YYYYMMDD format (JST timezone)
 ctx : ProjectContext
     Project context with user and project information
+service : TaskResultService
+    Injected task result service
 
 Returns
 -------
@@ -1019,6 +1031,8 @@ task : str
     Name of the task to fetch history for
 ctx : ProjectContext
     Project context with user and project information
+service : TaskResultService
+    Injected task result service
 
 Returns
 -------
@@ -1233,6 +1247,8 @@ end_at : str
     End time in ISO format for the time range
 ctx : ProjectContext
     Project context with user and project information
+service : TaskResultService
+    Injected task result service
 qid : str | None
     Optional qubit ID to filter results to a specific qubit
 
@@ -1399,6 +1415,119 @@ export function useGetTimeseriesTaskResults<
   return query;
 }
 
+/**
+ * Re-execute a single task using the system single-task-executor deployment.
+
+Looks up the TaskResultHistoryDocument to extract task_name, qid, chip_id,
+execution_id, and tags, then delegates to FlowService to create a Prefect
+flow run via the system deployment.
+
+Parameters
+----------
+task_id : str
+    The task result ID to re-execute
+ctx : ProjectContext
+    Project context with user and project information
+service : TaskResultService
+    Injected task result service
+flow_service : FlowService
+    Injected flow service
+
+Returns
+-------
+ExecuteFlowResponse
+    Execution result with IDs and URLs
+ * @summary Re-execute a single task from its task result
+ */
+export const reExecuteTaskResult = (
+  taskId: string,
+  bodyReExecuteTaskResult: BodyReExecuteTaskResult,
+  options?: SecondParameter<typeof customInstance>,
+  signal?: AbortSignal,
+) => {
+  return customInstance<ExecuteFlowResponse>(
+    {
+      url: `/task-results/${taskId}/re-execute`,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      data: bodyReExecuteTaskResult,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getReExecuteTaskResultMutationOptions = <
+  TError = HTTPValidationError,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof reExecuteTaskResult>>,
+    TError,
+    { taskId: string; data: BodyReExecuteTaskResult },
+    TContext
+  >;
+  request?: SecondParameter<typeof customInstance>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof reExecuteTaskResult>>,
+  TError,
+  { taskId: string; data: BodyReExecuteTaskResult },
+  TContext
+> => {
+  const mutationKey = ["reExecuteTaskResult"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof reExecuteTaskResult>>,
+    { taskId: string; data: BodyReExecuteTaskResult }
+  > = (props) => {
+    const { taskId, data } = props ?? {};
+
+    return reExecuteTaskResult(taskId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ReExecuteTaskResultMutationResult = NonNullable<
+  Awaited<ReturnType<typeof reExecuteTaskResult>>
+>;
+export type ReExecuteTaskResultMutationBody = BodyReExecuteTaskResult;
+export type ReExecuteTaskResultMutationError = HTTPValidationError;
+
+/**
+ * @summary Re-execute a single task from its task result
+ */
+export const useReExecuteTaskResult = <
+  TError = HTTPValidationError,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof reExecuteTaskResult>>,
+      TError,
+      { taskId: string; data: BodyReExecuteTaskResult },
+      TContext
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof reExecuteTaskResult>>,
+  TError,
+  { taskId: string; data: BodyReExecuteTaskResult },
+  TContext
+> => {
+  const mutationOptions = getReExecuteTaskResultMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
 /**
  * Download multiple calibration figures as a ZIP file.
 

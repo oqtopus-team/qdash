@@ -10,7 +10,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { MarkdownContent } from "@/components/ui/MarkdownContent";
 import { useIssues } from "@/hooks/useIssues";
 import { useProject } from "@/contexts/ProjectContext";
-import { formatRelativeTime } from "@/utils/datetime";
+import { formatRelativeTime } from "@/lib/utils/datetime";
 import type { IssueResponse } from "@/schemas";
 
 function getCurrentUsername(): string {

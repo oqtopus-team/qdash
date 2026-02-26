@@ -12,6 +12,7 @@ import {
   ExternalLink,
   LayoutGrid,
   List,
+  StopCircle,
   XCircle,
 } from "lucide-react";
 import Select, { type SingleValue, type StylesConfig } from "react-select";
@@ -20,13 +21,16 @@ import {
   formatDate,
   formatTime,
   formatDateTime as formatDateTimeUtil,
-} from "@/utils/datetime";
+} from "@/lib/utils/datetime";
 
-import ExecutionDAG from "./ExecutionDAG";
+import { ExecutionDAG } from "./ExecutionDAG";
 
-import type { ExecutionResponseDetail } from "@/schemas";
+import type { ExecutionResponseDetail, Task } from "@/schemas";
 
-import { useGetExecution } from "@/client/execution/execution";
+import {
+  useGetExecution,
+  useCancelExecution,
+} from "@/client/execution/execution";
 import { InteractiveFigureModal } from "@/components/charts/InteractiveFigureModal";
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { TaskGridView } from "@/components/features/chip/TaskGridView";
@@ -38,13 +42,13 @@ type FilterOption = {
 };
 
 interface ExecutionDetailClientProps {
-  chip_id: string;
-  execute_id: string;
+  chipId: string;
+  executionId: string;
 }
 
-export default function ExecutionDetailClient({
-  chip_id,
-  execute_id,
+export function ExecutionDetailClient({
+  chipId,
+  executionId,
 }: ExecutionDetailClientProps) {
   const [expandedFigure, setExpandedFigure] = useState<{
     path: string;
@@ -58,6 +62,7 @@ export default function ExecutionDetailClient({
   );
   const [filterQubitId, setFilterQubitId] = useState<string>("all");
   const [filterTaskName, setFilterTaskName] = useState<string>("all");
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
 
   const calculateDetailedDuration = (
     start: string | null | undefined,
@@ -86,7 +91,7 @@ export default function ExecutionDetailClient({
     data: executionDetailData,
     isLoading: isDetailLoading,
     isError: isDetailError,
-  } = useGetExecution(execute_id, {
+  } = useGetExecution(executionId, {
     query: {
       // Refresh every 5 seconds
       refetchInterval: 5000,
@@ -95,15 +100,44 @@ export default function ExecutionDetailClient({
     },
   });
 
+  const cancelMutation = useCancelExecution();
+
   const execution = executionDetailData?.data as
-    | ExecutionResponseDetail
+    | (ExecutionResponseDetail & {
+        tags?: string[];
+        chip_id?: string;
+        flow_name?: string;
+      })
     | undefined;
+
+  const flowRunId = execution?.note?.flow_run_id as string | undefined;
+
+  const isCancellable =
+    !!flowRunId &&
+    (execution?.status === "running" ||
+      execution?.status === "scheduled" ||
+      execution?.status === "pending");
+
+  const handleCancel = () => {
+    if (!flowRunId) return;
+    cancelMutation.mutate(
+      { flowRunId },
+      {
+        onSuccess: () => {
+          setShowCancelConfirm(false);
+        },
+        onError: () => {
+          setShowCancelConfirm(false);
+        },
+      },
+    );
+  };
 
   // Extract unique qubit IDs and task names for filtering
   const uniqueQubitIds = useMemo(() => {
     if (!execution?.task) return [];
     const qids = new Set<string>();
-    execution.task.forEach((task: any) => {
+    execution.task.forEach((task) => {
       if (task.qid) {
         qids.add(task.qid);
       }
@@ -114,7 +148,7 @@ export default function ExecutionDetailClient({
   const uniqueTaskNames = useMemo(() => {
     if (!execution?.task) return [];
     const names = new Set<string>();
-    execution.task.forEach((task: any) => {
+    execution.task.forEach((task) => {
       if (task.name) {
         names.add(task.name);
       }
@@ -164,7 +198,7 @@ export default function ExecutionDetailClient({
   // Filter tasks based on selected filters
   const filteredTasks = useMemo(() => {
     if (!execution?.task) return [];
-    return execution.task.filter((task: any) => {
+    return execution.task.filter((task) => {
       const matchesQubitId =
         filterQubitId === "all" || task.qid === filterQubitId;
       const matchesTaskName =
@@ -175,17 +209,19 @@ export default function ExecutionDetailClient({
 
   // Transform tasks for TaskGridView (adds taskId field)
   const tasksForGridView = useMemo(() => {
-    return filteredTasks.map((task: any) => ({
-      ...task,
-      taskId: task.task_id,
-    }));
+    return filteredTasks
+      .filter((task): task is Task & { task_id: string } => !!task.task_id)
+      .map((task) => ({
+        ...task,
+        taskId: task.task_id,
+      }));
   }, [filteredTasks]);
 
   // Auto-select first task when filters change
   useEffect(() => {
     if (!execution?.task) return;
 
-    const filtered = execution.task.filter((task: any) => {
+    const filtered = execution.task.filter((task) => {
       const matchesQubitId =
         filterQubitId === "all" || task.qid === filterQubitId;
       const matchesTaskName =
@@ -196,14 +232,12 @@ export default function ExecutionDetailClient({
     if (filtered.length > 0) {
       // Find the index of the first filtered task in the original task array
       const firstFilteredTaskIndex = execution.task.findIndex(
-        (task: any) => task === filtered[0],
+        (task) => task === filtered[0],
       );
       // Only update if the current selection is not in the filtered list
       const currentTaskInFilteredList =
         selectedTaskIndex !== null &&
-        filtered.some(
-          (task: any) => execution.task[selectedTaskIndex] === task,
-        );
+        filtered.some((task) => execution.task[selectedTaskIndex] === task);
 
       if (!currentTaskInFilteredList) {
         setSelectedTaskIndex(firstFilteredTaskIndex);
@@ -248,6 +282,8 @@ export default function ExecutionDetailClient({
         return <CheckCircle className="text-success" size={18} />;
       case "failed":
         return <XCircle className="text-error" size={18} />;
+      case "cancelled":
+        return <StopCircle className="text-neutral" size={18} />;
       case "running":
         return <Clock className="text-info" size={18} />;
       default:
@@ -261,6 +297,8 @@ export default function ExecutionDetailClient({
         return <span className="badge badge-success badge-sm">Completed</span>;
       case "failed":
         return <span className="badge badge-error badge-sm">Failed</span>;
+      case "cancelled":
+        return <span className="badge badge-neutral badge-sm">Cancelled</span>;
       case "running":
         return (
           <span className="badge badge-info badge-sm status-pulse">
@@ -307,15 +345,30 @@ export default function ExecutionDetailClient({
               {execution.name}
             </h1>
             <div className="flex flex-col sm:flex-row gap-2 sm:gap-4">
+              {isCancellable && (
+                <button
+                  onClick={() => setShowCancelConfirm(true)}
+                  disabled={cancelMutation.isPending}
+                  className="bg-error text-error-content px-4 py-2 rounded flex items-center justify-center hover:opacity-80 transition-colors text-sm sm:text-base disabled:opacity-50"
+                >
+                  <StopCircle className="mr-2" size={16} />
+                  {cancelMutation.isPending
+                    ? "Cancelling..."
+                    : "Cancel Execution"}
+                </button>
+              )}
               <a
-                href={`/execution/${execute_id}/experiment`}
+                href={`/execution/${executionId}/experiment`}
                 className="bg-neutral text-neutral-content px-4 py-2 rounded flex items-center justify-center hover:opacity-80 transition-colors text-sm sm:text-base"
               >
                 <ExternalLink className="mr-2" size={16} />
                 Go to Experiment
               </a>
               <a
-                href={(execution.note as { [key: string]: any })?.ui_url || "#"}
+                href={
+                  ((execution.note as { [key: string]: unknown })
+                    ?.ui_url as string) || "#"
+                }
                 className="bg-accent text-accent-content px-4 py-2 rounded flex items-center justify-center hover:opacity-80 transition-colors text-sm sm:text-base"
               >
                 <ExternalLink className="mr-2" size={16} />
@@ -384,7 +437,7 @@ export default function ExecutionDetailClient({
                           const url = URL.createObjectURL(blob);
                           const link = document.createElement("a");
                           link.href = url;
-                          link.download = `execution_note_${chip_id}_${execute_id}.json`;
+                          link.download = `execution_note_${chipId}_${executionId}.json`;
                           document.body.appendChild(link);
                           link.click();
                           document.body.removeChild(link);
@@ -521,67 +574,75 @@ export default function ExecutionDetailClient({
                           No tasks match the selected filters
                         </div>
                       ) : (
-                        filteredTasks.map(
-                          (task: any, filteredIndex: number) => {
-                            // Find the original index in execution.task
-                            const originalIndex = execution.task.findIndex(
-                              (t: any) => t === task,
-                            );
-                            return (
-                              <div
-                                key={originalIndex}
-                                className={`cursor-pointer transition-all rounded-lg border-2 ${
-                                  selectedTaskIndex === originalIndex
-                                    ? "border-primary bg-primary/10"
-                                    : "border-base-300 hover:border-base-400 hover:bg-base-200"
-                                }`}
-                                onClick={() =>
-                                  setSelectedTaskIndex(originalIndex)
-                                }
-                              >
-                                <div className="p-3">
-                                  {/* Timeline connector */}
-                                  <div className="flex items-start gap-3">
-                                    <div className="flex flex-col items-center">
-                                      <div className="text-xl">
-                                        {getStatusIcon(task.status)}
-                                      </div>
-                                      {filteredIndex <
-                                        filteredTasks.length - 1 && (
-                                        <div className="w-0.5 h-8 bg-base-300 my-1"></div>
-                                      )}
+                        filteredTasks.map((task, filteredIndex: number) => {
+                          // Find the original index in execution.task
+                          const originalIndex = execution.task.findIndex(
+                            (t) => t === task,
+                          );
+                          return (
+                            <div
+                              key={originalIndex}
+                              className={`cursor-pointer transition-all rounded-lg border-2 ${
+                                selectedTaskIndex === originalIndex
+                                  ? "border-primary bg-primary/10"
+                                  : "border-base-300 hover:border-base-400 hover:bg-base-200"
+                              }`}
+                              onClick={() =>
+                                setSelectedTaskIndex(originalIndex)
+                              }
+                            >
+                              <div className="p-3">
+                                {/* Timeline connector */}
+                                <div className="flex items-start gap-3">
+                                  <div className="flex flex-col items-center">
+                                    <div className="text-xl">
+                                      {getStatusIcon(task.status)}
                                     </div>
+                                    {filteredIndex <
+                                      filteredTasks.length - 1 && (
+                                      <div className="w-0.5 h-8 bg-base-300 my-1"></div>
+                                    )}
+                                  </div>
 
-                                    <div className="flex-1 min-w-0">
-                                      <div className="flex items-center justify-between mb-1">
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center justify-between mb-1">
+                                      {task.task_id ? (
+                                        <Link
+                                          href={`/task-results/${task.task_id}`}
+                                          className="text-sm font-semibold truncate text-primary hover:underline"
+                                          onClick={(e) => e.stopPropagation()}
+                                        >
+                                          {task.name}
+                                        </Link>
+                                      ) : (
                                         <div className="text-sm font-semibold truncate">
                                           {task.name}
                                         </div>
-                                        {getStatusBadge(task.status)}
-                                      </div>
-
-                                      <div className="text-sm">
-                                        {formatDateTime(task.start_at)}
-                                      </div>
-
-                                      {task.elapsed_time && (
-                                        <div className="text-xs text-base-content/60 mt-1">
-                                          Duration: {task.elapsed_time}
-                                        </div>
                                       )}
-
-                                      {task.qid && (
-                                        <div className="text-xs text-base-content/70 mt-1 truncate">
-                                          Qubit: {task.qid}
-                                        </div>
-                                      )}
+                                      {getStatusBadge(task.status)}
                                     </div>
+
+                                    <div className="text-sm">
+                                      {formatDateTime(task.start_at)}
+                                    </div>
+
+                                    {task.elapsed_time && (
+                                      <div className="text-xs text-base-content/60 mt-1">
+                                        Duration: {task.elapsed_time}
+                                      </div>
+                                    )}
+
+                                    {task.qid && (
+                                      <div className="text-xs text-base-content/70 mt-1 truncate">
+                                        Qubit: {task.qid}
+                                      </div>
+                                    )}
                                   </div>
                                 </div>
                               </div>
-                            );
-                          },
-                        )
+                            </div>
+                          );
+                        })
                       )}
                     </div>
                   </div>
@@ -796,13 +857,17 @@ export default function ExecutionDetailClient({
                               <tbody>
                                 {Object.entries(
                                   selectedTask.output_parameters,
-                                ).map(([key, value]: [string, any]) => {
-                                  const paramValue =
+                                ).map(([key, value]: [string, unknown]) => {
+                                  const paramValue = (
                                     typeof value === "object" &&
                                     value !== null &&
                                     "value" in value
                                       ? value
-                                      : { value };
+                                      : { value }
+                                  ) as {
+                                    value: number | string;
+                                    unit?: string;
+                                  };
                                   return (
                                     <tr key={key}>
                                       <td className="font-medium">{key}</td>
@@ -839,13 +904,17 @@ export default function ExecutionDetailClient({
                               <tbody>
                                 {Object.entries(
                                   selectedTask.input_parameters,
-                                ).map(([key, value]: [string, any]) => {
-                                  const paramValue =
+                                ).map(([key, value]: [string, unknown]) => {
+                                  const paramValue = (
                                     typeof value === "object" &&
                                     value !== null &&
                                     "value" in value
                                       ? value
-                                      : { value };
+                                      : { value }
+                                  ) as {
+                                    value: number | string | object;
+                                    unit?: string;
+                                  };
                                   return (
                                     <tr key={key}>
                                       <td className="font-medium">{key}</td>
@@ -894,13 +963,74 @@ export default function ExecutionDetailClient({
             <div className="mt-4">
               <TaskGridView
                 tasks={tasksForGridView}
-                qubitId={chip_id}
+                qubitId={chipId}
                 emptyMessage="No tasks found"
               />
             </div>
           )}
         </div>
       </div>
+
+      {/* Cancel Confirmation Modal */}
+      {showCancelConfirm && (
+        <div className="modal modal-open">
+          <div className="modal-box">
+            <h3 className="font-bold text-lg">Cancel Execution</h3>
+            <p className="py-4">
+              Are you sure you want to cancel this execution? This action cannot
+              be undone.
+            </p>
+            {cancelMutation.isError && (
+              <div className="alert alert-error mb-4">
+                <XCircle size={16} />
+                <span>
+                  {(
+                    cancelMutation.error as {
+                      response?: { data?: { detail?: string } };
+                    }
+                  )?.response?.data?.detail || "Failed to cancel execution"}
+                </span>
+              </div>
+            )}
+            <div className="modal-action">
+              <button
+                className="btn btn-ghost"
+                onClick={() => setShowCancelConfirm(false)}
+                disabled={cancelMutation.isPending}
+              >
+                Close
+              </button>
+              <button
+                className="btn btn-error"
+                onClick={handleCancel}
+                disabled={cancelMutation.isPending}
+              >
+                {cancelMutation.isPending ? (
+                  <span className="loading loading-spinner loading-sm" />
+                ) : (
+                  "Cancel Execution"
+                )}
+              </button>
+            </div>
+          </div>
+          <div
+            className="modal-backdrop"
+            onClick={() =>
+              !cancelMutation.isPending && setShowCancelConfirm(false)
+            }
+          />
+        </div>
+      )}
+
+      {/* Cancel success alert */}
+      {cancelMutation.isSuccess && (
+        <div className="toast toast-end">
+          <div className="alert alert-success">
+            <CheckCircle size={16} />
+            <span>Cancellation requested successfully</span>
+          </div>
+        </div>
+      )}
 
       {/* Figure Expansion Modal - Interactive View Only */}
       <InteractiveFigureModal

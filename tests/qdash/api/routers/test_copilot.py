@@ -3,43 +3,49 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import TYPE_CHECKING
 from unittest.mock import MagicMock, patch
 
+from qdash.api.lib.ai_labels import TOOL_LABELS
 from qdash.api.lib.copilot_agent import AGENT_TOOLS
-from qdash.api.routers.copilot import (
-    TOOL_LABELS,
-    _build_tool_executors,
-    _load_provenance_lineage_graph,
-)
+from qdash.api.services.copilot_data_service import CopilotDataService
+
+if TYPE_CHECKING:
+    from qdash.api.schemas.provenance import LineageResponse
 
 
 class TestProvenanceLineageGraphValidation:
     """Tests for entity_id format validation and max_depth bounds."""
 
+    def setup_method(self):
+        self.service = CopilotDataService()
+
     def test_empty_entity_id_returns_error(self):
-        result = _load_provenance_lineage_graph("", "chip-1")
+        result = self.service.load_provenance_lineage_graph("", "chip-1")
         assert "error" in result
         assert "Invalid entity_id format" in result["error"]
 
     def test_entity_id_too_few_colons_returns_error(self):
-        result = _load_provenance_lineage_graph("param:qid", "chip-1")
+        result = self.service.load_provenance_lineage_graph("param:qid", "chip-1")
         assert "error" in result
         assert "Invalid entity_id format" in result["error"]
 
     def test_entity_id_too_many_colons_returns_error(self):
-        result = _load_provenance_lineage_graph("a:b:c:d:e", "chip-1")
+        result = self.service.load_provenance_lineage_graph("a:b:c:d:e", "chip-1")
         assert "error" in result
         assert "Invalid entity_id format" in result["error"]
 
-    @patch("qdash.api.routers.copilot._resolve_project_id", return_value=None)
+    @patch.object(CopilotDataService, "_resolve_project_id", return_value=None)
     def test_missing_chip_returns_descriptive_error(self, _mock_resolve):
-        result = _load_provenance_lineage_graph("param:0:exec-1:task-1", "nonexistent-chip")
+        result = self.service.load_provenance_lineage_graph(
+            "param:0:exec-1:task-1", "nonexistent-chip"
+        )
         assert "error" in result
         assert "nonexistent-chip" in result["error"]
         assert "may not exist" in result["error"]
 
-    @patch("qdash.api.routers.copilot._resolve_project_id", return_value="proj-1")
-    @patch("qdash.api.routers.copilot._get_provenance_service")
+    @patch.object(CopilotDataService, "_resolve_project_id", return_value="proj-1")
+    @patch.object(CopilotDataService, "_get_provenance_service")
     def test_max_depth_clamped_to_upper_bound(
         self, mock_get_service: MagicMock, _mock_resolve: MagicMock
     ):
@@ -49,13 +55,13 @@ class TestProvenanceLineageGraphValidation:
         mock_service.get_lineage.return_value = mock_lineage
         mock_get_service.return_value = mock_service
 
-        _load_provenance_lineage_graph("param:0:exec-1:task-1", "chip-1", max_depth=99)
+        self.service.load_provenance_lineage_graph("param:0:exec-1:task-1", "chip-1", max_depth=99)
 
         _, kwargs = mock_service.get_lineage.call_args
         assert kwargs["max_depth"] == 20
 
-    @patch("qdash.api.routers.copilot._resolve_project_id", return_value="proj-1")
-    @patch("qdash.api.routers.copilot._get_provenance_service")
+    @patch.object(CopilotDataService, "_resolve_project_id", return_value="proj-1")
+    @patch.object(CopilotDataService, "_get_provenance_service")
     def test_max_depth_clamped_to_lower_bound(
         self, mock_get_service: MagicMock, _mock_resolve: MagicMock
     ):
@@ -65,7 +71,7 @@ class TestProvenanceLineageGraphValidation:
         mock_service.get_lineage.return_value = mock_lineage
         mock_get_service.return_value = mock_service
 
-        _load_provenance_lineage_graph("param:0:exec-1:task-1", "chip-1", max_depth=-5)
+        self.service.load_provenance_lineage_graph("param:0:exec-1:task-1", "chip-1", max_depth=-5)
 
         _, kwargs = mock_service.get_lineage.call_args
         assert kwargs["max_depth"] == 1
@@ -74,8 +80,11 @@ class TestProvenanceLineageGraphValidation:
 class TestProvenanceLineageGraphOutput:
     """Tests for the LLM-friendly output structure."""
 
-    @patch("qdash.api.routers.copilot._resolve_project_id", return_value="proj-1")
-    @patch("qdash.api.routers.copilot._get_provenance_service")
+    def setup_method(self):
+        self.service = CopilotDataService()
+
+    @patch.object(CopilotDataService, "_resolve_project_id", return_value="proj-1")
+    @patch.object(CopilotDataService, "_get_provenance_service")
     def test_successful_lineage_returns_expected_structure(
         self, mock_get_service: MagicMock, _mock_resolve: MagicMock
     ):
@@ -84,7 +93,7 @@ class TestProvenanceLineageGraphOutput:
         mock_service.get_lineage.return_value = mock_lineage
         mock_get_service.return_value = mock_service
 
-        result = _load_provenance_lineage_graph("qf:0:exec-1:task-1", "chip-1")
+        result = self.service.load_provenance_lineage_graph("qf:0:exec-1:task-1", "chip-1")
 
         assert "error" not in result
         assert result["origin"] == "qf:0:exec-1:task-1"
@@ -94,8 +103,8 @@ class TestProvenanceLineageGraphOutput:
         assert result["num_edges"] == len(result["edges"])
         assert "max_depth" in result
 
-    @patch("qdash.api.routers.copilot._resolve_project_id", return_value="proj-1")
-    @patch("qdash.api.routers.copilot._get_provenance_service")
+    @patch.object(CopilotDataService, "_resolve_project_id", return_value="proj-1")
+    @patch.object(CopilotDataService, "_get_provenance_service")
     def test_entity_node_has_parameter_fields(
         self, mock_get_service: MagicMock, _mock_resolve: MagicMock
     ):
@@ -104,7 +113,7 @@ class TestProvenanceLineageGraphOutput:
         mock_service.get_lineage.return_value = mock_lineage
         mock_get_service.return_value = mock_service
 
-        result = _load_provenance_lineage_graph("qf:0:exec-1:task-1", "chip-1")
+        result = self.service.load_provenance_lineage_graph("qf:0:exec-1:task-1", "chip-1")
 
         entity_nodes = [n for n in result["nodes"] if n["node_type"] == "entity"]
         assert len(entity_nodes) >= 1
@@ -115,8 +124,8 @@ class TestProvenanceLineageGraphOutput:
         assert "version" in node
         assert "task_name" in node
 
-    @patch("qdash.api.routers.copilot._resolve_project_id", return_value="proj-1")
-    @patch("qdash.api.routers.copilot._get_provenance_service")
+    @patch.object(CopilotDataService, "_resolve_project_id", return_value="proj-1")
+    @patch.object(CopilotDataService, "_get_provenance_service")
     def test_activity_node_has_task_fields(
         self, mock_get_service: MagicMock, _mock_resolve: MagicMock
     ):
@@ -125,7 +134,7 @@ class TestProvenanceLineageGraphOutput:
         mock_service.get_lineage.return_value = mock_lineage
         mock_get_service.return_value = mock_service
 
-        result = _load_provenance_lineage_graph("qf:0:exec-1:task-1", "chip-1")
+        result = self.service.load_provenance_lineage_graph("qf:0:exec-1:task-1", "chip-1")
 
         activity_nodes = [n for n in result["nodes"] if n["node_type"] == "activity"]
         assert len(activity_nodes) >= 1
@@ -134,8 +143,8 @@ class TestProvenanceLineageGraphOutput:
         assert "execution_id" in node
         assert "status" in node
 
-    @patch("qdash.api.routers.copilot._resolve_project_id", return_value="proj-1")
-    @patch("qdash.api.routers.copilot._get_provenance_service")
+    @patch.object(CopilotDataService, "_resolve_project_id", return_value="proj-1")
+    @patch.object(CopilotDataService, "_get_provenance_service")
     def test_latest_version_included_when_present(
         self, mock_get_service: MagicMock, _mock_resolve: MagicMock
     ):
@@ -146,7 +155,7 @@ class TestProvenanceLineageGraphOutput:
         mock_service.get_lineage.return_value = mock_lineage
         mock_get_service.return_value = mock_service
 
-        result = _load_provenance_lineage_graph("qf:0:exec-1:task-1", "chip-1")
+        result = self.service.load_provenance_lineage_graph("qf:0:exec-1:task-1", "chip-1")
 
         nodes_with_latest = [n for n in result["nodes"] if "latest_version" in n]
         assert len(nodes_with_latest) >= 1
@@ -170,14 +179,15 @@ class TestToolRegistration:
         assert "get_provenance_lineage_graph" in TOOL_LABELS
 
     def test_tool_in_executors(self):
-        executors = _build_tool_executors()
+        service = CopilotDataService()
+        executors = service.build_tool_executors()
         assert "get_provenance_lineage_graph" in executors
 
 
 # --------------- helpers ---------------
 
 
-def _make_empty_lineage(origin_id: str) -> MagicMock:
+def _make_empty_lineage(origin_id: str) -> LineageResponse:
     """Create a minimal LineageResponse mock with no nodes/edges."""
     from qdash.api.schemas.provenance import LineageNodeResponse, LineageResponse
 
@@ -185,7 +195,7 @@ def _make_empty_lineage(origin_id: str) -> MagicMock:
     return LineageResponse(origin=origin, nodes=[], edges=[], max_depth=5)
 
 
-def _make_lineage_with_entity_and_activity() -> MagicMock:
+def _make_lineage_with_entity_and_activity() -> LineageResponse:
     """Create a LineageResponse with one entity node and one activity node."""
     from qdash.api.schemas.provenance import (
         ActivityResponse,

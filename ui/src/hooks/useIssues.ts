@@ -12,7 +12,7 @@ import {
   useReopenIssue,
   getGetIssueQueryKey,
 } from "@/client/issue/issue";
-export type StatusFilter = "open" | "closed" | "all";
+type StatusFilter = "open" | "closed" | "all";
 
 const PAGE_SIZE = 50;
 

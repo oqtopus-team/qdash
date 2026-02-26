@@ -15,7 +15,7 @@ import {
 import { useGetQubitMetricHistory } from "@/client/metrics/metrics";
 import { useGetExecution } from "@/client/execution/execution";
 import { TaskFigure } from "@/components/charts/TaskFigure";
-import { formatDateTime, formatDateTimeCompact } from "@/utils/datetime";
+import { formatDateTime, formatDateTimeCompact } from "@/lib/utils/datetime";
 
 import { ParametersTable } from "./ParametersTable";
 import { TaskResultIssues } from "./TaskResultIssues";
@@ -478,7 +478,12 @@ export function QubitMetricHistoryModal({
           {selectedTask.task_id && (
             <div className="flex items-center gap-2">
               <span className="font-semibold">Task ID:</span>
-              <span className="font-mono truncate">{selectedTask.task_id}</span>
+              <a
+                href={`/task-results/${selectedTask.task_id}`}
+                className="font-mono truncate link link-primary"
+              >
+                {selectedTask.task_id}
+              </a>
             </div>
           )}
           {selectedTask.start_at != null && (

@@ -5,8 +5,8 @@ import { useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { NuqsAdapter } from "nuqs/adapters/next/app";
 
-import AxiosProvider from "./providers/AxiosProvider";
-import { ThemeProvider } from "./providers/theme-provider";
+import { AxiosProvider } from "@/contexts/AxiosContext";
+import { ThemeProvider } from "@/contexts/ThemeContext";
 
 import { ToastProvider, ToastContainer } from "@/components/ui/Toast";
 import { AuthProvider } from "@/contexts/AuthContext";

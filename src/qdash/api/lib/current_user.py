@@ -4,9 +4,7 @@ from typing import cast
 from fastapi import Depends
 from qdash.api.lib.auth import get_user, username_header
 
-# Logger configuration
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
 
 
 def get_current_user_id(username: str | None = Depends(username_header)) -> str:

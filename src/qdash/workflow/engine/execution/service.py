@@ -74,15 +74,6 @@ class ExecutionService:
         state_manager: ExecutionStateManager,
         repository: ExecutionRepository | None = None,
     ):
-        """Initialize ExecutionService.
-
-        Parameters
-        ----------
-        state_manager : ExecutionStateManager
-            Manager for execution state
-        repository : ExecutionRepository | None
-            Repository for persistence (defaults to MongoExecutionRepository)
-        """
         self.state_manager = state_manager
         self.repository = repository or MongoExecutionRepository()
 
@@ -171,68 +162,33 @@ class ExecutionService:
         return cls(state_manager=state_manager, repository=repo)
 
     def save(self) -> "ExecutionService":
-        """Save current state to repository.
-
-        Returns
-        -------
-        ExecutionService
-            Self for method chaining
-        """
+        """Save current state to repository."""
         model = self.state_manager.to_datamodel()
         self.repository.save(model)
         return self
 
     def start(self) -> "ExecutionService":
-        """Start the execution and persist.
-
-        Returns
-        -------
-        ExecutionService
-            Self for method chaining
-        """
+        """Start the execution and persist."""
         self.state_manager.start()
         return self.save()
 
     def complete(self) -> "ExecutionService":
-        """Complete the execution and persist.
-
-        Returns
-        -------
-        ExecutionService
-            Self for method chaining
-        """
+        """Complete the execution and persist."""
         self.state_manager.complete()
         return self.save()
 
     def fail(self) -> "ExecutionService":
-        """Fail the execution and persist.
-
-        Returns
-        -------
-        ExecutionService
-            Self for method chaining
-        """
+        """Fail the execution and persist."""
         self.state_manager.fail()
         return self.save()
 
+    def cancel(self) -> "ExecutionService":
+        """Cancel the execution and persist."""
+        self.state_manager.cancel()
+        return self.save()
+
     def reload(self) -> "ExecutionService":
-        """Reload state from repository.
-
-        Note: calib_data is preserved from the current in-memory state since
-        it is no longer persisted to the database. This ensures workflow
-        tasks can continue to access calibration data accumulated during
-        the current execution.
-
-        Returns
-        -------
-        ExecutionService
-            Self for method chaining
-
-        Raises
-        ------
-        ValueError
-            If execution not found in repository
-        """
+        """Reload state from repository, preserving in-memory calib_data."""
         # Preserve in-memory calib_data before reload
         current_calib_data = self.state_manager.calib_data
 
@@ -246,45 +202,13 @@ class ExecutionService:
         return self
 
     def merge_calib_data(self, calib_data: CalibDataModel) -> "ExecutionService":
-        """Merge calibration data into in-memory state.
-
-        Note: calib_data is no longer persisted to the database to reduce
-        document size. It is only maintained in-memory during workflow
-        execution. Persistent calibration data is stored in qubit/coupling
-        collections.
-
-        Parameters
-        ----------
-        calib_data : CalibDataModel
-            Calibration data to merge
-
-        Returns
-        -------
-        ExecutionService
-            Self for method chaining
-        """
+        """Merge calibration data into in-memory state (not persisted to DB)."""
         # Only update in-memory state, not persisted to DB
         self.state_manager.merge_calib_data(calib_data)
         return self
 
     def update_note(self, key: str, value: Any) -> "ExecutionService":
-        """Update a note entry and persist.
-
-        For known fields (stage_results, github_push_results, config_commit_id),
-        use the appropriate setter. For other keys, they are stored in 'extra'.
-
-        Parameters
-        ----------
-        key : str
-            Note key
-        value : Any
-            Note value
-
-        Returns
-        -------
-        ExecutionService
-            Self for method chaining
-        """
+        """Update a note entry and persist."""
 
         def update_func(model: ExecutionModel) -> None:
             model.note[key] = value
@@ -295,13 +219,7 @@ class ExecutionService:
         return self
 
     def _update_with_lock(self, update_func: Callable[[ExecutionModel], None]) -> None:
-        """Update with optimistic locking via repository.
-
-        Parameters
-        ----------
-        update_func : callable
-            Function to apply to the model
-        """
+        """Update with optimistic locking via repository."""
         initial_model = self.state_manager.to_datamodel()
         self.repository.update_with_optimistic_lock(
             execution_id=self.state_manager.execution_id,
@@ -355,13 +273,7 @@ class ExecutionService:
             self.state_manager.note = value
 
     def to_datamodel(self) -> ExecutionModel:
-        """Convert to ExecutionModel.
-
-        Returns
-        -------
-        ExecutionModel
-            The execution model
-        """
+        """Convert to ExecutionModel."""
         return self.state_manager.to_datamodel()
 
     # === Additional properties for ExecutionManager compatibility ===
@@ -405,87 +317,3 @@ class ExecutionService:
     def message(self) -> str:
         """Get message."""
         return str(self.state_manager.message)
-
-    # === Methods for ExecutionManager compatibility ===
-
-    def update_with_calib_data(
-        self,
-        calib_data: CalibDataModel,
-    ) -> "ExecutionService":
-        """Update execution with calibration data.
-
-        This is a replacement for ExecutionManager.update_with_task_manager().
-
-        Note: calib_data is only updated in-memory and stored in qubit/coupling
-        collections. Task results are persisted separately to task_result_history
-        collection by TaskResultHistoryRepository.
-
-        Parameters
-        ----------
-        calib_data : CalibDataModel
-            Calibration data to merge
-
-        Returns
-        -------
-        ExecutionService
-            Self for method chaining
-        """
-        self.state_manager.merge_calib_data(calib_data)
-        return self
-
-    def start_execution(self) -> "ExecutionService":
-        """Start the execution (alias for start()).
-
-        Returns
-        -------
-        ExecutionService
-            Self for method chaining
-        """
-        return self.start()
-
-    def complete_execution(self) -> "ExecutionService":
-        """Complete the execution (alias for complete()).
-
-        Returns
-        -------
-        ExecutionService
-            Self for method chaining
-        """
-        return self.complete()
-
-    def fail_execution(self) -> "ExecutionService":
-        """Fail the execution (alias for fail()).
-
-        Returns
-        -------
-        ExecutionService
-            Self for method chaining
-        """
-        return self.fail()
-
-    def save_with_tags(self) -> "ExecutionService":
-        """Save current state to repository and auto-register tags.
-
-        Note: Tags are automatically registered by the repository's save() method,
-        so this method is now equivalent to save(). Kept for backward compatibility.
-
-        Returns
-        -------
-        ExecutionService
-            Self for method chaining
-        """
-        # Tags are auto-registered in MongoExecutionRepository.save()
-        return self.save()
-
-    def ensure_saved(self) -> "ExecutionService":
-        """Ensure execution exists in database (upsert if not found).
-
-        Returns
-        -------
-        ExecutionService
-            Self for method chaining
-        """
-        model = self.repository.find_by_id(self.state_manager.execution_id)
-        if model is None:
-            self.save()
-        return self

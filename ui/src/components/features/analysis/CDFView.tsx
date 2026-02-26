@@ -2,6 +2,7 @@
 
 import { useMemo, useEffect, useCallback } from "react";
 
+import type { PlotData } from "plotly.js";
 import Select from "react-select";
 
 import { useListChips } from "@/client/chip/chip";
@@ -207,7 +208,17 @@ export function CDFView() {
       return {};
     }
 
-    const results: Record<string, any> = {};
+    const results: Record<
+      string,
+      {
+        plotData: Partial<PlotData>[];
+        tableData: CumulativeDataPoint[];
+        median: number | null;
+        mean: number | null;
+        percentile10: number | null;
+        percentile90: number | null;
+      }
+    > = {};
 
     selectedParameters.forEach((paramKey) => {
       const config = selectedMetricConfigs[paramKey];
@@ -226,8 +237,8 @@ export function CDFView() {
       const allValues: { value: number; qid: string }[] = [];
 
       Object.entries(rawData).forEach(
-        ([entityId, metricValue]: [string, any]) => {
-          const value = metricValue?.value;
+        ([entityId, metricValue]: [string, unknown]) => {
+          const value = (metricValue as Record<string, unknown>)?.value;
           if (
             value === null ||
             value === undefined ||
@@ -419,7 +430,7 @@ export function CDFView() {
     if (selectedParameters.length === 0) return [];
 
     // Collect all entity IDs from all parameters
-    const entityMap = new Map<string, Record<string, number | null>>();
+    const entityMap = new Map<string, Record<string, string | number | null>>();
 
     selectedParameters.forEach((param) => {
       const data = processedDataByParameter[param];
@@ -427,7 +438,7 @@ export function CDFView() {
 
       data.tableData.forEach((item: CumulativeDataPoint) => {
         if (!entityMap.has(item.qid)) {
-          entityMap.set(item.qid, { qid: item.qid } as any);
+          entityMap.set(item.qid, { qid: item.qid });
         }
         const row = entityMap.get(item.qid)!;
         row[param] = item.value;
@@ -464,7 +475,7 @@ export function CDFView() {
         const data = processedDataByParameter[param];
         if (!data || !data.plotData || data.plotData.length === 0) return [];
 
-        return data.plotData.map((trace: any, idx: number) => {
+        return data.plotData.map((trace, idx) => {
           const config = selectedMetricConfigs[param];
           if (idx === 0) {
             return {
@@ -483,7 +494,7 @@ export function CDFView() {
               line: {
                 ...trace.line,
                 color: colors[param] || "#6b7280",
-                dash: "dash",
+                dash: "dash" as const,
               },
               name: `${config?.title || param} median: ${data.median?.toFixed(2)}${unit}`,
               showlegend: true,
@@ -497,7 +508,7 @@ export function CDFView() {
 
     // Single parameter - add color
     if (primaryData.plotData.length > 0) {
-      return primaryData.plotData.map((trace: any, idx: number) => {
+      return primaryData.plotData.map((trace, idx) => {
         if (idx === 0) {
           return {
             ...trace,
@@ -854,7 +865,13 @@ export function CDFView() {
               {selectedParameters.map((param) => {
                 const data = processedDataByParameter[param];
                 const config = selectedMetricConfigs[param];
-                if (!data || data.median === null || !config) return null;
+                if (
+                  !data ||
+                  data.median === null ||
+                  data.mean === null ||
+                  !config
+                )
+                  return null;
 
                 const colors: Record<string, string> = {
                   t1: "text-blue-600",

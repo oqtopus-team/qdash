@@ -71,12 +71,14 @@ def execute_dynamic_task_by_qid_service(
 
     try:
         # Execute via TaskContext's executor
-        execution_service, result = task_context.executor.execute(
+        es, result = task_context.executor.execute(
             task=task_instance,
             backend=backend,
             execution_service=execution_service,
             qid=qid,
         )
+        assert es is not None  # guaranteed when execution_service is provided
+        execution_service = es
 
         # Save session state
         task_context.save()
@@ -105,12 +107,14 @@ def execute_dynamic_task_batch_service(
     try:
         # Execute task for each qid
         for qid in qids:
-            execution_service, result = task_context.executor.execute(
+            es, result = task_context.executor.execute(
                 task=task_instance,
                 backend=backend,
                 execution_service=execution_service,
                 qid=qid,
             )
+            assert es is not None  # guaranteed when execution_service is provided
+            execution_service = es
 
         # Save session state
         task_context.save()

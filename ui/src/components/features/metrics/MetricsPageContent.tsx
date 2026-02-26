@@ -22,7 +22,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { MetricsPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
 import { useMetricsConfig } from "@/hooks/useMetricsConfig";
 import { useMetricsUrlState } from "@/hooks/useUrlState";
-import { getDaisySelectStyles } from "@/lib/reactSelectTheme";
+import { getDaisySelectStyles } from "@/lib/react-select-theme";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PageFiltersBar } from "@/components/ui/PageFiltersBar";
@@ -87,7 +87,7 @@ export function MetricsPageContent() {
       });
       setSelectedChip(sortedChips[0].chip_id);
     }
-  }, [selectedChip, chipsData]);
+  }, [selectedChip, chipsData, setSelectedChip]);
 
   // Calculate grid size from chip data
   useEffect(() => {
@@ -151,7 +151,7 @@ export function MetricsPageContent() {
     if (!isBestModeSupported && selectionMode === "best") {
       setSelectionMode("latest");
     }
-  }, [isBestModeSupported, selectionMode]);
+  }, [isBestModeSupported, selectionMode, setSelectionMode]);
 
   const metricOptions: MetricOption[] = useMemo(
     () =>
@@ -203,7 +203,7 @@ export function MetricsPageContent() {
         stddev?: number | null;
       };
     } = {};
-    Object.entries(rawData).forEach(([key, metricValue]: [string, any]) => {
+    Object.entries(rawData).forEach(([key, metricValue]) => {
       // Use simple numeric format for qubit metrics (e.g., "0", "1"), keep "0-1" format for coupling
       const formattedKey =
         metricType === "qubit"
@@ -252,7 +252,7 @@ export function MetricsPageContent() {
       if (!rawData) return;
 
       const scaledData: { [key: string]: { value: number | null } } = {};
-      Object.entries(rawData).forEach(([key, metricValue]: [string, any]) => {
+      Object.entries(rawData).forEach(([key, metricValue]) => {
         const formattedKey =
           metricType === "qubit"
             ? key.startsWith("Q")

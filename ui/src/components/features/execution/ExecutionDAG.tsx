@@ -20,7 +20,7 @@ import JsonView from "react18-json-view";
 import type { Node, Edge, NodeProps, NodeTypes } from "@xyflow/react";
 
 import { TaskFigure } from "@/components/charts/TaskFigure";
-import { formatDateTime } from "@/utils/datetime";
+import { formatDateTime } from "@/lib/utils/datetime";
 import "@xyflow/react/dist/style.css";
 
 interface TaskNode {
@@ -60,6 +60,12 @@ const getStatusStyles = (status: string) => {
         background: "hsl(0 91% 71% / 0.1)",
         borderColor: "hsl(0 91% 71%)",
         color: "hsl(0 91% 71%)",
+      };
+    case "cancelled":
+      return {
+        background: "hsl(220 9% 46% / 0.1)",
+        borderColor: "hsl(220 9% 46%)",
+        color: "hsl(220 9% 46%)",
       };
     default:
       return {
@@ -258,7 +264,7 @@ function FlowContent({
   );
 }
 
-export default function ExecutionDAG({ tasks }: ExecutionDAGProps) {
+export function ExecutionDAG({ tasks }: ExecutionDAGProps) {
   const [selectedTask, setSelectedTask] = useState<TaskDetails | null>(null);
   const [isMaximized, setIsMaximized] = useState(false);
   const getLayoutedElements = useCallback(() => {
@@ -419,7 +425,9 @@ export default function ExecutionDAG({ tasks }: ExecutionDAGProps) {
                       ? "text-success"
                       : selectedTask.status === "scheduled"
                         ? "text-warning"
-                        : "text-error"
+                        : selectedTask.status === "cancelled"
+                          ? "text-neutral"
+                          : "text-error"
                 }`}
               >
                 {selectedTask.status}

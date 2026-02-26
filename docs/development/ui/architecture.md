@@ -1,59 +1,8 @@
-# UI Architecture Overview
-
-This document describes the architecture of the QDash frontend application, including its component structure, data flow patterns, and key design decisions.
-
-## Table of Contents
-
-1. [Architecture Overview](#architecture-overview)
-2. [Next.js App Router](#nextjs-app-router)
-3. [Component Architecture](#component-architecture)
-4. [Data Flow](#data-flow)
-5. [Authentication](#authentication)
-6. [API Client Generation](#api-client-generation)
-7. [State Management Patterns](#state-management-patterns)
-8. [Key Components](#key-components)
-
----
+# UI Architecture
 
 ## Architecture Overview
 
-```mermaid
-flowchart TB
-    subgraph Browser["Browser"]
-        subgraph NextJS["Next.js Application"]
-            subgraph Pages["App Router (Pages)"]
-                P1["/metrics"]
-                P2["/chip"]
-                P3["/flow"]
-                P4["/analysis"]
-            end
-
-            subgraph Components["Components Layer"]
-                C1["features"]
-                C2["ui"]
-                C3["charts"]
-                C4["selectors"]
-            end
-
-            subgraph State["State Management Layer"]
-                S1["TanStack Query<br/>(Server State)"]
-                S2["React Context<br/>(Client State)"]
-                S3["nuqs<br/>(URL State)"]
-            end
-
-            subgraph APIClient["API Client Layer"]
-                AC["Auto-generated from OpenAPI (Orval)<br/>src/client/ | src/schemas/"]
-            end
-        end
-    end
-
-    API["QDash API (FastAPI)"]
-
-    Pages --> Components
-    Components --> State
-    State --> APIClient
-    APIClient -->|"HTTP (Axios)"| API
-```
+![UI Architecture](../../diagrams/ui-architecture.drawio.png)
 
 ---
 
@@ -68,31 +17,38 @@ src/app/
 ├── (auth)/                     # Protected routes
 │   ├── admin/page.tsx          # /admin
 │   ├── analysis/page.tsx       # /analysis
+│   ├── chat/page.tsx           # /chat
 │   ├── chip/
 │   │   ├── page.tsx            # /chip
 │   │   └── [chipId]/
 │   │       └── qubit/
-│   │           └── [qubitsId]/
-│   │               └── page.tsx # /chip/:chipId/qubit/:qubitsId
+│   │           └── [qubitId]/
+│   │               └── page.tsx # /chip/:chipId/qubit/:qubitId
 │   ├── execution/
 │   │   ├── page.tsx            # /execution
-│   │   └── [chip_id]/
-│   │       └── [execute_id]/
-│   │           └── page.tsx    # /execution/:chip_id/:execute_id
+│   │   └── [executionId]/
+│   │       └── page.tsx        # /execution/:executionId
 │   ├── files/page.tsx          # /files
-│   ├── flow/
-│   │   ├── page.tsx            # /flow
-│   │   ├── new/page.tsx        # /flow/new
-│   │   └── [name]/page.tsx     # /flow/:name
+│   ├── inbox/page.tsx          # /inbox (default landing page)
+│   ├── issues/
+│   │   ├── page.tsx            # /issues
+│   │   └── [issueId]/
+│   │       └── page.tsx        # /issues/:issueId
 │   ├── metrics/page.tsx        # /metrics
-│   ├── setting/page.tsx        # /setting
-│   └── tasks/page.tsx          # /tasks
+│   ├── provenance/page.tsx     # /provenance
+│   ├── settings/page.tsx       # /settings
+│   ├── task-results/page.tsx   # /task-results
+│   ├── tasks/page.tsx          # /tasks
+│   └── workflow/
+│       ├── page.tsx            # /workflow
+│       ├── new/page.tsx        # /workflow/new
+│       └── [name]/page.tsx     # /workflow/:name
 ├── (public)/                   # Public routes
 │   └── login/page.tsx          # /login
-├── providers/                  # Provider components
+├── api/                        # API route handlers (SSE streaming)
 ├── globals.css                 # Global styles
 ├── layout.tsx                  # Root layout
-├── page.tsx                    # / (redirects to /metrics)
+├── page.tsx                    # / (redirects to /inbox)
 └── providers.tsx               # Provider composition
 ```
 
@@ -102,8 +58,8 @@ Route groups (parenthesized folders) organize routes without affecting URLs:
 
 ```tsx
 // (auth) group - requires authentication
-// File: src/app/(auth)/metrics/page.tsx
-// URL: /metrics (not /auth/metrics)
+// File: src/app/(auth)/inbox/page.tsx
+// URL: /inbox (not /auth/inbox)
 
 // (public) group - no authentication required
 // File: src/app/(public)/login/page.tsx
@@ -129,11 +85,12 @@ RootLayout (src/app/layout.tsx)
 ```
 components/
 ├── ui/                     # Generic, reusable components
-│   ├── Button.tsx          # Basic button
 │   ├── Card.tsx            # Card container
 │   ├── DataTable.tsx       # Generic data table
 │   ├── LoadingSpinner.tsx  # Loading indicator
-│   └── Modal.tsx           # Modal dialog
+│   ├── FluentEmoji.tsx     # Fluent Emoji component
+│   ├── EmptyState.tsx      # Empty state templates
+│   └── ...                 # Other UI primitives
 │
 ├── charts/                 # Visualization components
 │   ├── Plot.tsx            # Lightweight Plotly wrapper (plotly.js-basic-dist)
@@ -141,26 +98,32 @@ components/
 │   └── TaskFigure.tsx      # Task result figure
 │
 ├── features/               # Feature-specific components
+│   ├── admin/              # Admin page components
 │   ├── analysis/           # Analysis page components
-│   │   ├── HistogramView.tsx
-│   │   ├── CDFView.tsx
-│   │   └── StatisticsPanel.tsx
+│   ├── chat/               # Copilot chat components
 │   ├── chip/               # Chip page components
-│   │   ├── ChipPageContent.tsx
-│   │   └── QubitGrid.tsx
 │   ├── execution/          # Execution page components
+│   ├── files/              # File management components
 │   ├── flow/               # Flow editor components
-│   └── metrics/            # Metrics dashboard components
+│   ├── inbox/              # Inbox components
+│   ├── issues/             # Issue tracking components
+│   ├── metrics/            # Metrics dashboard components
+│   ├── provenance/         # Data provenance components
+│   ├── qubit/              # Qubit detail components
+│   ├── settings/           # Settings page components
+│   ├── task-results/       # Task result components
+│   └── tasks/              # Task management components
 │
 ├── layout/                 # Layout components
 │   ├── AppLayout.tsx       # Main app layout
-│   ├── Navbar.tsx          # Top navigation
-│   └── Sidebar.tsx         # Side navigation
+│   └── AnalysisSidebar.tsx # Analysis page sidebar
 │
 └── selectors/              # Selection/input components
-    ├── ChipSelector.tsx    # Chip dropdown
-    ├── DateRangeSelector.tsx
-    └── ProjectSelector.tsx
+    ├── ChipSelector/       # Chip dropdown
+    ├── DateSelector/       # Date selection
+    ├── ParameterSelector/  # Parameter selection
+    ├── TagSelector/        # Tag selection
+    └── TaskSelector/       # Task selection
 ```
 
 ### Component Responsibility
@@ -179,19 +142,7 @@ components/
 
 ### Server State Flow (TanStack Query)
 
-```mermaid
-flowchart TB
-    Component["Component<br/><code>useQuery({ queryKey, queryFn })</code>"]
-    TanStack["TanStack Query<br/>Cache Management | Deduping | Refetch Strategy"]
-    APIClient["Auto-generated API Client<br/><code>getChip(chipId)</code>"]
-    Axios["Custom Axios Instance<br/>Base URL | Auth Headers | Error Handling"]
-    API["QDash API Server"]
-
-    Component --> TanStack
-    TanStack --> APIClient
-    APIClient --> Axios
-    Axios --> API
-```
+The server state flow (Component → TanStack Query → API Client → Axios → API) is shown in the UI Architecture diagram above.
 
 ### Mutation Flow
 
@@ -235,17 +186,7 @@ queryClient.invalidateQueries({ queryKey: ["chips", chipId] });
 
 ### Authentication Flow
 
-```mermaid
-flowchart TB
-    Visit["User visits page"]
-    Middleware["middleware.ts (Edge Runtime)<br/>Check cookie → redirect if missing"]
-    AuthProvider["AuthProvider (Context)<br/>Provide username | Handle login/logout"]
-    APIRequests["API Requests<br/>X-Username header via Axios"]
-
-    Visit --> Middleware
-    Middleware --> AuthProvider
-    AuthProvider --> APIRequests
-```
+The authentication flow (User visit → middleware.ts → AuthProvider → API Requests with X-Username header) is shown in the UI Architecture diagram above.
 
 ### Middleware Implementation
 
@@ -276,22 +217,7 @@ export const config = {
 
 ### Generation Pipeline
 
-```mermaid
-flowchart TB
-    FastAPI["FastAPI Backend<br/>Pydantic models → OpenAPI spec"]
-    OpenAPI["docs/oas/openapi.json<br/>OpenAPI 3.0 specification"]
-    Orval["Orval Generator<br/>Reads spec → generates code"]
-    Generated["Generated Code"]
-
-    FastAPI --> OpenAPI
-    OpenAPI --> Orval
-    Orval --> Generated
-
-    subgraph Generated["Generated Code"]
-        Schemas["src/schemas/<br/>TypeScript types"]
-        Client["src/client/<br/>React Query hooks"]
-    end
-```
+The API client generation pipeline (FastAPI → OpenAPI spec → Orval → Generated Code) is shown in the UI Architecture diagram above.
 
 ### Orval Configuration
 
@@ -513,26 +439,3 @@ export function ChipSelector({ value, onChange, disabled }: ChipSelectorProps) {
 }
 ```
 
----
-
-## Summary
-
-### Architecture Principles
-
-1. **Separation of Concerns** - Pages handle routing, components handle UI, hooks handle logic
-2. **Type Safety** - Full TypeScript with auto-generated types from backend
-3. **Server State Management** - TanStack Query for all API interactions
-4. **Component Reusability** - Generic components in `ui/`, feature-specific in `features/`
-5. **URL-Driven State** - Shareable/bookmarkable application state via nuqs
-
-### Key Files Reference
-
-| File                             | Purpose                      |
-| -------------------------------- | ---------------------------- |
-| `src/app/layout.tsx`             | Root layout with providers   |
-| `src/app/providers.tsx`          | Provider composition         |
-| `src/middleware.ts`              | Authentication middleware    |
-| `src/lib/api/custom-instance.ts` | Axios configuration          |
-| `orval.config.cjs`               | API client generation config |
-| `eslint.config.mjs`              | ESLint configuration         |
-| `tailwind.config.ts`             | Tailwind CSS configuration   |

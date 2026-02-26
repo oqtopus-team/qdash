@@ -14,11 +14,6 @@
     },
     "version": "0.0.1"
   },
-  "servers": [
-    {
-      "url": "/api"
-    }
-  ],
   "paths": {
     "/auth/login": {
       "post": {
@@ -26,7 +21,7 @@
           "auth"
         ],
         "summary": "Login user",
-        "description": "Authenticate user and return access token.\n\nValidates user credentials against the database and returns an access token\nfor subsequent authenticated requests.\n\nParameters\n----------\nusername : str\n    User's username provided via form data\npassword : str\n    User's password provided via form data\n\nReturns\n-------\nTokenResponse\n    Response containing access_token, token_type, and username\n\nRaises\n------\nHTTPException\n    401 if authentication fails due to incorrect username or password",
+        "description": "Authenticate user and return access token.\n\nParameters\n----------\nusername : str\n    User's username provided via form data\npassword : str\n    User's password provided via form data\n\nReturns\n-------\nTokenResponse\n    Response containing access_token, token_type, and username\n\nRaises\n------\nHTTPException\n    401 if authentication fails due to incorrect username or password",
         "operationId": "login",
         "requestBody": {
           "content": {
@@ -71,7 +66,7 @@
           "auth"
         ],
         "summary": "Register a new user (admin only)",
-        "description": "Register a new user account (admin only).\n\nCreates a new user in the database with hashed password and generates\nan access token for immediate use. Only admin users can create new accounts.\n\nParameters\n----------\nuser_data : UserCreate\n    User registration data including username, password, and optional full_name\ncurrent_user : User\n    Current authenticated admin user\n\nReturns\n-------\nUserWithToken\n    Newly created user information including access_token\n\nRaises\n------\nHTTPException\n    403 if the current user is not an admin\n    400 if the username is already registered",
+        "description": "Register a new user account (admin only).\n\nParameters\n----------\nuser_data : UserCreate\n    User registration data including username, password, and optional full_name\ncurrent_user : User\n    Current authenticated admin user\nauth_service : AuthService\n    The auth service instance\n\nReturns\n-------\nUserWithToken\n    Newly created user information including access_token\n\nRaises\n------\nHTTPException\n    403 if the current user is not an admin\n    400 if the username is already registered",
         "operationId": "registerUser",
         "requestBody": {
           "content": {
@@ -121,7 +116,7 @@
           "auth"
         ],
         "summary": "Get current user",
-        "description": "Get current authenticated user information.\n\nReturns the profile information of the currently authenticated user\nbased on the provided access token.\n\nParameters\n----------\ncurrent_user : User\n    Current authenticated user injected via dependency\n\nReturns\n-------\nUser\n    Current user's profile information including username, full_name,\n    and disabled status",
+        "description": "Get current authenticated user information.\n\nParameters\n----------\ncurrent_user : User\n    Current authenticated user injected via dependency\n\nReturns\n-------\nUser\n    Current user's profile information",
         "operationId": "getCurrentUser",
         "responses": {
           "200": {
@@ -151,7 +146,7 @@
           "auth"
         ],
         "summary": "Logout user",
-        "description": "Logout the current user.\n\nThis endpoint serves as a logout confirmation. Since authentication tokens\nare managed client-side (via cookies), no server-side session invalidation\nis required. The client is responsible for removing the stored credentials.\n\nReturns\n-------\ndict[str, str]\n    Success message confirming logout",
+        "description": "Logout the current user.\n\nReturns\n-------\ndict[str, str]\n    Success message confirming logout",
         "operationId": "logout",
         "responses": {
           "200": {
@@ -180,7 +175,7 @@
           "auth"
         ],
         "summary": "Change user password",
-        "description": "Change the current user's password.\n\nValidates the current password and updates to the new password.\n\nParameters\n----------\npassword_data : PasswordChange\n    Contains current_password and new_password\ncurrent_user : User\n    Current authenticated user injected via dependency\n\nReturns\n-------\ndict[str, str]\n    Success message confirming password change\n\nRaises\n------\nHTTPException\n    400 if current password is incorrect\n    400 if new password is empty",
+        "description": "Change the current user's password.\n\nParameters\n----------\npassword_data : PasswordChange\n    Contains current_password and new_password\ncurrent_user : User\n    Current authenticated user injected via dependency\nauth_service : AuthService\n    The auth service instance\n\nReturns\n-------\ndict[str, str]\n    Success message confirming password change",
         "operationId": "changePassword",
         "requestBody": {
           "content": {
@@ -234,7 +229,7 @@
           "auth"
         ],
         "summary": "Reset user password (admin only)",
-        "description": "Reset a user's password (admin only).\n\nAllows administrators to reset any user's password without knowing\nthe current password. This is useful for password recovery scenarios.\n\nParameters\n----------\npassword_data : PasswordReset\n    Contains username and new_password\ncurrent_user : User\n    Current authenticated admin user\n\nReturns\n-------\ndict[str, str]\n    Success message confirming password reset\n\nRaises\n------\nHTTPException\n    403 if the current user is not an admin\n    404 if the target user is not found\n    400 if new password is empty",
+        "description": "Reset a user's password (admin only).\n\nParameters\n----------\npassword_data : PasswordReset\n    Contains username and new_password\ncurrent_user : User\n    Current authenticated admin user\nauth_service : AuthService\n    The auth service instance\n\nReturns\n-------\ndict[str, str]\n    Success message confirming password reset\n\nRaises\n------\nHTTPException\n    403 if the current user is not an admin",
         "operationId": "resetPassword",
         "requestBody": {
           "content": {
@@ -318,7 +313,7 @@
           "admin"
         ],
         "summary": "List all users",
-        "description": "List all users in the system (admin only).\n\nParameters\n----------\nadmin : User\n    Current admin user (verified by dependency)\nskip : int\n    Number of users to skip for pagination\nlimit : int\n    Maximum number of users to return\n\nReturns\n-------\nUserListResponse\n    List of users with total count",
+        "description": "List all users in the system (admin only).",
         "operationId": "listAllUsers",
         "security": [
           {
@@ -380,7 +375,7 @@
           "admin"
         ],
         "summary": "Get user details",
-        "description": "Get detailed information about a specific user (admin only).\n\nParameters\n----------\nusername : str\n    Username to look up\nadmin : User\n    Current admin user (verified by dependency)\n\nReturns\n-------\nUserDetailResponse\n    Detailed user information\n\nRaises\n------\nHTTPException\n    404 if user not found",
+        "description": "Get detailed information about a specific user (admin only).",
         "operationId": "getUserDetails",
         "security": [
           {
@@ -429,7 +424,7 @@
           "admin"
         ],
         "summary": "Update user settings",
-        "description": "Update user settings (admin only).\n\nParameters\n----------\nusername : str\n    Username to update\nrequest : UpdateUserRequest\n    Update request with fields to modify\nadmin : User\n    Current admin user (verified by dependency)\n\nReturns\n-------\nUserDetailResponse\n    Updated user information\n\nRaises\n------\nHTTPException\n    404 if user not found\n    400 if trying to demote the last admin",
+        "description": "Update user settings (admin only).",
         "operationId": "updateUserSettings",
         "security": [
           {
@@ -488,7 +483,7 @@
           "admin"
         ],
         "summary": "Delete user",
-        "description": "Delete a user account (admin only).\n\nParameters\n----------\nusername : str\n    Username to delete\nadmin : User\n    Current admin user (verified by dependency)\n\nReturns\n-------\ndict[str, str]\n    Success message\n\nRaises\n------\nHTTPException\n    404 if user not found\n    400 if trying to delete self or last admin",
+        "description": "Delete a user account (admin only).",
         "operationId": "deleteUser",
         "security": [
           {
@@ -543,7 +538,7 @@
           "admin"
         ],
         "summary": "List all projects",
-        "description": "List all projects in the system (admin only).\n\nParameters\n----------\nadmin : User\n    Current admin user (verified by dependency)\nskip : int\n    Number of projects to skip for pagination\nlimit : int\n    Maximum number of projects to return\n\nReturns\n-------\nProjectListResponse\n    List of projects with total count",
+        "description": "List all projects in the system (admin only).",
         "operationId": "listAllProjects",
         "security": [
           {
@@ -605,7 +600,7 @@
           "admin"
         ],
         "summary": "Delete project",
-        "description": "Delete a project and all its memberships (admin only).\n\nParameters\n----------\nproject_id : str\n    Project ID to delete\nadmin : User\n    Current admin user (verified by dependency)\n\nReturns\n-------\ndict[str, str]\n    Success message\n\nRaises\n------\nHTTPException\n    404 if project not found\n    400 if trying to delete own project",
+        "description": "Delete a project and all its memberships (admin only).",
         "operationId": "adminDeleteProject",
         "security": [
           {
@@ -660,7 +655,7 @@
           "admin"
         ],
         "summary": "List project members",
-        "description": "List all members of a project (admin only).\n\nParameters\n----------\nproject_id : str\n    Project ID to list members for\nadmin : User\n    Current admin user (verified by dependency)\n\nReturns\n-------\nMemberListResponse\n    List of members with total count\n\nRaises\n------\nHTTPException\n    404 if project not found",
+        "description": "List all members of a project (admin only).",
         "operationId": "listProjectMembersAdmin",
         "security": [
           {
@@ -709,7 +704,7 @@
           "admin"
         ],
         "summary": "Add member to project",
-        "description": "Add a member to a project as viewer (admin only).\n\nParameters\n----------\nproject_id : str\n    Project ID to add member to\nrequest : AddMemberRequest\n    Member details (username)\nadmin : User\n    Current admin user (verified by dependency)\n\nReturns\n-------\nMemberItem\n    Created member info\n\nRaises\n------\nHTTPException\n    404 if project or user not found\n    400 if user is already a member",
+        "description": "Add a member to a project as viewer (admin only).",
         "operationId": "addProjectMemberAdmin",
         "security": [
           {
@@ -770,7 +765,7 @@
           "admin"
         ],
         "summary": "Remove member from project",
-        "description": "Remove a member from a project (admin only).\n\nParameters\n----------\nproject_id : str\n    Project ID to remove member from\nusername : str\n    Username to remove\nadmin : User\n    Current admin user (verified by dependency)\n\nReturns\n-------\ndict[str, str]\n    Success message\n\nRaises\n------\nHTTPException\n    404 if project or member not found\n    400 if trying to remove the owner",
+        "description": "Remove a member from a project (admin only).",
         "operationId": "removeProjectMemberAdmin",
         "security": [
           {
@@ -834,7 +829,7 @@
           "admin"
         ],
         "summary": "Create project for user",
-        "description": "Create a default project for a user who doesn't have one (admin only).\n\nParameters\n----------\nusername : str\n    Username to create project for\nadmin : User\n    Current admin user (verified by dependency)\n\nReturns\n-------\nUserDetailResponse\n    Updated user information with new project\n\nRaises\n------\nHTTPException\n    404 if user not found\n    400 if user already has a project",
+        "description": "Create a default project for a user who doesn't have one (admin only).",
         "operationId": "createProjectForUser",
         "security": [
           {
@@ -1080,7 +1075,7 @@
           "projects"
         ],
         "summary": "Delete project",
-        "description": "Delete a project. Owner only.\n\nWarning: This will delete the project but NOT the associated data.\nData cleanup should be handled separately.",
+        "description": "Delete a project. Owner only.",
         "operationId": "deleteProject",
         "security": [
           {
@@ -1677,13 +1672,151 @@
         }
       }
     },
+    "/executions/{flow_run_id}/cancel": {
+      "post": {
+        "tags": [
+          "execution"
+        ],
+        "summary": "Cancel a running or scheduled execution",
+        "description": "Cancel a running or scheduled execution via Prefect.\n\nSends a cancellation request to Prefect for the specified flow run.\nThe flow_run_id is the Prefect flow run UUID, which can be obtained from\nthe execution detail's note.flow_run_id field.\nOnly executions in SCHEDULED, PENDING, RUNNING, or PAUSED state can be cancelled.\n\nParameters\n----------\nflow_run_id : str\n    Prefect flow run UUID\nctx : ProjectContext\n    Project context with user and project information\nexecution_service : ExecutionService\n    Service for execution operations\n\nReturns\n-------\nCancelExecutionResponse\n    Cancellation result with status",
+        "operationId": "cancelExecution",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "flow_run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Flow Run Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CancelExecutionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/executions/{execution_id}/re-execute": {
+      "post": {
+        "tags": [
+          "execution"
+        ],
+        "summary": "Re-execute a flow from snapshot parameters",
+        "description": "Re-execute a flow using snapshot parameters from a previous execution.\n\nParameters\n----------\nexecution_id : str\n    ID of the source execution to snapshot parameters from\nrequest : ReExecuteRequest\n    Re-execution request with flow_name and optional parameter_overrides\nctx : ProjectContext\n    Project context with user and project information\nexecution_service : ExecutionService\n    Service for execution operations\nflow_service : FlowService\n    Service for flow operations\n\nReturns\n-------\nExecuteFlowResponse\n    Execution result with IDs and URLs",
+        "operationId": "reExecuteFromSnapshot",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "execution_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Execution Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReExecuteRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExecuteFlowResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/files/raw-data": {
       "get": {
         "tags": [
           "file"
         ],
         "summary": "Download file",
-        "description": "Download a raw data file from the server.\n\nRetrieves a file from the server's filesystem and returns it as a downloadable\nresponse.\n\nParameters\n----------\npath : str\n    Absolute file path to the file to download\n\nReturns\n-------\nFileResponse\n    The file as a downloadable response\n\nRaises\n------\nHTTPException\n    404 if the file does not exist at the specified path",
+        "description": "Download a raw data file from the server.\n\nParameters\n----------\npath : str\n    Absolute file path to the file to download\n\nReturns\n-------\nFileResponse\n    The file as a downloadable response",
         "operationId": "downloadFile",
         "parameters": [
           {
@@ -1719,7 +1852,7 @@
           "file"
         ],
         "summary": "Download file or directory as zip",
-        "description": "Download a file or directory as a ZIP archive.\n\nCreates a ZIP archive of the specified file or directory and returns it\nas a downloadable response. The archive is created in a temporary directory\nand cleaned up after the response is sent.\n\nParameters\n----------\npath : str\n    Absolute path to the file or directory to archive\n\nReturns\n-------\nFileResponse\n    ZIP archive as a downloadable response with media type \"application/zip\"\n\nRaises\n------\nHTTPException\n    404 if the path does not exist\n    500 if there is an error creating the ZIP archive",
+        "description": "Download a file or directory as a ZIP archive.\n\nParameters\n----------\npath : str\n    Absolute path to the file or directory to archive\n\nReturns\n-------\nFileResponse\n    ZIP archive as a downloadable response",
         "operationId": "downloadZipFile",
         "parameters": [
           {
@@ -1755,7 +1888,7 @@
           "file"
         ],
         "summary": "Get file tree for entire config directory",
-        "description": "Get file tree structure for entire config directory (all chips).\n\nReturns\n-------\n    File tree structure",
+        "description": "Get file tree structure for entire config directory.\n\nReturns\n-------\n    File tree structure",
         "operationId": "getFileTree",
         "responses": {
           "200": {
@@ -1781,7 +1914,7 @@
           "file"
         ],
         "summary": "Get file content for editing",
-        "description": "Get file content for editing.\n\nArgs:\n----\n    path: Relative path from CONFIG_BASE_PATH (e.g., \"64Qv2/config/chip.yaml\")\n\nReturns:\n-------\n    File content and metadata",
+        "description": "Get file content for editing.\n\nArgs:\n----\n    path: Relative path from CONFIG_BASE_PATH\n\nReturns:\n-------\n    File content and metadata",
         "operationId": "getFileContent",
         "parameters": [
           {
@@ -3253,7 +3386,7 @@
           "task"
         ],
         "summary": "List all tasks",
-        "description": "List all tasks.\n\nParameters\n----------\nctx : ProjectContext\n    The project context with user and project information.\ntask_repo : MongoTaskDefinitionRepository\n    Repository for task definition operations.\nbackend : str | None\n    Optional backend name to filter tasks by.\n\nReturns\n-------\nListTaskResponse\n    The list of tasks.",
+        "description": "List all tasks.\n\nParameters\n----------\nctx : ProjectContext\n    The project context with user and project information.\nservice : TaskService\n    The task service instance.\nbackend : str | None\n    Optional backend name to filter tasks by.\n\nReturns\n-------\nListTaskResponse\n    The list of tasks.",
         "operationId": "listTasks",
         "security": [
           {
@@ -3326,7 +3459,7 @@
           "task"
         ],
         "summary": "Get task result by task ID",
-        "description": "Get task result by task_id.\n\nParameters\n----------\ntask_id : str\n    The task ID to search for.\nctx : ProjectContext\n    The project context with user and project information.\n\nReturns\n-------\nTaskResultResponse\n    The task result information including figure paths.",
+        "description": "Get task result by task_id.\n\nParameters\n----------\ntask_id : str\n    The task ID to search for.\nctx : ProjectContext\n    The project context with user and project information.\nservice : TaskService\n    The task service instance.\n\nReturns\n-------\nTaskResultResponse\n    The task result information including figure paths.",
         "operationId": "getTaskResult",
         "security": [
           {
@@ -3384,13 +3517,81 @@
         }
       }
     },
+    "/task-knowledge": {
+      "get": {
+        "tags": [
+          "task"
+        ],
+        "summary": "List all task knowledge entries",
+        "description": "List all available task knowledge entries with summary info.",
+        "operationId": "listTaskKnowledge",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListTaskKnowledgeResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/tasks/{task_name}/knowledge/markdown": {
+      "get": {
+        "tags": [
+          "task"
+        ],
+        "summary": "Get raw markdown for a task knowledge entry",
+        "description": "Get raw markdown content for a task knowledge entry.\n\nReturns the index.md content with image references replaced\nby inline base64 data URIs for self-contained rendering.",
+        "operationId": "getTaskKnowledgeMarkdown",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "task_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Task Name"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/tasks/{task_name}/knowledge": {
       "get": {
         "tags": [
           "task"
         ],
         "summary": "Get task knowledge for LLM analysis",
-        "description": "Get structured domain knowledge for a calibration task.\n\nReturns LLM-oriented knowledge including physical principles,\nexpected behavior, evaluation criteria, and failure modes.\n\nParameters\n----------\ntask_name : str\n    The task name (e.g. \"CheckT1\", \"CheckRabi\").\nbackend : str\n    The backend name (default \"qubex\").\n\nReturns\n-------\nTaskKnowledgeResponse\n    Structured task knowledge.",
+        "description": "Get structured domain knowledge for a calibration task.\n\nReturns LLM-oriented knowledge including physical principles,\nexpected behavior, evaluation criteria, and failure modes.\n\nParameters\n----------\ntask_name : str\n    The task name (e.g. \"CheckT1\", \"CheckRabi\").\nservice : TaskService\n    The task service instance.\nbackend : str\n    The backend name (default \"qubex\").\n\nReturns\n-------\nTaskKnowledgeResponse\n    Structured task knowledge.",
         "operationId": "getTaskKnowledge",
         "security": [
           {
@@ -3450,7 +3651,7 @@
           "task-file"
         ],
         "summary": "Get task file settings",
-        "description": "Get task file settings from config/settings.yaml.\n\nUses ConfigLoader for unified loading with local override support.\n\nReturns\n-------\n    Task file settings including default backend",
+        "description": "Get task file settings from config/settings.yaml.\n\nReturns\n-------\n    Task file settings including default backend",
         "operationId": "getTaskFileSettings",
         "responses": {
           "200": {
@@ -3556,7 +3757,7 @@
           "task-file"
         ],
         "summary": "Get task file content for viewing/editing",
-        "description": "Get task file content for viewing/editing.\n\nArgs:\n----\n    path: Relative path from CALIBTASKS_BASE_PATH (e.g., \"qubex/one_qubit_coarse/check_rabi.py\")\n\nReturns:\n-------\n    File content and metadata",
+        "description": "Get task file content for viewing/editing.\n\nArgs:\n----\n    path: Relative path from CALIBTASKS_BASE_PATH\n\nReturns:\n-------\n    File content and metadata",
         "operationId": "getTaskFileContent",
         "security": [
           {
@@ -3655,7 +3856,7 @@
           "task-file"
         ],
         "summary": "Get backend configuration",
-        "description": "Get backend configuration from backend.yaml.\n\nReturns backend definitions, tasks, and categories.\n\nReturns\n-------\n    Backend configuration",
+        "description": "Get backend configuration from backend.yaml.\n\nReturns\n-------\n    Backend configuration",
         "operationId": "getBackendConfig",
         "responses": {
           "200": {
@@ -3682,7 +3883,7 @@
           "task-file"
         ],
         "summary": "List all tasks in a backend",
-        "description": "List all task definitions found in a backend directory.\n\nParses Python files to extract task names, types, and descriptions.\nResults are cached and invalidated when files are modified.\n\nArgs:\n----\n    backend: Backend name (e.g., \"qubex\", \"fake\")\n    sort_order: Sort order for tasks (\"type_then_name\", \"name_only\", \"file_path\")\n    enabled_only: If True, only return tasks that are enabled in backend.yaml\n\nReturns:\n-------\n    List of task information",
+        "description": "List all task definitions found in a backend directory.\n\nArgs:\n----\n    backend: Backend name (e.g., \"qubex\", \"fake\")\n    sort_order: Sort order for tasks\n    enabled_only: If True, only return tasks that are enabled\n\nReturns:\n-------\n    List of task information",
         "operationId": "listTaskInfo",
         "security": [
           {
@@ -3756,7 +3957,7 @@
           "task-result"
         ],
         "summary": "Get latest qubit task results",
-        "description": "Get the latest qubit task results for all qubits on a chip.\n\nRetrieves the most recent task result for each qubit on the specified chip.\nResults include fidelity threshold status based on x90 gate fidelity.\n\nParameters\n----------\nchip_id : str\n    ID of the chip to fetch results for\ntask : str\n    Name of the task to fetch results for\nctx : ProjectContext\n    Project context with user and project information\n\nReturns\n-------\nLatestTaskResultResponse\n    Task results for all qubits, keyed by qubit ID\n\nRaises\n------\nValueError\n    If the chip is not found for the current project",
+        "description": "Get the latest qubit task results for all qubits on a chip.\n\nRetrieves the most recent task result for each qubit on the specified chip.\nResults include fidelity threshold status based on x90 gate fidelity.\n\nParameters\n----------\nchip_id : str\n    ID of the chip to fetch results for\ntask : str\n    Name of the task to fetch results for\nctx : ProjectContext\n    Project context with user and project information\nservice : TaskResultService\n    Injected task result service\n\nReturns\n-------\nLatestTaskResultResponse\n    Task results for all qubits, keyed by qubit ID\n\nRaises\n------\nValueError\n    If the chip is not found for the current project",
         "operationId": "getLatestQubitTaskResults",
         "security": [
           {
@@ -3833,7 +4034,7 @@
           "task-result"
         ],
         "summary": "Get historical qubit task results",
-        "description": "Get historical qubit task results for a specific date.\n\nRetrieves task results from a specific historical date using chip history\nsnapshots. Results are filtered to tasks executed within the specified\nday in JST timezone.\n\nParameters\n----------\nchip_id : str\n    ID of the chip to fetch results for\ntask : str\n    Name of the task to fetch results for\ndate : str\n    Date in YYYYMMDD format (JST timezone)\nctx : ProjectContext\n    Project context with user and project information\n\nReturns\n-------\nLatestTaskResultResponse\n    Historical task results for all qubits, keyed by qubit ID\n\nRaises\n------\nValueError\n    If the chip history is not found for the specified date",
+        "description": "Get historical qubit task results for a specific date.\n\nRetrieves task results from a specific historical date using chip history\nsnapshots. Results are filtered to tasks executed within the specified\nday in JST timezone.\n\nParameters\n----------\nchip_id : str\n    ID of the chip to fetch results for\ntask : str\n    Name of the task to fetch results for\ndate : str\n    Date in YYYYMMDD format (JST timezone)\nctx : ProjectContext\n    Project context with user and project information\nservice : TaskResultService\n    Injected task result service\n\nReturns\n-------\nLatestTaskResultResponse\n    Historical task results for all qubits, keyed by qubit ID\n\nRaises\n------\nValueError\n    If the chip history is not found for the specified date",
         "operationId": "getHistoricalQubitTaskResults",
         "security": [
           {
@@ -3921,7 +4122,7 @@
           "task-result"
         ],
         "summary": "Get qubit task history",
-        "description": "Get complete task history for a specific qubit.\n\nRetrieves all historical task results for a specific qubit, sorted by\nend time in descending order. Useful for tracking calibration trends\nover time.\n\nParameters\n----------\nqid : str\n    Qubit ID to fetch history for\nchip_id : str\n    ID of the chip containing the qubit\ntask : str\n    Name of the task to fetch history for\nctx : ProjectContext\n    Project context with user and project information\n\nReturns\n-------\nTaskHistoryResponse\n    All historical task results, keyed by task_id\n\nRaises\n------\nValueError\n    If the chip is not found for the current project",
+        "description": "Get complete task history for a specific qubit.\n\nRetrieves all historical task results for a specific qubit, sorted by\nend time in descending order. Useful for tracking calibration trends\nover time.\n\nParameters\n----------\nqid : str\n    Qubit ID to fetch history for\nchip_id : str\n    ID of the chip containing the qubit\ntask : str\n    Name of the task to fetch history for\nctx : ProjectContext\n    Project context with user and project information\nservice : TaskResultService\n    Injected task result service\n\nReturns\n-------\nTaskHistoryResponse\n    All historical task results, keyed by task_id\n\nRaises\n------\nValueError\n    If the chip is not found for the current project",
         "operationId": "getQubitTaskHistory",
         "security": [
           {
@@ -4007,7 +4208,7 @@
           "task-result"
         ],
         "summary": "Get latest coupling task results",
-        "description": "Get the latest coupling task results for all couplings on a chip.\n\nRetrieves the most recent task result for each coupling (qubit pair) on\nthe specified chip. Results include fidelity threshold status based on\nBell state fidelity.\n\nParameters\n----------\nchip_id : str\n    ID of the chip to fetch results for\ntask : str\n    Name of the task to fetch results for\nctx : ProjectContext\n    Project context with user and project information\n\nReturns\n-------\nLatestTaskResultResponse\n    Task results for all couplings, keyed by coupling ID (e.g., \"0-1\")\n\nRaises\n------\nValueError\n    If the chip is not found for the current project",
+        "description": "Get the latest coupling task results for all couplings on a chip.\n\nRetrieves the most recent task result for each coupling (qubit pair) on\nthe specified chip. Results include fidelity threshold status based on\nBell state fidelity.\n\nParameters\n----------\nchip_id : str\n    ID of the chip to fetch results for\ntask : str\n    Name of the task to fetch results for\nctx : ProjectContext\n    Project context with user and project information\nservice : TaskResultService\n    Injected task result service\n\nReturns\n-------\nLatestTaskResultResponse\n    Task results for all couplings, keyed by coupling ID (e.g., \"0-1\")\n\nRaises\n------\nValueError\n    If the chip is not found for the current project",
         "operationId": "getLatestCouplingTaskResults",
         "security": [
           {
@@ -4084,7 +4285,7 @@
           "task-result"
         ],
         "summary": "Get historical coupling task results",
-        "description": "Get historical coupling task results for a specific date.\n\nRetrieves task results from a specific historical date using chip history\nsnapshots. Results are filtered to tasks executed within the specified\nday in JST timezone.\n\nParameters\n----------\nchip_id : str\n    ID of the chip to fetch results for\ntask : str\n    Name of the task to fetch results for\ndate : str\n    Date in YYYYMMDD format (JST timezone)\nctx : ProjectContext\n    Project context with user and project information\n\nReturns\n-------\nLatestTaskResultResponse\n    Historical task results for all couplings, keyed by coupling ID\n\nRaises\n------\nValueError\n    If the chip history is not found for the specified date",
+        "description": "Get historical coupling task results for a specific date.\n\nRetrieves task results from a specific historical date using chip history\nsnapshots. Results are filtered to tasks executed within the specified\nday in JST timezone.\n\nParameters\n----------\nchip_id : str\n    ID of the chip to fetch results for\ntask : str\n    Name of the task to fetch results for\ndate : str\n    Date in YYYYMMDD format (JST timezone)\nctx : ProjectContext\n    Project context with user and project information\nservice : TaskResultService\n    Injected task result service\n\nReturns\n-------\nLatestTaskResultResponse\n    Historical task results for all couplings, keyed by coupling ID\n\nRaises\n------\nValueError\n    If the chip history is not found for the specified date",
         "operationId": "getHistoricalCouplingTaskResults",
         "security": [
           {
@@ -4172,7 +4373,7 @@
           "task-result"
         ],
         "summary": "Get coupling task history",
-        "description": "Get complete task history for a specific coupling.\n\nRetrieves all historical task results for a specific coupling (qubit pair),\nsorted by end time in descending order. Useful for tracking two-qubit\ncalibration trends over time.\n\nParameters\n----------\ncoupling_id : str\n    Coupling ID to fetch history for (e.g., \"0-1\")\nchip_id : str\n    ID of the chip containing the coupling\ntask : str\n    Name of the task to fetch history for\nctx : ProjectContext\n    Project context with user and project information\n\nReturns\n-------\nTaskHistoryResponse\n    All historical task results, keyed by task_id\n\nRaises\n------\nValueError\n    If the chip is not found for the current project",
+        "description": "Get complete task history for a specific coupling.\n\nRetrieves all historical task results for a specific coupling (qubit pair),\nsorted by end time in descending order. Useful for tracking two-qubit\ncalibration trends over time.\n\nParameters\n----------\ncoupling_id : str\n    Coupling ID to fetch history for (e.g., \"0-1\")\nchip_id : str\n    ID of the chip containing the coupling\ntask : str\n    Name of the task to fetch history for\nctx : ProjectContext\n    Project context with user and project information\nservice : TaskResultService\n    Injected task result service\n\nReturns\n-------\nTaskHistoryResponse\n    All historical task results, keyed by task_id\n\nRaises\n------\nValueError\n    If the chip is not found for the current project",
         "operationId": "getCouplingTaskHistory",
         "security": [
           {
@@ -4258,7 +4459,7 @@
           "task-result"
         ],
         "summary": "Get timeseries task results by tag and parameter",
-        "description": "Get timeseries task results filtered by tag and parameter.\n\nRetrieves time series data for calibration parameters, optionally filtered\nto a specific qubit. Useful for plotting parameter trends over time.\n\nParameters\n----------\nchip_id : str\n    ID of the chip to fetch results for\ntag : str\n    Tag to filter tasks by (e.g., calibration category)\nparameter : str\n    Name of the output parameter to retrieve\nstart_at : str\n    Start time in ISO format for the time range\nend_at : str\n    End time in ISO format for the time range\nctx : ProjectContext\n    Project context with user and project information\nqid : str | None\n    Optional qubit ID to filter results to a specific qubit\n\nReturns\n-------\nTimeSeriesData\n    Time series data keyed by qubit ID, each containing a list of\n    parameter values with timestamps",
+        "description": "Get timeseries task results filtered by tag and parameter.\n\nRetrieves time series data for calibration parameters, optionally filtered\nto a specific qubit. Useful for plotting parameter trends over time.\n\nParameters\n----------\nchip_id : str\n    ID of the chip to fetch results for\ntag : str\n    Tag to filter tasks by (e.g., calibration category)\nparameter : str\n    Name of the output parameter to retrieve\nstart_at : str\n    Start time in ISO format for the time range\nend_at : str\n    End time in ISO format for the time range\nctx : ProjectContext\n    Project context with user and project information\nservice : TaskResultService\n    Injected task result service\nqid : str | None\n    Optional qubit ID to filter results to a specific qubit\n\nReturns\n-------\nTimeSeriesData\n    Time series data keyed by qubit ID, each containing a list of\n    parameter values with timestamps",
         "operationId": "getTimeseriesTaskResults",
         "security": [
           {
@@ -4363,6 +4564,79 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/TimeSeriesData"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/task-results/{task_id}/re-execute": {
+      "post": {
+        "tags": [
+          "task-result"
+        ],
+        "summary": "Re-execute a single task from its task result",
+        "description": "Re-execute a single task using the system single-task-executor deployment.\n\nLooks up the TaskResultHistoryDocument to extract task_name, qid, chip_id,\nexecution_id, and tags, then delegates to FlowService to create a Prefect\nflow run via the system deployment.\n\nParameters\n----------\ntask_id : str\n    The task result ID to re-execute\nctx : ProjectContext\n    Project context with user and project information\nservice : TaskResultService\n    Injected task result service\nflow_service : FlowService\n    Injected flow service\n\nReturns\n-------\nExecuteFlowResponse\n    Execution result with IDs and URLs",
+        "operationId": "reExecuteTaskResult",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Task Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_reExecuteTaskResult"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExecuteFlowResponse"
                 }
               }
             }
@@ -5078,6 +5352,510 @@
         }
       }
     },
+    "/issue-knowledge": {
+      "get": {
+        "tags": [
+          "issue-knowledge"
+        ],
+        "summary": "List knowledge cases",
+        "description": "List issue-derived knowledge cases with optional filters.",
+        "operationId": "listIssueKnowledge",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "skip",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Skip"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by status: draft, approved, rejected",
+              "title": "Status"
+            },
+            "description": "Filter by status: draft, approved, rejected"
+          },
+          {
+            "name": "task_name",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by task name",
+              "title": "Task Name"
+            },
+            "description": "Filter by task name"
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListIssueKnowledgeResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/issue-knowledge/{knowledge_id}": {
+      "get": {
+        "tags": [
+          "issue-knowledge"
+        ],
+        "summary": "Get a knowledge case",
+        "description": "Get a single knowledge case by ID.",
+        "operationId": "getIssueKnowledge",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "knowledge_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Knowledge Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IssueKnowledgeResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "issue-knowledge"
+        ],
+        "summary": "Update a knowledge draft",
+        "description": "Update a knowledge draft's content. Only drafts can be edited.",
+        "operationId": "updateIssueKnowledge",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "knowledge_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Knowledge Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IssueKnowledgeUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IssueKnowledgeResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "issue-knowledge"
+        ],
+        "summary": "Delete a knowledge case",
+        "description": "Delete a knowledge case.",
+        "operationId": "deleteIssueKnowledge",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "knowledge_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Knowledge Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/issues/{issue_id}/extract-knowledge": {
+      "post": {
+        "tags": [
+          "issue-knowledge"
+        ],
+        "summary": "Generate knowledge draft from issue",
+        "description": "Generate an AI knowledge draft from a closed issue thread.",
+        "operationId": "extractIssueKnowledge",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "issue_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Issue Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IssueKnowledgeResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/issue-knowledge/{knowledge_id}/approve": {
+      "patch": {
+        "tags": [
+          "issue-knowledge"
+        ],
+        "summary": "Approve a knowledge draft",
+        "description": "Approve a knowledge draft for inclusion in task knowledge.",
+        "operationId": "approveIssueKnowledge",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "knowledge_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Knowledge Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IssueKnowledgeResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/issue-knowledge/{knowledge_id}/reject": {
+      "patch": {
+        "tags": [
+          "issue-knowledge"
+        ],
+        "summary": "Reject a knowledge draft",
+        "description": "Reject a knowledge draft.",
+        "operationId": "rejectIssueKnowledge",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "knowledge_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Knowledge Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IssueKnowledgeResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/tags": {
       "get": {
         "tags": [
@@ -5317,7 +6095,7 @@
           "flow"
         ],
         "summary": "Save a flow",
-        "description": "Save a Flow to file system and MongoDB.\n\nSteps:\n1. Validate flow name\n2. Validate flow code contains expected function\n3. Create user directory if not exists\n4. Write code to file: user_flows/{username}/{name}.py\n5. Upsert metadata to MongoDB\n6. Return file path and success message",
+        "description": "Save a Flow to file system and MongoDB.",
         "operationId": "saveFlow",
         "security": [
           {
@@ -5380,7 +6158,7 @@
           "flow"
         ],
         "summary": "List all flows",
-        "description": "List all Flows for the current project.\n\nReturns metadata only (no code content for performance).",
+        "description": "List all Flows for the current project.",
         "operationId": "listFlows",
         "security": [
           {
@@ -5435,7 +6213,7 @@
           "flow"
         ],
         "summary": "List all flow templates",
-        "description": "List all available flow templates.\n\nReturns metadata only (no code content for performance).",
+        "description": "List all available flow templates.",
         "operationId": "listFlowTemplates",
         "responses": {
           "200": {
@@ -5466,7 +6244,7 @@
           "flow"
         ],
         "summary": "Get a flow template",
-        "description": "Get flow template details including code content.\n\nSteps:\n1. Find template metadata\n2. Read Python file content\n3. Return combined data",
+        "description": "Get flow template details including code content.",
         "operationId": "getFlowTemplate",
         "security": [
           {
@@ -5514,7 +6292,7 @@
           "flow"
         ],
         "summary": "List flow helper files",
-        "description": "List all Python files in the qdash.workflow.service module.\n\nReturns list of filenames that users can view for reference.",
+        "description": "List all Python files in the qdash.workflow.service module.",
         "operationId": "listFlowHelperFiles",
         "responses": {
           "200": {
@@ -5545,7 +6323,7 @@
           "flow"
         ],
         "summary": "Get flow helper file content",
-        "description": "Get the content of a flow helper file.\n\nArgs:\n    filename: Name of the Python file (e.g., \"session.py\")\n\nReturns:\n    File content as string",
+        "description": "Get the content of a flow helper file.",
         "operationId": "getFlowHelperFile",
         "security": [
           {
@@ -5594,7 +6372,7 @@
           "flow"
         ],
         "summary": "List all flow schedules for current user",
-        "description": "List all Flow schedules (cron and one-time) for the current project.\n\nArgs:\n----\n    ctx: Project context with user and project information\n    limit: Maximum number of schedules to return (max 100)\n    offset: Number of schedules to skip\n\nReturns:\n-------\n    List of all flow schedules",
+        "description": "List all Flow schedules (cron and one-time) for the current project.",
         "operationId": "listAllFlowSchedules",
         "security": [
           {
@@ -5669,7 +6447,7 @@
           "flow"
         ],
         "summary": "Delete a flow schedule",
-        "description": "Delete a Flow schedule (cron or one-time).\n\nSchedule ID Types:\n- **Cron schedules**: schedule_id is the deployment_id (UUID format)\n- **One-time schedules**: schedule_id is the flow_run_id (UUID format)\n\nThe API automatically determines the type and handles accordingly:\n- Cron: Removes the schedule from the deployment (schedule=None)\n- One-time: Deletes the scheduled flow run\n\nArgs:\n----\n    schedule_id: Schedule ID (deployment_id for cron, flow_run_id for one-time)\n    ctx: Project context with user and project information\n\nReturns:\n-------\n    Standardized response with schedule type information",
+        "description": "Delete a Flow schedule (cron or one-time).",
         "operationId": "deleteFlowSchedule",
         "security": [
           {
@@ -5731,7 +6509,7 @@
           "flow"
         ],
         "summary": "Update a flow schedule",
-        "description": "Update a Flow schedule (cron schedules only).\n\nCan update: active status, cron expression, parameters.\n\nArgs:\n----\n    schedule_id: Schedule ID (deployment_id)\n    request: Update request\n    ctx: Project context with user and project information\n\nReturns:\n-------\n    Success message",
+        "description": "Update a Flow schedule (cron schedules only).",
         "operationId": "updateFlowSchedule",
         "security": [
           {
@@ -5805,7 +6583,7 @@
           "flow"
         ],
         "summary": "Get flow details",
-        "description": "Get Flow details including code content.\n\nSteps:\n1. Find metadata in MongoDB\n2. Read code from file\n3. Return combined data",
+        "description": "Get Flow details including code content.",
         "operationId": "getFlow",
         "security": [
           {
@@ -5867,7 +6645,7 @@
           "flow"
         ],
         "summary": "Delete a flow",
-        "description": "Delete a Flow.\n\nSteps:\n1. Delete Prefect deployment\n2. Delete file from user_flows/{username}/{name}.py\n3. Delete metadata from MongoDB",
+        "description": "Delete a Flow.",
         "operationId": "deleteFlow",
         "security": [
           {
@@ -5935,7 +6713,7 @@
           "flow"
         ],
         "summary": "Execute a flow",
-        "description": "Execute a Flow via Prefect deployment.\n\nSteps:\n1. Find flow metadata in MongoDB\n2. Merge request parameters with default_parameters\n3. Create flow run via Prefect Client\n4. Return execution_id and URLs",
+        "description": "Execute a Flow via Prefect deployment.",
         "operationId": "executeFlow",
         "security": [
           {
@@ -6009,7 +6787,7 @@
           "flow"
         ],
         "summary": "Schedule a flow execution (cron or one-time)",
-        "description": "Schedule a Flow execution with cron or one-time schedule.\n\nArgs:\n----\n    name: Flow name\n    request: Schedule request (must provide either cron or scheduled_time)\n    ctx: Project context with user and project information\n\nReturns:\n-------\n    Schedule response with schedule_id and details",
+        "description": "Schedule a Flow execution with cron or one-time schedule.",
         "operationId": "scheduleFlow",
         "security": [
           {
@@ -6083,7 +6861,7 @@
           "flow"
         ],
         "summary": "List schedules for a specific flow",
-        "description": "List all schedules (cron and one-time) for a specific Flow.\n\nArgs:\n----\n    name: Flow name\n    ctx: Project context with user and project information\n    limit: Maximum number of schedules to return (max 100)\n    offset: Number of schedules to skip\n\nReturns:\n-------\n    List of schedules for the flow",
+        "description": "List all schedules (cron and one-time) for a specific Flow.",
         "operationId": "listFlowSchedules",
         "security": [
           {
@@ -6196,7 +6974,7 @@
           "metrics"
         ],
         "summary": "Get Chip Metrics",
-        "description": "Get chip calibration metrics for visualization.\n\nThis endpoint returns calibration metrics for a specific chip from the database, including:\n- Qubit frequency, anharmonicity, T1, T2 echo times\n- Gate fidelities (single-qubit and two-qubit)\n- Readout fidelities\n\nArgs:\n----\n    chip_id: The chip identifier\n    ctx: Project context with user and project information\n    within_hours: Optional filter to only include data from last N hours (e.g., 24)\n    selection_mode: \"latest\" to get most recent values, \"best\" to get optimal values\n\nReturns:\n-------\n    ChipMetricsResponse with all metrics data",
+        "description": "Get chip calibration metrics for visualization.\n\nThis endpoint returns calibration metrics for a specific chip from the database, including:\n- Qubit frequency, anharmonicity, T1, T2 echo times\n- Gate fidelities (single-qubit and two-qubit)\n- Readout fidelities\n\nArgs:\n----\n    chip_id: The chip identifier\n    ctx: Project context with user and project information\n    metrics_service: Injected metrics service\n    within_hours: Optional filter to only include data from last N hours (e.g., 24)\n    selection_mode: \"latest\" to get most recent values, \"best\" to get optimal values\n\nReturns:\n-------\n    ChipMetricsResponse with all metrics data",
         "operationId": "getChipMetrics",
         "security": [
           {
@@ -6295,7 +7073,7 @@
           "metrics"
         ],
         "summary": "Get Qubit Metric History",
-        "description": "Get historical metric data for a specific qubit with task_id for figure display.\n\nThis endpoint queries TaskResultHistoryDocument to retrieve calibration\nhistory for a specific metric, including multiple executions on the same day.\nEach history item includes task_id for displaying calibration figures.\n\nArgs:\n----\n    chip_id: The chip identifier\n    qid: The qubit identifier (e.g., \"0\", \"Q00\")\n    ctx: Project context with user and project information\n    metric: Metric name to retrieve history for\n    limit: Maximum number of history items (None for unlimited within time range)\n    within_days: Optional filter to only include data from last N days\n\nReturns:\n-------\n    QubitMetricHistoryResponse with historical metric data and task_ids",
+        "description": "Get historical metric data for a specific qubit with task_id for figure display.\n\nThis endpoint queries TaskResultHistoryDocument to retrieve calibration\nhistory for a specific metric, including multiple executions on the same day.\nEach history item includes task_id for displaying calibration figures.\n\nArgs:\n----\n    chip_id: The chip identifier\n    qid: The qubit identifier (e.g., \"0\", \"Q00\")\n    ctx: Project context with user and project information\n    metrics_service: Injected metrics service\n    metric: Metric name to retrieve history for\n    limit: Maximum number of history items (None for unlimited within time range)\n    within_days: Optional filter to only include data from last N days\n\nReturns:\n-------\n    QubitMetricHistoryResponse with historical metric data and task_ids",
         "operationId": "getQubitMetricHistory",
         "security": [
           {
@@ -6418,7 +7196,7 @@
           "metrics"
         ],
         "summary": "Get Coupling Metric History",
-        "description": "Get historical metric data for a specific coupling with task_id for figure display.\n\nThis endpoint queries TaskResultHistoryDocument to retrieve calibration\nhistory for a specific coupling metric, including multiple executions on the same day.\nEach history item includes task_id for displaying calibration figures.\n\nArgs:\n----\n    chip_id: The chip identifier\n    coupling_id: The coupling identifier (e.g., \"0-1\", \"2-3\")\n    ctx: Project context with user and project information\n    metric: Metric name to retrieve history for\n    limit: Maximum number of history items (None for unlimited within time range)\n    within_days: Optional filter to only include data from last N days\n\nReturns:\n-------\n    QubitMetricHistoryResponse with historical metric data and task_ids\n    (Note: qid field contains coupling_id for coupling metrics)",
+        "description": "Get historical metric data for a specific coupling with task_id for figure display.\n\nThis endpoint queries TaskResultHistoryDocument to retrieve calibration\nhistory for a specific coupling metric, including multiple executions on the same day.\nEach history item includes task_id for displaying calibration figures.\n\nArgs:\n----\n    chip_id: The chip identifier\n    coupling_id: The coupling identifier (e.g., \"0-1\", \"2-3\")\n    ctx: Project context with user and project information\n    metrics_service: Injected metrics service\n    metric: Metric name to retrieve history for\n    limit: Maximum number of history items (None for unlimited within time range)\n    within_days: Optional filter to only include data from last N days\n\nReturns:\n-------\n    QubitMetricHistoryResponse with historical metric data and task_ids\n    (Note: qid field contains coupling_id for coupling metrics)",
         "operationId": "getCouplingMetricHistory",
         "security": [
           {
@@ -8127,6 +8905,28 @@
         ],
         "title": "Body_login"
       },
+      "Body_reExecuteTaskResult": {
+        "properties": {
+          "parameter_overrides": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parameter Overrides",
+            "description": "Optional parameter overrides: {run: {...}, input: {...}}"
+          }
+        },
+        "type": "object",
+        "title": "Body_reExecuteTaskResult"
+      },
       "CalibrationNoteResponse": {
         "properties": {
           "username": {
@@ -8168,6 +8968,30 @@
         ],
         "title": "CalibrationNoteResponse",
         "description": "CalibrationNote is a subclass of BaseModel."
+      },
+      "CancelExecutionResponse": {
+        "properties": {
+          "execution_id": {
+            "type": "string",
+            "title": "Execution Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "execution_id",
+          "status",
+          "message"
+        ],
+        "title": "CancelExecutionResponse",
+        "description": "Response model for cancelling an execution."
       },
       "ChipDatesResponse": {
         "properties": {
@@ -8840,6 +9664,11 @@
             "type": "string",
             "title": "Status"
           },
+          "flow_name": {
+            "type": "string",
+            "title": "Flow Name",
+            "default": ""
+          },
           "start_at": {
             "anyOf": [
               {
@@ -8887,6 +9716,19 @@
             "additionalProperties": true,
             "type": "object",
             "title": "Note"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tags",
+            "default": []
+          },
+          "chip_id": {
+            "type": "string",
+            "title": "Chip Id",
+            "default": ""
           }
         },
         "type": "object",
@@ -8897,7 +9739,7 @@
           "note"
         ],
         "title": "ExecutionResponseDetail",
-        "description": "ExecutionResponseDetail is a Pydantic model that represents the detail of an execution response.\n\nAttributes\n----------\n    name (str): The name of the execution.\n    status (str): The current status of the execution.\n    start_at (datetime | None): The start time of the execution.\n    end_at (datetime | None): The end time of the execution.\n    elapsed_time (timedelta | None): The total elapsed time of the execution.\n    task (list[Task]): List of tasks in the execution.\n    note (dict): Notes for the execution."
+        "description": "ExecutionResponseDetail is a Pydantic model that represents the detail of an execution response.\n\nAttributes\n----------\n    name (str): The name of the execution.\n    status (str): The current status of the execution.\n    start_at (datetime | None): The start time of the execution.\n    end_at (datetime | None): The end time of the execution.\n    elapsed_time (timedelta | None): The total elapsed time of the execution.\n    task (list[Task]): List of tasks in the execution.\n    note (dict): Notes for the execution.\n    tags (list[str]): Tags associated with the execution.\n    chip_id (str): The chip ID for the execution."
       },
       "ExecutionResponseSummary": {
         "properties": {
@@ -9575,6 +10417,247 @@
         "title": "IssueCreate",
         "description": "Request schema for creating an issue."
       },
+      "IssueKnowledgeResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Document ID"
+          },
+          "issue_id": {
+            "type": "string",
+            "title": "Issue Id",
+            "description": "Source issue ID"
+          },
+          "task_id": {
+            "type": "string",
+            "title": "Task Id",
+            "description": "Associated task result ID"
+          },
+          "task_name": {
+            "type": "string",
+            "title": "Task Name",
+            "description": "Calibration task class name"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "description": "Lifecycle status: draft, approved, rejected"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title",
+            "description": "Short descriptive title"
+          },
+          "date": {
+            "type": "string",
+            "title": "Date",
+            "description": "Date of the incident",
+            "default": ""
+          },
+          "severity": {
+            "type": "string",
+            "title": "Severity",
+            "description": "Severity level",
+            "default": "warning"
+          },
+          "chip_id": {
+            "type": "string",
+            "title": "Chip Id",
+            "description": "Chip identifier",
+            "default": ""
+          },
+          "qid": {
+            "type": "string",
+            "title": "Qid",
+            "description": "Qubit identifier",
+            "default": ""
+          },
+          "resolution_status": {
+            "type": "string",
+            "title": "Resolution Status",
+            "description": "Case outcome",
+            "default": "resolved"
+          },
+          "symptom": {
+            "type": "string",
+            "title": "Symptom",
+            "description": "Observed symptom",
+            "default": ""
+          },
+          "root_cause": {
+            "type": "string",
+            "title": "Root Cause",
+            "description": "Identified root cause",
+            "default": ""
+          },
+          "resolution": {
+            "type": "string",
+            "title": "Resolution",
+            "description": "How the issue was resolved",
+            "default": ""
+          },
+          "lesson_learned": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Lesson Learned",
+            "description": "Key takeaways"
+          },
+          "figure_paths": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Figure Paths",
+            "description": "Task result figure paths"
+          },
+          "thread_image_urls": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Thread Image Urls",
+            "description": "Image URLs from issue thread"
+          },
+          "reviewed_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewed By",
+            "description": "Reviewer username"
+          },
+          "pr_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pr Url",
+            "description": "GitHub PR URL (set on approve)"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At",
+            "description": "When the draft was created"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At",
+            "description": "When the draft was last updated"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "issue_id",
+          "task_id",
+          "task_name",
+          "status",
+          "title",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "IssueKnowledgeResponse",
+        "description": "Response schema for a knowledge case."
+      },
+      "IssueKnowledgeUpdate": {
+        "properties": {
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title",
+            "description": "Updated title"
+          },
+          "severity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Severity",
+            "description": "Updated severity"
+          },
+          "symptom": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 5000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symptom",
+            "description": "Updated symptom"
+          },
+          "root_cause": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 5000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Root Cause",
+            "description": "Updated root cause"
+          },
+          "resolution": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 5000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolution",
+            "description": "Updated resolution"
+          },
+          "lesson_learned": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lesson Learned",
+            "description": "Updated lessons"
+          }
+        },
+        "type": "object",
+        "title": "IssueKnowledgeUpdate",
+        "description": "Request schema for editing a knowledge draft."
+      },
       "IssueResponse": {
         "properties": {
           "id": {
@@ -9693,6 +10776,97 @@
         ],
         "title": "IssueUpdate",
         "description": "Request schema for updating an issue."
+      },
+      "KnowledgeCaseResponse": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "date": {
+            "type": "string",
+            "title": "Date",
+            "default": ""
+          },
+          "severity": {
+            "type": "string",
+            "title": "Severity",
+            "default": "warning"
+          },
+          "chip_id": {
+            "type": "string",
+            "title": "Chip Id",
+            "default": ""
+          },
+          "qid": {
+            "type": "string",
+            "title": "Qid",
+            "default": ""
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "default": "resolved"
+          },
+          "symptom": {
+            "type": "string",
+            "title": "Symptom",
+            "default": ""
+          },
+          "root_cause": {
+            "type": "string",
+            "title": "Root Cause",
+            "default": ""
+          },
+          "resolution": {
+            "type": "string",
+            "title": "Resolution",
+            "default": ""
+          },
+          "lesson_learned": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Lesson Learned",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "title"
+        ],
+        "title": "KnowledgeCaseResponse",
+        "description": "Response model for a knowledge case (postmortem)."
+      },
+      "KnowledgeImageResponse": {
+        "properties": {
+          "alt_text": {
+            "type": "string",
+            "title": "Alt Text"
+          },
+          "relative_path": {
+            "type": "string",
+            "title": "Relative Path"
+          },
+          "section": {
+            "type": "string",
+            "title": "Section"
+          },
+          "base64_data": {
+            "type": "string",
+            "title": "Base64 Data",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "alt_text",
+          "relative_path",
+          "section"
+        ],
+        "title": "KnowledgeImageResponse",
+        "description": "Response model for a task knowledge image reference."
       },
       "LatestTaskResultResponse": {
         "properties": {
@@ -9986,6 +11160,38 @@
         "title": "ListFlowsResponse",
         "description": "Response for listing flows."
       },
+      "ListIssueKnowledgeResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/IssueKnowledgeResponse"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "skip": {
+            "type": "integer",
+            "title": "Skip"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "skip",
+          "limit"
+        ],
+        "title": "ListIssueKnowledgeResponse",
+        "description": "Paginated list of knowledge cases."
+      },
       "ListIssuesResponse": {
         "properties": {
           "issues": {
@@ -10117,6 +11323,31 @@
         ],
         "title": "ListTaskInfoResponse",
         "description": "Response model for listing task info."
+      },
+      "ListTaskKnowledgeResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/TaskKnowledgeSummaryResponse"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "categories": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Categories",
+            "default": {}
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "ListTaskKnowledgeResponse",
+        "description": "Response model for listing all task knowledge entries."
       },
       "ListTaskResponse": {
         "properties": {
@@ -11739,6 +12970,67 @@
         "title": "QubitResponse",
         "description": "Response model for a single qubit."
       },
+      "ReExecuteRequest": {
+        "properties": {
+          "flow_name": {
+            "type": "string",
+            "title": "Flow Name"
+          },
+          "parameter_overrides": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Parameter Overrides",
+            "default": {}
+          }
+        },
+        "type": "object",
+        "required": [
+          "flow_name"
+        ],
+        "title": "ReExecuteRequest",
+        "description": "Request model for re-executing an execution from snapshot parameters."
+      },
+      "ReExecutionEntry": {
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "title": "Task Id"
+          },
+          "task_name": {
+            "type": "string",
+            "title": "Task Name"
+          },
+          "qid": {
+            "type": "string",
+            "title": "Qid"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "start_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "task_id",
+          "task_name",
+          "qid",
+          "status"
+        ],
+        "title": "ReExecutionEntry",
+        "description": "A child task result created by re-execution."
+      },
       "RecalibrationRecommendationResponse": {
         "properties": {
           "source_entity_id": {
@@ -12887,6 +14179,11 @@
             "type": "string",
             "title": "Name"
           },
+          "category": {
+            "type": "string",
+            "title": "Category",
+            "default": ""
+          },
           "summary": {
             "type": "string",
             "title": "Summary"
@@ -12952,6 +14249,22 @@
             "title": "Prerequisites",
             "default": []
           },
+          "images": {
+            "items": {
+              "$ref": "#/components/schemas/KnowledgeImageResponse"
+            },
+            "type": "array",
+            "title": "Images",
+            "default": []
+          },
+          "cases": {
+            "items": {
+              "$ref": "#/components/schemas/KnowledgeCaseResponse"
+            },
+            "type": "array",
+            "title": "Cases",
+            "default": []
+          },
           "prompt_text": {
             "type": "string",
             "title": "Prompt Text"
@@ -12971,6 +14284,50 @@
         ],
         "title": "TaskKnowledgeResponse",
         "description": "Response model for task knowledge (LLM-oriented domain knowledge)."
+      },
+      "TaskKnowledgeSummaryResponse": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "category": {
+            "type": "string",
+            "title": "Category",
+            "default": ""
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary"
+          },
+          "failure_mode_count": {
+            "type": "integer",
+            "title": "Failure Mode Count",
+            "default": 0
+          },
+          "case_count": {
+            "type": "integer",
+            "title": "Case Count",
+            "default": 0
+          },
+          "image_count": {
+            "type": "integer",
+            "title": "Image Count",
+            "default": 0
+          },
+          "has_analysis_guide": {
+            "type": "boolean",
+            "title": "Has Analysis Guide",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "summary"
+        ],
+        "title": "TaskKnowledgeSummaryResponse",
+        "description": "Summary response for list endpoint (no heavy fields)."
       },
       "TaskResponse": {
         "properties": {
@@ -13262,6 +14619,11 @@
             "type": "string",
             "title": "Execution Id"
           },
+          "flow_name": {
+            "type": "string",
+            "title": "Flow Name",
+            "default": ""
+          },
           "figure_path": {
             "items": {
               "type": "string"
@@ -13291,6 +14653,33 @@
             "type": "object",
             "title": "Run Parameters",
             "default": {}
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tags",
+            "default": []
+          },
+          "source_task_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Task Id"
+          },
+          "re_executions": {
+            "items": {
+              "$ref": "#/components/schemas/ReExecutionEntry"
+            },
+            "type": "array",
+            "title": "Re Executions",
+            "default": []
           },
           "start_at": {
             "anyOf": [
@@ -13342,7 +14731,7 @@
           "output_parameters"
         ],
         "title": "TaskResultResponse",
-        "description": "Response model for task result by task_id.\n\nAttributes\n----------\n    task_id (str): The task ID.\n    task_name (str): The name of the task.\n    qid (str): The qubit or coupling ID.\n    status (str): The task status.\n    execution_id (str): The execution ID.\n    figure_path (list[str]): List of figure paths.\n    json_figure_path (list[str]): List of JSON figure paths.\n    input_parameters (dict): Input parameters.\n    output_parameters (dict): Output parameters.\n    start_at (datetime | None): Start time.\n    end_at (datetime | None): End time.\n    elapsed_time (timedelta | None): Elapsed time."
+        "description": "Response model for task result by task_id.\n\nAttributes\n----------\n    task_id (str): The task ID.\n    task_name (str): The name of the task.\n    qid (str): The qubit or coupling ID.\n    status (str): The task status.\n    execution_id (str): The execution ID.\n    figure_path (list[str]): List of figure paths.\n    json_figure_path (list[str]): List of JSON figure paths.\n    input_parameters (dict): Input parameters.\n    output_parameters (dict): Output parameters.\n    start_at (datetime | None): Start time.\n    end_at (datetime | None): End time.\n    elapsed_time (timedelta | None): Elapsed time.\n    source_task_id (str | None): Parent task ID this was re-executed from.\n    re_executions (list[ReExecutionEntry]): Child task results from re-executions."
       },
       "TimeSeriesData": {
         "properties": {
@@ -13868,6 +15257,13 @@
           "type": {
             "type": "string",
             "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
           }
         },
         "type": "object",
@@ -13973,5 +15369,10 @@
         "scheme": "bearer"
       }
     }
-  }
+  },
+  "servers": [
+    {
+      "url": "/api"
+    }
+  ]
 }

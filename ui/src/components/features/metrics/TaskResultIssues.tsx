@@ -14,7 +14,7 @@ import {
   type TaskResultIssue,
 } from "@/hooks/useTaskResultIssues";
 import { useProject } from "@/contexts/ProjectContext";
-import { formatRelativeTime } from "@/utils/datetime";
+import { formatRelativeTime } from "@/lib/utils/datetime";
 import { MarkdownContent } from "@/components/ui/MarkdownContent";
 import { MarkdownEditor } from "@/components/ui/MarkdownEditor";
 import { useImageUpload } from "@/hooks/useImageUpload";

@@ -5,7 +5,7 @@ import { useCallback, useState, useEffect } from "react";
 
 import { Book, Github, Moon, Sun } from "lucide-react";
 
-import { useTheme } from "@/app/providers/theme-provider";
+import { useTheme } from "@/contexts/ThemeContext";
 import { EnvironmentBadge } from "@/components/ui/EnvironmentBadge";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { useAuth } from "@/contexts/AuthContext";
@@ -32,7 +32,7 @@ export default function LoginPage() {
     try {
       await authLogin(userName, password);
       router.replace("/execution");
-    } catch (err) {
+    } catch {
       setError("Login failed. Please check your user ID and password.");
     }
   };

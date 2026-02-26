@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useRef, useId } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import dynamic from "next/dynamic";
@@ -13,6 +13,48 @@ const ChatPlotlyChart = dynamic(
     ),
   { ssr: false },
 );
+
+/**
+ * Renders a mermaid diagram from a code string.
+ * Uses mermaid.render() on the client side only.
+ */
+function MermaidDiagram({ code }: { code: string }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const uniqueId = useId().replace(/:/g, "_");
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const mermaid = (await import("mermaid")).default;
+        mermaid.initialize({
+          startOnLoad: false,
+          theme: "default",
+          securityLevel: "loose",
+        });
+        const { svg } = await mermaid.render(`mermaid${uniqueId}`, code);
+        if (!cancelled && containerRef.current) {
+          containerRef.current.innerHTML = svg;
+        }
+      } catch (e) {
+        // Fallback: show as code block
+        if (!cancelled && containerRef.current) {
+          containerRef.current.textContent = code;
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [code, uniqueId]);
+
+  return (
+    <div
+      ref={containerRef}
+      className="my-3 flex justify-center overflow-x-auto"
+    />
+  );
+}
 
 const MENTION_RE = /@(qdash)\b/gi;
 
@@ -74,6 +116,7 @@ function tryParsePlotlyJson(
   return null;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const markdownComponents: Record<string, React.ComponentType<any>> = {
   code({
     className,
@@ -82,6 +125,11 @@ const markdownComponents: Record<string, React.ComponentType<any>> = {
   }: React.ComponentPropsWithoutRef<"code"> & { className?: string }) {
     const match = /language-(\w+)/.exec(className || "");
     const codeString = String(children).replace(/\n$/, "");
+
+    // Render mermaid diagrams
+    if (match && match[1] === "mermaid") {
+      return <MermaidDiagram code={codeString} />;
+    }
 
     // Render Plotly charts from JSON code blocks
     if (match && match[1] === "json") {
@@ -139,6 +187,31 @@ const markdownComponents: Record<string, React.ComponentType<any>> = {
   },
 };
 
+/**
+ * Custom URL transform that extends the default behaviour to allow
+ * `data:` URIs.  react-markdown v10 strips any protocol not in its
+ * safe-list (http, https, mailto …) which breaks inline base64 images
+ * returned by the task-knowledge API.
+ */
+function urlTransform(url: string): string {
+  if (url.startsWith("data:")) return url;
+  // Fall back to the built-in sanitisation for everything else.
+  const colon = url.indexOf(":");
+  const questionMark = url.indexOf("?");
+  const numberSign = url.indexOf("#");
+  const slash = url.indexOf("/");
+  if (
+    colon === -1 ||
+    (slash !== -1 && colon > slash) ||
+    (questionMark !== -1 && colon > questionMark) ||
+    (numberSign !== -1 && colon > numberSign) ||
+    /^(https?|ircs?|mailto|xmpp)$/i.test(url.slice(0, colon))
+  ) {
+    return url;
+  }
+  return "";
+}
+
 export function MarkdownContent({
   content,
   className,
@@ -150,6 +223,7 @@ export function MarkdownContent({
     <div className={`prose prose-sm max-w-none ${className ?? ""}`}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
+        urlTransform={urlTransform}
         components={markdownComponents}
       >
         {content}

@@ -5,7 +5,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { useToast } from "@/components/ui/Toast";
-import { formatDateTime } from "@/utils/datetime";
+import { formatDateTime } from "@/lib/utils/datetime";
 
 import type { ScheduleFlowRequest, FlowScheduleSummary } from "@/schemas";
 
@@ -52,8 +52,8 @@ export function FlowSchedulePanel({ flowName }: FlowSchedulePanelProps) {
       setCronExpression("");
       setScheduledTime("");
     },
-    onError: (error: any) => {
-      toast.error(`Failed to create schedule: ${(error as Error)?.message}`);
+    onError: (error: Error) => {
+      toast.error(`Failed to create schedule: ${error.message}`);
     },
   });
 
@@ -66,8 +66,8 @@ export function FlowSchedulePanel({ flowName }: FlowSchedulePanelProps) {
       queryClient.invalidateQueries({ queryKey: ["flow-schedules"] });
       toast.success("Schedule deleted successfully!");
     },
-    onError: (error: any) => {
-      toast.error(`Failed to delete schedule: ${(error as Error)?.message}`);
+    onError: (error: Error) => {
+      toast.error(`Failed to delete schedule: ${error.message}`);
     },
   });
 
@@ -85,8 +85,8 @@ export function FlowSchedulePanel({ flowName }: FlowSchedulePanelProps) {
       queryClient.invalidateQueries({ queryKey: ["flow-schedules"] });
       toast.success("Schedule updated successfully!");
     },
-    onError: (error: any) => {
-      toast.error(`Failed to update schedule: ${(error as Error)?.message}`);
+    onError: (error: Error) => {
+      toast.error(`Failed to update schedule: ${error.message}`);
     },
   });
 

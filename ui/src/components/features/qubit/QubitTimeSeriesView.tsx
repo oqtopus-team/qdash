@@ -259,7 +259,7 @@ export function QubitTimeSeriesView({
             label: "Value",
             sortable: false,
             className: "text-center",
-            render: (value: any) =>
+            render: (value: unknown) =>
               typeof value === "number" ? value.toFixed(4) : String(value),
           },
           {
@@ -267,8 +267,10 @@ export function QubitTimeSeriesView({
             label: "Error",
             sortable: false,
             className: "text-center",
-            render: (value: any) =>
-              value !== undefined ? `±${value.toFixed(4)}` : "-",
+            render: (value: unknown) =>
+              value !== undefined && value !== null && typeof value === "number"
+                ? `\u00B1${value.toFixed(4)}`
+                : "-",
           },
           {
             key: "unit",

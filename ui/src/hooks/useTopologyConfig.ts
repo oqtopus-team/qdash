@@ -11,26 +11,26 @@ import { useGetTopologyById } from "@/client/topology/topology";
 
 // Type definitions matching backend Pydantic models
 
-export interface QubitPosition {
+interface QubitPosition {
   row: number;
   col: number;
 }
 
-export interface MuxConfig {
+interface MuxConfig {
   enabled: boolean;
   size: number;
 }
 
-export interface VisualizationConfig {
+interface VisualizationConfig {
   show_mux_boundaries: boolean;
   region_size: number;
 }
 
-export type LayoutType = "grid" | "linear" | "hex" | "custom";
+type LayoutType = "grid" | "linear" | "hex" | "custom";
 
-export type DirectionConvention = "checkerboard_cr" | "unspecified";
+type DirectionConvention = "checkerboard_cr" | "unspecified";
 
-export interface TopologyDefinition {
+interface TopologyDefinition {
   id: string;
   name: string;
   description: string;
@@ -119,36 +119,5 @@ export function useTopologyConfig(topologyId: string) {
     isLoading,
     isError,
     error,
-  };
-}
-
-/**
- * Get grid position for a qubit from explicit position data.
- */
-export function getQubitPositionFromTopology(
-  qid: number,
-  qubits: Record<number, QubitPosition>,
-): QubitPosition | null {
-  return qubits[qid] || null;
-}
-
-/**
- * Get coupling position between two qubits.
- */
-export function getCouplingPositionFromTopology(
-  qid1: number,
-  qid2: number,
-  qubits: Record<number, QubitPosition>,
-): { row1: number; col1: number; row2: number; col2: number } | null {
-  const pos1 = getQubitPositionFromTopology(qid1, qubits);
-  const pos2 = getQubitPositionFromTopology(qid2, qubits);
-
-  if (!pos1 || !pos2) return null;
-
-  return {
-    row1: pos1.row,
-    col1: pos1.col,
-    row2: pos2.row,
-    col2: pos2.col,
   };
 }

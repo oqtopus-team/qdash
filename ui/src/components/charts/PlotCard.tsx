@@ -2,7 +2,7 @@ import dynamic from "next/dynamic";
 import type { ReactNode } from "react";
 import { useMemo, useState, useEffect } from "react";
 
-import type { PlotData, Layout, Config } from "plotly.js";
+import type { PlotData, Layout, Config, Font } from "plotly.js";
 
 const Plot = dynamic(() => import("@/components/charts/Plot"), {
   ssr: false,
@@ -68,7 +68,10 @@ export function PlotCard({
           ? { text: layout.title, font: { size: 14 } }
           : {
               ...layout.title,
-              font: { ...(layout.title as any).font, size: 14 },
+              font: {
+                ...(layout.title as { font?: Partial<Font> }).font,
+                size: 14,
+              },
             }
         : undefined,
     };

@@ -1,33 +1,26 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 
 import Plot from "@/components/charts/Plot";
 
-export default function PlotlyRenderer({
+export function PlotlyRenderer({
   fullPath,
   className = "",
 }: {
   fullPath: string;
   className?: string;
 }) {
-  const [figure, setFigure] = useState<any | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const { data: figure, error } = useQuery({
+    queryKey: ["plotly-figure", fullPath],
+    queryFn: async () => {
+      const res = await fetch(fullPath);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res.json();
+    },
+  });
 
-  useEffect(() => {
-    fetch(fullPath)
-      .then((res) => {
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return res.json();
-      })
-      .then((fig) => setFigure(fig))
-      .catch((err) => {
-        console.error("Failed to load Plotly figure:", err);
-        setError("Failed to load plot");
-      });
-  }, [fullPath]);
-
-  if (error) return <div className="text-error">{error}</div>;
+  if (error) return <div className="text-error">Failed to load plot</div>;
   if (!figure) return <div>Loading...</div>;
 
   return (

@@ -5,7 +5,8 @@ from qdash.datamodel.execution import (
     ExecutionModel,
     ExecutionStatusModel,
 )
-from qdash.workflow.engine.repository import (
+from qdash.datamodel.system_info import SystemInfoModel
+from qdash.repository.inmemory import (
     InMemoryExecutionCounterRepository,
     InMemoryExecutionLockRepository,
     InMemoryExecutionRepository,
@@ -27,15 +28,13 @@ class TestInMemoryExecutionRepository:
             calib_data_path="/tmp",
             note={},
             status=ExecutionStatusModel.SCHEDULED,
-            task_results={},
             tags=[],
             chip_id="chip_1",
             start_at=None,
             end_at=None,
             elapsed_time=None,
-            calib_data={"qubit": {}, "coupling": {}},
             message="",
-            system_info={},
+            system_info=SystemInfoModel(),
         )
 
         repo.save(model)
@@ -61,15 +60,13 @@ class TestInMemoryExecutionRepository:
             calib_data_path="/tmp",
             note={},
             status=ExecutionStatusModel.SCHEDULED,
-            task_results={},
             tags=[],
             chip_id="chip_1",
             start_at=None,
             end_at=None,
             elapsed_time=None,
-            calib_data={"qubit": {}, "coupling": {}},
             message="",
-            system_info={},
+            system_info=SystemInfoModel(),
         )
         repo.save(model)
 
@@ -90,15 +87,13 @@ class TestInMemoryExecutionRepository:
             calib_data_path="/tmp",
             note={},
             status=ExecutionStatusModel.SCHEDULED,
-            task_results={},
             tags=[],
             chip_id="chip_1",
             start_at=None,
             end_at=None,
             elapsed_time=None,
-            calib_data={"qubit": {}, "coupling": {}},
             message="",
-            system_info={},
+            system_info=SystemInfoModel(),
         )
 
         def update_status(m: ExecutionModel) -> None:
@@ -128,15 +123,13 @@ class TestInMemoryExecutionRepository:
             calib_data_path="/tmp",
             note={},
             status=ExecutionStatusModel.SCHEDULED,
-            task_results={},
             tags=[],
             chip_id="chip_1",
             start_at=None,
             end_at=None,
             elapsed_time=None,
-            calib_data={"qubit": {}, "coupling": {}},
             message="",
-            system_info={},
+            system_info=SystemInfoModel(),
         )
         repo.save(model)
 
@@ -328,15 +321,13 @@ class TestInMemoryTaskResultHistoryRepository:
             calib_data_path="/tmp",
             note={},
             status=ExecutionStatusModel.RUNNING,
-            task_results={},
             tags=[],
             chip_id="chip_1",
             start_at=None,
             end_at=None,
             elapsed_time=None,
-            calib_data={"qubit": {}, "coupling": {}},
             message="",
-            system_info={},
+            system_info=SystemInfoModel(),
             project_id="proj-1",
         )
 
@@ -367,15 +358,13 @@ class TestInMemoryTaskResultHistoryRepository:
             calib_data_path="/tmp",
             note={},
             status=ExecutionStatusModel.RUNNING,
-            task_results={},
             tags=[],
             chip_id="chip_1",
             start_at=None,
             end_at=None,
             elapsed_time=None,
-            calib_data={"qubit": {}, "coupling": {}},
             message="",
-            system_info={},
+            system_info=SystemInfoModel(),
             project_id="proj-1",
         )
         task_result = QubitTaskModel(name="Test", qid="0", project_id="proj-1")
@@ -391,7 +380,7 @@ class TestInMemoryChipHistoryRepository:
 
     def test_create_history(self):
         """Test creating chip history snapshot."""
-        from qdash.workflow.engine.repository import InMemoryChipHistoryRepository
+        from qdash.repository.inmemory import InMemoryChipHistoryRepository
 
         repo = InMemoryChipHistoryRepository()
 
@@ -404,7 +393,7 @@ class TestInMemoryChipHistoryRepository:
 
     def test_create_history_without_chip_id(self):
         """Test creating history without chip_id."""
-        from qdash.workflow.engine.repository import InMemoryChipHistoryRepository
+        from qdash.repository.inmemory import InMemoryChipHistoryRepository
 
         repo = InMemoryChipHistoryRepository()
 
@@ -417,7 +406,7 @@ class TestInMemoryChipHistoryRepository:
 
     def test_clear(self):
         """Test clearing repository."""
-        from qdash.workflow.engine.repository import InMemoryChipHistoryRepository
+        from qdash.repository.inmemory import InMemoryChipHistoryRepository
 
         repo = InMemoryChipHistoryRepository()
         repo.create_history("alice", "chip_1")
@@ -432,7 +421,7 @@ class TestInMemoryQubitCalibrationRepository:
 
     def test_update_calib_data_creates_new(self):
         """Test updating creates new qubit if not exists."""
-        from qdash.workflow.engine.repository import InMemoryQubitCalibrationRepository
+        from qdash.repository.inmemory import InMemoryQubitCalibrationRepository
 
         repo = InMemoryQubitCalibrationRepository()
 
@@ -450,7 +439,7 @@ class TestInMemoryQubitCalibrationRepository:
 
     def test_update_calib_data_merges_existing(self):
         """Test updating merges into existing qubit."""
-        from qdash.workflow.engine.repository import InMemoryQubitCalibrationRepository
+        from qdash.repository.inmemory import InMemoryQubitCalibrationRepository
 
         repo = InMemoryQubitCalibrationRepository()
 
@@ -477,7 +466,7 @@ class TestInMemoryQubitCalibrationRepository:
 
     def test_find_one(self):
         """Test finding qubit by identifiers."""
-        from qdash.workflow.engine.repository import InMemoryQubitCalibrationRepository
+        from qdash.repository.inmemory import InMemoryQubitCalibrationRepository
 
         repo = InMemoryQubitCalibrationRepository()
         repo.update_calib_data(
@@ -497,7 +486,7 @@ class TestInMemoryQubitCalibrationRepository:
 
     def test_clear(self):
         """Test clearing repository."""
-        from qdash.workflow.engine.repository import InMemoryQubitCalibrationRepository
+        from qdash.repository.inmemory import InMemoryQubitCalibrationRepository
 
         repo = InMemoryQubitCalibrationRepository()
         repo.update_calib_data(
@@ -518,7 +507,7 @@ class TestInMemoryCouplingCalibrationRepository:
 
     def test_update_calib_data_creates_new(self):
         """Test updating creates new coupling if not exists."""
-        from qdash.workflow.engine.repository import InMemoryCouplingCalibrationRepository
+        from qdash.repository.inmemory import InMemoryCouplingCalibrationRepository
 
         repo = InMemoryCouplingCalibrationRepository()
 
@@ -536,7 +525,7 @@ class TestInMemoryCouplingCalibrationRepository:
 
     def test_update_calib_data_merges_existing(self):
         """Test updating merges into existing coupling."""
-        from qdash.workflow.engine.repository import InMemoryCouplingCalibrationRepository
+        from qdash.repository.inmemory import InMemoryCouplingCalibrationRepository
 
         repo = InMemoryCouplingCalibrationRepository()
 
@@ -563,7 +552,7 @@ class TestInMemoryCouplingCalibrationRepository:
 
     def test_find_one(self):
         """Test finding coupling by identifiers."""
-        from qdash.workflow.engine.repository import InMemoryCouplingCalibrationRepository
+        from qdash.repository.inmemory import InMemoryCouplingCalibrationRepository
 
         repo = InMemoryCouplingCalibrationRepository()
         repo.update_calib_data(
@@ -583,7 +572,7 @@ class TestInMemoryCouplingCalibrationRepository:
 
     def test_clear(self):
         """Test clearing repository."""
-        from qdash.workflow.engine.repository import InMemoryCouplingCalibrationRepository
+        from qdash.repository.inmemory import InMemoryCouplingCalibrationRepository
 
         repo = InMemoryCouplingCalibrationRepository()
         repo.update_calib_data(

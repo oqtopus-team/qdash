@@ -2,8 +2,8 @@
 
 import { usePathname } from "next/navigation";
 
-import Navbar from "./Navbar";
-import Sidebar from "./Sidebar";
+import { Navbar } from "./Navbar";
+import { Sidebar } from "./Sidebar";
 import { AnalysisSidebar } from "./AnalysisSidebar";
 
 import { SidebarProvider } from "@/contexts/SidebarContext";
@@ -16,7 +16,7 @@ interface AppLayoutProps {
 // Pages that should not show sidebar and navbar
 const PUBLIC_PATHS = ["/login"];
 
-export default function AppLayout({ children }: AppLayoutProps) {
+export function AppLayout({ children }: AppLayoutProps) {
   const pathname = usePathname();
   const isPublicPage = PUBLIC_PATHS.includes(pathname);
 
