@@ -771,12 +771,8 @@ class TestDocToMarkdown:
         )
         md = IssueKnowledgeService._doc_to_markdown(doc)
         assert "## Thread images" in md
-        assert (
-            "![Thread image 1](./figures/81909b81-af30-40d8-85b3-379bb4d75909.png)" in md
-        )
-        assert (
-            "![Thread image 2](./figures/abcdef12-3456-7890-abcd-ef1234567890.jpg)" in md
-        )
+        assert "![Thread image 1](./figures/81909b81-af30-40d8-85b3-379bb4d75909.png)" in md
+        assert "![Thread image 2](./figures/abcdef12-3456-7890-abcd-ef1234567890.jpg)" in md
 
     def test_thread_image_urls_mixed(self):
         """Mixed local and external thread image URLs are handled correctly."""
