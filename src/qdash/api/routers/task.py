@@ -6,12 +6,14 @@ import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
+from fastapi.responses import Response
 from qdash.api.dependencies import get_task_service  # noqa: TCH002
 from qdash.api.lib.project import (  # noqa: TCH002
     ProjectContext,
     get_project_context,
 )
 from qdash.api.schemas.task import (
+    ListTaskKnowledgeResponse,
     ListTaskResponse,
     TaskKnowledgeResponse,
     TaskResultResponse,
@@ -83,6 +85,38 @@ def get_task_result(
 
     """
     return service.get_task_result(ctx.project_id, task_id)
+
+
+@router.get(
+    "/task-knowledge",
+    response_model=ListTaskKnowledgeResponse,
+    summary="List all task knowledge entries",
+    operation_id="listTaskKnowledge",
+)
+def list_task_knowledge(
+    service: Annotated[TaskService, Depends(get_task_service)],
+) -> ListTaskKnowledgeResponse:
+    """List all available task knowledge entries with summary info."""
+    return service.list_task_knowledge()
+
+
+@router.get(
+    "/tasks/{task_name}/knowledge/markdown",
+    summary="Get raw markdown for a task knowledge entry",
+    operation_id="getTaskKnowledgeMarkdown",
+    response_class=Response,
+)
+def get_task_knowledge_markdown(
+    task_name: str,
+    service: Annotated[TaskService, Depends(get_task_service)],
+) -> Response:
+    """Get raw markdown content for a task knowledge entry.
+
+    Returns the index.md content with image references replaced
+    by inline base64 data URIs for self-contained rendering.
+    """
+    content = service.get_task_knowledge_markdown(task_name)
+    return Response(content=content, media_type="text/markdown; charset=utf-8")
 
 
 @router.get(

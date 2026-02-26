@@ -237,6 +237,7 @@ config/qubex/*
 !config/topologies/
 !config/qubex/qubex.example/
 config/qubex-config/*
+config/task-knowledge/
 # Local settings overrides (not committed)
 # These allow per-developer customization without modifying committed files
 config/*.local.yaml

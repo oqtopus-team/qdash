@@ -2,20 +2,35 @@
 
 from __future__ import annotations
 
+import base64
 import logging
+import re
 from typing import TYPE_CHECKING
 
 from fastapi import HTTPException
 from qdash.api.schemas.task import (
     ExpectedResultResponse,
     InputParameterModel,
+    KnowledgeCaseResponse,
+    KnowledgeImageResponse,
+    ListTaskKnowledgeResponse,
     ListTaskResponse,
     ReExecutionEntry,
     TaskKnowledgeResponse,
+    TaskKnowledgeSummaryResponse,
     TaskResponse,
     TaskResultResponse,
 )
-from qdash.datamodel.task_knowledge import get_task_knowledge as _lookup_knowledge
+from qdash.common.config_loader import ConfigLoader
+from qdash.datamodel.task_knowledge import (
+    CATEGORY_DISPLAY_NAMES,
+)
+from qdash.datamodel.task_knowledge import (
+    get_task_knowledge as _lookup_knowledge,
+)
+from qdash.datamodel.task_knowledge import (
+    list_all_task_knowledge as _list_all_knowledge,
+)
 from qdash.dbmodel.execution_history import ExecutionHistoryDocument
 from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
 
@@ -145,6 +160,77 @@ class TaskService:
             elapsed_time=task_result.elapsed_time,
         )
 
+    def get_task_knowledge_markdown(self, task_name: str) -> str:
+        """Get raw markdown for a task knowledge entry.
+
+        Reads the index.md file and replaces relative image references
+        with inline base64 data URIs for self-contained rendering.
+        """
+        knowledge = _lookup_knowledge(task_name)
+        if knowledge is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Task '{task_name}' does not have knowledge defined",
+            )
+
+        # Locate the markdown file via category
+        knowledge_dir = ConfigLoader.get_config_dir() / "task-knowledge"
+        md_path = knowledge_dir / knowledge.category / task_name / "index.md"
+
+        if not md_path.is_file():
+            raise HTTPException(
+                status_code=404,
+                detail=f"Markdown file not found for '{task_name}'",
+            )
+
+        content = md_path.read_text(encoding="utf-8")
+
+        # Build a lookup of relative_path -> base64_data from the registry
+        img_map: dict[str, str] = {}
+        for img in knowledge.images:
+            if img.base64_data:
+                img_map[img.relative_path] = img.base64_data
+
+        # Replace ![alt](relative_path) with ![alt](data:image/png;base64,...)
+        def _replace_img(m: re.Match[str]) -> str:
+            alt = m.group(1)
+            rel_path = m.group(2)
+            b64 = img_map.get(rel_path)
+            if b64:
+                return f"![{alt}](data:image/png;base64,{b64})"
+            # Try reading the file directly as fallback
+            img_path = md_path.parent / rel_path
+            if img_path.is_file():
+                try:
+                    data = img_path.read_bytes()
+                    encoded = base64.b64encode(data).decode("ascii")
+                    return f"![{alt}](data:image/png;base64,{encoded})"
+                except OSError:
+                    pass
+            return m.group(0)
+
+        return re.sub(r"!\[([^\]]*)\]\(([^)]+)\)", _replace_img, content)
+
+    def list_task_knowledge(self) -> ListTaskKnowledgeResponse:
+        """List all available task knowledge entries with summary info."""
+        all_knowledge = _list_all_knowledge()
+        items = [
+            TaskKnowledgeSummaryResponse(
+                name=k.name,
+                category=k.category,
+                summary=k.summary,
+                failure_mode_count=len(k.failure_modes),
+                case_count=len(k.cases),
+                image_count=len(k.images),
+                has_analysis_guide=len(k.analysis_guide) > 0,
+            )
+            for k in all_knowledge
+        ]
+        return ListTaskKnowledgeResponse(
+            items=items,
+            categories=CATEGORY_DISPLAY_NAMES,
+        )
+
     def get_task_knowledge(self, task_name: str) -> TaskKnowledgeResponse:
         """Get structured domain knowledge for a calibration task.
 
@@ -173,6 +259,7 @@ class TaskService:
 
         return TaskKnowledgeResponse(
             name=knowledge.name,
+            category=knowledge.category,
             summary=knowledge.summary,
             what_it_measures=knowledge.what_it_measures,
             physical_principle=knowledge.physical_principle,
@@ -184,5 +271,7 @@ class TaskService:
             output_parameters_info=[p.model_dump() for p in knowledge.output_parameters_info],
             analysis_guide=knowledge.analysis_guide,
             prerequisites=knowledge.prerequisites,
+            images=[KnowledgeImageResponse(**img.model_dump()) for img in knowledge.images],
+            cases=[KnowledgeCaseResponse(**case.model_dump()) for case in knowledge.cases],
             prompt_text=knowledge.to_prompt(),
         )

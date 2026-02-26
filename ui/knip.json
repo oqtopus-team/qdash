@@ -11,7 +11,13 @@
     "src/client/**/*.ts",
     "src/schemas/**/*.ts"
   ],
-  "ignoreDependencies": ["sharp", "daisyui", "tailwindcss", "autoprefixer"],
+  "ignoreDependencies": [
+    "sharp",
+    "daisyui",
+    "tailwindcss",
+    "autoprefixer",
+    "@tailwindcss/typography"
+  ],
   "next": {
     "entry": [
       "next.config.js",

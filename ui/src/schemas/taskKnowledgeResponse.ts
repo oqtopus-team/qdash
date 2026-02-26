@@ -8,12 +8,15 @@
 import type { ExpectedResultResponse } from "./expectedResultResponse";
 import type { FailureModeResponse } from "./failureModeResponse";
 import type { OutputParameterInfoResponse } from "./outputParameterInfoResponse";
+import type { KnowledgeImageResponse } from "./knowledgeImageResponse";
+import type { KnowledgeCaseResponse } from "./knowledgeCaseResponse";
 
 /**
  * Response model for task knowledge (LLM-oriented domain knowledge).
  */
 export interface TaskKnowledgeResponse {
   name: string;
+  category?: string;
   summary: string;
   what_it_measures: string;
   physical_principle: string;
@@ -25,5 +28,7 @@ export interface TaskKnowledgeResponse {
   output_parameters_info?: OutputParameterInfoResponse[];
   analysis_guide?: string[];
   prerequisites?: string[];
+  images?: KnowledgeImageResponse[];
+  cases?: KnowledgeCaseResponse[];
   prompt_text: string;
 }

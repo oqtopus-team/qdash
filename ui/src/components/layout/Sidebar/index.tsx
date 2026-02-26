@@ -7,6 +7,7 @@ import { useCallback, useRef } from "react";
 
 import {
   BarChart3,
+  BookMarked,
   BookOpen,
   ChevronLeft,
   ChevronRight,
@@ -19,6 +20,7 @@ import {
   LayoutGrid,
   ListTodo,
   LogOut,
+  Brain,
   CircleDot,
   Moon,
   Settings,
@@ -257,6 +259,24 @@ export function Sidebar() {
           </Link>
         </li>
 
+        <li>
+          <Link
+            href="/task-knowledge"
+            className={
+              isMobileOpen
+                ? linkClass(pathname.startsWith("/task-knowledge"))
+                : desktopLinkClass(pathname.startsWith("/task-knowledge"))
+            }
+            title="Task Knowledge"
+            onClick={handleLinkClick}
+          >
+            <BookMarked size={18} />
+            {(isOpen || isMobileOpen) && (
+              <span className="ml-2">Task Knowledge</span>
+            )}
+          </Link>
+        </li>
+
         {/* Operations Section */}
         <SectionHeader visible={sectionHeaderVisible} label="Operations" />
         {canEdit && (
@@ -308,6 +328,23 @@ export function Sidebar() {
           >
             <CircleDot size={18} />
             {(isOpen || isMobileOpen) && <span className="ml-2">Issues</span>}
+          </Link>
+        </li>
+        <li>
+          <Link
+            href="/issue-knowledge"
+            className={
+              isMobileOpen
+                ? linkClass(pathname.startsWith("/issue-knowledge"))
+                : desktopLinkClass(pathname.startsWith("/issue-knowledge"))
+            }
+            title="Knowledge"
+            onClick={handleLinkClick}
+          >
+            <Brain size={18} />
+            {(isOpen || isMobileOpen) && (
+              <span className="ml-2">Knowledge</span>
+            )}
           </Link>
         </li>
         {canEdit && (

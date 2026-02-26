@@ -23,7 +23,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 MD_DIR = REPO_ROOT / "docs" / "task-knowledge"
-OUTPUT_FILE = REPO_ROOT / "config" / "task-knowledge.json"
+OUTPUT_FILE = REPO_ROOT / "config" / "task-knowledge" / "task-knowledge.json"
 SIDEBAR_FILE = REPO_ROOT / "docs" / ".vitepress" / "task-knowledge-sidebar.json"
 
 # ---------------------------------------------------------------------------
@@ -278,6 +278,154 @@ def _parse_analysis_guide(text: str) -> list[str]:
     return steps
 
 
+# Case metadata keys in frontmatter-style lines: - key: value
+_CASE_META_KEYS = {"date", "severity", "chip_id", "qid", "status"}
+
+# Case H2 section heading → field name
+_CASE_SECTION_MAP: dict[str, str] = {
+    "symptom": "symptom",
+    "root cause": "root_cause",
+    "resolution": "resolution",
+    "lesson learned": "lesson_learned",
+}
+
+
+def _parse_case_file(path: Path) -> dict | None:
+    """Parse a case Markdown file into a dict.
+
+    Expected format::
+
+        # Title
+        - date: 2026-02-15
+        - severity: critical
+        - chip_id: CHIP-01
+        - qid: Q12
+        - status: resolved
+
+        ## Symptom
+        ...
+        ## Root cause
+        ...
+        ## Resolution
+        ...
+        ## Lesson learned
+        - lesson 1
+        - lesson 2
+
+    Returns ``None`` if the file cannot be parsed.
+    """
+    raw = path.read_text(encoding="utf-8")
+    lines = raw.splitlines()
+
+    # --- H1 (title) ---
+    title: str | None = None
+    meta_start: int = 0
+    for i, line in enumerate(lines):
+        if line.startswith("# ") and not line.startswith("## "):
+            title = line[2:].strip()
+            meta_start = i + 1
+            break
+
+    if title is None:
+        return None
+
+    # --- Metadata lines (before first H2) ---
+    h2_indices = [i for i, line in enumerate(lines) if line.startswith("## ")]
+    meta_end = h2_indices[0] if h2_indices else len(lines)
+
+    metadata: dict[str, str] = {}
+    for line in lines[meta_start:meta_end]:
+        stripped = line.strip()
+        if stripped.startswith("- "):
+            content = stripped[2:]
+            if ":" in content:
+                key, val = content.split(":", 1)
+                key = key.strip().lower().replace(" ", "_")
+                if key in _CASE_META_KEYS:
+                    metadata[key] = val.strip()
+
+    # --- H2 sections ---
+    sections: dict[str, str] = {}
+    for idx, h2_line_idx in enumerate(h2_indices):
+        heading = lines[h2_line_idx][3:].strip().lower()
+        body_start = h2_line_idx + 1
+        body_end = h2_indices[idx + 1] if idx + 1 < len(h2_indices) else len(lines)
+        sections[heading] = "\n".join(lines[body_start:body_end]).strip()
+
+    # --- Map sections to fields ---
+    fields: dict[str, object] = {}
+    for heading, body in sections.items():
+        field_name = _CASE_SECTION_MAP.get(heading)
+        if field_name is None:
+            continue
+        if field_name == "lesson_learned":
+            fields[field_name] = _parse_list_items(body)
+        else:
+            fields[field_name] = body
+
+    # --- Images (from all sections) ---
+    images = []
+    full_text = "\n".join(lines)
+    for m in _IMAGE_RE.finditer(full_text):
+        rel = m.group(2)
+        img_path = (path.parent / rel).resolve()
+        b64 = ""
+        if img_path.is_file():
+            try:
+                data = img_path.read_bytes()
+                if len(data) > MAX_IMAGE_SIZE:
+                    print(f"  Warning: {img_path.name} ({len(data)} bytes) exceeds 1MB limit, skipping")
+                elif _detect_image_type(data) is None:
+                    print(f"  Warning: {img_path.name} is not a valid image format, skipping")
+                else:
+                    b64 = base64.b64encode(data).decode("ascii")
+                    print(f"  Encoded case image {img_path.name} ({len(data)} bytes)")
+            except (OSError, MemoryError) as e:
+                print(f"  Error encoding {img_path.name}: {e}")
+        else:
+            print(f"  Warning: Case image not found: {rel}")
+        images.append(
+            {
+                "alt_text": m.group(1),
+                "relative_path": rel,
+                "section": "case",
+                "base64_data": b64,
+            }
+        )
+
+    return {
+        "title": title,
+        "date": metadata.get("date", ""),
+        "severity": metadata.get("severity", "warning"),
+        "chip_id": metadata.get("chip_id", ""),
+        "qid": metadata.get("qid", ""),
+        "status": metadata.get("status", "resolved"),
+        "symptom": fields.get("symptom", ""),
+        "root_cause": fields.get("root_cause", ""),
+        "resolution": fields.get("resolution", ""),
+        "lesson_learned": fields.get("lesson_learned", []),
+        "images": images,
+    }
+
+
+def _parse_cases_dir(task_dir: Path) -> list[dict]:
+    """Parse all case Markdown files in ``<task_dir>/cases/``."""
+    cases_dir = task_dir / "cases"
+    if not cases_dir.is_dir():
+        return []
+
+    cases: list[dict] = []
+    for case_path in sorted(cases_dir.glob("*.md")):
+        case = _parse_case_file(case_path)
+        if case is None:
+            print(f"  SKIP case {case_path.name}: no H1 heading found")
+            continue
+        cases.append(case)
+        print(f"  CASE {case_path.name} -> {case['title']}")
+
+    return cases
+
+
 def _parse_markdown_file(path: Path) -> dict | None:
     """Parse a Markdown knowledge file into a dict.
 
@@ -369,8 +517,15 @@ def _parse_markdown_file(path: Path) -> dict | None:
             ).strip()
             fields[field_name] = clean
 
+    # --- cases ---
+    cases = _parse_cases_dir(path.parent)
+
+    # Derive category from directory path: <category>/<TaskName>/index.md
+    category = path.parent.parent.name if path.parent.parent != path.parent else ""
+
     return {
         "name": name,
+        "category": category,
         "summary": summary,
         "what_it_measures": fields.get("what_it_measures", ""),
         "physical_principle": fields.get("physical_principle", ""),
@@ -386,6 +541,7 @@ def _parse_markdown_file(path: Path) -> dict | None:
         "analysis_guide": fields.get("analysis_guide", []),
         "images": images,
         "related_context": fields.get("related_context", []),
+        "cases": cases,
     }
 
 
@@ -393,101 +549,12 @@ def _parse_markdown_file(path: Path) -> dict | None:
 # Index page generator
 # ---------------------------------------------------------------------------
 
-# Categories for organising the index page.  Tasks not listed here go into
-# "Other".
-# (display_name, dir_slug, task_list)
-_CATEGORIES: list[tuple[str, str, list[str]]] = [
-    (
-        "Box Setup",
-        "box-setup",
-        [
-            "CheckStatus",
-            "LinkUp",
-            "DumpBox",
-            "CheckNoise",
-            "Configure",
-            "ReadoutConfigure",
-        ],
-    ),
-    (
-        "System",
-        "system",
-        [
-            "CheckSkew",
-        ],
-    ),
-    (
-        "CW Characterization",
-        "cw-characterization",
-        [
-            "CheckResonatorFrequencies",
-            "CheckResonatorSpectroscopy",
-            "CheckReflectionCoefficient",
-            "CheckElectricalDelay",
-            "CheckReadoutAmplitude",
-            "CheckQubitFrequencies",
-            "CheckQubitSpectroscopy",
-        ],
-    ),
-    (
-        "TD Characterization",
-        "td-characterization",
-        [
-            "CheckQubit",
-            "CheckQubitFrequency",
-            "CheckReadoutFrequency",
-            "CheckRabi",
-            "CheckT1",
-            "CheckT2Echo",
-            "CheckRamsey",
-            "CheckDispersiveShift",
-            "CheckOptimalReadoutAmplitude",
-            "ReadoutClassification",
-            "ChevronPattern",
-        ],
-    ),
-    (
-        "One-Qubit Gate Calibration",
-        "one-qubit-gate-calibration",
-        [
-            "CheckPIPulse",
-            "CheckHPIPulse",
-            "CheckDRAGPIPulse",
-            "CheckDRAGHPIPulse",
-            "CreatePIPulse",
-            "CreateHPIPulse",
-            "CreateDRAGPIPulse",
-            "CreateDRAGHPIPulse",
-        ],
-    ),
-    (
-        "Two-Qubit Gate Calibration",
-        "two-qubit-gate-calibration",
-        [
-            "CheckCrossResonance",
-            "CheckZX90",
-            "CreateZX90",
-            "CheckBellState",
-            "CheckBellStateTomography",
-        ],
-    ),
-    (
-        "Benchmarking",
-        "benchmarking",
-        [
-            "RandomizedBenchmarking",
-            "X90InterleavedRandomizedBenchmarking",
-            "X180InterleavedRandomizedBenchmarking",
-            "ZX90InterleavedRandomizedBenchmarking",
-        ],
-    ),
-]
-
-# Reverse lookup: task_name -> category dir slug
-_TASK_TO_CAT_DIR: dict[str, str] = {}
-for _cat_name, _cat_dir, _cat_tasks in _CATEGORIES:
-    for _t in _cat_tasks:
-        _TASK_TO_CAT_DIR[_t] = _cat_dir
+# Categories and task→category mapping are defined in the datamodel
+# so that both this script and the API share a single source of truth.
+from qdash.datamodel.task_knowledge import (
+    _CATEGORIES,
+    TASK_TO_CATEGORY_DIR as _TASK_TO_CAT_DIR,
+)
 
 # ---------------------------------------------------------------------------
 # Calibration Workflows
@@ -743,16 +810,9 @@ def _generate_sidebar(registry: dict[str, dict]) -> None:
 # ---------------------------------------------------------------------------
 
 
-def main() -> int:
-    if not MD_DIR.is_dir():
-        print(f"ERROR: Markdown directory not found: {MD_DIR}", file=sys.stderr)
-        return 1
-
-    md_files = sorted(MD_DIR.glob("*/*/index.md"))
-    if not md_files:
-        print(f"ERROR: No */*/index.md files found in {MD_DIR}", file=sys.stderr)
-        return 1
-
+def _scan_and_build(md_dir: Path) -> tuple[dict[str, dict], list[str]]:
+    """Scan a directory for ``*/*/index.md`` and build a registry."""
+    md_files = sorted(md_dir.glob("*/*/index.md"))
     registry: dict[str, dict] = {}
     errors: list[str] = []
 
@@ -771,7 +831,6 @@ def main() -> int:
             )
             if not entry.get(f)
         ]
-        # Check expected_result has a description
         er = entry.get("expected_result", {})
         if isinstance(er, dict) and not er.get("description"):
             missing.append("expected_result")
@@ -784,18 +843,80 @@ def main() -> int:
         registry[entry["name"]] = entry
         print(f"  OK   {md_path.parent.name}/index.md -> {entry['name']}")
 
-    if errors:
+    return registry, errors
+
+
+def main() -> int:
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Generate task-knowledge.json")
+    parser.add_argument(
+        "--knowledge-dir",
+        type=Path,
+        default=None,
+        help=(
+            "Path to an external knowledge repo (e.g. qdash-task-knowledge clone). "
+            "If provided, entries from this directory are merged with (and override) "
+            "the built-in docs/task-knowledge/ entries."
+        ),
+    )
+    parser.add_argument(
+        "--output", "-o",
+        type=Path,
+        default=OUTPUT_FILE,
+        help="Output JSON file path",
+    )
+    args = parser.parse_args()
+
+    # --- Built-in knowledge ---
+    registry: dict[str, dict] = {}
+    all_errors: list[str] = []
+
+    if MD_DIR.is_dir():
+        built_in, errors = _scan_and_build(MD_DIR)
+        registry.update(built_in)
+        all_errors.extend(errors)
+        print(f"Loaded {len(built_in)} entries from {MD_DIR}")
+    else:
+        print(f"Note: built-in directory not found: {MD_DIR}")
+
+    # --- External knowledge repo (overrides/supplements built-in) ---
+    if args.knowledge_dir:
+        ext_dir = args.knowledge_dir.resolve()
+        if ext_dir.is_dir():
+            external, ext_errors = _scan_and_build(ext_dir)
+            # Merge: external entries override built-in, but preserve
+            # built-in entries for tasks not in external repo.
+            # Cases from external repo supplement built-in cases.
+            for name, ext_entry in external.items():
+                if name in registry:
+                    # Merge cases: external cases supplement existing
+                    existing_cases = registry[name].get("cases", [])
+                    ext_cases = ext_entry.get("cases", [])
+                    ext_entry["cases"] = existing_cases + ext_cases
+                registry[name] = ext_entry
+            all_errors.extend(ext_errors)
+            print(f"Merged {len(external)} entries from {ext_dir}")
+        else:
+            print(f"WARNING: --knowledge-dir not found: {ext_dir}", file=sys.stderr)
+
+    if not registry:
+        print("ERROR: No knowledge entries found", file=sys.stderr)
+        return 1
+
+    if all_errors:
         print("\nWarnings:")
-        for e in errors:
+        for e in all_errors:
             print(e)
 
     _enrich_workflow_context(registry)
 
-    OUTPUT_FILE.write_text(
+    output_file: Path = args.output
+    output_file.write_text(
         json.dumps(registry, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
-    print(f"\nGenerated {OUTPUT_FILE} ({len(registry)} entries)")
+    print(f"\nGenerated {output_file} ({len(registry)} entries)")
 
     _generate_index(registry)
     _generate_sidebar(registry)
