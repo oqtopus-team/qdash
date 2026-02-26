@@ -189,13 +189,19 @@ export function CodeBlock({ language, children }: CodeBlockProps) {
   const isPython = language === "python" || language === "py";
 
   return (
-    <div className="relative group my-2 rounded-lg overflow-hidden border border-base-300 bg-base-200">
+    <div className="relative group my-3 rounded-xl overflow-hidden border border-base-300/70 bg-base-200/80">
       {/* Header bar */}
-      <div className="flex items-center justify-between px-3 py-1 bg-base-300/50 text-xs text-base-content/50">
-        <span>{language || "code"}</span>
+      <div className="flex items-center justify-between px-3 py-1.5 bg-base-300/30 text-xs border-b border-base-300/50">
+        <span className="font-mono text-base-content/40 text-[11px] uppercase tracking-wider">
+          {language || "code"}
+        </span>
         <button
           onClick={handleCopy}
-          className="btn btn-ghost btn-xs gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
+          className={`btn btn-ghost btn-xs gap-1 transition-all ${
+            copied
+              ? "opacity-100 text-success"
+              : "opacity-0 group-hover:opacity-100 text-base-content/50"
+          }`}
           title="Copy code"
         >
           {copied ? (
@@ -212,7 +218,7 @@ export function CodeBlock({ language, children }: CodeBlockProps) {
         </button>
       </div>
       {/* Code content */}
-      <pre className="overflow-x-auto px-3 py-2 text-xs leading-relaxed">
+      <pre className="overflow-x-auto px-4 py-3 text-xs leading-relaxed">
         <code>{isPython ? highlightPython(children) : children}</code>
       </pre>
     </div>
