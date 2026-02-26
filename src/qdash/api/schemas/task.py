@@ -63,10 +63,35 @@ class ExpectedResultResponse(BaseModel):
     good_visual: str = ""
 
 
+class KnowledgeImageResponse(BaseModel):
+    """Response model for a task knowledge image reference."""
+
+    alt_text: str
+    relative_path: str
+    section: str
+    base64_data: str = ""
+
+
+class KnowledgeCaseResponse(BaseModel):
+    """Response model for a knowledge case (postmortem)."""
+
+    title: str
+    date: str = ""
+    severity: str = "warning"
+    chip_id: str = ""
+    qid: str = ""
+    status: str = "resolved"
+    symptom: str = ""
+    root_cause: str = ""
+    resolution: str = ""
+    lesson_learned: list[str] = []
+
+
 class TaskKnowledgeResponse(BaseModel):
     """Response model for task knowledge (LLM-oriented domain knowledge)."""
 
     name: str
+    category: str = ""
     summary: str
     what_it_measures: str
     physical_principle: str
@@ -78,7 +103,28 @@ class TaskKnowledgeResponse(BaseModel):
     output_parameters_info: list[OutputParameterInfoResponse] = []
     analysis_guide: list[str] = []
     prerequisites: list[str] = []
+    images: list[KnowledgeImageResponse] = []
+    cases: list[KnowledgeCaseResponse] = []
     prompt_text: str
+
+
+class TaskKnowledgeSummaryResponse(BaseModel):
+    """Summary response for list endpoint (no heavy fields)."""
+
+    name: str
+    category: str = ""
+    summary: str
+    failure_mode_count: int = 0
+    case_count: int = 0
+    image_count: int = 0
+    has_analysis_guide: bool = False
+
+
+class ListTaskKnowledgeResponse(BaseModel):
+    """Response model for listing all task knowledge entries."""
+
+    items: list[TaskKnowledgeSummaryResponse]
+    categories: dict[str, str] = {}  # slug -> display name
 
 
 class ReExecutionEntry(BaseModel):

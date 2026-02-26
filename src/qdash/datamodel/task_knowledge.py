@@ -111,6 +111,7 @@ class TaskKnowledge(BaseModel):
     """LLM-oriented structured knowledge for a calibration task."""
 
     name: str = Field(description="Task name (e.g. CheckT1)")
+    category: str = Field(default="", description="Category slug (e.g. td-characterization)")
     summary: str = Field(description="One-line experiment summary")
     what_it_measures: str = Field(description="What physical quantity is measured")
     physical_principle: str = Field(
@@ -305,3 +306,20 @@ TASK_KNOWLEDGE_REGISTRY: dict[str, TaskKnowledge] = _build_registry()
 def get_task_knowledge(task_name: str) -> TaskKnowledge | None:
     """Look up TaskKnowledge by task class name."""
     return TASK_KNOWLEDGE_REGISTRY.get(task_name)
+
+
+def list_all_task_knowledge() -> list[TaskKnowledge]:
+    """Return all task knowledge entries."""
+    return list(TASK_KNOWLEDGE_REGISTRY.values())
+
+
+# Category slug → display name mapping
+CATEGORY_DISPLAY_NAMES: dict[str, str] = {
+    "box-setup": "Box Setup",
+    "system": "System",
+    "cw-characterization": "CW Characterization",
+    "td-characterization": "TD Characterization",
+    "one-qubit-gate-calibration": "One-Qubit Gate Calibration",
+    "two-qubit-gate-calibration": "Two-Qubit Gate Calibration",
+    "benchmarking": "Benchmarking",
+}

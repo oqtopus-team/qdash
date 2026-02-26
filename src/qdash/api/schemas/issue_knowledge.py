@@ -25,7 +25,11 @@ class IssueKnowledgeResponse(BaseModel):
     resolution: str = Field(default="", description="How the issue was resolved")
     lesson_learned: list[str] = Field(default_factory=list, description="Key takeaways")
 
+    figure_paths: list[str] = Field(default_factory=list, description="Task result figure paths")
+    thread_image_urls: list[str] = Field(default_factory=list, description="Image URLs from issue thread")
+
     reviewed_by: str | None = Field(default=None, description="Reviewer username")
+    pr_url: str | None = Field(default=None, description="GitHub PR URL (set on approve)")
     created_at: datetime = Field(..., description="When the draft was created")
     updated_at: datetime = Field(..., description="When the draft was last updated")
 

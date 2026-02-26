@@ -3517,6 +3517,74 @@
         }
       }
     },
+    "/task-knowledge": {
+      "get": {
+        "tags": [
+          "task"
+        ],
+        "summary": "List all task knowledge entries",
+        "description": "List all available task knowledge entries with summary info.",
+        "operationId": "listTaskKnowledge",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListTaskKnowledgeResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/tasks/{task_name}/knowledge/markdown": {
+      "get": {
+        "tags": [
+          "task"
+        ],
+        "summary": "Get raw markdown for a task knowledge entry",
+        "description": "Get raw markdown content for a task knowledge entry.\n\nReturns the index.md content with image references replaced\nby inline base64 data URIs for self-contained rendering.",
+        "operationId": "getTaskKnowledgeMarkdown",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "task_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Task Name"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/tasks/{task_name}/knowledge": {
       "get": {
         "tags": [
@@ -5267,6 +5335,510 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/IssueResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/issue-knowledge": {
+      "get": {
+        "tags": [
+          "issue-knowledge"
+        ],
+        "summary": "List knowledge cases",
+        "description": "List issue-derived knowledge cases with optional filters.",
+        "operationId": "listIssueKnowledge",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "skip",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Skip"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by status: draft, approved, rejected",
+              "title": "Status"
+            },
+            "description": "Filter by status: draft, approved, rejected"
+          },
+          {
+            "name": "task_name",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by task name",
+              "title": "Task Name"
+            },
+            "description": "Filter by task name"
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListIssueKnowledgeResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/issue-knowledge/{knowledge_id}": {
+      "get": {
+        "tags": [
+          "issue-knowledge"
+        ],
+        "summary": "Get a knowledge case",
+        "description": "Get a single knowledge case by ID.",
+        "operationId": "getIssueKnowledge",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "knowledge_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Knowledge Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IssueKnowledgeResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "issue-knowledge"
+        ],
+        "summary": "Update a knowledge draft",
+        "description": "Update a knowledge draft's content. Only drafts can be edited.",
+        "operationId": "updateIssueKnowledge",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "knowledge_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Knowledge Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IssueKnowledgeUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IssueKnowledgeResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "issue-knowledge"
+        ],
+        "summary": "Delete a knowledge case",
+        "description": "Delete a knowledge case.",
+        "operationId": "deleteIssueKnowledge",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "knowledge_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Knowledge Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/issues/{issue_id}/extract-knowledge": {
+      "post": {
+        "tags": [
+          "issue-knowledge"
+        ],
+        "summary": "Generate knowledge draft from issue",
+        "description": "Generate an AI knowledge draft from a closed issue thread.",
+        "operationId": "extractIssueKnowledge",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "issue_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Issue Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IssueKnowledgeResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/issue-knowledge/{knowledge_id}/approve": {
+      "patch": {
+        "tags": [
+          "issue-knowledge"
+        ],
+        "summary": "Approve a knowledge draft",
+        "description": "Approve a knowledge draft for inclusion in task knowledge.",
+        "operationId": "approveIssueKnowledge",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "knowledge_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Knowledge Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IssueKnowledgeResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/issue-knowledge/{knowledge_id}/reject": {
+      "patch": {
+        "tags": [
+          "issue-knowledge"
+        ],
+        "summary": "Reject a knowledge draft",
+        "description": "Reject a knowledge draft.",
+        "operationId": "rejectIssueKnowledge",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "knowledge_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Knowledge Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IssueKnowledgeResponse"
                 }
               }
             }
@@ -9845,6 +10417,247 @@
         "title": "IssueCreate",
         "description": "Request schema for creating an issue."
       },
+      "IssueKnowledgeResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Document ID"
+          },
+          "issue_id": {
+            "type": "string",
+            "title": "Issue Id",
+            "description": "Source issue ID"
+          },
+          "task_id": {
+            "type": "string",
+            "title": "Task Id",
+            "description": "Associated task result ID"
+          },
+          "task_name": {
+            "type": "string",
+            "title": "Task Name",
+            "description": "Calibration task class name"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "description": "Lifecycle status: draft, approved, rejected"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title",
+            "description": "Short descriptive title"
+          },
+          "date": {
+            "type": "string",
+            "title": "Date",
+            "description": "Date of the incident",
+            "default": ""
+          },
+          "severity": {
+            "type": "string",
+            "title": "Severity",
+            "description": "Severity level",
+            "default": "warning"
+          },
+          "chip_id": {
+            "type": "string",
+            "title": "Chip Id",
+            "description": "Chip identifier",
+            "default": ""
+          },
+          "qid": {
+            "type": "string",
+            "title": "Qid",
+            "description": "Qubit identifier",
+            "default": ""
+          },
+          "resolution_status": {
+            "type": "string",
+            "title": "Resolution Status",
+            "description": "Case outcome",
+            "default": "resolved"
+          },
+          "symptom": {
+            "type": "string",
+            "title": "Symptom",
+            "description": "Observed symptom",
+            "default": ""
+          },
+          "root_cause": {
+            "type": "string",
+            "title": "Root Cause",
+            "description": "Identified root cause",
+            "default": ""
+          },
+          "resolution": {
+            "type": "string",
+            "title": "Resolution",
+            "description": "How the issue was resolved",
+            "default": ""
+          },
+          "lesson_learned": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Lesson Learned",
+            "description": "Key takeaways"
+          },
+          "figure_paths": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Figure Paths",
+            "description": "Task result figure paths"
+          },
+          "thread_image_urls": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Thread Image Urls",
+            "description": "Image URLs from issue thread"
+          },
+          "reviewed_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewed By",
+            "description": "Reviewer username"
+          },
+          "pr_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pr Url",
+            "description": "GitHub PR URL (set on approve)"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At",
+            "description": "When the draft was created"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At",
+            "description": "When the draft was last updated"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "issue_id",
+          "task_id",
+          "task_name",
+          "status",
+          "title",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "IssueKnowledgeResponse",
+        "description": "Response schema for a knowledge case."
+      },
+      "IssueKnowledgeUpdate": {
+        "properties": {
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title",
+            "description": "Updated title"
+          },
+          "severity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Severity",
+            "description": "Updated severity"
+          },
+          "symptom": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 5000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symptom",
+            "description": "Updated symptom"
+          },
+          "root_cause": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 5000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Root Cause",
+            "description": "Updated root cause"
+          },
+          "resolution": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 5000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolution",
+            "description": "Updated resolution"
+          },
+          "lesson_learned": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lesson Learned",
+            "description": "Updated lessons"
+          }
+        },
+        "type": "object",
+        "title": "IssueKnowledgeUpdate",
+        "description": "Request schema for editing a knowledge draft."
+      },
       "IssueResponse": {
         "properties": {
           "id": {
@@ -9963,6 +10776,97 @@
         ],
         "title": "IssueUpdate",
         "description": "Request schema for updating an issue."
+      },
+      "KnowledgeCaseResponse": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "date": {
+            "type": "string",
+            "title": "Date",
+            "default": ""
+          },
+          "severity": {
+            "type": "string",
+            "title": "Severity",
+            "default": "warning"
+          },
+          "chip_id": {
+            "type": "string",
+            "title": "Chip Id",
+            "default": ""
+          },
+          "qid": {
+            "type": "string",
+            "title": "Qid",
+            "default": ""
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "default": "resolved"
+          },
+          "symptom": {
+            "type": "string",
+            "title": "Symptom",
+            "default": ""
+          },
+          "root_cause": {
+            "type": "string",
+            "title": "Root Cause",
+            "default": ""
+          },
+          "resolution": {
+            "type": "string",
+            "title": "Resolution",
+            "default": ""
+          },
+          "lesson_learned": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Lesson Learned",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "title"
+        ],
+        "title": "KnowledgeCaseResponse",
+        "description": "Response model for a knowledge case (postmortem)."
+      },
+      "KnowledgeImageResponse": {
+        "properties": {
+          "alt_text": {
+            "type": "string",
+            "title": "Alt Text"
+          },
+          "relative_path": {
+            "type": "string",
+            "title": "Relative Path"
+          },
+          "section": {
+            "type": "string",
+            "title": "Section"
+          },
+          "base64_data": {
+            "type": "string",
+            "title": "Base64 Data",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "alt_text",
+          "relative_path",
+          "section"
+        ],
+        "title": "KnowledgeImageResponse",
+        "description": "Response model for a task knowledge image reference."
       },
       "LatestTaskResultResponse": {
         "properties": {
@@ -10256,6 +11160,38 @@
         "title": "ListFlowsResponse",
         "description": "Response for listing flows."
       },
+      "ListIssueKnowledgeResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/IssueKnowledgeResponse"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "skip": {
+            "type": "integer",
+            "title": "Skip"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "skip",
+          "limit"
+        ],
+        "title": "ListIssueKnowledgeResponse",
+        "description": "Paginated list of knowledge cases."
+      },
       "ListIssuesResponse": {
         "properties": {
           "issues": {
@@ -10387,6 +11323,31 @@
         ],
         "title": "ListTaskInfoResponse",
         "description": "Response model for listing task info."
+      },
+      "ListTaskKnowledgeResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/TaskKnowledgeSummaryResponse"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "categories": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Categories",
+            "default": {}
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "ListTaskKnowledgeResponse",
+        "description": "Response model for listing all task knowledge entries."
       },
       "ListTaskResponse": {
         "properties": {
@@ -13218,6 +14179,11 @@
             "type": "string",
             "title": "Name"
           },
+          "category": {
+            "type": "string",
+            "title": "Category",
+            "default": ""
+          },
           "summary": {
             "type": "string",
             "title": "Summary"
@@ -13283,6 +14249,22 @@
             "title": "Prerequisites",
             "default": []
           },
+          "images": {
+            "items": {
+              "$ref": "#/components/schemas/KnowledgeImageResponse"
+            },
+            "type": "array",
+            "title": "Images",
+            "default": []
+          },
+          "cases": {
+            "items": {
+              "$ref": "#/components/schemas/KnowledgeCaseResponse"
+            },
+            "type": "array",
+            "title": "Cases",
+            "default": []
+          },
           "prompt_text": {
             "type": "string",
             "title": "Prompt Text"
@@ -13302,6 +14284,50 @@
         ],
         "title": "TaskKnowledgeResponse",
         "description": "Response model for task knowledge (LLM-oriented domain knowledge)."
+      },
+      "TaskKnowledgeSummaryResponse": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "category": {
+            "type": "string",
+            "title": "Category",
+            "default": ""
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary"
+          },
+          "failure_mode_count": {
+            "type": "integer",
+            "title": "Failure Mode Count",
+            "default": 0
+          },
+          "case_count": {
+            "type": "integer",
+            "title": "Case Count",
+            "default": 0
+          },
+          "image_count": {
+            "type": "integer",
+            "title": "Image Count",
+            "default": 0
+          },
+          "has_analysis_guide": {
+            "type": "boolean",
+            "title": "Has Analysis Guide",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "summary"
+        ],
+        "title": "TaskKnowledgeSummaryResponse",
+        "description": "Summary response for list endpoint (no heavy fields)."
       },
       "TaskResponse": {
         "properties": {

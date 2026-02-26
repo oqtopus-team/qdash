@@ -1,6 +1,7 @@
 {
   "RandomizedBenchmarking": {
     "name": "RandomizedBenchmarking",
+    "category": "benchmarking",
     "summary": "Measures average gate error rate via randomized benchmarking (RB).",
     "what_it_measures": "Average error per Clifford gate (EPC) – gate-set-level fidelity metric.",
     "physical_principle": "Apply random Clifford gate sequences of increasing length with inversion gate; measure survival probability. Exponential decay rate gives average gate error.\n\n```mermaid\ngantt\n    title RandomizedBenchmarking Pulse Sequence\n    dateFormat x\n    axisFormat \" \"\n\n    section Drive\n    C₁       :d1, 0, 20ms\n    C₂       :d2, after d1, 20ms\n    C₃       :d3, after d2, 20ms\n    ···      :done, d4, after d3, 15ms\n    Cₘ       :d5, after d4, 20ms\n    C_inv    :active, d6, after d5, 20ms\n\n    section Readout\n    Measurement :crit, r1, after d6, 50ms\n```",
@@ -109,6 +110,7 @@
   },
   "X180InterleavedRandomizedBenchmarking": {
     "name": "X180InterleavedRandomizedBenchmarking",
+    "category": "benchmarking",
     "summary": "Measures X180 (π) gate-specific error rate via interleaved randomized benchmarking.",
     "what_it_measures": "Error per X180 gate isolated from average Clifford error.",
     "physical_principle": "Same interleaved RB protocol as X90 IRB but with X180 gate interleaved.\n\n```mermaid\ngantt\n    title X180 Interleaved RB Pulse Sequence\n    dateFormat x\n    axisFormat \" \"\n\n    section Drive\n    C₁       :d1, 0, 20ms\n    X180     :active, x1, after d1, 15ms\n    C₂       :d2, after x1, 20ms\n    X180     :active, x2, after d2, 15ms\n    ···      :done, d3, after x2, 10ms\n    Cₘ       :d4, after d3, 20ms\n    X180     :active, x3, after d4, 15ms\n    C_inv    :d5, after x3, 20ms\n\n    section Readout\n    Measurement :crit, r1, after d5, 50ms\n```",
@@ -186,6 +188,7 @@
   },
   "X90InterleavedRandomizedBenchmarking": {
     "name": "X90InterleavedRandomizedBenchmarking",
+    "category": "benchmarking",
     "summary": "Measures X90 (π/2) gate-specific error rate via interleaved randomized benchmarking.",
     "what_it_measures": "Error per X90 gate by interleaving it between random Cliffords.",
     "physical_principle": "Run standard RB and interleaved RB (with X90 between each Clifford); ratio of decay rates gives gate-specific error.\n\n```mermaid\ngantt\n    title X90 Interleaved RB Pulse Sequence\n    dateFormat x\n    axisFormat \" \"\n\n    section Drive\n    C₁       :d1, 0, 20ms\n    X90      :active, x1, after d1, 15ms\n    C₂       :d2, after x1, 20ms\n    X90      :active, x2, after d2, 15ms\n    ···      :done, d3, after x2, 10ms\n    Cₘ       :d4, after d3, 20ms\n    X90      :active, x3, after d4, 15ms\n    C_inv    :d5, after x3, 20ms\n\n    section Readout\n    Measurement :crit, r1, after d5, 50ms\n```",
@@ -293,6 +296,7 @@
   },
   "ZX90InterleavedRandomizedBenchmarking": {
     "name": "ZX90InterleavedRandomizedBenchmarking",
+    "category": "benchmarking",
     "summary": "Measures ZX90 two-qubit gate error rate via interleaved randomized benchmarking.",
     "what_it_measures": "Error per ZX90 gate isolated via two-qubit interleaved RB.",
     "physical_principle": "Two-qubit RB with ZX90 interleaved between random two-qubit Cliffords.\n\n```mermaid\ngantt\n    title ZX90 Interleaved RB Pulse Sequence\n    dateFormat x\n    axisFormat \" \"\n\n    section Control\n    C₁       :d1, 0, 20ms\n    ZX90     :active, z1, after d1, 25ms\n    C₂       :d2, after z1, 20ms\n    ZX90     :active, z2, after d2, 25ms\n    ···      :done, d3, after z2, 10ms\n    C_inv    :d4, after d3, 20ms\n    Readout  :crit, r1, after d4, 50ms\n\n    section Target\n    C₁       :t1, 0, 20ms\n    ZX90     :active, tz1, after t1, 25ms\n    C₂       :t2, after tz1, 20ms\n    ZX90     :active, tz2, after t2, 25ms\n    ···      :done, t3, after tz2, 10ms\n    C_inv    :t4, after t3, 20ms\n    Readout  :crit, r2, after t4, 50ms\n```",
@@ -402,6 +406,7 @@
   },
   "CheckNoise": {
     "name": "CheckNoise",
+    "category": "box-setup",
     "summary": "Checks the noise levels in the control and readout system.",
     "what_it_measures": "System noise floor – measures the baseline noise level across control and readout channels to ensure the system is operating within acceptable noise margins.",
     "physical_principle": "Measures the signal amplitude with no intentional drive applied, characterizing the noise floor from electronics, thermal sources, and environmental interference.",
@@ -469,6 +474,7 @@
   },
   "CheckStatus": {
     "name": "CheckStatus",
+    "category": "box-setup",
     "summary": "Checks the status of the experiment and control hardware.",
     "what_it_measures": "Overall experiment status – verifies that the control system and hardware are in a healthy, operational state.",
     "physical_principle": "Diagnostic query to the experiment controller. No physical measurement is performed; the task polls the system for readiness and error conditions.",
@@ -526,6 +532,7 @@
   },
   "Configure": {
     "name": "Configure",
+    "category": "box-setup",
     "summary": "Loads and applies the full calibration state configuration to the control boxes.",
     "what_it_measures": "No measurement is performed. This task loads the saved calibration state (frequencies, amplitudes, timing parameters) from configuration files and pushes them to all control boxes.",
     "physical_principle": "No physical measurement. This is a state management task that restores a previously saved calibration configuration to the hardware, ensuring all control parameters are set to known values.",
@@ -591,6 +598,7 @@
   },
   "DumpBox": {
     "name": "DumpBox",
+    "category": "box-setup",
     "summary": "Dumps diagnostic information from all control boxes.",
     "what_it_measures": "Control box internal state – extracts configuration, firmware version, register values, and other diagnostic data from each control box.",
     "physical_principle": "No physical measurement. This task reads internal registers and configuration from the FPGA-based control hardware for diagnostic and debugging purposes.",
@@ -649,6 +657,7 @@
   },
   "LinkUp": {
     "name": "LinkUp",
+    "category": "box-setup",
     "summary": "Initializes and links up the control box hardware.",
     "what_it_measures": "Hardware link status – establishes communication between the host system and the control boxes (FPGA-based quantum control hardware).",
     "physical_principle": "No physical measurement. This task performs hardware initialization: establishing network/bus connections to the control boxes and verifying bidirectional communication.",
@@ -707,6 +716,7 @@
   },
   "ReadoutConfigure": {
     "name": "ReadoutConfigure",
+    "category": "box-setup",
     "summary": "Configures readout parameters for a specified subset of qubits.",
     "what_it_measures": "No measurement is performed. This task applies readout configuration (frequencies, amplitudes) to the control hardware for a selected set of qubits.",
     "physical_principle": "No physical measurement. This is a configuration task that sets readout resonator frequencies for specified qubits and disables (sets to NaN) frequencies for qubits not in the target list.",
@@ -764,6 +774,7 @@
   },
   "CheckElectricalDelay": {
     "name": "CheckElectricalDelay",
+    "category": "cw-characterization",
     "summary": "Measures the electrical delay in the readout line.",
     "what_it_measures": "Electrical delay – the time delay experienced by signals traveling through the readout chain (cables, components, filters) from pulse generation to measurement acquisition.",
     "physical_principle": "Time-of-flight measurement: measures the phase slope of the readout signal as a function of frequency. The electrical delay is proportional to the linear phase gradient across the measurement bandwidth. Accurate delay compensation is essential for proper IQ demodulation and readout fidelity.",
@@ -829,6 +840,7 @@
   },
   "CheckQubitFrequencies": {
     "name": "CheckQubitFrequencies",
+    "category": "cw-characterization",
     "summary": "Coarse qubit frequency scan to locate the qubit transition frequency.",
     "what_it_measures": "Coarse qubit frequency (f_01) – performs a broadband frequency scan to identify the approximate qubit transition frequency.",
     "physical_principle": "Continuous-wave (CW) qubit spectroscopy: a probe tone is swept across a wide frequency range while monitoring the readout resonator response. When the probe frequency matches the qubit's ground-to-excited state transition (f_01), the qubit absorbs energy, causing a detectable shift in the resonator response.",
@@ -901,6 +913,7 @@
   },
   "CheckQubitSpectroscopy": {
     "name": "CheckQubitSpectroscopy",
+    "category": "cw-characterization",
     "summary": "High-resolution qubit spectroscopy to measure qubit transition frequencies and anharmonicity.",
     "what_it_measures": "Qubit transition frequencies – measures the ground-to-excited state frequency (f_01) and optionally the excited-to-second-excited state frequency (f_12) to determine the qubit anharmonicity (alpha = f_12 - f_01).",
     "physical_principle": "Qubit spectroscopy with peak detection and analysis: a probe tone is swept across the frequency range near the qubit's expected transition while monitoring the readout resonator. The f_01 peak appears as the dominant absorption feature. The f_12 transition, typically at a lower frequency (negative anharmonicity for transmons), appears as a secondary, weaker feature.",
@@ -995,6 +1008,7 @@
   },
   "CheckReadoutAmplitude": {
     "name": "CheckReadoutAmplitude",
+    "category": "cw-characterization",
     "summary": "Optimizes readout pulse amplitude by sweeping amplitude and measuring signal-to-noise ratio.",
     "what_it_measures": "Optimal readout amplitude – sweeps the readout pulse amplitude and measures the resulting signal-to-noise ratio (SNR) to find the minimum amplitude that achieves sufficient measurement fidelity.",
     "physical_principle": "Readout amplitude optimization: the readout pulse amplitude is varied while measuring both signal strength and noise. At low amplitudes, SNR is poor and state discrimination is unreliable. As amplitude increases, SNR improves until reaching a threshold for reliable measurement. Excessive amplitude can cause unwanted qubit transitions (measurement-induced mixing) or nonlinear resonator effects.",
@@ -1068,6 +1082,7 @@
   },
   "CheckReflectionCoefficient": {
     "name": "CheckReflectionCoefficient",
+    "category": "cw-characterization",
     "summary": "Measures the resonator reflection coefficient to extract resonator frequency and coupling rates.",
     "what_it_measures": "Resonator reflection parameters – measures the S11 (reflection coefficient) of the readout resonator to precisely determine the resonator frequency (f_r), external coupling rate (kappa_external), and internal loss rate (kappa_internal).",
     "physical_principle": "Reflection coefficient spectroscopy: the resonator is probed in reflection, and the complex S11 parameter is measured as a function of frequency. The resonance appears as a circle in the complex plane. Fitting to a resonator model extracts the resonance frequency and coupling rates. The external coupling rate (kappa_external) quantifies the resonator-feedline coupling, while the internal loss rate (kappa_internal) quantifies intrinsic losses.",
@@ -1150,6 +1165,7 @@
   },
   "CheckResonatorFrequencies": {
     "name": "CheckResonatorFrequencies",
+    "category": "cw-characterization",
     "summary": "Coarse frequency scan to locate readout resonator resonance frequencies.",
     "what_it_measures": "Coarse resonator frequency – performs a broadband frequency sweep to identify the approximate resonance frequency of the readout resonator.",
     "physical_principle": "Resonator frequency sweep: a probe tone is swept across a wide frequency range, and the transmitted or reflected signal phase is measured. At the resonator's resonance frequency, a sharp phase shift occurs, identifying the resonance.",
@@ -1223,6 +1239,7 @@
   },
   "CheckResonatorSpectroscopy": {
     "name": "CheckResonatorSpectroscopy",
+    "category": "cw-characterization",
     "summary": "High-resolution 2D spectroscopy of all resonators in a readout multiplexer (MUX).",
     "what_it_measures": "Readout resonator frequency – performs a 2D sweep (frequency x power) to precisely determine each resonator's resonance frequency within a MUX, including power-dependent behavior.",
     "physical_principle": "2D resonator spectroscopy: the readout resonator response is measured across both frequency and power ranges. At low power, the resonator frequency reflects the dispersive shift from the qubit (dressed frequency). At high power, the resonator approaches its bare frequency. Comparing low-power and high-power responses reveals coupling strength and optimal readout conditions.",
@@ -1309,6 +1326,7 @@
   },
   "CheckDRAGHPIPulse": {
     "name": "CheckDRAGHPIPulse",
+    "category": "one-qubit-gate-calibration",
     "summary": "Validates DRAG-corrected π/2 pulse quality for leakage suppression.",
     "what_it_measures": "Gate fidelity of DRAG-corrected X90 pulse.",
     "physical_principle": "Same DRAG principle as π pulse but for half rotation. Critical for quantum algorithms using superposition states.\n\n```mermaid\ngantt\n    title CheckDRAGHPIPulse Pulse Sequence\n    dateFormat x\n    axisFormat \" \"\n\n    section Drive (I)\n    DRAG π/2 (1) :d1, 0, 20ms\n    DRAG π/2 (2) :d2, after d1, 20ms\n    DRAG π/2 (3) :d3, after d2, 20ms\n    ···          :done, d4, after d3, 15ms\n    DRAG π/2 (N) :d5, after d4, 20ms\n\n    section Drive (Q)\n    dY/dt (1)    :active, q1, 0, 20ms\n    dY/dt (2)    :active, q2, after q1, 20ms\n    dY/dt (3)    :active, q3, after q2, 20ms\n    ···          :done, q4, after q3, 15ms\n    dY/dt (N)    :active, q5, after q4, 20ms\n\n    section Readout\n    Measurement  :crit, r1, after d5, 50ms\n```",
@@ -1403,6 +1421,7 @@
   },
   "CheckDRAGPIPulse": {
     "name": "CheckDRAGPIPulse",
+    "category": "one-qubit-gate-calibration",
     "summary": "Validates DRAG-corrected π pulse quality to suppress leakage to |2⟩.",
     "what_it_measures": "Gate fidelity of DRAG-corrected X180 pulse.",
     "physical_principle": "DRAG adds a derivative quadrature component to suppress leakage during fast gates. Validate by repeated pulse application.\n\n```mermaid\ngantt\n    title CheckDRAGPIPulse Pulse Sequence\n    dateFormat x\n    axisFormat \" \"\n\n    section Drive (I)\n    DRAG π (1)  :d1, 0, 20ms\n    DRAG π (2)  :d2, after d1, 20ms\n    DRAG π (3)  :d3, after d2, 20ms\n    ···         :done, d4, after d3, 15ms\n    DRAG π (N)  :d5, after d4, 20ms\n\n    section Drive (Q)\n    dY/dt (1)   :active, q1, 0, 20ms\n    dY/dt (2)   :active, q2, after q1, 20ms\n    dY/dt (3)   :active, q3, after q2, 20ms\n    ···         :done, q4, after q3, 15ms\n    dY/dt (N)   :active, q5, after q4, 20ms\n\n    section Readout\n    Measurement :crit, r1, after d5, 50ms\n```",
@@ -1499,6 +1518,7 @@
   },
   "CheckHPIPulse": {
     "name": "CheckHPIPulse",
+    "category": "one-qubit-gate-calibration",
     "summary": "Validates π/2 pulse quality by repeated application and population measurement.",
     "what_it_measures": "π/2 pulse fidelity – accumulated rotation error over multiple applications.",
     "physical_principle": "Apply the calibrated π/2 pulse repeatedly; population should cycle through superposition states. Deviation indicates rotation or phase error.\n\n```mermaid\ngantt\n    title CheckHPIPulse Pulse Sequence\n    dateFormat x\n    axisFormat \" \"\n\n    section Drive\n    π/2 (1)     :d1, 0, 20ms\n    π/2 (2)     :d2, after d1, 20ms\n    π/2 (3)     :d3, after d2, 20ms\n    ···         :done, d4, after d3, 15ms\n    π/2 (N)     :d5, after d4, 20ms\n\n    section Readout\n    Measurement :crit, r1, after d5, 50ms\n```",
@@ -1604,6 +1624,7 @@
   },
   "CheckPIPulse": {
     "name": "CheckPIPulse",
+    "category": "one-qubit-gate-calibration",
     "summary": "Validates π pulse quality by repeated application and population measurement.",
     "what_it_measures": "π pulse fidelity – accumulated error over multiple applications.",
     "physical_principle": "Apply the calibrated π pulse repeatedly N times; odd repetitions should give |1⟩, even should give |0⟩. Deviation indicates rotation error.\n\n```mermaid\ngantt\n    title CheckPIPulse Pulse Sequence\n    dateFormat x\n    axisFormat \" \"\n\n    section Drive\n    π (1)       :d1, 0, 20ms\n    π (2)       :d2, after d1, 20ms\n    π (3)       :d3, after d2, 20ms\n    ···         :done, d4, after d3, 15ms\n    π (N)       :d5, after d4, 20ms\n\n    section Readout\n    Measurement :crit, r1, after d5, 50ms\n```",
@@ -1697,6 +1718,7 @@
   },
   "CreateDRAGHPIPulse": {
     "name": "CreateDRAGHPIPulse",
+    "category": "one-qubit-gate-calibration",
     "summary": "Calibrates DRAG beta and amplitude for leakage-suppressed π/2 pulse.",
     "what_it_measures": "Optimal DRAG derivative coefficient for X90 gate.",
     "physical_principle": "Same as CreateDRAGPIPulse but for half-rotation; may share beta but needs independent amplitude calibration.\n\n```mermaid\ngantt\n    title CreateDRAGHPIPulse Pulse Sequence (n_rotations=4, n_iterations=2)\n    dateFormat x\n    axisFormat \" \"\n\n    section Drive (I)\n    π/2 (1) :d1, 0, 15ms\n    π/2 (2) :d2, after d1, 15ms\n    π/2 (3) :d3, after d2, 15ms\n    π/2 (4) :d4, after d3, 15ms\n\n    section Drive (Q)\n    dY/dt (sweep β) :active, q1, 0, 15ms\n    dY/dt           :active, q2, after q1, 15ms\n    dY/dt           :active, q3, after q2, 15ms\n    dY/dt           :active, q4, after q3, 15ms\n\n    section Readout\n    Measurement     :crit, r1, after d4, 40ms\n```",
@@ -1803,6 +1825,7 @@
   },
   "CreateDRAGPIPulse": {
     "name": "CreateDRAGPIPulse",
+    "category": "one-qubit-gate-calibration",
     "summary": "Calibrates DRAG beta and amplitude for leakage-suppressed π pulse.",
     "what_it_measures": "Optimal DRAG derivative coefficient (beta) for X180 gate.",
     "physical_principle": "Scan DRAG beta parameter while monitoring leakage to |2⟩; find the minimum leakage point. Amplitude scan refines the rotation angle.\n\n```mermaid\ngantt\n    title CreateDRAGPIPulse Pulse Sequence (n_rotations=4, n_iterations=2)\n    dateFormat x\n    axisFormat \" \"\n\n    section Drive (I)\n    π (1)   :d1, 0, 15ms\n    π (2)   :d2, after d1, 15ms\n    π (3)   :d3, after d2, 15ms\n    π (4)   :d4, after d3, 15ms\n\n    section Drive (Q)\n    dY/dt (sweep β) :active, q1, 0, 15ms\n    dY/dt           :active, q2, after q1, 15ms\n    dY/dt           :active, q3, after q2, 15ms\n    dY/dt           :active, q4, after q3, 15ms\n\n    section Readout\n    Measurement     :crit, r1, after d4, 40ms\n```",
@@ -1911,6 +1934,7 @@
   },
   "CreateHPIPulse": {
     "name": "CreateHPIPulse",
+    "category": "one-qubit-gate-calibration",
     "summary": "Calibrates π/2 (X90) gate pulse amplitude via Rabi-based fitting.",
     "what_it_measures": "Optimal pulse amplitude for a half-π rotation (|0⟩ → superposition).",
     "physical_principle": "Same Rabi-based calibration as CreatePIPulse but targeting the π/2 rotation point – the first point where population reaches 0.5.\n\n```mermaid\ngantt\n    title CreateHPIPulse Pulse Sequence\n    dateFormat x\n    axisFormat \" \"\n\n    section Drive\n    Shaped pulse (sweep amp) :d1, 0, 80ms\n\n    section Readout\n    Measurement              :crit, r1, after d1, 50ms\n```",
@@ -2023,6 +2047,7 @@
   },
   "CreatePIPulse": {
     "name": "CreatePIPulse",
+    "category": "one-qubit-gate-calibration",
     "summary": "Calibrates π (X180) gate pulse amplitude via Rabi-based fitting.",
     "what_it_measures": "Optimal pulse amplitude for a full π rotation (|0⟩ → |1⟩).",
     "physical_principle": "Apply a shaped pulse of fixed duration and sweep amplitude; fit the Rabi oscillation to find the amplitude corresponding to exactly π rotation.\n\n```mermaid\ngantt\n    title CreatePIPulse Pulse Sequence\n    dateFormat x\n    axisFormat \" \"\n\n    section Drive\n    Shaped pulse (sweep amp) :d1, 0, 80ms\n\n    section Readout\n    Measurement              :crit, r1, after d1, 50ms\n```",
@@ -2123,6 +2148,7 @@
   },
   "CheckSkew": {
     "name": "CheckSkew",
+    "category": "system",
     "summary": "Measures and corrects time skew between multiple control boxes.",
     "what_it_measures": "Inter-box timing skew – measures the relative timing offsets (clock skew) between different control boxes and applies correction to synchronize their clocks.",
     "physical_principle": "Clock synchronization: multiple control boxes share a common reference clock, but signal propagation delays and internal clock distribution cause timing offsets between boxes. This task measures the relative timing by sending synchronized pulses and measuring arrival time differences, then applies skew correction to align all boxes to a common time reference.",
@@ -2192,6 +2218,7 @@
   },
   "CheckDispersiveShift": {
     "name": "CheckDispersiveShift",
+    "category": "td-characterization",
     "summary": "Measures dispersive shift (χ) between qubit and readout resonator.",
     "what_it_measures": "Dispersive shift (χ) – the frequency shift of the resonator conditioned on the qubit state.",
     "physical_principle": "Measure resonator spectrum with qubit in |0⟩ and |1⟩; in the dispersive regime the resonator shifts by 2χ, enabling QND readout.\n\n```mermaid\ngantt\n    title CheckDispersiveShift Pulse Sequence\n    dateFormat x\n    axisFormat \" \"\n\n    section Electrical delay\n    Delay measurement       :active, p1, 0, 60ms\n\n    section Meas 1 (|0⟩)\n    idle (|0⟩ prep)         :done, a1, after p1, 20ms\n    Readout (sweep freq)    :crit, a2, after a1, 60ms\n\n    section Meas 2 (|1⟩)\n    π pulse (|1⟩ prep)      :b1, after p1, 20ms\n    Readout (sweep freq)    :crit, b2, after b1, 60ms\n```",
@@ -2268,6 +2295,7 @@
   },
   "CheckOptimalReadoutAmplitude": {
     "name": "CheckOptimalReadoutAmplitude",
+    "category": "td-characterization",
     "summary": "Optimizes readout pulse amplitude for best state discrimination.",
     "what_it_measures": "Optimal readout drive amplitude – the power level that maximizes |0⟩/|1⟩ discrimination.",
     "physical_principle": "Sweep readout amplitude while measuring state separation; too low gives poor SNR, too high causes measurement-induced transitions (QND violation).",
@@ -2340,6 +2368,7 @@
   },
   "CheckQubit": {
     "name": "CheckQubit",
+    "category": "td-characterization",
     "summary": "Quick qubit validation via brief Rabi oscillation check.",
     "what_it_measures": "Basic qubit responsiveness – whether the qubit shows coherent Rabi oscillations.",
     "physical_principle": "Short Rabi experiment with varying pulse duration to confirm qubit is functional and control/readout lines are operational.",
@@ -2416,6 +2445,7 @@
   },
   "CheckQubitFrequency": {
     "name": "CheckQubitFrequency",
+    "category": "td-characterization",
     "summary": "Measures qubit transition frequency via Ramsey-based detuning calibration.",
     "what_it_measures": "Qubit |0⟩→|1⟩ transition frequency with high precision.",
     "physical_principle": "Sweep drive detuning and pulse duration to map Ramsey fringes; the zero-detuning point gives the exact qubit frequency.",
@@ -2495,6 +2525,7 @@
   },
   "CheckRabi": {
     "name": "CheckRabi",
+    "category": "td-characterization",
     "summary": "Measures Rabi oscillation to extract drive amplitude, frequency, and IQ-plane parameters.",
     "what_it_measures": "Rabi oscillation parameters: amplitude, frequency (drive strength), phase, offset, and IQ-plane rotation parameters.",
     "physical_principle": "Apply a resonant drive pulse of variable duration; the qubit oscillates between |0⟩ and |1⟩ at the Rabi frequency Ω_R. The IQ data is rotated via PCA to align the measurement axis, then fitted with a damped cosine model.\n\n```mermaid\ngantt\n    title CheckRabi Pulse Sequence\n    dateFormat x\n    axisFormat \" \"\n\n    section Drive\n    Drive pulse (sweep t) :d1, 0, 100ms\n\n    section Readout\n    Measurement            :crit, r1, after d1, 50ms\n```",
@@ -2660,6 +2691,7 @@
   },
   "CheckRamsey": {
     "name": "CheckRamsey",
+    "category": "td-characterization",
     "summary": "Measures T2\\* (free-induction) dephasing time and fine-tunes qubit frequency via Ramsey fringes.",
     "what_it_measures": "T2\\* dephasing time and residual detuning from the drive frequency.",
     "physical_principle": "X/2 – free evolution τ – X/2 (or Y/2), then measure. Fringes oscillate at the detuning Δf; envelope decays as exp(-τ/T2\\*).\n\n```mermaid\ngantt\n    title CheckRamsey Pulse Sequence (X and Y axes)\n    dateFormat x\n    axisFormat \" \"\n\n    section X-axis\n    X/2 pulse       :d1, 0, 15ms\n    free evolution τ :done, d2, after d1, 100ms\n    X/2 pulse       :d3, after d2, 15ms\n    Measurement     :crit, r1, after d3, 40ms\n\n    section Y-axis\n    X/2 pulse       :e1, 0, 15ms\n    free evolution τ :done, e2, after e1, 100ms\n    Y/2 pulse       :active, e3, after e2, 15ms\n    Measurement     :crit, r2, after e3, 40ms\n```",
@@ -2784,6 +2816,7 @@
   },
   "CheckReadoutFrequency": {
     "name": "CheckReadoutFrequency",
+    "category": "td-characterization",
     "summary": "Calibrates the readout resonator frequency for optimal state discrimination.",
     "what_it_measures": "Readout resonator frequency – the optimal probe frequency for qubit state measurement.",
     "physical_principle": "Sweep readout tone detuning around the expected resonator frequency while measuring transmission; the optimal point maximizes state-dependent signal.",
@@ -2856,6 +2889,7 @@
   },
   "CheckT1": {
     "name": "CheckT1",
+    "category": "td-characterization",
     "summary": "Measures T1 energy-relaxation time via exponential decay of the excited state.",
     "what_it_measures": "T1 relaxation time – how long the qubit retains energy in the |1⟩ state.",
     "physical_principle": "Prepare |1⟩, wait variable delay τ, measure P(|1⟩). Fit exponential decay exp(-τ/T1).\n\n```mermaid\ngantt\n    title CheckT1 Pulse Sequence\n    dateFormat x\n    axisFormat \" \"\n\n    section Drive\n    π pulse    :d1, 0, 20ms\n    wait τ     :done, d2, after d1, 120ms\n\n    section Readout\n    Measurement :crit, r1, after d2, 50ms\n```",
@@ -2961,6 +2995,7 @@
   },
   "CheckT2Echo": {
     "name": "CheckT2Echo",
+    "category": "td-characterization",
     "summary": "Measures T2 echo (Hahn echo) coherence time, refocusing low-frequency noise.",
     "what_it_measures": "T2 echo – phase coherence time after a Hahn-echo refocusing pulse.",
     "physical_principle": "X/2 – wait τ/2 – π – wait τ/2 – X/2, then measure. Refocuses static and slow noise, revealing intrinsic dephasing.\n\n```mermaid\ngantt\n    title CheckT2Echo (Hahn Echo) Pulse Sequence\n    dateFormat x\n    axisFormat \" \"\n\n    section Drive\n    X/2 pulse  :d1, 0, 15ms\n    wait τ/2   :done, d2, after d1, 55ms\n    π pulse    :d3, after d2, 20ms\n    wait τ/2   :done, d4, after d3, 55ms\n    X/2 pulse  :d5, after d4, 15ms\n\n    section Readout\n    Measurement :crit, r1, after d5, 50ms\n```",
@@ -3050,6 +3085,7 @@
   },
   "ChevronPattern": {
     "name": "ChevronPattern",
+    "category": "td-characterization",
     "summary": "Measures qubit response vs frequency and time to map the chevron pattern.",
     "what_it_measures": "Chevron pattern – 2D map of qubit excitation vs drive detuning and pulse duration.",
     "physical_principle": "Drive at various frequency detunings and durations; on-resonance gives Rabi oscillations, off-resonance gives faster but smaller oscillations, forming a V-shaped pattern.\n\n```mermaid\ngantt\n    title ChevronPattern Pulse Sequence\n    dateFormat x\n    axisFormat \" \"\n\n    section Drive\n    Drive pulse (sweep Δf, t) :d1, 0, 100ms\n\n    section Readout\n    Measurement               :crit, r1, after d1, 50ms\n```",
@@ -3147,6 +3183,7 @@
   },
   "ReadoutClassification": {
     "name": "ReadoutClassification",
+    "category": "td-characterization",
     "summary": "Calibrates and evaluates readout state discrimination (|0⟩ vs |1⟩ classification).",
     "what_it_measures": "Readout assignment fidelity – probability of correctly identifying qubit state.",
     "physical_principle": "Prepare |0⟩ and |1⟩ states, measure IQ data, train classifier, evaluate confusion matrix.\n\n```mermaid\ngantt\n    title ReadoutClassification Pulse Sequence\n    dateFormat x\n    axisFormat \" \"\n\n    section Meas 1 (|0⟩)\n    idle (|0⟩ prep)    :done, a1, 0, 30ms\n    Readout (IQ)       :crit, a2, after a1, 60ms\n\n    section Meas 2 (|1⟩)\n    π pulse (|1⟩ prep) :b1, 0, 30ms\n    Readout (IQ)       :crit, b2, after b1, 60ms\n```",
@@ -3265,6 +3302,7 @@
   },
   "CheckBellState": {
     "name": "CheckBellState",
+    "category": "two-qubit-gate-calibration",
     "summary": "Prepares Bell state (|00⟩+|11⟩)/√2 and measures state fidelity.",
     "what_it_measures": "Bell state fidelity – quality of entanglement between qubit pair.",
     "physical_principle": "Apply H⊗I then CNOT; measure in Z basis and verify equal |00⟩/|11⟩ populations with coherent superposition.\n\n```mermaid\ngantt\n    title CheckBellState Pulse Sequence (echo CR = ZX90)\n    dateFormat x\n    axisFormat \" \"\n\n    section Control\n    X/2        :d1, 0, 15ms\n    CR pulse   :d2, after d1, 35ms\n    π          :d3, after d2, 15ms\n    CR pulse   :d4, after d3, 35ms\n    Readout    :crit, r1, after d4, 40ms\n\n    section Target\n    idle       :done, t0, 0, 15ms\n    Cancel     :active, t1, after t0, 35ms\n    idle       :done, t2, after t1, 15ms\n    Cancel     :active, t3, after t2, 35ms\n    Readout    :crit, r2, after t3, 40ms\n```",
@@ -3372,6 +3410,7 @@
   },
   "CheckBellStateTomography": {
     "name": "CheckBellStateTomography",
+    "category": "two-qubit-gate-calibration",
     "summary": "Full density matrix tomography of the Bell state for detailed characterization.",
     "what_it_measures": "Complete density matrix of prepared Bell state; concurrence and entanglement metrics.",
     "physical_principle": "Prepare Bell state, measure in 9 Pauli basis combinations (XX, XY, ..., ZZ), reconstruct density matrix via maximum likelihood.",
@@ -3478,6 +3517,7 @@
   },
   "CheckCrossResonance": {
     "name": "CheckCrossResonance",
+    "category": "two-qubit-gate-calibration",
     "summary": "Measures cross-resonance (CR) interaction strength between coupled qubits.",
     "what_it_measures": "ZX interaction rate and CR Hamiltonian terms for two-qubit gate calibration.",
     "physical_principle": "Drive control qubit at target frequency; monitor target rotation rate. ZX coupling enables CNOT-type gates.\n\n```mermaid\ngantt\n    title CheckCrossResonance Pulse Sequence\n    dateFormat x\n    axisFormat \" \"\n\n    section Control Drive\n    CR pulse (at target freq) :d1, 0, 120ms\n\n    section Target Drive\n    Cancel tone               :active, t1, 0, 120ms\n\n    section Readout (Target)\n    Measurement               :crit, r1, after d1, 50ms\n```",
@@ -3656,6 +3696,7 @@
   },
   "CheckZX90": {
     "name": "CheckZX90",
+    "category": "two-qubit-gate-calibration",
     "summary": "Validates ZX90 two-qubit gate fidelity via process or state fidelity measurement.",
     "what_it_measures": "ZX90 gate fidelity – closeness to ideal CNOT-equivalent operation.",
     "physical_principle": "Apply calibrated ZX90 gate and measure output state fidelity against ideal; may use interleaved RB or QPT.",
@@ -3761,6 +3802,7 @@
   },
   "CreateZX90": {
     "name": "CreateZX90",
+    "category": "two-qubit-gate-calibration",
     "summary": "Calibrates ZX90 (CNOT-equivalent) two-qubit gate from cross-resonance interaction.",
     "what_it_measures": "Optimal CR pulse amplitude and duration for π/2 ZX rotation.",
     "physical_principle": "Tune CR drive parameters to achieve exactly 90° ZX rotation; combine with single-qubit corrections for CNOT.\n\n```mermaid\ngantt\n    title CreateZX90 Pulse Sequence\n    dateFormat x\n    axisFormat \" \"\n\n    section Control Drive\n    CR pulse (sweep duration) :d1, 0, 120ms\n\n    section Target Drive\n    Cancel tone               :active, t1, 0, 120ms\n\n    section Readout (Target)\n    Measurement               :crit, r1, after d1, 50ms\n```",

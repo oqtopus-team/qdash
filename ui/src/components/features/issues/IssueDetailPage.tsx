@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
+  Brain,
   Lock,
   Unlock,
   Trash2,
@@ -30,6 +31,7 @@ import {
 } from "@/client/issue/issue";
 import { useProject } from "@/contexts/ProjectContext";
 import { useQueryClient } from "@tanstack/react-query";
+import { useExtractKnowledge } from "@/hooks/useIssueKnowledge";
 
 function getCurrentUsername(): string {
   if (typeof document === "undefined") return "";
@@ -107,6 +109,9 @@ export function IssueDetailPage({ issueId }: { issueId: string }) {
   // Close/Reopen mutations
   const closeMutation = useCloseIssue();
   const reopenMutation = useReopenIssue();
+
+  // Knowledge extraction
+  const { extract: extractKnowledge, isExtracting } = useExtractKnowledge();
 
   const canManage = isOwner || currentUser === issue?.username;
 
@@ -272,26 +277,46 @@ export function IssueDetailPage({ issueId }: { issueId: string }) {
             </div>
           </div>
         </div>
-        {canManage &&
-          (issue.is_closed ? (
+        <div className="flex items-center gap-2">
+          {issue.is_closed && canManage && (
             <button
-              onClick={handleReopen}
-              className="btn btn-sm btn-ghost gap-1"
-              disabled={reopenMutation.isPending}
+              onClick={() => {
+                extractKnowledge(issueId).then(() => {
+                  router.push("/issue-knowledge");
+                });
+              }}
+              className="btn btn-sm btn-primary gap-1"
+              disabled={isExtracting}
             >
-              <Unlock className="h-3.5 w-3.5" />
-              Reopen
+              {isExtracting ? (
+                <span className="loading loading-spinner loading-xs"></span>
+              ) : (
+                <Brain className="h-3.5 w-3.5" />
+              )}
+              Extract Knowledge
             </button>
-          ) : (
-            <button
-              onClick={handleClose}
-              className="btn btn-sm btn-ghost gap-1"
-              disabled={closeMutation.isPending}
-            >
-              <Lock className="h-3.5 w-3.5" />
-              Close
-            </button>
-          ))}
+          )}
+          {canManage &&
+            (issue.is_closed ? (
+              <button
+                onClick={handleReopen}
+                className="btn btn-sm btn-ghost gap-1"
+                disabled={reopenMutation.isPending}
+              >
+                <Unlock className="h-3.5 w-3.5" />
+                Reopen
+              </button>
+            ) : (
+              <button
+                onClick={handleClose}
+                className="btn btn-sm btn-ghost gap-1"
+                disabled={closeMutation.isPending}
+              >
+                <Lock className="h-3.5 w-3.5" />
+                Close
+              </button>
+            ))}
+        </div>
       </div>
 
       {/* Task Result Summary */}

@@ -7,9 +7,9 @@ import logging
 from functools import partial
 from typing import TYPE_CHECKING, Annotated, Any
 
-from fastapi import APIRouter, BackgroundTasks, Depends, Query, UploadFile
+from fastapi import APIRouter, Depends, Query, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
-from qdash.api.dependencies import get_issue_knowledge_service, get_issue_service  # noqa: TCH002
+from qdash.api.dependencies import get_issue_service  # noqa: TCH002
 from qdash.api.lib.ai_labels import STATUS_LABELS as _AI_STATUS_LABELS
 from qdash.api.lib.ai_labels import TOOL_LABELS as _AI_TOOL_LABELS
 from qdash.api.lib.project import (  # noqa: TCH002
@@ -25,7 +25,6 @@ from qdash.api.schemas.issue import (
     ListIssuesResponse,
 )
 from qdash.api.schemas.success import SuccessResponse
-from qdash.api.services.issue_knowledge_service import IssueKnowledgeService
 from qdash.api.services.issue_service import IssueService
 
 if TYPE_CHECKING:
@@ -153,40 +152,16 @@ def update_issue(
 )
 def close_issue(
     issue_id: str,
-    background_tasks: BackgroundTasks,
     ctx: Annotated[ProjectContext, Depends(get_project_context)],
     service: Annotated[IssueService, Depends(get_issue_service)],
-    knowledge_service: Annotated[IssueKnowledgeService, Depends(get_issue_knowledge_service)],
 ) -> SuccessResponse:
-    """Close an issue thread. Only the author or project owner can close.
-
-    Automatically triggers background AI knowledge draft generation.
-    """
-    result = service.close_issue(
+    """Close an issue thread. Only the author or project owner can close."""
+    return service.close_issue(
         project_id=ctx.project_id,
         issue_id=issue_id,
         username=ctx.user.username,
         role=ctx.role,
     )
-
-    # Trigger background knowledge draft generation
-    async def _generate_knowledge_draft() -> None:
-        try:
-            await knowledge_service.generate_draft(
-                project_id=ctx.project_id,
-                issue_id=issue_id,
-                issue_service=service,
-            )
-            logger.info("Auto-generated knowledge draft for issue %s", issue_id)
-        except Exception:
-            logger.warning(
-                "Failed to auto-generate knowledge draft for issue %s",
-                issue_id,
-                exc_info=True,
-            )
-
-    background_tasks.add_task(_generate_knowledge_draft)
-    return result
 
 
 @router.patch(

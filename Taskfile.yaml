@@ -32,6 +32,45 @@ tasks:
     cmds:
       - uv run scripts/generate_task_knowledge.py
 
+  knowledge-pull:
+    desc: Pull task-knowledge.json from the knowledge repository (KNOWLEDGE_REPO_URL)
+    dotenv: [.env]
+    cmds:
+      - |
+        KNOWLEDGE_DIR="config/task-knowledge"
+        if [ -z "$KNOWLEDGE_REPO_URL" ]; then
+          echo "KNOWLEDGE_REPO_URL not set, skipping pull"
+          exit 0
+        fi
+        # Build auth URL if credentials available
+        AUTH_URL="$KNOWLEDGE_REPO_URL"
+        if [ -n "$GITHUB_USER" ] && [ -n "$GITHUB_TOKEN" ]; then
+          AUTH_URL=$(echo "$KNOWLEDGE_REPO_URL" | sed "s|https://|https://${GITHUB_USER}:${GITHUB_TOKEN}@|")
+        fi
+        # Clone or pull
+        if [ -d "$KNOWLEDGE_DIR/.git" ]; then
+          echo "Pulling latest from $KNOWLEDGE_REPO_URL..."
+          git -C "$KNOWLEDGE_DIR" remote set-url origin "$AUTH_URL"
+          git -C "$KNOWLEDGE_DIR" fetch origin && git -C "$KNOWLEDGE_DIR" reset --hard origin/main || {
+            echo "Pull failed, re-cloning..."
+            rm -rf "$KNOWLEDGE_DIR"
+            git clone --depth 1 "$AUTH_URL" "$KNOWLEDGE_DIR"
+          }
+        else
+          echo "Cloning $KNOWLEDGE_REPO_URL..."
+          rm -rf "$KNOWLEDGE_DIR"
+          mkdir -p config
+          git clone --depth 1 "$AUTH_URL" "$KNOWLEDGE_DIR"
+        fi
+        # Copy JSON to config root
+        if [ -f "$KNOWLEDGE_DIR/task-knowledge.json" ]; then
+          cp "$KNOWLEDGE_DIR/task-knowledge.json" config/task-knowledge.json
+          echo "Copied task-knowledge.json ($(du -h config/task-knowledge.json | cut -f1))"
+        else
+          echo "ERROR: task-knowledge.json not found in repo" >&2
+          exit 1
+        fi
+
   docs:
     dir: docs
     cmds:
@@ -251,11 +290,13 @@ tasks:
 
   deploy-local:
     cmds:
+      - task: knowledge-pull
       - docker compose up -d --build
     desc: Deploy the application with Docker Compose in dev mode
 
   deploy:
     cmds:
+      - task: knowledge-pull
       - docker compose --profile tunnel up -d --build
       - sleep 3
       - docker compose restart api

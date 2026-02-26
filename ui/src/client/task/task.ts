@@ -21,6 +21,7 @@ import type {
 import type {
   GetTaskKnowledgeParams,
   HTTPValidationError,
+  ListTaskKnowledgeResponse,
   ListTaskResponse,
   ListTasksParams,
   TaskKnowledgeResponse,
@@ -327,6 +328,325 @@ export function useGetTaskResult<
   queryClient?: QueryClient,
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
   const queryOptions = getGetTaskResultQueryOptions(taskId, options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * List all available task knowledge entries with summary info.
+ * @summary List all task knowledge entries
+ */
+export const listTaskKnowledge = (
+  options?: SecondParameter<typeof customInstance>,
+  signal?: AbortSignal,
+) => {
+  return customInstance<ListTaskKnowledgeResponse>(
+    { url: `/task-knowledge`, method: "GET", signal },
+    options,
+  );
+};
+
+export const getListTaskKnowledgeQueryKey = () => {
+  return [`/task-knowledge`] as const;
+};
+
+export const getListTaskKnowledgeQueryOptions = <
+  TData = Awaited<ReturnType<typeof listTaskKnowledge>>,
+  TError = unknown,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof listTaskKnowledge>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof customInstance>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListTaskKnowledgeQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listTaskKnowledge>>
+  > = ({ signal }) => listTaskKnowledge(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listTaskKnowledge>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData> };
+};
+
+export type ListTaskKnowledgeQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listTaskKnowledge>>
+>;
+export type ListTaskKnowledgeQueryError = unknown;
+
+export function useListTaskKnowledge<
+  TData = Awaited<ReturnType<typeof listTaskKnowledge>>,
+  TError = unknown,
+>(
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof listTaskKnowledge>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listTaskKnowledge>>,
+          TError,
+          Awaited<ReturnType<typeof listTaskKnowledge>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData>;
+};
+export function useListTaskKnowledge<
+  TData = Awaited<ReturnType<typeof listTaskKnowledge>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof listTaskKnowledge>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listTaskKnowledge>>,
+          TError,
+          Awaited<ReturnType<typeof listTaskKnowledge>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+export function useListTaskKnowledge<
+  TData = Awaited<ReturnType<typeof listTaskKnowledge>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof listTaskKnowledge>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+/**
+ * @summary List all task knowledge entries
+ */
+
+export function useListTaskKnowledge<
+  TData = Awaited<ReturnType<typeof listTaskKnowledge>>,
+  TError = unknown,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof listTaskKnowledge>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+  const queryOptions = getListTaskKnowledgeQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Get raw markdown content for a task knowledge entry.
+
+Returns the index.md content with image references replaced
+by inline base64 data URIs for self-contained rendering.
+ * @summary Get raw markdown for a task knowledge entry
+ */
+export const getTaskKnowledgeMarkdown = (
+  taskName: string,
+  options?: SecondParameter<typeof customInstance>,
+  signal?: AbortSignal,
+) => {
+  return customInstance<void>(
+    { url: `/tasks/${taskName}/knowledge/markdown`, method: "GET", signal },
+    options,
+  );
+};
+
+export const getGetTaskKnowledgeMarkdownQueryKey = (taskName?: string) => {
+  return [`/tasks/${taskName}/knowledge/markdown`] as const;
+};
+
+export const getGetTaskKnowledgeMarkdownQueryOptions = <
+  TData = Awaited<ReturnType<typeof getTaskKnowledgeMarkdown>>,
+  TError = HTTPValidationError,
+>(
+  taskName: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof getTaskKnowledgeMarkdown>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetTaskKnowledgeMarkdownQueryKey(taskName);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getTaskKnowledgeMarkdown>>
+  > = ({ signal }) =>
+    getTaskKnowledgeMarkdown(taskName, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!taskName,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getTaskKnowledgeMarkdown>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData> };
+};
+
+export type GetTaskKnowledgeMarkdownQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getTaskKnowledgeMarkdown>>
+>;
+export type GetTaskKnowledgeMarkdownQueryError = HTTPValidationError;
+
+export function useGetTaskKnowledgeMarkdown<
+  TData = Awaited<ReturnType<typeof getTaskKnowledgeMarkdown>>,
+  TError = HTTPValidationError,
+>(
+  taskName: string,
+  options: {
+    query: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof getTaskKnowledgeMarkdown>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getTaskKnowledgeMarkdown>>,
+          TError,
+          Awaited<ReturnType<typeof getTaskKnowledgeMarkdown>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData>;
+};
+export function useGetTaskKnowledgeMarkdown<
+  TData = Awaited<ReturnType<typeof getTaskKnowledgeMarkdown>>,
+  TError = HTTPValidationError,
+>(
+  taskName: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof getTaskKnowledgeMarkdown>>,
+        TError,
+        TData
+      >
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getTaskKnowledgeMarkdown>>,
+          TError,
+          Awaited<ReturnType<typeof getTaskKnowledgeMarkdown>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+export function useGetTaskKnowledgeMarkdown<
+  TData = Awaited<ReturnType<typeof getTaskKnowledgeMarkdown>>,
+  TError = HTTPValidationError,
+>(
+  taskName: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof getTaskKnowledgeMarkdown>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+/**
+ * @summary Get raw markdown for a task knowledge entry
+ */
+
+export function useGetTaskKnowledgeMarkdown<
+  TData = Awaited<ReturnType<typeof getTaskKnowledgeMarkdown>>,
+  TError = HTTPValidationError,
+>(
+  taskName: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof getTaskKnowledgeMarkdown>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+  const queryOptions = getGetTaskKnowledgeMarkdownQueryOptions(
+    taskName,
+    options,
+  );
 
   const query = useQuery(queryOptions, queryClient) as UseQueryResult<
     TData,

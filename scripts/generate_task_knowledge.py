@@ -489,8 +489,12 @@ def _parse_markdown_file(path: Path) -> dict | None:
     # --- cases ---
     cases = _parse_cases_dir(path.parent)
 
+    # Derive category from directory path: <category>/<TaskName>/index.md
+    category = path.parent.parent.name if path.parent.parent != path.parent else ""
+
     return {
         "name": name,
+        "category": category,
         "summary": summary,
         "what_it_measures": fields.get("what_it_measures", ""),
         "physical_principle": fields.get("physical_principle", ""),
@@ -864,16 +868,9 @@ def _generate_sidebar(registry: dict[str, dict]) -> None:
 # ---------------------------------------------------------------------------
 
 
-def main() -> int:
-    if not MD_DIR.is_dir():
-        print(f"ERROR: Markdown directory not found: {MD_DIR}", file=sys.stderr)
-        return 1
-
-    md_files = sorted(MD_DIR.glob("*/*/index.md"))
-    if not md_files:
-        print(f"ERROR: No */*/index.md files found in {MD_DIR}", file=sys.stderr)
-        return 1
-
+def _scan_and_build(md_dir: Path) -> tuple[dict[str, dict], list[str]]:
+    """Scan a directory for ``*/*/index.md`` and build a registry."""
+    md_files = sorted(md_dir.glob("*/*/index.md"))
     registry: dict[str, dict] = {}
     errors: list[str] = []
 
@@ -892,7 +889,6 @@ def main() -> int:
             )
             if not entry.get(f)
         ]
-        # Check expected_result has a description
         er = entry.get("expected_result", {})
         if isinstance(er, dict) and not er.get("description"):
             missing.append("expected_result")
@@ -905,18 +901,80 @@ def main() -> int:
         registry[entry["name"]] = entry
         print(f"  OK   {md_path.parent.name}/index.md -> {entry['name']}")
 
-    if errors:
+    return registry, errors
+
+
+def main() -> int:
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Generate task-knowledge.json")
+    parser.add_argument(
+        "--knowledge-dir",
+        type=Path,
+        default=None,
+        help=(
+            "Path to an external knowledge repo (e.g. qdash-task-knowledge clone). "
+            "If provided, entries from this directory are merged with (and override) "
+            "the built-in docs/task-knowledge/ entries."
+        ),
+    )
+    parser.add_argument(
+        "--output", "-o",
+        type=Path,
+        default=OUTPUT_FILE,
+        help="Output JSON file path",
+    )
+    args = parser.parse_args()
+
+    # --- Built-in knowledge ---
+    registry: dict[str, dict] = {}
+    all_errors: list[str] = []
+
+    if MD_DIR.is_dir():
+        built_in, errors = _scan_and_build(MD_DIR)
+        registry.update(built_in)
+        all_errors.extend(errors)
+        print(f"Loaded {len(built_in)} entries from {MD_DIR}")
+    else:
+        print(f"Note: built-in directory not found: {MD_DIR}")
+
+    # --- External knowledge repo (overrides/supplements built-in) ---
+    if args.knowledge_dir:
+        ext_dir = args.knowledge_dir.resolve()
+        if ext_dir.is_dir():
+            external, ext_errors = _scan_and_build(ext_dir)
+            # Merge: external entries override built-in, but preserve
+            # built-in entries for tasks not in external repo.
+            # Cases from external repo supplement built-in cases.
+            for name, ext_entry in external.items():
+                if name in registry:
+                    # Merge cases: external cases supplement existing
+                    existing_cases = registry[name].get("cases", [])
+                    ext_cases = ext_entry.get("cases", [])
+                    ext_entry["cases"] = existing_cases + ext_cases
+                registry[name] = ext_entry
+            all_errors.extend(ext_errors)
+            print(f"Merged {len(external)} entries from {ext_dir}")
+        else:
+            print(f"WARNING: --knowledge-dir not found: {ext_dir}", file=sys.stderr)
+
+    if not registry:
+        print("ERROR: No knowledge entries found", file=sys.stderr)
+        return 1
+
+    if all_errors:
         print("\nWarnings:")
-        for e in errors:
+        for e in all_errors:
             print(e)
 
     _enrich_workflow_context(registry)
 
-    OUTPUT_FILE.write_text(
+    output_file: Path = args.output
+    output_file.write_text(
         json.dumps(registry, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
-    print(f"\nGenerated {OUTPUT_FILE} ({len(registry)} entries)")
+    print(f"\nGenerated {output_file} ({len(registry)} entries)")
 
     _generate_index(registry)
     _generate_sidebar(registry)

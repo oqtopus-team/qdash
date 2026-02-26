@@ -57,7 +57,16 @@ class IssueKnowledgeDocument(Document):
     resolution: str = Field(default="", description="How the issue was resolved")
     lesson_learned: list[str] = Field(default_factory=list, description="Key takeaways")
 
+    # Images
+    figure_paths: list[str] = Field(
+        default_factory=list, description="Task result figure paths (from calibration output)"
+    )
+    thread_image_urls: list[str] = Field(
+        default_factory=list, description="Image URLs from the issue thread discussion"
+    )
+
     reviewed_by: str | None = Field(default=None, description="Username of the reviewer")
+    pr_url: str | None = Field(default=None, description="GitHub PR URL created on approve")
     system_info: SystemInfoModel = Field(
         default_factory=SystemInfoModel, description="System timestamps"
     )

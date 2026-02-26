@@ -68,6 +68,15 @@ def _case_to_markdown(case: dict) -> str:
             lines.append(f"- {lesson}")
         lines.append("")
 
+    if case.get("figure_paths") or case.get("thread_image_urls"):
+        lines.append("## Images")
+        lines.append("")
+        for fp in case.get("figure_paths", []):
+            lines.append(f"![Task figure]({fp})")
+        for url in case.get("thread_image_urls", []):
+            lines.append(f"![Thread image]({url})")
+        lines.append("")
+
     return "\n".join(lines)
 
 
@@ -130,6 +139,8 @@ def main() -> int:
             "root_cause": doc.root_cause,
             "resolution": doc.resolution,
             "lesson_learned": doc.lesson_learned,
+            "figure_paths": doc.figure_paths,
+            "thread_image_urls": doc.thread_image_urls,
         }
 
         content = _case_to_markdown(case_data)
