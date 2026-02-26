@@ -105,6 +105,10 @@ class KnowledgeCase(BaseModel):
         default_factory=list,
         description="Key takeaways from the case",
     )
+    images: list[TaskKnowledgeImage] = Field(
+        default_factory=list,
+        description="Image references from the case file (with base64 data)",
+    )
 
 
 class TaskKnowledge(BaseModel):
@@ -266,6 +270,9 @@ class TaskKnowledge(BaseModel):
                     lines.append(f"   - Resolution: {case.resolution}")
                 if case.lesson_learned:
                     lines.append(f"   - Lessons: {'; '.join(case.lesson_learned)}")
+                if case.images:
+                    for img in case.images:
+                        lines.append(f"   - Image: {img.alt_text} ({img.relative_path})")
 
         return "\n".join(lines)
 

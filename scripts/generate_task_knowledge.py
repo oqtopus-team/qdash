@@ -363,6 +363,36 @@ def _parse_case_file(path: Path) -> dict | None:
         else:
             fields[field_name] = body
 
+    # --- Images (from all sections) ---
+    images = []
+    full_text = "\n".join(lines)
+    for m in _IMAGE_RE.finditer(full_text):
+        rel = m.group(2)
+        img_path = (path.parent / rel).resolve()
+        b64 = ""
+        if img_path.is_file():
+            try:
+                data = img_path.read_bytes()
+                if len(data) > MAX_IMAGE_SIZE:
+                    print(f"  Warning: {img_path.name} ({len(data)} bytes) exceeds 1MB limit, skipping")
+                elif _detect_image_type(data) is None:
+                    print(f"  Warning: {img_path.name} is not a valid image format, skipping")
+                else:
+                    b64 = base64.b64encode(data).decode("ascii")
+                    print(f"  Encoded case image {img_path.name} ({len(data)} bytes)")
+            except (OSError, MemoryError) as e:
+                print(f"  Error encoding {img_path.name}: {e}")
+        else:
+            print(f"  Warning: Case image not found: {rel}")
+        images.append(
+            {
+                "alt_text": m.group(1),
+                "relative_path": rel,
+                "section": "case",
+                "base64_data": b64,
+            }
+        )
+
     return {
         "title": title,
         "date": metadata.get("date", ""),
@@ -374,6 +404,7 @@ def _parse_case_file(path: Path) -> dict | None:
         "root_cause": fields.get("root_cause", ""),
         "resolution": fields.get("resolution", ""),
         "lesson_learned": fields.get("lesson_learned", []),
+        "images": images,
     }
 
 

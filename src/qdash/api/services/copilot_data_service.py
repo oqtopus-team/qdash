@@ -108,10 +108,16 @@ class CopilotDataService:
         """Collect expected reference images from TaskKnowledge.
 
         Returns list of (base64_data, alt_text) for images with embedded data.
+        Includes both task-level images and case-level images.
         """
-        if knowledge is None or not knowledge.images:
+        if knowledge is None:
             return []
-        return [(img.base64_data, img.alt_text) for img in knowledge.images if img.base64_data]
+        result = [(img.base64_data, img.alt_text) for img in knowledge.images if img.base64_data]
+        for case in knowledge.cases:
+            for img in case.images:
+                if img.base64_data:
+                    result.append((img.base64_data, f"[Case: {case.title}] {img.alt_text}"))
+        return result
 
     def load_task_history(
         self, task_name: str, chip_id: str, qid: str, last_n: int = 5

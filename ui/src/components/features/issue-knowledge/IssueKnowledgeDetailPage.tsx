@@ -152,7 +152,6 @@ export function IssueKnowledgeDetailPage({
 
   const handleApprove = async () => {
     await approve();
-    router.push("/issue-knowledge");
   };
 
   const handleReject = async () => {
