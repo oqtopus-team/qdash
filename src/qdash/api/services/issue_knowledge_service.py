@@ -123,28 +123,17 @@ class IssueKnowledgeService:
             The created draft knowledge case.
 
         """
-        # Delete any existing draft or rejected case (allows regeneration)
+        # Delete any existing case (allows regeneration regardless of status)
         existing = IssueKnowledgeDocument.find_one(
             {
                 "project_id": project_id,
                 "issue_id": issue_id,
-                "status": {"$in": ["draft", "rejected"]},
             }
         ).run()
         if existing is not None:
             existing.delete()
             logger.info(
                 "Deleted existing %s for issue %s (regenerating)", existing.status, issue_id
-            )
-
-        # Prevent regeneration if already approved
-        approved = IssueKnowledgeDocument.find_one(
-            {"project_id": project_id, "issue_id": issue_id, "status": "approved"}
-        ).run()
-        if approved is not None:
-            raise HTTPException(
-                status_code=409,
-                detail="An approved knowledge case already exists for this issue",
             )
 
         # Build context from issue thread
@@ -471,7 +460,11 @@ class IssueKnowledgeService:
             lines.append("## Thread images")
             lines.append("")
             for i, url in enumerate(doc.thread_image_urls, 1):
-                lines.append(f"![Thread image {i}]({url})")
+                if url.startswith("/api/issues/images/"):
+                    filename = url.rsplit("/", 1)[-1]
+                    lines.append(f"![Thread image {i}](./figures/{filename})")
+                else:
+                    lines.append(f"![Thread image {i}]({url})")
             lines.append("")
 
         return "\n".join(lines)
@@ -556,6 +549,25 @@ class IssueKnowledgeService:
                         files_to_add.append(rel)
                     else:
                         logger.warning("Figure not found, skipping: %s", fig_path)
+
+            # Copy thread images (local API images) alongside the case markdown
+            if doc.thread_image_urls:
+                from qdash.api.services.issue_service import ISSUES_IMAGE_DIR
+
+                figures_dir = target.parent / "figures"
+                figures_dir.mkdir(parents=True, exist_ok=True)
+                for url in doc.thread_image_urls:
+                    if not url.startswith("/api/issues/images/"):
+                        continue
+                    filename = url.rsplit("/", 1)[-1]
+                    src = ISSUES_IMAGE_DIR / filename
+                    if src.is_file():
+                        dst = figures_dir / filename
+                        shutil.copy2(src, dst)
+                        rel = str(dst.relative_to(Path(temp_dir)))
+                        files_to_add.append(rel)
+                    else:
+                        logger.warning("Thread image not found, skipping: %s", url)
 
             repo.index.add(files_to_add)
             diff = repo.index.diff("HEAD")
