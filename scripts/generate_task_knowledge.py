@@ -278,6 +278,123 @@ def _parse_analysis_guide(text: str) -> list[str]:
     return steps
 
 
+# Case metadata keys in frontmatter-style lines: - key: value
+_CASE_META_KEYS = {"date", "severity", "chip_id", "qid", "status"}
+
+# Case H2 section heading → field name
+_CASE_SECTION_MAP: dict[str, str] = {
+    "symptom": "symptom",
+    "root cause": "root_cause",
+    "resolution": "resolution",
+    "lesson learned": "lesson_learned",
+}
+
+
+def _parse_case_file(path: Path) -> dict | None:
+    """Parse a case Markdown file into a dict.
+
+    Expected format::
+
+        # Title
+        - date: 2026-02-15
+        - severity: critical
+        - chip_id: CHIP-01
+        - qid: Q12
+        - status: resolved
+
+        ## Symptom
+        ...
+        ## Root cause
+        ...
+        ## Resolution
+        ...
+        ## Lesson learned
+        - lesson 1
+        - lesson 2
+
+    Returns ``None`` if the file cannot be parsed.
+    """
+    raw = path.read_text(encoding="utf-8")
+    lines = raw.splitlines()
+
+    # --- H1 (title) ---
+    title: str | None = None
+    meta_start: int = 0
+    for i, line in enumerate(lines):
+        if line.startswith("# ") and not line.startswith("## "):
+            title = line[2:].strip()
+            meta_start = i + 1
+            break
+
+    if title is None:
+        return None
+
+    # --- Metadata lines (before first H2) ---
+    h2_indices = [i for i, line in enumerate(lines) if line.startswith("## ")]
+    meta_end = h2_indices[0] if h2_indices else len(lines)
+
+    metadata: dict[str, str] = {}
+    for line in lines[meta_start:meta_end]:
+        stripped = line.strip()
+        if stripped.startswith("- "):
+            content = stripped[2:]
+            if ":" in content:
+                key, val = content.split(":", 1)
+                key = key.strip().lower().replace(" ", "_")
+                if key in _CASE_META_KEYS:
+                    metadata[key] = val.strip()
+
+    # --- H2 sections ---
+    sections: dict[str, str] = {}
+    for idx, h2_line_idx in enumerate(h2_indices):
+        heading = lines[h2_line_idx][3:].strip().lower()
+        body_start = h2_line_idx + 1
+        body_end = h2_indices[idx + 1] if idx + 1 < len(h2_indices) else len(lines)
+        sections[heading] = "\n".join(lines[body_start:body_end]).strip()
+
+    # --- Map sections to fields ---
+    fields: dict[str, object] = {}
+    for heading, body in sections.items():
+        field_name = _CASE_SECTION_MAP.get(heading)
+        if field_name is None:
+            continue
+        if field_name == "lesson_learned":
+            fields[field_name] = _parse_list_items(body)
+        else:
+            fields[field_name] = body
+
+    return {
+        "title": title,
+        "date": metadata.get("date", ""),
+        "severity": metadata.get("severity", "warning"),
+        "chip_id": metadata.get("chip_id", ""),
+        "qid": metadata.get("qid", ""),
+        "status": metadata.get("status", "resolved"),
+        "symptom": fields.get("symptom", ""),
+        "root_cause": fields.get("root_cause", ""),
+        "resolution": fields.get("resolution", ""),
+        "lesson_learned": fields.get("lesson_learned", []),
+    }
+
+
+def _parse_cases_dir(task_dir: Path) -> list[dict]:
+    """Parse all case Markdown files in ``<task_dir>/cases/``."""
+    cases_dir = task_dir / "cases"
+    if not cases_dir.is_dir():
+        return []
+
+    cases: list[dict] = []
+    for case_path in sorted(cases_dir.glob("*.md")):
+        case = _parse_case_file(case_path)
+        if case is None:
+            print(f"  SKIP case {case_path.name}: no H1 heading found")
+            continue
+        cases.append(case)
+        print(f"  CASE {case_path.name} -> {case['title']}")
+
+    return cases
+
+
 def _parse_markdown_file(path: Path) -> dict | None:
     """Parse a Markdown knowledge file into a dict.
 
@@ -369,6 +486,9 @@ def _parse_markdown_file(path: Path) -> dict | None:
             ).strip()
             fields[field_name] = clean
 
+    # --- cases ---
+    cases = _parse_cases_dir(path.parent)
+
     return {
         "name": name,
         "summary": summary,
@@ -386,6 +506,7 @@ def _parse_markdown_file(path: Path) -> dict | None:
         "analysis_guide": fields.get("analysis_guide", []),
         "images": images,
         "related_context": fields.get("related_context", []),
+        "cases": cases,
     }
 
 

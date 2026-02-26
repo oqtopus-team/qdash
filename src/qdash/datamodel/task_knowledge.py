@@ -85,6 +85,28 @@ class OutputParameterInfo(BaseModel):
     description: str = Field(description="Explanation and expected value range")
 
 
+class KnowledgeCase(BaseModel):
+    """A concrete case derived from an issue postmortem.
+
+    Represents a real-world incident and its resolution, providing
+    the LLM with specific examples to draw on during analysis.
+    """
+
+    title: str = Field(description="Short descriptive title of the case")
+    date: str = Field(default="", description="Date of the incident (YYYY-MM-DD)")
+    severity: str = Field(default="warning", description="Severity: critical, warning, info")
+    chip_id: str = Field(default="", description="Chip identifier")
+    qid: str = Field(default="", description="Qubit identifier")
+    status: str = Field(default="resolved", description="Case status: resolved, open, workaround")
+    symptom: str = Field(default="", description="Observed symptom")
+    root_cause: str = Field(default="", description="Identified root cause")
+    resolution: str = Field(default="", description="How the issue was resolved")
+    lesson_learned: list[str] = Field(
+        default_factory=list,
+        description="Key takeaways from the case",
+    )
+
+
 class TaskKnowledge(BaseModel):
     """LLM-oriented structured knowledge for a calibration task."""
 
@@ -133,6 +155,10 @@ class TaskKnowledge(BaseModel):
     related_context: list[RelatedContextItem] = Field(
         default_factory=list,
         description="Additional data sources to load during analysis",
+    )
+    cases: list[KnowledgeCase] = Field(
+        default_factory=list,
+        description="Concrete cases derived from issue postmortems",
     )
 
     def to_prompt(self) -> str:
@@ -220,6 +246,25 @@ class TaskKnowledge(BaseModel):
             lines += ["", "### Reference figures"]
             for img in self.images:
                 lines.append(f"- {img.alt_text}: {img.relative_path}")
+
+        if self.cases:
+            lines += ["", "### Past cases"]
+            for i, case in enumerate(self.cases, 1):
+                header = f"{i}. [{case.severity}] {case.title}"
+                if case.date:
+                    header += f" ({case.date}"
+                    if case.qid:
+                        header += f", {case.qid}"
+                    header += ")"
+                lines.append(header)
+                if case.symptom:
+                    lines.append(f"   - Symptom: {case.symptom}")
+                if case.root_cause:
+                    lines.append(f"   - Root cause: {case.root_cause}")
+                if case.resolution:
+                    lines.append(f"   - Resolution: {case.resolution}")
+                if case.lesson_learned:
+                    lines.append(f"   - Lessons: {'; '.join(case.lesson_learned)}")
 
         return "\n".join(lines)
 

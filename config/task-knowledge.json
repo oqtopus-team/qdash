@@ -80,6 +80,7 @@
         "last_n": 5
       }
     ],
+    "cases": [],
     "workflow_context": [
       {
         "workflow": "1Q Fine-tune",
@@ -180,6 +181,7 @@
         "last_n": 5
       }
     ],
+    "cases": [],
     "workflow_context": []
   },
   "X90InterleavedRandomizedBenchmarking": {
@@ -263,6 +265,7 @@
         "last_n": 5
       }
     ],
+    "cases": [],
     "workflow_context": [
       {
         "workflow": "1Q Fine-tune",
@@ -377,6 +380,7 @@
         "last_n": 5
       }
     ],
+    "cases": [],
     "workflow_context": [
       {
         "workflow": "2Q Calibration",
@@ -460,6 +464,7 @@
         "last_n": 5
       }
     ],
+    "cases": [],
     "workflow_context": []
   },
   "CheckStatus": {
@@ -516,6 +521,7 @@
         "last_n": 5
       }
     ],
+    "cases": [],
     "workflow_context": []
   },
   "Configure": {
@@ -580,6 +586,7 @@
         "last_n": 5
       }
     ],
+    "cases": [],
     "workflow_context": []
   },
   "DumpBox": {
@@ -637,6 +644,7 @@
         "last_n": 5
       }
     ],
+    "cases": [],
     "workflow_context": []
   },
   "LinkUp": {
@@ -694,6 +702,7 @@
         "last_n": 5
       }
     ],
+    "cases": [],
     "workflow_context": []
   },
   "ReadoutConfigure": {
@@ -750,6 +759,7 @@
         "last_n": 5
       }
     ],
+    "cases": [],
     "workflow_context": []
   },
   "CheckElectricalDelay": {
@@ -814,6 +824,7 @@
         "last_n": 5
       }
     ],
+    "cases": [],
     "workflow_context": []
   },
   "CheckQubitFrequencies": {
@@ -885,6 +896,7 @@
         "last_n": 5
       }
     ],
+    "cases": [],
     "workflow_context": []
   },
   "CheckQubitSpectroscopy": {
@@ -963,6 +975,7 @@
         "last_n": 5
       }
     ],
+    "cases": [],
     "workflow_context": [
       {
         "workflow": "Bring-up",
@@ -1050,6 +1063,7 @@
         "last_n": 5
       }
     ],
+    "cases": [],
     "workflow_context": []
   },
   "CheckReflectionCoefficient": {
@@ -1131,6 +1145,7 @@
         "last_n": 5
       }
     ],
+    "cases": [],
     "workflow_context": []
   },
   "CheckResonatorFrequencies": {
@@ -1203,6 +1218,7 @@
         "last_n": 5
       }
     ],
+    "cases": [],
     "workflow_context": []
   },
   "CheckResonatorSpectroscopy": {
@@ -1277,6 +1293,7 @@
         "last_n": 5
       }
     ],
+    "cases": [],
     "workflow_context": [
       {
         "workflow": "Bring-up",
@@ -1361,6 +1378,7 @@
         "last_n": 5
       }
     ],
+    "cases": [],
     "workflow_context": [
       {
         "workflow": "1Q Fine-tune",
@@ -1454,6 +1472,7 @@
         "last_n": 5
       }
     ],
+    "cases": [],
     "workflow_context": [
       {
         "workflow": "1Q Fine-tune",
@@ -1549,6 +1568,7 @@
         "last_n": 5
       }
     ],
+    "cases": [],
     "workflow_context": [
       {
         "workflow": "1Q Check",
@@ -1654,6 +1674,7 @@
         "last_n": 5
       }
     ],
+    "cases": [],
     "workflow_context": [
       {
         "workflow": "1Q Fine-tune",
@@ -1758,6 +1779,7 @@
         "last_n": 5
       }
     ],
+    "cases": [],
     "workflow_context": [
       {
         "workflow": "1Q Fine-tune",
@@ -1863,6 +1885,7 @@
         "last_n": 5
       }
     ],
+    "cases": [],
     "workflow_context": [
       {
         "workflow": "1Q Fine-tune",
@@ -1966,6 +1989,7 @@
         "last_n": 5
       }
     ],
+    "cases": [],
     "workflow_context": [
       {
         "workflow": "1Q Check",
@@ -2077,6 +2101,7 @@
         "last_n": 5
       }
     ],
+    "cases": [],
     "workflow_context": [
       {
         "workflow": "1Q Fine-tune",
@@ -2162,6 +2187,7 @@
         "last_n": 5
       }
     ],
+    "cases": [],
     "workflow_context": []
   },
   "CheckDispersiveShift": {
@@ -2237,6 +2263,7 @@
         "last_n": 5
       }
     ],
+    "cases": [],
     "workflow_context": []
   },
   "CheckOptimalReadoutAmplitude": {
@@ -2308,6 +2335,7 @@
         "last_n": 5
       }
     ],
+    "cases": [],
     "workflow_context": []
   },
   "CheckQubit": {
@@ -2383,6 +2411,7 @@
         "last_n": 5
       }
     ],
+    "cases": [],
     "workflow_context": []
   },
   "CheckQubitFrequency": {
@@ -2461,6 +2490,7 @@
         "last_n": 5
       }
     ],
+    "cases": [],
     "workflow_context": []
   },
   "CheckRabi": {
@@ -2590,6 +2620,7 @@
         "last_n": 5
       }
     ],
+    "cases": [],
     "workflow_context": [
       {
         "workflow": "1Q Check",
@@ -2731,6 +2762,7 @@
         "last_n": 5
       }
     ],
+    "cases": [],
     "workflow_context": [
       {
         "workflow": "1Q Check",
@@ -2819,6 +2851,7 @@
         "last_n": 5
       }
     ],
+    "cases": [],
     "workflow_context": []
   },
   "CheckT1": {
@@ -2904,6 +2937,24 @@
           "t1"
         ],
         "last_n": 5
+      }
+    ],
+    "cases": [
+      {
+        "title": "Short T1 due to TLS coupling",
+        "date": "2026-02-15",
+        "severity": "critical",
+        "chip_id": "CHIP-01",
+        "qid": "Q12",
+        "status": "resolved",
+        "symptom": "T1 measured at 15 us, which is abnormally short compared to the typical 30-50 us range for this chip.",
+        "root_cause": "TLS defect located near the qubit frequency, accelerating energy relaxation.",
+        "resolution": "Shifted qubit frequency by 50 MHz to avoid the TLS defect. T1 recovered to 45 us.",
+        "lesson_learned": [
+          "When T1 degrades suddenly, suspect TLS coupling first.",
+          "Frequency shift can often circumvent TLS defects.",
+          "Monitor T1 stability over time to distinguish TLS from other loss mechanisms."
+        ]
       }
     ],
     "workflow_context": []
@@ -2994,6 +3045,7 @@
         "last_n": 5
       }
     ],
+    "cases": [],
     "workflow_context": []
   },
   "ChevronPattern": {
@@ -3076,6 +3128,7 @@
         "last_n": 5
       }
     ],
+    "cases": [],
     "workflow_context": [
       {
         "workflow": "Bring-up",
@@ -3184,6 +3237,7 @@
         "last_n": 5
       }
     ],
+    "cases": [],
     "workflow_context": [
       {
         "workflow": "1Q Fine-tune",
@@ -3296,6 +3350,7 @@
         "last_n": 5
       }
     ],
+    "cases": [],
     "workflow_context": [
       {
         "workflow": "2Q Calibration",
@@ -3400,6 +3455,7 @@
         "last_n": 5
       }
     ],
+    "cases": [],
     "workflow_context": [
       {
         "workflow": "2Q Calibration",
@@ -3584,6 +3640,7 @@
         "last_n": 5
       }
     ],
+    "cases": [],
     "workflow_context": [
       {
         "workflow": "2Q Calibration",
@@ -3683,6 +3740,7 @@
         "last_n": 5
       }
     ],
+    "cases": [],
     "workflow_context": [
       {
         "workflow": "2Q Calibration",
@@ -3826,6 +3884,7 @@
         "last_n": 5
       }
     ],
+    "cases": [],
     "workflow_context": [
       {
         "workflow": "2Q Calibration",
