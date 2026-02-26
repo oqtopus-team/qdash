@@ -41,6 +41,7 @@ const EMOJI_MAP: Record<string, string> = {
   file: "Page%20facing%20up/3D/page_facing_up_3d.png",
 
   // Science & Tech
+  brain: "Brain/3D/brain_3d.png",
   atom: "Atom%20symbol/3D/atom_symbol_3d.png",
   microchip: "Desktop%20computer/3D/desktop_computer_3d.png",
   computer: "Desktop%20computer/3D/desktop_computer_3d.png",

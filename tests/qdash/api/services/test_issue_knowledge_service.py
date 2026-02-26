@@ -751,8 +751,8 @@ class TestDocToMarkdown:
         assert "![Figure 2](./figures/fig2.png)" in md
         assert "![Figure 3](./figures/fig3.png)" in md
 
-    def test_thread_image_urls(self):
-        """Thread image URLs are included as-is."""
+    def test_thread_image_urls_external(self):
+        """External thread image URLs are included as-is."""
         doc = _make_doc(
             thread_image_urls=["https://img.example.com/a.png", "https://img.example.com/b.png"]
         )
@@ -760,6 +760,31 @@ class TestDocToMarkdown:
         assert "## Thread images" in md
         assert "![Thread image 1](https://img.example.com/a.png)" in md
         assert "![Thread image 2](https://img.example.com/b.png)" in md
+
+    def test_thread_image_urls_local_api(self):
+        """Local API thread image URLs are rewritten to relative paths."""
+        doc = _make_doc(
+            thread_image_urls=[
+                "/api/issues/images/81909b81-af30-40d8-85b3-379bb4d75909.png",
+                "/api/issues/images/abcdef12-3456-7890-abcd-ef1234567890.jpg",
+            ]
+        )
+        md = IssueKnowledgeService._doc_to_markdown(doc)
+        assert "## Thread images" in md
+        assert "![Thread image 1](./figures/81909b81-af30-40d8-85b3-379bb4d75909.png)" in md
+        assert "![Thread image 2](./figures/abcdef12-3456-7890-abcd-ef1234567890.jpg)" in md
+
+    def test_thread_image_urls_mixed(self):
+        """Mixed local and external thread image URLs are handled correctly."""
+        doc = _make_doc(
+            thread_image_urls=[
+                "/api/issues/images/abc123.png",
+                "https://img.example.com/ext.png",
+            ]
+        )
+        md = IssueKnowledgeService._doc_to_markdown(doc)
+        assert "![Thread image 1](./figures/abc123.png)" in md
+        assert "![Thread image 2](https://img.example.com/ext.png)" in md
 
     def test_omits_empty_sections(self):
         """Sections with empty content are omitted."""
