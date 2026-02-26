@@ -518,101 +518,12 @@ def _parse_markdown_file(path: Path) -> dict | None:
 # Index page generator
 # ---------------------------------------------------------------------------
 
-# Categories for organising the index page.  Tasks not listed here go into
-# "Other".
-# (display_name, dir_slug, task_list)
-_CATEGORIES: list[tuple[str, str, list[str]]] = [
-    (
-        "Box Setup",
-        "box-setup",
-        [
-            "CheckStatus",
-            "LinkUp",
-            "DumpBox",
-            "CheckNoise",
-            "Configure",
-            "ReadoutConfigure",
-        ],
-    ),
-    (
-        "System",
-        "system",
-        [
-            "CheckSkew",
-        ],
-    ),
-    (
-        "CW Characterization",
-        "cw-characterization",
-        [
-            "CheckResonatorFrequencies",
-            "CheckResonatorSpectroscopy",
-            "CheckReflectionCoefficient",
-            "CheckElectricalDelay",
-            "CheckReadoutAmplitude",
-            "CheckQubitFrequencies",
-            "CheckQubitSpectroscopy",
-        ],
-    ),
-    (
-        "TD Characterization",
-        "td-characterization",
-        [
-            "CheckQubit",
-            "CheckQubitFrequency",
-            "CheckReadoutFrequency",
-            "CheckRabi",
-            "CheckT1",
-            "CheckT2Echo",
-            "CheckRamsey",
-            "CheckDispersiveShift",
-            "CheckOptimalReadoutAmplitude",
-            "ReadoutClassification",
-            "ChevronPattern",
-        ],
-    ),
-    (
-        "One-Qubit Gate Calibration",
-        "one-qubit-gate-calibration",
-        [
-            "CheckPIPulse",
-            "CheckHPIPulse",
-            "CheckDRAGPIPulse",
-            "CheckDRAGHPIPulse",
-            "CreatePIPulse",
-            "CreateHPIPulse",
-            "CreateDRAGPIPulse",
-            "CreateDRAGHPIPulse",
-        ],
-    ),
-    (
-        "Two-Qubit Gate Calibration",
-        "two-qubit-gate-calibration",
-        [
-            "CheckCrossResonance",
-            "CheckZX90",
-            "CreateZX90",
-            "CheckBellState",
-            "CheckBellStateTomography",
-        ],
-    ),
-    (
-        "Benchmarking",
-        "benchmarking",
-        [
-            "RandomizedBenchmarking",
-            "X90InterleavedRandomizedBenchmarking",
-            "X180InterleavedRandomizedBenchmarking",
-            "ZX90InterleavedRandomizedBenchmarking",
-        ],
-    ),
-]
-
-# Reverse lookup: task_name -> category dir slug
-_TASK_TO_CAT_DIR: dict[str, str] = {}
-for _cat_name, _cat_dir, _cat_tasks in _CATEGORIES:
-    for _t in _cat_tasks:
-        _TASK_TO_CAT_DIR[_t] = _cat_dir
+# Categories and task→category mapping are defined in the datamodel
+# so that both this script and the API share a single source of truth.
+from qdash.datamodel.task_knowledge import (
+    _CATEGORIES,
+    TASK_TO_CATEGORY_DIR as _TASK_TO_CAT_DIR,
+)
 
 # ---------------------------------------------------------------------------
 # Calibration Workflows

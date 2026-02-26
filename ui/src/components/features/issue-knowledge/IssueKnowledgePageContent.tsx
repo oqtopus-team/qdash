@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Search, X, Check, XCircle, Trash2 } from "lucide-react";
+import { Search, X, GitPullRequest, XCircle, Trash2 } from "lucide-react";
 import { PageContainer } from "@/components/ui/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -91,8 +91,8 @@ function KnowledgeCard({
               }}
               className="btn btn-success btn-xs gap-1"
             >
-              <Check className="h-3 w-3" />
-              Approve
+              <GitPullRequest className="h-3 w-3" />
+              Create PR
             </button>
             <button
               onClick={(e) => {

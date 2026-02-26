@@ -278,7 +278,7 @@ export function IssueDetailPage({ issueId }: { issueId: string }) {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {issue.is_closed && canManage && (
+          {canManage && (
             <button
               onClick={() => {
                 extractKnowledge(issueId).then(() => {

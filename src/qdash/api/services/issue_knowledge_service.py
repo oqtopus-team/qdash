@@ -152,13 +152,15 @@ class IssueKnowledgeService:
         task_id = ai_context["task_id"]
 
         # Resolve task_name from task_result_history
+        # Use ``name`` (e.g. "CheckT1") not ``task_type`` (e.g. "qubit")
+        # so it matches the knowledge repo directory structure.
         task_name = ""
         from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
 
         task_result = TaskResultHistoryDocument.find_one({"task_id": task_id}).run()
         figure_paths: list[str] = []
         if task_result:
-            task_name = task_result.task_type or ""
+            task_name = task_result.name or ""
             figure_paths = task_result.figure_path or []
 
         # Build thread text
@@ -365,7 +367,12 @@ class IssueKnowledgeService:
 
     @staticmethod
     def _doc_to_markdown(doc: IssueKnowledgeDocument) -> str:
-        """Convert a knowledge document to case Markdown content."""
+        """Convert a knowledge document to case Markdown content.
+
+        Figure paths are rewritten to ``./figures/<filename>`` so that
+        they resolve correctly when the images are committed alongside
+        the case Markdown file in the knowledge repository.
+        """
         lines = [f"# {doc.title}", ""]
 
         meta = []
@@ -396,6 +403,21 @@ class IssueKnowledgeService:
             lines.append("")
             for lesson in doc.lesson_learned:
                 lines.append(f"- {lesson}")
+            lines.append("")
+
+        if doc.figure_paths:
+            lines.append("## Figures")
+            lines.append("")
+            for i, fig_path in enumerate(doc.figure_paths, 1):
+                filename = Path(fig_path).name
+                lines.append(f"![Figure {i}](./figures/{filename})")
+            lines.append("")
+
+        if doc.thread_image_urls:
+            lines.append("## Thread images")
+            lines.append("")
+            for i, url in enumerate(doc.thread_image_urls, 1):
+                lines.append(f"![Thread image {i}]({url})")
             lines.append("")
 
         return "\n".join(lines)
@@ -465,7 +487,23 @@ class IssueKnowledgeService:
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(md_content, encoding="utf-8")
 
-            repo.index.add([repo_subpath])
+            files_to_add = [repo_subpath]
+
+            # Copy figure images alongside the case markdown
+            if doc.figure_paths:
+                figures_dir = target.parent / "figures"
+                figures_dir.mkdir(parents=True, exist_ok=True)
+                for fig_path in doc.figure_paths:
+                    src = Path(fig_path)
+                    if src.is_file():
+                        dst = figures_dir / src.name
+                        shutil.copy2(src, dst)
+                        rel = str(dst.relative_to(Path(temp_dir)))
+                        files_to_add.append(rel)
+                    else:
+                        logger.warning("Figure not found, skipping: %s", fig_path)
+
+            repo.index.add(files_to_add)
             diff = repo.index.diff("HEAD")
             if not diff:
                 logger.info("No changes to commit for knowledge PR")
@@ -547,13 +585,9 @@ class IssueKnowledgeService:
         # Determine repo subpath by looking up the task in the knowledge repo
         repo_url = os.getenv("KNOWLEDGE_REPO_URL")
         if repo_url:
-            # Try to find existing category dir by cloning and checking
-            # For efficiency, use _TASK_TO_CAT_DIR from generate script as fallback
-            try:
-                from scripts.generate_task_knowledge import _TASK_TO_CAT_DIR
-                cat_dir = _TASK_TO_CAT_DIR.get(doc.task_name, "other")
-            except ImportError:
-                cat_dir = "other"
+            from qdash.datamodel.task_knowledge import get_task_category_dir
+
+            cat_dir = get_task_category_dir(doc.task_name)
             repo_subpath = f"{cat_dir}/{doc.task_name}/cases/{filename}"
 
             pr_url = self._create_knowledge_pr(doc, md_content, repo_subpath)

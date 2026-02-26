@@ -323,3 +323,114 @@ CATEGORY_DISPLAY_NAMES: dict[str, str] = {
     "two-qubit-gate-calibration": "Two-Qubit Gate Calibration",
     "benchmarking": "Benchmarking",
 }
+
+# Canonical task → category directory mapping.
+# This is the single source of truth used by both the API and the
+# ``generate_task_knowledge.py`` script.
+TASK_TO_CATEGORY_DIR: dict[str, str] = {}
+_CATEGORIES: list[tuple[str, str, list[str]]] = [
+    (
+        "Box Setup",
+        "box-setup",
+        [
+            "CheckStatus",
+            "LinkUp",
+            "DumpBox",
+            "CheckNoise",
+            "Configure",
+            "ReadoutConfigure",
+        ],
+    ),
+    (
+        "System",
+        "system",
+        [
+            "CheckSkew",
+        ],
+    ),
+    (
+        "CW Characterization",
+        "cw-characterization",
+        [
+            "CheckResonatorFrequencies",
+            "CheckResonatorSpectroscopy",
+            "CheckReflectionCoefficient",
+            "CheckElectricalDelay",
+            "CheckReadoutAmplitude",
+            "CheckQubitFrequencies",
+            "CheckQubitSpectroscopy",
+        ],
+    ),
+    (
+        "TD Characterization",
+        "td-characterization",
+        [
+            "CheckQubit",
+            "CheckQubitFrequency",
+            "CheckReadoutFrequency",
+            "CheckRabi",
+            "CheckT1",
+            "CheckT2Echo",
+            "CheckRamsey",
+            "CheckDispersiveShift",
+            "CheckOptimalReadoutAmplitude",
+            "ReadoutClassification",
+            "ChevronPattern",
+        ],
+    ),
+    (
+        "One-Qubit Gate Calibration",
+        "one-qubit-gate-calibration",
+        [
+            "CheckPIPulse",
+            "CheckHPIPulse",
+            "CheckDRAGPIPulse",
+            "CheckDRAGHPIPulse",
+            "CreatePIPulse",
+            "CreateHPIPulse",
+            "CreateDRAGPIPulse",
+            "CreateDRAGHPIPulse",
+        ],
+    ),
+    (
+        "Two-Qubit Gate Calibration",
+        "two-qubit-gate-calibration",
+        [
+            "CheckCrossResonance",
+            "CheckZX90",
+            "CreateZX90",
+            "CheckBellState",
+            "CheckBellStateTomography",
+        ],
+    ),
+    (
+        "Benchmarking",
+        "benchmarking",
+        [
+            "RandomizedBenchmarking",
+            "X90InterleavedRandomizedBenchmarking",
+            "X180InterleavedRandomizedBenchmarking",
+            "ZX90InterleavedRandomizedBenchmarking",
+        ],
+    ),
+]
+for _cat_name, _cat_dir, _cat_tasks in _CATEGORIES:
+    for _t in _cat_tasks:
+        TASK_TO_CATEGORY_DIR[_t] = _cat_dir
+
+
+def get_task_category_dir(task_name: str) -> str:
+    """Return the category directory slug for a task name.
+
+    First checks the static ``TASK_TO_CATEGORY_DIR`` mapping (covers
+    all known tasks even without a knowledge entry), then falls back
+    to the loaded registry's ``category`` field.
+    Returns ``"other"`` if the task is completely unknown.
+    """
+    cat = TASK_TO_CATEGORY_DIR.get(task_name)
+    if cat:
+        return cat
+    entry = TASK_KNOWLEDGE_REGISTRY.get(task_name)
+    if entry and entry.category:
+        return entry.category
+    return "other"

@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
-  Check,
   XCircle,
   Pencil,
   Save,
@@ -276,8 +275,8 @@ export function IssueKnowledgeDetailPage({
                 onClick={handleApprove}
                 className="btn btn-success btn-sm gap-1"
               >
-                <Check className="h-3 w-3" />
-                Approve
+                <GitPullRequest className="h-3 w-3" />
+                Create PR
               </button>
               <button
                 onClick={handleReject}
