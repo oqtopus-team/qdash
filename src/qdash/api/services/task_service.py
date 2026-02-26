@@ -5,11 +5,9 @@ from __future__ import annotations
 import base64
 import logging
 import re
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 from fastapi import HTTPException
-from qdash.common.config_loader import ConfigLoader
 from qdash.api.schemas.task import (
     ExpectedResultResponse,
     InputParameterModel,
@@ -23,9 +21,14 @@ from qdash.api.schemas.task import (
     TaskResponse,
     TaskResultResponse,
 )
+from qdash.common.config_loader import ConfigLoader
 from qdash.datamodel.task_knowledge import (
     CATEGORY_DISPLAY_NAMES,
+)
+from qdash.datamodel.task_knowledge import (
     get_task_knowledge as _lookup_knowledge,
+)
+from qdash.datamodel.task_knowledge import (
     list_all_task_knowledge as _list_all_knowledge,
 )
 from qdash.dbmodel.execution_history import ExecutionHistoryDocument
@@ -206,8 +209,7 @@ class TaskService:
                     pass
             return m.group(0)
 
-        content = re.sub(r"!\[([^\]]*)\]\(([^)]+)\)", _replace_img, content)
-        return content
+        return re.sub(r"!\[([^\]]*)\]\(([^)]+)\)", _replace_img, content)
 
     def list_task_knowledge(self) -> ListTaskKnowledgeResponse:
         """List all available task knowledge entries with summary info."""
@@ -269,13 +271,7 @@ class TaskService:
             output_parameters_info=[p.model_dump() for p in knowledge.output_parameters_info],
             analysis_guide=knowledge.analysis_guide,
             prerequisites=knowledge.prerequisites,
-            images=[
-                KnowledgeImageResponse(**img.model_dump())
-                for img in knowledge.images
-            ],
-            cases=[
-                KnowledgeCaseResponse(**case.model_dump())
-                for case in knowledge.cases
-            ],
+            images=[KnowledgeImageResponse(**img.model_dump()) for img in knowledge.images],
+            cases=[KnowledgeCaseResponse(**case.model_dump()) for case in knowledge.cases],
             prompt_text=knowledge.to_prompt(),
         )

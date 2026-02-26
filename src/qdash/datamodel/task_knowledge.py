@@ -4,9 +4,9 @@ Provides a ``TaskKnowledge`` Pydantic model and a central registry
 (``TASK_KNOWLEDGE_REGISTRY``) that maps task class names to their
 knowledge entries.
 
-Knowledge is loaded from ``config/task-knowledge.json``, which is
-generated from Markdown files by ``scripts/generate_task_knowledge.py``
-(run via ``task knowledge``).
+Knowledge is loaded from ``config/task-knowledge/task-knowledge.json``
+(cloned knowledge repo), which is generated from Markdown files by
+``scripts/generate_task_knowledge.py`` (run via ``task knowledge``).
 
 The registry lives in ``datamodel`` so that both the API container and
 the workflow container can access it without cross-importing.
@@ -283,12 +283,23 @@ class TaskKnowledge(BaseModel):
 
 
 def _resolve_json_path() -> Path | None:
-    """Locate ``task-knowledge.json`` under the config root."""
+    """Locate ``task-knowledge.json`` under the config root.
+
+    Checks ``config/task-knowledge/task-knowledge.json`` first (cloned
+    knowledge repo), then falls back to ``config/task-knowledge.json``
+    for backward compatibility.
+    """
     from qdash.common.config_loader import ConfigLoader
 
-    json_path = ConfigLoader.get_config_dir() / "task-knowledge.json"
-    if json_path.is_file():
-        return json_path
+    config_dir = ConfigLoader.get_config_dir()
+    # Primary: inside the cloned knowledge repo directory
+    repo_path = config_dir / "task-knowledge" / "task-knowledge.json"
+    if repo_path.is_file():
+        return repo_path
+    # Fallback: legacy location at config root
+    legacy_path = config_dir / "task-knowledge.json"
+    if legacy_path.is_file():
+        return legacy_path
     return None
 
 

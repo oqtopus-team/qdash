@@ -23,7 +23,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 MD_DIR = REPO_ROOT / "docs" / "task-knowledge"
-OUTPUT_FILE = REPO_ROOT / "config" / "task-knowledge.json"
+OUTPUT_FILE = REPO_ROOT / "config" / "task-knowledge" / "task-knowledge.json"
 SIDEBAR_FILE = REPO_ROOT / "docs" / ".vitepress" / "task-knowledge-sidebar.json"
 
 # ---------------------------------------------------------------------------

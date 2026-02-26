@@ -19,13 +19,13 @@ function useTaskKnowledgeMarkdown(taskName: string) {
   });
 }
 
-export function TaskKnowledgeDetailPage({
-  taskName,
-}: {
-  taskName: string;
-}) {
+export function TaskKnowledgeDetailPage({ taskName }: { taskName: string }) {
   const router = useRouter();
-  const { data: markdown, isLoading, error } = useTaskKnowledgeMarkdown(taskName);
+  const {
+    data: markdown,
+    isLoading,
+    error,
+  } = useTaskKnowledgeMarkdown(taskName);
 
   if (isLoading) {
     return (

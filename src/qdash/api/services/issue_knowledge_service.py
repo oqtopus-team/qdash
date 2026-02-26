@@ -122,11 +122,17 @@ class IssueKnowledgeService:
         """
         # Delete any existing draft or rejected case (allows regeneration)
         existing = IssueKnowledgeDocument.find_one(
-            {"project_id": project_id, "issue_id": issue_id, "status": {"$in": ["draft", "rejected"]}}
+            {
+                "project_id": project_id,
+                "issue_id": issue_id,
+                "status": {"$in": ["draft", "rejected"]},
+            }
         ).run()
         if existing is not None:
             existing.delete()
-            logger.info("Deleted existing %s for issue %s (regenerating)", existing.status, issue_id)
+            logger.info(
+                "Deleted existing %s for issue %s (regenerating)", existing.status, issue_id
+            )
 
         # Prevent regeneration if already approved
         approved = IssueKnowledgeDocument.find_one(
@@ -221,9 +227,7 @@ class IssueKnowledgeService:
         )
         doc.insert()
 
-        logger.info(
-            "Generated knowledge draft for issue %s (task=%s)", issue_id, task_name
-        )
+        logger.info("Generated knowledge draft for issue %s (task=%s)", issue_id, task_name)
         return self._to_response(doc)
 
     @staticmethod

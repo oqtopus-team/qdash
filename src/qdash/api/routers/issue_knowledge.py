@@ -5,8 +5,8 @@ from __future__ import annotations
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
-from qdash.api.dependencies import get_issue_knowledge_service, get_issue_service
-from qdash.api.lib.project import (
+from qdash.api.dependencies import get_issue_knowledge_service, get_issue_service  # noqa: TCH002
+from qdash.api.lib.project import (  # noqa: TCH002
     ProjectContext,
     get_project_context,
 )
@@ -16,8 +16,8 @@ from qdash.api.schemas.issue_knowledge import (
     ListIssueKnowledgeResponse,
 )
 from qdash.api.schemas.success import SuccessResponse
-from qdash.api.services.issue_knowledge_service import IssueKnowledgeService
-from qdash.api.services.issue_service import IssueService
+from qdash.api.services.issue_knowledge_service import IssueKnowledgeService  # noqa: TCH002
+from qdash.api.services.issue_service import IssueService  # noqa: TCH002
 
 router = APIRouter()
 
@@ -33,7 +33,9 @@ def list_issue_knowledge(
     service: Annotated[IssueKnowledgeService, Depends(get_issue_knowledge_service)],
     skip: Annotated[int, Query(ge=0)] = 0,
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
-    status: Annotated[str | None, Query(description="Filter by status: draft, approved, rejected")] = None,
+    status: Annotated[
+        str | None, Query(description="Filter by status: draft, approved, rejected")
+    ] = None,
     task_name: Annotated[str | None, Query(description="Filter by task name")] = None,
 ) -> ListIssueKnowledgeResponse:
     """List issue-derived knowledge cases with optional filters."""

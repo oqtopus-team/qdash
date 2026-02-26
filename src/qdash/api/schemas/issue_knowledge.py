@@ -26,7 +26,9 @@ class IssueKnowledgeResponse(BaseModel):
     lesson_learned: list[str] = Field(default_factory=list, description="Key takeaways")
 
     figure_paths: list[str] = Field(default_factory=list, description="Task result figure paths")
-    thread_image_urls: list[str] = Field(default_factory=list, description="Image URLs from issue thread")
+    thread_image_urls: list[str] = Field(
+        default_factory=list, description="Image URLs from issue thread"
+    )
 
     reviewed_by: str | None = Field(default=None, description="Reviewer username")
     pr_url: str | None = Field(default=None, description="GitHub PR URL (set on approve)")

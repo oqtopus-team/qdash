@@ -62,13 +62,11 @@ tasks:
           mkdir -p config
           git clone --depth 1 "$AUTH_URL" "$KNOWLEDGE_DIR"
         fi
-        # Copy JSON to config root
+        # Verify JSON exists in the cloned repo
         if [ -f "$KNOWLEDGE_DIR/task-knowledge.json" ]; then
-          cp "$KNOWLEDGE_DIR/task-knowledge.json" config/task-knowledge.json
-          echo "Copied task-knowledge.json ($(du -h config/task-knowledge.json | cut -f1))"
+          echo "task-knowledge.json ready ($(du -h "$KNOWLEDGE_DIR/task-knowledge.json" | cut -f1))"
         else
-          echo "ERROR: task-knowledge.json not found in repo" >&2
-          exit 1
+          echo "WARNING: task-knowledge.json not found in repo; it will be generated on next PR merge" >&2
         fi
 
   docs:
