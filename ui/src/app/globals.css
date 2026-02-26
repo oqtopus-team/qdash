@@ -1781,7 +1781,8 @@ html[data-theme="dev-dark"],
 .chat-session-active {
   background: color-mix(in oklch, var(--color-primary) 8%, transparent);
   border: 1px solid color-mix(in oklch, var(--color-primary) 20%, transparent);
-  box-shadow: 0 0 0 1px color-mix(in oklch, var(--color-primary) 5%, transparent);
+  box-shadow: 0 0 0 1px
+    color-mix(in oklch, var(--color-primary) 5%, transparent);
 }
 
 /* Input card container */
@@ -1790,7 +1791,9 @@ html[data-theme="dev-dark"],
   border: 2px solid var(--color-base-300);
   border-radius: 1rem;
   padding: 0.25rem 0.75rem;
-  transition: border-color 0.2s ease, box-shadow 0.3s ease;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.3s ease;
 }
 
 .chat-input-card:focus-within {
@@ -1807,7 +1810,8 @@ html[data-theme="dev-dark"],
   gap: 0.75rem;
   padding: 0.75rem 1rem;
   border-radius: 0.75rem;
-  border: 1px solid color-mix(in oklch, var(--color-base-content) 10%, transparent);
+  border: 1px solid
+    color-mix(in oklch, var(--color-base-content) 10%, transparent);
   background: var(--color-base-100);
   text-align: left;
   cursor: pointer;
@@ -1817,7 +1821,11 @@ html[data-theme="dev-dark"],
 
 .chat-suggestion-card:hover {
   border-color: color-mix(in oklch, var(--color-primary) 30%, transparent);
-  background: color-mix(in oklch, var(--color-primary) 3%, var(--color-base-100));
+  background: color-mix(
+    in oklch,
+    var(--color-primary) 3%,
+    var(--color-base-100)
+  );
   box-shadow:
     0 4px 6px -1px rgb(0 0 0 / 0.07),
     0 0 0 1px color-mix(in oklch, var(--color-primary) 10%, transparent);

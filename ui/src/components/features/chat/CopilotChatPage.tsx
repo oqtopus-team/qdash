@@ -51,7 +51,10 @@ const markdownComponents = {
       return <CodeBlock language={match[1]}>{codeString}</CodeBlock>;
     }
     return (
-      <code className="bg-base-200 px-1.5 py-0.5 rounded-md text-sm font-mono" {...props}>
+      <code
+        className="bg-base-200 px-1.5 py-0.5 rounded-md text-sm font-mono"
+        {...props}
+      >
         {children}
       </code>
     );
@@ -235,7 +238,9 @@ function MessageBubble({
 }) {
   if (message.role === "user") {
     return (
-      <div className={`flex justify-end ${isLatest ? "animate-fade-in-up" : ""}`}>
+      <div
+        className={`flex justify-end ${isLatest ? "animate-fade-in-up" : ""}`}
+      >
         <div className="chat-bubble-user rounded-2xl rounded-br-sm px-4 py-2.5 max-w-[75%] text-sm whitespace-pre-wrap shadow-sm">
           {message.content}
         </div>
@@ -312,7 +317,9 @@ function SessionListItem({
               </span>
             )}
             <span>{session.messages.length} msgs</span>
-            <span className="text-base-content/30">{formatTime(session.updatedAt)}</span>
+            <span className="text-base-content/30">
+              {formatTime(session.updatedAt)}
+            </span>
           </div>
         </div>
         <button
