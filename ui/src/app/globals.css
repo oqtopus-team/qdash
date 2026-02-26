@@ -1752,3 +1752,90 @@ html[data-theme="dev-dark"],
   animation-duration: 2.5s;
   animation-direction: reverse;
 }
+
+/* ========================================
+   Chat UI Styles
+   ======================================== */
+
+/* User message bubble - uses primary gradient consistent with btn-primary */
+.chat-bubble-user {
+  background: linear-gradient(
+    135deg,
+    var(--color-primary),
+    color-mix(in oklch, var(--color-primary) 80%, var(--color-accent))
+  );
+  color: var(--color-primary-content);
+}
+
+/* Bot avatar icon background */
+.chat-avatar-bot {
+  background: linear-gradient(
+    135deg,
+    color-mix(in oklch, var(--color-primary) 12%, transparent),
+    color-mix(in oklch, var(--color-accent) 8%, transparent)
+  );
+  border: 1px solid color-mix(in oklch, var(--color-primary) 15%, transparent);
+}
+
+/* Active session in sidebar */
+.chat-session-active {
+  background: color-mix(in oklch, var(--color-primary) 8%, transparent);
+  border: 1px solid color-mix(in oklch, var(--color-primary) 20%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in oklch, var(--color-primary) 5%, transparent);
+}
+
+/* Input card container */
+.chat-input-card {
+  background: var(--color-base-100);
+  border: 2px solid var(--color-base-300);
+  border-radius: 1rem;
+  padding: 0.25rem 0.75rem;
+  transition: border-color 0.2s ease, box-shadow 0.3s ease;
+}
+
+.chat-input-card:focus-within {
+  border-color: var(--color-primary);
+  box-shadow:
+    0 0 0 4px color-mix(in oklch, var(--color-primary) 15%, transparent),
+    0 4px 12px -2px rgb(0 0 0 / 0.08);
+}
+
+/* Suggestion cards in empty state */
+.chat-suggestion-card {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-radius: 0.75rem;
+  border: 1px solid color-mix(in oklch, var(--color-base-content) 10%, transparent);
+  background: var(--color-base-100);
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.05);
+}
+
+.chat-suggestion-card:hover {
+  border-color: color-mix(in oklch, var(--color-primary) 30%, transparent);
+  background: color-mix(in oklch, var(--color-primary) 3%, var(--color-base-100));
+  box-shadow:
+    0 4px 6px -1px rgb(0 0 0 / 0.07),
+    0 0 0 1px color-mix(in oklch, var(--color-primary) 10%, transparent);
+  transform: translateY(-1px);
+}
+
+/* Fade-in-up animation for new messages */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.3s ease-out;
+}
