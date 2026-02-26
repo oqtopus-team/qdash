@@ -271,7 +271,8 @@ class IssueKnowledgeService:
                 raw = raw.split("\n", 1)[1] if "\n" in raw else raw[3:]
             if raw.endswith("```"):
                 raw = raw[: raw.rfind("```")]
-            return json.loads(raw.strip())
+            result: dict[str, Any] = json.loads(raw.strip())
+            return result
         except Exception:
             logger.exception("LLM knowledge extraction failed")
             return {}
@@ -549,7 +550,7 @@ class IssueKnowledgeService:
             )
             pr_response.raise_for_status()
             pr_data = pr_response.json()
-            pr_url = pr_data["html_url"]
+            pr_url: str = pr_data["html_url"]
             logger.info("Knowledge PR created: %s", pr_url)
             return pr_url
 
