@@ -95,60 +95,72 @@ def main() -> int:
     if args.project_id:
         query["project_id"] = args.project_id
 
-    docs = IssueKnowledgeDocument.find(query).sort("system_info.created_at").to_list()
-
-    if not docs:
+    total = IssueKnowledgeDocument.find(query).count()
+    if total == 0:
         print("No approved knowledge cases found.")
         return 0
 
+    print(f"Found {total} approved knowledge cases")
+
     written = 0
-    for doc in docs:
-        task_name = doc.task_name
-        if not task_name:
-            print(f"  SKIP {doc.id}: no task_name")
-            continue
+    batch_size = 100
+    for offset in range(0, total, batch_size):
+        docs = (
+            IssueKnowledgeDocument.find(query)
+            .sort("system_info.created_at")
+            .skip(offset)
+            .limit(batch_size)
+            .to_list()
+        )
+        for doc in docs:
+            task_name = doc.task_name
+            if not task_name:
+                print(f"  SKIP {doc.id}: no task_name")
+                continue
 
-        cat_dir = _TASK_TO_CAT_DIR.get(task_name)
-        if cat_dir:
-            task_dir = MD_DIR / cat_dir / task_name
-        else:
-            print(f"  WARN {doc.id}: task '{task_name}' not in known categories, using 'other'")
-            task_dir = MD_DIR / "other" / task_name
+            cat_dir = _TASK_TO_CAT_DIR.get(task_name)
+            if cat_dir:
+                task_dir = MD_DIR / cat_dir / task_name
+            else:
+                print(
+                    f"  WARN {doc.id}: task '{task_name}' not in known categories, using 'other'"
+                )
+                task_dir = MD_DIR / "other" / task_name
 
-        cases_dir = task_dir / "cases"
-        cases_dir.mkdir(parents=True, exist_ok=True)
+            cases_dir = task_dir / "cases"
+            cases_dir.mkdir(parents=True, exist_ok=True)
 
-        date_prefix = doc.date or "unknown"
-        slug = _slugify(doc.title)
-        filename = f"{date_prefix}_{slug}.md"
-        filepath = cases_dir / filename
+            date_prefix = doc.date or "unknown"
+            slug = _slugify(doc.title)
+            filename = f"{date_prefix}_{slug}.md"
+            filepath = cases_dir / filename
 
-        if filepath.exists():
-            print(f"  EXISTS {filepath.relative_to(REPO_ROOT)}")
-            continue
+            if filepath.exists():
+                print(f"  EXISTS {filepath.relative_to(REPO_ROOT)}")
+                continue
 
-        case_data = {
-            "title": doc.title,
-            "date": doc.date,
-            "severity": doc.severity,
-            "chip_id": doc.chip_id,
-            "qid": doc.qid,
-            "resolution_status": doc.resolution_status,
-            "issue_id": doc.issue_id,
-            "symptom": doc.symptom,
-            "root_cause": doc.root_cause,
-            "resolution": doc.resolution,
-            "lesson_learned": doc.lesson_learned,
-            "figure_paths": doc.figure_paths,
-            "thread_image_urls": doc.thread_image_urls,
-        }
+            case_data = {
+                "title": doc.title,
+                "date": doc.date,
+                "severity": doc.severity,
+                "chip_id": doc.chip_id,
+                "qid": doc.qid,
+                "resolution_status": doc.resolution_status,
+                "issue_id": doc.issue_id,
+                "symptom": doc.symptom,
+                "root_cause": doc.root_cause,
+                "resolution": doc.resolution,
+                "lesson_learned": doc.lesson_learned,
+                "figure_paths": doc.figure_paths,
+                "thread_image_urls": doc.thread_image_urls,
+            }
 
-        content = _case_to_markdown(case_data)
-        filepath.write_text(content, encoding="utf-8")
-        print(f"  WROTE {filepath.relative_to(REPO_ROOT)}")
-        written += 1
+            content = _case_to_markdown(case_data)
+            filepath.write_text(content, encoding="utf-8")
+            print(f"  WROTE {filepath.relative_to(REPO_ROOT)}")
+            written += 1
 
-    print(f"\nExported {written} knowledge cases ({len(docs)} total approved)")
+    print(f"\nExported {written} knowledge cases ({total} total approved)")
     return 0
 
 

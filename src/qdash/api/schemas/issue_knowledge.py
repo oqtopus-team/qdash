@@ -1,8 +1,9 @@
 """Schema definitions for issue-derived knowledge cases."""
 
 from datetime import datetime
+from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class IssueKnowledgeResponse(BaseModel):
@@ -36,15 +37,32 @@ class IssueKnowledgeResponse(BaseModel):
     updated_at: datetime = Field(..., description="When the draft was last updated")
 
 
+_VALID_SEVERITIES = {"critical", "warning", "info"}
+
+
 class IssueKnowledgeUpdate(BaseModel):
     """Request schema for editing a knowledge draft."""
 
     title: str | None = Field(default=None, max_length=200, description="Updated title")
-    severity: str | None = Field(default=None, description="Updated severity")
+    severity: Literal["critical", "warning", "info"] | None = Field(
+        default=None, description="Updated severity"
+    )
     symptom: str | None = Field(default=None, max_length=5000, description="Updated symptom")
     root_cause: str | None = Field(default=None, max_length=5000, description="Updated root cause")
     resolution: str | None = Field(default=None, max_length=5000, description="Updated resolution")
-    lesson_learned: list[str] | None = Field(default=None, description="Updated lessons")
+    lesson_learned: list[str] | None = Field(
+        default=None, max_length=50, description="Updated lessons"
+    )
+
+    @field_validator("lesson_learned")
+    @classmethod
+    def validate_lessons(cls, v: list[str] | None) -> list[str] | None:
+        if v is not None:
+            for lesson in v:
+                if len(lesson) > 2000:
+                    msg = "Each lesson must be at most 2000 characters"
+                    raise ValueError(msg)
+        return v
 
 
 class ListIssueKnowledgeResponse(BaseModel):

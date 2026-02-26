@@ -10,7 +10,10 @@ import shutil
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from qdash.api.services.issue_service import IssueService
 
 from qdash.api.schemas.issue_knowledge import (
     IssueKnowledgeResponse,
@@ -88,7 +91,7 @@ class IssueKnowledgeService:
     @staticmethod
     def _build_thread_text(
         root_content: str,
-        replies: list[dict[str, str]],
+        replies: list[dict[str, Any]],
     ) -> str:
         """Format issue thread as plain text for the LLM prompt."""
         parts = [f"[Original] {root_content}"]
@@ -101,7 +104,7 @@ class IssueKnowledgeService:
         self,
         project_id: str,
         issue_id: str,
-        issue_service: Any,
+        issue_service: IssueService,
     ) -> IssueKnowledgeResponse:
         """Generate an AI knowledge draft from a closed issue thread.
 
@@ -204,6 +207,9 @@ class IssueKnowledgeService:
                 detail="Failed to extract knowledge from issue thread. Check copilot configuration.",
             )
 
+        # Validate and sanitise LLM output
+        validated = self._validate_extracted(extracted)
+
         # Save as draft
         today = datetime.now(tz=timezone.utc).strftime("%Y-%m-%d")
         doc = IssueKnowledgeDocument(
@@ -212,16 +218,16 @@ class IssueKnowledgeService:
             task_id=task_id,
             task_name=task_name,
             status="draft",
-            title=extracted.get("title", root_doc.title or "Untitled"),
+            title=validated.get("title", root_doc.title or "Untitled"),
             date=today,
-            severity=extracted.get("severity", "warning"),
+            severity=validated.get("severity", "warning"),
             chip_id=chip_id,
             qid=qid,
             resolution_status="resolved",
-            symptom=extracted.get("symptom", ""),
-            root_cause=extracted.get("root_cause", ""),
-            resolution=extracted.get("resolution", ""),
-            lesson_learned=extracted.get("lesson_learned", []),
+            symptom=validated.get("symptom", ""),
+            root_cause=validated.get("root_cause", ""),
+            resolution=validated.get("resolution", ""),
+            lesson_learned=validated.get("lesson_learned", []),
             figure_paths=figure_paths,
             thread_image_urls=thread_image_urls,
         )
@@ -229,6 +235,43 @@ class IssueKnowledgeService:
 
         logger.info("Generated knowledge draft for issue %s (task=%s)", issue_id, task_name)
         return self._to_response(doc)
+
+    _VALID_SEVERITIES = {"critical", "warning", "info"}
+
+    @classmethod
+    def _validate_extracted(cls, data: dict[str, Any]) -> dict[str, Any]:
+        """Validate and sanitise the LLM-extracted knowledge dict.
+
+        Ensures types are correct and values are within expected ranges.
+        """
+        validated: dict[str, Any] = {}
+
+        # title – required string, truncate to 200 chars
+        title = data.get("title")
+        if isinstance(title, str) and title.strip():
+            validated["title"] = title.strip()[:200]
+
+        # severity – must be one of the allowed values
+        severity = data.get("severity")
+        if isinstance(severity, str) and severity in cls._VALID_SEVERITIES:
+            validated["severity"] = severity
+        else:
+            validated["severity"] = "warning"
+
+        # Free-text fields – truncate to 5000 chars
+        for key in ("symptom", "root_cause", "resolution"):
+            val = data.get(key)
+            if isinstance(val, str):
+                validated[key] = val.strip()[:5000]
+
+        # lesson_learned – list of strings, max 50 items, each max 2000 chars
+        lessons = data.get("lesson_learned")
+        if isinstance(lessons, list):
+            validated["lesson_learned"] = [
+                str(item).strip()[:2000] for item in lessons[:50] if isinstance(item, str)
+            ]
+
+        return validated
 
     @staticmethod
     async def _call_llm_extract(
@@ -272,7 +315,13 @@ class IssueKnowledgeService:
             if raw.endswith("```"):
                 raw = raw[: raw.rfind("```")]
             result: dict[str, Any] = json.loads(raw.strip())
+            if not isinstance(result, dict):
+                logger.warning("LLM returned non-dict JSON: %s", type(result).__name__)
+                return {}
             return result
+        except json.JSONDecodeError:
+            logger.exception("LLM returned invalid JSON")
+            return {}
         except Exception:
             logger.exception("LLM knowledge extraction failed")
             return {}
