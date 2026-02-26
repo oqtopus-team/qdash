@@ -20,6 +20,7 @@ from qdash.api.services.copilot_data_service import CopilotDataService
 from qdash.api.services.device_topology_service import DeviceTopologyService
 from qdash.api.services.execution_service import ExecutionService
 from qdash.api.services.file_service import FileService
+from qdash.api.services.issue_knowledge_service import IssueKnowledgeService
 from qdash.api.services.issue_service import IssueService
 from qdash.api.services.metrics_service import MetricsService
 from qdash.api.services.project_service import ProjectService
@@ -262,6 +263,12 @@ def get_provenance_service() -> ProvenanceService:
 def get_issue_service() -> IssueService:
     """Get the issue service instance."""
     return IssueService()
+
+
+@lru_cache(maxsize=1)
+def get_issue_knowledge_service() -> IssueKnowledgeService:
+    """Get the issue knowledge service instance."""
+    return IssueKnowledgeService()
 
 
 @lru_cache(maxsize=1)
