@@ -253,7 +253,12 @@ class TaskKnowledge(BaseModel):
                 lines.append(f"- {img.alt_text}: {img.relative_path}")
 
         if self.cases:
-            lines += ["", "### Past cases"]
+            lines += [
+                "",
+                "### Past cases",
+                "For each case below, check the diagnostic criteria in the lessons"
+                " and report whether the current conditions satisfy or violate them.",
+            ]
             for i, case in enumerate(self.cases, 1):
                 header = f"{i}. [{case.severity}] {case.title}"
                 if case.date:
