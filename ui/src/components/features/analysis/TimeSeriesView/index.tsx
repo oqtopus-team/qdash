@@ -944,7 +944,7 @@ export function TimeSeriesView() {
                 />
               </div>
               <button
-                className={`btn btn-sm mt-8 gap-2 ${
+                className={`btn btn-sm mt-8 gap-2 w-4 ${
                   timeRange.isStartAtLocked ? "btn-primary" : "btn-ghost"
                 }`}
                 onClick={toggleStartAtLock}
@@ -989,7 +989,7 @@ export function TimeSeriesView() {
                 />
               </div>
               <button
-                className={`btn btn-sm mt-8 gap-2 ${
+                className={`btn btn-sm mt-8 gap-2 w-4 ${
                   timeRange.isEndAtLocked ? "btn-primary" : "btn-ghost"
                 }`}
                 onClick={toggleEndAtLock}
