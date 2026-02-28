@@ -1127,6 +1127,36 @@ html[data-theme="dev-dark"],
   transform: translateY(0);
 }
 
+/* Static card - suppress hover shadow/transform effects */
+.card.card-no-hover:hover {
+  box-shadow:
+    0 4px 6px -1px rgb(0 0 0 / 0.1),
+    0 2px 4px -2px rgb(0 0 0 / 0.1);
+  transform: none;
+}
+
+/* Floating hover animation
+   Uses standalone `translate` property to avoid conflicting with transform: scale() */
+@keyframes card-float-anim {
+  0%,
+  100% {
+    translate: 0 0;
+    box-shadow:
+      0 4px 6px -1px rgb(0 0 0 / 0.12),
+      0 2px 4px -2px rgb(0 0 0 / 0.08);
+  }
+  50% {
+    translate: 0 -8px;
+    box-shadow:
+      0 14px 24px -4px rgb(0 0 0 / 0.16),
+      0 6px 10px -4px rgb(0 0 0 / 0.1);
+  }
+}
+
+.card-float-hover:hover {
+  animation: card-float-anim 1.8s ease-in-out infinite;
+}
+
 /* Gradient border for highlighted cards */
 .card-gradient-border {
   position: relative;

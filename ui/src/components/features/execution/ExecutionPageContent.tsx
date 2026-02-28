@@ -269,7 +269,7 @@ export function ExecutionPageContent() {
           return (
             <div
               key={executionKey}
-              className={`p-2 sm:p-4 rounded-lg shadow-md flex cursor-pointer relative overflow-hidden transition-transform duration-200 bg-base-100 ${
+              className={`p-2 sm:p-4 rounded-lg shadow-md flex cursor-pointer relative overflow-hidden transition-transform duration-200 bg-base-100 card-float-hover ${
                 isSelected ? "transform scale-100" : "sm:transform sm:scale-95"
               } ${statusBorderStyle}`}
               onClick={() => handleCardClick(execution)}
