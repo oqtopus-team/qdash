@@ -19,7 +19,7 @@ export function FlowSchedulesSection() {
 
   if (isLoading) {
     return (
-      <div className="card bg-base-100 shadow-xl">
+      <div className="card card-no-hover bg-base-100 shadow-xl">
         <div className="card-body">
           <h2 className="card-title">Scheduled Flows</h2>
           <div className="flex justify-center py-4">
@@ -32,7 +32,7 @@ export function FlowSchedulesSection() {
 
   if (error) {
     return (
-      <div className="card bg-base-100 shadow-xl">
+      <div className="card card-no-hover bg-base-100 shadow-xl">
         <div className="card-body">
           <h2 className="card-title">Scheduled Flows</h2>
           <div className="alert alert-error">
@@ -45,7 +45,7 @@ export function FlowSchedulesSection() {
 
   if (schedules.length === 0) {
     return (
-      <div className="card bg-base-100 shadow-xl">
+      <div className="card card-no-hover bg-base-100 shadow-xl">
         <div className="card-body">
           <h2 className="card-title">Scheduled Flows</h2>
           <p className="text-sm opacity-70">
@@ -70,7 +70,7 @@ export function FlowSchedulesSection() {
     .slice(0, 10); // Show only the next 10 upcoming one-time schedules
 
   return (
-    <div className="card bg-base-100 shadow-xl">
+    <div className="card card-no-hover bg-base-100 shadow-xl">
       <div className="card-body">
         <h2 className="card-title">Scheduled Flows</h2>
 
