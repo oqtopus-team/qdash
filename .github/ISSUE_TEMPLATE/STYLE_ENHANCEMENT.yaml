@@ -1,0 +1,29 @@
+name: Style enhancement
+description: Suggest improvements to UI/UX styling, layout, or visual design
+title: "[Style]: "
+labels: [style]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for suggesting a style enhancement. Please provide a clear and concise description of the visual or UX improvement and its motivation.
+
+  - type: textarea
+    id: current_behavior
+    attributes:
+      label: Current appearance / behavior
+      description: Describe or attach a screenshot of how it currently looks.
+
+  - type: textarea
+    id: desired_behavior
+    attributes:
+      label: Desired appearance / behavior
+      description: Describe or attach a screenshot/mockup of how it should look.
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional context
+      description: Add any other context, references, or screenshots about the style enhancement here.

@@ -13,14 +13,24 @@ if TYPE_CHECKING:
 
 
 def _sanitize_for_json(obj: Any) -> Any:
-    """Recursively replace NaN/Inf float values with None for valid JSON."""
+    """Recursively sanitize values for JSON serialization.
+
+    - NaN / Inf floats → None
+    - Array-like objects (numpy ndarray, etc.) → list
+    - Non-primitive types (datetime, numpy scalar, etc.) → str
+    """
     if isinstance(obj, float) and (math.isnan(obj) or math.isinf(obj)):
         return None
     if isinstance(obj, dict):
         return {k: _sanitize_for_json(v) for k, v in obj.items()}
     if isinstance(obj, list):
         return [_sanitize_for_json(v) for v in obj]
-    return obj
+    if isinstance(obj, (str, int, bool, type(None), float)):
+        return obj
+    # numpy ndarray, pandas Series, etc. — convert to list first
+    if hasattr(obj, "tolist"):
+        return _sanitize_for_json(obj.tolist())
+    return str(obj)
 
 
 def sse_event(event: str, data: dict[str, Any]) -> str:
@@ -39,7 +49,7 @@ def sse_event(event: str, data: dict[str, Any]) -> str:
         Formatted SSE string
 
     """
-    return f"event: {event}\ndata: {json.dumps(_sanitize_for_json(data), ensure_ascii=False)}\n\n"
+    return f"event: {event}\ndata: {json.dumps(_sanitize_for_json(data), default=str, ensure_ascii=False)}\n\n"
 
 
 @dataclass

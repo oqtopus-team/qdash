@@ -17,8 +17,8 @@ The agent has access to 17 tools defined in `AGENT_TOOLS`:
 | `get_latest_task_result` | Get the latest result for a specific calibration task |
 | `get_task_history` | Get recent historical results for a calibration task |
 | `get_parameter_timeseries` | Get time series data for a single qubit |
-| `execute_python_analysis` | Execute Python code in a sandboxed environment |
-| `get_chip_summary` | Get summary of all qubits on a chip with statistics |
+| `execute_python_analysis` | Execute Python code in a sandboxed environment (data store auto-injected) |
+| `get_chip_summary` | Get summary of all qubits on a chip with statistics (stored tool) |
 | `get_coupling_params` | Get calibrated parameters for coupling resonators |
 | `get_execution_history` | Get recent execution history for a chip |
 | `compare_qubits` | Compare parameters across multiple qubits |
@@ -28,7 +28,7 @@ The agent has access to 17 tools defined in `AGENT_TOOLS`:
 | `get_parameter_lineage` | Get version history of a calibration parameter |
 | `get_provenance_lineage_graph` | Get provenance lineage graph for a parameter |
 | `generate_chip_heatmap` | Generate chip-wide heatmap for a qubit metric |
-| `get_chip_parameter_timeseries` | Batch timeseries for all qubits on a chip |
+| `get_chip_parameter_timeseries` | Batch timeseries for all qubits on a chip (stored tool) |
 | `list_available_parameters` | List available output parameter names |
 
 Tool executors are built by `CopilotDataService.build_tool_executors()`, mapping each tool name to a Python callable that queries MongoDB or invokes the sandbox. UI display labels are defined in `ai_labels.py`.
@@ -43,7 +43,7 @@ Build system prompt + input
         ▼
   Apply tool executor wrappers:
     _wrap_rate_limited_executors  (throttle per-qubit timeseries)
-    _wrap_chart_executors         (intercept charts for direct injection)
+    _wrap_tool_executors          (data store + chart interception)
         │
         ▼
   Call OpenAI Responses API
@@ -79,6 +79,18 @@ Build system prompt + input
 ```
 
 Key implementation detail: when feeding tool results back, all model output items (reasoning, function_call, message) must be preserved in the input. Omitting reasoning items causes a 400 error from the OpenAI API.
+
+## Data Store Pattern
+
+Large-data tools (`get_chip_parameter_timeseries`, `get_chip_summary`) use a **data store** to avoid sending full datasets to the LLM:
+
+1. Tool executes and returns full data
+2. `_wrap_tool_executors` stores the result in `data_store[key]`
+3. LLM receives only a compact summary (`_build_llm_summary`) with schema info and a `data_key`
+4. When the LLM calls `execute_python_analysis`, the sandbox receives `data_store` as the `data` variable
+5. LLM-generated code accesses full data via `data["t1"]`, `data["chip_summary"]`, etc.
+
+This eliminates token double-consumption (LLM no longer echoes back large datasets as `context_data`) while preserving full data precision for sandbox analysis. See [Tool Result Compression](./tool-result-compression.md) for details.
 
 ## Response Format
 

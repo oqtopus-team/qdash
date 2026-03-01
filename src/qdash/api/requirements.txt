@@ -96,6 +96,7 @@ numpy==1.26.0
     # via
     #   contourpy
     #   matplotlib
+    #   pandas
     #   qdash
     #   scipy
 openai==2.21.0
@@ -104,6 +105,8 @@ packaging==24.2
     #   gunicorn
     #   matplotlib
     #   plotly
+pandas==2.3.3 ; python_full_version < '3.11'
+pandas==3.0.1 ; python_full_version >= '3.11'
 passlib==1.7.4
 pendulum==3.1.0
     # via qdash
@@ -138,6 +141,7 @@ python-dateutil==2.9.0.post0
     # via
     #   croniter
     #   matplotlib
+    #   pandas
     #   pendulum
 python-dotenv==1.0.1
     # via
@@ -148,7 +152,9 @@ python-json-logger==3.3.0
 python-multipart==0.0.20
     # via fastapi
 pytz==2025.2
-    # via croniter
+    # via
+    #   croniter
+    #   pandas
 pyyaml==6.0.1
     # via uvicorn
 reportlab==4.4.3
@@ -199,7 +205,9 @@ typing-extensions==4.12.2
     #   typer
     #   uvicorn
 tzdata==2025.2
-    # via pendulum
+    # via
+    #   pandas
+    #   pendulum
 uvicorn==0.34.0
     # via
     #   fastapi
