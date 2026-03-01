@@ -1136,7 +1136,7 @@ html[data-theme="dev-dark"],
 }
 
 /* Hover: one-shot lift + border highlight */
-.card-float-hover {
+.float-hover {
   transition:
     translate 0.25s ease-out,
     box-shadow 0.25s ease-out,
@@ -1145,7 +1145,7 @@ html[data-theme="dev-dark"],
   outline-offset: 1px;
 }
 
-.card-float-hover:hover {
+.float-hover:hover {
   translate: 0 -4px;
   box-shadow:
     0 14px 24px -4px rgb(0 0 0 / 0.16),
