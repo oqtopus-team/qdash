@@ -1135,26 +1135,22 @@ html[data-theme="dev-dark"],
   transform: none;
 }
 
-/* Floating hover animation
-   Uses standalone `translate` property to avoid conflicting with transform: scale() */
-@keyframes card-float-anim {
-  0%,
-  100% {
-    translate: 0 0;
-    box-shadow:
-      0 4px 6px -1px rgb(0 0 0 / 0.12),
-      0 2px 4px -2px rgb(0 0 0 / 0.08);
-  }
-  50% {
-    translate: 0 -8px;
-    box-shadow:
-      0 14px 24px -4px rgb(0 0 0 / 0.16),
-      0 6px 10px -4px rgb(0 0 0 / 0.1);
-  }
+/* Hover: one-shot lift + border highlight */
+.card-float-hover {
+  transition:
+    translate 0.25s ease-out,
+    box-shadow 0.25s ease-out,
+    outline-color 0.2s ease;
+  outline: 2px solid transparent;
+  outline-offset: 1px;
 }
 
 .card-float-hover:hover {
-  animation: card-float-anim 1.8s ease-in-out infinite;
+  translate: 0 -8px;
+  box-shadow:
+    0 14px 24px -4px rgb(0 0 0 / 0.16),
+    0 6px 10px -4px rgb(0 0 0 / 0.1);
+  outline-color: oklch(var(--p) / 0.4);
 }
 
 /* Gradient border for highlighted cards */
