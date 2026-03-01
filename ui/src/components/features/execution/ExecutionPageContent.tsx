@@ -269,10 +269,18 @@ export function ExecutionPageContent() {
           return (
             <div
               key={executionKey}
+              role="button"
+              tabIndex={0}
               className={`p-2 sm:p-4 rounded-lg shadow-md flex cursor-pointer relative overflow-hidden bg-base-100 float-hover ${
                 isSelected ? "transform scale-100" : "sm:transform sm:scale-95"
               } ${statusBorderStyle}`}
               onClick={() => handleCardClick(execution)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  handleCardClick(execution);
+                }
+              }}
             >
               {isSelected && (
                 <div className="absolute inset-0 bg-primary opacity-10 pointer-events-none transition-opacity duration-500" />
