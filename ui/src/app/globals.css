@@ -1141,16 +1141,16 @@ html[data-theme="dev-dark"],
     translate 0.25s ease-out,
     box-shadow 0.25s ease-out,
     outline-color 0.2s ease;
-  outline: 2px solid transparent;
+  outline: 1px solid transparent;
   outline-offset: 1px;
 }
 
 .card-float-hover:hover {
-  translate: 0 -8px;
+  translate: 0 -4px;
   box-shadow:
     0 14px 24px -4px rgb(0 0 0 / 0.16),
     0 6px 10px -4px rgb(0 0 0 / 0.1);
-  outline-color: oklch(var(--p) / 0.4);
+  outline-color: color-mix(in oklch, var(--color-accent) 50%, transparent);
 }
 
 /* Gradient border for highlighted cards */
