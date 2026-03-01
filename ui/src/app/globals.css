@@ -682,40 +682,14 @@ html[data-theme="dev-dark"],
   --color-error-content: #1e1033 !important;
 }
 
-/* Import other DaisyUI themes that users can select */
-@import "daisyui/theme/cupcake.css";
-@import "daisyui/theme/bumblebee.css";
-@import "daisyui/theme/emerald.css";
-@import "daisyui/theme/corporate.css";
-@import "daisyui/theme/synthwave.css";
-@import "daisyui/theme/retro.css";
-@import "daisyui/theme/cyberpunk.css";
-@import "daisyui/theme/valentine.css";
-@import "daisyui/theme/halloween.css";
-@import "daisyui/theme/garden.css";
-@import "daisyui/theme/forest.css";
-@import "daisyui/theme/aqua.css";
-@import "daisyui/theme/lofi.css";
-@import "daisyui/theme/pastel.css";
-@import "daisyui/theme/fantasy.css";
-@import "daisyui/theme/wireframe.css";
-@import "daisyui/theme/black.css";
-@import "daisyui/theme/luxury.css";
+/* Import DaisyUI themes referenced in code (globals.css selectors + Sidebar darkThemes) */
 @import "daisyui/theme/dracula.css";
-@import "daisyui/theme/cmyk.css";
-@import "daisyui/theme/autumn.css";
 @import "daisyui/theme/business.css";
-@import "daisyui/theme/acid.css";
-@import "daisyui/theme/lemonade.css";
 @import "daisyui/theme/night.css";
 @import "daisyui/theme/coffee.css";
-@import "daisyui/theme/winter.css";
 @import "daisyui/theme/dim.css";
-@import "daisyui/theme/nord.css";
 @import "daisyui/theme/sunset.css";
-@import "daisyui/theme/caramellatte.css";
 @import "daisyui/theme/abyss.css";
-@import "daisyui/theme/silk.css";
 
 /* ----------------------------------------
    Login Page Styles - VitePress Hero Inspired
