@@ -7,47 +7,7 @@ import { PasswordChangeCard } from "@/components/features/settings/PasswordChang
 import { PageContainer } from "@/components/ui/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { useAuth } from "@/contexts/AuthContext";
-
-// In dev environment, only light/dark available (auto-converted to dev-light/dev-dark)
-const devThemes = ["light", "dark"];
-
-const allThemes = [
-  "light",
-  "dark",
-  "cupcake",
-  "bumblebee",
-  "emerald",
-  "corporate",
-  "synthwave",
-  "retro",
-  "cyberpunk",
-  "valentine",
-  "halloween",
-  "garden",
-  "forest",
-  "aqua",
-  "lofi",
-  "pastel",
-  "fantasy",
-  "wireframe",
-  "black",
-  "luxury",
-  "dracula",
-  "cmyk",
-  "autumn",
-  "business",
-  "acid",
-  "lemonade",
-  "night",
-  "coffee",
-  "winter",
-  "dim",
-  "nord",
-  "sunset",
-  "caramellatte",
-  "abyss",
-  "silk",
-];
+import { AVAILABLE_THEMES, DEV_THEMES } from "@/constants/themes";
 
 type Tab = "appearance" | "account" | "api";
 
@@ -57,7 +17,7 @@ export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<Tab>("appearance");
 
   // Limit theme options in dev environment
-  const themes = isDevEnv ? devThemes : allThemes;
+  const themes = isDevEnv ? DEV_THEMES : AVAILABLE_THEMES;
   const [copied, setCopied] = useState(false);
   const [copiedCurl, setCopiedCurl] = useState(false);
   const [showToken, setShowToken] = useState(false);

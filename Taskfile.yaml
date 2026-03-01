@@ -292,6 +292,12 @@ tasks:
       - docker compose up -d --build
     desc: Deploy the application with Docker Compose in dev mode
 
+  dev-ui:
+    dir: ui
+    cmds:
+      - bun run dev
+    desc: Start the UI development server
+
   deploy:
     cmds:
       - task: knowledge-pull
