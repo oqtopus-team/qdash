@@ -643,29 +643,25 @@ export default function EditFlowPage() {
               </div>
 
               <div className="space-y-4">
-                <div className="form-control">
-                  <label className="label">
-                    <span className="label-text text-xs">Flow Name</span>
-                  </label>
+                <div className="flex flex-col gap-1">
+                  <label htmlFor="flow-name" className="text-xs font-medium">Flow Name</label>
                   <input
+                    id="flow-name"
                     type="text"
-                    className="input input-bordered input-sm"
+                    className="input input-bordered input-sm w-full"
                     value={name}
                     disabled
                   />
-                  <label className="label">
-                    <span className="label-text-alt text-xs">
-                      Cannot be changed
-                    </span>
-                  </label>
+                  <span className="text-xs text-base-content/60">
+                    Cannot be changed
+                  </span>
                 </div>
 
-                <div className="form-control">
-                  <label className="label">
-                    <span className="label-text text-xs">Description</span>
-                  </label>
+                <div className="flex flex-col gap-1">
+                  <label htmlFor="flow-description" className="text-xs font-medium">Description</label>
                   <textarea
-                    className="textarea textarea-bordered textarea-sm"
+                    id="flow-description"
+                    className="textarea textarea-bordered textarea-sm w-full"
                     placeholder="Describe your flow..."
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
@@ -673,100 +669,88 @@ export default function EditFlowPage() {
                   />
                 </div>
 
-                <div className="form-control">
-                  <label className="label">
-                    <span className="label-text text-xs">
-                      Entrypoint Function
-                    </span>
+                <div className="flex flex-col gap-1">
+                  <label htmlFor="flow-entrypoint" className="text-xs font-medium">
+                    Entrypoint Function
                   </label>
                   <input
+                    id="flow-entrypoint"
                     type="text"
                     placeholder="simple_flow"
-                    className="input input-bordered input-sm"
+                    className="input input-bordered input-sm w-full"
                     value={flowFunctionName}
                     onChange={(e) => setFlowFunctionName(e.target.value)}
                   />
-                  <label className="label">
-                    <span className="label-text-alt text-xs">
-                      The @flow decorated function name in your code
-                    </span>
-                  </label>
+                  <span className="text-xs text-base-content/60">
+                    The @flow decorated function name in your code
+                  </span>
                 </div>
 
-                <div className="form-control">
-                  <label className="label">
-                    <span className="label-text text-xs">Username *</span>
-                  </label>
+                <div className="flex flex-col gap-1">
+                  <label htmlFor="flow-username" className="text-xs font-medium">Username *</label>
                   <input
+                    id="flow-username"
                     type="text"
                     placeholder="your_username"
-                    className="input input-bordered input-sm"
+                    className="input input-bordered input-sm w-full"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
                   />
                 </div>
 
-                <div className="form-control">
-                  <label className="label">
-                    <span className="label-text text-xs">Chip ID *</span>
-                  </label>
+                <div className="flex flex-col gap-1">
+                  <label htmlFor="flow-chip-id" className="text-xs font-medium">Chip ID *</label>
                   <input
+                    id="flow-chip-id"
                     type="text"
                     placeholder="64Qv3"
-                    className="input input-bordered input-sm"
+                    className="input input-bordered input-sm w-full"
                     value={chipId}
                     onChange={(e) => setChipId(e.target.value)}
                   />
                 </div>
 
-                <div className="form-control">
-                  <label className="label">
-                    <span className="label-text text-xs">Tags</span>
-                  </label>
+                <div className="flex flex-col gap-1">
+                  <label htmlFor="flow-tags" className="text-xs font-medium">Tags</label>
                   <input
+                    id="flow-tags"
                     type="text"
                     placeholder="tag1, tag2, tag3"
-                    className="input input-bordered input-sm"
+                    className="input input-bordered input-sm w-full"
                     value={tags}
                     onChange={(e) => setTags(e.target.value)}
                   />
-                  <label className="label">
-                    <span className="label-text-alt text-xs">
-                      Comma-separated
-                    </span>
-                  </label>
+                  <span className="text-xs text-base-content/60">
+                    Comma-separated
+                  </span>
                 </div>
 
-                <div className="form-control">
-                  <label className="label">
-                    <span className="label-text text-xs">
-                      Default Interval (ns)
-                    </span>
+                <div className="flex flex-col gap-1">
+                  <label htmlFor="flow-interval" className="text-xs font-medium">
+                    Default Interval (ns)
                   </label>
                   <input
+                    id="flow-interval"
                     type="text"
                     placeholder="150 * 1024"
-                    className="input input-bordered input-sm"
+                    className="input input-bordered input-sm w-full"
                     value={defaultInterval}
                     onChange={(e) => setDefaultInterval(e.target.value)}
                   />
-                  <label className="label">
-                    <span className="label-text-alt text-xs">
-                      Default: 150 * 1024 (153600 ns). Expression format
-                      supported.
-                    </span>
-                  </label>
+                  <span className="text-xs text-base-content/60">
+                    Default: 150 * 1024 (153600 ns). Expression format
+                    supported.
+                  </span>
                 </div>
 
                 <div className="divider my-2"></div>
 
-                <div className="form-control">
-                  <label className="label">
-                    <span className="label-text text-xs">File Path</span>
-                  </label>
+                <div className="flex flex-col gap-1">
+                  <label htmlFor="flow-file-path" className="text-xs font-medium">File Path</label>
                   <input
+                    id="flow-file-path"
                     type="text"
-                    className="input input-bordered input-sm text-xs"
+                    className="input input-bordered input-sm w-full text-xs"
                     value={data?.data?.file_path || ""}
                     disabled
                   />
