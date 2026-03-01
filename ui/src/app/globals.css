@@ -1145,7 +1145,8 @@ html[data-theme="dev-dark"],
   outline-offset: 1px;
 }
 
-.float-hover:hover {
+.float-hover:hover,
+.float-hover:focus {
   translate: 0 -4px;
   box-shadow:
     0 14px 24px -4px rgb(0 0 0 / 0.16),
