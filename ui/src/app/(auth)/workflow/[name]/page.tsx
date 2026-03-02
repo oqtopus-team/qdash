@@ -643,7 +643,7 @@ export default function EditFlowPage() {
               </div>
 
               <div className="space-y-4">
-                <div className="form-control">
+                <div className="form-control flex flex-col gap-1">
                   <label className="label">
                     <span className="label-text text-xs">Flow Name</span>
                   </label>
@@ -660,7 +660,7 @@ export default function EditFlowPage() {
                   </label>
                 </div>
 
-                <div className="form-control">
+                <div className="form-control flex flex-col gap-1">
                   <label className="label">
                     <span className="label-text text-xs">Description</span>
                   </label>
@@ -673,7 +673,7 @@ export default function EditFlowPage() {
                   />
                 </div>
 
-                <div className="form-control">
+                <div className="form-control flex flex-col gap-1">
                   <label className="label">
                     <span className="label-text text-xs">
                       Entrypoint Function
@@ -693,7 +693,7 @@ export default function EditFlowPage() {
                   </label>
                 </div>
 
-                <div className="form-control">
+                <div className="form-control flex flex-col gap-1">
                   <label className="label">
                     <span className="label-text text-xs">Username *</span>
                   </label>
@@ -706,7 +706,7 @@ export default function EditFlowPage() {
                   />
                 </div>
 
-                <div className="form-control">
+                <div className="form-control flex flex-col gap-1">
                   <label className="label">
                     <span className="label-text text-xs">Chip ID *</span>
                   </label>
@@ -719,7 +719,7 @@ export default function EditFlowPage() {
                   />
                 </div>
 
-                <div className="form-control">
+                <div className="form-control flex flex-col gap-1">
                   <label className="label">
                     <span className="label-text text-xs">Tags</span>
                   </label>
@@ -737,7 +737,7 @@ export default function EditFlowPage() {
                   </label>
                 </div>
 
-                <div className="form-control">
+                <div className="form-control flex flex-col gap-1">
                   <label className="label">
                     <span className="label-text text-xs">
                       Default Interval (ns)
@@ -760,7 +760,7 @@ export default function EditFlowPage() {
 
                 <div className="divider my-2"></div>
 
-                <div className="form-control">
+                <div className="form-control flex flex-col gap-1">
                   <label className="label">
                     <span className="label-text text-xs">File Path</span>
                   </label>
