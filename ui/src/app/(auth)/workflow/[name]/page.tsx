@@ -644,10 +644,11 @@ export default function EditFlowPage() {
 
               <div className="space-y-4">
                 <div className="form-control flex flex-col gap-1">
-                  <label className="label">
+                  <label htmlFor="flow-name" className="label">
                     <span className="label-text text-xs">Flow Name</span>
                   </label>
                   <input
+                    id="flow-name"
                     type="text"
                     className="input input-bordered input-sm"
                     value={name}
@@ -661,10 +662,11 @@ export default function EditFlowPage() {
                 </div>
 
                 <div className="form-control flex flex-col gap-1">
-                  <label className="label">
+                  <label htmlFor="flow-description" className="label">
                     <span className="label-text text-xs">Description</span>
                   </label>
                   <textarea
+                    id="flow-description"
                     className="textarea textarea-bordered textarea-sm"
                     placeholder="Describe your flow..."
                     value={description}
@@ -674,12 +676,13 @@ export default function EditFlowPage() {
                 </div>
 
                 <div className="form-control flex flex-col gap-1">
-                  <label className="label">
+                  <label htmlFor="flow-entrypoint" className="label">
                     <span className="label-text text-xs">
                       Entrypoint Function
                     </span>
                   </label>
                   <input
+                    id="flow-entrypoint"
                     type="text"
                     placeholder="simple_flow"
                     className="input input-bordered input-sm"
@@ -694,10 +697,11 @@ export default function EditFlowPage() {
                 </div>
 
                 <div className="form-control flex flex-col gap-1">
-                  <label className="label">
+                  <label htmlFor="flow-username" className="label">
                     <span className="label-text text-xs">Username *</span>
                   </label>
                   <input
+                    id="flow-username"
                     type="text"
                     placeholder="your_username"
                     className="input input-bordered input-sm"
@@ -707,10 +711,11 @@ export default function EditFlowPage() {
                 </div>
 
                 <div className="form-control flex flex-col gap-1">
-                  <label className="label">
+                  <label htmlFor="flow-chip-id" className="label">
                     <span className="label-text text-xs">Chip ID *</span>
                   </label>
                   <input
+                    id="flow-chip-id"
                     type="text"
                     placeholder="64Qv3"
                     className="input input-bordered input-sm"
@@ -720,10 +725,11 @@ export default function EditFlowPage() {
                 </div>
 
                 <div className="form-control flex flex-col gap-1">
-                  <label className="label">
+                  <label htmlFor="flow-tags" className="label">
                     <span className="label-text text-xs">Tags</span>
                   </label>
                   <input
+                    id="flow-tags"
                     type="text"
                     placeholder="tag1, tag2, tag3"
                     className="input input-bordered input-sm"
@@ -738,12 +744,13 @@ export default function EditFlowPage() {
                 </div>
 
                 <div className="form-control flex flex-col gap-1">
-                  <label className="label">
+                  <label htmlFor="flow-interval" className="label">
                     <span className="label-text text-xs">
                       Default Interval (ns)
                     </span>
                   </label>
                   <input
+                    id="flow-interval"
                     type="text"
                     placeholder="150 * 1024"
                     className="input input-bordered input-sm"
@@ -761,10 +768,11 @@ export default function EditFlowPage() {
                 <div className="divider my-2"></div>
 
                 <div className="form-control flex flex-col gap-1">
-                  <label className="label">
+                  <label htmlFor="flow-file-path" className="label">
                     <span className="label-text text-xs">File Path</span>
                   </label>
                   <input
+                    id="flow-file-path"
                     type="text"
                     className="input input-bordered input-sm text-xs"
                     value={data?.data?.file_path || ""}
