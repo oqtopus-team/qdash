@@ -430,7 +430,7 @@ export function MetricsPageContent() {
               </PageFiltersBar.Item>
             </PageFiltersBar.Group>
 
-            <PageFiltersBar.Group position="end">
+            <PageFiltersBar.Group>
               <PageFiltersBar.Item>
                 <ChipSelector
                   selectedChip={selectedChip}
