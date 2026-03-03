@@ -28,6 +28,7 @@ export function PageFiltersBar({
 }: PageFiltersBarProps) {
   return (
     <div
+      // Enable wrapping to prevent filter controls from overlapping on smaller screens
       className={`flex flex-col md:flex-row md:flex-wrap md:justify-between md:items-start gap-4 ${className}`}
     >
       {children}
@@ -55,6 +56,7 @@ function FilterGroup({
 
   return (
     <div
+      // Enable wrapping to prevent filter controls from overlapping on smaller screens
       className={`flex flex-col sm:flex-row sm:flex-wrap gap-3 sm:gap-4 ${positionClass} ${className}`}
     >
       {children}
