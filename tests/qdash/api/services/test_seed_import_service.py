@@ -234,6 +234,25 @@ class TestSeedImportServiceImportFromManual:
         assert "Q2" in imported_qids
         assert "Q1" not in imported_qids
 
+    def test_import_from_manual_skips_coupling_qids(self, service, mock_deps):
+        """Test _import_from_manual skips coupling-format qids (containing '-')."""
+        request = SeedImportRequest(
+            chip_id="chip001",
+            source=SeedImportSource.MANUAL,
+            manual_data={
+                "zx90_gate_fidelity": {
+                    "Q0": 97.0,
+                    "Q0-Q1": 96.5,
+                    "Q1-Q2": 95.0,
+                }
+            },
+        )
+
+        result = service._import_from_manual(request, "project-001", "user001")
+
+        assert result.imported_count == 1  # Only Q0
+        assert result.skipped_count == 2  # Q0-Q1 and Q1-Q2
+
 
 class TestSeedImportServiceImportFromQubex:
     """Tests for _import_from_qubex method."""
@@ -315,6 +334,37 @@ data:
 
         assert result.imported_count == 2
         assert result.chip_id == "chip001"
+
+    def test_import_from_qubex_skips_coupling_qids(self, service, mock_deps, tmp_path):
+        """Test _import_from_qubex skips coupling-format qids (containing '-')."""
+        service._config_base = str(tmp_path)
+        params_dir = tmp_path / "chip001" / "params"
+        params_dir.mkdir(parents=True)
+
+        yaml_content = """
+meta:
+  unit: '%'
+data:
+  Q0: 97.0
+  Q0-Q1: 96.5
+  Q1-Q2: 95.0
+  Q2: 98.0
+"""
+        (params_dir / "zx90_gate_fidelity.yaml").write_text(yaml_content)
+
+        request = SeedImportRequest(
+            chip_id="chip001",
+            source=SeedImportSource.QUBEX_PARAMS,
+            parameters=["zx90_gate_fidelity"],
+        )
+
+        result = service._import_from_qubex(request, "project-001", "user001")
+
+        assert result.imported_count == 2  # Only Q0 and Q2
+        assert result.skipped_count == 2  # Q0-Q1 and Q1-Q2
+        imported_qids = [r.qid for r in result.results if r.status == "imported"]
+        assert "Q0" in imported_qids
+        assert "Q2" in imported_qids
 
     def test_import_from_qubex_skips_null_values_in_yaml(self, service, mock_deps, tmp_path):
         """Test _import_from_qubex skips null values in YAML."""

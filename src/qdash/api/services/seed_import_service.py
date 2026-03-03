@@ -174,6 +174,12 @@ class SeedImportService:
                 unit = meta.get("unit", "")
 
                 for qid, value in data.items():
+                    # Skip coupling-format qids (e.g. "Q024-Q025")
+                    # Seed import only handles qubit parameters
+                    if "-" in qid:
+                        skipped_count += 1
+                        continue
+
                     # Filter by qids if specified
                     if request.qids and qid not in request.qids:
                         continue
@@ -302,6 +308,11 @@ class SeedImportService:
 
         for param_name, qid_values in request.manual_data.items():
             for qid, value_data in qid_values.items():
+                # Skip coupling-format qids (e.g. "Q024-Q025")
+                if "-" in qid:
+                    skipped_count += 1
+                    continue
+
                 # Filter by qids if specified
                 if request.qids and qid not in request.qids:
                     continue
@@ -433,8 +444,10 @@ class SeedImportService:
             Parameter unit
 
         """
-        # Normalize qid (remove 'Q' prefix for storage if present)
+        # Normalize qid: remove 'Q' prefix and leading zeros to match
+        # chip_initializer format (e.g. "Q024" -> "24", "Q000" -> "0")
         normalized_qid = qid.lstrip("Q") if qid.startswith("Q") else qid
+        normalized_qid = str(int(normalized_qid)) if normalized_qid.isdigit() else normalized_qid
 
         # Find existing document
         qubit_doc = QubitDocument.find_one(

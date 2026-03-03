@@ -370,6 +370,7 @@ numpy==1.26.0
     #   ml-dtypes
     #   optax
     #   osqp
+    #   pandas
     #   pylabrad
     #   qctrl-visualizer
     #   qdash
@@ -404,6 +405,8 @@ packaging==24.2
     #   pytest
     #   quel-ic-config
     #   qutip
+pandas==2.3.3 ; python_full_version < '3.11'
+pandas==3.0.1 ; python_full_version >= '3.11'
 pandocfilters==1.5.1
     # via nbconvert
 parso==0.8.4
@@ -506,6 +509,7 @@ python-dateutil==2.9.0.post0
     #   croniter
     #   jupyter-client
     #   matplotlib
+    #   pandas
     #   pendulum
 python-dotenv==1.0.1
     # via
@@ -517,7 +521,9 @@ python-json-logger==3.3.0
 python-multipart==0.0.20
     # via fastapi
 pytz==2025.2
-    # via croniter
+    # via
+    #   croniter
+    #   pandas
 pywin32==308 ; platform_python_implementation != 'PyPy' and sys_platform == 'win32'
     # via jupyter-core
 pywinpty==2.0.15 ; os_name == 'nt'
@@ -730,7 +736,9 @@ typing-extensions==4.12.2
     #   typer
     #   uvicorn
 tzdata==2025.2
-    # via pendulum
+    # via
+    #   pandas
+    #   pendulum
 uri-template==1.3.0
     # via jsonschema
 urllib3==2.3.0
