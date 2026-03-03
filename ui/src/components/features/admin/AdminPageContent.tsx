@@ -808,7 +808,7 @@ function EditUserModal({
           </div>
 
           {/* System Role */}
-          <div className="form-control">
+          <div className="form-control flex flex-col gap-1">
             <label className="label">
               <span className="label-text font-medium">System Role</span>
             </label>
