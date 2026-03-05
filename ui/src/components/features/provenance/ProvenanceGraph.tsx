@@ -1001,8 +1001,7 @@ export function ProvenanceGraph({
 
         {/* Controls / Summary */}
         <div className="absolute top-4 left-4 right-4 flex flex-col sm:flex-row sm:flex-wrap gap-2 items-start sm:items-center z-20 pointer-events-none">
-          <div className="flex flex-col sm:flex-row sm:grow sm:shrink-0 gap-2 items-start sm:items-center">
-            <div className="flex items-center gap-2 bg-base-100/90 border border-base-300 rounded-lg px-3 py-2 shadow-sm w-full sm:w-auto">
+          <div className="flex items-center gap-2 bg-base-100/90 border border-base-300 rounded-lg px-3 py-2 shadow-sm w-full sm:w-auto">
             <input
               type="text"
               value={searchQuery}
@@ -1020,7 +1019,7 @@ export function ProvenanceGraph({
             )}
           </div>
 
-          <div className="flex items-center gap-2 bg-base-100/90 border border-base-300 rounded-lg px-3 py-2 shadow-sm w-full sm:w-auto">
+          <div className="flex items-center gap-2 bg-base-100/90 border border-base-300 rounded-lg px-3 py-2 shadow-sm w-full sm:w-auto sm:mr-auto">
             <div className="text-xs text-base-content/60 whitespace-nowrap">
               Focus
             </div>
@@ -1074,7 +1073,6 @@ export function ProvenanceGraph({
                 Task Flow
               </button>
             </div>
-          </div>
           </div>
           <div className="flex items-center gap-1 sm:gap-2 bg-base-100/90 border border-base-300 rounded-lg px-2 sm:px-3 py-2 shadow-sm w-full sm:w-auto sm:shrink-0">
             <span className="badge badge-primary badge-sm whitespace-nowrap">
