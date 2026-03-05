@@ -1074,7 +1074,7 @@ export function ProvenanceGraph({
               </button>
             </div>
           </div>
-          <div className="flex items-center gap-1 sm:gap-2 bg-base-100/90 border border-base-300 rounded-lg px-2 sm:px-3 py-2 shadow-sm w-full sm:w-auto sm:shrink-0">
+          <div className="flex flex-wrap items-center gap-1 sm:gap-2 bg-base-100/90 border border-base-300 rounded-lg px-2 sm:px-3 py-2 shadow-sm w-full sm:w-auto sm:shrink-0">
             <span className="badge badge-primary badge-sm whitespace-nowrap">
               {initialNodes.length}/{apiNodes.length} shown
             </span>
