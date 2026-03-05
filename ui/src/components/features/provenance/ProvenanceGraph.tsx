@@ -1000,7 +1000,7 @@ export function ProvenanceGraph({
         </ReactFlow>
 
         {/* Controls / Summary */}
-        <div className="absolute top-4 left-4 right-4 flex flex-col sm:flex-row gap-2 items-start sm:items-center z-20 pointer-events-none">
+        <div className="absolute top-4 left-4 right-4 flex flex-col sm:flex-row sm:flex-wrap gap-2 items-start sm:items-center z-20 pointer-events-none">
           <div className="flex items-center gap-2 bg-base-100/90 border border-base-300 rounded-lg px-3 py-2 shadow-sm w-full sm:w-auto">
             <input
               type="text"
@@ -1075,28 +1075,29 @@ export function ProvenanceGraph({
             </div>
           </div>
 
-          <div className="flex items-center gap-2 bg-base-100/90 border border-base-300 rounded-lg px-3 py-2 shadow-sm ml-0 sm:ml-auto w-full sm:w-auto">
-            <span className="badge badge-primary badge-sm">
+          <div className="hidden sm:block sm:flex-1" />
+          <div className="flex items-center gap-1 sm:gap-2 bg-base-100/90 border border-base-300 rounded-lg px-2 sm:px-3 py-2 shadow-sm w-full sm:w-auto">
+            <span className="badge badge-primary badge-sm whitespace-nowrap">
               {initialNodes.length}/{apiNodes.length} shown
             </span>
-            <span className="badge badge-ghost badge-sm">
+            <span className="badge badge-ghost badge-sm whitespace-nowrap">
               params {visibleCounts.entityCount}
             </span>
-            <span className="badge badge-ghost badge-sm">
+            <span className="badge badge-ghost badge-sm whitespace-nowrap">
               tasks {visibleCounts.taskCount}
             </span>
             {visibleCounts.failedTasks > 0 && (
-              <span className="badge badge-error badge-sm">
+              <span className="badge badge-error badge-sm whitespace-nowrap">
                 failed {visibleCounts.failedTasks}
               </span>
             )}
             {visibleCounts.lowConfidenceParams > 0 && (
-              <span className="badge badge-warning badge-sm">
+              <span className="badge badge-warning badge-sm whitespace-nowrap">
                 uncertain {visibleCounts.lowConfidenceParams}
               </span>
             )}
             {visibleCounts.staleInputs > 0 && (
-              <span className="badge badge-info badge-sm">
+              <span className="badge badge-info badge-sm whitespace-nowrap">
                 updated {visibleCounts.staleInputs}
               </span>
             )}
