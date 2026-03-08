@@ -237,14 +237,14 @@ export function LineageExplorerPanel({
             </div>
             <div className="join">
               <button
-                className={`btn btn-xs sm:btn-sm join-item ${viewMode === "graph" ? "btn-active" : ""}`}
+                className={`btn btn-xs sm:btn-sm join-item ${viewMode === "graph" ? "btn-primary" : ""}`}
                 onClick={() => setViewMode("graph")}
               >
                 <GraphIcon className="h-3 w-3 sm:h-4 sm:w-4" />
                 Graph
               </button>
               <button
-                className={`btn btn-xs sm:btn-sm join-item ${viewMode === "list" ? "btn-active" : ""}`}
+                className={`btn btn-xs sm:btn-sm join-item ${viewMode === "list" ? "btn-primary" : ""}`}
                 onClick={() => setViewMode("list")}
               >
                 <LayoutGrid className="h-3 w-3 sm:h-4 sm:w-4" />
@@ -252,7 +252,7 @@ export function LineageExplorerPanel({
               </button>
               {versions.length > 1 && (
                 <button
-                  className={`btn btn-xs sm:btn-sm join-item ${viewMode === "compare" ? "btn-active" : ""}`}
+                  className={`btn btn-xs sm:btn-sm join-item ${viewMode === "compare" ? "btn-primary" : ""}`}
                   onClick={() => setViewMode("compare")}
                 >
                   <GitCompare className="h-3 w-3 sm:h-4 sm:w-4" />

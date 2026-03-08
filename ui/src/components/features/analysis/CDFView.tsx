@@ -787,19 +787,19 @@ export function CDFView() {
             <div className="flex flex-wrap items-center gap-2 sm:gap-3">
               <div className="join h-8 sm:h-9">
                 <button
-                  className={`join-item btn btn-sm h-full ${timeRange === "1d" ? "btn-active" : ""}`}
+                  className={`join-item btn btn-sm h-full ${timeRange === "1d" ? "btn-primary" : ""}`}
                   onClick={() => setTimeRange("1d")}
                 >
                   1D
                 </button>
                 <button
-                  className={`join-item btn btn-sm h-full ${timeRange === "7d" ? "btn-active" : ""}`}
+                  className={`join-item btn btn-sm h-full ${timeRange === "7d" ? "btn-primary" : ""}`}
                   onClick={() => setTimeRange("7d")}
                 >
                   7D
                 </button>
                 <button
-                  className={`join-item btn btn-sm h-full ${timeRange === "30d" ? "btn-active" : ""}`}
+                  className={`join-item btn btn-sm h-full ${timeRange === "30d" ? "btn-primary" : ""}`}
                   onClick={() => setTimeRange("30d")}
                 >
                   30D
@@ -808,13 +808,13 @@ export function CDFView() {
 
               <div className="join h-8 sm:h-9">
                 <button
-                  className={`join-item btn btn-xs sm:btn-sm h-full ${selectionMode === "latest" ? "btn-active" : ""}`}
+                  className={`join-item btn btn-xs sm:btn-sm h-full ${selectionMode === "latest" ? "btn-primary" : ""}`}
                   onClick={() => setSelectionMode("latest")}
                 >
                   Latest
                 </button>
                 <button
-                  className={`join-item btn btn-xs sm:btn-sm h-full ${selectionMode === "best" ? "btn-active" : ""} ${!isBestModeSupported ? "btn-disabled" : ""}`}
+                  className={`join-item btn btn-xs sm:btn-sm h-full ${selectionMode === "best" ? "btn-primary" : ""} ${!isBestModeSupported ? "btn-disabled" : ""}`}
                   onClick={() => setSelectionMode("best")}
                   disabled={!isBestModeSupported}
                   title={
@@ -826,7 +826,7 @@ export function CDFView() {
                   Best
                 </button>
                 <button
-                  className={`join-item btn btn-xs sm:btn-sm h-full ${selectionMode === "average" ? "btn-active" : ""}`}
+                  className={`join-item btn btn-xs sm:btn-sm h-full ${selectionMode === "average" ? "btn-primary" : ""}`}
                   onClick={() => setSelectionMode("average")}
                   title="Show average values"
                 >
