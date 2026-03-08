@@ -1039,7 +1039,7 @@ export function ProvenanceGraph({
               {effectiveShowAll ? "All" : `${focusHops}h`}
             </div>
             <button
-              className={`btn btn-xs pointer-events-auto ${effectiveShowAll ? "btn-active" : ""}`}
+              className={`btn btn-xs pointer-events-auto ${effectiveShowAll ? "btn-primary" : ""}`}
               onClick={() => setShowAll((v) => !v)}
             >
               All
@@ -1061,13 +1061,13 @@ export function ProvenanceGraph({
             </div>
             <div className="join ml-2">
               <button
-                className={`btn btn-xs join-item pointer-events-auto ${viewDetail === "full" ? "btn-active" : ""}`}
+                className={`btn btn-xs join-item pointer-events-auto ${viewDetail === "full" ? "btn-primary" : ""}`}
                 onClick={() => setViewDetail("full")}
               >
                 Detail
               </button>
               <button
-                className={`btn btn-xs join-item pointer-events-auto ${viewDetail === "taskFlow" ? "btn-active" : ""}`}
+                className={`btn btn-xs join-item pointer-events-auto ${viewDetail === "taskFlow" ? "btn-primary" : ""}`}
                 onClick={() => setViewDetail("taskFlow")}
               >
                 Task Flow

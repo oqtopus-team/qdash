@@ -110,7 +110,7 @@ function QubitDetailPageContent() {
             <div className="join rounded-lg overflow-hidden">
               <button
                 className={`join-item btn btn-sm ${
-                  viewMode === "dashboard" ? "btn-active" : ""
+                  viewMode === "dashboard" ? "btn-primary" : ""
                 }`}
                 onClick={() => setViewMode("dashboard")}
               >
@@ -119,7 +119,7 @@ function QubitDetailPageContent() {
               </button>
               <button
                 className={`join-item btn btn-sm ${
-                  viewMode === "history" ? "btn-active" : ""
+                  viewMode === "history" ? "btn-primary" : ""
                 }`}
                 onClick={() => setViewMode("history")}
               >
@@ -128,7 +128,7 @@ function QubitDetailPageContent() {
               </button>
               <button
                 className={`join-item btn btn-sm ${
-                  viewMode === "timeseries" ? "btn-active" : ""
+                  viewMode === "timeseries" ? "btn-primary" : ""
                 }`}
                 onClick={() => setViewMode("timeseries")}
               >

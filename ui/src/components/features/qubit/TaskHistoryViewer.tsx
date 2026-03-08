@@ -172,7 +172,7 @@ export function TaskHistoryViewer({
         <div className="join">
           <button
             className={`join-item btn btn-sm ${
-              historyViewMode === "list" ? "btn-active" : ""
+              historyViewMode === "list" ? "btn-primary" : ""
             }`}
             onClick={() => setHistoryViewMode("list")}
             title="List View"
@@ -182,7 +182,7 @@ export function TaskHistoryViewer({
           </button>
           <button
             className={`join-item btn btn-sm ${
-              historyViewMode === "grid" ? "btn-active" : ""
+              historyViewMode === "grid" ? "btn-primary" : ""
             }`}
             onClick={() => setHistoryViewMode("grid")}
             title="Grid View"
