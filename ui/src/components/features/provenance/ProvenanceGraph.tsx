@@ -1019,59 +1019,64 @@ export function ProvenanceGraph({
             )}
           </div>
 
-          <div className="flex items-center gap-2 bg-base-100/90 border border-base-300 rounded-lg px-3 py-2 shadow-sm w-full sm:w-auto">
-            <div className="text-xs text-base-content/60 whitespace-nowrap">
-              Focus
-            </div>
-            <input
-              type="range"
-              min={1}
-              max={Math.max(1, Math.min(10, maxDistance || 10))}
-              value={Math.min(
-                focusHops,
-                Math.max(1, Math.min(10, maxDistance || 10)),
-              )}
-              onChange={(e) => setFocusHops(Number(e.target.value))}
-              className="range range-xs range-primary w-28 pointer-events-auto"
-              disabled={effectiveShowAll}
-            />
-            <div className="text-xs font-medium tabular-nums w-10 text-right">
-              {effectiveShowAll ? "All" : `${focusHops}h`}
-            </div>
-            <button
-              className={`btn btn-xs pointer-events-auto ${effectiveShowAll ? "btn-active" : ""}`}
-              onClick={() => setShowAll((v) => !v)}
-            >
-              All
-            </button>
-            <div className="flex items-center gap-2 ml-2">
+          <div className="flex flex-col sm:flex-row items-center gap-2 bg-base-100/90 border border-base-300 rounded-lg px-3 py-2 shadow-sm w-full sm:w-auto">
+            <div className="flex items-center gap-2">
+              <div className="text-xs text-base-content/60 whitespace-nowrap">
+                Focus
+              </div>
               <input
-                type="checkbox"
-                className="checkbox checkbox-xs checkbox-primary pointer-events-auto"
-                checked={showDerivedEdges}
-                onChange={(e) => setShowDerivedEdges(e.target.checked)}
-                id="show-derived"
+                type="range"
+                min={1}
+                max={Math.max(1, Math.min(10, maxDistance || 10))}
+                value={Math.min(
+                  focusHops,
+                  Math.max(1, Math.min(10, maxDistance || 10)),
+                )}
+                onChange={(e) => setFocusHops(Number(e.target.value))}
+                className="range range-xs range-primary w-28 pointer-events-auto"
+                disabled={effectiveShowAll}
               />
-              <label
-                htmlFor="show-derived"
-                className="text-xs text-base-content/60 cursor-pointer pointer-events-auto"
+              <div className="text-xs font-medium tabular-nums w-10 text-right">
+                {effectiveShowAll ? "All" : `${focusHops}h`}
+              </div>
+              <button
+                className={`btn btn-xs pointer-events-auto ${effectiveShowAll ? "btn-active" : ""}`}
+                onClick={() => setShowAll((v) => !v)}
               >
-                derived
-              </label>
+                All
+              </button>
             </div>
-            <div className="join ml-2">
-              <button
-                className={`btn btn-xs join-item pointer-events-auto ${viewDetail === "full" ? "btn-active" : ""}`}
-                onClick={() => setViewDetail("full")}
-              >
-                Detail
-              </button>
-              <button
-                className={`btn btn-xs join-item pointer-events-auto ${viewDetail === "taskFlow" ? "btn-active" : ""}`}
-                onClick={() => setViewDetail("taskFlow")}
-              >
-                Task Flow
-              </button>
+            
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 ml-2">
+                <input
+                  type="checkbox"
+                  className="checkbox checkbox-xs checkbox-primary pointer-events-auto"
+                  checked={showDerivedEdges}
+                  onChange={(e) => setShowDerivedEdges(e.target.checked)}
+                  id="show-derived"
+                />
+                <label
+                  htmlFor="show-derived"
+                  className="text-xs text-base-content/60 cursor-pointer pointer-events-auto"
+                >
+                  derived
+                </label>
+              </div>
+              <div className="join ml-2">
+                <button
+                  className={`btn btn-xs join-item pointer-events-auto ${viewDetail === "full" ? "btn-active" : ""}`}
+                  onClick={() => setViewDetail("full")}
+                >
+                  Detail
+                </button>
+                <button
+                  className={`btn btn-xs join-item pointer-events-auto ${viewDetail === "taskFlow" ? "btn-active" : ""}`}
+                  onClick={() => setViewDetail("taskFlow")}
+                >
+                  Task Flow
+                </button>
+              </div>
             </div>
           </div>
 
