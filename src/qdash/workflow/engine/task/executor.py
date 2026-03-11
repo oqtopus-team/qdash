@@ -520,7 +520,10 @@ class TaskExecutor:
                     param.value = new_value
                     logger.info("User override applied: input.%s = %s", key, new_value)
             self.state_manager.put_input_parameters(
-                task_name, task.input_parameters, task_type, qid  # type: ignore[attr-defined]
+                task_name,
+                task.input_parameters,
+                task_type,
+                qid,  # type: ignore[attr-defined]
             )
 
         if run_overrides:

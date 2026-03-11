@@ -79,7 +79,13 @@ class CheckRabi(QubexTask):
         result = super().preprocess(backend, qid)
         param = self.input_parameters.get("control_amplitude")
         value = param.value if param is not None else None
-        if value is None or not isinstance(value, (int, float)) or math.isnan(value) or value <= CONTROL_AMPLITUDE_MIN or value >= CONTROL_AMPLITUDE_MAX:
+        if (
+            value is None
+            or not isinstance(value, (int, float))
+            or math.isnan(value)
+            or value <= CONTROL_AMPLITUDE_MIN
+            or value >= CONTROL_AMPLITUDE_MAX
+        ):
             print(
                 f"control_amplitude={value} is out of range "
                 f"({CONTROL_AMPLITUDE_MIN}, {CONTROL_AMPLITUDE_MAX}), "

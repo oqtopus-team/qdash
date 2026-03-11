@@ -56,7 +56,13 @@ class ChevronPattern(QubexTask):
         # Validate control_amplitude from DB; use default if invalid
         param = self.input_parameters.get("control_amplitude")
         value = param.value if param is not None else None
-        if value is None or not isinstance(value, (int, float)) or math.isnan(value) or value <= CONTROL_AMPLITUDE_MIN or value >= CONTROL_AMPLITUDE_MAX:
+        if (
+            value is None
+            or not isinstance(value, (int, float))
+            or math.isnan(value)
+            or value <= CONTROL_AMPLITUDE_MIN
+            or value >= CONTROL_AMPLITUDE_MAX
+        ):
             print(
                 f"control_amplitude={value} is out of range "
                 f"({CONTROL_AMPLITUDE_MIN}, {CONTROL_AMPLITUDE_MAX}), "
@@ -105,7 +111,13 @@ class ChevronPattern(QubexTask):
 
         # Fallback to default if control_amplitude value is invalid
         ctrl_amp_value = control_amplitude.value
-        if ctrl_amp_value is None or not isinstance(ctrl_amp_value, (int, float)) or math.isnan(ctrl_amp_value) or ctrl_amp_value <= CONTROL_AMPLITUDE_MIN or ctrl_amp_value >= CONTROL_AMPLITUDE_MAX:
+        if (
+            ctrl_amp_value is None
+            or not isinstance(ctrl_amp_value, (int, float))
+            or math.isnan(ctrl_amp_value)
+            or ctrl_amp_value <= CONTROL_AMPLITUDE_MIN
+            or ctrl_amp_value >= CONTROL_AMPLITUDE_MAX
+        ):
             print(
                 f"[run] control_amplitude={ctrl_amp_value} is invalid for {labels[0]}, "
                 f"using default={DEFAULT_CONTROL_AMPLITUDE}"
