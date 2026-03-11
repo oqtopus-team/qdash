@@ -307,6 +307,8 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
   const [reExecuteSuccess, setReExecuteSuccess] = useState<string | null>(null);
   // Track re_executions count at the moment re-execute was triggered
   const [reExecCountBefore, setReExecCountBefore] = useState<number>(0);
+  const [updateParams, setUpdateParams] = useState(true);
+  const [reconfigure, setReconfigure] = useState(false);
 
   // Parameter override form state
   const [runParamValues, setRunParamValues] = useState<Record<string, string>>(
@@ -426,18 +428,22 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
         Object.keys(runOverrides).length > 0 ||
         Object.keys(inputOverrides).length > 0;
 
-      const body = hasOverrides
-        ? {
-            parameter_overrides: {
-              ...(Object.keys(runOverrides).length > 0
-                ? { run: runOverrides }
-                : {}),
-              ...(Object.keys(inputOverrides).length > 0
-                ? { input: inputOverrides }
-                : {}),
-            },
-          }
-        : undefined;
+      const body: Record<string, unknown> = {
+        update_params: updateParams,
+        reconfigure: reconfigure,
+        ...(hasOverrides
+          ? {
+              parameter_overrides: {
+                ...(Object.keys(runOverrides).length > 0
+                  ? { run: runOverrides }
+                  : {}),
+                ...(Object.keys(inputOverrides).length > 0
+                  ? { input: inputOverrides }
+                  : {}),
+              },
+            }
+          : {}),
+      };
 
       const response = await AXIOS_INSTANCE.post(
         `/task-results/${taskId}/re-execute`,
@@ -833,6 +839,45 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
                     defaultOpen={false}
                   />
                 )}
+
+              <div className="form-control">
+                <label className="label cursor-pointer justify-start gap-3">
+                  <input
+                    type="checkbox"
+                    className="toggle toggle-primary toggle-sm"
+                    checked={reconfigure}
+                    onChange={(e) => setReconfigure(e.target.checked)}
+                  />
+                  <div>
+                    <span className="label-text font-medium">
+                      Reconfigure hardware
+                    </span>
+                    <p className="label-text-alt text-base-content/50">
+                      Run Configure (system_manager load + push) before
+                      executing the task
+                    </p>
+                  </div>
+                </label>
+              </div>
+
+              <div className="form-control">
+                <label className="label cursor-pointer justify-start gap-3">
+                  <input
+                    type="checkbox"
+                    className="toggle toggle-primary toggle-sm"
+                    checked={updateParams}
+                    onChange={(e) => setUpdateParams(e.target.checked)}
+                  />
+                  <div>
+                    <span className="label-text font-medium">
+                      Update backend params
+                    </span>
+                    <p className="label-text-alt text-base-content/50">
+                      Write output parameters back to qubex YAML files
+                    </p>
+                  </div>
+                </label>
+              </div>
 
               {reExecuteError && (
                 <div className="alert alert-error text-sm">

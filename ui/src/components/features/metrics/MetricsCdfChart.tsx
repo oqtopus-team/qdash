@@ -4,7 +4,7 @@ import dynamic from "next/dynamic";
 import { useMemo, useState } from "react";
 import { FluentEmoji } from "@/components/ui/FluentEmoji";
 
-const Plot = dynamic(() => import("react-plotly.js"), { ssr: false });
+const Plot = dynamic(() => import("@/components/charts/Plot"), { ssr: false });
 
 interface MetricDataItem {
   value: number | null;

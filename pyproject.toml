@@ -175,6 +175,7 @@ api = [
     "pendulum>=3.1.0",  # For timestamp formatting in Git commits
     "pydantic-settings>=2.0.0",  # For Settings configuration
     "reportlab>=4.4.1",  # For PDF generation
+    "pandas>=2.0.0",  # For copilot sandbox data analysis
     "plotly>=5.18.0",  # For chart generation
     "kaleido>=0.2.1",  # For Plotly image export
     "pillow>=10.0.0",  # For image processing

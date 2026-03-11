@@ -4,6 +4,8 @@
 
 The sandbox (`src/qdash/api/lib/copilot_sandbox.py`) provides a restricted Python execution environment where LLM-generated code can run safely. It is exposed to the LLM agent as the `execute_python_analysis` tool, allowing the agent to perform calculations, statistical analysis, and generate Plotly charts from calibration data.
 
+Data from "stored" tools (e.g., `get_chip_parameter_timeseries`, `get_chip_summary`) is automatically available in the sandbox as `data["<data_key>"]` — the LLM does not need to pass data manually. See [Tool Result Compression](./tool-result-compression.md) for how the data store pattern works.
+
 The sandbox enforces multiple layers of security:
 1. **AST validation** -- Static analysis before execution
 2. **Module whitelist** -- Only numerical/statistical imports allowed
@@ -49,6 +51,7 @@ Only the following modules can be imported:
 | `datetime` | Date/time handling |
 | `_strptime` | Internal module required by `datetime.strptime()` |
 | `collections` | Data structures (Counter, defaultdict, etc.) |
+| `io` | StringIO for in-memory I/O |
 
 A custom `__import__` function (`_safe_import`) enforces this whitelist at runtime, providing a second layer of defense beyond AST validation.
 
@@ -99,7 +102,7 @@ LLM generates Python code
         ▼
   Build restricted globals
   (__builtins__ = SAFE_BUILTINS + _safe_import)
-  Inject context_data as 'data' variable
+  Inject data_store as 'data' variable
         │
         ▼
   Set SIGALRM timeout
@@ -142,6 +145,9 @@ The `execute_python_analysis` function returns a dict with three keys:
 The LLM-generated code can set a `result` variable as a dict:
 
 ```python
+# Access stored tool data via data["<key>"]
+ts = data["t1"]["timeseries"]  # full timeseries from get_chip_parameter_timeseries
+
 result = {
     "output": "Mean T1 = 45.2 μs, std = 3.1 μs",
     "chart": {
