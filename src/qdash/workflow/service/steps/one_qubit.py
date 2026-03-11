@@ -168,6 +168,7 @@ class OneQubitCheck(CalibrationStep):
 
     mode: str = "synchronized"
     tasks: list[str] | None = None
+    configure: bool = False
 
     @property
     def name(self) -> str:
@@ -185,7 +186,9 @@ class OneQubitCheck(CalibrationStep):
     ) -> StepContext:
         """Execute 1-qubit check calibration."""
         logger = get_run_logger()
-        tasks = self.tasks or CHECK_1Q_TASKS
+        tasks = list(self.tasks or CHECK_1Q_TASKS)
+        if self.configure:
+            tasks.insert(0, "Configure")
 
         logger.info(f"[{self.name}] Starting with mode={self.mode}, {len(tasks)} tasks")
 
@@ -299,6 +302,7 @@ class OneQubitFineTune(CalibrationStep):
 
     mode: str = "synchronized"
     tasks: list[str] | None = None
+    configure: bool = False
 
     @property
     def name(self) -> str:
@@ -316,7 +320,9 @@ class OneQubitFineTune(CalibrationStep):
     ) -> StepContext:
         """Execute 1-qubit fine-tuning calibration."""
         logger = get_run_logger()
-        tasks = self.tasks or FULL_1Q_TASKS_AFTER_CHECK
+        tasks = list(self.tasks or FULL_1Q_TASKS_AFTER_CHECK)
+        if self.configure:
+            tasks.insert(0, "Configure")
 
         # Use filtered candidates from context if available
         qids = ctx.candidate_qids if ctx.candidate_qids else targets.to_qids(service.chip_id)

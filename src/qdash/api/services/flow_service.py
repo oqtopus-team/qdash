@@ -494,6 +494,8 @@ class FlowService:
         tags: list[str] | None = None,
         source_task_id: str | None = None,
         parameter_overrides: dict[str, dict[str, Any]] | None = None,
+        update_params: bool = True,
+        reconfigure: bool = False,
     ) -> ExecuteFlowResponse:
         """Execute a single task via the system single-task-executor deployment.
 
@@ -548,6 +550,8 @@ class FlowService:
             "tags": tags or [],
             "source_task_id": source_task_id,
             "parameter_overrides": parameter_overrides,
+            "update_params": update_params,
+            "reconfigure": reconfigure,
         }
 
         logger.info(

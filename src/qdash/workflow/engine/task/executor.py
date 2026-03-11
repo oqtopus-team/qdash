@@ -81,6 +81,7 @@ class TaskExecutor:
         data_saver: FilesystemCalibDataSaver | None = None,
         snapshot_loader: SnapshotParameterLoader | None = None,
         source_task_id: str | None = None,
+        force_update_params: bool = False,
     ) -> None:
         self.state_manager = state_manager
         self.execution_id = execution_id
@@ -97,6 +98,7 @@ class TaskExecutor:
             username=username,
             calib_dir=calib_dir,
             task_manager_id=task_manager_id,
+            force_update_params=force_update_params,
         )
         self._mux_distributor = MuxDistributor(
             state_manager=state_manager,
@@ -279,10 +281,13 @@ class TaskExecutor:
                 if execution_service is not None:
                     execution_service = self._update_execution(execution_service)
 
-            # 2.5 Re-apply snapshot overrides (preprocess may have
-            #     overwritten input_parameters with values from chip state).
+            # 2.5 Re-apply only user-specified overrides (not the full snapshot).
+            # The full snapshot was already applied in step 1.5. Preprocess may
+            # have computed new values (e.g. SNR sweep for readout_amplitude),
+            # so we must not overwrite those with snapshot defaults. Only
+            # parameters the user explicitly overrode should be re-applied.
             if self._snapshot_loader is not None:
-                self._apply_snapshot_overrides(task, task_name, task_type, qid)
+                self._apply_user_overrides_only(task, task_name, task_type, qid)
 
             # 3. Run
             run_result = self._run_task(task, backend, qid)
@@ -482,6 +487,49 @@ class TaskExecutor:
             task.run_parameters = reconstructed_run
             # Re-record in state_manager
             run_params_dict = {k: v.model_dump() for k, v in reconstructed_run.items()}
+            self.state_manager.put_run_parameters(task_name, run_params_dict, task_type, qid)
+
+    def _apply_user_overrides_only(
+        self,
+        task: TaskProtocol,
+        task_name: str,
+        task_type: str,
+        qid: str,
+    ) -> None:
+        """Re-apply only user-specified parameter overrides after preprocess.
+
+        Unlike _apply_snapshot_overrides which replaces all parameters with
+        snapshot values, this method only updates parameters that the user
+        explicitly overrode. This preserves values computed by preprocess
+        (e.g. readout_amplitude from SNR sweep).
+        """
+        from qdash.datamodel.task import ParameterModel, RunParameterModel
+
+        assert self._snapshot_loader is not None
+        overrides = self._snapshot_loader._parameter_overrides
+        if not overrides:
+            return
+
+        input_overrides = overrides.get("input", {})
+        run_overrides = overrides.get("run", {})
+
+        if input_overrides:
+            for key, new_value in input_overrides.items():
+                param = task.input_parameters.get(key)  # type: ignore[attr-defined]
+                if isinstance(param, ParameterModel):
+                    param.value = new_value
+                    logger.info("User override applied: input.%s = %s", key, new_value)
+            self.state_manager.put_input_parameters(
+                task_name, task.input_parameters, task_type, qid  # type: ignore[attr-defined]
+            )
+
+        if run_overrides:
+            for key, new_value in run_overrides.items():
+                param = task.run_parameters.get(key)
+                if isinstance(param, RunParameterModel):
+                    param.value = new_value
+                    logger.info("User override applied: run.%s = %s", key, new_value)
+            run_params_dict = {k: v.model_dump() for k, v in task.run_parameters.items()}
             self.state_manager.put_run_parameters(task_name, run_params_dict, task_type, qid)
 
     def _update_execution(self, execution_service: "ExecutionService") -> "ExecutionService":

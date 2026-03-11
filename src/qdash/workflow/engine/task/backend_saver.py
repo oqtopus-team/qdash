@@ -48,11 +48,13 @@ class BackendSaver:
         username: str,
         calib_dir: str,
         task_manager_id: str,
+        force_update_params: bool = False,
     ) -> None:
         self._state_manager = state_manager
         self._username = username
         self._calib_dir = calib_dir
         self._task_manager_id = task_manager_id
+        self._force_update_params = force_update_params
 
     def save(
         self,
@@ -192,8 +194,8 @@ class BackendSaver:
                     project_id=execution_service.project_id,
                 )
 
-        # Only update backend params on success
-        if not success:
+        # Update backend params on success, or when force_update_params is enabled
+        if not success and not self._force_update_params:
             logger.info(
                 "Skipping backend parameter updates for %s due to failed R² validation",
                 task_name,
@@ -201,6 +203,11 @@ class BackendSaver:
             return
 
         if output_parameters and task.is_qubit_task():
+            if not success and self._force_update_params:
+                logger.info(
+                    "Force-updating backend params for %s despite failed R² validation",
+                    task_name,
+                )
             self._update_backend_params(backend, execution_service, qid, output_parameters)
 
     def _update_backend_params(
