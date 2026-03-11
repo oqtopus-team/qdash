@@ -170,6 +170,7 @@ class CalibOrchestrator:
             qids=config.qids,
             calib_dir=config.calib_data_path,
             history_recorder=self._create_history_recorder(),
+            force_update_params=config.force_update_params,
         )
 
         # Initialize Backend
@@ -433,6 +434,7 @@ class CalibOrchestrator:
             history_recorder=self._create_history_recorder(),
             snapshot_loader=self._snapshot_loader,
             source_task_id=self._source_task_id,
+            force_update_params=config.force_update_params,
         )
 
         # Copy relevant calibration data

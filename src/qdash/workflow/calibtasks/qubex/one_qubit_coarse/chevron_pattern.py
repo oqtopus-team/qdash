@@ -1,3 +1,4 @@
+import math
 from typing import ClassVar
 
 import numpy as np
@@ -11,8 +12,10 @@ from qdash.workflow.calibtasks.qubex.base import QubexTask
 from qdash.workflow.engine.backend.qubex import QubexBackend
 from qubex.measurement.measurement import DEFAULT_READOUT_DURATION
 
-DEFAULT_SNR_THRESHOLD = 1.0
-DEFAULT_READOUT_AMPLITUDE = 0.025
+DEFAULT_READOUT_AMPLITUDE = 0.2
+DEFAULT_CONTROL_AMPLITUDE = 0.0625
+CONTROL_AMPLITUDE_MIN = 1e-4
+CONTROL_AMPLITUDE_MAX = 1.0
 
 
 class ChevronPattern(QubexTask):
@@ -23,72 +26,56 @@ class ChevronPattern(QubexTask):
     timeout: int = 60 * 240
     input_parameters: ClassVar[dict[str, ParameterModel | None]] = {
         "qubit_frequency": None,
-        "readout_amplitude": None,
         "readout_frequency": None,
+        "control_amplitude": ParameterModel(
+            value=0.0625, unit="a.u.", description="Control pulse amplitude"
+        ),
         "readout_length": ParameterModel(
             value=DEFAULT_READOUT_DURATION, unit="ns", description="Readout pulse length"
         ),
     }
     run_parameters: ClassVar[dict[str, RunParameterModel]] = {
-        "control_amplitude": RunParameterModel(
-            unit="a.u.", value_type="float", value=0.0125, description="Control pulse amplitude"
-        ),
-        "readout_amplitude_range": RunParameterModel(
-            unit="a.u.",
-            value_type="np.linspace",
-            value=(0.0, 0.2, 51),
-            description="Amplitude range for readout sweep",
-        ),
-        "snr_threshold": RunParameterModel(
+        "readout_amplitude": RunParameterModel(
             unit="a.u.",
             value_type="float",
-            value=DEFAULT_SNR_THRESHOLD,
-            description="SNR threshold for determining readout amplitude",
+            value=DEFAULT_READOUT_AMPLITUDE,
+            description="Readout amplitude",
         ),
     }
     output_parameters: ClassVar[dict[str, ParameterModel]] = {
         "qubit_frequency": ParameterModel(unit="GHz", description="Qubit bare frequency"),
         "readout_amplitude": ParameterModel(
-            unit="a.u.", description="Optimal readout amplitude from SNR threshold"
+            unit="a.u.", description="Readout amplitude used for chevron pattern"
         ),
     }
 
     def preprocess(self, backend: QubexBackend, qid: str) -> PreProcessResult:
-        """Preprocess: load params from DB, then sweep readout amplitude to determine optimal value."""
+        """Preprocess: load params from DB and validate control_amplitude."""
         result = super().preprocess(backend, qid)
-        exp = self.get_experiment(backend)
-        label = self.get_qubit_label(backend, qid)
-        amplitude_range = self.run_parameters["readout_amplitude_range"].get_value()
-        threshold = self.run_parameters["snr_threshold"].get_value()
 
-        sweep_result = exp.sweep_readout_amplitude(
-            targets=[label],
-            amplitude_range=amplitude_range,
-        )
-        snr = np.asarray(sweep_result["snr"][label])
-        idx = np.where(snr > threshold)[0]
-        if len(idx) > 0:
-            i = idx[0]
-            if i > 0:
-                x1, x2 = amplitude_range[i - 1], amplitude_range[i]
-                y1, y2 = snr[i - 1], snr[i]
-                optimal_amp = float(x1 + (threshold - y1) * (x2 - x1) / (y2 - y1))
-            else:
-                optimal_amp = float(amplitude_range[i])
-            readout_amp_param = self.input_parameters["readout_amplitude"]
-            assert readout_amp_param is not None
-            readout_amp_param.value = optimal_amp
-            self.output_parameters["readout_amplitude"].value = optimal_amp
-            print(f"readout_amplitude={optimal_amp:.6f} (from SNR sweep, threshold={threshold})")
-        else:
+        # Validate control_amplitude from DB; use default if invalid
+        param = self.input_parameters.get("control_amplitude")
+        value = param.value if param is not None else None
+        if (
+            value is None
+            or not isinstance(value, (int, float))
+            or math.isnan(value)
+            or value <= CONTROL_AMPLITUDE_MIN
+            or value >= CONTROL_AMPLITUDE_MAX
+        ):
             print(
-                f"WARNING: SNR never exceeded {threshold} for {label}, "
-                f"using default={DEFAULT_READOUT_AMPLITUDE}"
+                f"control_amplitude={value} is out of range "
+                f"({CONTROL_AMPLITUDE_MIN}, {CONTROL_AMPLITUDE_MAX}), "
+                f"using default={DEFAULT_CONTROL_AMPLITUDE}"
             )
-            readout_amp_param = self.input_parameters["readout_amplitude"]
-            assert readout_amp_param is not None
-            readout_amp_param.value = DEFAULT_READOUT_AMPLITUDE
-            self.output_parameters["readout_amplitude"].value = DEFAULT_READOUT_AMPLITUDE
+            if param is None:
+                self.input_parameters["control_amplitude"] = ParameterModel(
+                    value=DEFAULT_CONTROL_AMPLITUDE,
+                    unit="a.u.",
+                    description="Control pulse amplitude (default)",
+                )
+            else:
+                param.value = DEFAULT_CONTROL_AMPLITUDE
 
         return result
 
@@ -99,6 +86,10 @@ class ChevronPattern(QubexTask):
         label = self.get_qubit_label(backend, qid)
         result = run_result.raw_result
         self.output_parameters["qubit_frequency"].value = result["resonant_frequencies"][label]
+        # Record the readout_amplitude actually used
+        ra_param = self.run_parameters.get("readout_amplitude")
+        if ra_param is not None:
+            self.output_parameters["readout_amplitude"].value = ra_param.get_value()
         output_parameters = self.attach_execution_id(execution_id)
         figures = [result["fig"][label]]
         return PostProcessResult(output_parameters=output_parameters, figures=figures)
@@ -107,17 +98,44 @@ class ChevronPattern(QubexTask):
         exp = self.get_experiment(backend)
         labels = [exp.get_qubit_label(int(qid))]
 
-        readout_amplitude = self.input_parameters["readout_amplitude"]
         readout_frequency = self.input_parameters["readout_frequency"]
         qubit_frequency = self.input_parameters["qubit_frequency"]
-        assert readout_amplitude is not None
+        control_amplitude = self.input_parameters["control_amplitude"]
         assert readout_frequency is not None
         assert qubit_frequency is not None
+        assert control_amplitude is not None
 
-        exp.params.readout_amplitude[labels[0]] = readout_amplitude.value
+        # Get readout_amplitude from run_parameters
+        ra_param = self.run_parameters.get("readout_amplitude")
+        readout_amp = ra_param.get_value() if ra_param is not None else DEFAULT_READOUT_AMPLITUDE
+
+        # Fallback to default if control_amplitude value is invalid
+        ctrl_amp_value = control_amplitude.value
+        if (
+            ctrl_amp_value is None
+            or not isinstance(ctrl_amp_value, (int, float))
+            or math.isnan(ctrl_amp_value)
+            or ctrl_amp_value <= CONTROL_AMPLITUDE_MIN
+            or ctrl_amp_value >= CONTROL_AMPLITUDE_MAX
+        ):
+            print(
+                f"[run] control_amplitude={ctrl_amp_value} is invalid for {labels[0]}, "
+                f"using default={DEFAULT_CONTROL_AMPLITUDE}"
+            )
+            ctrl_amp_value = DEFAULT_CONTROL_AMPLITUDE
+
+        print(
+            f"[run] ChevronPattern params for {labels[0]}: "
+            f"control_amplitude={ctrl_amp_value}, "
+            f"qubit_frequency={qubit_frequency.value}, "
+            f"readout_amplitude={readout_amp}, "
+            f"readout_frequency={readout_frequency.value}"
+        )
+
+        exp.params.readout_amplitude[labels[0]] = readout_amp
         with exp.modified_frequencies({"R" + labels[0]: readout_frequency.value}):
             result = exp.chevron_pattern(
-                amplitudes={labels[0]: self.run_parameters["control_amplitude"].get_value()},
+                amplitudes={labels[0]: ctrl_amp_value},
                 frequencies={labels[0]: qubit_frequency.value},
                 targets=labels,
                 detuning_range=np.linspace(-0.05, 0.05, 51),
