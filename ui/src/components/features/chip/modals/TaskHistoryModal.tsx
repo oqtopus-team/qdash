@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo } from "react";
 import Link from "next/link";
+import { usePathname, useSearchParams } from "next/navigation";
 import { ChevronRight, History, FileText, GitBranch, Bot } from "lucide-react";
 
 import type { Task } from "@/schemas";
@@ -35,6 +36,15 @@ export function TaskHistoryModal({
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [mobileTab, setMobileTab] = useState<MobileTab>("history");
   const { openAnalysisChat } = useAnalysisChatContext();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  const fromParam = encodeURIComponent(
+    pathname + (searchParams.toString() ? `?${searchParams.toString()}` : ""),
+  );
+
+  const buildTaskResultUrl = (taskId: string) =>
+    `/task-results/${taskId}?from=${fromParam}`;
 
   const buildProvenanceUrl = (parameterName: string, qidValue: string) => {
     const p = encodeURIComponent(parameterName);
@@ -242,12 +252,12 @@ export function TaskHistoryModal({
           {selectedTask.task_id && (
             <div className="flex items-center gap-2">
               <span className="font-semibold">Task ID:</span>
-              <a
-                href={`/task-results/${selectedTask.task_id}`}
+              <Link
+                href={buildTaskResultUrl(selectedTask.task_id)}
                 className="font-mono truncate link link-primary"
               >
                 {selectedTask.task_id}
-              </a>
+              </Link>
             </div>
           )}
           {selectedTask.end_at && (
