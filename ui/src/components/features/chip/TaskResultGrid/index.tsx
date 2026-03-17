@@ -531,7 +531,7 @@ export function TaskResultGrid({
         );
 
         if (!qid) {
-          return <EmptyCell key={index} muxBgClass={muxBgClass} />;
+          return <EmptyCell key={`empty-${index}`} muxBgClass={muxBgClass} />;
         }
 
         const task = getTaskResult(qid);
