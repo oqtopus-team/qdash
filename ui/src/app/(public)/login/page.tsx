@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useCallback, useState, useEffect } from "react";
 
 import { Book, Github, Moon, Sun } from "lucide-react";
@@ -14,7 +13,6 @@ export default function LoginPage() {
   const [userName, setUserName] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-  const router = useRouter();
   const { login: authLogin, loading } = useAuth();
   const { theme, setTheme } = useTheme();
 
@@ -31,7 +29,6 @@ export default function LoginPage() {
 
     try {
       await authLogin(userName, password);
-      router.replace("/execution");
     } catch {
       setError("Login failed. Please check your user ID and password.");
     }
