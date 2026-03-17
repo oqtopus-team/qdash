@@ -106,12 +106,6 @@ select,
     color-mix(in oklch, var(--color-base-content) 8%, transparent);
 }
 
-.card:hover {
-  box-shadow:
-    0 10px 15px -3px rgb(0 0 0 / 0.15),
-    0 4px 6px -4px rgb(0 0 0 / 0.1);
-}
-
 /* Interactive cards get lift effect with glow */
 .card[role="button"]:hover,
 .card.cursor-pointer:hover,
@@ -1058,12 +1052,6 @@ html[data-theme="dev-dark"],
     transform 0.2s ease,
     box-shadow 0.2s ease,
     border-color 0.2s ease;
-}
-
-.card:hover {
-  box-shadow:
-    0 4px 12px -2px oklch(var(--bc) / 0.08),
-    0 2px 6px -2px oklch(var(--bc) / 0.04);
 }
 
 /* Card hover lift effect - more pronounced */
