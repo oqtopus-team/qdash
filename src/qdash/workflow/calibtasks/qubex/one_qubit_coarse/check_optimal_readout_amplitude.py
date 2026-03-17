@@ -21,7 +21,7 @@ class CheckOptimalReadoutAmplitude(QubexTask):
         "amplitude_range": RunParameterModel(
             unit="a.u.",
             value_type="np.arange",
-            value=(0.01, 0.21, 0.01),
+            value=(0.01, 0.25, 0.01),
             description="Readout amplitude range",
         ),
         "shots": RunParameterModel(
@@ -38,9 +38,7 @@ class CheckOptimalReadoutAmplitude(QubexTask):
         ),
     }
     output_parameters: ClassVar[dict[str, ParameterModel]] = {
-        "optimal_readout_amplitude": ParameterModel(
-            unit="a.u.", description="Optimal Readout Amplitude"
-        ),
+        "readout_amplitude": ParameterModel(unit="a.u.", description="Optimal Readout Amplitude"),
     }
 
     def postprocess(
@@ -48,7 +46,7 @@ class CheckOptimalReadoutAmplitude(QubexTask):
     ) -> PostProcessResult:
         """Process the results of the task."""
         result = run_result.raw_result
-        self.output_parameters["optimal_readout_amplitude"].value = result["optimal_amplitude"]
+        self.output_parameters["readout_amplitude"].value = result["optimal_amplitude"]
         output_parameters = self.attach_execution_id(execution_id)
         figures = [result["fig"]]
         return PostProcessResult(output_parameters=output_parameters, figures=figures)

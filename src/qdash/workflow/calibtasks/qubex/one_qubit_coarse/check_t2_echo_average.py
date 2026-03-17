@@ -72,6 +72,9 @@ class CheckT2EchoAverage(QubexTask):
         exp = self.get_experiment(backend)
         labels = [exp.get_qubit_label(int(qid))]
         label = labels[0]
+        readout_amp_param = self.input_parameters["readout_amplitude"]
+        if readout_amp_param is not None:
+            exp.params.readout_amplitude[label] = readout_amp_param.value
 
         n_runs = int(self.run_parameters["n_runs"].get_value())
 

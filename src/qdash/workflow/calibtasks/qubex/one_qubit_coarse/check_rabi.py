@@ -29,17 +29,14 @@ class CheckRabi(QubexTask):
         "qubit_frequency": None,
         "control_amplitude": None,
         "readout_frequency": None,
+        "readout_amplitude": ParameterModel(
+            value=DEFAULT_READOUT_AMPLITUDE, unit="a.u.", description="Readout amplitude"
+        ),
         "readout_length": ParameterModel(
             value=DEFAULT_READOUT_DURATION, unit="ns", description="Readout pulse length"
         ),
     }
     run_parameters: ClassVar[dict[str, RunParameterModel]] = {
-        "readout_amplitude": RunParameterModel(
-            unit="a.u.",
-            value_type="float",
-            value=DEFAULT_READOUT_AMPLITUDE,
-            description="Readout amplitude",
-        ),
         "time_range": RunParameterModel(
             unit="ns",
             value_type="range",
@@ -153,12 +150,13 @@ class CheckRabi(QubexTask):
 
         control_amplitude_param = self.input_parameters["control_amplitude"]
         qubit_frequency_param = self.input_parameters["qubit_frequency"]
+        readout_amplitude_param = self.input_parameters["readout_amplitude"]
         assert control_amplitude_param is not None
         assert qubit_frequency_param is not None
+        assert readout_amplitude_param is not None
 
-        # Get readout_amplitude from run_parameters
-        ra_param = self.run_parameters.get("readout_amplitude")
-        readout_amp = ra_param.get_value() if ra_param is not None else DEFAULT_READOUT_AMPLITUDE
+        # Get readout_amplitude from input_parameters (loaded from DB)
+        readout_amp = readout_amplitude_param.value
         exp.params.readout_amplitude[label] = readout_amp
 
         print(

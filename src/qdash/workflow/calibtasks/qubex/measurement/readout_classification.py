@@ -141,6 +141,9 @@ class ReadoutClassification(QubexTask):
     def run(self, backend: QubexBackend, qid: str) -> RunResult:
         exp = self.get_experiment(backend)
         label = self.get_qubit_label(backend, qid)
+        readout_amp_param = self.input_parameters["readout_amplitude"]
+        if readout_amp_param is not None:
+            exp.params.readout_amplitude[label] = readout_amp_param.value
         result = exp.build_classifier(
             targets=label,
             save_dir=exp.classifier_dir,

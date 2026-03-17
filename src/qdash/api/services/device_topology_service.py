@@ -25,7 +25,7 @@ from qdash.api.schemas.device_topology import (
     QubitGateDuration,
     QubitLifetime,
 )
-from qdash.common.datetime_utils import now, to_datetime
+from qdash.common.datetime_utils import ensure_timezone, now, to_datetime
 from qdash.common.qubit_utils import qid_to_label
 from qdash.common.topology_config import load_topology
 
@@ -156,7 +156,7 @@ class DeviceTopologyService:
             device_id=request.device_id,
             qubits=filtered_qubits,
             couplings=filtered_couplings,
-            calibrated_at=latest.timestamp or "",
+            calibrated_at=ensure_timezone(latest.timestamp) or "",
         )
 
     def _build_qubits(

@@ -17,6 +17,7 @@ from qdash.workflow.engine.task.types import TaskExecutionError, TaskProtocol
 class MockTask:
     """Mock task for testing."""
 
+    input_parameters: ClassVar[dict[str, Any]] = {}
     run_parameters: ClassVar[dict[str, Any]] = {}
 
     def __init__(
@@ -30,7 +31,6 @@ class MockTask:
         self._task_type = task_type
         self.r2_threshold = r2_threshold
         self.backend = backend
-        self.input_parameters: dict[str, Any] = {}
 
     def get_name(self) -> str:
         return self.name
@@ -689,8 +689,8 @@ class TestSnapshotOverrides:
         result = executor.execute_task(task, session, "0")
 
         assert result["success"] is True
-        # Snapshot should have been queried (called twice: before and after preprocess)
-        assert mock_snapshot_loader.get_snapshot.call_count == 2
+        # Snapshot should have been queried once (before preprocess in step 1.5)
+        assert mock_snapshot_loader.get_snapshot.call_count == 1
 
     def test_execute_without_snapshot_loader_skips_overrides(
         self, mock_state_manager: MagicMock

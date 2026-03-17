@@ -44,6 +44,8 @@ BRINGUP_TASKS: list[str] = [
 CHECK_1Q_TASKS: list[str] = [
     "CheckRabi",
     "CheckRabi",
+    "CheckOptimalReadoutAmplitude",
+    "CheckRabi",
     "CreateHPIPulse",
     "CheckHPIPulse",
     "CheckT1",
