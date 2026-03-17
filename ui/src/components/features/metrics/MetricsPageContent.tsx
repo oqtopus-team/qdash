@@ -347,7 +347,7 @@ export function MetricsPageContent() {
                   <div className="join rounded-lg overflow-hidden">
                     <button
                       className={`join-item btn btn-sm ${
-                        timeRange === "1d" ? "btn-active" : ""
+                        timeRange === "1d" ? "btn-primary" : ""
                       }`}
                       onClick={() => setTimeRange("1d")}
                     >
@@ -356,7 +356,7 @@ export function MetricsPageContent() {
                     </button>
                     <button
                       className={`join-item btn btn-sm ${
-                        timeRange === "7d" ? "btn-active" : ""
+                        timeRange === "7d" ? "btn-primary" : ""
                       }`}
                       onClick={() => setTimeRange("7d")}
                     >
@@ -365,7 +365,7 @@ export function MetricsPageContent() {
                     </button>
                     <button
                       className={`join-item btn btn-sm ${
-                        timeRange === "30d" ? "btn-active" : ""
+                        timeRange === "30d" ? "btn-primary" : ""
                       }`}
                       onClick={() => setTimeRange("30d")}
                     >
@@ -374,7 +374,7 @@ export function MetricsPageContent() {
                     </button>
                     <button
                       className={`join-item btn btn-sm gap-1 ${
-                        timeRange === "custom" ? "btn-active" : ""
+                        timeRange === "custom" ? "btn-primary" : ""
                       }`}
                       onClick={() => setTimeRange("custom")}
                       title="Set a custom time range in days"
@@ -397,7 +397,7 @@ export function MetricsPageContent() {
                 <div className="join rounded-lg overflow-hidden">
                   <button
                     className={`join-item btn btn-sm ${
-                      selectionMode === "latest" ? "btn-active" : ""
+                      selectionMode === "latest" ? "btn-primary" : ""
                     }`}
                     onClick={() => setSelectionMode("latest")}
                   >
@@ -405,7 +405,7 @@ export function MetricsPageContent() {
                   </button>
                   <button
                     className={`join-item btn btn-sm ${
-                      selectionMode === "best" ? "btn-active" : ""
+                      selectionMode === "best" ? "btn-primary" : ""
                     } ${!isBestModeSupported ? "btn-disabled" : ""}`}
                     onClick={() => setSelectionMode("best")}
                     disabled={!isBestModeSupported}
@@ -419,7 +419,7 @@ export function MetricsPageContent() {
                   </button>
                   <button
                     className={`join-item btn btn-sm ${
-                      selectionMode === "average" ? "btn-active" : ""
+                      selectionMode === "average" ? "btn-primary" : ""
                     }`}
                     onClick={() => setSelectionMode("average")}
                     title="Show average values within time range"

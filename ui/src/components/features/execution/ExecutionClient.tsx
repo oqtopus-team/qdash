@@ -471,7 +471,7 @@ export function ExecutionDetailClient({
             <div className="btn-group self-start sm:self-auto">
               <button
                 className={`btn btn-sm ${
-                  taskViewMode === "list" ? "btn-active" : ""
+                  taskViewMode === "list" ? "btn-primary" : ""
                 }`}
                 onClick={() => setTaskViewMode("list")}
               >
@@ -480,7 +480,7 @@ export function ExecutionDetailClient({
               </button>
               <button
                 className={`btn btn-sm ${
-                  taskViewMode === "grid" ? "btn-active" : ""
+                  taskViewMode === "grid" ? "btn-primary" : ""
                 }`}
                 onClick={() => setTaskViewMode("grid")}
               >
