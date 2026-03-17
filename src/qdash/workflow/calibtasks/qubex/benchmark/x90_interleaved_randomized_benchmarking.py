@@ -78,6 +78,9 @@ class X90InterleavedRandomizedBenchmarking(QubexTask):
         """Run the X90 interleaved randomized benchmarking task with timeout."""
         exp = self.get_experiment(backend)
         label = self.get_qubit_label(backend, qid)
+        readout_amp_param = self.input_parameters["readout_amplitude"]
+        if readout_amp_param is not None:
+            exp.params.readout_amplitude[label] = readout_amp_param.value
         result = exp.interleaved_randomized_benchmarking(
             targets=label,
             interleaved_clifford="X90",

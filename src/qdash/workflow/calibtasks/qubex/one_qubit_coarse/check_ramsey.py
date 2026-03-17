@@ -279,6 +279,9 @@ class CheckRamsey(QubexTask):
         """Run the task."""
         exp = self.get_experiment(backend)
         label = self.get_qubit_label(backend, qid)
+        readout_amp_param = self.input_parameters["readout_amplitude"]
+        if readout_amp_param is not None:
+            exp.params.readout_amplitude[label] = readout_amp_param.value
 
         # Apply frequency override if qubit_frequency was explicitly provided
         with self._apply_frequency_override(backend, qid):
