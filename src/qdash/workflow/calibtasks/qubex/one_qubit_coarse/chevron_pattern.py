@@ -71,7 +71,8 @@ class ChevronPattern(QubexTask):
                 f"({CONTROL_AMPLITUDE_MIN}, {CONTROL_AMPLITUDE_MAX}), "
                 f"using default={DEFAULT_CONTROL_AMPLITUDE}"
             )
-            param.value = DEFAULT_CONTROL_AMPLITUDE
+            if param is not None:
+                param.value = DEFAULT_CONTROL_AMPLITUDE
 
         return result
 

@@ -473,7 +473,7 @@ class TaskExecutor:
                 for k, v in snap_input.items()
                 if (m := self._reconstruct_param(ParameterModel, k, v)) is not None
             }
-            task.input_parameters = reconstructed_input  # type: ignore[attr-defined]
+            task.input_parameters = reconstructed_input
             # Re-record in state_manager
             self.state_manager.put_input_parameters(task_name, reconstructed_input, task_type, qid)
 
@@ -515,7 +515,7 @@ class TaskExecutor:
 
         if input_overrides:
             for key, new_value in input_overrides.items():
-                param = task.input_parameters.get(key)  # type: ignore[attr-defined]
+                param = task.input_parameters.get(key)
                 if isinstance(param, ParameterModel):
                     param.value = new_value
                     logger.info("User override applied: input.%s = %s", key, new_value)
@@ -523,7 +523,7 @@ class TaskExecutor:
                 task_name,
                 task.input_parameters,
                 task_type,
-                qid,  # type: ignore[attr-defined]
+                qid,
             )
 
         if run_overrides:

@@ -17,6 +17,7 @@ from qdash.workflow.engine.task.types import TaskExecutionError, TaskProtocol
 class MockTask:
     """Mock task for testing."""
 
+    input_parameters: ClassVar[dict[str, Any]] = {}
     run_parameters: ClassVar[dict[str, Any]] = {}
 
     def __init__(
@@ -30,7 +31,6 @@ class MockTask:
         self._task_type = task_type
         self.r2_threshold = r2_threshold
         self.backend = backend
-        self.input_parameters: dict[str, Any] = {}
 
     def get_name(self) -> str:
         return self.name

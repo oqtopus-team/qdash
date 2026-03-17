@@ -22,6 +22,7 @@ class TaskProtocol(Protocol):
     name: str
     r2_threshold: float
     backend: str
+    input_parameters: ClassVar[dict[str, Any]]
     run_parameters: ClassVar[dict[str, Any]]
 
     def get_name(self) -> str:
