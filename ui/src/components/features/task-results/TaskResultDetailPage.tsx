@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
   MessageSquare,
@@ -294,17 +294,7 @@ function IssueCard({
 
 export function TaskResultDetailPage({ taskId }: { taskId: string }) {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
-
-  const handleBack = () => {
-    const from = searchParams.get("from");
-    if (from) {
-      router.push(from);
-    } else {
-      router.back();
-    }
-  };
   const { isOwner } = useProject();
   const currentUser = getCurrentUsername();
   const [showEditor, setShowEditor] = useState(false);
@@ -496,7 +486,7 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
         emoji="magnifying-glass"
         action={
           <button
-            onClick={handleBack}
+            onClick={() => router.back()}
             className="btn btn-sm btn-ghost gap-1"
           >
             <ArrowLeft className="h-4 w-4" />
@@ -512,7 +502,7 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
       {/* Header */}
       <div className="flex items-center gap-3 mb-6">
         <button
-          onClick={handleBack}
+          onClick={() => router.back()}
           className="btn btn-sm btn-ghost btn-square"
         >
           <ArrowLeft className="h-4 w-4" />
