@@ -689,8 +689,8 @@ class TestSnapshotOverrides:
         result = executor.execute_task(task, session, "0")
 
         assert result["success"] is True
-        # Snapshot should have been queried (called twice: before and after preprocess)
-        assert mock_snapshot_loader.get_snapshot.call_count == 2
+        # Snapshot should have been queried once (before preprocess in step 1.5)
+        assert mock_snapshot_loader.get_snapshot.call_count == 1
 
     def test_execute_without_snapshot_loader_skips_overrides(
         self, mock_state_manager: MagicMock
