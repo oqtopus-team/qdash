@@ -347,12 +347,12 @@ def get_coupling_task_history(
 )
 def get_timeseries_task_results(
     chip_id: Annotated[str, Query(description="Chip ID")],
-    tag: Annotated[str, Query(description="Tag to filter by")],
     parameter: Annotated[str, Query(description="Parameter name")],
     start_at: Annotated[str, Query(description="Start time in ISO format")],
     end_at: Annotated[str, Query(description="End time in ISO format")],
     ctx: Annotated[ProjectContext, Depends(get_project_context)],
     service: Annotated[TaskResultService, Depends(get_task_result_service)],
+    tag: Annotated[str | None, Query(description="Tag to filter by")] = None,
     qid: Annotated[str | None, Query(description="Optional qubit ID to filter by")] = None,
 ) -> TimeSeriesData:
     """Get timeseries task results filtered by tag and parameter.

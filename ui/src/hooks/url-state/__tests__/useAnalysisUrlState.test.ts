@@ -13,7 +13,7 @@ describe("useAnalysisUrlState", () => {
     expect(result.current.selectedChip).toBe("");
     expect(result.current.selectedParameter).toBe("t1");
     expect(result.current.selectedParameters).toEqual([]);
-    expect(result.current.selectedTag).toBe("daily");
+    expect(result.current.selectedTag).toBe("");
     expect(result.current.analysisViewType).toBe("timeseries");
   });
 

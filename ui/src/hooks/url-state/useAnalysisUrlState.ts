@@ -81,8 +81,7 @@ export function useAnalysisUrlState(): UseAnalysisUrlStateResult {
 
   const setSelectedTag = useCallback(
     (tag: string) => {
-      // Always include tag in URL for complete state management
-      setSelectedTagState(tag);
+      setSelectedTagState(tag || null);
     },
     [setSelectedTagState],
   );
@@ -99,7 +98,7 @@ export function useAnalysisUrlState(): UseAnalysisUrlStateResult {
     selectedChip: selectedChip ?? "",
     selectedParameter: selectedParameter ?? "t1",
     selectedParameters: selectedParameters ?? [],
-    selectedTag: selectedTag ?? "daily",
+    selectedTag: selectedTag ?? "",
     analysisViewType: analysisViewType ?? "timeseries",
     setSelectedChip,
     setSelectedParameter,

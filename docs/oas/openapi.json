@@ -4479,17 +4479,6 @@
             "description": "Chip ID"
           },
           {
-            "name": "tag",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "description": "Tag to filter by",
-              "title": "Tag"
-            },
-            "description": "Tag to filter by"
-          },
-          {
             "name": "parameter",
             "in": "query",
             "required": true,
@@ -4521,6 +4510,24 @@
               "title": "End At"
             },
             "description": "End time in ISO format"
+          },
+          {
+            "name": "tag",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Tag to filter by",
+              "title": "Tag"
+            },
+            "description": "Tag to filter by"
           },
           {
             "name": "qid",
@@ -8922,6 +8929,18 @@
             ],
             "title": "Parameter Overrides",
             "description": "Optional parameter overrides: {run: {...}, input: {...}}"
+          },
+          "update_params": {
+            "type": "boolean",
+            "title": "Update Params",
+            "description": "Update backend parameters (e.g. qubex YAML) after execution",
+            "default": true
+          },
+          "reconfigure": {
+            "type": "boolean",
+            "title": "Reconfigure",
+            "description": "Run Configure (system_manager load + push) before executing the task",
+            "default": false
           }
         },
         "type": "object",
@@ -9296,7 +9315,7 @@
             "type": "number",
             "title": "Delta Per Step",
             "description": "Average delta per step",
-            "default": 0
+            "default": 0.0
           },
           "current_value": {
             "anyOf": [
@@ -10590,7 +10609,12 @@
           "severity": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "enum": [
+                  "critical",
+                  "warning",
+                  "info"
+                ]
               },
               {
                 "type": "null"
@@ -10644,7 +10668,8 @@
                 "items": {
                   "type": "string"
                 },
-                "type": "array"
+                "type": "array",
+                "maxItems": 50
               },
               {
                 "type": "null"
@@ -12077,7 +12102,7 @@
           "error": {
             "type": "number",
             "title": "Error",
-            "default": 0
+            "default": 0.0
           },
           "previous_error": {
             "anyOf": [
@@ -12315,7 +12340,7 @@
           "error": {
             "type": "number",
             "title": "Error",
-            "default": 0
+            "default": 0.0
           },
           "version": {
             "type": "integer",
@@ -12456,7 +12481,7 @@
           "error": {
             "type": "number",
             "title": "Error",
-            "default": 0
+            "default": 0.0
           },
           "valid_from": {
             "anyOf": [
