@@ -10,4 +10,8 @@ import type { BodyReExecuteTaskResultParameterOverrides } from "./bodyReExecuteT
 export interface BodyReExecuteTaskResult {
   /** Optional parameter overrides: {run: {...}, input: {...}} */
   parameter_overrides?: BodyReExecuteTaskResultParameterOverrides;
+  /** Update backend parameters (e.g. qubex YAML) after execution */
+  update_params?: boolean;
+  /** Run Configure (system_manager load + push) before executing the task */
+  reconfigure?: boolean;
 }

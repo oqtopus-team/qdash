@@ -11,7 +11,7 @@ import logging
 import zipfile
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from bunnet import SortDirection
 from qdash.api.schemas.task_result import (
@@ -234,7 +234,7 @@ class TaskResultService:
     def get_timeseries(
         self,
         chip_id: str,
-        tag: str,
+        tag: str | None,
         parameter: str,
         project_id: str,
         target_qid: str | None = None,
@@ -272,14 +272,17 @@ class TaskResultService:
             start_at_dt = datetime.fromisoformat(start_at)
             end_at_dt = datetime.fromisoformat(end_at)
 
+        query_filter: dict[str, Any] = {
+            "project_id": project_id,
+            "chip_id": chip_id,
+            "output_parameter_names": parameter,
+            "start_at": {"$gte": start_at_dt, "$lte": end_at_dt},
+        }
+        if tag is not None:
+            query_filter["tags"] = tag
+
         task_results = self._task_result_repo.find_with_projection(
-            {
-                "project_id": project_id,
-                "chip_id": chip_id,
-                "tags": tag,
-                "output_parameter_names": parameter,
-                "start_at": {"$gte": start_at_dt, "$lte": end_at_dt},
-            },
+            query_filter,
             projection_model=TimeSeriesProjection,
             sort=[("start_at", SortDirection.ASCENDING)],
         )

@@ -138,7 +138,7 @@ export function IssueKnowledgeDetailPage({
   const handleSave = async () => {
     await update({
       title: editTitle,
-      severity: editSeverity,
+      severity: editSeverity as "critical" | "warning" | "info" | null,
       symptom: editSymptom,
       root_cause: editRootCause,
       resolution: editResolution,
