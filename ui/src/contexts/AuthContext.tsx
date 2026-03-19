@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import {
   createContext,
@@ -26,7 +25,6 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [username, setUsername] = useState<string | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
@@ -142,7 +140,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setLoading(false); // End loading
       }
     },
-    [loginMutation, saveAuth, router, removeAuth],
+    [loginMutation, saveAuth, removeAuth],
   );
 
   const logout = useCallback(async () => {
