@@ -31,6 +31,9 @@ export default function LoginPage() {
 
     try {
       await authLogin(userName, password);
+      // Clear Next.js Router Cache before navigating to prevent stale cache
+      // from (public) layout causing router.back() to show the login page.
+      router.refresh();
       router.replace("/execution");
     } catch {
       setError("Login failed. Please check your user ID and password.");

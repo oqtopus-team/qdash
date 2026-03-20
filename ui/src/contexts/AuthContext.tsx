@@ -124,12 +124,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         // Save auth info (access_token and username)
         saveAuth(response.data.access_token, response.data.username);
-
-        // Hard navigation to clear Next.js Router Cache entirely.
-        // Soft navigation (router.replace) after login causes router.back()
-        // to break on auth pages due to stale cache from the layout switch.
-        // This mirrors the same pattern used in logout (window.location.href).
-        window.location.href = "/execution";
       } catch (error) {
         console.error("Login failed:", error);
         // Clear auth info
