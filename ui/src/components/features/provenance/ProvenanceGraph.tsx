@@ -1103,7 +1103,7 @@ export function ProvenanceGraph({
         {/* Controls — SP: accordion (hidden on sm+) */}
         <details className="group absolute top-2 left-2 right-2 z-20 pointer-events-auto sm:hidden">
           <summary className="bg-base-100/90 border border-base-300 rounded-lg px-3 py-2 shadow-sm cursor-pointer select-none list-none text-sm font-medium flex items-center gap-2">
-            <span className="inline-block transition-transform group-open:rotate-90">▶</span>
+            <span className="inline-block transition-transform group-open:rotate-90" aria-hidden="true">▶</span>
             Controls
           </summary>
           <div className="flex flex-col gap-2 items-start mt-2">
