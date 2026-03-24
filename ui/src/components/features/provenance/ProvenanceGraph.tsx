@@ -1000,8 +1000,13 @@ export function ProvenanceGraph({
         </ReactFlow>
 
         {/* Controls / Summary */}
-        <div className="absolute top-4 left-4 right-4 flex flex-col sm:flex-row sm:flex-wrap gap-2 items-start sm:items-center z-20 pointer-events-none">
-          <div className="flex items-center gap-2 bg-base-100/90 border border-base-300 rounded-lg px-3 py-2 shadow-sm w-full sm:w-auto">
+        <details className="group absolute top-2 sm:top-4 left-2 sm:left-4 right-2 sm:right-4 z-20 pointer-events-auto sm:pointer-events-none sm:[&>*:not(summary)]:!flex sm:[&>summary]:hidden">
+          <summary className="bg-base-100/90 border border-base-300 rounded-lg px-3 py-2 shadow-sm cursor-pointer select-none list-none text-sm font-medium flex items-center gap-2">
+            <span className="inline-block transition-transform group-open:rotate-90">▶</span>
+            Controls
+          </summary>
+          <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2 items-start sm:items-center mt-2 sm:mt-0">
+            <div className="flex items-center gap-2 bg-base-100/90 border border-base-300 rounded-lg px-3 py-2 shadow-sm w-full sm:w-auto">
             <input
               type="text"
               value={searchQuery}
@@ -1019,59 +1024,64 @@ export function ProvenanceGraph({
             )}
           </div>
 
-          <div className="flex items-center gap-2 bg-base-100/90 border border-base-300 rounded-lg px-3 py-2 shadow-sm w-full sm:w-auto sm:mr-auto">
-            <div className="text-xs text-base-content/60 whitespace-nowrap">
-              Focus
-            </div>
-            <input
-              type="range"
-              min={1}
-              max={Math.max(1, Math.min(10, maxDistance || 10))}
-              value={Math.min(
-                focusHops,
-                Math.max(1, Math.min(10, maxDistance || 10)),
-              )}
-              onChange={(e) => setFocusHops(Number(e.target.value))}
-              className="range range-xs range-primary w-28 pointer-events-auto"
-              disabled={effectiveShowAll}
-            />
-            <div className="text-xs font-medium tabular-nums w-10 text-right">
-              {effectiveShowAll ? "All" : `${focusHops}h`}
-            </div>
-            <button
-              className={`btn btn-xs pointer-events-auto ${effectiveShowAll ? "btn-primary" : ""}`}
-              onClick={() => setShowAll((v) => !v)}
-            >
-              All
-            </button>
-            <div className="flex items-center gap-2 ml-2">
+          <div className="flex flex-col sm:flex-row items-center gap-2 bg-base-100/90 border border-base-300 rounded-lg px-3 py-2 shadow-sm w-full sm:w-auto">
+            <div className="flex items-center gap-2">
+              <div className="text-xs text-base-content/60 whitespace-nowrap">
+                Focus
+              </div>
               <input
-                type="checkbox"
-                className="checkbox checkbox-xs checkbox-primary pointer-events-auto"
-                checked={showDerivedEdges}
-                onChange={(e) => setShowDerivedEdges(e.target.checked)}
-                id="show-derived"
+                type="range"
+                min={1}
+                max={Math.max(1, Math.min(10, maxDistance || 10))}
+                value={Math.min(
+                  focusHops,
+                  Math.max(1, Math.min(10, maxDistance || 10)),
+                )}
+                onChange={(e) => setFocusHops(Number(e.target.value))}
+                className="range range-xs range-primary w-28 pointer-events-auto"
+                disabled={effectiveShowAll}
               />
-              <label
-                htmlFor="show-derived"
-                className="text-xs text-base-content/60 cursor-pointer pointer-events-auto"
+              <div className="text-xs font-medium tabular-nums w-10 text-right">
+                {effectiveShowAll ? "All" : `${focusHops}h`}
+              </div>
+              <button
+                className={`btn btn-xs pointer-events-auto ${effectiveShowAll ? "btn-primary" : ""}`}
+                onClick={() => setShowAll((v) => !v)}
               >
-                derived
-              </label>
+                All
+              </button>
             </div>
-            <div className="join ml-2">
-              <button
-                className={`btn btn-xs join-item pointer-events-auto ${viewDetail === "full" ? "btn-primary" : ""}`}
-                onClick={() => setViewDetail("full")}
-              >
-                Detail
-              </button>
-              <button
-                className={`btn btn-xs join-item pointer-events-auto ${viewDetail === "taskFlow" ? "btn-primary" : ""}`}
-                onClick={() => setViewDetail("taskFlow")}
-              >
-                Task Flow
-              </button>
+
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 ml-2">
+                <input
+                  type="checkbox"
+                  className="checkbox checkbox-xs checkbox-primary pointer-events-auto"
+                  checked={showDerivedEdges}
+                  onChange={(e) => setShowDerivedEdges(e.target.checked)}
+                  id="show-derived"
+                />
+                <label
+                  htmlFor="show-derived"
+                  className="text-xs text-base-content/60 cursor-pointer pointer-events-auto"
+                >
+                  derived
+                </label>
+              </div>
+              <div className="join ml-2">
+                <button
+                  className={`btn btn-xs join-item pointer-events-auto ${viewDetail === "full" ? "btn-primary" : ""}`}
+                  onClick={() => setViewDetail("full")}
+                >
+                  Detail
+                </button>
+                <button
+                  className={`btn btn-xs join-item pointer-events-auto ${viewDetail === "taskFlow" ? "btn-primary" : ""}`}
+                  onClick={() => setViewDetail("taskFlow")}
+                >
+                  Task Flow
+                </button>
+              </div>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-1 sm:gap-2 bg-base-100/90 border border-base-300 rounded-lg px-2 sm:px-3 py-2 shadow-sm w-full sm:w-auto sm:shrink-0">
@@ -1100,7 +1110,8 @@ export function ProvenanceGraph({
               </span>
             )}
           </div>
-        </div>
+          </div>
+        </details>
 
         {/* Legend */}
         <div className="absolute bottom-4 left-4 bg-base-100 p-3 rounded-lg shadow border border-base-300 text-xs">
