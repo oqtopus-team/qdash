@@ -382,6 +382,11 @@ export function CopilotChatPage() {
 
   const [input, setInput] = useState("");
   const [showSessionSidebar, setShowSessionSidebar] = useState(true);
+  useEffect(() => {
+    if (window.innerWidth < 640) {
+      setShowSessionSidebar(false);
+    }
+  }, []);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
