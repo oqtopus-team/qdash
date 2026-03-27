@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useMemo, useState, useRef, useCallback, memo } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import {
   TransformWrapper,
@@ -131,78 +132,93 @@ const GridCell = memo(function GridCell({
   onClick,
 }: GridCellProps) {
   const fontSizes = getCellFontSizes(cellSize);
+  const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
 
   return (
-    <button
-      onClick={onClick}
-      className={`aspect-square rounded-lg shadow-md flex flex-col items-center justify-center relative group cursor-pointer ${
-        !bgColor ? "bg-base-300/50" : ""
-      } ${muxBgClass}`}
-      style={{
-        backgroundColor: bgColor || undefined,
-      }}
-    >
-      {/* QID Label */}
-      {showLabels && (
-        <div
-          className={`absolute top-0.5 left-0.5 backdrop-blur-sm px-0.5 py-px rounded font-bold shadow-sm ${
-            value !== null && value !== undefined
-              ? "bg-black/30 text-white"
-              : "bg-base-content/20 text-base-content"
-          }`}
-          style={{ fontSize: fontSizes.labelSize }}
-        >
-          {qid}
-        </div>
-      )}
-
-      {/* Value Display */}
-      {value !== null && value !== undefined && showValues && (
-        <div className="flex flex-col items-center justify-center h-full">
+    <>
+      <button
+        onClick={onClick}
+        onMouseEnter={(e) => {
+          const rect = e.currentTarget.getBoundingClientRect();
+          setTooltipPos({ x: rect.left + rect.width / 2, y: rect.top });
+        }}
+        onMouseLeave={() => setTooltipPos(null)}
+        className={`aspect-square rounded-lg shadow-md flex flex-col items-center justify-center relative cursor-pointer ${
+          !bgColor ? "bg-base-300/50" : ""
+        } ${muxBgClass}`}
+        style={{
+          backgroundColor: bgColor || undefined,
+        }}
+      >
+        {/* QID Label */}
+        {showLabels && (
           <div
-            className="font-bold text-white drop-shadow-md"
-            style={{ fontSize: fontSizes.valueSize }}
+            className={`absolute top-0.5 left-0.5 backdrop-blur-sm px-0.5 py-px rounded font-bold shadow-sm ${
+              value !== null && value !== undefined
+                ? "bg-black/30 text-white"
+                : "bg-base-content/20 text-base-content"
+            }`}
+            style={{ fontSize: fontSizes.labelSize }}
           >
-            {value.toFixed(2)}
+            {qid}
           </div>
-          {stddev != null && showUnits && (
-            <div
-              className="text-white/80 font-medium drop-shadow"
-              style={{ fontSize: fontSizes.unitSize }}
-            >
-              ± {stddev.toFixed(2)}
-            </div>
-          )}
-          {showUnits && (
-            <div
-              className="text-white/90 font-medium drop-shadow"
-              style={{ fontSize: fontSizes.unitSize }}
-            >
-              {unit}
-            </div>
-          )}
-        </div>
-      )}
+        )}
 
-      {/* No data indicator */}
-      {(value === null || value === undefined) && showValues && (
-        <div className="flex flex-col items-center justify-center h-full">
+        {/* Value Display */}
+        {value !== null && value !== undefined && showValues && (
+          <div className="flex flex-col items-center justify-center h-full">
+            <div
+              className="font-bold text-white drop-shadow-md"
+              style={{ fontSize: fontSizes.valueSize }}
+            >
+              {value.toFixed(2)}
+            </div>
+            {stddev != null && showUnits && (
+              <div
+                className="text-white/80 font-medium drop-shadow"
+                style={{ fontSize: fontSizes.unitSize }}
+              >
+                ± {stddev.toFixed(2)}
+              </div>
+            )}
+            {showUnits && (
+              <div
+                className="text-white/90 font-medium drop-shadow"
+                style={{ fontSize: fontSizes.unitSize }}
+              >
+                {unit}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* No data indicator */}
+        {(value === null || value === undefined) && showValues && (
+          <div className="flex flex-col items-center justify-center h-full">
+            <div
+              className="text-base-content/40 font-medium"
+              style={{ fontSize: fontSizes.valueSize }}
+            >
+              N/A
+            </div>
+          </div>
+        )}
+      </button>
+
+      {tooltipPos &&
+        typeof document !== "undefined" &&
+        createPortal(
           <div
-            className="text-base-content/40 font-medium"
-            style={{ fontSize: fontSizes.valueSize }}
+            className="px-3 py-2 bg-base-100 text-base-content text-sm rounded-lg shadow-lg whitespace-nowrap pointer-events-none border border-base-300"
+            style={{ position: "fixed", left: tooltipPos.x, top: tooltipPos.y - 8, transform: "translate(-50%, -100%)", zIndex: 9999 }}
           >
-            N/A
-          </div>
-        </div>
-      )}
-
-      {/* Hover tooltip - only render when needed */}
-      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-base-100 text-base-content text-sm rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
-        {value !== null && value !== undefined
-          ? `${qid}: ${value.toFixed(4)}${stddev != null ? ` ± ${stddev.toFixed(4)}` : ""} ${unit}`
-          : `${qid}: No data`}
-      </div>
-    </button>
+            {value !== null && value !== undefined
+              ? `${qid}: ${value.toFixed(4)}${stddev != null ? ` ± ${stddev.toFixed(4)}` : ""} ${unit}`
+              : `${qid}: No data`}
+          </div>,
+          document.body,
+        )}
+    </>
   );
 });
 
