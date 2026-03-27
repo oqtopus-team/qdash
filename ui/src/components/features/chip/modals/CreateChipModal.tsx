@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
 import { useQueryClient } from "@tanstack/react-query";
 
-import { useCreateChip } from "@/client/chip/chip";
+import { useCreateChip, getListChipsQueryKey } from "@/client/chip/chip";
 import { useListTopologies } from "@/client/topology/topology";
 
 interface TopologyItem {
@@ -100,7 +100,7 @@ export function CreateChipModal({
     mutation: {
       onSuccess: (data) => {
         // Invalidate chips list to refresh
-        queryClient.invalidateQueries({ queryKey: ["listChips"] });
+        queryClient.invalidateQueries({ queryKey: getListChipsQueryKey() });
 
         // Call success callback if provided
         if (onSuccess && data.data) {
