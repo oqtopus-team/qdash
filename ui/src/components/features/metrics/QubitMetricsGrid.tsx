@@ -135,76 +135,75 @@ const GridCell = memo(function GridCell({
   const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
 
   return (
-    <>
-      <button
-        onClick={onClick}
-        onMouseEnter={(e) => {
-          const rect = e.currentTarget.getBoundingClientRect();
-          setTooltipPos({ x: rect.left + rect.width / 2, y: rect.top });
-        }}
-        onMouseLeave={() => setTooltipPos(null)}
-        className={`aspect-square rounded-lg shadow-md flex flex-col items-center justify-center relative cursor-pointer ${
-          !bgColor ? "bg-base-300/50" : ""
-        } ${muxBgClass}`}
-        style={{
-          backgroundColor: bgColor || undefined,
-        }}
-      >
-        {/* QID Label */}
-        {showLabels && (
+    <button
+      onClick={onClick}
+      onMouseEnter={(e) => {
+        const rect = e.currentTarget.getBoundingClientRect();
+        setTooltipPos({ x: rect.left + rect.width / 2, y: rect.top });
+      }}
+      onMouseLeave={() => setTooltipPos(null)}
+      className={`aspect-square rounded-lg shadow-md flex flex-col items-center justify-center relative cursor-pointer ${
+        !bgColor ? "bg-base-300/50" : ""
+      } ${muxBgClass}`}
+      style={{
+        backgroundColor: bgColor || undefined,
+      }}
+    >
+      {/* QID Label */}
+      {showLabels && (
+        <div
+          className={`absolute top-0.5 left-0.5 backdrop-blur-sm px-0.5 py-px rounded font-bold shadow-sm ${
+            value !== null && value !== undefined
+              ? "bg-black/30 text-white"
+              : "bg-base-content/20 text-base-content"
+          }`}
+          style={{ fontSize: fontSizes.labelSize }}
+        >
+          {qid}
+        </div>
+      )}
+
+      {/* Value Display */}
+      {value !== null && value !== undefined && showValues && (
+        <div className="flex flex-col items-center justify-center h-full">
           <div
-            className={`absolute top-0.5 left-0.5 backdrop-blur-sm px-0.5 py-px rounded font-bold shadow-sm ${
-              value !== null && value !== undefined
-                ? "bg-black/30 text-white"
-                : "bg-base-content/20 text-base-content"
-            }`}
-            style={{ fontSize: fontSizes.labelSize }}
+            className="font-bold text-white drop-shadow-md"
+            style={{ fontSize: fontSizes.valueSize }}
           >
-            {qid}
+            {value.toFixed(2)}
           </div>
-        )}
-
-        {/* Value Display */}
-        {value !== null && value !== undefined && showValues && (
-          <div className="flex flex-col items-center justify-center h-full">
+          {stddev != null && showUnits && (
             <div
-              className="font-bold text-white drop-shadow-md"
-              style={{ fontSize: fontSizes.valueSize }}
+              className="text-white/80 font-medium drop-shadow"
+              style={{ fontSize: fontSizes.unitSize }}
             >
-              {value.toFixed(2)}
+              ± {stddev.toFixed(2)}
             </div>
-            {stddev != null && showUnits && (
-              <div
-                className="text-white/80 font-medium drop-shadow"
-                style={{ fontSize: fontSizes.unitSize }}
-              >
-                ± {stddev.toFixed(2)}
-              </div>
-            )}
-            {showUnits && (
-              <div
-                className="text-white/90 font-medium drop-shadow"
-                style={{ fontSize: fontSizes.unitSize }}
-              >
-                {unit}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* No data indicator */}
-        {(value === null || value === undefined) && showValues && (
-          <div className="flex flex-col items-center justify-center h-full">
+          )}
+          {showUnits && (
             <div
-              className="text-base-content/40 font-medium"
-              style={{ fontSize: fontSizes.valueSize }}
+              className="text-white/90 font-medium drop-shadow"
+              style={{ fontSize: fontSizes.unitSize }}
             >
-              N/A
+              {unit}
             </div>
-          </div>
-        )}
-      </button>
+          )}
+        </div>
+      )}
 
+      {/* No data indicator */}
+      {(value === null || value === undefined) && showValues && (
+        <div className="flex flex-col items-center justify-center h-full">
+          <div
+            className="text-base-content/40 font-medium"
+            style={{ fontSize: fontSizes.valueSize }}
+          >
+            N/A
+          </div>
+        </div>
+      )}
+
+      {/* Hover tooltip - portal to escape overflow-hidden */}
       {tooltipPos &&
         typeof document !== "undefined" &&
         createPortal(
@@ -218,7 +217,7 @@ const GridCell = memo(function GridCell({
           </div>,
           document.body,
         )}
-    </>
+    </button>
   );
 });
 
