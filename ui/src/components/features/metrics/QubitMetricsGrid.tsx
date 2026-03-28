@@ -210,6 +210,7 @@ const GridCell = memo(function GridCell({
         typeof document !== "undefined" &&
         createPortal(
           <div
+            role="tooltip"
             className="px-3 py-2 bg-base-100 text-base-content text-sm rounded-lg shadow-lg whitespace-nowrap pointer-events-none border border-base-300"
             style={{
               position: "fixed",
