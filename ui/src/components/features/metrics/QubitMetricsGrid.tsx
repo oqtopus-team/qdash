@@ -132,7 +132,9 @@ const GridCell = memo(function GridCell({
   onClick,
 }: GridCellProps) {
   const fontSizes = getCellFontSizes(cellSize);
-  const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
+  const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(
+    null,
+  );
 
   return (
     <button
@@ -209,7 +211,13 @@ const GridCell = memo(function GridCell({
         createPortal(
           <div
             className="px-3 py-2 bg-base-100 text-base-content text-sm rounded-lg shadow-lg whitespace-nowrap pointer-events-none border border-base-300"
-            style={{ position: "fixed", left: tooltipPos.x, top: tooltipPos.y - 8, transform: "translate(-50%, -100%)", zIndex: 9999 }}
+            style={{
+              position: "fixed",
+              left: tooltipPos.x,
+              top: tooltipPos.y - 8,
+              transform: "translate(-50%, -100%)",
+              zIndex: 9999,
+            }}
           >
             {value !== null && value !== undefined
               ? `${qid}: ${value.toFixed(4)}${stddev != null ? ` ± ${stddev.toFixed(4)}` : ""} ${unit}`
