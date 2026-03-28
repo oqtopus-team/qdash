@@ -7,6 +7,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Braces,
+  ChevronLeft,
   Copy,
   File,
   FileCode2,
@@ -508,10 +509,20 @@ export function TasksPageContent() {
         <div className="flex-1 flex overflow-hidden">
           {/* Sidebar */}
           <div
-            className={`${isSidebarVisible ? "w-48 sm:w-64" : "w-0"} bg-base-100 border-r border-base-300 flex flex-col flex-shrink-0 transition-all duration-200 overflow-hidden`}
+            className={`${isSidebarVisible ? "w-48 sm:w-64" : "w-6"} bg-base-100 border-r border-base-300 flex flex-col flex-shrink-0 transition-all duration-200 overflow-hidden`}
           >
-            {/* Tab buttons */}
+            {/* Tab buttons + collapse toggle */}
             <div className="flex border-b border-base-300">
+              <button
+                onClick={() => setIsSidebarVisible(!isSidebarVisible)}
+                className="w-6 flex-shrink-0 flex items-center justify-center hover:bg-base-200 transition-colors"
+                title={isSidebarVisible ? "Collapse sidebar" : "Expand sidebar"}
+              >
+                <ChevronLeft
+                  size={14}
+                  className={`transition-transform duration-200 ${!isSidebarVisible ? "rotate-180" : ""}`}
+                />
+              </button>
               <button
                 onClick={() => setViewMode("files")}
                 className={`flex-1 px-3 py-2 text-xs font-medium flex items-center justify-center gap-1 transition-colors ${
