@@ -61,7 +61,12 @@ export function TasksPageContent() {
   const [cursorPosition, setCursorPosition] = useState({ line: 1, column: 1 });
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isEditorLocked, setIsEditorLocked] = useState(true);
-  const [isSidebarVisible, setIsSidebarVisible] = useState(false);
+  const [isSidebarVisible, setIsSidebarVisible] = useState(true);
+  useEffect(() => {
+    if (window.innerWidth < 640) {
+      setIsSidebarVisible(false);
+    }
+  }, []);
 
   // Fetch settings (including default backend)
   const { data: settingsData } = useQuery({
