@@ -510,9 +510,9 @@ export function TasksPageContent() {
         <div className="flex-1 flex overflow-hidden">
           {/* Sidebar */}
           <div
-            className={`${isSidebarVisible ? "w-48 sm:w-64" : "w-0"} bg-base-100 border-r border-base-300 flex flex-col flex-shrink-0 transition-all duration-300 overflow-hidden`}
+            className={`${isSidebarVisible ? "w-48 sm:w-64" : "w-0"} bg-base-100 border-r border-base-300 flex flex-col flex-shrink-0 transition-all duration-200 overflow-hidden`}
           >
-            {/* Tab buttons row with fold button on the right */}
+            {/* Tab buttons */}
             <div className="flex border-b border-base-300">
               <button
                 onClick={() => setViewMode("files")}
