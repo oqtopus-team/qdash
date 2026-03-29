@@ -8,6 +8,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Braces,
   ChevronLeft,
+  ChevronRight,
   Copy,
   File,
   FileCode2,
@@ -509,23 +510,9 @@ export function TasksPageContent() {
         <div className="flex-1 flex overflow-hidden">
           {/* Sidebar */}
           <div
-            className={`${isSidebarVisible ? "w-48 sm:w-64" : "w-6"} bg-base-100 border-r border-base-300 flex flex-col flex-shrink-0 transition-all duration-200 overflow-hidden`}
+            className={`${isSidebarVisible ? "w-48 sm:w-64" : "w-0"} bg-base-100 border-r border-base-300 flex flex-col flex-shrink-0 transition-all duration-300 overflow-hidden`}
           >
-            {/* Collapse toggle (always visible) */}
-            <button
-              onClick={() => setIsSidebarVisible(!isSidebarVisible)}
-              className={`w-6 flex-shrink-0 flex items-center justify-center hover:bg-base-200 transition-colors border-b border-base-300 ${isSidebarVisible ? "self-start" : "h-full"}`}
-              title={isSidebarVisible ? "Collapse sidebar" : "Expand sidebar"}
-            >
-              <ChevronLeft
-                size={14}
-                className={`transition-transform duration-200 ${!isSidebarVisible ? "rotate-180" : ""}`}
-              />
-            </button>
-
-            {/* Tab buttons + content (hidden when collapsed) */}
-            {isSidebarVisible && (
-              <>
+            {/* Tab buttons row with fold button on the right */}
             <div className="flex border-b border-base-300">
               <button
                 onClick={() => setViewMode("files")}
@@ -548,6 +535,13 @@ export function TasksPageContent() {
               >
                 <Braces size={14} />
                 Tasks
+              </button>
+              <button
+                onClick={() => setIsSidebarVisible(false)}
+                className="btn btn-ghost btn-sm btn-square"
+                aria-label="Collapse sidebar"
+              >
+                <ChevronLeft size={16} />
               </button>
             </div>
 
@@ -591,9 +585,20 @@ export function TasksPageContent() {
                 </>
               )}
             </div>
-              </>
-            )}
           </div>
+
+          {/* Expand sidebar button (shown when sidebar is collapsed) */}
+          {!isSidebarVisible && (
+            <div className="bg-base-100 border-r border-base-300 flex-shrink-0">
+              <button
+                onClick={() => setIsSidebarVisible(true)}
+                className="btn btn-ghost btn-sm btn-square"
+                aria-label="Expand sidebar"
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
+          )}
 
           {/* Editor */}
           <div className="flex-1 flex flex-col">
