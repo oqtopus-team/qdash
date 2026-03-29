@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useMemo, useState, useRef, useCallback, memo } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import {
   TransformWrapper,
@@ -131,11 +132,19 @@ const GridCell = memo(function GridCell({
   onClick,
 }: GridCellProps) {
   const fontSizes = getCellFontSizes(cellSize);
+  const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(
+    null,
+  );
 
   return (
     <button
       onClick={onClick}
-      className={`aspect-square rounded-lg shadow-md flex flex-col items-center justify-center relative group cursor-pointer ${
+      onMouseEnter={(e) => {
+        const rect = e.currentTarget.getBoundingClientRect();
+        setTooltipPos({ x: rect.left + rect.width / 2, y: rect.top });
+      }}
+      onMouseLeave={() => setTooltipPos(null)}
+      className={`aspect-square rounded-lg shadow-md flex flex-col items-center justify-center relative cursor-pointer ${
         !bgColor ? "bg-base-300/50" : ""
       } ${muxBgClass}`}
       style={{
@@ -196,12 +205,27 @@ const GridCell = memo(function GridCell({
         </div>
       )}
 
-      {/* Hover tooltip - only render when needed */}
-      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-base-100 text-base-content text-sm rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
-        {value !== null && value !== undefined
-          ? `${qid}: ${value.toFixed(4)}${stddev != null ? ` ± ${stddev.toFixed(4)}` : ""} ${unit}`
-          : `${qid}: No data`}
-      </div>
+      {/* Hover tooltip - portal to escape overflow-hidden */}
+      {tooltipPos &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div
+            role="tooltip"
+            className="px-3 py-2 bg-base-100 text-base-content text-sm rounded-lg shadow-lg whitespace-nowrap pointer-events-none border border-base-300"
+            style={{
+              position: "fixed",
+              left: tooltipPos.x,
+              top: tooltipPos.y - 8,
+              transform: "translate(-50%, -100%)",
+              zIndex: 9999,
+            }}
+          >
+            {value !== null && value !== undefined
+              ? `${qid}: ${value.toFixed(4)}${stddev != null ? ` ± ${stddev.toFixed(4)}` : ""} ${unit}`
+              : `${qid}: No data`}
+          </div>,
+          document.body,
+        )}
     </button>
   );
 });
