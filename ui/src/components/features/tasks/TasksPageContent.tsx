@@ -49,6 +49,8 @@ const Editor = dynamic(() => import("@monaco-editor/react"), { ssr: false });
 
 type ViewMode = "files" | "tasks";
 
+const SIDEBAR_STORAGE_KEY = "tasks-sidebar-visible";
+
 export function TasksPageContent() {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -62,12 +64,12 @@ export function TasksPageContent() {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isEditorLocked, setIsEditorLocked] = useState(true);
   const [isSidebarVisible, setIsSidebarVisible] = useState(() => {
-    const saved = localStorage.getItem("tasks-sidebar-visible");
+    const saved = localStorage.getItem(SIDEBAR_STORAGE_KEY);
     return saved !== null ? saved === "true" : true;
   });
 
   useEffect(() => {
-    localStorage.setItem("tasks-sidebar-visible", String(isSidebarVisible));
+    localStorage.setItem(SIDEBAR_STORAGE_KEY, String(isSidebarVisible));
   }, [isSidebarVisible]);
 
   // Fetch settings (including default backend)
