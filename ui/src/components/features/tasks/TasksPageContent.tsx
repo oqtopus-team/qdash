@@ -61,7 +61,14 @@ export function TasksPageContent() {
   const [cursorPosition, setCursorPosition] = useState({ line: 1, column: 1 });
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isEditorLocked, setIsEditorLocked] = useState(true);
-  const [isSidebarVisible, setIsSidebarVisible] = useState(true);
+  const [isSidebarVisible, setIsSidebarVisible] = useState(() => {
+    const saved = localStorage.getItem("tasks-sidebar-visible");
+    return saved !== null ? saved === "true" : true;
+  });
+
+  useEffect(() => {
+    localStorage.setItem("tasks-sidebar-visible", String(isSidebarVisible));
+  }, [isSidebarVisible]);
 
   // Fetch settings (including default backend)
   const { data: settingsData } = useQuery({
@@ -511,6 +518,7 @@ export function TasksPageContent() {
           {/* Sidebar */}
           <div
             className={`${isSidebarVisible ? "w-48 sm:w-64" : "w-0"} bg-base-100 border-r border-base-300 flex flex-col flex-shrink-0 transition-all duration-200 overflow-hidden`}
+            aria-hidden={!isSidebarVisible}
           >
             {/* Tab buttons */}
             <div className="flex border-b border-base-300">
