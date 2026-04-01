@@ -170,7 +170,7 @@ class CheckResonatorSpectroscopy(QubexTask):
         label = self.get_qubit_label(backend, qid)
         read_box = exp.experiment_system.get_readout_box_for_qubit(label)
         import numpy as np
-        from qubex.backend import BoxType
+        from qubex.system import BoxType
 
         if read_box.type == BoxType.QUEL1SE_R8:
             frequency_range = np.arange(5.75, 6.75, 0.002)
@@ -191,7 +191,7 @@ class CheckResonatorSpectroscopy(QubexTask):
         labels = [self.get_qubit_label(backend, qid) for qid in qids]
         read_box = exp.experiment_system.get_readout_box_for_qubit(labels[0])
         import numpy as np
-        from qubex.backend import BoxType
+        from qubex.system import BoxType
 
         if read_box.type == BoxType.QUEL1SE_R8:
             frequency_range = np.arange(5.75, 6.75, 0.002)

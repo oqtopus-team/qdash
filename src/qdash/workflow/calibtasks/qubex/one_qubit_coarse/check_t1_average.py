@@ -11,7 +11,11 @@ from qdash.workflow.calibtasks.base import (
 )
 from qdash.workflow.calibtasks.qubex.base import QubexTask
 from qdash.workflow.engine.backend.qubex import QubexBackend
-from qubex.measurement.measurement_defaults import DEFAULT_INTERVAL, DEFAULT_READOUT_DURATION, DEFAULT_SHOTS
+from qubex.measurement.measurement_defaults import (
+    DEFAULT_INTERVAL,
+    DEFAULT_READOUT_DURATION,
+    DEFAULT_SHOTS,
+)
 
 
 class CheckT1Average(QubexTask):
