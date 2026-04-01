@@ -65,7 +65,7 @@ export function QubitMetricHistoryModal({
   const { data, isLoading, isError } = useGetQubitMetricHistory(
     chipId,
     qid,
-    { metric: metricName, limit: 20, within_days: 30 },
+    { metric: metricName, limit: 100, within_days: 365 },
     {
       query: {
         staleTime: 30000,
@@ -196,7 +196,7 @@ export function QubitMetricHistoryModal({
           />
         </svg>
         <span>
-          No {metricName} history available for {qid} in the last 30 days
+          No {metricName} history available for {qid} in the last 365 days
         </span>
       </div>
     );

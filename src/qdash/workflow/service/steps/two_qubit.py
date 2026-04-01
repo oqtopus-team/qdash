@@ -155,6 +155,9 @@ class CustomTwoQubit(CalibrationStep):
             "execution_id": session.execution_id,
             "project_id": session.project_id,
             "default_run_parameters": session.default_run_parameters,
+            "tags": session.tags,
+            "flow_name": session.flow_name,
+            "note": session.note,
         }
 
         # Execute groups sequentially (groups are scheduled to avoid resource conflicts)
@@ -472,6 +475,9 @@ class TwoQubitCalibration(CalibrationStep):
             "execution_id": session.execution_id,
             "project_id": session.project_id,
             "default_run_parameters": session.default_run_parameters,
+            "tags": session.tags,
+            "flow_name": session.flow_name,
+            "note": session.note,
         }
 
         # Execute groups sequentially (groups are scheduled to avoid resource conflicts)
