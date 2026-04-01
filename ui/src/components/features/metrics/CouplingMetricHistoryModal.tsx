@@ -81,7 +81,7 @@ export function CouplingMetricHistoryModal({
   const { data, isLoading, isError } = useGetCouplingMetricHistory(
     chipId,
     activeCouplingId,
-    { metric: metricName, limit: 20, within_days: 30 },
+    { metric: metricName, limit: 100, within_days: 365 },
     {
       query: {
         staleTime: 30000,
@@ -234,7 +234,7 @@ export function CouplingMetricHistoryModal({
           </svg>
           <span>
             No {metricName} history available for {activeCouplingId} in the last
-            30 days
+            365 days
           </span>
         </div>
       </div>
