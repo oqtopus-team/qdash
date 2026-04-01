@@ -196,7 +196,7 @@ export function QubitMetricHistoryModal({
           />
         </svg>
         <span>
-          No {metricName} history available for {qid} in the last 30 days
+          No {metricName} history available for {qid} in the last 365 days
         </span>
       </div>
     );

@@ -234,7 +234,7 @@ export function CouplingMetricHistoryModal({
           </svg>
           <span>
             No {metricName} history available for {activeCouplingId} in the last
-            30 days
+            365 days
           </span>
         </div>
       </div>
