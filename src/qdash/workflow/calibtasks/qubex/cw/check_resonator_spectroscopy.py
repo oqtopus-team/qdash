@@ -180,7 +180,7 @@ class CheckResonatorSpectroscopy(QubexTask):
             target=label,
             frequency_range=frequency_range,
             power_range=self.run_parameters["power_range"].get_value(),
-            shots=self.run_parameters["shots"].get_value(),
+            n_shots=self.run_parameters["shots"].get_value(),
         )
         self.save_calibration(backend)
         return RunResult(raw_result=result)
@@ -201,7 +201,7 @@ class CheckResonatorSpectroscopy(QubexTask):
             labels[0],
             frequency_range=frequency_range,
             power_range=self.run_parameters["power_range"].get_value(),
-            shots=1024,
+            n_shots=1024,
         )
         self.save_calibration(backend)
         return RunResult(raw_result=result)

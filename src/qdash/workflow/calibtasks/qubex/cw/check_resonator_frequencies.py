@@ -76,7 +76,7 @@ class CheckResonatorFrequencies(QubexTask):
         result = exp.scan_resonator_frequencies(
             labels[0],
             frequency_range=frequency_range,
-            shots=1024,
+            n_shots=1024,
             filter="savgol",
         )
         self.save_calibration(backend)

@@ -11,7 +11,7 @@ from qdash.workflow.calibtasks.base import (
 )
 from qdash.workflow.calibtasks.qubex.base import QubexTask
 from qdash.workflow.engine.backend.qubex import QubexBackend
-from qubex.measurement.measurement import DEFAULT_INTERVAL, DEFAULT_READOUT_DURATION, DEFAULT_SHOTS
+from qubex.measurement.measurement_defaults import DEFAULT_INTERVAL, DEFAULT_READOUT_DURATION, DEFAULT_SHOTS
 
 
 class CheckT1Average(QubexTask):
@@ -86,8 +86,8 @@ class CheckT1Average(QubexTask):
         for i in range(n_runs):
             result = exp.t1_experiment(
                 time_range=self.run_parameters["time_range"].get_value(),
-                shots=self.run_parameters["shots"].get_value(),
-                interval=self.run_parameters["interval"].get_value(),
+                n_shots=self.run_parameters["shots"].get_value(),
+                shot_interval=self.run_parameters["interval"].get_value(),
                 targets=labels,
             )
             t1_values.append(result.data[label].t1 * 0.001)  # convert to μs

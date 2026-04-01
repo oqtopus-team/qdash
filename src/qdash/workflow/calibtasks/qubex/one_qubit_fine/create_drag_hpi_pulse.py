@@ -10,7 +10,7 @@ from qdash.workflow.calibtasks.base import (
 from qdash.workflow.calibtasks.qubex.base import QubexTask
 from qdash.workflow.engine.backend.qubex import QubexBackend
 from qubex.experiment.experiment_constants import CALIBRATION_SHOTS, DRAG_HPI_DURATION
-from qubex.measurement.measurement import DEFAULT_INTERVAL, DEFAULT_READOUT_DURATION
+from qubex.measurement.measurement_defaults import DEFAULT_INTERVAL, DEFAULT_READOUT_DURATION
 
 
 class CreateDRAGHPIPulse(QubexTask):
@@ -79,8 +79,8 @@ class CreateDRAGHPIPulse(QubexTask):
             n_turns=1,
             n_iterations=2,
             duration=self.run_parameters["drag_hpi_duration"].get_value(),
-            shots=self.run_parameters["shots"].get_value(),
-            interval=self.run_parameters["interval"].get_value(),
+            n_shots=self.run_parameters["shots"].get_value(),
+            shot_interval=self.run_parameters["interval"].get_value(),
         )
         self.save_calibration(backend)
         r2 = result["amplitude"][exp.get_qubit_label(int(qid))]["r2"]
