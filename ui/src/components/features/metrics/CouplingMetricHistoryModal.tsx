@@ -81,7 +81,7 @@ export function CouplingMetricHistoryModal({
   const { data, isLoading, isError } = useGetCouplingMetricHistory(
     chipId,
     activeCouplingId,
-    { metric: metricName, limit: 20, within_days: 30 },
+    { metric: metricName, limit: 100, within_days: 365 },
     {
       query: {
         staleTime: 30000,
