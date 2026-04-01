@@ -7,7 +7,7 @@ from qdash.workflow.calibtasks.base import (
 )
 from qdash.workflow.calibtasks.qubex.base import QubexTask
 from qdash.workflow.engine.backend.qubex import QubexBackend
-from qubex.measurement.measurement import DEFAULT_INTERVAL, DEFAULT_READOUT_DURATION
+from qubex.measurement.measurement_defaults import DEFAULT_INTERVAL, DEFAULT_READOUT_DURATION
 
 
 class CheckPIPulse(QubexTask):
@@ -62,7 +62,7 @@ class CheckPIPulse(QubexTask):
         result = exp.repeat_sequence(
             sequence=pi_pulse,
             repetitions=self.run_parameters["repetitions"].get_value(),
-            interval=self.run_parameters["interval"].get_value(),
+            shot_interval=self.run_parameters["interval"].get_value(),
         )
         self.save_calibration(backend)
         return RunResult(raw_result=result)

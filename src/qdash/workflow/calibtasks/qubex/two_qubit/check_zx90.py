@@ -8,7 +8,7 @@ from qdash.workflow.calibtasks.base import (
 from qdash.workflow.calibtasks.qubex.base import QubexTask
 from qdash.workflow.engine.backend.qubex import QubexBackend
 from qubex.experiment.experiment_constants import CALIBRATION_SHOTS
-from qubex.measurement.measurement import DEFAULT_INTERVAL
+from qubex.measurement.measurement_defaults import DEFAULT_INTERVAL
 
 
 class CheckZX90(QubexTask):
@@ -122,8 +122,8 @@ class CheckZX90(QubexTask):
         result = exp.repeat_sequence(
             sequence=zx90_pulse,
             repetitions=self.run_parameters["repetitions"].get_value(),
-            shots=self.run_parameters["shots"].get_value(),
-            interval=self.run_parameters["interval"].get_value(),
+            n_shots=self.run_parameters["shots"].get_value(),
+            shot_interval=self.run_parameters["interval"].get_value(),
         )
         self.save_calibration(backend)
         return RunResult(raw_result=result)

@@ -8,7 +8,7 @@ from qdash.workflow.calibtasks.base import (
 from qdash.workflow.calibtasks.qubex.base import QubexTask
 from qdash.workflow.engine.backend.qubex import QubexBackend
 from qubex.experiment.experiment_constants import CALIBRATION_SHOTS
-from qubex.measurement.measurement import DEFAULT_INTERVAL
+from qubex.measurement.measurement_defaults import DEFAULT_INTERVAL
 
 
 class CreateZX90(QubexTask):
@@ -147,8 +147,8 @@ class CreateZX90(QubexTask):
         raw_result = exp.calibrate_zx90(
             control,
             target,
-            shots=self.run_parameters["shots"].get_value(),
-            interval=self.run_parameters["interval"].get_value(),
+            n_shots=self.run_parameters["shots"].get_value(),
+            shot_interval=self.run_parameters["interval"].get_value(),
         )
         fit_result = exp.calib_note.get_cr_param(label)
         if fit_result is None:

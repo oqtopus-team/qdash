@@ -8,7 +8,7 @@ from qdash.workflow.calibtasks.base import (
 from qdash.workflow.calibtasks.qubex.base import QubexTask
 from qdash.workflow.engine.backend.qubex import QubexBackend
 from qubex.experiment.experiment_constants import CALIBRATION_SHOTS
-from qubex.measurement.measurement import DEFAULT_INTERVAL
+from qubex.measurement.measurement_defaults import DEFAULT_INTERVAL
 
 
 class CheckDispersiveShift(QubexTask):
@@ -61,8 +61,8 @@ class CheckDispersiveShift(QubexTask):
             electrical_delay = exp.measure_electrical_delay(target=label)
             result = exp.measure_dispersive_shift(
                 electrical_delay=electrical_delay,
-                shots=self.run_parameters["shots"].get_value(),
-                interval=self.run_parameters["interval"].get_value(),
+                n_shots=self.run_parameters["shots"].get_value(),
+                shot_interval=self.run_parameters["interval"].get_value(),
                 target=label,
             )
 

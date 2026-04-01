@@ -11,7 +11,7 @@ from qdash.workflow.calibtasks.base import (
 from qdash.workflow.calibtasks.qubex.base import QubexTask
 from qdash.workflow.engine.backend.qubex import QubexBackend
 from qubex.experiment.experiment_constants import CALIBRATION_SHOTS
-from qubex.measurement.measurement import DEFAULT_INTERVAL, DEFAULT_READOUT_DURATION
+from qubex.measurement.measurement_defaults import DEFAULT_INTERVAL, DEFAULT_READOUT_DURATION
 
 
 class ReadoutClassification(QubexTask):
@@ -147,8 +147,8 @@ class ReadoutClassification(QubexTask):
         result = exp.build_classifier(
             targets=label,
             save_dir=exp.classifier_dir,
-            shots=self.run_parameters["shots"].get_value(),
-            interval=self.run_parameters["interval"].get_value(),
+            n_shots=self.run_parameters["shots"].get_value(),
+            shot_interval=self.run_parameters["interval"].get_value(),
         )
         self.save_calibration(backend)
         return RunResult(raw_result=result)
