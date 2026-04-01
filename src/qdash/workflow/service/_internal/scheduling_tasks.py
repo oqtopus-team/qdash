@@ -178,6 +178,9 @@ def _create_isolated_session(
         enable_github_pull=False,  # Parent session handles GitHub pull
         enable_github=False,  # No GitHub operations for isolated sessions
         default_run_parameters=session_config.get("default_run_parameters"),
+        tags=session_config.get("tags"),
+        flow_name=session_config.get("flow_name"),
+        note=session_config.get("note"),
     )
 
 
