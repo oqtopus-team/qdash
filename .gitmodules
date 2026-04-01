@@ -1,4 +1,0 @@
-[submodule "config/qubex-config"]
-	path = config/qubex-config
-	url = https://github.com/oqtopus-team/qubex-config.git
-	ignore = all
