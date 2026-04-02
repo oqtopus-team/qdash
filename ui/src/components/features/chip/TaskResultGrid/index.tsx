@@ -188,7 +188,7 @@ const GridCell = memo(function GridCell({
       }`}
     >
       {task.figure_path && figurePath && (
-        <div className="absolute inset-1">
+        <div className="absolute inset-1 [&_button]:hidden">
           <TaskFigure
             path={figurePath}
             qid={qid}
