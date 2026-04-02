@@ -631,7 +631,7 @@ export default function EditFlowPage() {
               className="modal-backdrop"
               onClick={() => setShowPropertiesModal(false)}
             />
-            <div className="modal-box max-w-md">
+            <div className="modal-box max-w-md max-h-[calc(100vh-8rem)]">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="font-bold text-lg">Properties</h3>
                 <button

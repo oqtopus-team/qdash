@@ -13,7 +13,7 @@ from qdash.workflow.calibtasks.base import (
 )
 from qdash.workflow.calibtasks.fake.base import FakeTask
 from qdash.workflow.engine.backend.fake import FakeBackend
-from qubex.measurement.measurement import DEFAULT_INTERVAL, DEFAULT_SHOTS
+from qubex.measurement.measurement_defaults import DEFAULT_INTERVAL, DEFAULT_SHOTS
 from qubex.simulator import Control, QuantumSimulator, QuantumSystem, SimulationResult, Transmon
 
 

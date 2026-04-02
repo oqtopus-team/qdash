@@ -166,9 +166,9 @@ api = [
     "pyyaml==6.0.1",
     "python-multipart==0.0.20",
     "numpy>=1.26.0,<1.27.0",
+    "scipy",
     "matplotlib>=3.8.0",
     "networkx>=3.4.2",
-    "scipy>=1.15.3",
     "httpx>=0.27.0",  # For deployment service communication
     "ruff==0.5.5",  # For auto-formatting saved flows
     "gitpython>=3.1.44",  # For Git operations in file router
@@ -215,4 +215,4 @@ dev = [
     "setuptools>=80.9.0",
 ]
 [tool.uv.sources]
-qubex = { git = "https://github.com/amachino/qubex.git", branch = "develop" }
+qubex = { git = "https://github.com/amachino/qubex.git", tag = "v1.5.0b4" }

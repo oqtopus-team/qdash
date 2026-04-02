@@ -67,7 +67,7 @@ class CheckResonatorFrequencies(QubexTask):
         labels = [self.get_qubit_label(backend, qid) for qid in qids]
         read_box = exp.experiment_system.get_readout_box_for_qubit(labels[0])
         import numpy as np
-        from qubex.backend import BoxType
+        from qubex.system import BoxType
 
         if read_box.type == BoxType.QUEL1SE_R8:
             frequency_range = np.arange(5.75, 6.75, 0.002)
@@ -76,7 +76,7 @@ class CheckResonatorFrequencies(QubexTask):
         result = exp.scan_resonator_frequencies(
             labels[0],
             frequency_range=frequency_range,
-            shots=1024,
+            n_shots=1024,
             filter="savgol",
         )
         self.save_calibration(backend)

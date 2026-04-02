@@ -60,9 +60,9 @@ class QubexBackend(BaseBackend):
 
     def version(self) -> str:
         """Return the version of the Qubex backend."""
-        from qubex.version import get_package_version
+        from qubex.version import get_version
 
-        return str(get_package_version("qubex"))
+        return str(get_version())
 
     def connect(self) -> None:
         if self._exp is None:

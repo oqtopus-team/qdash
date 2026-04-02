@@ -104,6 +104,9 @@ def parallel_retry_calibration(
             "backend_name": cal.backend_name,
             "execution_id": cal.execution_id,
             "project_id": cal.project_id,
+            "tags": cal.tags,
+            "flow_name": cal.flow_name,
+            "note": cal.note,
         }
 
         # === PARALLEL PROCESSES: Run groups using DaskTaskRunner ===

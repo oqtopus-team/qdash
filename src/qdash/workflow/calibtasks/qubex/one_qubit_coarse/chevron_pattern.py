@@ -10,7 +10,7 @@ from qdash.workflow.calibtasks.base import (
 )
 from qdash.workflow.calibtasks.qubex.base import QubexTask
 from qdash.workflow.engine.backend.qubex import QubexBackend
-from qubex.measurement.measurement import DEFAULT_READOUT_DURATION
+from qubex.measurement.measurement_defaults import DEFAULT_READOUT_DURATION
 
 DEFAULT_READOUT_AMPLITUDE = 0.2
 DEFAULT_CONTROL_AMPLITUDE = 0.0625
