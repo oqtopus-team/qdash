@@ -9,6 +9,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowDown,
   Check,
+  ChevronLeft,
+  ChevronRight,
   Database,
   ExternalLink,
   File,
@@ -16,6 +18,7 @@ import {
   Folder,
   FolderOpen,
   GitPullRequestArrow,
+  PanelLeft,
   Pencil,
   Plus,
   Save,
@@ -396,6 +399,13 @@ export function FilesPageContent() {
       <div className="h-screen flex flex-col bg-base-300">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between px-2 sm:px-4 py-2 bg-base-200 border-b border-base-300 gap-2">
           <div className="flex items-center gap-2 sm:gap-4 min-w-0">
+            <button
+              onClick={() => setIsSidebarVisible(!isSidebarVisible)}
+              className="btn btn-sm btn-ghost hidden sm:flex"
+              title={isSidebarVisible ? "Hide sidebar" : "Show sidebar"}
+            >
+              <PanelLeft size={16} />
+            </button>
             <div className="flex items-center gap-1 sm:gap-2 min-w-0 overflow-hidden">
               <span className="text-sm font-medium flex-shrink-0 hidden sm:inline">
                 Config Files
@@ -573,12 +583,24 @@ export function FilesPageContent() {
 
         <div className="flex-1 flex overflow-hidden">
           <div
-            className={`${isSidebarVisible ? "w-48 sm:w-64" : "w-0"} bg-base-100 border-r border-base-300 overflow-y-auto transition-all duration-200 overflow-hidden flex-shrink-0`}
+            className={`${isSidebarVisible ? "w-48 sm:w-64 border-r border-base-300" : "w-0"} bg-base-100 flex flex-col flex-shrink-0 transition-all duration-300 overflow-hidden`}
+            aria-hidden={!isSidebarVisible}
           >
-            <div className="py-2">
-              <h2 className="text-xs font-bold text-base-content/60 mb-1 px-3 tracking-wider">
+            {/* Sidebar header with mobile close button */}
+            <div className="flex items-center border-b border-base-300 flex-shrink-0">
+              <span className="flex-1 text-xs font-bold text-base-content/60 px-3 tracking-wider py-2">
                 EXPLORER
-              </h2>
+              </span>
+              <button
+                onClick={() => setIsSidebarVisible(false)}
+                className="btn btn-ghost btn-sm btn-square sm:hidden"
+                aria-label="Collapse sidebar"
+              >
+                <ChevronLeft size={16} />
+              </button>
+            </div>
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto py-2">
               <div className="text-xs text-base-content/50 px-3 mb-2 uppercase tracking-wide">
                 Config Files
               </div>
@@ -586,7 +608,17 @@ export function FilesPageContent() {
             </div>
           </div>
 
-          <div className="flex-1 flex flex-col">
+          <div className="flex-1 flex flex-col relative">
+            {/* Expand sidebar button (shown when sidebar is collapsed, mobile only) */}
+            {!isSidebarVisible && (
+              <button
+                onClick={() => setIsSidebarVisible(true)}
+                className="absolute left-0 top-0 z-10 btn btn-sm btn-square bg-white hover:bg-base-200 border border-base-300 rounded-l-none sm:hidden"
+                aria-label="Expand sidebar"
+              >
+                <ChevronRight size={16} />
+              </button>
+            )}
             {selectedFile ? (
               <>
                 {isContentLoading ? (

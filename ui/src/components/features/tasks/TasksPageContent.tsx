@@ -515,7 +515,7 @@ export function TasksPageContent() {
         <div className="flex-1 flex overflow-hidden">
           {/* Sidebar */}
           <div
-            className={`${isSidebarVisible ? "w-48 sm:w-64" : "w-0"} bg-base-100 border-r border-base-300 flex flex-col flex-shrink-0 transition-all duration-200 overflow-hidden`}
+            className={`${isSidebarVisible ? "w-48 sm:w-64 border-r border-base-300" : "w-0"} bg-base-100 flex flex-col flex-shrink-0 transition-all duration-200 overflow-hidden`}
             aria-hidden={!isSidebarVisible}
           >
             {/* Tab buttons */}
@@ -544,7 +544,7 @@ export function TasksPageContent() {
               </button>
               <button
                 onClick={() => setIsSidebarVisible(false)}
-                className="btn btn-ghost btn-sm btn-square"
+                className="btn btn-ghost btn-sm btn-square sm:hidden"
                 aria-label="Collapse sidebar"
               >
                 <ChevronLeft size={16} />
@@ -593,21 +593,18 @@ export function TasksPageContent() {
             </div>
           </div>
 
-          {/* Expand sidebar button (shown when sidebar is collapsed) */}
-          {!isSidebarVisible && (
-            <div className="bg-base-100 border-r border-base-300 flex-shrink-0">
+          {/* Editor */}
+          <div className="flex-1 flex flex-col relative">
+            {/* Expand sidebar button (shown when sidebar is collapsed, mobile only) */}
+            {!isSidebarVisible && (
               <button
                 onClick={() => setIsSidebarVisible(true)}
-                className="btn btn-ghost btn-sm btn-square"
+                className="absolute left-0 top-0 z-10 btn btn-sm btn-square bg-white hover:bg-base-200 border border-base-300 rounded-l-none sm:hidden"
                 aria-label="Expand sidebar"
               >
                 <ChevronRight size={16} />
               </button>
-            </div>
-          )}
-
-          {/* Editor */}
-          <div className="flex-1 flex flex-col">
+            )}
             {selectedFile ? (
               <>
                 {isContentLoading ? (
