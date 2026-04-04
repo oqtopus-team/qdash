@@ -171,6 +171,7 @@ class TaskResultResponse(BaseModel):
     output_parameters: dict[str, Any]
     run_parameters: dict[str, Any] = {}
     tags: list[str] = []
+    message: str = ""
     source_task_id: str | None = None
     re_executions: list[ReExecutionEntry] = []
     start_at: datetime | None = None
