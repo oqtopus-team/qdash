@@ -48,6 +48,7 @@ export interface TaskResultResponse {
   run_parameters?: TaskResultResponseRunParameters;
   tags?: string[];
   message?: string;
+  stack_trace?: string;
   source_task_id?: TaskResultResponseSourceTaskId;
   re_executions?: ReExecutionEntry[];
   start_at?: TaskResultResponseStartAt;
