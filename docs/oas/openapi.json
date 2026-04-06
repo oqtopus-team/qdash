@@ -14687,6 +14687,11 @@
             "title": "Tags",
             "default": []
           },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "default": ""
+          },
           "source_task_id": {
             "anyOf": [
               {
