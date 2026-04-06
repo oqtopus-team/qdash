@@ -122,12 +122,13 @@ class TaskStateManager(BaseModel):
         task.message = message
 
     def update_task_status_to_failed(
-        self, task_name: str, message: str, task_type: str, qid: str
+        self, task_name: str, message: str, task_type: str, qid: str, stack_trace: str = ""
     ) -> None:
         """Update task status to FAILED."""
         task = self._ensure_task_exists(task_name, task_type, qid)
         task.status = TaskStatusModel.FAILED
         task.message = message
+        task.stack_trace = stack_trace
 
     def update_task_status_to_skipped(
         self, task_name: str, message: str, task_type: str, qid: str
