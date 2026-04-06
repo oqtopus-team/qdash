@@ -11,6 +11,7 @@ The TaskExecutor is responsible for the complete task execution lifecycle:
 """
 
 import logging
+import traceback
 from typing import TYPE_CHECKING, Any
 
 from qdash.repository import FilesystemCalibDataSaver
@@ -393,11 +394,13 @@ class TaskExecutor:
         except (R2ValidationError, FidelityValidationError, ValueError) as e:
             self._fail_task(task_name, task_type, qid, str(e))
             result.message = str(e)
+            result.stack_trace = traceback.format_exc()
             raise
 
         except Exception as e:
             self._fail_task(task_name, task_type, qid, str(e))
             result.message = str(e)
+            result.stack_trace = traceback.format_exc()
             raise TaskExecutionError(f"Task {task_name} failed: {e}") from e
 
         finally:

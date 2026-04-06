@@ -229,6 +229,7 @@ class BaseTaskResultModel(BaseModel):
     upstream_id: str = ""
     status: TaskStatusModel = TaskStatusModel.SCHEDULED
     message: str = ""
+    stack_trace: str = ""
     input_parameters: dict[str, Any] = {}
     output_parameters: dict[str, Any] = {}
     output_parameter_names: list[str] = []
