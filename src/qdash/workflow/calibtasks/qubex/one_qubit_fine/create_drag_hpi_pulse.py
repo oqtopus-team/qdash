@@ -73,6 +73,9 @@ class CreateDRAGHPIPulse(QubexTask):
         readout_amp_param = self.input_parameters["readout_amplitude"]
         if readout_amp_param is not None:
             exp.params.readout_amplitude[labels[0]] = readout_amp_param.value
+        control_amp_param = self.input_parameters["control_amplitude"]
+        if control_amp_param is not None:
+            exp.params.control_amplitude[labels[0]] = control_amp_param.value
         result = exp.calibrate_drag_hpi_pulse(
             targets=labels,
             n_rotations=4,
