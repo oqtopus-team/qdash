@@ -702,7 +702,11 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
                   Stack Trace
                   <button
                     className="btn btn-ghost btn-xs"
-                    onClick={() => navigator.clipboard.writeText(taskResult.stack_trace ?? "")}
+                    onClick={() =>
+                      navigator.clipboard.writeText(
+                        taskResult.stack_trace ?? "",
+                      )
+                    }
                   >
                     Copy
                   </button>
