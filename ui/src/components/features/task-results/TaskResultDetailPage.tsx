@@ -698,8 +698,14 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
             </pre>
             {taskResult.stack_trace && (
               <>
-                <div className="px-3 py-1 text-xs font-semibold text-error/60 bg-error/5 border-t border-error/20">
+                <div className="px-3 py-1 text-xs font-semibold text-error/60 bg-error/5 border-t border-error/20 flex justify-between items-center">
                   Stack Trace
+                  <button
+                    className="btn btn-ghost btn-xs"
+                    onClick={() => navigator.clipboard.writeText(taskResult.stack_trace ?? "")}
+                  >
+                    Copy
+                  </button>
                 </div>
                 <pre className="px-3 py-3 text-xs font-mono text-error/60 whitespace-pre-wrap break-all bg-error/5">
                   {taskResult.stack_trace}

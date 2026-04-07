@@ -201,6 +201,8 @@ class TaskExecutor:
         stack_trace: str = "",
     ) -> None:
         """Mark task as failed."""
+        if len(stack_trace) > 10000:
+            stack_trace = stack_trace[:9950] + "\n... (truncated)"
         self.state_manager.update_task_status_to_failed(task_name, message, task_type, qid, stack_trace)
 
     def execute(
