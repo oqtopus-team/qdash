@@ -32,9 +32,7 @@ class TaskResultHistoryDocument(Document):
     """
 
     project_id: str | None = Field(None, description="Owning project identifier")
-    username: str = Field(
-        ..., description="The username of the user who created the task"
-    )
+    username: str = Field(..., description="The username of the user who created the task")
     task_id: str = Field(..., description="The task ID")
     name: str = Field(..., description="The task name")
     upstream_id: str = Field(..., description="The upstream task ID")
@@ -43,22 +41,14 @@ class TaskResultHistoryDocument(Document):
     stack_trace: str = Field("", description="The stack trace")
     input_parameters: dict[str, Any] = Field(..., description="The input parameters")
     output_parameters: dict[str, Any] = Field(..., description="The output parameters")
-    output_parameter_names: list[str] = Field(
-        ..., description="The output parameter names"
-    )
-    run_parameters: dict[str, Any] = Field(
-        default_factory=dict, description="The run parameters"
-    )
+    output_parameter_names: list[str] = Field(..., description="The output parameter names")
+    run_parameters: dict[str, Any] = Field(default_factory=dict, description="The run parameters")
     note: dict[str, Any] = Field(..., description="The note")
     figure_path: list[str] = Field(..., description="The path to the figure")
     json_figure_path: list[str] = Field([], description="The path to the JSON figure")
     raw_data_path: list[str] = Field([], description="The path to the raw data")
-    start_at: datetime | None = Field(
-        ..., description="The time when the execution started"
-    )
-    end_at: datetime | None = Field(
-        ..., description="The time when the execution ended"
-    )
+    start_at: datetime | None = Field(..., description="The time when the execution started")
+    end_at: datetime | None = Field(..., description="The time when the execution ended")
     elapsed_time: float | None = Field(..., description="The elapsed time in seconds")
     task_type: str = Field(..., description="The task type")
     system_info: SystemInfoModel = Field(..., description="The system information")
@@ -107,16 +97,10 @@ class TaskResultHistoryDocument(Document):
         name = "task_result_history"
         indexes: ClassVar = [
             # Primary indexes
-            IndexModel(
-                [("project_id", ASCENDING), ("task_id", ASCENDING)], unique=True
-            ),
+            IndexModel([("project_id", ASCENDING), ("task_id", ASCENDING)], unique=True),
             IndexModel([("project_id", ASCENDING), ("execution_id", ASCENDING)]),
             IndexModel(
-                [
-                    ("project_id", ASCENDING),
-                    ("chip_id", ASCENDING),
-                    ("start_at", DESCENDING),
-                ]
+                [("project_id", ASCENDING), ("chip_id", ASCENDING), ("start_at", DESCENDING)]
             ),
             # Index for latest task result queries (task_result.py: get_latest_*_task_results)
             IndexModel(
@@ -224,9 +208,7 @@ class TaskResultHistoryDocument(Document):
         doc.raw_data_path = task.raw_data_path
         doc.start_at = task.start_at
         doc.end_at = task.end_at
-        doc.elapsed_time = (
-            task.elapsed_time.total_seconds() if task.elapsed_time else None
-        )
+        doc.elapsed_time = task.elapsed_time.total_seconds() if task.elapsed_time else None
         doc.task_type = task.task_type
         doc.system_info = task.system_info
         doc.qid = getattr(task, "qid", "")
