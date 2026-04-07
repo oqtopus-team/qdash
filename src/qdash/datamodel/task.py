@@ -54,17 +54,23 @@ class RunParameterModel(BaseModel):
         """
         if self.value_type == "np.linspace":
             if not isinstance(self.value, (list, tuple)) or len(self.value) != 3:
-                raise ValueError("np.linspace requires a tuple/list of (start, stop, num)")
+                raise ValueError(
+                    "np.linspace requires a tuple/list of (start, stop, num)"
+                )
             start, stop, num = self.value
             return np.linspace(float(start), float(stop), int(num))
         elif self.value_type == "np.logspace":
             if not isinstance(self.value, (list, tuple)) or len(self.value) != 3:
-                raise ValueError("np.logspace requires a tuple/list of (start, stop, num)")
+                raise ValueError(
+                    "np.logspace requires a tuple/list of (start, stop, num)"
+                )
             start, stop, num = self.value
             return np.logspace(float(start), float(stop), int(num))
         elif self.value_type == "np.arange":
             if not isinstance(self.value, (list, tuple)) or len(self.value) != 3:
-                raise ValueError("np.arange requires a tuple/list of (start, stop, step)")
+                raise ValueError(
+                    "np.arange requires a tuple/list of (start, stop, step)"
+                )
             start, stop, step = self.value
             return np.arange(float(start), float(stop), float(step))
         elif self.value_type == "range":
@@ -184,12 +190,16 @@ class CalibDataModel(BaseModel):
     qubit: dict[str, dict[str, ParameterModel]] = Field(default_factory=dict)
     coupling: dict[str, dict[str, ParameterModel]] = Field(default_factory=dict)
 
-    def put_qubit_data(self, qid: str, parameter_name: str, data: ParameterModel) -> None:
+    def put_qubit_data(
+        self, qid: str, parameter_name: str, data: ParameterModel
+    ) -> None:
         if qid not in self.qubit:
             self.qubit[qid] = {}
         self.qubit[qid][parameter_name] = data
 
-    def put_coupling_data(self, qid: str, parameter_name: str, data: ParameterModel) -> None:
+    def put_coupling_data(
+        self, qid: str, parameter_name: str, data: ParameterModel
+    ) -> None:
         if qid not in self.coupling:
             self.coupling[qid] = {}
         self.coupling[qid][parameter_name] = data
@@ -223,7 +233,9 @@ class BaseTaskResultModel(BaseModel):
 
     """
 
-    project_id: str | None = Field(default=None, description="Owning project identifier")
+    project_id: str | None = Field(
+        default=None, description="Owning project identifier"
+    )
     task_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     name: str = ""
     upstream_id: str = ""
@@ -428,10 +440,16 @@ class TaskModel(BaseModel):
     """
 
     project_id: str | None = Field(None, description="Owning project identifier")
-    username: str = Field(..., description="The username of the user who created the task")
+    username: str = Field(
+        ..., description="The username of the user who created the task"
+    )
     name: str = Field(..., description="The name of the task")
     backend: str | None = Field(None, description="The backend of the task")
     description: str = Field(..., description="Detailed description of the task")
     task_type: str = Field(..., description="The type of the task")
-    input_parameters: dict[str, Any] = Field(..., description="The input parameters of the task")
-    output_parameters: dict[str, Any] = Field(..., description="The output parameters of the task")
+    input_parameters: dict[str, Any] = Field(
+        ..., description="The input parameters of the task"
+    )
+    output_parameters: dict[str, Any] = Field(
+        ..., description="The output parameters of the task"
+    )

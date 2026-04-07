@@ -203,7 +203,9 @@ class TaskExecutor:
         """Mark task as failed."""
         if len(stack_trace) > 10000:
             stack_trace = stack_trace[:9950] + "\n... (truncated)"
-        self.state_manager.update_task_status_to_failed(task_name, message, task_type, qid, stack_trace)
+        self.state_manager.update_task_status_to_failed(
+            task_name, message, task_type, qid, stack_trace
+        )
 
     def execute(
         self,
@@ -467,7 +469,7 @@ class TaskExecutor:
 
         snap_input, snap_run = snapshot
         logger.info(
-            "Applying snapshot overrides for task=%s, qid=%s " "(input_params=%d, run_params=%d)",
+            "Applying snapshot overrides for task=%s, qid=%s (input_params=%d, run_params=%d)",
             task_name,
             qid,
             len(snap_input),

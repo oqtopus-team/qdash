@@ -50,7 +50,9 @@ class TaskService:
         """Initialize the service with repositories."""
         self._task_def_repo = task_definition_repository
 
-    def list_tasks(self, project_id: str, backend: str | None = None) -> ListTaskResponse:
+    def list_tasks(
+        self, project_id: str, backend: str | None = None
+    ) -> ListTaskResponse:
         """List all tasks for a project.
 
         Parameters
@@ -265,15 +267,23 @@ class TaskService:
             summary=knowledge.summary,
             what_it_measures=knowledge.what_it_measures,
             physical_principle=knowledge.physical_principle,
-            expected_result=ExpectedResultResponse(**knowledge.expected_result.model_dump()),
+            expected_result=ExpectedResultResponse(
+                **knowledge.expected_result.model_dump()
+            ),
             evaluation_criteria=knowledge.evaluation_criteria,
             check_questions=knowledge.check_questions,
             failure_modes=[fm.model_dump() for fm in knowledge.failure_modes],
             tips=knowledge.tips,
-            output_parameters_info=[p.model_dump() for p in knowledge.output_parameters_info],
+            output_parameters_info=[
+                p.model_dump() for p in knowledge.output_parameters_info
+            ],
             analysis_guide=knowledge.analysis_guide,
             prerequisites=knowledge.prerequisites,
-            images=[KnowledgeImageResponse(**img.model_dump()) for img in knowledge.images],
-            cases=[KnowledgeCaseResponse(**case.model_dump()) for case in knowledge.cases],
+            images=[
+                KnowledgeImageResponse(**img.model_dump()) for img in knowledge.images
+            ],
+            cases=[
+                KnowledgeCaseResponse(**case.model_dump()) for case in knowledge.cases
+            ],
             prompt_text=knowledge.to_prompt(),
         )
