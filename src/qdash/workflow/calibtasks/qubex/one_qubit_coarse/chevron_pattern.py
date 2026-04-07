@@ -27,6 +27,9 @@ class ChevronPattern(QubexTask):
     input_parameters: ClassVar[dict[str, ParameterModel | None]] = {
         "qubit_frequency": None,
         "readout_frequency": None,
+        "control_amplitude": ParameterModel(
+            value=DEFAULT_CONTROL_AMPLITUDE, unit="a.u.", description="Control pulse amplitude"
+        ),
         "readout_length": ParameterModel(
             value=DEFAULT_READOUT_DURATION, unit="ns", description="Readout pulse length"
         ),
@@ -37,12 +40,6 @@ class ChevronPattern(QubexTask):
             value_type="float",
             value=DEFAULT_READOUT_AMPLITUDE,
             description="Readout amplitude",
-        ),
-        "control_amplitude": RunParameterModel(
-            unit="a.u.",
-            value_type="float",
-            value=DEFAULT_CONTROL_AMPLITUDE,
-            description="Control pulse amplitude",
         ),
     }
     output_parameters: ClassVar[dict[str, ParameterModel]] = {
@@ -56,9 +53,9 @@ class ChevronPattern(QubexTask):
         """Preprocess: load params from DB and validate control_amplitude."""
         result = super().preprocess(backend, qid)
 
-        # Validate control_amplitude from run_parameters
-        param = self.run_parameters.get("control_amplitude")
-        value = param.get_value() if param is not None else None
+        # Validate control_amplitude from input_parameters
+        param = self.input_parameters.get("control_amplitude")
+        value = param.value if param is not None else None
         if (
             value is None
             or not isinstance(value, (int, float))
@@ -71,7 +68,13 @@ class ChevronPattern(QubexTask):
                 f"({CONTROL_AMPLITUDE_MIN}, {CONTROL_AMPLITUDE_MAX}), "
                 f"using default={DEFAULT_CONTROL_AMPLITUDE}"
             )
-            if param is not None:
+            if param is None:
+                self.input_parameters["control_amplitude"] = ParameterModel(
+                    value=DEFAULT_CONTROL_AMPLITUDE,
+                    unit="a.u.",
+                    description="Control pulse amplitude (default)",
+                )
+            else:
                 param.value = DEFAULT_CONTROL_AMPLITUDE
 
         return result
@@ -104,9 +107,9 @@ class ChevronPattern(QubexTask):
         ra_param = self.run_parameters.get("readout_amplitude")
         readout_amp = ra_param.get_value() if ra_param is not None else DEFAULT_READOUT_AMPLITUDE
 
-        # Get control_amplitude from run_parameters
-        ca_param = self.run_parameters.get("control_amplitude")
-        ctrl_amp_value = ca_param.get_value() if ca_param is not None else DEFAULT_CONTROL_AMPLITUDE
+        # Get control_amplitude from input_parameters (loaded from DB or default)
+        ca_param = self.input_parameters.get("control_amplitude")
+        ctrl_amp_value = ca_param.value if ca_param is not None else DEFAULT_CONTROL_AMPLITUDE
 
         # Fallback to default if control_amplitude value is invalid
         if (

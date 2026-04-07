@@ -248,3 +248,4 @@ src/tools/schedule/*
 /.claude/settings.local.json
 docs/internal/*
 docs/papers/*
+config/qubex-config
