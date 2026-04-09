@@ -9315,7 +9315,7 @@
             "type": "number",
             "title": "Delta Per Step",
             "description": "Average delta per step",
-            "default": 0.0
+            "default": 0
           },
           "current_value": {
             "anyOf": [
@@ -12102,7 +12102,7 @@
           "error": {
             "type": "number",
             "title": "Error",
-            "default": 0.0
+            "default": 0
           },
           "previous_error": {
             "anyOf": [
@@ -12340,7 +12340,7 @@
           "error": {
             "type": "number",
             "title": "Error",
-            "default": 0.0
+            "default": 0
           },
           "version": {
             "type": "integer",
@@ -12481,7 +12481,7 @@
           "error": {
             "type": "number",
             "title": "Error",
-            "default": 0.0
+            "default": 0
           },
           "valid_from": {
             "anyOf": [
