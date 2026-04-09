@@ -11,6 +11,7 @@ The TaskExecutor is responsible for the complete task execution lifecycle:
 """
 
 import logging
+import traceback
 from typing import TYPE_CHECKING, Any
 
 from qdash.repository import FilesystemCalibDataSaver
@@ -197,9 +198,14 @@ class TaskExecutor:
         task_type: str,
         qid: str,
         message: str,
+        stack_trace: str = "",
     ) -> None:
         """Mark task as failed."""
-        self.state_manager.update_task_status_to_failed(task_name, message, task_type, qid)
+        if len(stack_trace) > 10000:
+            stack_trace = stack_trace[:9950] + "\n... (truncated)"
+        self.state_manager.update_task_status_to_failed(
+            task_name, message, task_type, qid, stack_trace
+        )
 
     def execute(
         self,
@@ -391,13 +397,17 @@ class TaskExecutor:
             result.message = "Completed"
 
         except (R2ValidationError, FidelityValidationError, ValueError) as e:
-            self._fail_task(task_name, task_type, qid, str(e))
+            tb = traceback.format_exc()
+            self._fail_task(task_name, task_type, qid, str(e), tb)
             result.message = str(e)
+            result.stack_trace = tb
             raise
 
         except Exception as e:
-            self._fail_task(task_name, task_type, qid, str(e))
+            tb = traceback.format_exc()
+            self._fail_task(task_name, task_type, qid, str(e), tb)
             result.message = str(e)
+            result.stack_trace = tb
             raise TaskExecutionError(f"Task {task_name} failed: {e}") from e
 
         finally:
@@ -459,7 +469,7 @@ class TaskExecutor:
 
         snap_input, snap_run = snapshot
         logger.info(
-            "Applying snapshot overrides for task=%s, qid=%s " "(input_params=%d, run_params=%d)",
+            "Applying snapshot overrides for task=%s, qid=%s (input_params=%d, run_params=%d)",
             task_name,
             qid,
             len(snap_input),

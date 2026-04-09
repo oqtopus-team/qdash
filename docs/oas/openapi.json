@@ -14687,6 +14687,16 @@
             "title": "Tags",
             "default": []
           },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "default": ""
+          },
+          "stack_trace": {
+            "type": "string",
+            "title": "Stack Trace",
+            "default": ""
+          },
           "source_task_id": {
             "anyOf": [
               {
