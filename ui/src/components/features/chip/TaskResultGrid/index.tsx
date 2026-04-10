@@ -362,8 +362,6 @@ export function TaskResultGrid({
         <span className="loading loading-spinner loading-lg"></span>
       </div>
     );
-  if (isTaskError)
-    return <div className="alert alert-error">Failed to load data</div>;
 
   const gridPositions: { [key: string]: { row: number; col: number } } = {};
   if (taskResponse?.data?.result) {
@@ -691,6 +689,9 @@ export function TaskResultGrid({
 
   return (
     <div className="flex flex-col h-full space-y-2">
+      {isTaskError && (
+        <div className="alert alert-error">Failed to load data</div>
+      )}
       {/* View Mode Toggle and Download Controls */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
