@@ -37,6 +37,7 @@ import {
 } from "@/hooks/useTaskResultIssues";
 import { useProject } from "@/contexts/ProjectContext";
 import { formatDateTime, formatRelativeTime } from "@/lib/utils/datetime";
+import { useToast } from "@/components/ui/Toast";
 
 /** Extract the display value from a parameter entry (may be a dict with `value` key or a plain value). */
 function extractParamValue(entry: unknown): string {
@@ -296,6 +297,7 @@ function IssueCard({
 export function TaskResultDetailPage({ taskId }: { taskId: string }) {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const toast = useToast();
   const { isOwner } = useProject();
   const currentUser = getCurrentUsername();
   const [showEditor, setShowEditor] = useState(false);
@@ -702,11 +704,16 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
                   Stack Trace
                   <button
                     className="btn btn-ghost btn-xs"
-                    onClick={() =>
-                      navigator.clipboard.writeText(
-                        taskResult.stack_trace ?? "",
-                      )
-                    }
+                    onClick={async () => {
+                      try {
+                        await navigator.clipboard.writeText(
+                          taskResult.stack_trace ?? "",
+                        );
+                        toast.success("Copied to clipboard");
+                      } catch {
+                        toast.error("Failed to copy to clipboard");
+                      }
+                    }}
                   >
                     Copy
                   </button>
