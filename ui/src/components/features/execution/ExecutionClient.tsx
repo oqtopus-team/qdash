@@ -8,6 +8,7 @@ import {
   Calendar,
   CheckCircle,
   Clock,
+  Cpu,
   Download,
   ExternalLink,
   LayoutGrid,
@@ -34,6 +35,7 @@ import {
 import { InteractiveFigureModal } from "@/components/charts/InteractiveFigureModal";
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { TaskGridView } from "@/components/features/chip/TaskGridView";
+import { ExecutionTopologyView } from "@/components/features/execution/ExecutionTopologyView";
 import { ExecutionDetailPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
 
 type FilterOption = {
@@ -56,7 +58,9 @@ export function ExecutionDetailClient({
     qid: string;
     index: number;
   } | null>(null);
-  const [taskViewMode, setTaskViewMode] = useState<"list" | "grid">("list");
+  const [taskViewMode, setTaskViewMode] = useState<
+    "list" | "grid" | "topology"
+  >("list");
   const [selectedTaskIndex, setSelectedTaskIndex] = useState<number | null>(
     null,
   );
@@ -486,6 +490,15 @@ export function ExecutionDetailClient({
               >
                 <LayoutGrid size={16} />
                 Grid
+              </button>
+              <button
+                className={`btn btn-sm ${
+                  taskViewMode === "topology" ? "btn-primary" : ""
+                }`}
+                onClick={() => setTaskViewMode("topology")}
+              >
+                <Cpu size={16} />
+                Topology
               </button>
             </div>
           </div>
@@ -959,12 +972,20 @@ export function ExecutionDetailClient({
                 )}
               </div>
             </div>
-          ) : (
+          ) : taskViewMode === "grid" ? (
             <div className="mt-4">
               <TaskGridView
                 tasks={tasksForGridView}
                 qubitId={chipId}
                 emptyMessage="No tasks found"
+              />
+            </div>
+          ) : (
+            <div className="mt-4">
+              <ExecutionTopologyView
+                chipId={chipId}
+                tasks={execution.task || []}
+                filterTaskName={filterTaskName}
               />
             </div>
           )}

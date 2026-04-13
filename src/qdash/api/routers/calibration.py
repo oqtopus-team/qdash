@@ -4,14 +4,22 @@ from logging import getLogger
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException
-from qdash.api.dependencies import get_calibration_service, get_seed_import_service
+from qdash.api.dependencies import (
+    get_calibration_service,
+    get_manual_update_service,
+    get_seed_import_service,
+)
 from qdash.api.lib.project import ProjectContext, get_project_context
 from qdash.api.schemas.calibration import (
     CalibrationNoteResponse,
+    ManualEditsResponse,
+    ManualParameterUpdateRequest,
+    ManualParameterUpdateResponse,
     SeedImportRequest,
     SeedImportResponse,
 )
 from qdash.api.services.calibration_service import CalibrationService
+from qdash.api.services.manual_update_service import ManualUpdateService
 from qdash.api.services.seed_import_service import SeedImportService
 
 router = APIRouter()
@@ -210,4 +218,50 @@ def compare_seed_values(
         project_id=ctx.project_id,
         username=ctx.user.username,
         parameters=param_list,
+    )
+
+
+@router.patch(
+    "/calibrations/parameters",
+    response_model=ManualParameterUpdateResponse,
+    summary="Manually update calibration parameters",
+    operation_id="updateCalibrationParameters",
+)
+def update_calibration_parameters(
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    service: Annotated[ManualUpdateService, Depends(get_manual_update_service)],
+    request: ManualParameterUpdateRequest,
+) -> ManualParameterUpdateResponse:
+    """Manually update calibration parameters for a qubit or coupling.
+
+    Updates the specified parameters in the database and records provenance.
+    The target type (qubit vs coupling) is determined by the qid format:
+    "0" for qubit, "0-1" for coupling.
+    """
+    logger.info(
+        f"Manual parameter update: project={ctx.project_id}, user={ctx.user.username}, "
+        f"chip={request.chip_id}, qid={request.qid}, params={list(request.parameters.keys())}"
+    )
+    return service.update_parameters(
+        request=request,
+        project_id=ctx.project_id,
+        username=ctx.user.username,
+    )
+
+
+@router.get(
+    "/calibrations/manual-edits/{qid}",
+    response_model=ManualEditsResponse,
+    summary="Get manual edits for a qubit or coupling",
+    operation_id="getManualEdits",
+)
+def get_manual_edits(
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    service: Annotated[ManualUpdateService, Depends(get_manual_update_service)],
+    qid: str,
+) -> ManualEditsResponse:
+    """Get the most recent manual edit for each parameter of a qid."""
+    return service.get_manual_edits(
+        project_id=ctx.project_id,
+        qid=qid,
     )

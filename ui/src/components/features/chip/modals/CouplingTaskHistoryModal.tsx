@@ -1,8 +1,9 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useCallback } from "react";
 import Link from "next/link";
+import { useQueryClient } from "@tanstack/react-query";
 import { ChevronRight, History, FileText, GitBranch, Bot } from "lucide-react";
 
 import type { Task } from "@/schemas";
@@ -10,8 +11,10 @@ import type { Task } from "@/schemas";
 import { formatDateTime, formatDateTimeCompact } from "@/lib/utils/datetime";
 
 import { useGetCouplingTaskHistory } from "@/client/task-result/task-result";
+import { useUpdateCalibrationParameters } from "@/client/calibration/calibration";
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { ParametersTable } from "@/components/features/metrics/ParametersTable";
+import { useManualOverrides } from "@/hooks/useManualOverrides";
 import { TaskResultIssues } from "@/components/features/metrics/TaskResultIssues";
 import type { AnalysisContext } from "@/hooks/useAnalysisChat";
 import { useAnalysisChatContext } from "@/contexts/AnalysisChatContext";
@@ -44,7 +47,47 @@ export function CouplingTaskHistoryModal({
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [viewMode, setViewMode] = useState<"static" | "interactive">("static");
   const [mobileTab, setMobileTab] = useState<MobileTab>("history");
-  const { openAnalysisChat } = useAnalysisChatContext();
+  const [saveMessage, setSaveMessage] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
+  const { openMiniChat } = useAnalysisChatContext();
+  const queryClient = useQueryClient();
+  const updateParamsMutation = useUpdateCalibrationParameters();
+  const manualOverrides = useManualOverrides(couplingId);
+
+  const handleSaveParameters = useCallback(
+    async (updatedParams: Record<string, unknown>) => {
+      setSaveMessage(null);
+      try {
+        const res = await updateParamsMutation.mutateAsync({
+          data: {
+            chip_id: chipId,
+            qid: couplingId,
+            parameters: updatedParams as Record<
+              string,
+              Record<string, unknown>
+            >,
+          },
+        });
+        await queryClient.invalidateQueries({ queryKey: ["/metrics"] });
+        await queryClient.invalidateQueries({ queryKey: ["/chip"] });
+        await queryClient.invalidateQueries({
+          queryKey: [`/calibrations/manual-edits/${couplingId}`],
+        });
+        const count = res.data?.updated_count ?? 0;
+        setSaveMessage({
+          type: "success",
+          text: `${count} parameter(s) saved`,
+        });
+        setTimeout(() => setSaveMessage(null), 5000);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Failed to save";
+        setSaveMessage({ type: "error", text: message });
+      }
+    },
+    [chipId, couplingId, updateParamsMutation, queryClient],
+  );
 
   const resolveQid = (taskQid: string, qidRole?: string): string => {
     if (!qidRole || qidRole === "self" || qidRole === "coupling")
@@ -376,7 +419,7 @@ export function CouplingTaskHistoryModal({
             </Link>
             {analysisContext && (
               <button
-                onClick={() => openAnalysisChat(analysisContext)}
+                onClick={() => openMiniChat(analysisContext)}
                 className="btn btn-xs btn-primary gap-1"
               >
                 <Bot className="h-3 w-3" />
@@ -401,12 +444,29 @@ export function CouplingTaskHistoryModal({
             )}
           {selectedTask.output_parameters &&
             Object.keys(selectedTask.output_parameters).length > 0 && (
-              <ParametersTable
-                title="Output Parameters"
-                parameters={
-                  selectedTask.output_parameters as Record<string, unknown>
-                }
-              />
+              <>
+                <ParametersTable
+                  title="Output Parameters"
+                  parameters={
+                    selectedTask.output_parameters as Record<string, unknown>
+                  }
+                  editable
+                  onSave={handleSaveParameters}
+                  isSaving={updateParamsMutation.isPending}
+                  overrides={manualOverrides}
+                />
+                {saveMessage && (
+                  <div
+                    className={`text-xs px-2 py-1 rounded ${
+                      saveMessage.type === "success"
+                        ? "text-success bg-success/10"
+                        : "text-error bg-error/10"
+                    }`}
+                  >
+                    {saveMessage.text}
+                  </div>
+                )}
+              </>
             )}
           {selectedTask.run_parameters &&
             Object.keys(selectedTask.run_parameters).length > 0 && (

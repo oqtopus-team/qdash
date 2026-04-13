@@ -86,3 +86,42 @@ class SeedImportResponse(BaseModel):
     provenance_activity_id: str | None = Field(
         None, description="Activity ID for provenance tracking"
     )
+
+
+class ManualParameterUpdateRequest(BaseModel):
+    """Request to manually update calibration parameters.
+
+    Parameters are written to the DB and provenance is recorded.
+    The qid format determines target type: "0" for qubit, "0-1" for coupling.
+    """
+
+    chip_id: str = Field(..., description="Target chip ID")
+    qid: str = Field(..., description="Qubit ID (e.g. '0') or coupling ID (e.g. '0-1')")
+    parameters: dict[str, dict[str, Any]] = Field(
+        ...,
+        description='Parameters to update. Format: {"param_name": {"value": 4.85, "unit": "GHz"}}',
+    )
+
+
+class ManualParameterUpdateResponse(BaseModel):
+    """Response from manual parameter update."""
+
+    updated_count: int
+    provenance_activity_id: str | None = None
+
+
+class ManualEditItem(BaseModel):
+    """A single manual edit record."""
+
+    parameter_name: str
+    value: float | int | str
+    unit: str = ""
+    edited_at: datetime
+    execution_id: str = ""
+
+
+class ManualEditsResponse(BaseModel):
+    """All manual edits for a qid."""
+
+    qid: str
+    edits: list[ManualEditItem]

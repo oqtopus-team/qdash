@@ -329,6 +329,14 @@ class TaskExecutor:
                 # 5c. Save figures and raw data
                 self._save_artifacts(postprocess_result, task_name, task_type, qid)
 
+                # 5c.1 Check for postprocess validation error (after artifacts are saved)
+                if postprocess_result.validation_error:
+                    if postprocess_result.output_parameters:
+                        self.state_manager.clear_output_parameters(task_name, task_type, qid)
+                    if execution_service is not None:
+                        self._backend_saver.save(task, execution_service, qid, backend, False)
+                    raise ValueError(postprocess_result.validation_error)
+
                 # 5d. Validate R² (rollback output params on failure)
                 backend_success = True
                 r2_error_msg: str | None = None

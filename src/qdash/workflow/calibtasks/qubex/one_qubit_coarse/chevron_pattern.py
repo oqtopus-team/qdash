@@ -44,6 +44,9 @@ class ChevronPattern(QubexTask):
     }
     output_parameters: ClassVar[dict[str, ParameterModel]] = {
         "qubit_frequency": ParameterModel(unit="GHz", description="Qubit bare frequency"),
+        "control_amplitude": ParameterModel(
+            unit="a.u.", description="Control pulse amplitude used for chevron pattern"
+        ),
         "readout_amplitude": ParameterModel(
             unit="a.u.", description="Readout amplitude used for chevron pattern"
         ),
@@ -86,12 +89,27 @@ class ChevronPattern(QubexTask):
         label = self.get_qubit_label(backend, qid)
         result = run_result.raw_result
         self.output_parameters["qubit_frequency"].value = result["resonant_frequencies"][label]
+        # Record the control_amplitude actually used in run()
+        self.output_parameters["control_amplitude"].value = result.get(
+            "control_amplitude_used", DEFAULT_CONTROL_AMPLITUDE
+        )
         # Record the readout_amplitude actually used
         ra_param = self.run_parameters.get("readout_amplitude")
         if ra_param is not None:
             self.output_parameters["readout_amplitude"].value = ra_param.get_value()
         output_parameters = self.attach_execution_id(execution_id)
         figures = [result["fig"][label]]
+
+        qubit_freq = self.output_parameters["qubit_frequency"].value
+        if qubit_freq is not None and qubit_freq < 3.0:
+            error_msg = f"Qubit frequency too low for qid={qid}: " f"{qubit_freq:.6f} GHz < 3.0 GHz"
+            print(f"[ERROR] {error_msg}")
+            return PostProcessResult(
+                output_parameters=output_parameters,
+                figures=figures,
+                validation_error=error_msg,
+            )
+
         return PostProcessResult(output_parameters=output_parameters, figures=figures)
 
     def run(self, backend: QubexBackend, qid: str) -> RunResult:
@@ -144,4 +162,5 @@ class ChevronPattern(QubexTask):
             )
 
         self.save_calibration(backend)
+        result["control_amplitude_used"] = ctrl_amp_value
         return RunResult(raw_result=result)

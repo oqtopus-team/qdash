@@ -348,6 +348,7 @@ export function TaskDetailModal({
                         <div className="bg-white rounded-lg p-2">
                           <TaskFigure
                             path={path}
+                            jsonFigurePath={jsonFigures[idx]}
                             qid={qid}
                             className="w-full h-auto max-h-[400px] object-contain"
                           />
@@ -375,6 +376,7 @@ export function TaskDetailModal({
                       {currentFigure && (
                         <TaskFigure
                           path={currentFigure}
+                          jsonFigurePath={currentJsonFigure || undefined}
                           qid={qid}
                           className="w-full h-full object-contain"
                         />
