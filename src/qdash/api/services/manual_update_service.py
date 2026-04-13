@@ -10,6 +10,7 @@ import logging
 import uuid
 from typing import Any
 
+from bunnet import SortDirection
 from qdash.api.schemas.calibration import (
     ManualEditItem,
     ManualEditsResponse,
@@ -182,7 +183,7 @@ class ManualUpdateService:
                     "task_name": "ManualParameterEdit",
                 }
             )
-            .sort([("valid_from", -1)])
+            .sort([("valid_from", SortDirection.DESCENDING)])
             .limit(100)
             .run()
         )
