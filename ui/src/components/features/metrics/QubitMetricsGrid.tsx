@@ -21,7 +21,6 @@ import {
 import { calculateGridContainerWidth } from "@/lib/utils/grid-layout";
 
 import { QubitMetricHistoryModal } from "./QubitMetricHistoryModal";
-import { useAnalysisChatContext } from "@/contexts/AnalysisChatContext";
 
 interface MetricValue {
   value: number | null;
@@ -86,20 +85,47 @@ function getCellFontSizes(cellSize: number): {
   labelSize: string;
   valueSize: string;
   unitSize: string;
+  /** Whether stddev and unit should be hidden to save space */
+  hideExtras: boolean;
 } {
   // Scale font sizes proportionally to cell size
   // Base reference: 60px cell = 12px label, 16px value, 10px unit
   if (cellSize >= 60) {
-    return { labelSize: "0.75rem", valueSize: "1rem", unitSize: "0.625rem" };
+    return {
+      labelSize: "0.75rem",
+      valueSize: "1rem",
+      unitSize: "0.625rem",
+      hideExtras: false,
+    };
   } else if (cellSize >= 50) {
-    return { labelSize: "0.65rem", valueSize: "0.875rem", unitSize: "0.5rem" };
+    return {
+      labelSize: "0.65rem",
+      valueSize: "0.875rem",
+      unitSize: "0.5rem",
+      hideExtras: false,
+    };
   } else if (cellSize >= 40) {
-    return { labelSize: "0.55rem", valueSize: "0.75rem", unitSize: "0.45rem" };
+    return {
+      labelSize: "0.55rem",
+      valueSize: "0.75rem",
+      unitSize: "0.45rem",
+      hideExtras: false,
+    };
   } else if (cellSize >= 30) {
-    return { labelSize: "0.5rem", valueSize: "0.625rem", unitSize: "0.4rem" };
+    return {
+      labelSize: "0.5rem",
+      valueSize: "0.675rem",
+      unitSize: "0.4rem",
+      hideExtras: true,
+    };
   } else {
-    // Very small cells (< 30px)
-    return { labelSize: "0.45rem", valueSize: "0.55rem", unitSize: "0.35rem" };
+    // Very small cells (< 30px): show only the value
+    return {
+      labelSize: "0.45rem",
+      valueSize: "0.6rem",
+      unitSize: "0.35rem",
+      hideExtras: true,
+    };
   }
 }
 
@@ -135,6 +161,8 @@ const GridCell = memo(function GridCell({
   const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(
     null,
   );
+  // When cells are small, hide stddev and unit to prevent text from being crushed
+  const effectiveShowUnits = showUnits && !fontSizes.hideExtras;
 
   return (
     <button
@@ -174,7 +202,7 @@ const GridCell = memo(function GridCell({
           >
             {value.toFixed(2)}
           </div>
-          {stddev != null && showUnits && (
+          {stddev != null && effectiveShowUnits && (
             <div
               className="text-white/80 font-medium drop-shadow"
               style={{ fontSize: fontSizes.unitSize }}
@@ -182,7 +210,7 @@ const GridCell = memo(function GridCell({
               ± {stddev.toFixed(2)}
             </div>
           )}
-          {showUnits && (
+          {effectiveShowUnits && (
             <div
               className="text-white/90 font-medium drop-shadow"
               style={{ fontSize: fontSizes.unitSize }}
@@ -321,7 +349,6 @@ export function QubitMetricsGrid({
     });
 
   const isModalOpen = selectedQubitInfo !== null;
-  const { isOpen: isSidebarOpen } = useAnalysisChatContext();
 
   const numRegions = Math.floor(effectiveGridSize / regionSize);
   const isSquareGrid = gridRows === gridCols;
@@ -790,23 +817,13 @@ export function QubitMetricsGrid({
       {/* Qubit Detail Modal */}
       <div
         className={`modal modal-bottom sm:modal-middle ${isModalOpen ? "modal-open" : ""}`}
-        style={{
-          width: isSidebarOpen ? "calc(100% - 20rem)" : "100%",
-          maxWidth: "none",
-          transition: "width 300ms ease",
-        }}
         onClick={(e) => {
           if (e.target === e.currentTarget) setSelectedQubitInfo(null);
         }}
       >
         <div
           className="modal-box w-full bg-base-100 p-0 h-[90vh] sm:h-[95vh] overflow-hidden flex flex-col"
-          style={{
-            maxWidth: isSidebarOpen
-              ? "min(calc(100vw - 22rem), 1400px)"
-              : "1800px",
-            transition: "max-width 300ms ease",
-          }}
+          style={{ maxWidth: "1800px" }}
         >
           {selectedQubitInfo && (
             <>

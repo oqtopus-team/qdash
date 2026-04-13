@@ -2418,6 +2418,135 @@
         }
       }
     },
+    "/calibrations/parameters": {
+      "patch": {
+        "tags": [
+          "calibration"
+        ],
+        "summary": "Manually update calibration parameters",
+        "description": "Manually update calibration parameters for a qubit or coupling.\n\nUpdates the specified parameters in the database and records provenance.\nThe target type (qubit vs coupling) is determined by the qid format:\n\"0\" for qubit, \"0-1\" for coupling.",
+        "operationId": "updateCalibrationParameters",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ManualParameterUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManualParameterUpdateResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/calibrations/manual-edits/{qid}": {
+      "get": {
+        "tags": [
+          "calibration"
+        ],
+        "summary": "Get manual edits for a qubit or coupling",
+        "description": "Get the most recent manual edit for each parameter of a qid.",
+        "operationId": "getManualEdits",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "qid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Qid"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManualEditsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/copilot/config": {
       "get": {
         "tags": [
@@ -9315,7 +9444,7 @@
             "type": "number",
             "title": "Delta Per Step",
             "description": "Average delta per step",
-            "default": 0.0
+            "default": 0
           },
           "current_value": {
             "anyOf": [
@@ -11391,6 +11520,129 @@
         "title": "ListTaskResponse",
         "description": "Response model for a list of tasks."
       },
+      "ManualEditItem": {
+        "properties": {
+          "parameter_name": {
+            "type": "string",
+            "title": "Parameter Name"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Value"
+          },
+          "unit": {
+            "type": "string",
+            "title": "Unit",
+            "default": ""
+          },
+          "edited_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Edited At"
+          },
+          "execution_id": {
+            "type": "string",
+            "title": "Execution Id",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "parameter_name",
+          "value",
+          "edited_at"
+        ],
+        "title": "ManualEditItem",
+        "description": "A single manual edit record."
+      },
+      "ManualEditsResponse": {
+        "properties": {
+          "qid": {
+            "type": "string",
+            "title": "Qid"
+          },
+          "edits": {
+            "items": {
+              "$ref": "#/components/schemas/ManualEditItem"
+            },
+            "type": "array",
+            "title": "Edits"
+          }
+        },
+        "type": "object",
+        "required": [
+          "qid",
+          "edits"
+        ],
+        "title": "ManualEditsResponse",
+        "description": "All manual edits for a qid."
+      },
+      "ManualParameterUpdateRequest": {
+        "properties": {
+          "chip_id": {
+            "type": "string",
+            "title": "Chip Id",
+            "description": "Target chip ID"
+          },
+          "qid": {
+            "type": "string",
+            "title": "Qid",
+            "description": "Qubit ID (e.g. '0') or coupling ID (e.g. '0-1')"
+          },
+          "parameters": {
+            "additionalProperties": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "object",
+            "title": "Parameters",
+            "description": "Parameters to update. Format: {\"param_name\": {\"value\": 4.85, \"unit\": \"GHz\"}}"
+          }
+        },
+        "type": "object",
+        "required": [
+          "chip_id",
+          "qid",
+          "parameters"
+        ],
+        "title": "ManualParameterUpdateRequest",
+        "description": "Request to manually update calibration parameters.\n\nParameters are written to the DB and provenance is recorded.\nThe qid format determines target type: \"0\" for qubit, \"0-1\" for coupling."
+      },
+      "ManualParameterUpdateResponse": {
+        "properties": {
+          "updated_count": {
+            "type": "integer",
+            "title": "Updated Count"
+          },
+          "provenance_activity_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provenance Activity Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "updated_count"
+        ],
+        "title": "ManualParameterUpdateResponse",
+        "description": "Response from manual parameter update."
+      },
       "MeasError": {
         "properties": {
           "prob_meas1_prep0": {
@@ -12102,7 +12354,7 @@
           "error": {
             "type": "number",
             "title": "Error",
-            "default": 0.0
+            "default": 0
           },
           "previous_error": {
             "anyOf": [
@@ -12340,7 +12592,7 @@
           "error": {
             "type": "number",
             "title": "Error",
-            "default": 0.0
+            "default": 0
           },
           "version": {
             "type": "integer",
@@ -12481,7 +12733,7 @@
           "error": {
             "type": "number",
             "title": "Error",
-            "default": 0.0
+            "default": 0
           },
           "valid_from": {
             "anyOf": [

@@ -22,6 +22,7 @@ from qdash.api.services.execution_service import ExecutionService
 from qdash.api.services.file_service import FileService
 from qdash.api.services.issue_knowledge_service import IssueKnowledgeService
 from qdash.api.services.issue_service import IssueService
+from qdash.api.services.manual_update_service import ManualUpdateService
 from qdash.api.services.metrics_service import MetricsService
 from qdash.api.services.project_service import ProjectService
 from qdash.api.services.provenance_service import ProvenanceService
@@ -247,6 +248,12 @@ def get_task_definition_repository() -> MongoTaskDefinitionRepository:
 def get_seed_import_service() -> SeedImportService:
     """Get the seed import service instance."""
     return SeedImportService()
+
+
+@lru_cache(maxsize=1)
+def get_manual_update_service() -> ManualUpdateService:
+    """Get the manual parameter update service instance."""
+    return ManualUpdateService()
 
 
 @lru_cache(maxsize=1)

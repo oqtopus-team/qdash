@@ -647,12 +647,16 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
       {((taskResult.figure_path && taskResult.figure_path.length > 0) ||
         (taskResult.json_figure_path &&
           taskResult.json_figure_path.length > 0)) && (
-        <div className="h-[220px] overflow-x-auto flex gap-2 mb-4">
-          <TaskFigure
-            taskId={taskId}
-            qid={taskResult.qid}
-            className="h-full w-auto object-contain rounded"
-          />
+        <div className="h-[280px] overflow-x-auto overflow-y-hidden flex items-center justify-start gap-3 mb-4">
+          {(taskResult.figure_path ?? []).map((fig, i) => (
+            <TaskFigure
+              key={i}
+              path={fig}
+              jsonFigurePath={(taskResult.json_figure_path ?? [])[i]}
+              qid={taskResult.qid}
+              className="h-full w-auto object-contain rounded flex-shrink-0"
+            />
+          ))}
         </div>
       )}
 

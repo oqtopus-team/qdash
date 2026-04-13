@@ -14,7 +14,7 @@ export function AnalysisSidebar() {
       {!isOpen && (
         <button
           onClick={openGeneralChat}
-          className="fixed right-0 top-1/2 -translate-y-1/2 z-[9998] flex flex-col items-center gap-1.5 bg-primary text-primary-content px-1.5 py-3 rounded-l-xl shadow-lg hover:px-2 transition-all duration-200"
+          className="fixed right-0 top-1/2 -translate-y-1/2 z-50 flex flex-col items-center gap-1.5 bg-primary text-primary-content px-1.5 py-3 rounded-l-xl shadow-lg hover:px-2 transition-all duration-200"
           title="Ask AI"
         >
           <Bot className="w-5 h-5" />
@@ -27,14 +27,16 @@ export function AnalysisSidebar() {
         </button>
       )}
 
-      {/* Slide-in sidebar panel */}
+      {/* Inline sidebar panel — participates in flex layout to push main content */}
       <div
-        className={`fixed top-0 right-0 h-screen z-[9999] transition-transform duration-300 ease-in-out w-80 shadow-2xl ${
-          isOpen ? "translate-x-0" : "translate-x-full"
+        className={`h-screen flex-shrink-0 border-l border-base-300 bg-base-100 transition-[width] duration-300 ease-in-out overflow-hidden ${
+          isOpen ? "w-80" : "w-0"
         }`}
       >
         {isOpen && (
-          <AnalysisChatPanel context={activeSession?.context ?? null} />
+          <div className="w-80 h-full">
+            <AnalysisChatPanel context={activeSession?.context ?? null} />
+          </div>
         )}
       </div>
     </>

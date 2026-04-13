@@ -26,6 +26,9 @@ import type {
   CompareSeedValues200,
   CompareSeedValuesParams,
   HTTPValidationError,
+  ManualEditsResponse,
+  ManualParameterUpdateRequest,
+  ManualParameterUpdateResponse,
   SeedImportRequest,
   SeedImportResponse,
 } from "../../schemas";
@@ -725,6 +728,244 @@ export function useCompareSeedValues<
     params,
     options,
   );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey;
+
+  return query;
+}
+
+/**
+ * Manually update calibration parameters for a qubit or coupling.
+
+Updates the specified parameters in the database and records provenance.
+The target type (qubit vs coupling) is determined by the qid format:
+"0" for qubit, "0-1" for coupling.
+ * @summary Manually update calibration parameters
+ */
+export const updateCalibrationParameters = (
+  manualParameterUpdateRequest: ManualParameterUpdateRequest,
+  options?: SecondParameter<typeof customInstance>,
+) => {
+  return customInstance<ManualParameterUpdateResponse>(
+    {
+      url: `/calibrations/parameters`,
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      data: manualParameterUpdateRequest,
+    },
+    options,
+  );
+};
+
+export const getUpdateCalibrationParametersMutationOptions = <
+  TError = HTTPValidationError,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateCalibrationParameters>>,
+    TError,
+    { data: ManualParameterUpdateRequest },
+    TContext
+  >;
+  request?: SecondParameter<typeof customInstance>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateCalibrationParameters>>,
+  TError,
+  { data: ManualParameterUpdateRequest },
+  TContext
+> => {
+  const mutationKey = ["updateCalibrationParameters"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateCalibrationParameters>>,
+    { data: ManualParameterUpdateRequest }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return updateCalibrationParameters(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateCalibrationParametersMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateCalibrationParameters>>
+>;
+export type UpdateCalibrationParametersMutationBody =
+  ManualParameterUpdateRequest;
+export type UpdateCalibrationParametersMutationError = HTTPValidationError;
+
+/**
+ * @summary Manually update calibration parameters
+ */
+export const useUpdateCalibrationParameters = <
+  TError = HTTPValidationError,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof updateCalibrationParameters>>,
+      TError,
+      { data: ManualParameterUpdateRequest },
+      TContext
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof updateCalibrationParameters>>,
+  TError,
+  { data: ManualParameterUpdateRequest },
+  TContext
+> => {
+  const mutationOptions =
+    getUpdateCalibrationParametersMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+/**
+ * Get the most recent manual edit for each parameter of a qid.
+ * @summary Get manual edits for a qubit or coupling
+ */
+export const getManualEdits = (
+  qid: string,
+  options?: SecondParameter<typeof customInstance>,
+  signal?: AbortSignal,
+) => {
+  return customInstance<ManualEditsResponse>(
+    { url: `/calibrations/manual-edits/${qid}`, method: "GET", signal },
+    options,
+  );
+};
+
+export const getGetManualEditsQueryKey = (qid?: string) => {
+  return [`/calibrations/manual-edits/${qid}`] as const;
+};
+
+export const getGetManualEditsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getManualEdits>>,
+  TError = HTTPValidationError,
+>(
+  qid: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getManualEdits>>, TError, TData>
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetManualEditsQueryKey(qid);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getManualEdits>>> = ({
+    signal,
+  }) => getManualEdits(qid, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!qid,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getManualEdits>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData> };
+};
+
+export type GetManualEditsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getManualEdits>>
+>;
+export type GetManualEditsQueryError = HTTPValidationError;
+
+export function useGetManualEdits<
+  TData = Awaited<ReturnType<typeof getManualEdits>>,
+  TError = HTTPValidationError,
+>(
+  qid: string,
+  options: {
+    query: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getManualEdits>>, TError, TData>
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getManualEdits>>,
+          TError,
+          Awaited<ReturnType<typeof getManualEdits>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData>;
+};
+export function useGetManualEdits<
+  TData = Awaited<ReturnType<typeof getManualEdits>>,
+  TError = HTTPValidationError,
+>(
+  qid: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getManualEdits>>, TError, TData>
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getManualEdits>>,
+          TError,
+          Awaited<ReturnType<typeof getManualEdits>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+export function useGetManualEdits<
+  TData = Awaited<ReturnType<typeof getManualEdits>>,
+  TError = HTTPValidationError,
+>(
+  qid: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getManualEdits>>, TError, TData>
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+/**
+ * @summary Get manual edits for a qubit or coupling
+ */
+
+export function useGetManualEdits<
+  TData = Awaited<ReturnType<typeof getManualEdits>>,
+  TError = HTTPValidationError,
+>(
+  qid: string,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getManualEdits>>, TError, TData>
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+  const queryOptions = getGetManualEditsQueryOptions(qid, options);
 
   const query = useQuery(queryOptions, queryClient) as UseQueryResult<
     TData,

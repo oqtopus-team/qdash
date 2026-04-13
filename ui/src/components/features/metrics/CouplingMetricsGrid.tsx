@@ -27,7 +27,6 @@ import {
 import { calculateGridDimension } from "@/lib/utils/grid-layout";
 
 import { CouplingMetricHistoryModal } from "./CouplingMetricHistoryModal";
-import { useAnalysisChatContext } from "@/contexts/AnalysisChatContext";
 
 // Dynamic font size calculation based on cell size
 function getCouplingFontSizes(cellSize: number): {
@@ -43,10 +42,10 @@ function getCouplingFontSizes(cellSize: number): {
   } else if (cellSize >= 40) {
     return { qubitLabelSize: "0.625rem", valueSize: "0.55rem" };
   } else if (cellSize >= 30) {
-    return { qubitLabelSize: "0.5rem", valueSize: "0.5rem" };
+    return { qubitLabelSize: "0.5rem", valueSize: "0.525rem" };
   } else {
     // Very small cells (< 30px)
-    return { qubitLabelSize: "0.45rem", valueSize: "0.4rem" };
+    return { qubitLabelSize: "0.45rem", valueSize: "0.475rem" };
   }
 }
 
@@ -202,7 +201,6 @@ export function CouplingMetricsGrid({
   const [selectedCouplingInfo, setSelectedCouplingInfo] =
     useState<SelectedCouplingInfo | null>(null);
   const isModalOpen = selectedCouplingInfo !== null;
-  const { isOpen: isSidebarOpen } = useAnalysisChatContext();
 
   // Use grid layout hook for responsive sizing
   const displayCols = zoomMode === "region" ? regionSize : gridCols;
@@ -769,23 +767,13 @@ export function CouplingMetricsGrid({
       {/* Coupling Detail Modal with History */}
       <div
         className={`modal modal-bottom sm:modal-middle ${isModalOpen ? "modal-open" : ""}`}
-        style={{
-          width: isSidebarOpen ? "calc(100% - 20rem)" : "100%",
-          maxWidth: "none",
-          transition: "width 300ms ease",
-        }}
         onClick={(e) => {
           if (e.target === e.currentTarget) setSelectedCouplingInfo(null);
         }}
       >
         <div
           className="modal-box w-full bg-base-100 p-0 h-[90vh] sm:h-[95vh] overflow-hidden flex flex-col"
-          style={{
-            maxWidth: isSidebarOpen
-              ? "min(calc(100vw - 22rem), 1400px)"
-              : "1800px",
-            transition: "max-width 300ms ease",
-          }}
+          style={{ maxWidth: "1800px" }}
         >
           {selectedCouplingInfo && (
             <>

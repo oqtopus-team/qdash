@@ -27,13 +27,23 @@ class PreProcessResult(BaseModel):
 
 
 class PostProcessResult(BaseModel):
-    """Result class for task postprocessing."""
+    """Result class for task postprocessing.
+
+    Attributes
+    ----------
+    validation_error : str | None
+        If set, the task will be marked as failed **after** figures and output
+        parameters have been saved.  This allows callers to reject a result
+        (e.g. qubit frequency out of range) while still persisting the
+        measurement artifacts for inspection.
+    """
 
     model_config = {"arbitrary_types_allowed": True}
 
     output_parameters: dict[str, ParameterModel]
     figures: list[go.Figure | go.FigureWidget] = []
     raw_data: list[Any] = []
+    validation_error: str | None = None
 
 
 class RunResult(BaseModel):

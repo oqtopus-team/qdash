@@ -31,6 +31,11 @@ interface AnalysisChatContextValue {
   closeAnalysisChat: () => void;
   toggleAnalysisChat: () => void;
 
+  // mini chat (floating window above modals)
+  miniChat: { isOpen: boolean; context: AnalysisContext | null };
+  openMiniChat: (context: AnalysisContext) => void;
+  closeMiniChat: () => void;
+
   // session management
   sessions: ChatSession[];
   activeSessionId: string | null;
@@ -155,6 +160,10 @@ export function AnalysisChatProvider({
   const [isOpen, setIsOpen] = useState(false);
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  const [miniChat, setMiniChat] = useState<{
+    isOpen: boolean;
+    context: AnalysisContext | null;
+  }>({ isOpen: false, context: null });
   const initialized = useRef(false);
 
   // Load from localStorage on mount
@@ -233,6 +242,38 @@ export function AnalysisChatProvider({
 
   const toggleAnalysisChat = useCallback(() => {
     setIsOpen((prev) => !prev);
+  }, []);
+
+  // ------- mini chat -------
+
+  const openMiniChat = useCallback(
+    (ctx: AnalysisContext) => {
+      // Create or find session for this context
+      const key = contextKey(ctx);
+      const existing = sessions.find((s) => contextKey(s.context) === key);
+      if (existing) {
+        setActiveSessionId(existing.id);
+      } else {
+        const id = generateId();
+        const now = Date.now();
+        const session: ChatSession = {
+          id,
+          title: `${ctx.taskName} / ${ctx.qid}`,
+          context: ctx,
+          messages: [],
+          createdAt: now,
+          updatedAt: now,
+        };
+        setSessions((prev) => [session, ...prev]);
+        setActiveSessionId(id);
+      }
+      setMiniChat({ isOpen: true, context: ctx });
+    },
+    [sessions],
+  );
+
+  const closeMiniChat = useCallback(() => {
+    setMiniChat({ isOpen: false, context: null });
   }, []);
 
   // ------- session CRUD -------
@@ -336,6 +377,9 @@ export function AnalysisChatProvider({
         openGeneralChat,
         closeAnalysisChat,
         toggleAnalysisChat,
+        miniChat,
+        openMiniChat,
+        closeMiniChat,
         sessions,
         activeSessionId,
         activeSession,
