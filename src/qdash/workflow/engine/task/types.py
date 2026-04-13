@@ -96,6 +96,7 @@ class TaskExecutionResult(BaseModel):
     qid: str
     success: bool = False
     message: str = ""
+    stack_trace: str = ""
     output_parameters: dict[str, Any] = Field(default_factory=dict)
     r2: dict[str, float | None] | None = None
     calib_data_delta: CalibDataModel = Field(

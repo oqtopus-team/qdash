@@ -256,6 +256,24 @@ class TestTaskExecutorExecuteTask:
 
         mock_state_manager.update_task_status_to_failed.assert_called_once()
 
+    def test_execute_task_raises_value_error_on_validate_fidelity_failure(
+        self,
+        executor: TaskExecutor,
+        mock_result_processor: MagicMock,
+        mock_state_manager: MagicMock,
+    ) -> None:
+        """Test execute_task converts FidelityValidationError from validate_fidelity to ValueError."""
+        mock_result_processor.validate_fidelity.side_effect = FidelityValidationError(
+            "Fidelity exceeds 100%"
+        )
+        task = MockTask()
+        session: Any = MockSession()
+
+        with pytest.raises(ValueError, match="Fidelity exceeds 100%"):
+            executor.execute_task(task, session, "0")
+
+        mock_state_manager.update_task_status_to_failed.assert_called_once()
+
     def test_execute_task_raises_task_execution_error_on_exception(
         self, executor: TaskExecutor, mock_state_manager: MagicMock
     ) -> None:

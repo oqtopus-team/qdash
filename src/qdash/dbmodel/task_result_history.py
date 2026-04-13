@@ -38,6 +38,7 @@ class TaskResultHistoryDocument(Document):
     upstream_id: str = Field(..., description="The upstream task ID")
     status: str = Field(..., description="The status of the execution")
     message: str = Field(..., description="The message")
+    stack_trace: str = Field("", description="The stack trace")
     input_parameters: dict[str, Any] = Field(..., description="The input parameters")
     output_parameters: dict[str, Any] = Field(..., description="The output parameters")
     output_parameter_names: list[str] = Field(..., description="The output parameter names")
@@ -159,6 +160,7 @@ class TaskResultHistoryDocument(Document):
             upstream_id=task.upstream_id,
             status=task.status,
             message=task.message,
+            stack_trace=task.stack_trace,
             input_parameters=task.input_parameters,
             output_parameters=task.output_parameters,
             output_parameter_names=task.output_parameter_names,
@@ -195,6 +197,7 @@ class TaskResultHistoryDocument(Document):
         doc.upstream_id = task.upstream_id
         doc.status = task.status
         doc.message = task.message
+        doc.stack_trace = task.stack_trace
         doc.input_parameters = task.input_parameters
         doc.output_parameters = task.output_parameters
         doc.output_parameter_names = task.output_parameter_names
