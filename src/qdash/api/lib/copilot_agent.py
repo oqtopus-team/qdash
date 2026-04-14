@@ -609,7 +609,7 @@ def _build_client(config: CopilotConfig) -> AsyncOpenAI:
 
     if provider == "ollama":
         base_url = os.environ.get("OLLAMA_URL", "http://localhost:11434") + "/v1"
-        return AsyncOpenAI(base_url=base_url, api_key="ollama")
+        return AsyncOpenAI(base_url=base_url, api_key=os.environ.get("OLLAMA_API_KEY", "ollama"))
     elif provider == "openai":
         return AsyncOpenAI()  # uses OPENAI_API_KEY env var
     elif provider == "anthropic":
