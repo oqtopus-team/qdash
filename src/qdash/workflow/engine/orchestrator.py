@@ -389,18 +389,53 @@ class CalibOrchestrator:
             task_params = task_details[task_name]
             if "run_parameters" not in task_params:
                 task_params["run_parameters"] = {}
-            for param_name, param_data in self.config.default_run_parameters.items():
-                if not isinstance(param_data, dict):
+
+            # Split entries into flat defaults and per-task overrides.
+            # A flat entry is a RunParameter-like dict (contains "value" or "value_type").
+            # A nested entry is keyed by task name and maps to {param_name: RunParameter dict}.
+            flat_defaults: dict[str, dict[str, Any]] = {}
+            per_task_overrides: dict[str, Any] = {}
+            for key, data in self.config.default_run_parameters.items():
+                if not isinstance(data, dict):
                     logger.warning(
                         "Skipping invalid default_run_parameter '%s': expected dict, got %s",
-                        param_name,
-                        type(param_data).__name__,
+                        key,
+                        type(data).__name__,
                     )
                     continue
+                if "value" in data or "value_type" in data:
+                    flat_defaults[key] = data
+                else:
+                    per_task_overrides[key] = data
+
+            # Apply per-task overrides first so they take precedence over flat defaults.
+            # Precedence: explicit task_details > per-task overrides > flat defaults > task class defaults.
+            task_overrides = per_task_overrides.get(task_name)
+            if isinstance(task_overrides, dict):
+                for param_name, param_data in task_overrides.items():
+                    if not isinstance(param_data, dict):
+                        logger.warning(
+                            "Skipping invalid per-task override '%s.%s': expected dict, got %s",
+                            task_name,
+                            param_name,
+                            type(param_data).__name__,
+                        )
+                        continue
+                    if param_name not in task_params["run_parameters"]:
+                        task_params["run_parameters"][param_name] = param_data
+                        logger.debug(
+                            "Injected per-task run parameter '%s' into task '%s': %s",
+                            param_name,
+                            task_name,
+                            param_data,
+                        )
+
+            # Then apply flat defaults to any remaining unset parameters.
+            for param_name, param_data in flat_defaults.items():
                 if param_name not in task_params["run_parameters"]:
                     task_params["run_parameters"][param_name] = param_data
                     logger.debug(
-                        "Injected default run parameter '%s' into task '%s': %s",
+                        "Injected flat default run parameter '%s' into task '%s': %s",
                         param_name,
                         task_name,
                         param_data,

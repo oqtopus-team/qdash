@@ -540,6 +540,14 @@ class TwoQubitCalibration(CalibrationStep):
                 metrics["bell_fidelity"] = (
                     fidelity_param.value if hasattr(fidelity_param, "value") else fidelity_param
                 )
+        # 2Q gate coherence limit
+        coh_result = raw.get("Check2QGateCoherenceLimit", {})
+        if coh_result:
+            coh_param = coh_result.get("two_qubit_gate_coherence_limit")
+            if coh_param is not None:
+                metrics["two_qubit_gate_coherence_limit"] = (
+                    coh_param.value if hasattr(coh_param, "value") else coh_param
+                )
         return metrics
 
 

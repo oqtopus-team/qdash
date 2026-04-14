@@ -13,6 +13,7 @@ Example:
 
 from typing import Any
 
+import numpy as np  # noqa: F401  # used by commented per-task overrides below
 from prefect import flow
 from qdash.workflow.service import CalibService
 from qdash.workflow.service.calib_service import on_flow_cancellation
@@ -74,6 +75,19 @@ def bringup(
         skip_execution=True,
         default_run_parameters={
             "interval": {"value": 150 * 1024, "value_type": "int"},
+            # Per-task overrides — uncomment to extend coherence sweep ranges.
+            # "CheckT1": {
+            #     "time_range": {
+            #         "value": (np.log10(100), np.log10(1000 * 1000), 51),  # 100 ns 〜 1 ms
+            #         "value_type": "np.logspace",
+            #     },
+            # },
+            # "CheckT2Echo": {
+            #     "time_range": {
+            #         "value": (np.log10(300), np.log10(500 * 1000), 51),  # 300 ns 〜 500 μs
+            #         "value_type": "np.logspace",
+            #     },
+            # },
         },
     )
     return cal.run(targets, steps=steps)
