@@ -43,10 +43,9 @@ BRINGUP_TASKS: list[str] = [
 # 1Q Check: Basic characterization tasks (run first)
 CHECK_1Q_TASKS: list[str] = [
     "CheckRabi",
-    "CheckRabi",
-    "CheckOptimalReadoutAmplitude",
-    "CheckRabi",
     "CreateHPIPulse",
+    "CheckHPIPulse",
+    "CheckOptimalReadoutAmplitude",
     "CheckHPIPulse",
     "CheckT1",
     "CheckT2Echo",
@@ -64,7 +63,11 @@ FULL_1Q_TASKS_AFTER_CHECK: list[str] = [
     "CheckDRAGHPIPulse",
     "CreateDRAGPIPulse",
     "CheckDRAGPIPulse",
+    "CheckOptimalReadoutAmplitude",
     "ReadoutClassification",
+    "CheckT1Average",
+    "CheckT2EchoAverage",
+    "Check1QGateCoherenceLimit",
     "RandomizedBenchmarking",
     "X90InterleavedRandomizedBenchmarking",
 ]
@@ -84,5 +87,6 @@ FULL_2Q_TASKS: list[str] = [
     "CheckZX90",
     "CheckBellState",
     "CheckBellStateTomography",
+    "Check2QGateCoherenceLimit",
     "ZX90InterleavedRandomizedBenchmarking",
 ]

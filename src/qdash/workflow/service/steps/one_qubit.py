@@ -450,4 +450,26 @@ class OneQubitFineTune(CalibrationStep):
                 metrics["rb_fidelity"] = (
                     fidelity_param.value if hasattr(fidelity_param, "value") else fidelity_param
                 )
+        # T1 Average
+        t1_result = raw.get("CheckT1Average", {})
+        if t1_result:
+            t1_param = t1_result.get("t1_average")
+            if t1_param is not None:
+                metrics["t1_average"] = t1_param.value if hasattr(t1_param, "value") else t1_param
+        # T2 Echo Average
+        t2_result = raw.get("CheckT2EchoAverage", {})
+        if t2_result:
+            t2_param = t2_result.get("t2_echo_average")
+            if t2_param is not None:
+                metrics["t2_echo_average"] = (
+                    t2_param.value if hasattr(t2_param, "value") else t2_param
+                )
+        # 1Q gate coherence limit
+        coh_result = raw.get("Check1QGateCoherenceLimit", {})
+        if coh_result:
+            coh_param = coh_result.get("one_qubit_gate_coherence_limit")
+            if coh_param is not None:
+                metrics["one_qubit_gate_coherence_limit"] = (
+                    coh_param.value if hasattr(coh_param, "value") else coh_param
+                )
         return metrics

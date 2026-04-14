@@ -46,9 +46,13 @@ class CheckOptimalReadoutAmplitude(QubexTask):
     ) -> PostProcessResult:
         """Process the results of the task."""
         result = run_result.raw_result
+        label = self.get_qubit_label(backend, qid)
         self.output_parameters["readout_amplitude"].value = result["optimal_amplitude"]
         output_parameters = self.attach_execution_id(execution_id)
-        figures = [result["fig"]]
+        fig1 = result.figures["readout_fidelity"]
+        fig2 = result.figures[f"{label}_prepared_0"]
+        fig3 = result.figures[f"{label}_prepared_1"]
+        figures = [fig1, fig2, fig3]
         return PostProcessResult(output_parameters=output_parameters, figures=figures)
 
     def run(self, backend: QubexBackend, qid: str) -> RunResult:
