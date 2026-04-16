@@ -673,9 +673,7 @@ export function CouplingGrid({
 
   return (
     <div className="flex flex-col h-full space-y-2">
-      {isError && (
-        <div className="alert alert-error">Failed to load data</div>
-      )}
+      {isError && <div className="alert alert-error">Failed to load data</div>}
       {/* View mode toggle and Download controls */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
