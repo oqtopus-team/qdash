@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 
 import { ExternalLink, ArrowUpRight, StopCircle } from "lucide-react";
 import Link from "next/link";
@@ -78,9 +78,6 @@ export function ExecutionPageContent() {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20;
 
-  // Track if we've already set the default chip to prevent race conditions
-  const hasSetDefaultChip = useRef(false);
-
   // Use custom hook for date navigation (unused but kept for potential future use)
   useDateNavigation(selectedChip || "", selectedDate, setSelectedDate);
 
@@ -99,13 +96,7 @@ export function ExecutionPageContent() {
 
   // Set the latest chip as default when chips are loaded and no chip is selected from URL
   useEffect(() => {
-    if (
-      isInitialized &&
-      !selectedChip &&
-      !hasSetDefaultChip.current &&
-      sortedChips.length > 0
-    ) {
-      hasSetDefaultChip.current = true;
+    if (isInitialized && !selectedChip && sortedChips.length > 0) {
       setSelectedChip(sortedChips[0].chip_id);
     }
   }, [isInitialized, selectedChip, sortedChips, setSelectedChip]);
