@@ -32,6 +32,9 @@ type MetricOption = {
   label: string;
 };
 
+const STORAGE_KEY_QUBIT = "qdash:metrics:qubit:metric";
+const STORAGE_KEY_COUPLING = "qdash:metrics:coupling:metric";
+
 export function MetricsPageContent() {
   const {
     selectedChip,
@@ -46,6 +49,7 @@ export function MetricsPageContent() {
     setMetricType,
     setSelectedMetric,
     setCustomDays,
+    isInitialized,
   } = useMetricsUrlState();
   const [gridSize, setGridSize] = useState<number>(8);
 
@@ -153,6 +157,38 @@ export function MetricsPageContent() {
     }
   }, [isBestModeSupported, selectionMode, setSelectionMode]);
 
+  // Persist the selected metric per view type to localStorage
+  useEffect(() => {
+    if (!isInitialized || isConfigLoading) return;
+    if (metricType === "qubit" && qubitMetrics.some((m) => m.key === selectedMetric)) {
+      localStorage.setItem(STORAGE_KEY_QUBIT, selectedMetric);
+    } else if (metricType === "coupling" && couplingMetrics.some((m) => m.key === selectedMetric)) {
+      localStorage.setItem(STORAGE_KEY_COUPLING, selectedMetric);
+    }
+  }, [selectedMetric, metricType, qubitMetrics, couplingMetrics, isInitialized, isConfigLoading]);
+
+  // When metricType changes (e.g. URL navigation), reset selectedMetric to a valid value for
+  // the current view. Falls back to the last metric saved in localStorage, then to the default.
+  useEffect(() => {
+    if (!isInitialized || isConfigLoading || qubitMetrics.length === 0) return;
+    if (metricType === "qubit") {
+      const isValid = qubitMetrics.some((m) => m.key === selectedMetric);
+      if (!isValid) {
+        const saved = localStorage.getItem(STORAGE_KEY_QUBIT);
+        const target = saved && qubitMetrics.some((m) => m.key === saved) ? saved : "t1";
+        setSelectedMetric(target);
+      }
+    } else if (metricType === "coupling") {
+      const isValid = couplingMetrics.some((m) => m.key === selectedMetric);
+      if (!isValid) {
+        const saved = localStorage.getItem(STORAGE_KEY_COUPLING);
+        const defaultMetric = couplingMetrics[0]?.key ?? "zx90_gate_fidelity";
+        const target = saved && couplingMetrics.some((m) => m.key === saved) ? saved : defaultMetric;
+        setSelectedMetric(target);
+      }
+    }
+  }, [metricType, selectedMetric, qubitMetrics, couplingMetrics, isInitialized, isConfigLoading, setSelectedMetric]);
+
   const metricOptions: MetricOption[] = useMemo(
     () =>
       metricsConfig.map((metric) => ({
@@ -165,11 +201,11 @@ export function MetricsPageContent() {
   const groupedMetricOptions: GroupBase<MetricOption>[] = useMemo(
     () => [
       {
-        label: "Qubit Metrics",
+        label: metricType === "qubit" ? "Qubit Metrics" : "Coupling Metrics",
         options: metricOptions,
       },
     ],
-    [metricOptions],
+    [metricOptions, metricType],
   );
 
   // Use shared DaisyUI-compatible styles for React-Select
@@ -321,8 +357,15 @@ export function MetricsPageContent() {
             <button
               className={`tab ${metricType === "qubit" ? "tab-active" : ""}`}
               onClick={() => {
+                // Save current coupling metric before switching
+                if (metricType === "coupling" && couplingMetrics.some((m) => m.key === selectedMetric)) {
+                  localStorage.setItem(STORAGE_KEY_COUPLING, selectedMetric);
+                }
+                // Restore last qubit metric from localStorage, or default to "t1"
+                const saved = localStorage.getItem(STORAGE_KEY_QUBIT);
+                const target = saved && qubitMetrics.some((m) => m.key === saved) ? saved : "t1";
                 setMetricType("qubit");
-                setSelectedMetric("t1");
+                setSelectedMetric(target);
               }}
             >
               Qubit
@@ -330,8 +373,16 @@ export function MetricsPageContent() {
             <button
               className={`tab ${metricType === "coupling" ? "tab-active" : ""}`}
               onClick={() => {
+                // Save current qubit metric before switching
+                if (metricType === "qubit" && qubitMetrics.some((m) => m.key === selectedMetric)) {
+                  localStorage.setItem(STORAGE_KEY_QUBIT, selectedMetric);
+                }
+                // Restore last coupling metric from localStorage, or default
+                const saved = localStorage.getItem(STORAGE_KEY_COUPLING);
+                const defaultMetric = couplingMetrics[0]?.key ?? "zx90_gate_fidelity";
+                const target = saved && couplingMetrics.some((m) => m.key === saved) ? saved : defaultMetric;
                 setMetricType("coupling");
-                setSelectedMetric("zx90_gate_fidelity");
+                setSelectedMetric(target);
               }}
             >
               Coupling
