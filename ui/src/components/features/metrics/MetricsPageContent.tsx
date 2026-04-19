@@ -157,37 +157,24 @@ export function MetricsPageContent() {
     }
   }, [isBestModeSupported, selectionMode, setSelectionMode]);
 
-  // Persist the selected metric per view type to localStorage
-  useEffect(() => {
-    if (!isInitialized || isConfigLoading) return;
-    if (metricType === "qubit" && qubitMetrics.some((m) => m.key === selectedMetric)) {
-      localStorage.setItem(STORAGE_KEY_QUBIT, selectedMetric);
-    } else if (metricType === "coupling" && couplingMetrics.some((m) => m.key === selectedMetric)) {
-      localStorage.setItem(STORAGE_KEY_COUPLING, selectedMetric);
-    }
-  }, [selectedMetric, metricType, qubitMetrics, couplingMetrics, isInitialized, isConfigLoading]);
-
-  // When metricType changes (e.g. URL navigation), reset selectedMetric to a valid value for
-  // the current view. Falls back to the last metric saved in localStorage, then to the default.
   useEffect(() => {
     if (!isInitialized || isConfigLoading || qubitMetrics.length === 0) return;
     if (metricType === "qubit") {
-      const isValid = qubitMetrics.some((m) => m.key === selectedMetric);
-      if (!isValid) {
+      if (qubitMetrics.some((m) => m.key === selectedMetric)) {
+        localStorage.setItem(STORAGE_KEY_QUBIT, selectedMetric);
+      } else {
         const saved = localStorage.getItem(STORAGE_KEY_QUBIT);
-        const target = saved && qubitMetrics.some((m) => m.key === saved) ? saved : "t1";
-        setSelectedMetric(target);
+        setSelectedMetric(saved && qubitMetrics.some((m) => m.key === saved) ? saved : "t1");
       }
     } else if (metricType === "coupling") {
-      const isValid = couplingMetrics.some((m) => m.key === selectedMetric);
-      if (!isValid) {
+      if (couplingMetrics.some((m) => m.key === selectedMetric)) {
+        localStorage.setItem(STORAGE_KEY_COUPLING, selectedMetric);
+      } else {
         const saved = localStorage.getItem(STORAGE_KEY_COUPLING);
-        const defaultMetric = couplingMetrics[0]?.key ?? "zx90_gate_fidelity";
-        const target = saved && couplingMetrics.some((m) => m.key === saved) ? saved : defaultMetric;
-        setSelectedMetric(target);
+        setSelectedMetric(saved && couplingMetrics.some((m) => m.key === saved) ? saved : couplingMetrics[0]?.key ?? "zx90_gate_fidelity");
       }
     }
-  }, [metricType, selectedMetric, qubitMetrics, couplingMetrics, isInitialized, isConfigLoading, setSelectedMetric]);
+  }, [selectedMetric, metricType, qubitMetrics, couplingMetrics, isInitialized, isConfigLoading, setSelectedMetric]);
 
   const metricOptions: MetricOption[] = useMemo(
     () =>
@@ -356,34 +343,13 @@ export function MetricsPageContent() {
           <div className="tabs tabs-boxed bg-base-200 w-fit">
             <button
               className={`tab ${metricType === "qubit" ? "tab-active" : ""}`}
-              onClick={() => {
-                // Save current coupling metric before switching
-                if (metricType === "coupling" && couplingMetrics.some((m) => m.key === selectedMetric)) {
-                  localStorage.setItem(STORAGE_KEY_COUPLING, selectedMetric);
-                }
-                // Restore last qubit metric from localStorage, or default to "t1"
-                const saved = localStorage.getItem(STORAGE_KEY_QUBIT);
-                const target = saved && qubitMetrics.some((m) => m.key === saved) ? saved : "t1";
-                setMetricType("qubit");
-                setSelectedMetric(target);
-              }}
+              onClick={() => setMetricType("qubit")}
             >
               Qubit
             </button>
             <button
               className={`tab ${metricType === "coupling" ? "tab-active" : ""}`}
-              onClick={() => {
-                // Save current qubit metric before switching
-                if (metricType === "qubit" && qubitMetrics.some((m) => m.key === selectedMetric)) {
-                  localStorage.setItem(STORAGE_KEY_QUBIT, selectedMetric);
-                }
-                // Restore last coupling metric from localStorage, or default
-                const saved = localStorage.getItem(STORAGE_KEY_COUPLING);
-                const defaultMetric = couplingMetrics[0]?.key ?? "zx90_gate_fidelity";
-                const target = saved && couplingMetrics.some((m) => m.key === saved) ? saved : defaultMetric;
-                setMetricType("coupling");
-                setSelectedMetric(target);
-              }}
+              onClick={() => setMetricType("coupling")}
             >
               Coupling
             </button>
