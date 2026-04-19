@@ -37,17 +37,18 @@ const STORAGE_KEY_COUPLING = "qdash:metrics:coupling:metric";
 
 const saveToLocalStorage = (key: string, value: string) => {
   try {
+    if (localStorage.getItem(key) === value) return;
     localStorage.setItem(key, value);
-  } catch {
-    console.warn("Failed to save to localStorage:", key);
+  } catch (error) {
+    console.warn("Failed to save to localStorage:", key, error);
   }
 };
 
 const getFromLocalStorage = (key: string): string | null => {
   try {
     return localStorage.getItem(key);
-  } catch {
-    console.warn("Failed to read from localStorage:", key);
+  } catch (error) {
+    console.warn("Failed to read from localStorage:", key, error);
     return null;
   }
 };
