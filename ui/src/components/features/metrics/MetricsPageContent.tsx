@@ -164,17 +164,31 @@ export function MetricsPageContent() {
         localStorage.setItem(STORAGE_KEY_QUBIT, selectedMetric);
       } else {
         const saved = localStorage.getItem(STORAGE_KEY_QUBIT);
-        setSelectedMetric(saved && qubitMetrics.some((m) => m.key === saved) ? saved : "t1");
+        setSelectedMetric(
+          saved && qubitMetrics.some((m) => m.key === saved) ? saved : "t1",
+        );
       }
     } else if (metricType === "coupling") {
       if (couplingMetrics.some((m) => m.key === selectedMetric)) {
         localStorage.setItem(STORAGE_KEY_COUPLING, selectedMetric);
       } else {
         const saved = localStorage.getItem(STORAGE_KEY_COUPLING);
-        setSelectedMetric(saved && couplingMetrics.some((m) => m.key === saved) ? saved : couplingMetrics[0]?.key ?? "zx90_gate_fidelity");
+        setSelectedMetric(
+          saved && couplingMetrics.some((m) => m.key === saved)
+            ? saved
+            : (couplingMetrics[0]?.key ?? "zx90_gate_fidelity"),
+        );
       }
     }
-  }, [selectedMetric, metricType, qubitMetrics, couplingMetrics, isInitialized, isConfigLoading, setSelectedMetric]);
+  }, [
+    selectedMetric,
+    metricType,
+    qubitMetrics,
+    couplingMetrics,
+    isInitialized,
+    isConfigLoading,
+    setSelectedMetric,
+  ]);
 
   const metricOptions: MetricOption[] = useMemo(
     () =>
