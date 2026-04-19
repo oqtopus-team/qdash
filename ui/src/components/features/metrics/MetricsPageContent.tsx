@@ -35,6 +35,23 @@ type MetricOption = {
 const STORAGE_KEY_QUBIT = "qdash:metrics:qubit:metric";
 const STORAGE_KEY_COUPLING = "qdash:metrics:coupling:metric";
 
+const saveToLocalStorage = (key: string, value: string) => {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    console.warn("Failed to save to localStorage:", key);
+  }
+};
+
+const getFromLocalStorage = (key: string): string | null => {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    console.warn("Failed to read from localStorage:", key);
+    return null;
+  }
+};
+
 export function MetricsPageContent() {
   const {
     selectedChip,
@@ -157,31 +174,51 @@ export function MetricsPageContent() {
     }
   }, [isBestModeSupported, selectionMode, setSelectionMode]);
 
+  const selectedMetricRef = useRef(selectedMetric);
   useEffect(() => {
-    if (!isInitialized || isConfigLoading || qubitMetrics.length === 0) return;
-    if (metricType === "qubit") {
-      if (qubitMetrics.some((m) => m.key === selectedMetric)) {
-        localStorage.setItem(STORAGE_KEY_QUBIT, selectedMetric);
-      } else {
-        const saved = localStorage.getItem(STORAGE_KEY_QUBIT);
-        setSelectedMetric(
-          saved && qubitMetrics.some((m) => m.key === saved) ? saved : "t1",
-        );
-      }
-    } else if (metricType === "coupling") {
-      if (couplingMetrics.some((m) => m.key === selectedMetric)) {
-        localStorage.setItem(STORAGE_KEY_COUPLING, selectedMetric);
-      } else {
-        const saved = localStorage.getItem(STORAGE_KEY_COUPLING);
-        setSelectedMetric(
-          saved && couplingMetrics.some((m) => m.key === saved)
-            ? saved
-            : (couplingMetrics[0]?.key ?? "zx90_gate_fidelity"),
-        );
-      }
+    selectedMetricRef.current = selectedMetric;
+  });
+
+  // Save current metric selection to localStorage when it changes
+  useEffect(() => {
+    if (!isInitialized || isConfigLoading) return;
+    if (
+      metricType === "qubit" &&
+      qubitMetrics.some((m) => m.key === selectedMetric)
+    ) {
+      saveToLocalStorage(STORAGE_KEY_QUBIT, selectedMetric);
+    } else if (
+      metricType === "coupling" &&
+      couplingMetrics.some((m) => m.key === selectedMetric)
+    ) {
+      saveToLocalStorage(STORAGE_KEY_COUPLING, selectedMetric);
     }
   }, [
     selectedMetric,
+    metricType,
+    qubitMetrics,
+    couplingMetrics,
+    isInitialized,
+    isConfigLoading,
+  ]);
+
+  // Restore metric from localStorage when metric type changes and current metric is invalid
+  useEffect(() => {
+    if (!isInitialized || isConfigLoading) return;
+    const metrics = metricType === "qubit" ? qubitMetrics : couplingMetrics;
+    if (metrics.length === 0) return;
+    if (metrics.some((m) => m.key === selectedMetricRef.current)) return;
+    const key =
+      metricType === "qubit" ? STORAGE_KEY_QUBIT : STORAGE_KEY_COUPLING;
+    const defaultMetric =
+      metricType === "qubit"
+        ? "t1"
+        : (couplingMetrics[0]?.key ?? "zx90_gate_fidelity");
+    const saved = getFromLocalStorage(key);
+    setSelectedMetric(
+      saved && metrics.some((m) => m.key === saved) ? saved : defaultMetric,
+    );
+  }, [
     metricType,
     qubitMetrics,
     couplingMetrics,
