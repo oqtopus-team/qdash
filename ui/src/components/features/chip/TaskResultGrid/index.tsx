@@ -500,7 +500,6 @@ export function TaskResultGrid({
           isMobile,
           viewportHeight,
         ),
-        willChange: "transform",
       }}
     >
       {Array.from({

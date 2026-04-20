@@ -542,7 +542,6 @@ export function QubitMetricsGrid({
             isMobile,
             viewportHeight,
           ),
-          willChange: "transform",
         }}
       >
         {gridCellsData.map((cell) => {
