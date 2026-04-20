@@ -82,8 +82,7 @@ class BackendSaver:
         if task.backend == "qubex":
             self._save_qubex(task, execution_service, qid, backend, success)
         elif task.backend == "fake":
-            # Simulation metadata save (implement as needed)
-            pass
+            self._save_fake(task, execution_service, qid)
 
     def save_mux_qid(
         self,
@@ -123,6 +122,47 @@ class BackendSaver:
             project_id=execution_service.project_id,
         )
         # Note: calib_data is already updated by put_output_parameters
+
+    def _save_fake(
+        self,
+        task: "TaskProtocol",
+        execution_service: "ExecutionService",
+        qid: str,
+    ) -> None:
+        """Fake backend save processing (DB only, no note or param file updates)."""
+        from qdash.repository import (
+            MongoCouplingCalibrationRepository,
+            MongoQubitCalibrationRepository,
+        )
+
+        task_name = task.get_name()
+        task_type = task.get_task_type()
+
+        task_model = self._state_manager.get_task(task_name, task_type, qid)
+        output_parameters = dict(task_model.output_parameters)
+
+        if not output_parameters:
+            return
+
+        qubit_repo = MongoQubitCalibrationRepository()
+        coupling_repo = MongoCouplingCalibrationRepository()
+
+        if task.is_qubit_task():
+            qubit_repo.update_calib_data(
+                username=self._username,
+                qid=qid,
+                chip_id=execution_service.chip_id,
+                output_parameters=output_parameters,
+                project_id=execution_service.project_id,
+            )
+        elif task.is_coupling_task():
+            coupling_repo.update_calib_data(
+                username=self._username,
+                qid=qid,
+                chip_id=execution_service.chip_id,
+                output_parameters=output_parameters,
+                project_id=execution_service.project_id,
+            )
 
     def _save_qubex(
         self,
