@@ -323,7 +323,7 @@ class MongoTaskResultHistoryRepository:
         metric_keys : set[str]
             Set of metric keys to extract
         cutoff_time : datetime | None
-            Optional inclusive lower bound on ``start_at``
+            Optional datetime for filtering tasks (only include tasks after this time)
         end_time : datetime | None
             Optional inclusive upper bound on ``start_at``
 
@@ -428,7 +428,7 @@ class MongoTaskResultHistoryRepository:
         metric_modes : dict[str, Literal["maximize", "minimize"]]
             Dict mapping metric_key -> evaluation mode
         cutoff_time : datetime | None
-            Optional inclusive lower bound on ``start_at``
+            Optional datetime for filtering tasks
         end_time : datetime | None
             Optional inclusive upper bound on ``start_at``
 
@@ -500,7 +500,7 @@ class MongoTaskResultHistoryRepository:
         metric_keys : set[str]
             Set of metric keys to extract
         cutoff_time : datetime | None
-            Optional inclusive lower bound on ``start_at``
+            Optional datetime for filtering tasks (only include tasks after this time)
         end_time : datetime | None
             Optional inclusive upper bound on ``start_at``
 

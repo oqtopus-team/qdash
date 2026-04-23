@@ -140,7 +140,7 @@ class TaskResultHistoryRepository(Protocol):
         metric_keys : set[str]
             Set of metric keys to aggregate
         cutoff_time : datetime | None
-            Optional inclusive lower bound (start_at >= cutoff_time)
+            Optional cutoff time for filtering
         end_time : datetime | None
             Optional inclusive upper bound (start_at <= end_time)
 
@@ -175,7 +175,7 @@ class TaskResultHistoryRepository(Protocol):
         metric_modes : dict[str, Literal["maximize", "minimize"]]
             Optimization mode per metric
         cutoff_time : datetime | None
-            Optional inclusive lower bound (start_at >= cutoff_time)
+            Optional cutoff time for filtering
         end_time : datetime | None
             Optional inclusive upper bound (start_at <= end_time)
 
@@ -210,7 +210,7 @@ class TaskResultHistoryRepository(Protocol):
         metric_keys : set[str]
             Set of metric keys to aggregate
         cutoff_time : datetime | None
-            Optional inclusive lower bound (start_at >= cutoff_time)
+            Optional cutoff time for filtering
         end_time : datetime | None
             Optional inclusive upper bound (start_at <= end_time)
 

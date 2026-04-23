@@ -124,7 +124,6 @@ export function MetricsPageContent() {
     }
   }, [chipData?.data?.size]);
 
-  // Resolve the filter parameters sent to the API based on the active range mode.
   const isAbsolute = rangeMode === "absolute";
 
   const relativeWithinHours =
@@ -152,7 +151,6 @@ export function MetricsPageContent() {
         selection_mode: selectionMode,
       };
 
-  // Absolute mode needs at least one bound to be useful; relative mode is always ready.
   const hasAbsoluteBound = Boolean(startDate || endDate);
   const canFetch = !!selectedChip && (!isAbsolute || hasAbsoluteBound);
 

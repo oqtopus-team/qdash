@@ -31,7 +31,6 @@ interface QubitMetricHistoryModalProps {
   qid: string;
   metricName: string;
   metricUnit: string;
-  /** ISO timestamps bounding the Execution History list (inclusive). */
   startAt?: string | null;
   endAt?: string | null;
 }

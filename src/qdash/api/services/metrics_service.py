@@ -184,7 +184,7 @@ class MetricsService:
             chip_id: The chip identifier
             project_id: The project identifier for filtering
             entity_type: "qubit" or "coupling"
-            within_hours: Optional time filter in hours (relative)
+            within_hours: Optional time filter in hours
             selection_mode: "latest", "best", or "average"
             start_at: Optional absolute lower bound on ``start_at``
             end_at: Optional absolute upper bound on ``start_at``
@@ -230,7 +230,7 @@ class MetricsService:
             chip_id: The chip identifier
             project_id: The project identifier
             username: The requesting user's name
-            within_hours: Optional relative time filter in hours
+            within_hours: Optional time filter
             selection_mode: Selection strategy
             start_at: Optional absolute lower bound (ISO8601 string or datetime)
             end_at: Optional absolute upper bound (ISO8601 string or datetime)
@@ -241,7 +241,7 @@ class MetricsService:
 
         Raises:
         ------
-            HTTPException: 404 if chip not found, 400 if date range is invalid
+            HTTPException: 404 if chip not found
 
         """
         qubit_count = self._chip_repo.get_qubit_count(project_id, chip_id)
@@ -385,7 +385,7 @@ class MetricsService:
             chip_id: The chip identifier
             project_id: The project identifier
             username: The requesting user's name
-            within_hours: Optional relative time filter
+            within_hours: Optional time filter
             selection_mode: Selection strategy
             start_at: Optional absolute lower bound (ISO8601 string or datetime)
             end_at: Optional absolute upper bound (ISO8601 string or datetime)
