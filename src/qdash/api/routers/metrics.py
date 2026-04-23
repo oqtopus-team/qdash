@@ -88,7 +88,7 @@ async def get_chip_metrics(
         chip_id: The chip identifier
         ctx: Project context with user and project information
         metrics_service: Injected metrics service
-        within_hours: Optional relative filter (last N hours)
+        within_hours: Optional filter to only include data from last N hours (e.g., 24)
         selection_mode: "latest" to get most recent values, "best" to get optimal values
         start_at: Optional absolute lower bound (ISO8601 or date)
         end_at: Optional absolute upper bound (ISO8601 or date)
