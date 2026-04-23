@@ -768,9 +768,8 @@ function CdfWithCoverage({
   );
 }
 
-// Absolute date range picker. Visual design mirrors the Analysis > Time Series
-// "Time Range" section (form-control with label above input). Empty string in
-// either input clears that bound.
+// Absolute date range picker using HTML5 native date inputs.
+// Empty string in either input clears that bound.
 function AbsoluteDateRangePicker({
   startDate,
   endDate,

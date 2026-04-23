@@ -64,7 +64,6 @@ export function CouplingMetricHistoryModal({
   startAt,
   endAt,
 }: CouplingMetricHistoryModalProps) {
-  const hasDateBound = Boolean(startAt || endAt);
   const [selectedExecutionId, setSelectedExecutionId] = useState<string | null>(
     null,
   );
@@ -297,7 +296,7 @@ export function CouplingMetricHistoryModal({
           </svg>
           <span>
             No {metricName} history available for {activeCouplingId}
-            {hasDateBound
+            {startAt || endAt
               ? " in the selected date range"
               : " in the last 365 days"}
           </span>

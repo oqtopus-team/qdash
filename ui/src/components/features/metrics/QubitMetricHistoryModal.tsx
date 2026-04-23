@@ -63,7 +63,6 @@ export function QubitMetricHistoryModal({
   startAt,
   endAt,
 }: QubitMetricHistoryModalProps) {
-  const hasDateBound = Boolean(startAt || endAt);
   const [selectedExecutionId, setSelectedExecutionId] = useState<string | null>(
     null,
   );
@@ -260,7 +259,9 @@ export function QubitMetricHistoryModal({
         </svg>
         <span>
           No {metricName} history available for {qid}
-          {hasDateBound ? " in the selected date range" : " in the last 365 days"}
+          {startAt || endAt
+            ? " in the selected date range"
+            : " in the last 365 days"}
         </span>
       </div>
     );
