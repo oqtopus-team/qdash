@@ -376,7 +376,6 @@ export function CouplingGrid({
           viewportHeight,
         ),
         maxWidth: viewMode === "pan-zoom" ? "none" : "100%",
-        willChange: viewMode === "pan-zoom" ? "transform" : "auto",
       }}
     >
       {/* Qubit positions - either from topology or computed, with MUX styling */}
