@@ -25,6 +25,18 @@ class MetricAggregateResult(TypedDict, total=False):
     stddev: float | None
 
 
+def _build_start_at_filter(
+    cutoff_time: datetime | None, end_time: datetime | None
+) -> dict[str, datetime] | None:
+    """Build a MongoDB range filter on ``start_at`` from optional bounds."""
+    bounds: dict[str, datetime] = {}
+    if cutoff_time is not None:
+        bounds["$gte"] = cutoff_time
+    if end_time is not None:
+        bounds["$lte"] = end_time
+    return bounds or None
+
+
 class MongoTaskResultHistoryRepository:
     """MongoDB implementation of TaskResultHistoryRepository.
 
@@ -292,6 +304,7 @@ class MongoTaskResultHistoryRepository:
         entity_type: Literal["qubit", "coupling"],
         metric_keys: set[str],
         cutoff_time: datetime | None = None,
+        end_time: datetime | None = None,
     ) -> dict[str, dict[str, MetricAggregateResult]]:
         """Aggregate latest metric values for each entity using MongoDB aggregation.
 
@@ -310,7 +323,9 @@ class MongoTaskResultHistoryRepository:
         metric_keys : set[str]
             Set of metric keys to extract
         cutoff_time : datetime | None
-            Optional datetime for filtering tasks (only include tasks after this time)
+            Optional inclusive lower bound on ``start_at``
+        end_time : datetime | None
+            Optional inclusive upper bound on ``start_at``
 
         Returns
         -------
@@ -329,8 +344,9 @@ class MongoTaskResultHistoryRepository:
             "status": "completed",
             "$or": [{f"output_parameters.{m}": {"$exists": True}} for m in metric_keys],
         }
-        if cutoff_time:
-            match_stage["start_at"] = {"$gte": cutoff_time}
+        start_at_filter = _build_start_at_filter(cutoff_time, end_time)
+        if start_at_filter:
+            match_stage["start_at"] = start_at_filter
 
         # Aggregation pipeline:
         # 1. Match relevant documents
@@ -394,6 +410,7 @@ class MongoTaskResultHistoryRepository:
         entity_type: Literal["qubit", "coupling"],
         metric_modes: dict[str, Literal["maximize", "minimize"]],
         cutoff_time: datetime | None = None,
+        end_time: datetime | None = None,
     ) -> dict[str, dict[str, MetricAggregateResult]]:
         """Aggregate best metric values for each entity using MongoDB aggregation.
 
@@ -411,7 +428,9 @@ class MongoTaskResultHistoryRepository:
         metric_modes : dict[str, Literal["maximize", "minimize"]]
             Dict mapping metric_key -> evaluation mode
         cutoff_time : datetime | None
-            Optional datetime for filtering tasks
+            Optional inclusive lower bound on ``start_at``
+        end_time : datetime | None
+            Optional inclusive upper bound on ``start_at``
 
         Returns
         -------
@@ -432,8 +451,9 @@ class MongoTaskResultHistoryRepository:
             "status": "completed",
             "$or": [{f"output_parameters.{m}": {"$exists": True}} for m in metric_keys],
         }
-        if cutoff_time:
-            match_stage["start_at"] = {"$gte": cutoff_time}
+        start_at_filter = _build_start_at_filter(cutoff_time, end_time)
+        if start_at_filter:
+            match_stage["start_at"] = start_at_filter
 
         # For best metrics, we need to run separate aggregations for
         # maximize and minimize modes, as MongoDB doesn't support
@@ -461,6 +481,7 @@ class MongoTaskResultHistoryRepository:
         entity_type: Literal["qubit", "coupling"],
         metric_keys: set[str],
         cutoff_time: datetime | None = None,
+        end_time: datetime | None = None,
     ) -> dict[str, dict[str, MetricAggregateResult]]:
         """Aggregate average metric values for each entity using MongoDB aggregation.
 
@@ -479,7 +500,9 @@ class MongoTaskResultHistoryRepository:
         metric_keys : set[str]
             Set of metric keys to extract
         cutoff_time : datetime | None
-            Optional datetime for filtering tasks (only include tasks after this time)
+            Optional inclusive lower bound on ``start_at``
+        end_time : datetime | None
+            Optional inclusive upper bound on ``start_at``
 
         Returns
         -------
@@ -499,8 +522,9 @@ class MongoTaskResultHistoryRepository:
             "status": "completed",
             "$or": [{f"output_parameters.{m}": {"$exists": True}} for m in metric_keys],
         }
-        if cutoff_time:
-            match_stage["start_at"] = {"$gte": cutoff_time}
+        start_at_filter = _build_start_at_filter(cutoff_time, end_time)
+        if start_at_filter:
+            match_stage["start_at"] = start_at_filter
 
         pipeline: list[dict[str, Any]] = [
             {"$match": match_stage},

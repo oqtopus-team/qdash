@@ -62,6 +62,19 @@ async def get_chip_metrics(
             )
         ),
     ] = "latest",
+    start_at: Annotated[
+        str | None,
+        Query(
+            description=(
+                "Inclusive absolute lower bound on task start time (ISO8601 or date). "
+                "Takes precedence over within_hours for the lower bound."
+            )
+        ),
+    ] = None,
+    end_at: Annotated[
+        str | None,
+        Query(description="Inclusive absolute upper bound on task start time (ISO8601 or date)."),
+    ] = None,
 ) -> ChipMetricsResponse:
     """Get chip calibration metrics for visualization.
 
@@ -75,8 +88,10 @@ async def get_chip_metrics(
         chip_id: The chip identifier
         ctx: Project context with user and project information
         metrics_service: Injected metrics service
-        within_hours: Optional filter to only include data from last N hours (e.g., 24)
+        within_hours: Optional relative filter (last N hours)
         selection_mode: "latest" to get most recent values, "best" to get optimal values
+        start_at: Optional absolute lower bound (ISO8601 or date)
+        end_at: Optional absolute upper bound (ISO8601 or date)
 
     Returns:
     -------
@@ -89,6 +104,8 @@ async def get_chip_metrics(
         username=ctx.user.username,
         within_hours=within_hours,
         selection_mode=selection_mode,
+        start_at=start_at,
+        end_at=end_at,
     )
 
 
@@ -213,6 +230,14 @@ async def download_metrics_pdf(
         Literal["latest", "best", "average"],
         Query(description="Selection mode: 'latest', 'best', or 'average'"),
     ] = "latest",
+    start_at: Annotated[
+        str | None,
+        Query(description="Inclusive absolute lower bound on task start time (ISO8601 or date)."),
+    ] = None,
+    end_at: Annotated[
+        str | None,
+        Query(description="Inclusive absolute upper bound on task start time (ISO8601 or date)."),
+    ] = None,
 ) -> StreamingResponse:
     """Download chip metrics as a PDF report.
 
@@ -226,8 +251,10 @@ async def download_metrics_pdf(
 
     Args:
         chip_id: Chip identifier
-        within_hours: Optional time filter in hours
+        within_hours: Optional relative time filter in hours
         selection_mode: "latest" for most recent values, "best" for optimal values
+        start_at: Optional absolute lower bound (ISO8601 or date)
+        end_at: Optional absolute upper bound (ISO8601 or date)
     """
     pdf_buffer, filename, _ = metrics_service.generate_metrics_pdf(
         chip_id=chip_id,
@@ -235,6 +262,8 @@ async def download_metrics_pdf(
         username=ctx.user.username,
         within_hours=within_hours,
         selection_mode=selection_mode,
+        start_at=start_at,
+        end_at=end_at,
     )
 
     return StreamingResponse(

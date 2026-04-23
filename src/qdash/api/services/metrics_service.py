@@ -97,6 +97,31 @@ def _extract_metric_output_info(
     return metric_data, None, None
 
 
+def _parse_date_range(
+    start_at: str | datetime | None,
+    end_at: str | datetime | None,
+) -> tuple[datetime | None, datetime | None]:
+    """Parse and validate absolute date-range parameters.
+
+    Raises
+    ------
+    HTTPException
+        400 if the values cannot be parsed or the range is inverted.
+    """
+    try:
+        start_dt = to_datetime(start_at) if start_at is not None else None
+        end_dt = to_datetime(end_at) if end_at is not None else None
+    except (ValueError, TypeError) as exc:
+        raise HTTPException(status_code=400, detail=f"Invalid date value: {exc}") from exc
+
+    if start_dt is not None and end_dt is not None and start_dt > end_dt:
+        raise HTTPException(
+            status_code=400,
+            detail="start_at must be on or before end_at",
+        )
+    return start_dt, end_dt
+
+
 def _get_task_timestamp(task_doc: Any) -> datetime:
     """Get the best available timestamp for a task history document."""
 
@@ -149,6 +174,8 @@ class MetricsService:
         entity_type: Literal["qubit", "coupling"],
         within_hours: int | None = None,
         selection_mode: Literal["latest", "best", "average"] = "latest",
+        start_at: datetime | None = None,
+        end_at: datetime | None = None,
     ) -> dict[str, dict[str, MetricValue]]:
         """Extract metrics for qubits or couplings from task result history.
 
@@ -157,8 +184,10 @@ class MetricsService:
             chip_id: The chip identifier
             project_id: The project identifier for filtering
             entity_type: "qubit" or "coupling"
-            within_hours: Optional time filter in hours
+            within_hours: Optional time filter in hours (relative)
             selection_mode: "latest", "best", or "average"
+            start_at: Optional absolute lower bound on ``start_at``
+            end_at: Optional absolute upper bound on ``start_at``
 
         Returns:
         -------
@@ -169,8 +198,8 @@ class MetricsService:
         entity_metrics = config.qubit_metrics if entity_type == "qubit" else config.coupling_metrics
         valid_metric_keys = set(entity_metrics.keys())
 
-        cutoff_time = None
-        if within_hours:
+        cutoff_time = start_at
+        if cutoff_time is None and within_hours:
             cutoff_time = now() - timedelta(hours=within_hours)
 
         return self._extract_metrics(
@@ -180,6 +209,7 @@ class MetricsService:
             valid_metric_keys=valid_metric_keys,
             selection_mode=selection_mode,
             cutoff_time=cutoff_time,
+            end_time=end_at,
             metrics_config=entity_metrics if selection_mode == "best" else None,
         )
 
@@ -190,6 +220,8 @@ class MetricsService:
         username: str,
         within_hours: int | None = None,
         selection_mode: Literal["latest", "best", "average"] = "latest",
+        start_at: str | datetime | None = None,
+        end_at: str | datetime | None = None,
     ) -> ChipMetricsResponse:
         """Get chip calibration metrics for visualization.
 
@@ -198,8 +230,10 @@ class MetricsService:
             chip_id: The chip identifier
             project_id: The project identifier
             username: The requesting user's name
-            within_hours: Optional time filter
+            within_hours: Optional relative time filter in hours
             selection_mode: Selection strategy
+            start_at: Optional absolute lower bound (ISO8601 string or datetime)
+            end_at: Optional absolute upper bound (ISO8601 string or datetime)
 
         Returns:
         -------
@@ -207,7 +241,7 @@ class MetricsService:
 
         Raises:
         ------
-            HTTPException: 404 if chip not found
+            HTTPException: 404 if chip not found, 400 if date range is invalid
 
         """
         qubit_count = self._chip_repo.get_qubit_count(project_id, chip_id)
@@ -219,11 +253,13 @@ class MetricsService:
                     detail=f"Chip {chip_id} not found in project {project_id}",
                 )
 
+        start_at_dt, end_at_dt = _parse_date_range(start_at, end_at)
+
         qubit_metrics = self.extract_entity_metrics(
-            chip_id, project_id, "qubit", within_hours, selection_mode
+            chip_id, project_id, "qubit", within_hours, selection_mode, start_at_dt, end_at_dt
         )
         coupling_metrics = self.extract_entity_metrics(
-            chip_id, project_id, "coupling", within_hours, selection_mode
+            chip_id, project_id, "coupling", within_hours, selection_mode, start_at_dt, end_at_dt
         )
 
         return ChipMetricsResponse(
@@ -231,6 +267,8 @@ class MetricsService:
             username=username,
             qubit_count=qubit_count,
             within_hours=within_hours,
+            start_at=start_at_dt,
+            end_at=end_at_dt,
             qubit_metrics=qubit_metrics,
             coupling_metrics=coupling_metrics,
         )
@@ -337,6 +375,8 @@ class MetricsService:
         username: str,
         within_hours: int | None = None,
         selection_mode: Literal["latest", "best", "average"] = "latest",
+        start_at: str | datetime | None = None,
+        end_at: str | datetime | None = None,
     ) -> tuple[BytesIO, str, str]:
         """Generate a PDF report for chip metrics.
 
@@ -345,8 +385,10 @@ class MetricsService:
             chip_id: The chip identifier
             project_id: The project identifier
             username: The requesting user's name
-            within_hours: Optional time filter
+            within_hours: Optional relative time filter
             selection_mode: Selection strategy
+            start_at: Optional absolute lower bound (ISO8601 string or datetime)
+            end_at: Optional absolute upper bound (ISO8601 string or datetime)
 
         Returns:
         -------
@@ -365,11 +407,13 @@ class MetricsService:
 
         qubit_count = self._chip_repo.get_qubit_count(project_id, chip_id)
 
+        start_at_dt, end_at_dt = _parse_date_range(start_at, end_at)
+
         qubit_metrics_data = self.extract_entity_metrics(
-            chip_id, project_id, "qubit", within_hours, selection_mode
+            chip_id, project_id, "qubit", within_hours, selection_mode, start_at_dt, end_at_dt
         )
         coupling_metrics_data = self.extract_entity_metrics(
-            chip_id, project_id, "coupling", within_hours, selection_mode
+            chip_id, project_id, "coupling", within_hours, selection_mode, start_at_dt, end_at_dt
         )
 
         metrics_response = ChipMetricsResponse(
@@ -377,6 +421,8 @@ class MetricsService:
             username=username,
             qubit_count=qubit_count,
             within_hours=within_hours,
+            start_at=start_at_dt,
+            end_at=end_at_dt,
             qubit_metrics=qubit_metrics_data,
             coupling_metrics=coupling_metrics_data,
         )
@@ -406,6 +452,7 @@ class MetricsService:
         valid_metric_keys: set[str],
         selection_mode: Literal["latest", "best", "average"],
         cutoff_time: Any | None,
+        end_time: Any | None = None,
         metrics_config: dict[str, Any] | None = None,
     ) -> dict[str, dict[str, MetricValue]]:
         """Extract metrics using the appropriate aggregation strategy."""
@@ -428,6 +475,7 @@ class MetricsService:
                     entity_type=entity_type,
                     metric_modes=metric_modes,
                     cutoff_time=cutoff_time,
+                    end_time=end_time,
                 )
             elif selection_mode == "average":
                 agg_results = self._task_result_repo.aggregate_average_metrics(
@@ -436,6 +484,7 @@ class MetricsService:
                     entity_type=entity_type,
                     metric_keys=valid_metric_keys,
                     cutoff_time=cutoff_time,
+                    end_time=end_time,
                 )
             else:  # latest
                 agg_results = self._task_result_repo.aggregate_latest_metrics(
@@ -444,6 +493,7 @@ class MetricsService:
                     entity_type=entity_type,
                     metric_keys=valid_metric_keys,
                     cutoff_time=cutoff_time,
+                    end_time=end_time,
                 )
         except Exception as e:
             logger.error(f"Failed to aggregate {selection_mode} metrics: {e}")
