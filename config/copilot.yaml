@@ -11,16 +11,27 @@ thinking_language: en
 response_language: ja
 
 # Model configuration
+# `model` is used for general chat (side-panel Q&A, tool use, explanations).
+# `analysis_model` (optional) overrides `model` ONLY for task result analysis —
+# use a calibration-specialized LLM here while keeping general chat on a
+# versatile frontier model.
 model:
   # Provider: "openai", "anthropic", or "ollama"
-  #provider: ollama
   provider: openai
-  # Model name (e.g., "gpt-4.1", "gpt-4.1-mini", "gpt-oss:20b" for Ollama)
-  name: gpt-4.1
+  # Latest general-purpose OpenAI model
+  name: gpt-5.4
   # Temperature for response generation (0.0 - 2.0)
   temperature: 0.7
   # Maximum tokens for response
-  max_output_tokens: 16384
+  max_output_tokens: 4096
+
+# Specialized model for task result analysis (chevron patterns, Rabi, etc.)
+# Comment out to fall back to the general `model` above.
+analysis_model:
+  provider: ollama
+  name: nvidia/Ising-Calibration-1-35B-A3B
+  temperature: 0.7
+  max_output_tokens: 4096
 
 # Metrics to include in multi-metric evaluation
 # Only these metrics will be used for overall chip health scoring

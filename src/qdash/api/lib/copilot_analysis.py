@@ -8,7 +8,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 @dataclass
@@ -86,6 +86,22 @@ class AnalysisResponse(BaseModel):
         default_factory=list,
         description="Recommended next actions",
     )
+
+    @field_validator("potential_issues", "recommendations", mode="before")
+    @classmethod
+    def _coerce_list(cls, v: Any) -> Any:
+        if v is None or v == "":
+            return []
+        if isinstance(v, str):
+            return [v]
+        return v
+
+    @field_validator("assessment", mode="before")
+    @classmethod
+    def _coerce_assessment(cls, v: Any) -> Any:
+        if v is None:
+            return "warning"
+        return str(v).strip().lower()
 
 
 class ContentBlock(BaseModel):
