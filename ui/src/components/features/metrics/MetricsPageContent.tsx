@@ -405,7 +405,7 @@ export function MetricsPageContent() {
                 metricData={metricData}
                 metricConfig={currentMetricConfig}
                 selectionMode={selectionMode}
-                rangeLabel={
+                timeRange={
                   isAbsolute
                     ? `absolute:${startDate ?? ""}..${endDate ?? ""}`
                     : timeRange
