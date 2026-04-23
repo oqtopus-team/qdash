@@ -21,7 +21,11 @@ interface MetricsYamlDownloadButtonProps {
   } | null;
   metricConfig: MetricConfig | undefined;
   selectionMode: "latest" | "best" | "average";
-  timeRange: "1d" | "7d" | "30d" | "custom";
+  /**
+   * Human-readable label describing the active time filter.
+   * Written into the YAML header for traceability.
+   */
+  rangeLabel: string;
   disabled?: boolean;
 }
 
@@ -36,7 +40,7 @@ function buildYaml(
   chipId: string,
   metricConfig: MetricConfig,
   selectionMode: string,
-  timeRange: string,
+  rangeLabel: string,
   metricData: { [entityId: string]: MetricEntry },
 ): string {
   const timestamp = new Date().toISOString();
@@ -52,7 +56,7 @@ function buildYaml(
     `title: ${escapeYamlString(metricConfig.title)}`,
     `unit: ${escapeYamlString(metricConfig.unit)}`,
     `selection_mode: ${selectionMode}`,
-    `time_range: ${timeRange}`,
+    `time_range: ${escapeYamlString(rangeLabel)}`,
     `timestamp: ${escapeYamlString(timestamp)}`,
     `data:`,
   ];
@@ -88,7 +92,7 @@ export function MetricsYamlDownloadButton({
   metricData,
   metricConfig,
   selectionMode,
-  timeRange,
+  rangeLabel,
   disabled = false,
 }: MetricsYamlDownloadButtonProps) {
   const handleDownload = () => {
@@ -98,7 +102,7 @@ export function MetricsYamlDownloadButton({
       chipId,
       metricConfig,
       selectionMode,
-      timeRange,
+      rangeLabel,
       metricData,
     );
 

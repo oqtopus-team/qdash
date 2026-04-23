@@ -105,4 +105,58 @@ describe("useMetricsUrlState", () => {
 
     expect(result.current.isInitialized).toBe(true);
   });
+
+  it("defaults rangeMode to 'relative' with null start/end dates", () => {
+    const { result } = renderHook(() => useMetricsUrlState(), {
+      wrapper: withNuqsTestingAdapter({ searchParams: "" }),
+    });
+
+    expect(result.current.rangeMode).toBe("relative");
+    expect(result.current.startDate).toBeNull();
+    expect(result.current.endDate).toBeNull();
+  });
+
+  it("reads absolute mode and dates from URL params", () => {
+    const { result } = renderHook(() => useMetricsUrlState(), {
+      wrapper: withNuqsTestingAdapter({
+        searchParams: "rangeMode=absolute&start=2026-01-01&end=2026-01-15",
+      }),
+    });
+
+    expect(result.current.rangeMode).toBe("absolute");
+    expect(result.current.startDate).toBe("2026-01-01");
+    expect(result.current.endDate).toBe("2026-01-15");
+  });
+
+  it("setRangeMode('absolute') clears relative-mode params", () => {
+    const { result } = renderHook(() => useMetricsUrlState(), {
+      wrapper: withNuqsTestingAdapter({
+        searchParams: "range=30d&days=45",
+      }),
+    });
+
+    act(() => {
+      result.current.setRangeMode("absolute");
+    });
+
+    expect(result.current.rangeMode).toBe("absolute");
+    expect(result.current.timeRange).toBe("7d"); // falls back to default
+    expect(result.current.customDays).toBeNull();
+  });
+
+  it("setRangeMode('relative') clears absolute-mode params", () => {
+    const { result } = renderHook(() => useMetricsUrlState(), {
+      wrapper: withNuqsTestingAdapter({
+        searchParams: "rangeMode=absolute&start=2026-01-01&end=2026-01-15",
+      }),
+    });
+
+    act(() => {
+      result.current.setRangeMode("relative");
+    });
+
+    expect(result.current.rangeMode).toBe("relative");
+    expect(result.current.startDate).toBeNull();
+    expect(result.current.endDate).toBeNull();
+  });
 });
