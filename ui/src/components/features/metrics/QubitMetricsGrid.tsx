@@ -43,6 +43,9 @@ interface QubitMetricsGridProps {
   chipId: string;
   topologyId: string;
   selectedDate: string;
+  /** Optional ISO timestamp bounds to restrict the history modal. */
+  startAt?: string | null;
+  endAt?: string | null;
 }
 
 interface SelectedQubitInfo {
@@ -278,6 +281,8 @@ export function QubitMetricsGrid({
   gridSize = 8,
   chipId,
   topologyId,
+  startAt,
+  endAt,
 }: QubitMetricsGridProps) {
   // Get topology configuration
   const {
@@ -850,6 +855,8 @@ export function QubitMetricsGrid({
                   qid={selectedQubitInfo.qid}
                   metricName={metricKey}
                   metricUnit={unit}
+                  startAt={startAt}
+                  endAt={endAt}
                 />
               </div>
               <div className="px-4 sm:px-6 py-3 sm:py-4 border-t border-base-300 flex justify-between items-center">

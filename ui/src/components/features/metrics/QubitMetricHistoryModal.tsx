@@ -31,6 +31,9 @@ interface QubitMetricHistoryModalProps {
   qid: string;
   metricName: string;
   metricUnit: string;
+  /** ISO timestamps bounding the Execution History list (inclusive). */
+  startAt?: string | null;
+  endAt?: string | null;
 }
 
 interface ExecutionGroup {
@@ -57,7 +60,10 @@ export function QubitMetricHistoryModal({
   qid,
   metricName,
   metricUnit,
+  startAt,
+  endAt,
 }: QubitMetricHistoryModalProps) {
+  const hasDateBound = Boolean(startAt || endAt);
   const [selectedExecutionId, setSelectedExecutionId] = useState<string | null>(
     null,
   );
@@ -89,10 +95,22 @@ export function QubitMetricHistoryModal({
     [data?.data?.history],
   );
 
+  // When caller passes a date range (e.g. absolute mode on metrics page),
+  // restrict the Execution History to items whose timestamp falls inside it.
+  const filteredHistory = useMemo(() => {
+    if (!startAt && !endAt) return history;
+    const startMs = startAt ? new Date(startAt).getTime() : -Infinity;
+    const endMs = endAt ? new Date(endAt).getTime() : Infinity;
+    return history.filter((item) => {
+      const ts = new Date(item.timestamp).getTime();
+      return ts >= startMs && ts <= endMs;
+    });
+  }, [history, startAt, endAt]);
+
   // Group history items by execution_id
   const executionGroups = useMemo(() => {
     const groups = new Map<string, ExecutionGroup>();
-    history.forEach((item) => {
+    filteredHistory.forEach((item) => {
       if (!groups.has(item.execution_id)) {
         groups.set(item.execution_id, {
           executionId: item.execution_id,
@@ -107,7 +125,7 @@ export function QubitMetricHistoryModal({
       (a, b) =>
         new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
     );
-  }, [history]);
+  }, [filteredHistory]);
 
   // Fetch execution details when an execution is selected
   const {
@@ -224,7 +242,7 @@ export function QubitMetricHistoryModal({
     );
   }
 
-  if (isError || history.length === 0) {
+  if (isError || filteredHistory.length === 0) {
     return (
       <div className="alert alert-info">
         <svg
@@ -241,7 +259,8 @@ export function QubitMetricHistoryModal({
           />
         </svg>
         <span>
-          No {metricName} history available for {qid} in the last 365 days
+          No {metricName} history available for {qid}
+          {hasDateBound ? " in the selected date range" : " in the last 365 days"}
         </span>
       </div>
     );

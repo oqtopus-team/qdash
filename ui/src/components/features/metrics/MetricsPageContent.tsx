@@ -670,6 +670,8 @@ export function MetricsPageContent() {
                 chipId={selectedChip}
                 topologyId={topologyId}
                 selectedDate="latest"
+                startAt={isAbsolute ? absoluteStartIso : null}
+                endAt={isAbsolute ? absoluteEndIso : null}
               />
             ) : (
               <CouplingMetricsGrid
@@ -682,6 +684,8 @@ export function MetricsPageContent() {
                 chipId={selectedChip}
                 topologyId={topologyId}
                 selectedDate="latest"
+                startAt={isAbsolute ? absoluteStartIso : null}
+                endAt={isAbsolute ? absoluteEndIso : null}
               />
             )}
           </>
