@@ -39,6 +39,13 @@ import { CodeBlock } from "@/components/features/chat/CodeBlock";
 
 interface AnalysisChatPanelProps {
   context: AnalysisContext | null;
+  /**
+   * Optional close handler. When provided it replaces the default
+   * `closeAnalysisChat` (which toggles the global sidebar) — use this when
+   * embedding the panel inline (e.g. split view inside a modal) so the close
+   * button controls the embedding container rather than the sidebar.
+   */
+  onClose?: () => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -254,8 +261,14 @@ function BlocksContent({ blocks }: { blocks: BlocksResult }) {
 function MessageBubble({ message }: { message: ChatMessage }) {
   if (message.role === "user") {
     return (
-      <div className="flex justify-end">
-        <div className="bg-primary text-primary-content rounded-2xl rounded-br-sm px-4 py-2 max-w-[85%] text-sm">
+      <div className="flex flex-col items-end gap-1">
+        {message.attachedImage && (
+          <div className="flex items-center gap-1 text-[11px] text-base-content/60 bg-base-200 border border-base-300 rounded-full px-2 py-0.5">
+            <ImageIcon className="w-3 h-3" />
+            <span>実験結果画像を添付</span>
+          </div>
+        )}
+        <div className="bg-primary text-primary-content rounded-2xl rounded-br-sm px-4 py-2 max-w-[85%] text-sm whitespace-pre-wrap break-words">
           {message.content}
         </div>
       </div>
@@ -374,7 +387,10 @@ const GENERAL_SUGGESTED_QUESTIONS = [
 // Main component
 // ---------------------------------------------------------------------------
 
-export function AnalysisChatPanel({ context }: AnalysisChatPanelProps) {
+export function AnalysisChatPanel({
+  context,
+  onClose,
+}: AnalysisChatPanelProps) {
   const {
     closeAnalysisChat,
     sessions,
@@ -466,9 +482,11 @@ export function AnalysisChatPanel({ context }: AnalysisChatPanelProps) {
   };
 
   const handleMaximize = () => {
-    closeAnalysisChat();
+    (onClose ?? closeAnalysisChat)();
     router.push("/chat");
   };
+
+  const handleClose = onClose ?? closeAnalysisChat;
 
   return (
     <div className="flex flex-col h-full border-l border-base-300 bg-base-100">
@@ -512,7 +530,7 @@ export function AnalysisChatPanel({ context }: AnalysisChatPanelProps) {
             <Maximize2 className="w-3.5 h-3.5" />
           </button>
           <button
-            onClick={closeAnalysisChat}
+            onClick={handleClose}
             className="btn btn-ghost btn-xs btn-square"
           >
             <X className="w-4 h-4" />

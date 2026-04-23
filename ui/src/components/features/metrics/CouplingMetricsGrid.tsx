@@ -371,7 +371,6 @@ export function CouplingMetricsGrid({
           viewportHeight,
         ),
         maxWidth: viewMode === "pan-zoom" ? "none" : "100%",
-        willChange: viewMode === "pan-zoom" ? "transform" : "auto",
       }}
     >
       {/* Qubit cells (background) with MUX styling */}

@@ -17,6 +17,7 @@ import { useManualOverrides } from "@/hooks/useManualOverrides";
 import { TaskResultIssues } from "@/components/features/metrics/TaskResultIssues";
 import type { AnalysisContext } from "@/hooks/useAnalysisChat";
 import { useAnalysisChatContext } from "@/contexts/AnalysisChatContext";
+import { AnalysisChatPanel } from "@/components/features/metrics/AnalysisChatPanel";
 
 interface TaskHistoryModalProps {
   chipId: string;
@@ -41,7 +42,36 @@ export function TaskHistoryModal({
     type: "success" | "error";
     text: string;
   } | null>(null);
-  const { openMiniChat } = useAnalysisChatContext();
+  const { createNewSession, switchSession, sessions } =
+    useAnalysisChatContext();
+  const [isChatOpen, setIsChatOpen] = useState(false);
+
+  const handleAskAi = useCallback(
+    (ctx: AnalysisContext) => {
+      // Reuse an existing session for this task context if present, otherwise
+      // create a new one. We deliberately do NOT open the global sidebar —
+      // the chat is shown inline as a split view inside this modal.
+      const key = `${ctx.taskId}:${ctx.executionId}:${ctx.qid}`;
+      const existing = sessions.find(
+        (s) =>
+          s.context &&
+          `${s.context.taskId}:${s.context.executionId}:${s.context.qid}` ===
+            key,
+      );
+      if (existing) {
+        switchSession(existing.id);
+      } else {
+        createNewSession(ctx);
+      }
+      setIsChatOpen(true);
+    },
+    [sessions, switchSession, createNewSession],
+  );
+
+  // Reset chat pane when modal closes so re-opening starts clean.
+  React.useEffect(() => {
+    if (!isOpen) setIsChatOpen(false);
+  }, [isOpen]);
   const queryClient = useQueryClient();
   const updateParamsMutation = useUpdateCalibrationParameters();
   const manualOverrides = useManualOverrides(qid);
@@ -360,7 +390,7 @@ export function TaskHistoryModal({
             </Link>
             {analysisContext && (
               <button
-                onClick={() => openMiniChat(analysisContext)}
+                onClick={() => handleAskAi(analysisContext)}
                 className="btn btn-xs btn-primary gap-1"
               >
                 <Bot className="h-3 w-3" />
@@ -437,8 +467,12 @@ export function TaskHistoryModal({
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="modal-box w-full sm:w-11/12 max-w-5xl bg-base-100 p-3 sm:p-6">
-        <div className="flex justify-between items-center mb-3 sm:mb-4">
+      <div
+        className={`modal-box w-full bg-base-100 p-0 flex flex-col transition-[max-width] duration-300 ease-in-out ${
+          isChatOpen ? "sm:w-[96vw] max-w-[88rem]" : "sm:w-11/12 max-w-5xl"
+        }`}
+      >
+        <div className="flex justify-between items-center px-3 sm:px-6 pt-3 sm:pt-5 pb-2 sm:pb-3 border-b border-base-300">
           <h3 className="font-bold text-base sm:text-lg truncate pr-2">
             {taskName} - QID {qid}
           </h3>
@@ -450,66 +484,85 @@ export function TaskHistoryModal({
           </button>
         </div>
 
-        {isLoading ? (
-          <div className="flex items-center justify-center h-48 sm:h-96">
-            <span className="loading loading-spinner loading-lg"></span>
-          </div>
-        ) : isError || historyArray.length === 0 ? (
-          <div className="alert alert-info text-sm">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              className="stroke-current shrink-0 w-5 h-5 sm:w-6 sm:h-6"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
-            <span>No history available</span>
-          </div>
-        ) : (
-          <div className="h-full min-h-0 flex flex-col max-h-[70vh] sm:max-h-[75vh]">
-            {/* Mobile Tabs */}
-            <div className="lg:hidden mb-3 shrink-0">
-              <div className="tabs tabs-boxed bg-base-200">
-                <button
-                  className={`tab gap-1 ${mobileTab === "history" ? "tab-active" : ""}`}
-                  onClick={() => setMobileTab("history")}
+        <div className="flex flex-1 min-h-0">
+          <div
+            className={`flex flex-col min-w-0 p-3 sm:p-6 overflow-hidden ${
+              isChatOpen ? "flex-1 lg:flex-[1.1]" : "flex-1"
+            }`}
+          >
+            {isLoading ? (
+              <div className="flex items-center justify-center h-48 sm:h-96">
+                <span className="loading loading-spinner loading-lg"></span>
+              </div>
+            ) : isError || historyArray.length === 0 ? (
+              <div className="alert alert-info text-sm">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  className="stroke-current shrink-0 w-5 h-5 sm:w-6 sm:h-6"
                 >
-                  <History className="h-3 w-3" />
-                  History
-                </button>
-                <button
-                  className={`tab gap-1 ${mobileTab === "details" ? "tab-active" : ""}`}
-                  onClick={() => setMobileTab("details")}
-                >
-                  <FileText className="h-3 w-3" />
-                  Details
-                </button>
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                </svg>
+                <span>No history available</span>
               </div>
-            </div>
+            ) : (
+              <div className="h-full min-h-0 flex flex-col max-h-[70vh] sm:max-h-[75vh]">
+                {/* Mobile Tabs */}
+                <div className="lg:hidden mb-3 shrink-0">
+                  <div className="tabs tabs-boxed bg-base-200">
+                    <button
+                      className={`tab gap-1 ${mobileTab === "history" ? "tab-active" : ""}`}
+                      onClick={() => setMobileTab("history")}
+                    >
+                      <History className="h-3 w-3" />
+                      History
+                    </button>
+                    <button
+                      className={`tab gap-1 ${mobileTab === "details" ? "tab-active" : ""}`}
+                      onClick={() => setMobileTab("details")}
+                    >
+                      <FileText className="h-3 w-3" />
+                      Details
+                    </button>
+                  </div>
+                </div>
 
-            {/* Mobile Content */}
-            <div className="lg:hidden flex-1 min-h-0 overflow-y-auto">
-              {mobileTab === "history" && renderHistoryList()}
-              {mobileTab === "details" && renderTaskDetails()}
-            </div>
+                {/* Mobile Content */}
+                <div className="lg:hidden flex-1 min-h-0 overflow-y-auto">
+                  {mobileTab === "history" && renderHistoryList()}
+                  {mobileTab === "details" && renderTaskDetails()}
+                </div>
 
-            {/* Desktop Layout */}
-            <div className="hidden lg:flex gap-4 h-full min-h-0">
-              <div className="w-1/3 flex flex-col min-h-0 border-r border-base-300 pr-4">
-                {renderHistoryList()}
+                {/* Desktop Layout */}
+                <div className="hidden lg:flex gap-4 h-full min-h-0">
+                  <div className="w-1/3 flex flex-col min-h-0 border-r border-base-300 pr-4">
+                    {renderHistoryList()}
+                  </div>
+                  <div className="w-2/3 overflow-y-auto min-h-0">
+                    {renderTaskDetails()}
+                  </div>
+                </div>
               </div>
-              <div className="w-2/3 overflow-y-auto min-h-0">
-                {renderTaskDetails()}
-              </div>
-            </div>
+            )}
           </div>
-        )}
+
+          {isChatOpen && (
+            <div className="hidden md:flex w-[26rem] xl:w-[30rem] flex-shrink-0 border-l border-base-300 bg-base-100 min-h-0">
+              <div className="w-full h-full min-h-0">
+                <AnalysisChatPanel
+                  context={analysisContext}
+                  onClose={() => setIsChatOpen(false)}
+                />
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

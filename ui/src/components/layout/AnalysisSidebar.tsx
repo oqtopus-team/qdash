@@ -30,11 +30,11 @@ export function AnalysisSidebar() {
       {/* Inline sidebar panel — participates in flex layout to push main content */}
       <div
         className={`h-screen flex-shrink-0 border-l border-base-300 bg-base-100 transition-[width] duration-300 ease-in-out overflow-hidden ${
-          isOpen ? "w-80" : "w-0"
+          isOpen ? "w-[28rem] xl:w-[32rem]" : "w-0"
         }`}
       >
         {isOpen && (
-          <div className="w-80 h-full">
+          <div className="w-[28rem] xl:w-[32rem] h-full">
             <AnalysisChatPanel context={activeSession?.context ?? null} />
           </div>
         )}

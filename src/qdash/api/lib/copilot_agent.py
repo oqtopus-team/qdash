@@ -17,7 +17,9 @@ from openai import AsyncOpenAI, BadRequestError
 from qdash.api.lib.copilot_analysis import AnalysisResponse, TaskAnalysisContext
 
 if TYPE_CHECKING:
-    from qdash.api.lib.copilot_config import CopilotConfig
+    from qdash.api.lib.copilot_config import CopilotConfig, ModelConfig
+else:
+    from qdash.api.lib.copilot_config import CopilotConfig, ModelConfig
 
 logger = logging.getLogger(__name__)
 
@@ -592,14 +594,20 @@ Example response:
 
 RESPONSE_FORMAT_INSTRUCTION = """\
 
-You MUST respond with a valid JSON object matching this schema:
+You MUST respond with a valid JSON object (no prose, no code fences) matching this schema:
 {
   "summary": "One-line result summary",
-  "assessment": "good or warning or bad",
+  "assessment": "good" | "warning" | "bad",
   "explanation": "Detailed analysis and interpretation",
   "potential_issues": ["issue1", "issue2"],
   "recommendations": ["action1", "action2"]
 }
+
+Rules:
+- `potential_issues` and `recommendations` MUST be JSON arrays of strings. Use an empty array `[]` when nothing applies — never a single string or null.
+- `assessment` MUST be exactly one of `good`, `warning`, `bad` (lowercase).
+- Write the user-facing text fields (`summary`, `explanation`, items in `potential_issues` and `recommendations`) in the user's response language as instructed above. Keep technical terms like T1, T2, fidelity in English.
+- Do not add keys outside this schema.
 """
 
 
@@ -957,26 +965,198 @@ def _parse_response(content: str) -> AnalysisResponse:
         )
 
 
-def _legacy_to_blocks(response: AnalysisResponse) -> dict[str, Any]:
-    """Convert a legacy AnalysisResponse to blocks format."""
+_ASSESSMENT_LABELS_JA = {
+    "good": ("✅", "良好"),
+    "warning": ("⚠️", "要注意"),
+    "warn": ("⚠️", "要注意"),
+    "bad": ("❌", "不良"),
+    "poor": ("❌", "不良"),
+}
+_ASSESSMENT_LABELS_EN = {
+    "good": ("✅", "Good"),
+    "warning": ("⚠️", "Warning"),
+    "warn": ("⚠️", "Warning"),
+    "bad": ("❌", "Bad"),
+    "poor": ("❌", "Bad"),
+}
+
+_SECTION_LABELS = {
+    "ja": {
+        "summary": "概要",
+        "explanation": "詳細",
+        "issues": "潜在的な問題",
+        "recommendations": "推奨アクション",
+        "assessment": "評価",
+    },
+    "en": {
+        "summary": "Summary",
+        "explanation": "Details",
+        "issues": "Potential Issues",
+        "recommendations": "Recommendations",
+        "assessment": "Assessment",
+    },
+}
+
+
+def _format_assessment_badge(assessment: str | None, lang: str) -> str:
+    if not assessment:
+        return ""
+    key = assessment.strip().lower()
+    table = _ASSESSMENT_LABELS_JA if lang == "ja" else _ASSESSMENT_LABELS_EN
+    emoji, label = table.get(key, ("", assessment))
+    return f"{emoji} **{label}**".strip()
+
+
+_LANG_FULLNAME = {"ja": "Japanese (日本語)", "en": "English"}
+
+
+def _looks_like_target_language(text: str, lang: str) -> bool:
+    """Cheap heuristic: does `text` already look like it's in `lang`?"""
+    if not text:
+        return True
+    if lang == "ja":
+        # Any CJK character → assume already Japanese enough.
+        return any("\u3040" <= ch <= "\u30ff" or "\u4e00" <= ch <= "\u9fff" for ch in text)
+    if lang == "en":
+        return all(ord(ch) < 0x3000 for ch in text)
+    return True
+
+
+async def _translate_analysis_response(
+    response: AnalysisResponse,
+    target_lang: str,
+    general_model: ModelConfig,
+) -> AnalysisResponse:
+    """Translate an AnalysisResponse via the general (non-specialized) model.
+
+    Used when a calibration-specialized analysis model replies in English but
+    the user expects a different language (e.g. Japanese). Only free-form
+    text fields are translated; `assessment` is left untouched.
+    """
+    lang_key = "ja" if target_lang.startswith("ja") else "en"
+    fields_needing = []
+    if response.summary and not _looks_like_target_language(response.summary, lang_key):
+        fields_needing.append("summary")
+    if response.explanation and not _looks_like_target_language(response.explanation, lang_key):
+        fields_needing.append("explanation")
+    if any(i and not _looks_like_target_language(i, lang_key) for i in response.potential_issues):
+        fields_needing.append("potential_issues")
+    if any(r and not _looks_like_target_language(r, lang_key) for r in response.recommendations):
+        fields_needing.append("recommendations")
+
+    if not fields_needing:
+        return response
+
+    lang_name = _LANG_FULLNAME.get(lang_key, target_lang)
+    payload = {
+        "summary": response.summary or "",
+        "explanation": response.explanation or "",
+        "potential_issues": list(response.potential_issues),
+        "recommendations": list(response.recommendations),
+    }
+    system = (
+        f"You translate technical quantum-calibration analysis into natural, fluent {lang_name}. "
+        "Preserve all numeric values, units, and technical terms like T1, T2, fidelity, Rabi, "
+        "R², π-pulse, I/Q in their original form. Keep the same JSON shape. "
+        "Do not add, remove, or reinterpret content — only translate."
+    )
+    user = (
+        "Translate the string values in this JSON into "
+        f"{lang_name}. Return a JSON object with the SAME keys and array lengths.\n\n"
+        + json.dumps(payload, ensure_ascii=False)
+    )
+
+    try:
+        translator_config = CopilotConfig(model=general_model)
+        client = _build_client(translator_config)
+        kwargs: dict[str, Any] = {
+            "model": general_model.name,
+            "messages": [
+                {"role": "system", "content": system},
+                {"role": "user", "content": user},
+            ],
+            "response_format": {"type": "json_object"},
+        }
+        if general_model.temperature is not None:
+            kwargs["temperature"] = 0.2
+        try:
+            completion = await client.chat.completions.create(**kwargs)
+        except BadRequestError as exc:
+            if "temperature" in str(exc):
+                kwargs.pop("temperature", None)
+                completion = await client.chat.completions.create(**kwargs)
+            else:
+                raise
+        content = completion.choices[0].message.content or "{}"
+        data = json.loads(_strip_code_fences(content))
+    except Exception as exc:
+        logger.warning("Translation to %s failed, using original text: %s", lang_key, exc)
+        return response
+
+    def _coerce_list(val: Any, fallback: list[str]) -> list[str]:
+        if isinstance(val, list):
+            return [str(x) for x in val if x]
+        if isinstance(val, str) and val:
+            return [val]
+        return fallback
+
+    return response.model_copy(
+        update={
+            "summary": str(data.get("summary") or response.summary),
+            "explanation": str(data.get("explanation") or response.explanation),
+            "potential_issues": _coerce_list(
+                data.get("potential_issues"), list(response.potential_issues)
+            ),
+            "recommendations": _coerce_list(
+                data.get("recommendations"), list(response.recommendations)
+            ),
+        }
+    )
+
+
+def _legacy_to_blocks(
+    response: AnalysisResponse, config: CopilotConfig | None = None
+) -> dict[str, Any]:
+    """Convert a legacy AnalysisResponse to a multi-block human-friendly response.
+
+    Emits one block per semantic section (assessment badge, summary, explanation,
+    issues, recommendations) so that the frontend can render them separately — e.g.
+    as dedicated cards once richer block types land.
+    """
+    lang_raw = (config.response_language if config else "ja") or "ja"
+    lang = "ja" if lang_raw.startswith("ja") else "en"
+    labels = _SECTION_LABELS[lang]
+
     blocks: list[dict[str, Any]] = []
 
-    # Summary + explanation as text block
-    parts: list[str] = []
-    if response.summary:
-        parts.append(response.summary)
-    if response.explanation:
-        parts.append(response.explanation)
-    if response.potential_issues:
-        parts.append("\n**Potential Issues:**")
-        for issue in response.potential_issues:
-            parts.append(f"- {issue}")
-    if response.recommendations:
-        parts.append("\n**Recommendations:**")
-        for rec in response.recommendations:
-            parts.append(f"- {rec}")
+    def _text_block(content: str) -> None:
+        if content and content.strip():
+            blocks.append({"type": "text", "content": content, "chart": None})
 
-    blocks.append({"type": "text", "content": "\n\n".join(parts), "chart": None})
+    badge = _format_assessment_badge(response.assessment, lang)
+    summary = (response.summary or "").strip()
+    if badge or summary:
+        header = f"### {labels['assessment']}: {badge}" if badge else ""
+        body = summary
+        _text_block("\n\n".join(p for p in (header, body) if p))
+
+    explanation = (response.explanation or "").strip()
+    if explanation and explanation != summary:
+        _text_block(f"**{labels['explanation']}**\n\n{explanation}")
+
+    issues = [i for i in response.potential_issues if i and str(i).strip()]
+    if issues:
+        issue_lines = "\n".join(f"- {issue}" for issue in issues)
+        _text_block(f"**{labels['issues']}**\n\n{issue_lines}")
+
+    recs = [r for r in response.recommendations if r and str(r).strip()]
+    if recs:
+        rec_lines = "\n".join(f"- {rec}" for rec in recs)
+        _text_block(f"**{labels['recommendations']}**\n\n{rec_lines}")
+
+    if not blocks:
+        fallback = explanation or summary or ""
+        blocks.append({"type": "text", "content": fallback, "chart": None})
 
     return {
         "blocks": blocks,
@@ -984,7 +1164,7 @@ def _legacy_to_blocks(response: AnalysisResponse) -> dict[str, Any]:
     }
 
 
-def _parse_blocks_response(content: str) -> dict[str, Any]:
+def _parse_blocks_response(content: str, config: CopilotConfig | None = None) -> dict[str, Any]:
     """Parse LLM response into blocks format dict, with fallback to legacy."""
     text = _strip_code_fences(content)
 
@@ -994,7 +1174,7 @@ def _parse_blocks_response(content: str) -> dict[str, Any]:
             return dict(data)
         # Legacy format returned — convert
         response = AnalysisResponse(**data)
-        return _legacy_to_blocks(response)
+        return _legacy_to_blocks(response, config)
     except (json.JSONDecodeError, ValueError):
         # Plain text fallback
         return {
@@ -1442,6 +1622,13 @@ async def run_analysis(
         Blocks-format response: {"blocks": [...], "assessment": ...}
 
     """
+    # Allow a dedicated analysis model (e.g. calibration-specialized LLM) to
+    # override the general chat model for task result analysis. Keep a
+    # reference to the original general model so we can use it for post-
+    # processing (e.g. translation to the user's response language).
+    general_model = config.model
+    if config.analysis_model is not None:
+        config = config.model_copy(update={"model": config.analysis_model})
     client = _build_client(config)
     provider = config.model.provider
 
@@ -1463,7 +1650,18 @@ async def run_analysis(
         content = await _run_chat_completions(client, messages, config)
         # Ollama still uses legacy schema; convert to blocks
         response = _parse_response(content)
-        return _legacy_to_blocks(response)
+        # Calibration-specialized models often ignore language instructions and
+        # reply in English. If the user expects a different language, translate
+        # the free-form fields via the general (frontier) model.
+        target_lang = (config.response_language or "en").lower()
+        should_translate = (
+            target_lang != "en"
+            and general_model.provider != "ollama"
+            and general_model is not config.model
+        )
+        if should_translate:
+            response = await _translate_analysis_response(response, target_lang, general_model)
+        return _legacy_to_blocks(response, config)
     else:
         # OpenAI: use Responses API with blocks schema (strict: False for flexible chart objects)
         system_prompt = (
@@ -1499,7 +1697,7 @@ async def run_analysis(
             on_tool_call=on_tool_call,
             on_status=on_status,
         )
-        return _inject_collected_charts(_parse_blocks_response(content), collected_charts)
+        return _inject_collected_charts(_parse_blocks_response(content, config), collected_charts)
 
 
 def blocks_to_markdown(result: dict[str, Any]) -> str:
@@ -1735,7 +1933,7 @@ async def run_chat(
         )
         content = await _run_chat_completions(client, messages, config)
         response = _parse_response(content)
-        return _legacy_to_blocks(response)
+        return _legacy_to_blocks(response, config)
     else:
         input_items = _build_input(user_message, image_base64, conversation_history)
 
@@ -1759,4 +1957,4 @@ async def run_chat(
             on_tool_call=on_tool_call,
             on_status=on_status,
         )
-        return _inject_collected_charts(_parse_blocks_response(content), collected_charts)
+        return _inject_collected_charts(_parse_blocks_response(content, config), collected_charts)

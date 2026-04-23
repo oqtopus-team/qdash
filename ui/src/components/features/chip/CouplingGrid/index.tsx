@@ -226,8 +226,6 @@ export function CouplingGrid({
         <span className="loading loading-spinner loading-lg"></span>
       </div>
     );
-  if (isError)
-    return <div className="alert alert-error">Failed to load data</div>;
 
   // In pan-zoom mode, ensure cells are large enough for figures to be readable.
   const effectiveGridSize = gridSize;
@@ -376,7 +374,6 @@ export function CouplingGrid({
           viewportHeight,
         ),
         maxWidth: viewMode === "pan-zoom" ? "none" : "100%",
-        willChange: viewMode === "pan-zoom" ? "transform" : "auto",
       }}
     >
       {/* Qubit positions - either from topology or computed, with MUX styling */}
@@ -675,6 +672,11 @@ export function CouplingGrid({
 
   return (
     <div className="flex flex-col h-full space-y-2">
+      {isError && (
+        <div className="alert alert-error">
+          Failed to load {selectedTask} data for {selectedDate}
+        </div>
+      )}
       {/* View mode toggle and Download controls */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
