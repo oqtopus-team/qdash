@@ -251,7 +251,7 @@ async def download_metrics_pdf(
 
     Args:
         chip_id: Chip identifier
-        within_hours: Optional relative time filter in hours
+        within_hours: Optional time filter in hours
         selection_mode: "latest" for most recent values, "best" for optimal values
         start_at: Optional absolute lower bound (ISO8601 or date)
         end_at: Optional absolute upper bound (ISO8601 or date)
