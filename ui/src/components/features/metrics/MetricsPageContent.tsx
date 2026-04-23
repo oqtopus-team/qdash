@@ -764,8 +764,9 @@ function CdfWithCoverage({
   );
 }
 
-// Absolute date range picker using HTML5 native date inputs.
-// Empty string in either input clears that bound.
+// Absolute date range picker. Visual design mirrors the Analysis > Time Series
+// "Time Range" section (form-control with label above input). Empty string in
+// either input clears that bound.
 function AbsoluteDateRangePicker({
   startDate,
   endDate,
@@ -782,24 +783,29 @@ function AbsoluteDateRangePicker({
 
   return (
     <div className="flex flex-col gap-1">
-      <div className="flex items-center gap-2">
-        <input
-          type="date"
-          value={startDate ?? ""}
-          onChange={(e) => onStartChange(e.target.value || null)}
-          max={endDate ?? undefined}
-          className="input input-sm input-bordered tabular-nums"
-          aria-label="Start date"
-        />
-        <span className="text-sm text-base-content/70">–</span>
-        <input
-          type="date"
-          value={endDate ?? ""}
-          onChange={(e) => onEndChange(e.target.value || null)}
-          min={startDate ?? undefined}
-          className="input input-sm input-bordered tabular-nums"
-          aria-label="End date"
-        />
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <label className="flex items-center gap-2">
+          <span className="label-text">From</span>
+          <input
+            type="date"
+            className="input input-sm input-bordered tabular-nums w-32"
+            value={startDate ?? ""}
+            onChange={(e) => onStartChange(e.target.value || null)}
+            max={endDate ?? undefined}
+            aria-label="Start date"
+          />
+        </label>
+        <label className="flex items-center gap-2">
+          <span className="label-text">To</span>
+          <input
+            type="date"
+            className="input input-sm input-bordered tabular-nums w-32"
+            value={endDate ?? ""}
+            onChange={(e) => onEndChange(e.target.value || null)}
+            min={startDate ?? undefined}
+            aria-label="End date"
+          />
+        </label>
       </div>
       {hasInvertedRange && (
         <span className="text-xs text-error">

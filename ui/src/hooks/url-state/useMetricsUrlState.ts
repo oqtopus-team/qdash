@@ -88,6 +88,21 @@ export function useMetricsUrlState(): UseMetricsUrlStateResult {
       } else {
         setTimeRangeState(null);
         setCustomDaysState(null);
+        // Seed a 7-day range (from = 6 days ago, to = today) on the first
+        // switch to absolute mode, unless the user already has dates set.
+        if (!startDate && !endDate) {
+          const today = new Date();
+          const sixDaysAgo = new Date();
+          sixDaysAgo.setDate(today.getDate() - 6);
+          const toIso = (d: Date) => {
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, "0");
+            const day = String(d.getDate()).padStart(2, "0");
+            return `${y}-${m}-${day}`;
+          };
+          setStartDateState(toIso(sixDaysAgo));
+          setEndDateState(toIso(today));
+        }
       }
     },
     [
@@ -96,6 +111,8 @@ export function useMetricsUrlState(): UseMetricsUrlStateResult {
       setEndDateState,
       setTimeRangeState,
       setCustomDaysState,
+      startDate,
+      endDate,
     ],
   );
 
