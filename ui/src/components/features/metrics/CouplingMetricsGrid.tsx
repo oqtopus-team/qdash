@@ -69,6 +69,9 @@ interface CouplingMetricsGridProps {
   chipId: string;
   topologyId: string;
   selectedDate: string;
+  /** Optional ISO timestamp bounds to restrict the history modal. */
+  startAt?: string | null;
+  endAt?: string | null;
 }
 
 interface SelectedCouplingInfo {
@@ -115,6 +118,8 @@ export function CouplingMetricsGrid({
   gridSize = 8,
   chipId,
   topologyId,
+  startAt,
+  endAt,
 }: CouplingMetricsGridProps) {
   // Get topology configuration
   const {
@@ -803,6 +808,8 @@ export function CouplingMetricsGrid({
                   couplingId={selectedCouplingInfo.couplingId}
                   metricName={metricKey}
                   metricUnit={unit}
+                  startAt={startAt}
+                  endAt={endAt}
                 />
               </div>
 

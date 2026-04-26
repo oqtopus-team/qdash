@@ -8,6 +8,8 @@ import { downloadMetricsPdf } from "@/client/metrics/metrics";
 interface MetricsPdfDownloadButtonProps {
   chipId: string;
   withinHours?: number;
+  startAt?: string | null;
+  endAt?: string | null;
   selectionMode: "latest" | "best" | "average";
   disabled?: boolean;
 }
@@ -15,6 +17,8 @@ interface MetricsPdfDownloadButtonProps {
 export function MetricsPdfDownloadButton({
   chipId,
   withinHours,
+  startAt,
+  endAt,
   selectionMode,
   disabled = false,
 }: MetricsPdfDownloadButtonProps) {
@@ -32,6 +36,8 @@ export function MetricsPdfDownloadButton({
         chipId,
         {
           within_hours: withinHours,
+          start_at: startAt ?? undefined,
+          end_at: endAt ?? undefined,
           selection_mode: selectionMode,
         },
         { responseType: "blob" },

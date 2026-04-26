@@ -125,6 +125,7 @@ class TaskResultHistoryRepository(Protocol):
         entity_type: Literal["qubit", "coupling"],
         metric_keys: set[str],
         cutoff_time: datetime | None = None,
+        end_time: datetime | None = None,
     ) -> dict[str, dict[str, Any]]:
         """Aggregate latest metric values for each entity.
 
@@ -140,6 +141,8 @@ class TaskResultHistoryRepository(Protocol):
             Set of metric keys to aggregate
         cutoff_time : datetime | None
             Optional cutoff time for filtering
+        end_time : datetime | None
+            Optional inclusive upper bound (start_at <= end_time)
 
         Returns
         -------
@@ -157,6 +160,7 @@ class TaskResultHistoryRepository(Protocol):
         entity_type: Literal["qubit", "coupling"],
         metric_modes: dict[str, Literal["maximize", "minimize"]],
         cutoff_time: datetime | None = None,
+        end_time: datetime | None = None,
     ) -> dict[str, dict[str, Any]]:
         """Aggregate best metric values for each entity.
 
@@ -172,6 +176,8 @@ class TaskResultHistoryRepository(Protocol):
             Optimization mode per metric
         cutoff_time : datetime | None
             Optional cutoff time for filtering
+        end_time : datetime | None
+            Optional inclusive upper bound (start_at <= end_time)
 
         Returns
         -------
@@ -189,6 +195,7 @@ class TaskResultHistoryRepository(Protocol):
         entity_type: Literal["qubit", "coupling"],
         metric_keys: set[str],
         cutoff_time: datetime | None = None,
+        end_time: datetime | None = None,
     ) -> dict[str, dict[str, Any]]:
         """Aggregate average metric values for each entity.
 
@@ -204,6 +211,8 @@ class TaskResultHistoryRepository(Protocol):
             Set of metric keys to aggregate
         cutoff_time : datetime | None
             Optional cutoff time for filtering
+        end_time : datetime | None
+            Optional inclusive upper bound (start_at <= end_time)
 
         Returns
         -------

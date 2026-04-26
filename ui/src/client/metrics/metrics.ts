@@ -207,6 +207,8 @@ Args:
     metrics_service: Injected metrics service
     within_hours: Optional filter to only include data from last N hours (e.g., 24)
     selection_mode: "latest" to get most recent values, "best" to get optimal values
+    start_at: Optional absolute lower bound (ISO8601 or date)
+    end_at: Optional absolute upper bound (ISO8601 or date)
 
 Returns:
 -------
@@ -810,6 +812,8 @@ Args:
     chip_id: Chip identifier
     within_hours: Optional time filter in hours
     selection_mode: "latest" for most recent values, "best" for optimal values
+    start_at: Optional absolute lower bound (ISO8601 or date)
+    end_at: Optional absolute upper bound (ISO8601 or date)
  * @summary Download metrics as PDF report
  */
 export const downloadMetricsPdf = (

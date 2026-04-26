@@ -31,6 +31,8 @@ class ChipMetricsResponse(BaseModel):
     username: str
     qubit_count: int
     within_hours: int | None = None
+    start_at: datetime | None = None
+    end_at: datetime | None = None
     qubit_metrics: dict[str, dict[str, MetricValue]]
     coupling_metrics: dict[str, dict[str, MetricValue]]
 

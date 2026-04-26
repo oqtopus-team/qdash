@@ -7110,7 +7110,7 @@
           "metrics"
         ],
         "summary": "Get Chip Metrics",
-        "description": "Get chip calibration metrics for visualization.\n\nThis endpoint returns calibration metrics for a specific chip from the database, including:\n- Qubit frequency, anharmonicity, T1, T2 echo times\n- Gate fidelities (single-qubit and two-qubit)\n- Readout fidelities\n\nArgs:\n----\n    chip_id: The chip identifier\n    ctx: Project context with user and project information\n    metrics_service: Injected metrics service\n    within_hours: Optional filter to only include data from last N hours (e.g., 24)\n    selection_mode: \"latest\" to get most recent values, \"best\" to get optimal values\n\nReturns:\n-------\n    ChipMetricsResponse with all metrics data",
+        "description": "Get chip calibration metrics for visualization.\n\nThis endpoint returns calibration metrics for a specific chip from the database, including:\n- Qubit frequency, anharmonicity, T1, T2 echo times\n- Gate fidelities (single-qubit and two-qubit)\n- Readout fidelities\n\nArgs:\n----\n    chip_id: The chip identifier\n    ctx: Project context with user and project information\n    metrics_service: Injected metrics service\n    within_hours: Optional filter to only include data from last N hours (e.g., 24)\n    selection_mode: \"latest\" to get most recent values, \"best\" to get optimal values\n    start_at: Optional absolute lower bound (ISO8601 or date)\n    end_at: Optional absolute upper bound (ISO8601 or date)\n\nReturns:\n-------\n    ChipMetricsResponse with all metrics data",
         "operationId": "getChipMetrics",
         "security": [
           {
@@ -7161,6 +7161,42 @@
               "title": "Selection Mode"
             },
             "description": "Selection mode: 'latest' for most recent, 'best' for optimal, 'average' for mean values"
+          },
+          {
+            "name": "start_at",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Inclusive absolute lower bound on task start time (ISO8601 or date). Takes precedence over within_hours for the lower bound.",
+              "title": "Start At"
+            },
+            "description": "Inclusive absolute lower bound on task start time (ISO8601 or date). Takes precedence over within_hours for the lower bound."
+          },
+          {
+            "name": "end_at",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Inclusive absolute upper bound on task start time (ISO8601 or date).",
+              "title": "End At"
+            },
+            "description": "Inclusive absolute upper bound on task start time (ISO8601 or date)."
           },
           {
             "name": "X-Project-Id",
@@ -7455,7 +7491,7 @@
           "metrics"
         ],
         "summary": "Download metrics as PDF report",
-        "description": "Download chip metrics as a PDF report.\n\nGenerates a comprehensive PDF report containing:\n- Cover page with chip information and report metadata\n- Heatmap visualizations for each metric\n- Statistics for each metric (coverage, average, min, max, std dev)\n\nThe report includes all qubit metrics (8 types) and coupling metrics (3 types)\nthat have data available.\n\nArgs:\n    chip_id: Chip identifier\n    within_hours: Optional time filter in hours\n    selection_mode: \"latest\" for most recent values, \"best\" for optimal values",
+        "description": "Download chip metrics as a PDF report.\n\nGenerates a comprehensive PDF report containing:\n- Cover page with chip information and report metadata\n- Heatmap visualizations for each metric\n- Statistics for each metric (coverage, average, min, max, std dev)\n\nThe report includes all qubit metrics (8 types) and coupling metrics (3 types)\nthat have data available.\n\nArgs:\n    chip_id: Chip identifier\n    within_hours: Optional time filter in hours\n    selection_mode: \"latest\" for most recent values, \"best\" for optimal values\n    start_at: Optional absolute lower bound (ISO8601 or date)\n    end_at: Optional absolute upper bound (ISO8601 or date)",
         "operationId": "downloadMetricsPdf",
         "security": [
           {
@@ -7506,6 +7542,42 @@
               "title": "Selection Mode"
             },
             "description": "Selection mode: 'latest', 'best', or 'average'"
+          },
+          {
+            "name": "start_at",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Inclusive absolute lower bound on task start time (ISO8601 or date).",
+              "title": "Start At"
+            },
+            "description": "Inclusive absolute lower bound on task start time (ISO8601 or date)."
+          },
+          {
+            "name": "end_at",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Inclusive absolute upper bound on task start time (ISO8601 or date).",
+              "title": "End At"
+            },
+            "description": "Inclusive absolute upper bound on task start time (ISO8601 or date)."
           },
           {
             "name": "X-Project-Id",
@@ -9182,6 +9254,30 @@
               }
             ],
             "title": "Within Hours"
+          },
+          "start_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start At"
+          },
+          "end_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End At"
           },
           "qubit_metrics": {
             "additionalProperties": {
