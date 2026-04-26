@@ -164,6 +164,16 @@ const GridCell = memo(function GridCell({
         </div>
       )}
 
+      {/* Unit Label */}
+      {showLabels && effectiveShowUnits && (
+        <div
+          className="absolute top-0.5 right-1 text-white/90 font-medium drop-shadow leading-tight"
+          style={{ fontSize: fontSizes.unitSize }}
+        >
+          ({unit})
+        </div>
+      )}
+
       {/* Value Display */}
       {value !== null && value !== undefined && showValues && (
         <div
@@ -186,14 +196,6 @@ const GridCell = memo(function GridCell({
               style={{ fontSize: fontSizes.unitSize }}
             >
               ± {stddev.toFixed(2)}
-            </div>
-          )}
-          {effectiveShowUnits && (
-            <div
-              className="text-white/90 font-medium drop-shadow"
-              style={{ fontSize: fontSizes.unitSize }}
-            >
-              {unit}
             </div>
           )}
         </div>
