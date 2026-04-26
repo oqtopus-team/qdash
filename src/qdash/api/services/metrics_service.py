@@ -103,14 +103,30 @@ def _parse_date_range(
 ) -> tuple[datetime | None, datetime | None]:
     """Parse and validate absolute date-range parameters.
 
-    Raises
+    Args:
+    ----
+        start_at: Lower bound (ISO8601 string, datetime, or None).
+            Empty/whitespace strings are treated as None.
+        end_at: Upper bound (ISO8601 string, datetime, or None).
+            Empty/whitespace strings are treated as None.
+
+    Returns:
+    -------
+        Tuple of (start_dt, end_dt); either may be None when omitted.
+
+    Raises:
     ------
-    HTTPException
-        400 if the values cannot be parsed or the range is inverted.
+        HTTPException: 400 if values cannot be parsed or the range is inverted.
+
     """
+    if isinstance(start_at, str) and not start_at.strip():
+        start_at = None
+    if isinstance(end_at, str) and not end_at.strip():
+        end_at = None
+
     try:
-        start_dt = to_datetime(start_at) if start_at is not None else None
-        end_dt = to_datetime(end_at) if end_at is not None else None
+        start_dt = to_datetime(start_at)
+        end_dt = to_datetime(end_at)
     except (ValueError, TypeError) as exc:
         raise HTTPException(status_code=400, detail=f"Invalid date value: {exc}") from exc
 
