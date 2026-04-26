@@ -18,7 +18,10 @@ import {
   getQubitGridPosition,
   type TopologyLayoutParams,
 } from "@/lib/utils/grid-position";
-import { calculateGridContainerWidth } from "@/lib/utils/grid-layout";
+import {
+  calculateGridContainerWidth,
+  cellFontSize,
+} from "@/lib/utils/grid-layout";
 
 import { QubitMetricHistoryModal } from "./QubitMetricHistoryModal";
 
@@ -80,7 +83,8 @@ function ZoomControls() {
   );
 }
 
-// Dynamic font size calculation based on cell size
+// Font sizes scale linearly with cellSize so the text-to-cell ratio is
+// constant across devices.
 function getCellFontSizes(cellSize: number): {
   labelSize: string;
   valueSize: string;
@@ -88,45 +92,12 @@ function getCellFontSizes(cellSize: number): {
   /** Whether stddev and unit should be hidden to save space */
   hideExtras: boolean;
 } {
-  // Scale font sizes proportionally to cell size
-  // Base reference: 60px cell = 12px label, 16px value, 10px unit
-  if (cellSize >= 60) {
-    return {
-      labelSize: "0.75rem",
-      valueSize: "1rem",
-      unitSize: "0.625rem",
-      hideExtras: false,
-    };
-  } else if (cellSize >= 50) {
-    return {
-      labelSize: "0.65rem",
-      valueSize: "0.875rem",
-      unitSize: "0.5rem",
-      hideExtras: false,
-    };
-  } else if (cellSize >= 40) {
-    return {
-      labelSize: "0.55rem",
-      valueSize: "0.75rem",
-      unitSize: "0.45rem",
-      hideExtras: false,
-    };
-  } else if (cellSize >= 30) {
-    return {
-      labelSize: "0.5rem",
-      valueSize: "0.675rem",
-      unitSize: "0.4rem",
-      hideExtras: true,
-    };
-  } else {
-    // Very small cells (< 30px): show only the value
-    return {
-      labelSize: "0.45rem",
-      valueSize: "0.6rem",
-      unitSize: "0.35rem",
-      hideExtras: true,
-    };
-  }
+  return {
+    labelSize: cellFontSize(cellSize, 0.17),
+    valueSize: cellFontSize(cellSize, 0.23),
+    unitSize: cellFontSize(cellSize, 0.14),
+    hideExtras: cellSize < 40,
+  };
 }
 
 // Memoized grid cell component for performance
@@ -616,7 +587,10 @@ export function QubitMetricsGrid({
                       gridRow: `${startRow} / span ${spanRows}`,
                     }}
                   >
-                    <div className="text-[0.45rem] md:text-[0.6rem] font-semibold text-base-content/30 bg-base-100/60 px-1 py-px rounded border border-base-content/5">
+                    <div
+                      className="font-semibold text-base-content/30 bg-base-100/60 px-1 py-px rounded border border-base-content/5"
+                      style={{ fontSize: cellFontSize(displayCellSize, 0.13) }}
+                    >
                       MUX{muxIndex}
                     </div>
                   </div>
