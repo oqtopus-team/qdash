@@ -179,9 +179,7 @@ const GridCell = memo(function GridCell({
         <div
           className="flex flex-col items-center justify-center h-full leading-tight"
           style={{
-            paddingTop: showLabels
-              ? cellFontSize(cellSize, 0.22)
-              : undefined,
+            paddingTop: showLabels ? cellFontSize(cellSize, 0.22) : undefined,
           }}
         >
           <div
@@ -206,9 +204,7 @@ const GridCell = memo(function GridCell({
         <div
           className="flex flex-col items-center justify-center h-full leading-tight"
           style={{
-            paddingTop: showLabels
-              ? cellFontSize(cellSize, 0.22)
-              : undefined,
+            paddingTop: showLabels ? cellFontSize(cellSize, 0.22) : undefined,
           }}
         >
           <div

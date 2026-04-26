@@ -24,10 +24,7 @@ import {
   getQubitGridPosition,
   type TopologyLayoutParams,
 } from "@/lib/utils/grid-position";
-import {
-  calculateGridDimension,
-  cellFontSize,
-} from "@/lib/utils/grid-layout";
+import { calculateGridDimension, cellFontSize } from "@/lib/utils/grid-layout";
 
 import { CouplingMetricHistoryModal } from "./CouplingMetricHistoryModal";
 
