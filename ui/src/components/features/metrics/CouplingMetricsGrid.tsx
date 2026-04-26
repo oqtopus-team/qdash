@@ -24,29 +24,20 @@ import {
   getQubitGridPosition,
   type TopologyLayoutParams,
 } from "@/lib/utils/grid-position";
-import { calculateGridDimension } from "@/lib/utils/grid-layout";
+import { calculateGridDimension, cellFontSize } from "@/lib/utils/grid-layout";
 
 import { CouplingMetricHistoryModal } from "./CouplingMetricHistoryModal";
 
-// Dynamic font size calculation based on cell size
+// Font sizes scale linearly with cellSize so the text-to-cell ratio is
+// constant across devices.
 function getCouplingFontSizes(cellSize: number): {
   qubitLabelSize: string;
   valueSize: string;
 } {
-  // Scale font sizes proportionally to cell size
-  // Base reference: 60px cell = 14px label, 12px value
-  if (cellSize >= 60) {
-    return { qubitLabelSize: "0.875rem", valueSize: "0.75rem" };
-  } else if (cellSize >= 50) {
-    return { qubitLabelSize: "0.75rem", valueSize: "0.65rem" };
-  } else if (cellSize >= 40) {
-    return { qubitLabelSize: "0.625rem", valueSize: "0.55rem" };
-  } else if (cellSize >= 30) {
-    return { qubitLabelSize: "0.5rem", valueSize: "0.525rem" };
-  } else {
-    // Very small cells (< 30px)
-    return { qubitLabelSize: "0.45rem", valueSize: "0.475rem" };
-  }
+  return {
+    qubitLabelSize: cellFontSize(cellSize, 0.2),
+    valueSize: cellFontSize(cellSize, 0.17),
+  };
 }
 
 interface MetricValue {
@@ -469,7 +460,10 @@ export function CouplingMetricsGrid({
                   transform: "translate(-50%, -50%)",
                 }}
               >
-                <div className="text-[0.45rem] md:text-[0.6rem] font-semibold text-base-content/30 bg-base-100/60 px-1 py-px rounded border border-base-content/5">
+                <div
+                  className="font-semibold text-base-content/30 bg-base-100/60 px-1 py-px rounded border border-base-content/5"
+                  style={{ fontSize: cellFontSize(displayCellSize, 0.13) }}
+                >
                   MUX{muxIndex}
                 </div>
               </div>

@@ -159,6 +159,22 @@ export function checkIsMobile(viewportWidth: number): boolean {
 }
 
 /**
+ * Compute a font size proportional to cellSize so that the text-to-cell
+ * ratio stays constant across devices and viewport sizes.
+ *
+ * Returns a `${px}px` string suitable for inline style. A minimum floor
+ * keeps text legible when cells become very small; two devices ending up
+ * at the same cellSize still produce identical output.
+ */
+export function cellFontSize(
+  cellSize: number,
+  ratio: number,
+  minPx = 6,
+): string {
+  return `${Math.max(cellSize * ratio, minPx)}px`;
+}
+
+/**
  * Calculate optimal cell size to fit grid in available space
  */
 export function calculateCellSize(params: {
