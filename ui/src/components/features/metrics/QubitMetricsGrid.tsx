@@ -153,7 +153,7 @@ const GridCell = memo(function GridCell({
       {/* QID Label */}
       {showLabels && (
         <div
-          className={`absolute top-0.5 left-0.5 backdrop-blur-sm px-0.5 py-px rounded font-bold shadow-sm ${
+          className={`absolute top-0.5 left-0.5 backdrop-blur-sm px-0.5 py-px rounded font-bold shadow-sm leading-tight ${
             value !== null && value !== undefined
               ? "bg-black/30 text-white"
               : "bg-base-content/20 text-base-content"
@@ -166,7 +166,14 @@ const GridCell = memo(function GridCell({
 
       {/* Value Display */}
       {value !== null && value !== undefined && showValues && (
-        <div className="flex flex-col items-center justify-center h-full">
+        <div
+          className="flex flex-col items-center justify-center h-full leading-tight"
+          style={{
+            paddingTop: showLabels
+              ? cellFontSize(cellSize, 0.22)
+              : undefined,
+          }}
+        >
           <div
             className="font-bold text-white drop-shadow-md"
             style={{ fontSize: fontSizes.valueSize }}
@@ -194,7 +201,14 @@ const GridCell = memo(function GridCell({
 
       {/* No data indicator */}
       {(value === null || value === undefined) && showValues && (
-        <div className="flex flex-col items-center justify-center h-full">
+        <div
+          className="flex flex-col items-center justify-center h-full leading-tight"
+          style={{
+            paddingTop: showLabels
+              ? cellFontSize(cellSize, 0.22)
+              : undefined,
+          }}
+        >
           <div
             className="text-base-content/40 font-medium"
             style={{ fontSize: fontSizes.valueSize }}
