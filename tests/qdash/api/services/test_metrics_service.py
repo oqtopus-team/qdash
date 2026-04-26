@@ -3,8 +3,8 @@
 from datetime import datetime
 
 import pytest
-from starlette.exceptions import HTTPException
 from qdash.api.services.metrics_service import _parse_date_range
+from starlette.exceptions import HTTPException
 
 
 class TestParseDateRange:
