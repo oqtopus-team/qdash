@@ -1,0 +1,81 @@
+64Q:
+  - mux: 0
+    ctrl: [R21B-5, R21B-0, R21B-2, R21B-6]
+    read_out: Q73A-1
+    read_in: Q73A-0
+    pump: Q73A-3
+  - mux: 1
+    ctrl: [Q73A-2, Q73A-4, Q73A-9, Q73A-11]
+    read_out: Q73A-8
+    read_in: Q73A-7
+    pump: Q73A-10
+  - mux: 2
+    ctrl: [S159A-2, S159A-4, S159A-9, S159A-11]
+    read_out: S159A-1
+    read_in: S159A-0
+    pump: S159A-3
+  - mux: 3
+    ctrl: [U10B-5, U10B-0, U10B-2, U10B-6]
+    read_out: S159A-8
+    read_in: S159A-7
+    pump: S159A-10
+  - mux: 4
+    ctrl: [R21B-7, R21B-11, R21B-13, R21B-8]
+    read_out: Q2A-8
+    read_in: Q2A-7
+    pump: Q2A-10
+  - mux: 5
+    ctrl: [Q2A-2, Q2A-4, Q2A-9, Q2A-11]
+    read_out: Q2A-1
+    read_in: Q2A-0
+    pump: Q2A-3
+  - mux: 6
+    ctrl: [R20A-5, R20A-6, R20A-7, R20A-8]
+    read_out: R20A-0
+    read_in: R20A-1
+    pump: R20A-2
+  - mux: 7
+    ctrl: [U10B-7, U10B-11, U10B-13, U10B-8]
+    read_out: R20A-13
+    read_in: R20A-12
+    pump: R20A-11
+  - mux: 8
+    ctrl: [R26A-5, R26A-6, R26A-7, R26A-8]
+    read_out: R26A-0
+    read_in: R26A-1
+    pump: R26A-2
+  - mux: 9
+    ctrl: [R31A-5, R31A-6, R31A-7, R31A-8]
+    read_out: R31A-0
+    read_in: R31A-1
+    pump: R31A-2
+  - mux: 10
+    ctrl: [U13B-5, U13B-0, U13B-2, U13B-6]
+    read_out: R19A-13
+    read_in: R19A-12
+    pump: R19A-11
+  - mux: 11
+    ctrl: [R19A-5, R19A-6, R19A-7, R19A-8]
+    read_out: R19A-0
+    read_in: R19A-1
+    pump: R19A-2
+  - mux: 12
+    ctrl: [R23A-5, R23A-6, R23A-7, R23A-8]
+    read_out: R23A-0
+    read_in: R23A-1
+    pump: R23A-2
+  - mux: 13
+    ctrl: [R28A-5, R28A-6, R28A-7, R28A-8]
+    read_out: R28A-13
+    read_in: R28A-12
+    pump: R28A-11
+  - mux: 14
+    ctrl: [U13B-7, U13B-11, U13B-13, U13B-8]
+    read_out: U15A-13
+    read_in: U15A-12
+    pump: U15A-11
+  - mux: 15
+    ctrl: [U15A-5, U15A-6, U15A-7, U15A-8]
+    read_out: U15A-0
+    read_in: U15A-1
+    pump: U15A-2
