@@ -23,6 +23,7 @@ import { MetricsPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
 import { useMetricsConfig } from "@/hooks/useMetricsConfig";
 import { useMetricsUrlState } from "@/hooks/useUrlState";
 import { getDaisySelectStyles } from "@/lib/react-select-theme";
+import { AbsoluteDateRangePicker } from "@/components/ui/AbsoluteDateRangePicker";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PageFiltersBar } from "@/components/ui/PageFiltersBar";
@@ -762,57 +763,6 @@ function CdfWithCoverage({
         groupTitle={currentCdfGroup.title}
         unit={currentCdfGroup.unit}
       />
-    </div>
-  );
-}
-
-// Absolute date range picker using HTML5 native date inputs.
-// Empty string in either input clears that bound.
-function AbsoluteDateRangePicker({
-  startDate,
-  endDate,
-  onStartChange,
-  onEndChange,
-}: {
-  startDate: string | null;
-  endDate: string | null;
-  onStartChange: (value: string | null) => void;
-  onEndChange: (value: string | null) => void;
-}) {
-  const hasInvertedRange =
-    startDate !== null && endDate !== null && startDate > endDate;
-
-  return (
-    <div className="flex flex-col gap-1">
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <label className="flex items-center gap-2">
-          <span className="label-text">From</span>
-          <input
-            type="date"
-            className="input input-sm input-bordered tabular-nums w-32"
-            value={startDate ?? ""}
-            onChange={(e) => onStartChange(e.target.value || null)}
-            max={endDate ?? undefined}
-            aria-label="Start date"
-          />
-        </label>
-        <label className="flex items-center gap-2">
-          <span className="label-text">To</span>
-          <input
-            type="date"
-            className="input input-sm input-bordered tabular-nums w-32"
-            value={endDate ?? ""}
-            onChange={(e) => onEndChange(e.target.value || null)}
-            min={startDate ?? undefined}
-            aria-label="End date"
-          />
-        </label>
-      </div>
-      {hasInvertedRange && (
-        <span className="text-xs text-error">
-          Start date must be on or before end date
-        </span>
-      )}
     </div>
   );
 }

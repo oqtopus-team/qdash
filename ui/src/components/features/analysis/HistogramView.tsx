@@ -11,9 +11,14 @@ import { ChipSelector } from "@/components/selectors/ChipSelector";
 import { DataTable } from "@/components/ui/DataTable";
 import { ErrorCard } from "@/components/ui/ErrorCard";
 import { QuantumLoader } from "@/components/ui/QuantumLoader";
+import { TimeRangeSelector } from "@/components/ui/TimeRangeSelector";
 import { useCSVExport } from "@/hooks/useCSVExport";
 import { useMetricsConfig } from "@/hooks/useMetricsConfig";
-import { useHistogramUrlState } from "@/hooks/useUrlState";
+import { useMetricsQueryParams } from "@/hooks/useMetricsQueryParams";
+import {
+  useHistogramUrlState,
+  useRangeModeUrlState,
+} from "@/hooks/useUrlState";
 import { naturalSortQIDs } from "@/lib/utils/qid";
 
 interface HistogramDataPoint {
@@ -50,6 +55,15 @@ export function HistogramView() {
     setCustomThreshold,
     isInitialized,
   } = useHistogramUrlState();
+
+  const {
+    rangeMode,
+    startDate,
+    endDate,
+    setRangeMode,
+    setStartDate,
+    setEndDate,
+  } = useRangeModeUrlState();
 
   // Load metrics configuration from backend
   const {
@@ -180,19 +194,19 @@ export function HistogramView() {
     }
   }, [selectedChip, chipsResponse, setSelectedChip]);
 
-  // Convert time range to hours
-  const withinHours = useMemo(() => {
-    switch (timeRange) {
-      case "1d":
-        return 24;
-      case "7d":
-        return 24 * 7;
-      case "30d":
-        return 24 * 30;
-      default:
-        return 24 * 7;
-    }
-  }, [timeRange]);
+  // Build API params based on range mode
+  const {
+    queryParams: metricsQueryParams,
+    isAbsolute,
+    canFetch,
+  } = useMetricsQueryParams({
+    rangeMode,
+    timeRange,
+    selectionMode,
+    startDate,
+    endDate,
+    selectedChip,
+  });
 
   // Fetch metrics data using the same API as metrics page
   const {
@@ -200,19 +214,12 @@ export function HistogramView() {
     isLoading,
     isError,
     error,
-  } = useGetChipMetrics(
-    selectedChip,
-    {
-      within_hours: withinHours,
-      selection_mode: selectionMode,
+  } = useGetChipMetrics(selectedChip, metricsQueryParams, {
+    query: {
+      enabled: canFetch,
+      staleTime: 30000,
     },
-    {
-      query: {
-        enabled: !!selectedChip,
-        staleTime: 30000,
-      },
-    },
-  );
+  });
 
   // Extract and transform raw data from metrics API for histogram (single metric)
   const histogramData = useMemo(() => {
@@ -545,7 +552,7 @@ export function HistogramView() {
       bargap: 0.1,
       annotations: [
         {
-          text: `Time range: ${timeRange === "1d" ? "Last 1 Day" : timeRange === "7d" ? "Last 7 Days" : "Last 30 Days"} | Mode: ${selectionMode === "latest" ? "Latest" : selectionMode === "best" ? "Best" : "Average"}<br>Sample size: ${histogramData.length} ${isCoupling ? "coupling pairs" : "qubits"}`,
+          text: `Time range: ${isAbsolute ? "Absolute" : timeRange === "1d" ? "Last 1 Day" : timeRange === "7d" ? "Last 7 Days" : "Last 30 Days"} | Mode: ${selectionMode === "latest" ? "Latest" : selectionMode === "best" ? "Best" : "Average"}<br>Sample size: ${histogramData.length} ${isCoupling ? "coupling pairs" : "qubits"}`,
           showarrow: false,
           xref: "paper" as const,
           yref: "paper" as const,
@@ -561,6 +568,7 @@ export function HistogramView() {
     selectedParameter,
     currentMetricConfig,
     metricType,
+    isAbsolute,
     timeRange,
     selectionMode,
     histogramData,
@@ -794,28 +802,18 @@ export function HistogramView() {
               </div>
             </div>
 
-            {/* Row 1b: Time Range + Mode + Display Toggle + Export */}
+            {/* Row 1b: Range Mode + Time Range + Mode + Display Toggle + Export */}
             <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-              <div className="join h-8 sm:h-9">
-                <button
-                  className={`join-item btn btn-sm h-full ${timeRange === "1d" ? "btn-primary" : ""}`}
-                  onClick={() => setTimeRange("1d")}
-                >
-                  1D
-                </button>
-                <button
-                  className={`join-item btn btn-sm h-full ${timeRange === "7d" ? "btn-primary" : ""}`}
-                  onClick={() => setTimeRange("7d")}
-                >
-                  7D
-                </button>
-                <button
-                  className={`join-item btn btn-sm h-full ${timeRange === "30d" ? "btn-primary" : ""}`}
-                  onClick={() => setTimeRange("30d")}
-                >
-                  30D
-                </button>
-              </div>
+              <TimeRangeSelector
+                rangeMode={rangeMode}
+                timeRange={timeRange}
+                startDate={startDate}
+                endDate={endDate}
+                onRangeModeChange={setRangeMode}
+                onTimeRangeChange={setTimeRange}
+                onStartDateChange={setStartDate}
+                onEndDateChange={setEndDate}
+              />
 
               <div className="join h-8 sm:h-9">
                 <button
