@@ -73,26 +73,18 @@ export function CorrelationView() {
   // URL state management
   const {
     selectedChip,
-    timeRange,
     selectionMode,
     xParameter,
     yParameter,
     setSelectedChip,
-    setTimeRange,
     setSelectionMode,
     setXParameter,
     setYParameter,
     isInitialized,
   } = useCorrelationUrlState();
 
-  const {
-    rangeMode,
-    startDate,
-    endDate,
-    setRangeMode,
-    setStartDate,
-    setEndDate,
-  } = useRangeModeUrlState();
+  const { startDate, endDate, setStartDate, setEndDate, setQuickRange } =
+    useRangeModeUrlState();
 
   // Load metrics configuration from backend
   const {
@@ -238,14 +230,8 @@ export function CorrelationView() {
     }
   }, [selectedChip, chipsResponse, setSelectedChip]);
 
-  // Build API params based on range mode
-  const {
-    queryParams: metricsQueryParams,
-    isAbsolute,
-    canFetch,
-  } = useMetricsQueryParams({
-    rangeMode,
-    timeRange,
+  // Build API params
+  const { queryParams: metricsQueryParams, canFetch } = useMetricsQueryParams({
     selectionMode,
     startDate,
     endDate,
@@ -439,9 +425,9 @@ export function CorrelationView() {
         {
           text: statistics
             ? `Correlation: r = ${statistics.correlation.toFixed(3)} (n = ${statistics.sampleSize})<br>` +
-              `Time range: ${isAbsolute ? "Absolute" : timeRange === "1d" ? "Last 1 Day" : timeRange === "7d" ? "Last 7 Days" : "Last 30 Days"} | ` +
+              `Time range: ${startDate} — ${endDate} | ` +
               `Mode: ${selectionMode === "latest" ? "Latest" : selectionMode === "best" ? "Best" : "Average"}`
-            : `Time range: ${isAbsolute ? "Absolute" : timeRange === "1d" ? "Last 1 Day" : timeRange === "7d" ? "Last 7 Days" : "Last 30 Days"} | ` +
+            : `Time range: ${startDate} — ${endDate} | ` +
               `Mode: ${selectionMode === "latest" ? "Latest" : selectionMode === "best" ? "Best" : "Average"}`,
           showarrow: false,
           xref: "paper" as const,
@@ -463,8 +449,8 @@ export function CorrelationView() {
     xMetricConfig,
     yMetricConfig,
     statistics,
-    isAbsolute,
-    timeRange,
+    startDate,
+    endDate,
     selectionMode,
   ]);
 
@@ -491,13 +477,13 @@ export function CorrelationView() {
       String(row.xValue.toFixed(6)),
       String(row.yValue.toFixed(6)),
       isCoupling ? "coupling_pair" : "qubit",
-      timeRange,
+      `${startDate}..${endDate}`,
       selectionMode,
       statistics?.correlation.toFixed(6) || "N/A",
       timestamp,
     ]);
 
-    const filename = `correlation_${xParameter}_${yParameter}_${selectedChip}_${timeRange}_${selectionMode}_${timestamp
+    const filename = `correlation_${xParameter}_${yParameter}_${selectedChip}_${selectionMode}_${timestamp
       .slice(0, 19)
       .replace(/[:-]/g, "")}.csv`;
 
@@ -510,7 +496,8 @@ export function CorrelationView() {
     yMetricConfig,
     metricType,
     selectedChip,
-    timeRange,
+    startDate,
+    endDate,
     selectionMode,
     statistics,
     exportToCSV,
@@ -645,19 +632,17 @@ export function CorrelationView() {
               </div>
             </div>
 
-            {/* Row 1b: Range Mode + Time Range + Mode + Export */}
-            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-              <TimeRangeSelector
-                rangeMode={rangeMode}
-                timeRange={timeRange}
-                startDate={startDate}
-                endDate={endDate}
-                onRangeModeChange={setRangeMode}
-                onTimeRangeChange={setTimeRange}
-                onStartDateChange={setStartDate}
-                onEndDateChange={setEndDate}
-              />
+            {/* Time Range */}
+            <TimeRangeSelector
+              startDate={startDate}
+              endDate={endDate}
+              onStartDateChange={setStartDate}
+              onEndDateChange={setEndDate}
+              onQuickRange={setQuickRange}
+            />
 
+            {/* Mode + Export */}
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
               <div className="join h-8 sm:h-9">
                 <button
                   className={`join-item btn btn-xs sm:btn-sm h-full ${selectionMode === "latest" ? "btn-primary" : ""}`}

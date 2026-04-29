@@ -1,70 +1,100 @@
 "use client";
 
-import type { RangeMode, TimeRange } from "@/hooks/url-state/types";
-
-import { AbsoluteDateRangePicker } from "./AbsoluteDateRangePicker";
+import { useEffect, useState } from "react";
 
 interface TimeRangeSelectorProps {
-  rangeMode: RangeMode;
-  timeRange: TimeRange;
-  startDate: string | null;
-  endDate: string | null;
-  onRangeModeChange: (mode: RangeMode) => void;
-  onTimeRangeChange: (range: TimeRange) => void;
-  onStartDateChange: (date: string | null) => void;
-  onEndDateChange: (date: string | null) => void;
+  startDate: string;
+  endDate: string;
+  onStartDateChange: (date: string) => void;
+  onEndDateChange: (date: string) => void;
+  onQuickRange: (days: number) => void;
+}
+
+function toLocalDateTimeString(isoString: string): string {
+  if (isoString.includes("T")) return isoString.slice(0, 16);
+  return `${isoString}T00:00`;
 }
 
 export function TimeRangeSelector({
-  rangeMode,
-  timeRange,
   startDate,
   endDate,
-  onRangeModeChange,
-  onTimeRangeChange,
   onStartDateChange,
   onEndDateChange,
+  onQuickRange,
 }: TimeRangeSelectorProps) {
-  return (
-    <>
-      <select
-        className="select select-sm select-bordered w-full sm:w-28"
-        value={rangeMode}
-        onChange={(e) => onRangeModeChange(e.target.value as RangeMode)}
-      >
-        <option value="relative">Relative</option>
-        <option value="absolute">Absolute</option>
-      </select>
+  const [localStart, setLocalStart] = useState(
+    toLocalDateTimeString(startDate),
+  );
+  const [localEnd, setLocalEnd] = useState(toLocalDateTimeString(endDate));
 
-      {rangeMode === "relative" ? (
-        <div className="join h-8 sm:h-9">
+  useEffect(() => {
+    setLocalStart(toLocalDateTimeString(startDate));
+  }, [startDate]);
+
+  useEffect(() => {
+    setLocalEnd(toLocalDateTimeString(endDate));
+  }, [endDate]);
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-3">
+        <span className="text-sm font-medium">Time Range</span>
+        <div className="join">
           <button
-            className={`join-item btn btn-sm h-full ${timeRange === "1d" ? "btn-primary" : ""}`}
-            onClick={() => onTimeRangeChange("1d")}
+            className="join-item btn btn-sm"
+            onClick={() => onQuickRange(1)}
           >
             1D
           </button>
           <button
-            className={`join-item btn btn-sm h-full ${timeRange === "7d" ? "btn-primary" : ""}`}
-            onClick={() => onTimeRangeChange("7d")}
+            className="join-item btn btn-sm"
+            onClick={() => onQuickRange(7)}
           >
             7D
           </button>
           <button
-            className={`join-item btn btn-sm h-full ${timeRange === "30d" ? "btn-primary" : ""}`}
-            onClick={() => onTimeRangeChange("30d")}
+            className="join-item btn btn-sm"
+            onClick={() => onQuickRange(30)}
           >
             30D
           </button>
         </div>
-      ) : (
-        <AbsoluteDateRangePicker
-          startDate={startDate}
-          endDate={endDate}
-          onStartChange={onStartDateChange}
-          onEndChange={onEndDateChange}
-        />
-      )}
-    </>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="form-control w-full">
+          <label className="label">
+            <span className="label-text">From</span>
+          </label>
+          <input
+            type="datetime-local"
+            className="input input-bordered w-full"
+            value={localStart}
+            onChange={(e) => {
+              setLocalStart(e.target.value);
+              onStartDateChange(e.target.value);
+            }}
+            max={localEnd}
+            aria-label="Start date and time"
+          />
+        </div>
+        <div className="form-control w-full">
+          <label className="label">
+            <span className="label-text">To</span>
+          </label>
+          <input
+            type="datetime-local"
+            className="input input-bordered w-full"
+            value={localEnd}
+            onChange={(e) => {
+              setLocalEnd(e.target.value);
+              onEndDateChange(e.target.value);
+            }}
+            min={localStart}
+            aria-label="End date and time"
+          />
+        </div>
+      </div>
+    </div>
   );
 }

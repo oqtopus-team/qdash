@@ -36,26 +36,18 @@ export function CDFView() {
   // URL state management
   const {
     selectedChip,
-    timeRange,
     selectionMode,
     selectedParameters,
     showAsErrorRate,
     setSelectedChip,
-    setTimeRange,
     setSelectionMode,
     setSelectedParameters,
     setShowAsErrorRate,
     isInitialized,
   } = useCDFUrlState();
 
-  const {
-    rangeMode,
-    startDate,
-    endDate,
-    setRangeMode,
-    setStartDate,
-    setEndDate,
-  } = useRangeModeUrlState();
+  const { startDate, endDate, setStartDate, setEndDate, setQuickRange } =
+    useRangeModeUrlState();
 
   // Load metrics configuration from backend
   const {
@@ -179,14 +171,8 @@ export function CDFView() {
     }
   }, [selectedChip, chipsResponse, setSelectedChip]);
 
-  // Build API params based on range mode
-  const {
-    queryParams: metricsQueryParams,
-    isAbsolute,
-    canFetch,
-  } = useMetricsQueryParams({
-    rangeMode,
-    timeRange,
+  // Build API params
+  const { queryParams: metricsQueryParams, canFetch } = useMetricsQueryParams({
     selectionMode,
     startDate,
     endDate,
@@ -598,7 +584,7 @@ export function CDFView() {
       annotations: primaryData.tableData
         ? [
             {
-              text: `Time range: ${isAbsolute ? "Absolute" : timeRange === "1d" ? "Last 1 Day" : timeRange === "7d" ? "Last 7 Days" : "Last 30 Days"} | Mode: ${selectionMode === "latest" ? "Latest" : selectionMode === "best" ? "Best" : "Average"}<br>Sample size: ${primaryData.tableData.length} ${isCoupling ? "coupling pairs" : "qubits"}`,
+              text: `Time range: ${startDate} — ${endDate} | Mode: ${selectionMode === "latest" ? "Latest" : selectionMode === "best" ? "Best" : "Average"}<br>Sample size: ${primaryData.tableData.length} ${isCoupling ? "coupling pairs" : "qubits"}`,
               showarrow: false,
               xref: "paper" as const,
               yref: "paper" as const,
@@ -618,8 +604,8 @@ export function CDFView() {
     couplingMetrics,
     showAsErrorRate,
     hasPercentageMetrics,
-    isAbsolute,
-    timeRange,
+    startDate,
+    endDate,
     selectionMode,
     primaryData,
   ]);
@@ -651,12 +637,12 @@ export function CDFView() {
       String(row.survivalFunction.toFixed(6)),
       primaryParameter,
       isCoupling ? "coupling_pair" : "qubit",
-      timeRange,
+      `${startDate}..${endDate}`,
       selectionMode,
       timestamp,
     ]);
 
-    const filename = `cdf_${primaryParameter}_${selectedChip}_${timeRange}_${selectionMode}_${timestamp
+    const filename = `cdf_${primaryParameter}_${selectedChip}_${selectionMode}_${timestamp
       .slice(0, 19)
       .replace(/[:-]/g, "")}.csv`;
 
@@ -666,7 +652,8 @@ export function CDFView() {
     primaryParameter,
     couplingMetrics,
     selectedChip,
-    timeRange,
+    startDate,
+    endDate,
     selectionMode,
     exportToCSV,
   ]);
@@ -788,19 +775,17 @@ export function CDFView() {
               </div>
             </div>
 
-            {/* Row 1b: Range Mode + Time Range + Mode + Display Toggle + Export */}
-            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-              <TimeRangeSelector
-                rangeMode={rangeMode}
-                timeRange={timeRange}
-                startDate={startDate}
-                endDate={endDate}
-                onRangeModeChange={setRangeMode}
-                onTimeRangeChange={setTimeRange}
-                onStartDateChange={setStartDate}
-                onEndDateChange={setEndDate}
-              />
+            {/* Time Range */}
+            <TimeRangeSelector
+              startDate={startDate}
+              endDate={endDate}
+              onStartDateChange={setStartDate}
+              onEndDateChange={setEndDate}
+              onQuickRange={setQuickRange}
+            />
 
+            {/* Mode + Display Toggle + Export */}
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
               <div className="join h-8 sm:h-9">
                 <button
                   className={`join-item btn btn-xs sm:btn-sm h-full ${selectionMode === "latest" ? "btn-primary" : ""}`}
