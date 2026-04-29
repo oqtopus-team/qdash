@@ -19,9 +19,7 @@ export function TimeRangeSelector({
   onEndDateChange,
   onQuickRange,
 }: TimeRangeSelectorProps) {
-  const [localStart, setLocalStart] = useState(
-    toDateTimeLocal(startDate),
-  );
+  const [localStart, setLocalStart] = useState(toDateTimeLocal(startDate));
   const [localEnd, setLocalEnd] = useState(toDateTimeLocal(endDate));
 
   useEffect(() => {
