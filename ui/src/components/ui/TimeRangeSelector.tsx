@@ -2,17 +2,14 @@
 
 import { useEffect, useState } from "react";
 
+import { toDateTimeLocal } from "@/lib/utils/datetime";
+
 interface TimeRangeSelectorProps {
   startDate: string;
   endDate: string;
   onStartDateChange: (date: string) => void;
   onEndDateChange: (date: string) => void;
   onQuickRange: (days: number) => void;
-}
-
-function toLocalDateTimeString(isoString: string): string {
-  if (isoString.includes("T")) return isoString.slice(0, 16);
-  return `${isoString}T00:00`;
 }
 
 export function TimeRangeSelector({
@@ -23,16 +20,16 @@ export function TimeRangeSelector({
   onQuickRange,
 }: TimeRangeSelectorProps) {
   const [localStart, setLocalStart] = useState(
-    toLocalDateTimeString(startDate),
+    toDateTimeLocal(startDate),
   );
-  const [localEnd, setLocalEnd] = useState(toLocalDateTimeString(endDate));
+  const [localEnd, setLocalEnd] = useState(toDateTimeLocal(endDate));
 
   useEffect(() => {
-    setLocalStart(toLocalDateTimeString(startDate));
+    setLocalStart(toDateTimeLocal(startDate));
   }, [startDate]);
 
   useEffect(() => {
-    setLocalEnd(toLocalDateTimeString(endDate));
+    setLocalEnd(toDateTimeLocal(endDate));
   }, [endDate]);
 
   return (

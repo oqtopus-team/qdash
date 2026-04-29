@@ -1,5 +1,7 @@
 import { useMemo } from "react";
 
+import { toIsoSeconds } from "@/lib/utils/datetime";
+
 import type { SelectionMode } from "./url-state/types";
 
 interface UseMetricsQueryParamsOptions {
@@ -7,11 +9,6 @@ interface UseMetricsQueryParamsOptions {
   startDate: string;
   endDate: string;
   selectedChip: string;
-}
-
-function toIsoSeconds(dt: string): string {
-  if (dt.length === 16) return `${dt}:00`;
-  return dt;
 }
 
 export function useMetricsQueryParams({

@@ -22,6 +22,7 @@ import { MetricsPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
 import { useMetricsConfig } from "@/hooks/useMetricsConfig";
 import { useMetricsUrlState } from "@/hooks/useUrlState";
 import { getDaisySelectStyles } from "@/lib/react-select-theme";
+import { toIsoSeconds } from "@/lib/utils/datetime";
 import { TimeRangeSelector } from "@/components/ui/TimeRangeSelector";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -118,8 +119,6 @@ export function MetricsPageContent() {
       setGridSize(Math.sqrt(chipData.data.size));
     }
   }, [chipData?.data?.size]);
-
-  const toIsoSeconds = (dt: string) => (dt.length === 16 ? `${dt}:00` : dt);
 
   const startIso = toIsoSeconds(startDate);
   const endIso = toIsoSeconds(endDate);
