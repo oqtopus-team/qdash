@@ -439,42 +439,6 @@ export function MetricsPageContent() {
                   styles={metricSelectStyles}
                 />
               </PageFiltersBar.Item>
-              {/* Latest/Best Toggle */}
-              <PageFiltersBar.Item>
-                <div className="join rounded-lg overflow-hidden">
-                  <button
-                    className={`join-item btn btn-sm ${
-                      selectionMode === "latest" ? "btn-primary" : ""
-                    }`}
-                    onClick={() => setSelectionMode("latest")}
-                  >
-                    <span>Latest</span>
-                  </button>
-                  <button
-                    className={`join-item btn btn-sm ${
-                      selectionMode === "best" ? "btn-primary" : ""
-                    } ${!isBestModeSupported ? "btn-disabled" : ""}`}
-                    onClick={() => setSelectionMode("best")}
-                    disabled={!isBestModeSupported}
-                    title={
-                      !isBestModeSupported
-                        ? "Best mode not available for this metric"
-                        : "Show best values within time range"
-                    }
-                  >
-                    <span>Best</span>
-                  </button>
-                  <button
-                    className={`join-item btn btn-sm ${
-                      selectionMode === "average" ? "btn-primary" : ""
-                    }`}
-                    onClick={() => setSelectionMode("average")}
-                    title="Show average values within time range"
-                  >
-                    <span>Average</span>
-                  </button>
-                </div>
-              </PageFiltersBar.Item>
             </PageFiltersBar.Group>
           </PageFiltersBar>
 
@@ -486,6 +450,41 @@ export function MetricsPageContent() {
             onEndDateChange={setEndDate}
             onQuickRange={setQuickRange}
           />
+
+          {/* Latest/Best/Average Toggle */}
+          <div className="join rounded-lg overflow-hidden">
+            <button
+              className={`join-item btn btn-sm ${
+                selectionMode === "latest" ? "btn-primary" : ""
+              }`}
+              onClick={() => setSelectionMode("latest")}
+            >
+              <span>Latest</span>
+            </button>
+            <button
+              className={`join-item btn btn-sm ${
+                selectionMode === "best" ? "btn-primary" : ""
+              } ${!isBestModeSupported ? "btn-disabled" : ""}`}
+              onClick={() => setSelectionMode("best")}
+              disabled={!isBestModeSupported}
+              title={
+                !isBestModeSupported
+                  ? "Best mode not available for this metric"
+                  : "Show best values within time range"
+              }
+            >
+              <span>Best</span>
+            </button>
+            <button
+              className={`join-item btn btn-sm ${
+                selectionMode === "average" ? "btn-primary" : ""
+              }`}
+              onClick={() => setSelectionMode("average")}
+              title="Show average values within time range"
+            >
+              <span>Average</span>
+            </button>
+          </div>
         </div>
 
         {/* Metrics Grid */}
