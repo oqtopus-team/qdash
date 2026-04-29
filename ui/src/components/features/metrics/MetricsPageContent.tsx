@@ -409,18 +409,36 @@ export function MetricsPageContent() {
             </button>
           </div>
 
-          {/* Time Range */}
-          <TimeRangeSelector
-            startDate={startDate}
-            endDate={endDate}
-            onStartDateChange={setStartDate}
-            onEndDateChange={setEndDate}
-            onQuickRange={setQuickRange}
-          />
-
-          {/* Selection Mode and Filters */}
+          {/* Chip and Metric Selectors */}
           <PageFiltersBar>
             <PageFiltersBar.Group>
+              <PageFiltersBar.Item>
+                <ChipSelector
+                  selectedChip={selectedChip}
+                  onChipSelect={setSelectedChip}
+                />
+              </PageFiltersBar.Item>
+
+              <PageFiltersBar.Item>
+                <Select<MetricOption, false, GroupBase<MetricOption>>
+                  className="w-full sm:w-64 text-base-content"
+                  classNamePrefix="react-select"
+                  options={groupedMetricOptions}
+                  value={
+                    metricOptions.find(
+                      (option) => option.value === selectedMetric,
+                    ) ?? null
+                  }
+                  onChange={(option: SingleValue<MetricOption>) => {
+                    if (option) {
+                      setSelectedMetric(option.value);
+                    }
+                  }}
+                  placeholder="Select a metric"
+                  isSearchable={false}
+                  styles={metricSelectStyles}
+                />
+              </PageFiltersBar.Item>
               {/* Latest/Best Toggle */}
               <PageFiltersBar.Item>
                 <div className="join rounded-lg overflow-hidden">
@@ -458,37 +476,16 @@ export function MetricsPageContent() {
                 </div>
               </PageFiltersBar.Item>
             </PageFiltersBar.Group>
-
-            <PageFiltersBar.Group>
-              <PageFiltersBar.Item>
-                <ChipSelector
-                  selectedChip={selectedChip}
-                  onChipSelect={setSelectedChip}
-                />
-              </PageFiltersBar.Item>
-
-              <PageFiltersBar.Item>
-                <Select<MetricOption, false, GroupBase<MetricOption>>
-                  className="w-full sm:w-64 text-base-content"
-                  classNamePrefix="react-select"
-                  options={groupedMetricOptions}
-                  value={
-                    metricOptions.find(
-                      (option) => option.value === selectedMetric,
-                    ) ?? null
-                  }
-                  onChange={(option: SingleValue<MetricOption>) => {
-                    if (option) {
-                      setSelectedMetric(option.value);
-                    }
-                  }}
-                  placeholder="Select a metric"
-                  isSearchable={false}
-                  styles={metricSelectStyles}
-                />
-              </PageFiltersBar.Item>
-            </PageFiltersBar.Group>
           </PageFiltersBar>
+
+          {/* Time Range */}
+          <TimeRangeSelector
+            startDate={startDate}
+            endDate={endDate}
+            onStartDateChange={setStartDate}
+            onEndDateChange={setEndDate}
+            onQuickRange={setQuickRange}
+          />
         </div>
 
         {/* Metrics Grid */}
