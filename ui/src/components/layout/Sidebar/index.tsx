@@ -13,6 +13,7 @@ import {
   ChevronRight,
   Code,
   Cpu,
+  Download,
   FileJson2,
   Files,
   GitBranch,
@@ -202,6 +203,21 @@ export function Sidebar() {
           >
             <Cpu size={18} />
             {(isOpen || isMobileOpen) && <span className="ml-2">Chip</span>}
+          </Link>
+        </li>
+        <li>
+          <Link
+            href="/import"
+            className={
+              isMobileOpen
+                ? linkClass(isActive("/import"))
+                : desktopLinkClass(isActive("/import"))
+            }
+            title="Import"
+            onClick={handleLinkClick}
+          >
+            <Download size={18} />
+            {(isOpen || isMobileOpen) && <span className="ml-2">Import</span>}
           </Link>
         </li>
         <li>

@@ -2,13 +2,7 @@
 
 import { useCallback } from "react";
 
-import {
-  GitBranch,
-  History,
-  GitCompare,
-  BarChart3,
-  Database,
-} from "lucide-react";
+import { GitBranch, History, GitCompare, BarChart3 } from "lucide-react";
 
 import { useGetProvenanceStats } from "@/client/provenance/provenance";
 import { PageContainer } from "@/components/ui/PageContainer";
@@ -18,7 +12,6 @@ import { useProvenanceUrlState } from "@/hooks/useUrlState";
 import { ParameterHistoryPanel } from "./ParameterHistoryPanel";
 import { ExecutionComparisonPanel } from "./ExecutionComparisonPanel";
 import { LineageExplorerPanel } from "./LineageExplorerPanel";
-import { SeedParametersPanel } from "./SeedParametersPanel";
 
 export function ProvenancePageContent() {
   const {
@@ -148,15 +141,6 @@ export function ProvenancePageContent() {
             <GitCompare className="h-3 w-3 sm:h-4 sm:w-4" />
             Compare
           </button>
-          <button
-            className={`tab tab-sm sm:tab-md gap-1 sm:gap-2 whitespace-nowrap ${
-              activeTab === "seeds" ? "tab-active" : ""
-            }`}
-            onClick={() => setActiveTab("seeds")}
-          >
-            <Database className="h-3 w-3 sm:h-4 sm:w-4" />
-            Seeds
-          </button>
         </div>
 
         {/* Tab Content */}
@@ -180,7 +164,6 @@ export function ProvenancePageContent() {
             />
           )}
           {activeTab === "compare" && <ExecutionComparisonPanel />}
-          {activeTab === "seeds" && <SeedParametersPanel />}
         </div>
       </div>
     </PageContainer>
