@@ -15,6 +15,7 @@ import {
   ChevronDown,
   ChevronRight,
   RotateCcw,
+  AlertCircle,
 } from "lucide-react";
 import { useGetTaskResult, getGetTaskResultQueryKey } from "@/client/task/task";
 import {
@@ -36,6 +37,7 @@ import {
 } from "@/hooks/useTaskResultIssues";
 import { useProject } from "@/contexts/ProjectContext";
 import { formatDateTime, formatRelativeTime } from "@/lib/utils/datetime";
+import { useToast } from "@/components/ui/Toast";
 
 /** Extract the display value from a parameter entry (may be a dict with `value` key or a plain value). */
 function extractParamValue(entry: unknown): string {
@@ -295,6 +297,7 @@ function IssueCard({
 export function TaskResultDetailPage({ taskId }: { taskId: string }) {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const toast = useToast();
   const { isOwner } = useProject();
   const currentUser = getCurrentUsername();
   const [showEditor, setShowEditor] = useState(false);
@@ -307,6 +310,8 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
   const [reExecuteSuccess, setReExecuteSuccess] = useState<string | null>(null);
   // Track re_executions count at the moment re-execute was triggered
   const [reExecCountBefore, setReExecCountBefore] = useState<number>(0);
+  const [updateParams, setUpdateParams] = useState(true);
+  const [reconfigure, setReconfigure] = useState(false);
 
   // Parameter override form state
   const [runParamValues, setRunParamValues] = useState<Record<string, string>>(
@@ -426,18 +431,22 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
         Object.keys(runOverrides).length > 0 ||
         Object.keys(inputOverrides).length > 0;
 
-      const body = hasOverrides
-        ? {
-            parameter_overrides: {
-              ...(Object.keys(runOverrides).length > 0
-                ? { run: runOverrides }
-                : {}),
-              ...(Object.keys(inputOverrides).length > 0
-                ? { input: inputOverrides }
-                : {}),
-            },
-          }
-        : undefined;
+      const body: Record<string, unknown> = {
+        update_params: updateParams,
+        reconfigure: reconfigure,
+        ...(hasOverrides
+          ? {
+              parameter_overrides: {
+                ...(Object.keys(runOverrides).length > 0
+                  ? { run: runOverrides }
+                  : {}),
+                ...(Object.keys(inputOverrides).length > 0
+                  ? { input: inputOverrides }
+                  : {}),
+              },
+            }
+          : {}),
+      };
 
       const response = await AXIOS_INSTANCE.post(
         `/task-results/${taskId}/re-execute`,
@@ -641,12 +650,16 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
       {((taskResult.figure_path && taskResult.figure_path.length > 0) ||
         (taskResult.json_figure_path &&
           taskResult.json_figure_path.length > 0)) && (
-        <div className="h-[220px] overflow-x-auto flex gap-2 mb-4">
-          <TaskFigure
-            taskId={taskId}
-            qid={taskResult.qid}
-            className="h-full w-auto object-contain rounded"
-          />
+        <div className="h-[280px] overflow-x-auto overflow-y-hidden flex items-center justify-start gap-3 mb-4">
+          {(taskResult.figure_path ?? []).map((fig, i) => (
+            <TaskFigure
+              key={i}
+              path={fig}
+              jsonFigurePath={(taskResult.json_figure_path ?? [])[i]}
+              qid={taskResult.qid}
+              className="h-full w-auto object-contain rounded flex-shrink-0"
+            />
+          ))}
         </div>
       )}
 
@@ -679,6 +692,43 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
               parameters={taskResult.run_parameters as Record<string, unknown>}
             />
           )}
+
+        {taskResult.status === "failed" && taskResult.message && (
+          <div className="border border-error/40 rounded-lg overflow-hidden">
+            <div className="flex items-center gap-2 px-3 py-2 bg-error/10 text-error text-sm font-semibold">
+              <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+              Error Log
+            </div>
+            <pre className="px-3 py-3 text-xs font-mono text-error/80 whitespace-pre-wrap break-all bg-error/5">
+              {taskResult.message}
+            </pre>
+            {taskResult.stack_trace && (
+              <>
+                <div className="px-3 py-1 text-xs font-semibold text-error/60 bg-error/5 border-t border-error/20 flex justify-between items-center">
+                  Stack Trace
+                  <button
+                    className="btn btn-ghost btn-xs"
+                    onClick={async () => {
+                      try {
+                        await navigator.clipboard.writeText(
+                          taskResult.stack_trace ?? "",
+                        );
+                        toast.success("Copied to clipboard");
+                      } catch {
+                        toast.error("Failed to copy to clipboard");
+                      }
+                    }}
+                  >
+                    Copy
+                  </button>
+                </div>
+                <pre className="px-3 py-3 text-xs font-mono text-error/60 whitespace-pre-wrap break-all bg-error/5">
+                  {taskResult.stack_trace}
+                </pre>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Divider: Issues */}
@@ -833,6 +883,45 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
                     defaultOpen={false}
                   />
                 )}
+
+              <div className="form-control">
+                <label className="label cursor-pointer justify-start gap-3">
+                  <input
+                    type="checkbox"
+                    className="toggle toggle-primary toggle-sm"
+                    checked={reconfigure}
+                    onChange={(e) => setReconfigure(e.target.checked)}
+                  />
+                  <div>
+                    <span className="label-text font-medium">
+                      Reconfigure hardware
+                    </span>
+                    <p className="label-text-alt text-base-content/50">
+                      Run Configure (system_manager load + push) before
+                      executing the task
+                    </p>
+                  </div>
+                </label>
+              </div>
+
+              <div className="form-control">
+                <label className="label cursor-pointer justify-start gap-3">
+                  <input
+                    type="checkbox"
+                    className="toggle toggle-primary toggle-sm"
+                    checked={updateParams}
+                    onChange={(e) => setUpdateParams(e.target.checked)}
+                  />
+                  <div>
+                    <span className="label-text font-medium">
+                      Update backend params
+                    </span>
+                    <p className="label-text-alt text-base-content/50">
+                      Write output parameters back to qubex YAML files
+                    </p>
+                  </div>
+                </label>
+              </div>
 
               {reExecuteError && (
                 <div className="alert alert-error text-sm">

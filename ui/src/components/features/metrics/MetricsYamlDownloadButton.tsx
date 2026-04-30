@@ -21,7 +21,7 @@ interface MetricsYamlDownloadButtonProps {
   } | null;
   metricConfig: MetricConfig | undefined;
   selectionMode: "latest" | "best" | "average";
-  timeRange: "1d" | "7d" | "30d" | "custom";
+  timeRange: string;
   disabled?: boolean;
 }
 
@@ -52,7 +52,7 @@ function buildYaml(
     `title: ${escapeYamlString(metricConfig.title)}`,
     `unit: ${escapeYamlString(metricConfig.unit)}`,
     `selection_mode: ${selectionMode}`,
-    `time_range: ${timeRange}`,
+    `time_range: ${escapeYamlString(timeRange)}`,
     `timestamp: ${escapeYamlString(timestamp)}`,
     `data:`,
   ];

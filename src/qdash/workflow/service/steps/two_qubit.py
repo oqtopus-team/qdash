@@ -155,6 +155,9 @@ class CustomTwoQubit(CalibrationStep):
             "execution_id": session.execution_id,
             "project_id": session.project_id,
             "default_run_parameters": session.default_run_parameters,
+            "tags": session.tags,
+            "flow_name": session.flow_name,
+            "note": session.note,
         }
 
         # Execute groups sequentially (groups are scheduled to avoid resource conflicts)
@@ -472,6 +475,9 @@ class TwoQubitCalibration(CalibrationStep):
             "execution_id": session.execution_id,
             "project_id": session.project_id,
             "default_run_parameters": session.default_run_parameters,
+            "tags": session.tags,
+            "flow_name": session.flow_name,
+            "note": session.note,
         }
 
         # Execute groups sequentially (groups are scheduled to avoid resource conflicts)
@@ -533,6 +539,14 @@ class TwoQubitCalibration(CalibrationStep):
             if fidelity_param is not None:
                 metrics["bell_fidelity"] = (
                     fidelity_param.value if hasattr(fidelity_param, "value") else fidelity_param
+                )
+        # 2Q gate coherence limit
+        coh_result = raw.get("Check2QGateCoherenceLimit", {})
+        if coh_result:
+            coh_param = coh_result.get("two_qubit_gate_coherence_limit")
+            if coh_param is not None:
+                metrics["two_qubit_gate_coherence_limit"] = (
+                    coh_param.value if hasattr(coh_param, "value") else coh_param
                 )
         return metrics
 

@@ -8,7 +8,7 @@ from qdash.workflow.calibtasks.base import (
 from qdash.workflow.calibtasks.qubex.base import QubexTask
 from qdash.workflow.engine.backend.qubex import QubexBackend
 from qubex.experiment.experiment_constants import CALIBRATION_SHOTS
-from qubex.measurement.measurement import DEFAULT_INTERVAL
+from qubex.measurement.measurement_defaults import DEFAULT_INTERVAL
 
 
 class CheckOptimalReadoutAmplitude(QubexTask):
@@ -21,7 +21,7 @@ class CheckOptimalReadoutAmplitude(QubexTask):
         "amplitude_range": RunParameterModel(
             unit="a.u.",
             value_type="np.arange",
-            value=(0.01, 0.21, 0.01),
+            value=(0.01, 0.25, 0.01),
             description="Readout amplitude range",
         ),
         "shots": RunParameterModel(
@@ -38,9 +38,7 @@ class CheckOptimalReadoutAmplitude(QubexTask):
         ),
     }
     output_parameters: ClassVar[dict[str, ParameterModel]] = {
-        "optimal_readout_amplitude": ParameterModel(
-            unit="a.u.", description="Optimal Readout Amplitude"
-        ),
+        "readout_amplitude": ParameterModel(unit="a.u.", description="Optimal Readout Amplitude"),
     }
 
     def postprocess(
@@ -48,9 +46,13 @@ class CheckOptimalReadoutAmplitude(QubexTask):
     ) -> PostProcessResult:
         """Process the results of the task."""
         result = run_result.raw_result
-        self.output_parameters["optimal_readout_amplitude"].value = result["optimal_amplitude"]
+        label = self.get_qubit_label(backend, qid)
+        self.output_parameters["readout_amplitude"].value = result["optimal_amplitude"]
         output_parameters = self.attach_execution_id(execution_id)
-        figures = [result["fig"]]
+        fig1 = result.figures["readout_fidelity"]
+        fig2 = result.figures[f"{label}_prepared_0"]
+        fig3 = result.figures[f"{label}_prepared_1"]
+        figures = [fig1, fig2, fig3]
         return PostProcessResult(output_parameters=output_parameters, figures=figures)
 
     def run(self, backend: QubexBackend, qid: str) -> RunResult:
@@ -63,8 +65,8 @@ class CheckOptimalReadoutAmplitude(QubexTask):
             result = exp.find_optimal_readout_amplitude(
                 target=label,
                 amplitude_range=self.run_parameters["amplitude_range"].get_value(),
-                shots=self.run_parameters["shots"].get_value(),
-                interval=self.run_parameters["interval"].get_value(),
+                n_shots=self.run_parameters["shots"].get_value(),
+                shot_interval=self.run_parameters["interval"].get_value(),
             )
 
         self.save_calibration(backend)

@@ -1,3 +1,4 @@
+import math
 from typing import ClassVar
 
 import plotly.graph_objects as go
@@ -11,8 +12,9 @@ from qdash.workflow.calibtasks.qubex.base import QubexTask
 from qdash.workflow.engine.backend.qubex import QubexBackend
 from qubex.analysis import IQPlotter
 from qubex.experiment.experiment_constants import CALIBRATION_SHOTS
-from qubex.measurement.measurement import DEFAULT_INTERVAL, DEFAULT_READOUT_DURATION
+from qubex.measurement.measurement_defaults import DEFAULT_INTERVAL, DEFAULT_READOUT_DURATION
 
+DEFAULT_READOUT_AMPLITUDE = 0.2
 DEFAULT_CONTROL_AMPLITUDE = 0.0125
 CONTROL_AMPLITUDE_MIN = 1e-4
 CONTROL_AMPLITUDE_MAX = 1.0
@@ -26,8 +28,10 @@ class CheckRabi(QubexTask):
     input_parameters: ClassVar[dict[str, ParameterModel | None]] = {
         "qubit_frequency": None,
         "control_amplitude": None,
-        "readout_amplitude": None,
         "readout_frequency": None,
+        "readout_amplitude": ParameterModel(
+            value=DEFAULT_READOUT_AMPLITUDE, unit="a.u.", description="Readout amplitude"
+        ),
         "readout_length": ParameterModel(
             value=DEFAULT_READOUT_DURATION, unit="ns", description="Readout pulse length"
         ),
@@ -72,7 +76,13 @@ class CheckRabi(QubexTask):
         result = super().preprocess(backend, qid)
         param = self.input_parameters.get("control_amplitude")
         value = param.value if param is not None else None
-        if value is None or value <= CONTROL_AMPLITUDE_MIN or value >= CONTROL_AMPLITUDE_MAX:
+        if (
+            value is None
+            or not isinstance(value, (int, float))
+            or math.isnan(value)
+            or value <= CONTROL_AMPLITUDE_MIN
+            or value >= CONTROL_AMPLITUDE_MAX
+        ):
             print(
                 f"control_amplitude={value} is out of range "
                 f"({CONTROL_AMPLITUDE_MIN}, {CONTROL_AMPLITUDE_MAX}), "
@@ -138,18 +148,30 @@ class CheckRabi(QubexTask):
         exp = self.get_experiment(backend)
         label = self.get_qubit_label(backend, qid)
 
-        # Apply frequency override if qubit_frequency was explicitly provided
         control_amplitude_param = self.input_parameters["control_amplitude"]
         qubit_frequency_param = self.input_parameters["qubit_frequency"]
+        readout_amplitude_param = self.input_parameters["readout_amplitude"]
         assert control_amplitude_param is not None
         assert qubit_frequency_param is not None
-        # with self._apply_frequency_override(backend, qid):
+        assert readout_amplitude_param is not None
+
+        # Get readout_amplitude from input_parameters (loaded from DB)
+        readout_amp = readout_amplitude_param.value
+        exp.params.readout_amplitude[label] = readout_amp
+
+        print(
+            f"[run] CheckRabi params for {label}: "
+            f"control_amplitude={control_amplitude_param.value}, "
+            f"qubit_frequency={qubit_frequency_param.value}, "
+            f"readout_amplitude={readout_amp}"
+        )
+
         result = exp.obtain_rabi_params(
             amplitudes={label: control_amplitude_param.value},
             frequencies={label: qubit_frequency_param.value},
             time_range=self.run_parameters["time_range"].get_value(),
-            shots=self.run_parameters["shots"].get_value(),
-            interval=self.run_parameters["interval"].get_value(),
+            n_shots=self.run_parameters["shots"].get_value(),
+            shot_interval=self.run_parameters["interval"].get_value(),
             targets=label,
         )
 

@@ -93,6 +93,7 @@ class TaskContext:
         context_id: str | None = None,
         snapshot_loader: SnapshotParameterLoader | None = None,
         source_task_id: str | None = None,
+        force_update_params: bool = False,
     ) -> None:
         self.id = context_id or str(uuid.uuid4())
         self.username = username
@@ -118,6 +119,7 @@ class TaskContext:
             data_saver=self.data_saver,
             snapshot_loader=snapshot_loader,
             source_task_id=source_task_id,
+            force_update_params=force_update_params,
         )
 
         # Initialize containers for coupling qids (only if state_manager was not injected)

@@ -28,6 +28,8 @@ def single_task_executor(
     tags: list[str] | None = None,
     source_task_id: str | None = None,
     parameter_overrides: dict[str, dict[str, Any]] | None = None,
+    update_params: bool = True,
+    reconfigure: bool = False,
 ) -> Any:
     """Execute a single calibration task.
 
@@ -63,12 +65,19 @@ def single_task_executor(
         flow_name=flow_name or f"re-execute:{task_name}",
         tags=tags,
         project_id=project_id,
-        enable_github=False,
+        enable_github_pull=False,
+        enable_github=update_params,
+        use_lock=False,
         parameter_overrides=parameter_overrides,
         source_task_id=source_task_id,
+        force_update_params=update_params,
     )
 
     try:
+        if reconfigure:
+            logger.info(f"Reconfiguring hardware for qid={qid} before executing {task_name}")
+            cal.execute_task("Configure", qid)
+
         result = cal.execute_task(task_name, qid)
         cal.finish_calibration()
 

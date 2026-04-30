@@ -15,6 +15,9 @@ Run migrations with:
 
     python -m qdash.dbmodel.migration remove-node-edge-info          # dry-run
     python -m qdash.dbmodel.migration remove-node-edge-info --execute  # execute
+
+    python -m qdash.dbmodel.migration remove-coupling-from-qubit          # dry-run
+    python -m qdash.dbmodel.migration remove-coupling-from-qubit --execute  # execute
 """
 
 import logging
@@ -397,6 +400,99 @@ def migrate_remove_node_edge_info(dry_run: bool = True) -> dict[str, int]:
     return stats
 
 
+def migrate_remove_coupling_from_qubit(dry_run: bool = True) -> dict[str, Any]:
+    """Remove invalid QubitDocuments created by the seed import bug.
+
+    Due to a bug in SeedImportService, two types of invalid QubitDocuments
+    were created:
+
+    1. Coupling-format qids (e.g. "024-Q025", "059-Q062") from coupling
+       parameter YAML files were saved as QubitDocument instead of being
+       skipped.
+    2. Zero-padded duplicate qids (e.g. "000", "001") were created alongside
+       the correct non-padded qids (e.g. "0", "1") because the seed import
+       normalized "Q000" to "000" which didn't match the existing "0".
+
+    Valid qubit qids are non-padded numeric strings: "0", "1", ..., "143".
+    This migration deletes entries matching either invalid pattern.
+
+    Args:
+        dry_run: If True, only reports what would be deleted.
+
+    Returns:
+        Migration statistics with counts of affected documents.
+    """
+    from qdash.dbmodel.qubit import QubitDocument
+
+    stats: dict[str, Any] = {
+        "total_qubit_documents": 0,
+        "coupling_qids": 0,
+        "zero_padded_duplicates": 0,
+        "total_invalid": 0,
+        "deleted": 0,
+        "sample_coupling_qids": [],
+        "sample_padded_qids": [],
+    }
+
+    collection = QubitDocument.get_motor_collection()
+
+    stats["total_qubit_documents"] = collection.count_documents({})
+
+    # 1. Find coupling-format qids (containing "-")
+    coupling_filter: dict[str, Any] = {"qid": {"$regex": "-"}}
+    stats["coupling_qids"] = collection.count_documents(coupling_filter)
+
+    if stats["coupling_qids"] > 0:
+        sample_docs = list(collection.find(coupling_filter, {"qid": 1, "chip_id": 1}).limit(10))
+        stats["sample_coupling_qids"] = [
+            {"qid": doc["qid"], "chip_id": doc.get("chip_id", "")} for doc in sample_docs
+        ]
+        logger.info(f"Coupling qids found: {stats['coupling_qids']}")
+        for item in stats["sample_coupling_qids"]:
+            logger.info(f"  - chip_id={item['chip_id']}, qid={item['qid']}")
+
+    # 2. Find zero-padded duplicate qids (e.g. "000", "001", "023")
+    #    Valid qids are: "0" through "N" (no leading zeros except "0" itself)
+    #    Invalid: any pure-numeric qid starting with "0" that has length >= 2
+    #    Exclude coupling qids (already counted above)
+    padded_filter: dict[str, Any] = {
+        "qid": {"$regex": "^0\\d+$"},  # anchored: pure-numeric, no "-"
+    }
+    stats["zero_padded_duplicates"] = collection.count_documents(padded_filter)
+
+    if stats["zero_padded_duplicates"] > 0:
+        sample_docs = list(collection.find(padded_filter, {"qid": 1, "chip_id": 1}).limit(10))
+        stats["sample_padded_qids"] = [
+            {"qid": doc["qid"], "chip_id": doc.get("chip_id", "")} for doc in sample_docs
+        ]
+        logger.info(f"Zero-padded duplicate qids found: {stats['zero_padded_duplicates']}")
+        for item in stats["sample_padded_qids"]:
+            logger.info(f"  - chip_id={item['chip_id']}, qid={item['qid']}")
+
+    # Use $or for the actual delete, and count the union to get accurate total
+    combined_filter: dict[str, Any] = {
+        "$or": [coupling_filter, padded_filter],
+    }
+    stats["total_invalid"] = collection.count_documents(combined_filter)
+
+    logger.info(
+        f"Total QubitDocuments: {stats['total_qubit_documents']}, "
+        f"invalid: {stats['total_invalid']} "
+        f"(coupling={stats['coupling_qids']}, zero-padded={stats['zero_padded_duplicates']}), "
+        f"valid after cleanup: {stats['total_qubit_documents'] - stats['total_invalid']}"
+    )
+
+    if not dry_run and stats["total_invalid"] > 0:
+        result = collection.delete_many(combined_filter)
+        stats["deleted"] = result.deleted_count
+        logger.info(f"Deleted {stats['deleted']} invalid QubitDocuments")
+
+    prefix = "[DRY RUN] Would delete" if dry_run else "Deleted"
+    logger.info(f"{prefix} {stats['total_invalid']} invalid entries from QubitDocument collection")
+
+    return stats
+
+
 def _get_mongo_client() -> MongoClient[Any]:
     """Get MongoDB client for migration."""
     return MongoClient(
@@ -605,6 +701,17 @@ if __name__ == "__main__":
         help="Actually execute the migration (default is dry-run)",
     )
 
+    # remove-coupling-from-qubit migration
+    remove_coupling_parser = subparsers.add_parser(
+        "remove-coupling-from-qubit",
+        help="Remove coupling data incorrectly stored as QubitDocument (seed import bug fix)",
+    )
+    remove_coupling_parser.add_argument(
+        "--execute",
+        action="store_true",
+        help="Actually execute the migration (default is dry-run)",
+    )
+
     args = parser.parse_args()
 
     if args.command == "fix-invalid-fidelity":
@@ -637,6 +744,12 @@ if __name__ == "__main__":
 
         initialize()
         stats = migrate_remove_node_edge_info(dry_run=not args.execute)
+        logger.info(f"Migration complete: {stats}")
+    elif args.command == "remove-coupling-from-qubit":
+        from qdash.dbmodel.initialize import initialize
+
+        initialize()
+        stats = migrate_remove_coupling_from_qubit(dry_run=not args.execute)
         logger.info(f"Migration complete: {stats}")
     else:
         parser.print_help()

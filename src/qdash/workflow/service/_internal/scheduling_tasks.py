@@ -178,6 +178,9 @@ def _create_isolated_session(
         enable_github_pull=False,  # Parent session handles GitHub pull
         enable_github=False,  # No GitHub operations for isolated sessions
         default_run_parameters=session_config.get("default_run_parameters"),
+        tags=session_config.get("tags"),
+        flow_name=session_config.get("flow_name"),
+        note=session_config.get("note"),
     )
 
 
@@ -581,8 +584,14 @@ def calibrate_parallel_group(
 # issues (boxpool, device_controller) that occur with threaded execution.
 
 
-def _get_dask_task_runner() -> Any:
+_DEFAULT_DASK_WORKERS = 16
+
+
+def _get_dask_task_runner(n_workers: int = _DEFAULT_DASK_WORKERS) -> Any:
     """Get DaskTaskRunner configured for multiprocess execution.
+
+    Args:
+        n_workers: Number of Dask workers (parallel processes). Default: 16.
 
     Raises:
         ImportError: If prefect-dask is not installed
@@ -594,7 +603,7 @@ def _get_dask_task_runner() -> Any:
         )
         raise ImportError(msg)
     return DaskTaskRunner(
-        cluster_kwargs={"n_workers": 4, "threads_per_worker": 1, "processes": True}
+        cluster_kwargs={"n_workers": n_workers, "threads_per_worker": 1, "processes": True}
     )
 
 

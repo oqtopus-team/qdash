@@ -12,10 +12,6 @@ export type GetTimeseriesTaskResultsParams = {
    */
   chip_id: string;
   /**
-   * Tag to filter by
-   */
-  tag: string;
-  /**
    * Parameter name
    */
   parameter: string;
@@ -27,6 +23,10 @@ export type GetTimeseriesTaskResultsParams = {
    * End time in ISO format
    */
   end_at: string;
+  /**
+   * Tag to filter by
+   */
+  tag?: string | null;
   /**
    * Optional qubit ID to filter by
    */

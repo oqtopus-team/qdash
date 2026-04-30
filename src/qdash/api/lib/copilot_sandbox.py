@@ -38,6 +38,7 @@ ALLOWED_MODULES = frozenset(
         "datetime",
         "_strptime",
         "collections",
+        "io",
     }
 )
 

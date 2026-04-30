@@ -8,6 +8,7 @@ import { FigureLightbox } from "./FigureLightbox";
 
 interface TaskFigureProps {
   path?: string | string[];
+  jsonFigurePath?: string | string[];
   taskId?: string;
   qid: string;
   className?: string;
@@ -21,10 +22,12 @@ function ExpandableImage({
   src,
   alt,
   className,
+  jsonFigurePath,
 }: {
   src: string;
   alt: string;
   className: string;
+  jsonFigurePath?: string;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [hasError, setHasError] = useState(false);
@@ -57,7 +60,12 @@ function ExpandableImage({
         <ZoomIn className="h-3 w-3" />
       </button>
       {isOpen && (
-        <FigureLightbox src={src} alt={alt} onClose={() => setIsOpen(false)} />
+        <FigureLightbox
+          src={src}
+          alt={alt}
+          jsonFigurePath={jsonFigurePath}
+          onClose={() => setIsOpen(false)}
+        />
       )}
     </div>
   );
@@ -65,6 +73,7 @@ function ExpandableImage({
 
 export function TaskFigure({
   path,
+  jsonFigurePath,
   taskId,
   qid,
   className = "",
@@ -108,6 +117,14 @@ export function TaskFigure({
       ? [raw]
       : [];
 
+  // Normalize json figure paths
+  const rawJson = jsonFigurePath || taskResult?.json_figure_path || [];
+  const normalizedJsonPaths = Array.isArray(rawJson)
+    ? rawJson
+    : typeof rawJson === "string"
+      ? [rawJson]
+      : [];
+
   if (normalizedPaths.length === 0) {
     return (
       <div className="alert alert-info">
@@ -122,18 +139,20 @@ export function TaskFigure({
         src={figureUrl(normalizedPaths[0])}
         alt={`Result for QID ${qid}`}
         className={className}
+        jsonFigurePath={normalizedJsonPaths[0]}
       />
     );
   }
 
   return (
     <div className="flex flex-wrap gap-2 overflow-hidden w-full h-full">
-      {normalizedPaths.map((p) => (
+      {normalizedPaths.map((p, i) => (
         <ExpandableImage
           key={p}
           src={figureUrl(p)}
           alt={`Result for QID ${qid}`}
           className={`${className} max-w-full max-h-full`}
+          jsonFigurePath={normalizedJsonPaths[i]}
         />
       ))}
     </div>

@@ -188,7 +188,7 @@ const GridCell = memo(function GridCell({
       }`}
     >
       {task.figure_path && figurePath && (
-        <div className="absolute inset-1">
+        <div className="absolute inset-1 [&_button]:hidden">
           <TaskFigure
             path={figurePath}
             qid={qid}
@@ -362,8 +362,6 @@ export function TaskResultGrid({
         <span className="loading loading-spinner loading-lg"></span>
       </div>
     );
-  if (isTaskError)
-    return <div className="alert alert-error">Failed to load data</div>;
 
   const gridPositions: { [key: string]: { row: number; col: number } } = {};
   if (taskResponse?.data?.result) {
@@ -500,7 +498,6 @@ export function TaskResultGrid({
           isMobile,
           viewportHeight,
         ),
-        willChange: "transform",
       }}
     >
       {Array.from({
@@ -531,7 +528,7 @@ export function TaskResultGrid({
         );
 
         if (!qid) {
-          return <EmptyCell key={index} muxBgClass={muxBgClass} />;
+          return <EmptyCell key={`empty-${index}`} muxBgClass={muxBgClass} />;
         }
 
         const task = getTaskResult(qid);
@@ -691,6 +688,9 @@ export function TaskResultGrid({
 
   return (
     <div className="flex flex-col h-full space-y-2">
+      {isTaskError && (
+        <div className="alert alert-error">Failed to load data</div>
+      )}
       {/* View Mode Toggle and Download Controls */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">

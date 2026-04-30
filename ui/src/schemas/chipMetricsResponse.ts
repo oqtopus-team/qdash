@@ -6,6 +6,8 @@
  * OpenAPI spec version: 0.0.1
  */
 import type { ChipMetricsResponseWithinHours } from "./chipMetricsResponseWithinHours";
+import type { ChipMetricsResponseStartAt } from "./chipMetricsResponseStartAt";
+import type { ChipMetricsResponseEndAt } from "./chipMetricsResponseEndAt";
 import type { ChipMetricsResponseQubitMetrics } from "./chipMetricsResponseQubitMetrics";
 import type { ChipMetricsResponseCouplingMetrics } from "./chipMetricsResponseCouplingMetrics";
 
@@ -17,6 +19,8 @@ export interface ChipMetricsResponse {
   username: string;
   qubit_count: number;
   within_hours?: ChipMetricsResponseWithinHours;
+  start_at?: ChipMetricsResponseStartAt;
+  end_at?: ChipMetricsResponseEndAt;
   qubit_metrics: ChipMetricsResponseQubitMetrics;
   coupling_metrics: ChipMetricsResponseCouplingMetrics;
 }

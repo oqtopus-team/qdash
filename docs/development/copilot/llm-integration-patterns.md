@@ -126,6 +126,31 @@ def compact_timestamp(ts):
 
 **Graceful degradation**: when the result exceeds a size threshold, drop detail arrays and keep only summary statistics. The LLM can still produce a useful answer from stats alone.
 
+### Server-Side Data Store
+
+For very large tool results (e.g., 600+ timeseries rows), even compressed data can consume excessive tokens. A more effective pattern is to **not send the data to the LLM at all**:
+
+1. Tool executes and returns full data
+2. A wrapper stores the result server-side in a `data_store` dict
+3. The LLM receives only a compact summary (schema info, row counts, scalar statistics)
+4. When the LLM invokes a sandbox tool, the `data_store` is injected as a variable
+5. LLM-generated code accesses full data locally — no token cost for the data itself
+
+```python
+# Summary sent to LLM (~200 chars instead of ~30K)
+{
+    "parameter_name": "t1",
+    "num_qubits": 64,
+    "statistics": {"mean": 45.2, "stdev": 3.1},
+    "qubits": {"_schema": ["qid", "latest", "trend"], "_rows": 64},
+    "timeseries": {"_schema": ["qid", "t", "v"], "_rows": 640},
+    "data_key": "t1",
+    "_note": "Full data available as data['t1'] in execute_python_analysis."
+}
+```
+
+This eliminates both the original token cost and the echo-back cost when the LLM passes data to a sandbox tool.
+
 ### Chart Injection
 
 When a tool produces a chart (e.g., a heatmap or analysis result), the chart JSON is typically 5-10K tokens. If returned as a tool result, the LLM often reproduces the entire chart spec in its response, wasting tokens and context.
@@ -138,15 +163,15 @@ Intercept chart-producing tools:
 4. After the LLM finishes, collected charts are injected into the response
 
 ```python
-async def wrap_chart_tool(args, original_executor, collected_charts):
-    result = await original_executor(args)
-    if isinstance(result, dict) and result.get("chart"):
+def heatmap_wrapper(args, _orig=original_heatmap):
+    result = _orig(args)
+    if isinstance(result, dict) and "chart" in result:
         collected_charts.append(result["chart"])
-        result = {**result, "chart": "[Chart collected and will be displayed directly]"}
+        return {"status": "success", "message": "Chart generated.", "statistics": result.get("statistics", {})}
     return result
 ```
 
-This eliminates redundant chart JSON from the LLM's output while preserving the chart for the frontend.
+This eliminates redundant chart JSON from the LLM's output while preserving the chart for the frontend. In QDash, `_wrap_tool_executors` combines data store, chart collection, and sandbox injection into a single wrapper layer.
 
 ### Null Safety in Tool Results
 

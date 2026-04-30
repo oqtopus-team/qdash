@@ -1,13 +1,13 @@
-"""Tests for copilot provenance lineage graph tool."""
+"""Tests for copilot provenance lineage graph tool and data store."""
 
 from __future__ import annotations
 
 from datetime import datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from unittest.mock import MagicMock, patch
 
 from qdash.api.lib.ai_labels import TOOL_LABELS
-from qdash.api.lib.copilot_agent import AGENT_TOOLS
+from qdash.api.lib.copilot_agent import AGENT_TOOLS, _build_llm_summary, _wrap_tool_executors
 from qdash.api.services.copilot_data_service import CopilotDataService
 
 if TYPE_CHECKING:
@@ -115,14 +115,14 @@ class TestProvenanceLineageGraphOutput:
 
         result = self.service.load_provenance_lineage_graph("qf:0:exec-1:task-1", "chip-1")
 
-        entity_nodes = [n for n in result["nodes"] if n["node_type"] == "entity"]
+        entity_nodes = [n for n in result["nodes"] if n["type"] == "entity"]
         assert len(entity_nodes) >= 1
         node = entity_nodes[0]
-        assert "parameter_name" in node
-        assert "value" in node
-        assert "unit" in node
-        assert "version" in node
-        assert "task_name" in node
+        assert node["param"] is not None
+        assert node["value"] is not None
+        assert node["unit"] is not None
+        assert node["ver"] is not None
+        assert node["task"] is not None
 
     @patch.object(CopilotDataService, "_resolve_project_id", return_value="proj-1")
     @patch.object(CopilotDataService, "_get_provenance_service")
@@ -136,12 +136,12 @@ class TestProvenanceLineageGraphOutput:
 
         result = self.service.load_provenance_lineage_graph("qf:0:exec-1:task-1", "chip-1")
 
-        activity_nodes = [n for n in result["nodes"] if n["node_type"] == "activity"]
+        activity_nodes = [n for n in result["nodes"] if n["type"] == "activity"]
         assert len(activity_nodes) >= 1
         node = activity_nodes[0]
-        assert "task_name" in node
-        assert "execution_id" in node
-        assert "status" in node
+        assert node["task"] is not None
+        assert node["exec_id"] is not None
+        assert node["status"] is not None
 
     @patch.object(CopilotDataService, "_resolve_project_id", return_value="proj-1")
     @patch.object(CopilotDataService, "_get_provenance_service")
@@ -157,9 +157,11 @@ class TestProvenanceLineageGraphOutput:
 
         result = self.service.load_provenance_lineage_graph("qf:0:exec-1:task-1", "chip-1")
 
-        nodes_with_latest = [n for n in result["nodes"] if "latest_version" in n]
-        assert len(nodes_with_latest) >= 1
-        assert nodes_with_latest[0]["latest_version"] == 5
+        versions_with_latest = [
+            n["ver"] for n in result["nodes"] if isinstance(n["ver"], str) and "/" in n["ver"]
+        ]
+        assert len(versions_with_latest) >= 1
+        assert "5" in versions_with_latest[0]
 
 
 class TestToolRegistration:
@@ -182,6 +184,112 @@ class TestToolRegistration:
         service = CopilotDataService()
         executors = service.build_tool_executors()
         assert "get_provenance_lineage_graph" in executors
+
+    def test_execute_python_analysis_has_no_context_data_param(self):
+        tool = next(t for t in AGENT_TOOLS if t["name"] == "execute_python_analysis")
+        props = tool["parameters"]["properties"]
+        assert "context_data" not in props
+        assert "code" in props
+
+
+class TestBuildLlmSummary:
+    """Tests for _build_llm_summary."""
+
+    def test_list_of_dicts_replaced_with_schema(self):
+        full = {
+            "chip_id": "chip-1",
+            "qubits": [
+                {"qid": "0", "latest": 5.05},
+                {"qid": "1", "latest": 4.98},
+            ],
+        }
+        summary = _build_llm_summary(full, "t1")
+        assert summary["chip_id"] == "chip-1"
+        assert summary["qubits"]["_schema"] == ["qid", "latest"]
+        assert summary["qubits"]["_rows"] == 2
+        assert summary["data_key"] == "t1"
+        assert "data['t1']" in summary["_note"]
+
+    def test_plain_list_replaced_with_row_count(self):
+        full = {"values": [1, 2, 3]}
+        summary = _build_llm_summary(full, "key")
+        assert summary["values"]["_rows"] == 3
+        assert "_schema" not in summary["values"]
+
+    def test_scalar_values_preserved(self):
+        full = {"chip_id": "chip-1", "num_qubits": 10, "unit": "GHz"}
+        summary = _build_llm_summary(full, "key")
+        assert summary["chip_id"] == "chip-1"
+        assert summary["num_qubits"] == 10
+        assert summary["unit"] == "GHz"
+
+    def test_empty_list_replaced(self):
+        full: dict[str, Any] = {"items": []}
+        summary = _build_llm_summary(full, "key")
+        assert summary["items"]["_rows"] == 0
+
+
+class TestDataStoreWrapper:
+    """Tests for _wrap_tool_executors data store behaviour."""
+
+    def test_stored_tool_saves_to_data_store(self):
+        data_store: dict[str, Any] = {}
+        mock_result = {
+            "chip_id": "chip-1",
+            "parameter_name": "t1",
+            "timeseries": [{"qid": "0", "v": 45.2, "t": "2026-01-01"}],
+            "qubits": [{"qid": "0", "latest": 45.2}],
+        }
+        executors = {
+            "get_chip_parameter_timeseries": lambda args: mock_result,
+        }
+        wrapped, _ = _wrap_tool_executors(executors, data_store)
+        result = wrapped["get_chip_parameter_timeseries"]({"parameter_name": "t1"})
+
+        # Full data stored
+        assert "t1" in data_store
+        assert data_store["t1"] is mock_result
+
+        # LLM receives summary only
+        assert result["data_key"] == "t1"
+        assert result["timeseries"]["_rows"] == 1
+
+    def test_stored_tool_error_not_saved(self):
+        data_store: dict[str, Any] = {}
+        executors = {
+            "get_chip_parameter_timeseries": lambda args: {"error": "No data"},
+        }
+        wrapped, _ = _wrap_tool_executors(executors, data_store)
+        result = wrapped["get_chip_parameter_timeseries"]({"parameter_name": "t1"})
+
+        assert data_store == {}
+        assert result["error"] == "No data"
+
+    def test_chip_summary_uses_fixed_key(self):
+        data_store: dict[str, Any] = {}
+        mock_result = {"chip_id": "c", "qubits": [{"qid": "0"}], "statistics": {}}
+        executors = {
+            "get_chip_summary": lambda args: mock_result,
+        }
+        wrapped, _ = _wrap_tool_executors(executors, data_store)
+        result = wrapped["get_chip_summary"]({"chip_id": "c"})
+
+        assert "chip_summary" in data_store
+        assert result["data_key"] == "chip_summary"
+
+    def test_python_analysis_receives_data_store(self):
+        data_store = {"t1": {"timeseries": [{"v": 45.2}]}}
+        executors = {
+            "execute_python_analysis": lambda args: None,  # overridden
+        }
+        wrapped, _ = _wrap_tool_executors(executors, data_store)
+
+        # Call with code that accesses data
+        result = wrapped["execute_python_analysis"](
+            {"code": "result = {'output': str(data.get('t1', {})), 'chart': None}"}
+        )
+        assert result["error"] is None
+        assert "timeseries" in result["output"]
 
 
 # --------------- helpers ---------------

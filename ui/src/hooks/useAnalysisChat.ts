@@ -6,6 +6,14 @@ import { flushSync } from "react-dom";
 export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
+  /**
+   * Optional hint that this user message was sent together with experimental
+   * figures (either explicitly via `imageBase64` or implicitly because the
+   * backend auto-attaches the task result figure when a task context is
+   * present). Used by the UI to show an "image attached" indicator
+   * immediately, before the server echoes back `images_sent`.
+   */
+  attachedImage?: boolean;
 }
 
 interface AnalysisResult {
@@ -177,6 +185,10 @@ export function useAnalysisChat(
       const newUserMessage: ChatMessage = {
         role: "user",
         content: userMessage,
+        // When a task context is active, the backend auto-attaches the task
+        // result figure; when the caller explicitly provides imageBase64 we
+        // also mark it as attached.
+        attachedImage: Boolean(context) || Boolean(imageBase64),
       };
       setMessages((prev) => [...prev, newUserMessage]);
       setIsLoading(true);

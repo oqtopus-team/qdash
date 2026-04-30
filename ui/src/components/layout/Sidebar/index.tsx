@@ -13,6 +13,7 @@ import {
   ChevronRight,
   Code,
   Cpu,
+  Download,
   FileJson2,
   Files,
   GitBranch,
@@ -38,6 +39,7 @@ import { FluentEmoji, getAvatarEmoji } from "@/components/ui/FluentEmoji";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProject } from "@/contexts/ProjectContext";
 import { useSidebar } from "@/contexts/SidebarContext";
+import { DARK_THEMES } from "@/constants/themes";
 
 const PREFECT_URL =
   process.env.NEXT_PUBLIC_PREFECT_URL || "http://127.0.0.1:4200";
@@ -67,17 +69,9 @@ export function Sidebar() {
   const { user, logout: authLogout } = useAuth();
   const { theme, setTheme } = useTheme();
   const isAdmin = user?.system_role === "admin";
-  const darkThemes = [
-    "dark",
-    "night",
-    "dracula",
-    "business",
-    "coffee",
-    "dim",
-    "sunset",
-    "abyss",
-  ];
-  const isDarkTheme = darkThemes.includes(theme);
+  const isDarkTheme = DARK_THEMES.includes(
+    theme as (typeof DARK_THEMES)[number],
+  );
 
   const logoutMutation = useLogout();
   const handleLogout = useCallback(async () => {
@@ -209,6 +203,21 @@ export function Sidebar() {
           >
             <Cpu size={18} />
             {(isOpen || isMobileOpen) && <span className="ml-2">Chip</span>}
+          </Link>
+        </li>
+        <li>
+          <Link
+            href="/import"
+            className={
+              isMobileOpen
+                ? linkClass(isActive("/import"))
+                : desktopLinkClass(isActive("/import"))
+            }
+            title="Import"
+            onClick={handleLinkClick}
+          >
+            <Download size={18} />
+            {(isOpen || isMobileOpen) && <span className="ml-2">Import</span>}
           </Link>
         </li>
         <li>

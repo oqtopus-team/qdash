@@ -32,20 +32,48 @@ type MetricOption = {
   label: string;
 };
 
+const STORAGE_KEY_QUBIT = "qdash:metrics:qubit:metric";
+const STORAGE_KEY_COUPLING = "qdash:metrics:coupling:metric";
+
+const saveToLocalStorage = (key: string, value: string) => {
+  try {
+    if (localStorage.getItem(key) === value) return;
+    localStorage.setItem(key, value);
+  } catch (error) {
+    console.warn("Failed to save to localStorage:", key, error);
+  }
+};
+
+const getFromLocalStorage = (key: string): string | null => {
+  try {
+    return localStorage.getItem(key);
+  } catch (error) {
+    console.warn("Failed to read from localStorage:", key, error);
+    return null;
+  }
+};
+
 export function MetricsPageContent() {
   const {
     selectedChip,
+    rangeMode,
     timeRange,
     selectionMode,
     metricType,
     selectedMetric,
     customDays,
+    startDate,
+    endDate,
     setSelectedChip,
+    setRangeMode,
     setTimeRange,
     setSelectionMode,
     setMetricType,
     setSelectedMetric,
     setCustomDays,
+    isInitialized,
+    setStartDate,
+    setEndDate,
   } = useMetricsUrlState();
   const [gridSize, setGridSize] = useState<number>(8);
 
@@ -96,8 +124,9 @@ export function MetricsPageContent() {
     }
   }, [chipData?.data?.size]);
 
-  // Fetch metrics data
-  const withinHours =
+  const isAbsolute = rangeMode === "absolute";
+
+  const relativeWithinHours =
     timeRange === "custom"
       ? (customDays ?? 90) * 24
       : timeRange === "1d"
@@ -107,15 +136,32 @@ export function MetricsPageContent() {
           : timeRange === "30d"
             ? 24 * 30
             : 24 * 7; // Default to 7 days
+
+  const absoluteStartIso = startDate ? `${startDate}T00:00:00` : null;
+  const absoluteEndIso = endDate ? `${endDate}T23:59:59` : null;
+
+  const metricsQueryParams = isAbsolute
+    ? {
+        start_at: absoluteStartIso,
+        end_at: absoluteEndIso,
+        selection_mode: selectionMode,
+      }
+    : {
+        within_hours: relativeWithinHours,
+        selection_mode: selectionMode,
+      };
+
+  const hasAbsoluteBound = Boolean(startDate || endDate);
+  const canFetch = !!selectedChip && (!isAbsolute || hasAbsoluteBound);
+
+  const withinHours = isAbsolute ? undefined : relativeWithinHours;
+
   const { data, isLoading, isError } = useGetChipMetrics(
     selectedChip,
-    {
-      within_hours: withinHours,
-      selection_mode: selectionMode,
-    },
+    metricsQueryParams,
     {
       query: {
-        enabled: !!selectedChip,
+        enabled: canFetch,
         staleTime: 30000,
       },
     },
@@ -153,6 +199,59 @@ export function MetricsPageContent() {
     }
   }, [isBestModeSupported, selectionMode, setSelectionMode]);
 
+  const selectedMetricRef = useRef(selectedMetric);
+  useEffect(() => {
+    selectedMetricRef.current = selectedMetric;
+  });
+
+  // Save current metric selection to localStorage when it changes
+  useEffect(() => {
+    if (!isInitialized || isConfigLoading) return;
+    if (
+      metricType === "qubit" &&
+      qubitMetrics.some((m) => m.key === selectedMetric)
+    ) {
+      saveToLocalStorage(STORAGE_KEY_QUBIT, selectedMetric);
+    } else if (
+      metricType === "coupling" &&
+      couplingMetrics.some((m) => m.key === selectedMetric)
+    ) {
+      saveToLocalStorage(STORAGE_KEY_COUPLING, selectedMetric);
+    }
+  }, [
+    selectedMetric,
+    metricType,
+    qubitMetrics,
+    couplingMetrics,
+    isInitialized,
+    isConfigLoading,
+  ]);
+
+  // Restore metric from localStorage when metric type changes and current metric is invalid
+  useEffect(() => {
+    if (!isInitialized || isConfigLoading) return;
+    const metrics = metricType === "qubit" ? qubitMetrics : couplingMetrics;
+    if (metrics.length === 0) return;
+    if (metrics.some((m) => m.key === selectedMetricRef.current)) return;
+    const key =
+      metricType === "qubit" ? STORAGE_KEY_QUBIT : STORAGE_KEY_COUPLING;
+    const defaultMetric =
+      metricType === "qubit"
+        ? "t1"
+        : (couplingMetrics[0]?.key ?? "zx90_gate_fidelity");
+    const saved = getFromLocalStorage(key);
+    setSelectedMetric(
+      saved && metrics.some((m) => m.key === saved) ? saved : defaultMetric,
+    );
+  }, [
+    metricType,
+    qubitMetrics,
+    couplingMetrics,
+    isInitialized,
+    isConfigLoading,
+    setSelectedMetric,
+  ]);
+
   const metricOptions: MetricOption[] = useMemo(
     () =>
       metricsConfig.map((metric) => ({
@@ -165,11 +264,11 @@ export function MetricsPageContent() {
   const groupedMetricOptions: GroupBase<MetricOption>[] = useMemo(
     () => [
       {
-        label: "Qubit Metrics",
+        label: metricType === "qubit" ? "Qubit Metrics" : "Coupling Metrics",
         options: metricOptions,
       },
     ],
-    [metricOptions],
+    [metricOptions, metricType],
   );
 
   // Use shared DaisyUI-compatible styles for React-Select
@@ -304,12 +403,18 @@ export function MetricsPageContent() {
                 metricData={metricData}
                 metricConfig={currentMetricConfig}
                 selectionMode={selectionMode}
-                timeRange={timeRange}
+                timeRange={
+                  isAbsolute
+                    ? `absolute:${startDate ?? ""}..${endDate ?? ""}`
+                    : timeRange
+                }
                 disabled={!selectedChip || isLoading}
               />
               <MetricsPdfDownloadButton
                 chipId={selectedChip}
                 withinHours={withinHours}
+                startAt={isAbsolute ? absoluteStartIso : null}
+                endAt={isAbsolute ? absoluteEndIso : null}
                 selectionMode={selectionMode}
                 disabled={!selectedChip || isLoading}
               />
@@ -320,19 +425,13 @@ export function MetricsPageContent() {
           <div className="tabs tabs-boxed bg-base-200 w-fit">
             <button
               className={`tab ${metricType === "qubit" ? "tab-active" : ""}`}
-              onClick={() => {
-                setMetricType("qubit");
-                setSelectedMetric("t1");
-              }}
+              onClick={() => setMetricType("qubit")}
             >
               Qubit
             </button>
             <button
               className={`tab ${metricType === "coupling" ? "tab-active" : ""}`}
-              onClick={() => {
-                setMetricType("coupling");
-                setSelectedMetric("zx90_gate_fidelity");
-              }}
+              onClick={() => setMetricType("coupling")}
             >
               Coupling
             </button>
@@ -341,55 +440,79 @@ export function MetricsPageContent() {
           {/* Time Range and Selection Mode Row */}
           <PageFiltersBar>
             <PageFiltersBar.Group>
+              {/* Range Mode Selector (Relative / Absolute) */}
+              <PageFiltersBar.Item>
+                <select
+                  className="select select-sm select-bordered"
+                  value={rangeMode}
+                  onChange={(e) =>
+                    setRangeMode(e.target.value as "relative" | "absolute")
+                  }
+                  title="Switch between relative range (last N days) and absolute date range"
+                >
+                  <option value="relative">Relative</option>
+                  <option value="absolute">Absolute</option>
+                </select>
+              </PageFiltersBar.Item>
+
               {/* Time Range Selector */}
               <PageFiltersBar.Item>
-                <div className="flex items-center gap-2">
-                  <div className="join rounded-lg overflow-hidden">
-                    <button
-                      className={`join-item btn btn-sm ${
-                        timeRange === "1d" ? "btn-active" : ""
-                      }`}
-                      onClick={() => setTimeRange("1d")}
-                    >
-                      <span className="hidden sm:inline">Last 1 Day</span>
-                      <span className="sm:hidden">1D</span>
-                    </button>
-                    <button
-                      className={`join-item btn btn-sm ${
-                        timeRange === "7d" ? "btn-active" : ""
-                      }`}
-                      onClick={() => setTimeRange("7d")}
-                    >
-                      <span className="hidden sm:inline">Last 7 Days</span>
-                      <span className="sm:hidden">7D</span>
-                    </button>
-                    <button
-                      className={`join-item btn btn-sm ${
-                        timeRange === "30d" ? "btn-active" : ""
-                      }`}
-                      onClick={() => setTimeRange("30d")}
-                    >
-                      <span className="hidden sm:inline">Last 30 Days</span>
-                      <span className="sm:hidden">30D</span>
-                    </button>
-                    <button
-                      className={`join-item btn btn-sm gap-1 ${
-                        timeRange === "custom" ? "btn-active" : ""
-                      }`}
-                      onClick={() => setTimeRange("custom")}
-                      title="Set a custom time range in days"
-                    >
-                      <SlidersHorizontal className="h-3.5 w-3.5" />
-                      <span className="hidden sm:inline">Custom</span>
-                    </button>
+                {rangeMode === "relative" ? (
+                  <div className="flex items-center gap-2">
+                    <div className="join rounded-lg overflow-hidden">
+                      <button
+                        className={`join-item btn btn-sm ${
+                          timeRange === "1d" ? "btn-primary" : ""
+                        }`}
+                        onClick={() => setTimeRange("1d")}
+                      >
+                        <span className="hidden sm:inline">Last 1 Day</span>
+                        <span className="sm:hidden">1D</span>
+                      </button>
+                      <button
+                        className={`join-item btn btn-sm ${
+                          timeRange === "7d" ? "btn-primary" : ""
+                        }`}
+                        onClick={() => setTimeRange("7d")}
+                      >
+                        <span className="hidden sm:inline">Last 7 Days</span>
+                        <span className="sm:hidden">7D</span>
+                      </button>
+                      <button
+                        className={`join-item btn btn-sm ${
+                          timeRange === "30d" ? "btn-primary" : ""
+                        }`}
+                        onClick={() => setTimeRange("30d")}
+                      >
+                        <span className="hidden sm:inline">Last 30 Days</span>
+                        <span className="sm:hidden">30D</span>
+                      </button>
+                      <button
+                        className={`join-item btn btn-sm gap-1 ${
+                          timeRange === "custom" ? "btn-primary" : ""
+                        }`}
+                        onClick={() => setTimeRange("custom")}
+                        title="Set a custom time range in days"
+                      >
+                        <SlidersHorizontal className="h-3.5 w-3.5" />
+                        <span className="hidden sm:inline">Custom</span>
+                      </button>
+                    </div>
+                    {timeRange === "custom" && (
+                      <CustomDaysInput
+                        value={customDays ?? 90}
+                        onChange={setCustomDays}
+                      />
+                    )}
                   </div>
-                  {timeRange === "custom" && (
-                    <CustomDaysInput
-                      value={customDays ?? 90}
-                      onChange={setCustomDays}
-                    />
-                  )}
-                </div>
+                ) : (
+                  <AbsoluteDateRangePicker
+                    startDate={startDate}
+                    endDate={endDate}
+                    onStartChange={setStartDate}
+                    onEndChange={setEndDate}
+                  />
+                )}
               </PageFiltersBar.Item>
 
               {/* Latest/Best Toggle */}
@@ -397,7 +520,7 @@ export function MetricsPageContent() {
                 <div className="join rounded-lg overflow-hidden">
                   <button
                     className={`join-item btn btn-sm ${
-                      selectionMode === "latest" ? "btn-active" : ""
+                      selectionMode === "latest" ? "btn-primary" : ""
                     }`}
                     onClick={() => setSelectionMode("latest")}
                   >
@@ -405,7 +528,7 @@ export function MetricsPageContent() {
                   </button>
                   <button
                     className={`join-item btn btn-sm ${
-                      selectionMode === "best" ? "btn-active" : ""
+                      selectionMode === "best" ? "btn-primary" : ""
                     } ${!isBestModeSupported ? "btn-disabled" : ""}`}
                     onClick={() => setSelectionMode("best")}
                     disabled={!isBestModeSupported}
@@ -419,7 +542,7 @@ export function MetricsPageContent() {
                   </button>
                   <button
                     className={`join-item btn btn-sm ${
-                      selectionMode === "average" ? "btn-active" : ""
+                      selectionMode === "average" ? "btn-primary" : ""
                     }`}
                     onClick={() => setSelectionMode("average")}
                     title="Show average values within time range"
@@ -430,7 +553,7 @@ export function MetricsPageContent() {
               </PageFiltersBar.Item>
             </PageFiltersBar.Group>
 
-            <PageFiltersBar.Group position="end">
+            <PageFiltersBar.Group>
               <PageFiltersBar.Item>
                 <ChipSelector
                   selectedChip={selectedChip}
@@ -545,6 +668,8 @@ export function MetricsPageContent() {
                 chipId={selectedChip}
                 topologyId={topologyId}
                 selectedDate="latest"
+                startAt={isAbsolute ? absoluteStartIso : null}
+                endAt={isAbsolute ? absoluteEndIso : null}
               />
             ) : (
               <CouplingMetricsGrid
@@ -557,6 +682,8 @@ export function MetricsPageContent() {
                 chipId={selectedChip}
                 topologyId={topologyId}
                 selectedDate="latest"
+                startAt={isAbsolute ? absoluteStartIso : null}
+                endAt={isAbsolute ? absoluteEndIso : null}
               />
             )}
           </>
@@ -635,6 +762,57 @@ function CdfWithCoverage({
         groupTitle={currentCdfGroup.title}
         unit={currentCdfGroup.unit}
       />
+    </div>
+  );
+}
+
+// Absolute date range picker using HTML5 native date inputs.
+// Empty string in either input clears that bound.
+function AbsoluteDateRangePicker({
+  startDate,
+  endDate,
+  onStartChange,
+  onEndChange,
+}: {
+  startDate: string | null;
+  endDate: string | null;
+  onStartChange: (value: string | null) => void;
+  onEndChange: (value: string | null) => void;
+}) {
+  const hasInvertedRange =
+    startDate !== null && endDate !== null && startDate > endDate;
+
+  return (
+    <div className="flex flex-col gap-1">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <label className="flex items-center gap-2">
+          <span className="label-text">From</span>
+          <input
+            type="date"
+            className="input input-sm input-bordered tabular-nums w-32"
+            value={startDate ?? ""}
+            onChange={(e) => onStartChange(e.target.value || null)}
+            max={endDate ?? undefined}
+            aria-label="Start date"
+          />
+        </label>
+        <label className="flex items-center gap-2">
+          <span className="label-text">To</span>
+          <input
+            type="date"
+            className="input input-sm input-bordered tabular-nums w-32"
+            value={endDate ?? ""}
+            onChange={(e) => onEndChange(e.target.value || null)}
+            min={startDate ?? undefined}
+            aria-label="End date"
+          />
+        </label>
+      </div>
+      {hasInvertedRange && (
+        <span className="text-xs text-error">
+          Start date must be on or before end date
+        </span>
+      )}
     </div>
   );
 }

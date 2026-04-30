@@ -117,6 +117,9 @@ class CustomOneQubit(CalibrationStep):
             "execution_id": service.execution_id,
             "project_id": service.project_id,
             "default_run_parameters": service.default_run_parameters,
+            "tags": service.tags,
+            "flow_name": service.flow_name,
+            "note": service.note,
         }
 
         results = run_qubit_calibrations_parallel(
@@ -168,6 +171,7 @@ class OneQubitCheck(CalibrationStep):
 
     mode: str = "synchronized"
     tasks: list[str] | None = None
+    configure: bool = False
 
     @property
     def name(self) -> str:
@@ -185,7 +189,9 @@ class OneQubitCheck(CalibrationStep):
     ) -> StepContext:
         """Execute 1-qubit check calibration."""
         logger = get_run_logger()
-        tasks = self.tasks or CHECK_1Q_TASKS
+        tasks = list(self.tasks or CHECK_1Q_TASKS)
+        if self.configure:
+            tasks.insert(0, "Configure")
 
         logger.info(f"[{self.name}] Starting with mode={self.mode}, {len(tasks)} tasks")
 
@@ -235,6 +241,9 @@ class OneQubitCheck(CalibrationStep):
             "execution_id": service.execution_id,
             "project_id": service.project_id,
             "default_run_parameters": service.default_run_parameters,
+            "tags": service.tags,
+            "flow_name": service.flow_name,
+            "note": service.note,
         }
 
         results = run_qubit_calibrations_parallel(
@@ -299,6 +308,7 @@ class OneQubitFineTune(CalibrationStep):
 
     mode: str = "synchronized"
     tasks: list[str] | None = None
+    configure: bool = False
 
     @property
     def name(self) -> str:
@@ -316,7 +326,9 @@ class OneQubitFineTune(CalibrationStep):
     ) -> StepContext:
         """Execute 1-qubit fine-tuning calibration."""
         logger = get_run_logger()
-        tasks = self.tasks or FULL_1Q_TASKS_AFTER_CHECK
+        tasks = list(self.tasks or FULL_1Q_TASKS_AFTER_CHECK)
+        if self.configure:
+            tasks.insert(0, "Configure")
 
         # Use filtered candidates from context if available
         qids = ctx.candidate_qids if ctx.candidate_qids else targets.to_qids(service.chip_id)
@@ -386,6 +398,9 @@ class OneQubitFineTune(CalibrationStep):
             "execution_id": service.execution_id,
             "project_id": service.project_id,
             "default_run_parameters": service.default_run_parameters,
+            "tags": service.tags,
+            "flow_name": service.flow_name,
+            "note": service.note,
         }
 
         results = run_qubit_calibrations_parallel(
@@ -434,5 +449,27 @@ class OneQubitFineTune(CalibrationStep):
             if fidelity_param is not None:
                 metrics["rb_fidelity"] = (
                     fidelity_param.value if hasattr(fidelity_param, "value") else fidelity_param
+                )
+        # T1 Average
+        t1_result = raw.get("CheckT1Average", {})
+        if t1_result:
+            t1_param = t1_result.get("t1_average")
+            if t1_param is not None:
+                metrics["t1_average"] = t1_param.value if hasattr(t1_param, "value") else t1_param
+        # T2 Echo Average
+        t2_result = raw.get("CheckT2EchoAverage", {})
+        if t2_result:
+            t2_param = t2_result.get("t2_echo_average")
+            if t2_param is not None:
+                metrics["t2_echo_average"] = (
+                    t2_param.value if hasattr(t2_param, "value") else t2_param
+                )
+        # 1Q gate coherence limit
+        coh_result = raw.get("Check1QGateCoherenceLimit", {})
+        if coh_result:
+            coh_param = coh_result.get("one_qubit_gate_coherence_limit")
+            if coh_param is not None:
+                metrics["one_qubit_gate_coherence_limit"] = (
+                    coh_param.value if hasattr(coh_param, "value") else coh_param
                 )
         return metrics

@@ -10,7 +10,6 @@ from qdash.workflow.calibtasks.base import (
 from qdash.workflow.calibtasks.qubex.base import QubexTask
 from qdash.workflow.engine.backend.qubex import QubexBackend
 from qdash.workflow.engine.backend.qubex_paths import get_qubex_paths
-from qubecalib.instrument.quel.quel1.tool.skew import Skew
 
 
 class CheckSkew(QubexTask):
@@ -50,6 +49,7 @@ class CheckSkew(QubexTask):
         skew_config = self.load(skew_file_path)
         for k, v in skew_config["box_setting"].items():
             print(f"Box {k} setting: {v}")
+        from qubecalib.instrument.quel.quel1.tool.skew import Skew
         from qubex import Experiment
 
         with open(skew_file_path) as file:

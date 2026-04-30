@@ -16,4 +16,12 @@ export type GetChipMetricsParams = {
    * Selection mode: 'latest' for most recent, 'best' for optimal, 'average' for mean values
    */
   selection_mode?: GetChipMetricsSelectionMode;
+  /**
+   * Inclusive absolute lower bound on task start time (ISO8601 or date). Takes precedence over within_hours for the lower bound.
+   */
+  start_at?: string | null;
+  /**
+   * Inclusive absolute upper bound on task start time (ISO8601 or date).
+   */
+  end_at?: string | null;
 };

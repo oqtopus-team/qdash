@@ -16,4 +16,12 @@ export type DownloadMetricsPdfParams = {
    * Selection mode: 'latest', 'best', or 'average'
    */
   selection_mode?: DownloadMetricsPdfSelectionMode;
+  /**
+   * Inclusive absolute lower bound on task start time (ISO8601 or date).
+   */
+  start_at?: string | null;
+  /**
+   * Inclusive absolute upper bound on task start time (ISO8601 or date).
+   */
+  end_at?: string | null;
 };

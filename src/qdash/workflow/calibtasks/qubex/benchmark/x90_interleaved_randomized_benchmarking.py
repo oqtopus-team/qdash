@@ -8,7 +8,7 @@ from qdash.workflow.calibtasks.base import (
 from qdash.workflow.calibtasks.qubex.base import QubexTask
 from qdash.workflow.engine.backend.qubex import QubexBackend
 from qubex.experiment.experiment_constants import CALIBRATION_SHOTS
-from qubex.measurement.measurement import DEFAULT_INTERVAL, DEFAULT_READOUT_DURATION
+from qubex.measurement.measurement_defaults import DEFAULT_INTERVAL, DEFAULT_READOUT_DURATION
 
 
 class X90InterleavedRandomizedBenchmarking(QubexTask):
@@ -78,13 +78,16 @@ class X90InterleavedRandomizedBenchmarking(QubexTask):
         """Run the X90 interleaved randomized benchmarking task with timeout."""
         exp = self.get_experiment(backend)
         label = self.get_qubit_label(backend, qid)
+        readout_amp_param = self.input_parameters["readout_amplitude"]
+        if readout_amp_param is not None:
+            exp.params.readout_amplitude[label] = readout_amp_param.value
         result = exp.interleaved_randomized_benchmarking(
             targets=label,
             interleaved_clifford="X90",
             n_trials=self.run_parameters["n_trials"].get_value(),
             save_image=False,
-            shots=self.run_parameters["shots"].get_value(),
-            interval=self.run_parameters["interval"].get_value(),
+            n_shots=self.run_parameters["shots"].get_value(),
+            shot_interval=self.run_parameters["interval"].get_value(),
         )
         self.save_calibration(backend)
         r2 = result[label]["rb_fit_result"]["r2"]

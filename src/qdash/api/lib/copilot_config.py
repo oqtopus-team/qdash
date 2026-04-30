@@ -62,6 +62,9 @@ class CopilotConfig(BaseModel):
     response_language: str = "en"
     thinking_language: str = "en"
     model: ModelConfig = ModelConfig()
+    # Optional override used only for task result analysis (image/chevron etc.).
+    # When unset, `model` is used for both chat and analysis.
+    analysis_model: ModelConfig | None = None
     evaluation_metrics: EvaluationMetrics = EvaluationMetrics()
     scoring: dict[str, ScoringThreshold] = {}
     system_prompt: str = ""

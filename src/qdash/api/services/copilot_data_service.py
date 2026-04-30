@@ -54,6 +54,28 @@ def _compact_timestamp(iso_str: str | None) -> str:
         return iso_str[:16]
 
 
+def _compact_output_parameters(params: dict[str, Any]) -> dict[str, Any]:
+    """Compress output_parameters to {param_name: {value, unit, error}}.
+
+    Drops verbose fields (parameter_name, qid_role, value_type, description,
+    calibrated_at, execution_id, task_id) that the LLM does not need.
+    """
+    result: dict[str, Any] = {}
+    for name, data in params.items():
+        if not isinstance(data, dict):
+            result[name] = data
+            continue
+        compact: dict[str, Any] = {"value": _compact_number(data.get("value"))}
+        unit = data.get("unit")
+        if unit:
+            compact["unit"] = unit
+        error = data.get("error")
+        if error and error != 0:
+            compact["error"] = _compact_number(error)
+        result[name] = compact
+    return result
+
+
 class CopilotDataService:
     """Service for loading data used by the Copilot AI assistant."""
 
@@ -137,8 +159,10 @@ class CopilotDataService:
         for doc in docs:
             results.append(
                 {
-                    "output_parameters": doc.output_parameters or {},
-                    "start_at": doc.start_at.isoformat() if doc.start_at else None,
+                    "output_parameters": _compact_output_parameters(doc.output_parameters or {}),
+                    "start_at": _compact_timestamp(
+                        doc.start_at.isoformat() if doc.start_at else None
+                    ),
                     "execution_id": doc.execution_id,
                 }
             )
@@ -344,8 +368,9 @@ class CopilotDataService:
         if not per_qubit:
             return {"error": f"No data for '{parameter_name}' on chip '{chip_id}'"}
 
-        # Build per-qubit data with timeseries + stats
-        qubits: dict[str, dict[str, Any]] = {}
+        # Build per-qubit stats
+        qubits: list[dict[str, Any]] = []
+        timeseries: list[dict[str, Any]] = []
         all_latest: list[float] = []
 
         for qid, entries in sorted(
@@ -353,130 +378,134 @@ class CopilotDataService:
             key=lambda x: int(x[0]) if x[0].isdigit() else x[0],
         ):
             recent = entries[:last_n]  # keep at most last_n per qubit
-            # Chronological order (oldest first) for charting
             chronological = list(reversed(recent))
             values = [e["value"] for e in recent]
             latest = values[0]
             if isinstance(latest, (int, float)) and math.isfinite(latest):
                 all_latest.append(float(latest))
 
-            # Columnar timeseries: compact format for charting
-            ts_values = [_compact_number(e["value"]) for e in chronological]
-            ts_times = [_compact_timestamp(e["start_at"]) for e in chronological]
-
             qubit_data: dict[str, Any] = {
+                "qid": qid,
                 "latest": _compact_number(latest),
                 "count": len(values),
-                "ts": {"v": ts_values, "t": ts_times},
+                "min": None,
+                "max": None,
+                "mean": None,
+                "trend": None,
             }
             numeric_values = [v for v in values if isinstance(v, (int, float)) and math.isfinite(v)]
             if len(numeric_values) >= 2:
                 qubit_data["min"] = _compact_number(min(numeric_values))
                 qubit_data["max"] = _compact_number(max(numeric_values))
                 qubit_data["mean"] = _compact_number(stats_mod.mean(numeric_values))
-                # Simple trend: compare latest vs oldest
                 if numeric_values[0] > numeric_values[-1] * 1.01:
                     qubit_data["trend"] = "up"
                 elif numeric_values[0] < numeric_values[-1] * 0.99:
                     qubit_data["trend"] = "down"
                 else:
                     qubit_data["trend"] = "stable"
-            qubits[qid] = qubit_data
+            qubits.append(qubit_data)
+
+            # Flat timeseries rows — full precision values and ISO timestamps
+            # for sandbox plotting (Plotly parses ISO datetimes natively).
+            for e in chronological:
+                timeseries.append(
+                    {
+                        "qid": qid,
+                        "t": e["start_at"] or "",
+                        "v": e["value"],
+                    }
+                )
+
+        # Sort timeseries globally by timestamp so chart axes are chronological.
+        timeseries.sort(key=lambda r: r["t"])
 
         # Chip-wide statistics
         chip_stats: dict[str, Any] = {
             "count": len(all_latest),
-            "mean": stats_mod.mean(all_latest) if all_latest else 0,
-            "median": stats_mod.median(all_latest) if all_latest else 0,
-            "min": min(all_latest) if all_latest else 0,
-            "max": max(all_latest) if all_latest else 0,
+            "mean": _compact_number(stats_mod.mean(all_latest)) if all_latest else 0,
+            "median": _compact_number(stats_mod.median(all_latest)) if all_latest else 0,
+            "min": _compact_number(min(all_latest)) if all_latest else 0,
+            "max": _compact_number(max(all_latest)) if all_latest else 0,
         }
         if len(all_latest) >= 2:
-            chip_stats["stdev"] = stats_mod.stdev(all_latest)
+            chip_stats["stdev"] = _compact_number(stats_mod.stdev(all_latest))
 
-        result = {
+        return {
             "chip_id": chip_id,
             "parameter_name": parameter_name,
             "unit": unit,
             "num_qubits": len(qubits),
-            "qubits": qubits,
             "statistics": chip_stats,
+            "qubits": qubits,
+            "timeseries": timeseries,
         }
-
-        # Guard against exceeding the tool result size limit (30K chars).
-        # If full timeseries makes it too large, drop timeseries arrays
-        # and keep only per-qubit stats so ALL qubits are still represented.
-        import json as _json
-
-        _MAX_SAFE_CHARS = 25000  # leave margin for JSON overhead
-        result_size = len(_json.dumps(result, default=str, ensure_ascii=False))
-        if result_size > _MAX_SAFE_CHARS:
-            logger.info(
-                "Chip parameter timeseries too large (%d chars, %d qubits x last_n=%d), "
-                "dropping timeseries arrays to fit",
-                result_size,
-                len(qubits),
-                last_n,
-            )
-            for qdata in qubits.values():
-                qdata.pop("ts", None)
-            result["_note"] = (
-                "Timeseries arrays omitted because the full result exceeded size limits. "
-                "Per-qubit stats (latest, min, max, mean, trend) and chip-wide statistics "
-                "are still included. To get timeseries, call again with a smaller qids list."
-            )
-
-        return result
 
     def load_chip_summary(
         self, chip_id: str, param_names: list[str] | None = None
     ) -> dict[str, Any]:
-        """Load summary of all qubits on a chip with computed statistics."""
+        """Load summary of all qubits on a chip with computed statistics.
+
+        Returns statistics (always included) and a list-of-dicts ``qubits``
+        table.
+        """
         from qdash.dbmodel.qubit import QubitDocument
 
         docs = QubitDocument.find({"chip_id": chip_id}).run()
         if not docs:
             return {"error": f"No qubits found for chip_id={chip_id}"}
 
-        qubits: dict[str, dict[str, Any]] = {}
+        raw_qubits: dict[str, dict[str, Any]] = {}
         numeric_values: dict[str, list[float]] = {}
 
         for doc in docs:
             data = dict(doc.data)
             if param_names:
                 data = {k: v for k, v in data.items() if k in param_names}
-            qubits[doc.qid] = sanitize_for_json(data)
+
+            compact: dict[str, Any] = {}
             for key, val in data.items():
                 raw = val.get("value") if isinstance(val, dict) and "value" in val else val
+                compact[key] = raw  # full precision for sandbox access
                 if isinstance(raw, (int, float)) and math.isfinite(raw):
                     numeric_values.setdefault(key, []).append(float(raw))
+            raw_qubits[doc.qid] = compact
 
         statistics: dict[str, dict[str, float]] = {}
         for key, values in numeric_values.items():
             if len(values) >= 2:
                 statistics[key] = {
-                    "mean": stats_mod.mean(values),
-                    "median": stats_mod.median(values),
-                    "stdev": stats_mod.stdev(values),
-                    "min": min(values),
-                    "max": max(values),
+                    "mean": _compact_number(stats_mod.mean(values)),
+                    "median": _compact_number(stats_mod.median(values)),
+                    "stdev": _compact_number(stats_mod.stdev(values)),
+                    "min": _compact_number(min(values)),
+                    "max": _compact_number(max(values)),
                     "count": len(values),
                 }
             elif len(values) == 1:
                 statistics[key] = {
-                    "mean": values[0],
-                    "median": values[0],
+                    "mean": _compact_number(values[0]),
+                    "median": _compact_number(values[0]),
                     "stdev": 0.0,
-                    "min": values[0],
-                    "max": values[0],
+                    "min": _compact_number(values[0]),
+                    "max": _compact_number(values[0]),
                     "count": 1,
                 }
+
+        # Build list-of-dicts with uniform keys
+        all_params = sorted({p for d in raw_qubits.values() for p in d})
+        qubits: list[dict[str, Any]] = []
+        for qid in sorted(raw_qubits, key=lambda x: int(x) if x.isdigit() else x):
+            row: dict[str, Any] = {"qid": qid}
+            for p in all_params:
+                row[p] = raw_qubits[qid].get(p)
+            qubits.append(row)
 
         return {
             "chip_id": chip_id,
             "num_qubits": len(qubits),
-            "qubits": qubits,
             "statistics": statistics,
+            "qubits": qubits,
         }
 
     def load_coupling_params_tool(
@@ -559,9 +588,11 @@ class CopilotDataService:
                     "status": doc.status,
                     "chip_id": doc.chip_id,
                     "tags": doc.tags,
-                    "start_at": doc.start_at.isoformat() if doc.start_at else None,
-                    "end_at": doc.end_at.isoformat() if doc.end_at else None,
-                    "elapsed_time": doc.elapsed_time,
+                    "start_at": _compact_timestamp(
+                        doc.start_at.isoformat() if doc.start_at else None
+                    ),
+                    "end_at": _compact_timestamp(doc.end_at.isoformat() if doc.end_at else None),
+                    "elapsed_time": _compact_number(doc.elapsed_time),
                     "message": doc.message,
                 }
             )
@@ -573,7 +604,10 @@ class CopilotDataService:
     def load_compare_qubits(
         self, chip_id: str, qids: list[str], param_names: list[str] | None = None
     ) -> dict[str, Any]:
-        """Load and compare parameters across multiple qubits."""
+        """Load and compare parameters across multiple qubits.
+
+        Returns compact {qid: {param: value}} with values only (no unit/description).
+        """
         from qdash.dbmodel.qubit import QubitDocument
 
         comparison: dict[str, dict[str, Any]] = {}
@@ -585,7 +619,12 @@ class CopilotDataService:
             data = dict(doc.data)
             if param_names:
                 data = {k: v for k, v in data.items() if k in param_names}
-            comparison[qid] = sanitize_for_json(data)
+            # Extract compact {param: value} per qubit (same as load_chip_summary)
+            compact: dict[str, Any] = {}
+            for key, val in data.items():
+                raw = val.get("value") if isinstance(val, dict) and "value" in val else val
+                compact[key] = _compact_number(raw) if isinstance(raw, (int, float)) else raw
+            comparison[qid] = compact
 
         return {"chip_id": chip_id, "qubits": comparison}
 
@@ -656,10 +695,12 @@ class CopilotDataService:
                     "qid": doc.qid,
                     "status": doc.status,
                     "execution_id": doc.execution_id,
-                    "start_at": doc.start_at.isoformat() if doc.start_at else None,
-                    "end_at": doc.end_at.isoformat() if doc.end_at else None,
-                    "elapsed_time": doc.elapsed_time,
-                    "output_parameters": doc.output_parameters or {},
+                    "start_at": _compact_timestamp(
+                        doc.start_at.isoformat() if doc.start_at else None
+                    ),
+                    "end_at": _compact_timestamp(doc.end_at.isoformat() if doc.end_at else None),
+                    "elapsed_time": _compact_number(doc.elapsed_time),
+                    "output_parameters": _compact_output_parameters(doc.output_parameters or {}),
                     "message": doc.message,
                 }
             )
@@ -762,39 +803,58 @@ class CopilotDataService:
             max_depth=max_depth,
         )
 
-        # Convert to a simplified dict for the LLM
+        # Build uniform node dicts (all nodes share the same keys)
         nodes: list[dict[str, Any]] = []
         for n in lineage.nodes:
-            entry: dict[str, Any] = {
-                "node_type": n.node_type,
-                "node_id": n.node_id,
-                "depth": n.depth,
-            }
+            param = None
+            qid_val = None
+            value = None
+            unit = None
+            ver = None
+            task = None
+            exec_id = None
+            valid_from = None
+            status = None
             if n.entity:
-                entry["parameter_name"] = n.entity.parameter_name
-                entry["qid"] = n.entity.qid
-                entry["value"] = n.entity.value
-                entry["unit"] = n.entity.unit
-                entry["version"] = n.entity.version
-                entry["task_name"] = n.entity.task_name
-                entry["execution_id"] = n.entity.execution_id
+                param = n.entity.parameter_name or None
+                qid_val = n.entity.qid or None
+                value = _compact_number(n.entity.value) if n.entity.value is not None else None
+                unit = n.entity.unit or None
+                ver = n.entity.version
+                task = n.entity.task_name or None
+                exec_id = n.entity.execution_id or None
                 if n.entity.valid_from:
-                    entry["valid_from"] = n.entity.valid_from.isoformat()
+                    valid_from = _compact_timestamp(n.entity.valid_from.isoformat())
             if n.activity:
-                entry["task_name"] = n.activity.task_name
-                entry["task_type"] = n.activity.task_type
-                entry["qid"] = n.activity.qid
-                entry["execution_id"] = n.activity.execution_id
-                entry["status"] = n.activity.status
-            if n.latest_version is not None:
-                entry["latest_version"] = n.latest_version
-            nodes.append(entry)
+                task = n.activity.task_name or None
+                qid_val = n.activity.qid or None
+                exec_id = n.activity.execution_id or None
+                status = n.activity.status or None
+            lv = n.latest_version
+            if lv is not None:
+                ver = f"{ver}/{lv}" if ver is not None else str(lv)
+            nodes.append(
+                {
+                    "type": n.node_type,
+                    "id": n.node_id,
+                    "depth": n.depth,
+                    "param": param,
+                    "qid": qid_val,
+                    "value": value,
+                    "unit": unit,
+                    "ver": ver,
+                    "task": task,
+                    "exec_id": exec_id,
+                    "valid_from": valid_from,
+                    "status": status,
+                }
+            )
 
         edges: list[dict[str, str]] = []
         for e in lineage.edges:
             edges.append(
                 {
-                    "relation_type": e.relation_type,
+                    "relation": e.relation_type,
                     "source": e.source_id,
                     "target": e.target_id,
                 }
@@ -802,8 +862,8 @@ class CopilotDataService:
 
         return {
             "origin": lineage.origin.node_id,
-            "num_nodes": len(nodes),
-            "num_edges": len(edges),
+            "num_nodes": len(lineage.nodes),
+            "num_edges": len(lineage.edges),
             "max_depth": lineage.max_depth,
             "nodes": nodes,
             "edges": edges,
@@ -829,14 +889,18 @@ class CopilotDataService:
             results.append(
                 {
                     "version": doc.version,
-                    "value": doc.value,
+                    "value": _compact_number(doc.value),
                     "unit": doc.unit,
-                    "error": doc.error,
+                    "error": _compact_number(doc.error) if doc.error else None,
                     "execution_id": doc.execution_id,
                     "task_id": doc.task_id,
                     "task_name": doc.task_name,
-                    "valid_from": doc.valid_from.isoformat() if doc.valid_from else None,
-                    "valid_until": doc.valid_until.isoformat() if doc.valid_until else None,
+                    "valid_from": _compact_timestamp(
+                        doc.valid_from.isoformat() if doc.valid_from else None
+                    ),
+                    "valid_until": _compact_timestamp(
+                        doc.valid_until.isoformat() if doc.valid_until else None
+                    ),
                 }
             )
 
@@ -1134,7 +1198,11 @@ class CopilotDataService:
         }
 
     def build_tool_executors(self) -> dict[str, Any]:
-        """Build the tool executor mapping for LLM function calling."""
+        """Build the tool executor mapping for LLM function calling.
+
+        Note: ``execute_python_analysis`` is overridden by ``_wrap_tool_executors``
+        in ``copilot_agent.py`` to auto-inject the data_store.
+        """
         from qdash.api.lib.copilot_sandbox import execute_python_analysis
 
         return {
@@ -1148,9 +1216,7 @@ class CopilotDataService:
             "get_parameter_timeseries": lambda args: self.load_parameter_timeseries(
                 args["parameter_name"], args["chip_id"], args["qid"], args.get("last_n", 10)
             ),
-            "execute_python_analysis": lambda args: execute_python_analysis(
-                args["code"], args.get("context_data")
-            ),
+            "execute_python_analysis": lambda args: execute_python_analysis(args["code"]),
             "get_chip_summary": lambda args: self.load_chip_summary(
                 args["chip_id"], args.get("param_names")
             ),

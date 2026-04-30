@@ -173,6 +173,20 @@ class CheckQubitSpectroscopy(QubexTask):
         for value in output_params_copy.values():
             value.execution_id = execution_id
 
+        # Validate qubit frequency range.
+        # We still return figures so they are saved before the task is marked failed.
+        if estimated_frequency < 3.0:
+            error_msg = (
+                f"Qubit frequency too low for qid={qid}: "
+                f"{estimated_frequency:.6f} GHz < 3.0 GHz"
+            )
+            print(f"[ERROR] {error_msg}")
+            return PostProcessResult(
+                output_parameters=output_params_copy,
+                figures=figures,
+                validation_error=error_msg,
+            )
+
         return PostProcessResult(
             output_parameters=output_params_copy,
             figures=figures,
@@ -186,10 +200,12 @@ class CheckQubitSpectroscopy(QubexTask):
         readout_freq_param = self.input_parameters["readout_frequency"]
         if readout_freq_param is None:
             raise ValueError("readout_frequency input parameter is required")
+        import numpy as np
 
         result = exp.qubit_spectroscopy(
             label,
-            readout_amplitude=0.01,
+            frequency_range=np.arange(3.0, 5.75, 0.005),
+            readout_amplitude=0.04,
             readout_frequency=readout_freq_param.value,
         )
 

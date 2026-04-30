@@ -66,6 +66,10 @@ class _QubexParamsUpdater:
         "average_readout_fidelity": "average_readout_fidelity.yaml",
     }
 
+    EXTRA_FILE_MAP: dict[str, list[str]] = {
+        "qubit_frequency": ["control_frequency.yaml"],
+    }
+
     def __init__(self, backend: Any, chip_id: str | None) -> None:
         self._backend = backend
         self._chip_id = chip_id
@@ -95,6 +99,10 @@ class _QubexParamsUpdater:
 
             file_path = params_dir / file_name
             self._update_yaml(file_path, label, value)
+
+            for extra_file in self.EXTRA_FILE_MAP.get(key, []):
+                extra_path = params_dir / extra_file
+                self._update_yaml(extra_path, label, value)
 
     def _resolve_params_dir(self) -> Path | None:
         config_dir = getattr(self._backend, "config", {}).get("params_dir")

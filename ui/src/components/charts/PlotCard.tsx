@@ -41,7 +41,7 @@ export function PlotCard({
   layout,
   config,
   height = "550px",
-  mobileHeight = "350px",
+  mobileHeight = "400px",
   className = "",
   children,
 }: PlotCardProps) {
@@ -62,7 +62,11 @@ export function PlotCard({
     return {
       ...layout,
       showlegend: false,
-      margin: { l: 50, r: 20, t: 40, b: 60 },
+      margin: { l: 50, r: 20, t: 80, b: 80 },
+      xaxis: {
+        ...(layout.xaxis ?? {}),
+        automargin: true,
+      },
       title: layout.title
         ? typeof layout.title === "string"
           ? { text: layout.title, font: { size: 14 } }

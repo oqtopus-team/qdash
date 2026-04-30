@@ -8,7 +8,7 @@ from qdash.workflow.calibtasks.base import (
 from qdash.workflow.calibtasks.qubex.base import QubexTask
 from qdash.workflow.engine.backend.qubex import QubexBackend
 from qubex.experiment.experiment_constants import CALIBRATION_SHOTS, PI_DURATION
-from qubex.measurement.measurement import DEFAULT_INTERVAL, DEFAULT_READOUT_DURATION
+from qubex.measurement.measurement_defaults import DEFAULT_INTERVAL, DEFAULT_READOUT_DURATION
 
 
 class CreatePIPulse(QubexTask):
@@ -61,12 +61,18 @@ class CreatePIPulse(QubexTask):
     def run(self, backend: QubexBackend, qid: str) -> RunResult:
         exp = self.get_experiment(backend)
         labels = [exp.get_qubit_label(int(qid))]
+        readout_amp_param = self.input_parameters["readout_amplitude"]
+        if readout_amp_param is not None:
+            exp.params.readout_amplitude[labels[0]] = readout_amp_param.value
+        control_amp_param = self.input_parameters["control_amplitude"]
+        if control_amp_param is not None:
+            exp.params.control_amplitude[labels[0]] = control_amp_param.value
         result = exp.calibrate_pi_pulse(
             targets=labels,
             n_rotations=1,
             duration=self.run_parameters["pi_duration"].get_value(),
-            shots=self.run_parameters["shots"].get_value(),
-            interval=self.run_parameters["interval"].get_value(),
+            n_shots=self.run_parameters["shots"].get_value(),
+            shot_interval=self.run_parameters["interval"].get_value(),
         )
         self.save_calibration(backend)
         r2 = result.data[exp.get_qubit_label(int(qid))].r2

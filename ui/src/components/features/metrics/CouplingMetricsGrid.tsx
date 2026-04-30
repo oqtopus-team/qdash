@@ -24,30 +24,20 @@ import {
   getQubitGridPosition,
   type TopologyLayoutParams,
 } from "@/lib/utils/grid-position";
-import { calculateGridDimension } from "@/lib/utils/grid-layout";
+import { calculateGridDimension, cellFontSize } from "@/lib/utils/grid-layout";
 
 import { CouplingMetricHistoryModal } from "./CouplingMetricHistoryModal";
-import { useAnalysisChatContext } from "@/contexts/AnalysisChatContext";
 
-// Dynamic font size calculation based on cell size
+// Font sizes scale linearly with cellSize so the text-to-cell ratio is
+// constant across devices.
 function getCouplingFontSizes(cellSize: number): {
   qubitLabelSize: string;
   valueSize: string;
 } {
-  // Scale font sizes proportionally to cell size
-  // Base reference: 60px cell = 14px label, 12px value
-  if (cellSize >= 60) {
-    return { qubitLabelSize: "0.875rem", valueSize: "0.75rem" };
-  } else if (cellSize >= 50) {
-    return { qubitLabelSize: "0.75rem", valueSize: "0.65rem" };
-  } else if (cellSize >= 40) {
-    return { qubitLabelSize: "0.625rem", valueSize: "0.55rem" };
-  } else if (cellSize >= 30) {
-    return { qubitLabelSize: "0.5rem", valueSize: "0.5rem" };
-  } else {
-    // Very small cells (< 30px)
-    return { qubitLabelSize: "0.45rem", valueSize: "0.4rem" };
-  }
+  return {
+    qubitLabelSize: cellFontSize(cellSize, 0.2),
+    valueSize: cellFontSize(cellSize, 0.17),
+  };
 }
 
 interface MetricValue {
@@ -70,6 +60,9 @@ interface CouplingMetricsGridProps {
   chipId: string;
   topologyId: string;
   selectedDate: string;
+  /** Optional ISO timestamp bounds to restrict the history modal. */
+  startAt?: string | null;
+  endAt?: string | null;
 }
 
 interface SelectedCouplingInfo {
@@ -116,6 +109,8 @@ export function CouplingMetricsGrid({
   gridSize = 8,
   chipId,
   topologyId,
+  startAt,
+  endAt,
 }: CouplingMetricsGridProps) {
   // Get topology configuration
   const {
@@ -202,7 +197,6 @@ export function CouplingMetricsGrid({
   const [selectedCouplingInfo, setSelectedCouplingInfo] =
     useState<SelectedCouplingInfo | null>(null);
   const isModalOpen = selectedCouplingInfo !== null;
-  const { isOpen: isSidebarOpen } = useAnalysisChatContext();
 
   // Use grid layout hook for responsive sizing
   const displayCols = zoomMode === "region" ? regionSize : gridCols;
@@ -373,7 +367,6 @@ export function CouplingMetricsGrid({
           viewportHeight,
         ),
         maxWidth: viewMode === "pan-zoom" ? "none" : "100%",
-        willChange: viewMode === "pan-zoom" ? "transform" : "auto",
       }}
     >
       {/* Qubit cells (background) with MUX styling */}
@@ -467,7 +460,10 @@ export function CouplingMetricsGrid({
                   transform: "translate(-50%, -50%)",
                 }}
               >
-                <div className="text-[0.45rem] md:text-[0.6rem] font-semibold text-base-content/30 bg-base-100/60 px-1 py-px rounded border border-base-content/5">
+                <div
+                  className="font-semibold text-base-content/30 bg-base-100/60 px-1 py-px rounded border border-base-content/5"
+                  style={{ fontSize: cellFontSize(displayCellSize, 0.13) }}
+                >
                   MUX{muxIndex}
                 </div>
               </div>
@@ -769,23 +765,13 @@ export function CouplingMetricsGrid({
       {/* Coupling Detail Modal with History */}
       <div
         className={`modal modal-bottom sm:modal-middle ${isModalOpen ? "modal-open" : ""}`}
-        style={{
-          width: isSidebarOpen ? "calc(100% - 20rem)" : "100%",
-          maxWidth: "none",
-          transition: "width 300ms ease",
-        }}
         onClick={(e) => {
           if (e.target === e.currentTarget) setSelectedCouplingInfo(null);
         }}
       >
         <div
           className="modal-box w-full bg-base-100 p-0 h-[90vh] sm:h-[95vh] overflow-hidden flex flex-col"
-          style={{
-            maxWidth: isSidebarOpen
-              ? "min(calc(100vw - 22rem), 1400px)"
-              : "1800px",
-            transition: "max-width 300ms ease",
-          }}
+          style={{ maxWidth: "1800px" }}
         >
           {selectedCouplingInfo && (
             <>
@@ -816,6 +802,8 @@ export function CouplingMetricsGrid({
                   couplingId={selectedCouplingInfo.couplingId}
                   metricName={metricKey}
                   metricUnit={unit}
+                  startAt={startAt}
+                  endAt={endAt}
                 />
               </div>
 

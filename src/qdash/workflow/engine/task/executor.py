@@ -11,6 +11,7 @@ The TaskExecutor is responsible for the complete task execution lifecycle:
 """
 
 import logging
+import traceback
 from typing import TYPE_CHECKING, Any
 
 from qdash.repository import FilesystemCalibDataSaver
@@ -81,6 +82,7 @@ class TaskExecutor:
         data_saver: FilesystemCalibDataSaver | None = None,
         snapshot_loader: SnapshotParameterLoader | None = None,
         source_task_id: str | None = None,
+        force_update_params: bool = False,
     ) -> None:
         self.state_manager = state_manager
         self.execution_id = execution_id
@@ -97,6 +99,7 @@ class TaskExecutor:
             username=username,
             calib_dir=calib_dir,
             task_manager_id=task_manager_id,
+            force_update_params=force_update_params,
         )
         self._mux_distributor = MuxDistributor(
             state_manager=state_manager,
@@ -195,9 +198,14 @@ class TaskExecutor:
         task_type: str,
         qid: str,
         message: str,
+        stack_trace: str = "",
     ) -> None:
         """Mark task as failed."""
-        self.state_manager.update_task_status_to_failed(task_name, message, task_type, qid)
+        if len(stack_trace) > 10000:
+            stack_trace = stack_trace[:9950] + "\n... (truncated)"
+        self.state_manager.update_task_status_to_failed(
+            task_name, message, task_type, qid, stack_trace
+        )
 
     def execute(
         self,
@@ -279,10 +287,13 @@ class TaskExecutor:
                 if execution_service is not None:
                     execution_service = self._update_execution(execution_service)
 
-            # 2.5 Re-apply snapshot overrides (preprocess may have
-            #     overwritten input_parameters with values from chip state).
+            # 2.5 Re-apply only user-specified overrides (not the full snapshot).
+            # The full snapshot was already applied in step 1.5. Preprocess may
+            # have computed new values (e.g. SNR sweep for readout_amplitude),
+            # so we must not overwrite those with snapshot defaults. Only
+            # parameters the user explicitly overrode should be re-applied.
             if self._snapshot_loader is not None:
-                self._apply_snapshot_overrides(task, task_name, task_type, qid)
+                self._apply_user_overrides_only(task, task_name, task_type, qid)
 
             # 3. Run
             run_result = self._run_task(task, backend, qid)
@@ -323,6 +334,14 @@ class TaskExecutor:
 
                 # 5c. Save figures and raw data
                 self._save_artifacts(postprocess_result, task_name, task_type, qid)
+
+                # 5c.1 Check for postprocess validation error (after artifacts are saved)
+                if postprocess_result.validation_error:
+                    if postprocess_result.output_parameters:
+                        self.state_manager.clear_output_parameters(task_name, task_type, qid)
+                    if execution_service is not None:
+                        self._backend_saver.save(task, execution_service, qid, backend, False)
+                    raise ValueError(postprocess_result.validation_error)
 
                 # 5d. Validate R² (rollback output params on failure)
                 backend_success = True
@@ -386,13 +405,17 @@ class TaskExecutor:
             result.message = "Completed"
 
         except (R2ValidationError, FidelityValidationError, ValueError) as e:
-            self._fail_task(task_name, task_type, qid, str(e))
+            tb = traceback.format_exc()
+            self._fail_task(task_name, task_type, qid, str(e), tb)
             result.message = str(e)
+            result.stack_trace = tb
             raise
 
         except Exception as e:
-            self._fail_task(task_name, task_type, qid, str(e))
+            tb = traceback.format_exc()
+            self._fail_task(task_name, task_type, qid, str(e), tb)
             result.message = str(e)
+            result.stack_trace = tb
             raise TaskExecutionError(f"Task {task_name} failed: {e}") from e
 
         finally:
@@ -454,7 +477,7 @@ class TaskExecutor:
 
         snap_input, snap_run = snapshot
         logger.info(
-            "Applying snapshot overrides for task=%s, qid=%s " "(input_params=%d, run_params=%d)",
+            "Applying snapshot overrides for task=%s, qid=%s (input_params=%d, run_params=%d)",
             task_name,
             qid,
             len(snap_input),
@@ -468,7 +491,7 @@ class TaskExecutor:
                 for k, v in snap_input.items()
                 if (m := self._reconstruct_param(ParameterModel, k, v)) is not None
             }
-            task.input_parameters = reconstructed_input  # type: ignore[attr-defined]
+            task.input_parameters = reconstructed_input
             # Re-record in state_manager
             self.state_manager.put_input_parameters(task_name, reconstructed_input, task_type, qid)
 
@@ -482,6 +505,52 @@ class TaskExecutor:
             task.run_parameters = reconstructed_run
             # Re-record in state_manager
             run_params_dict = {k: v.model_dump() for k, v in reconstructed_run.items()}
+            self.state_manager.put_run_parameters(task_name, run_params_dict, task_type, qid)
+
+    def _apply_user_overrides_only(
+        self,
+        task: TaskProtocol,
+        task_name: str,
+        task_type: str,
+        qid: str,
+    ) -> None:
+        """Re-apply only user-specified parameter overrides after preprocess.
+
+        Unlike _apply_snapshot_overrides which replaces all parameters with
+        snapshot values, this method only updates parameters that the user
+        explicitly overrode. This preserves values computed by preprocess
+        (e.g. readout_amplitude from SNR sweep).
+        """
+        from qdash.datamodel.task import ParameterModel, RunParameterModel
+
+        assert self._snapshot_loader is not None
+        overrides = self._snapshot_loader._parameter_overrides
+        if not overrides:
+            return
+
+        input_overrides = overrides.get("input", {})
+        run_overrides = overrides.get("run", {})
+
+        if input_overrides:
+            for key, new_value in input_overrides.items():
+                param = task.input_parameters.get(key)
+                if isinstance(param, ParameterModel):
+                    param.value = new_value
+                    logger.info("User override applied: input.%s = %s", key, new_value)
+            self.state_manager.put_input_parameters(
+                task_name,
+                task.input_parameters,
+                task_type,
+                qid,
+            )
+
+        if run_overrides:
+            for key, new_value in run_overrides.items():
+                param = task.run_parameters.get(key)
+                if isinstance(param, RunParameterModel):
+                    param.value = new_value
+                    logger.info("User override applied: run.%s = %s", key, new_value)
+            run_params_dict = {k: v.model_dump() for k, v in task.run_parameters.items()}
             self.state_manager.put_run_parameters(task_name, run_params_dict, task_type, qid)
 
     def _update_execution(self, execution_service: "ExecutionService") -> "ExecutionService":

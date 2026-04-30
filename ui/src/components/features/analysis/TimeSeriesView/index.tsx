@@ -207,13 +207,13 @@ export function TimeSeriesView() {
     {
       chip_id: selectedChip,
       parameter: selectedParameter as ParameterKey,
-      tag: selectedTag as TagKey,
+      tag: (selectedTag || undefined) as TagKey,
       start_at: timeRange.startAt,
       end_at: timeRange.endAt,
     },
     {
       query: {
-        enabled: Boolean(selectedChip && selectedParameter && selectedTag),
+        enabled: Boolean(selectedChip && selectedParameter),
         staleTime: 30000, // Keep data fresh for 30 seconds
       },
     },
@@ -229,13 +229,13 @@ export function TimeSeriesView() {
     {
       chip_id: selectedChip,
       parameter: secondaryParameter as ParameterKey,
-      tag: selectedTag as TagKey,
+      tag: (selectedTag || undefined) as TagKey,
       start_at: timeRange.startAt,
       end_at: timeRange.endAt,
     },
     {
       query: {
-        enabled: Boolean(selectedChip && secondaryParameter && selectedTag),
+        enabled: Boolean(selectedChip && secondaryParameter),
         staleTime: 30000,
       },
     },
@@ -944,7 +944,7 @@ export function TimeSeriesView() {
                 />
               </div>
               <button
-                className={`btn btn-sm mt-8 gap-2 ${
+                className={`btn btn-sm mt-8 gap-2 w-20 ${
                   timeRange.isStartAtLocked ? "btn-primary" : "btn-ghost"
                 }`}
                 onClick={toggleStartAtLock}
@@ -989,7 +989,7 @@ export function TimeSeriesView() {
                 />
               </div>
               <button
-                className={`btn btn-sm mt-8 gap-2 ${
+                className={`btn btn-sm mt-8 gap-2 w-20 ${
                   timeRange.isEndAtLocked ? "btn-primary" : "btn-ghost"
                 }`}
                 onClick={toggleEndAtLock}
@@ -1064,13 +1064,10 @@ export function TimeSeriesView() {
         }
         isLoading={isLoadingTimeseries || isLoadingSecondary}
         hasData={Boolean(
-          selectedChip &&
-          selectedParameter &&
-          selectedTag &&
-          plotData.length > 0,
+          selectedChip && selectedParameter && plotData.length > 0,
         )}
         emptyStateMessage={
-          !selectedChip || !selectedParameter || !selectedTag
+          !selectedChip || !selectedParameter
             ? "Select chip and parameters to visualize data"
             : "No data available for the selected parameters"
         }

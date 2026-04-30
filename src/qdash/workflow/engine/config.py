@@ -40,6 +40,7 @@ class CalibConfig:
     enable_github_pull: bool = True
     enable_provenance_tracking: bool = True
     skip_execution: bool = False  # Skip Execution creation (for wrapper/parent sessions)
+    force_update_params: bool = False  # Force backend params update regardless of R² validation
     default_run_parameters: dict[str, Any] = field(
         default_factory=dict
     )  # Default run parameters for all tasks (e.g., {"interval": {"value": "300 * 1024", "value_type": "int"}})

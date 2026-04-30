@@ -29,15 +29,14 @@ export function TagSelector({
   }));
 
   const handleChange = (option: SingleValue<TagOption>) => {
-    if (option) {
-      onTagSelect(option.value);
-    }
+    onTagSelect(option ? option.value : "");
   };
 
   return (
     <Select<TagOption>
+      isClearable
       options={options}
-      value={options.find((option) => option.value === selectedTag)}
+      value={options.find((option) => option.value === selectedTag) ?? null}
       onChange={handleChange}
       placeholder="Select tag"
       className="text-base-content w-full"

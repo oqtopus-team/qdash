@@ -32,18 +32,19 @@ export function getAdaptiveMinCellSize(
 ): number {
   const baseMin = getMinCellSize(isMobile, viewportHeight);
 
-  // For grids larger than 8x8, progressively reduce minimum cell size
+  // For grids larger than 8x8, progressively reduce minimum cell size.
+  // Cells must stay large enough for readable text; pan-zoom handles overflow.
   if (gridSize <= 8) {
     return baseMin;
   } else if (gridSize <= 10) {
-    // 64-100Q: reduce by 20%
-    return Math.max(24, Math.floor(baseMin * 0.8));
+    // 64-100Q: reduce by 15%
+    return Math.max(28, Math.floor(baseMin * 0.85));
   } else if (gridSize <= 12) {
-    // 100-144Q: reduce by 35%
-    return Math.max(20, Math.floor(baseMin * 0.65));
+    // 100-144Q: reduce by 25%
+    return Math.max(26, Math.floor(baseMin * 0.75));
   } else {
-    // >144Q: reduce by 50%
-    return Math.max(16, Math.floor(baseMin * 0.5));
+    // >144Q: reduce by 40%
+    return Math.max(22, Math.floor(baseMin * 0.6));
   }
 }
 
@@ -155,6 +156,22 @@ export function calculateGridContainerWidth(
  */
 export function checkIsMobile(viewportWidth: number): boolean {
   return viewportWidth < MOBILE_BREAKPOINT;
+}
+
+/**
+ * Compute a font size proportional to cellSize so that the text-to-cell
+ * ratio stays constant across devices and viewport sizes.
+ *
+ * Returns a `${px}px` string suitable for inline style. A minimum floor
+ * keeps text legible when cells become very small; two devices ending up
+ * at the same cellSize still produce identical output.
+ */
+export function cellFontSize(
+  cellSize: number,
+  ratio: number,
+  minPx = 6,
+): string {
+  return `${Math.max(cellSize * ratio, minPx)}px`;
 }
 
 /**

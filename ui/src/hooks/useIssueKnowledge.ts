@@ -13,6 +13,7 @@ import {
   useDeleteIssueKnowledge,
   useExtractIssueKnowledge,
 } from "@/client/issue-knowledge/issue-knowledge";
+import type { IssueKnowledgeUpdate } from "@/schemas/issueKnowledgeUpdate";
 
 type StatusFilter = "draft" | "approved" | "rejected" | "all";
 
@@ -125,14 +126,7 @@ export function useIssueKnowledgeDetail(knowledgeId: string) {
   }, [queryClient, knowledgeId]);
 
   const update = useCallback(
-    async (updates: {
-      title?: string;
-      severity?: string;
-      symptom?: string;
-      root_cause?: string;
-      resolution?: string;
-      lesson_learned?: string[];
-    }) => {
+    async (updates: IssueKnowledgeUpdate) => {
       await updateMutation.mutateAsync({
         knowledgeId,
         data: updates,

@@ -8,7 +8,11 @@ from qdash.workflow.calibtasks.base import (
 )
 from qdash.workflow.calibtasks.qubex.base import QubexTask
 from qdash.workflow.engine.backend.qubex import QubexBackend
-from qubex.measurement.measurement import DEFAULT_INTERVAL, DEFAULT_READOUT_DURATION, DEFAULT_SHOTS
+from qubex.measurement.measurement_defaults import (
+    DEFAULT_INTERVAL,
+    DEFAULT_READOUT_DURATION,
+    DEFAULT_SHOTS,
+)
 
 
 class CheckRamsey(QubexTask):
@@ -279,13 +283,16 @@ class CheckRamsey(QubexTask):
         """Run the task."""
         exp = self.get_experiment(backend)
         label = self.get_qubit_label(backend, qid)
+        readout_amp_param = self.input_parameters["readout_amplitude"]
+        if readout_amp_param is not None:
+            exp.params.readout_amplitude[label] = readout_amp_param.value
 
         # Apply frequency override if qubit_frequency was explicitly provided
         with self._apply_frequency_override(backend, qid):
             result_y = exp.ramsey_experiment(
                 time_range=self.run_parameters["time_range"].get_value(),
-                shots=self.run_parameters["shots"].get_value(),
-                interval=self.run_parameters["interval"].get_value(),
+                n_shots=self.run_parameters["shots"].get_value(),
+                shot_interval=self.run_parameters["interval"].get_value(),
                 detuning=self.run_parameters["detuning"].get_value(),
                 second_rotation_axis="Y",  # Default axis for Ramsey
                 spectator_state="0",
@@ -293,8 +300,8 @@ class CheckRamsey(QubexTask):
             )
             result_x = exp.ramsey_experiment(
                 time_range=self.run_parameters["time_range"].get_value(),
-                shots=self.run_parameters["shots"].get_value(),
-                interval=self.run_parameters["interval"].get_value(),
+                n_shots=self.run_parameters["shots"].get_value(),
+                shot_interval=self.run_parameters["interval"].get_value(),
                 detuning=self.run_parameters["detuning"].get_value(),
                 second_rotation_axis="X",  # Default axis for Ramsey
                 spectator_state="0",

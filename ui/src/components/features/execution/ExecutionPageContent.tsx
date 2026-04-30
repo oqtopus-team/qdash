@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 
 import { ExternalLink, ArrowUpRight, StopCircle } from "lucide-react";
 import Link from "next/link";
@@ -78,9 +78,6 @@ export function ExecutionPageContent() {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20;
 
-  // Track if we've already set the default chip to prevent race conditions
-  const hasSetDefaultChip = useRef(false);
-
   // Use custom hook for date navigation (unused but kept for potential future use)
   useDateNavigation(selectedChip || "", selectedDate, setSelectedDate);
 
@@ -99,13 +96,7 @@ export function ExecutionPageContent() {
 
   // Set the latest chip as default when chips are loaded and no chip is selected from URL
   useEffect(() => {
-    if (
-      isInitialized &&
-      !selectedChip &&
-      !hasSetDefaultChip.current &&
-      sortedChips.length > 0
-    ) {
-      hasSetDefaultChip.current = true;
+    if (isInitialized && !selectedChip && sortedChips.length > 0) {
       setSelectedChip(sortedChips[0].chip_id);
     }
   }, [isInitialized, selectedChip, sortedChips, setSelectedChip]);
@@ -269,10 +260,18 @@ export function ExecutionPageContent() {
           return (
             <div
               key={executionKey}
-              className={`p-2 sm:p-4 rounded-lg shadow-md flex cursor-pointer relative overflow-hidden transition-transform duration-200 bg-base-100 ${
+              role="button"
+              tabIndex={0}
+              className={`p-2 sm:p-4 rounded-lg shadow-md flex cursor-pointer relative overflow-hidden bg-base-100 float-hover ${
                 isSelected ? "transform scale-100" : "sm:transform sm:scale-95"
               } ${statusBorderStyle}`}
               onClick={() => handleCardClick(execution)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  handleCardClick(execution);
+                }
+              }}
             >
               {isSelected && (
                 <div className="absolute inset-0 bg-primary opacity-10 pointer-events-none transition-opacity duration-500" />

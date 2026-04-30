@@ -5,69 +5,53 @@ absl-py==2.3.1
     #   chex
     #   optax
 aiocoap==0.4.14
-    # via
-    #   qubecalib
-    #   quel-ic-config
+    # via quel-ic-config
+annotated-doc==0.0.4
+    # via typer
 annotated-types==0.7.0
     # via pydantic
 anyio==4.8.0
     # via
     #   httpx
-    #   jupyter-server
     #   openai
     #   starlette
     #   watchfiles
+anywidget==0.9.21
+    # via qubex
 appnope==0.1.4 ; sys_platform == 'darwin'
     # via ipykernel
-argon2-cffi==25.1.0
-    # via jupyter-server
-argon2-cffi-bindings==25.1.0
-    # via argon2-cffi
-arrow==1.3.0
-    # via isoduration
 asttokens==3.0.0
     # via stack-data
-async-lru==2.0.5
-    # via jupyterlab
+atpublic==7.0.0
+    # via flufl-lock
 attrs==24.3.0
     # via
     #   jsonschema
     #   pytest-mypy
     #   referencing
-    #   service-identity
-    #   twisted
-automat==25.4.16
-    # via twisted
-babel==2.17.0
-    # via jupyterlab-server
+    #   typedunits
 bcrypt==4.3.0
     # via passlib
-beautifulsoup4==4.13.4
-    # via nbconvert
-bleach==6.2.0
-    # via nbconvert
 bunnet==1.3.0
     # via qdash
 certifi==2025.1.31
     # via
     #   httpcore
     #   httpx
-    #   requests
+    #   netcdf4
 cffi==1.17.1
     # via
-    #   argon2-cffi-bindings
     #   clarabel
-    #   cryptography
     #   pyzmq
+cftime==1.6.5
+    # via netcdf4
 charset-normalizer==3.4.1
-    # via
-    #   reportlab
-    #   requests
+    # via reportlab
 chex==0.1.90
     # via optax
 clarabel==0.11.1
     # via cvxpy
-click==8.1.8
+click==8.3.1
     # via
     #   bunnet
     #   rich-toolkit
@@ -86,10 +70,6 @@ comm==0.2.3
     # via
     #   ipykernel
     #   ipywidgets
-configparser==7.2.0
-    # via pylabrad
-constantly==23.10.4
-    # via twisted
 contourpy==1.3.2 ; python_full_version < '3.11'
     # via matplotlib
 contourpy==1.3.3 ; python_full_version >= '3.11'
@@ -97,32 +77,24 @@ contourpy==1.3.3 ; python_full_version >= '3.11'
 coverage==7.6.12
     # via pytest-cov
 croniter==6.0.0
-cryptography==44.0.2
-    # via
-    #   pyopenssl
-    #   service-identity
-cvxopt==1.3.2
-    # via qubex
 cvxpy==1.7.1
     # via qubex
 cycler==0.12.1
     # via matplotlib
+cython==3.2.4
+    # via typedunits
 debugpy==1.8.16
     # via ipykernel
 decorator==5.2.1
     # via ipython
-defusedxml==0.7.1
-    # via nbconvert
 distro==1.9.0
     # via openai
 dnspython==2.7.0
     # via
     #   email-validator
     #   pymongo
-e7awgsw @ git+https://github.com/e-trees/e7awg_sw.git@7dccc53ce613fc42f8b0e3302b27959f0e486f87
-    # via
-    #   qubecalib
-    #   quel-ic-config
+e7awghal==0.1.5
+    # via quel-ic-config
 ecdsa==0.19.0
     # via python-jose
 email-validator==2.2.0
@@ -141,12 +113,10 @@ fastjsonschema==2.21.1
     # via nbformat
 filelock==3.17.0
     # via pytest-mypy
+flufl-lock==8.1.0
+    # via quel-ic-config
 fonttools==4.59.0
     # via matplotlib
-fqdn==1.5.1
-    # via jsonschema
-future==1.0.0
-    # via pylabrad
 gitdb==4.0.12
     # via gitpython
 gitpython==3.1.45
@@ -163,54 +133,42 @@ httptools==0.6.4
 httpx==0.27.2
     # via
     #   fastapi
-    #   jupyterlab
     #   openai
-    #   qubex
-hyperlink==21.0.0
-    # via twisted
 idna==3.10
     # via
     #   anyio
     #   email-validator
     #   httpx
-    #   hyperlink
-    #   jsonschema
-    #   requests
-incremental==24.7.2
-    # via twisted
 iniconfig==2.0.0
     # via pytest
 ipykernel==6.30.1
-    # via
-    #   jupyter
-    #   jupyter-console
-    #   jupyterlab
+    # via qubex
 ipython==8.37.0 ; python_full_version < '3.11'
     # via
     #   ipykernel
     #   ipywidgets
-    #   jupyter-console
+    #   qxsimulator
 ipython==9.4.0 ; python_full_version >= '3.11'
     # via
     #   ipykernel
     #   ipywidgets
-    #   jupyter-console
+    #   qxsimulator
 ipython-pygments-lexers==1.1.1 ; python_full_version >= '3.11'
     # via ipython
 ipywidgets==8.1.7
-    # via jupyter
-isoduration==20.11.0
-    # via jsonschema
+    # via
+    #   anywidget
+    #   qubex
 jax==0.6.2 ; python_full_version < '3.11'
     # via
     #   chex
     #   optax
-    #   qubex
+    #   qxsimulator
 jax==0.7.0 ; python_full_version >= '3.11'
     # via
     #   chex
     #   optax
-    #   qubex
+    #   qxsimulator
 jaxlib==0.6.2 ; python_full_version < '3.11'
     # via
     #   chex
@@ -226,10 +184,6 @@ jedi==0.19.2
 jinja2==3.1.6
     # via
     #   fastapi
-    #   jupyter-server
-    #   jupyterlab
-    #   jupyterlab-server
-    #   nbconvert
     #   osqp
 jiter==0.13.0
     # via openai
@@ -237,64 +191,19 @@ joblib==1.5.1
     # via
     #   osqp
     #   scikit-learn
-json5==0.12.0
-    # via jupyterlab-server
 jsonpickle==3.4.2
     # via qubex
-jsonpointer==3.0.0
-    # via jsonschema
 jsonschema==4.23.0
-    # via
-    #   jupyter-events
-    #   jupyterlab-server
-    #   nbformat
+    # via nbformat
 jsonschema-specifications==2024.10.1
     # via jsonschema
-jupyter==1.1.1
-    # via
-    #   qubecalib
-    #   qubex
 jupyter-client==8.6.3
-    # via
-    #   ipykernel
-    #   jupyter-console
-    #   jupyter-server
-    #   nbclient
-jupyter-console==6.6.3
-    # via jupyter
+    # via ipykernel
 jupyter-core==5.8.1
     # via
     #   ipykernel
     #   jupyter-client
-    #   jupyter-console
-    #   jupyter-server
-    #   jupyterlab
-    #   nbclient
-    #   nbconvert
     #   nbformat
-jupyter-events==0.12.0
-    # via jupyter-server
-jupyter-lsp==2.2.6
-    # via jupyterlab
-jupyter-server==2.16.0
-    # via
-    #   jupyter-lsp
-    #   jupyterlab
-    #   jupyterlab-server
-    #   notebook
-    #   notebook-shim
-jupyter-server-terminals==0.5.3
-    # via jupyter-server
-jupyterlab==4.4.5
-    # via
-    #   jupyter
-    #   notebook
-jupyterlab-pygments==0.3.0
-    # via nbconvert
-jupyterlab-server==2.27.3
-    # via
-    #   jupyterlab
-    #   notebook
 jupyterlab-widgets==3.0.15
     # via ipywidgets
 kaleido==0.2.1
@@ -306,15 +215,10 @@ lazy-model==0.2.0
 markdown-it-py==3.0.0
     # via rich
 markupsafe==3.0.2
-    # via
-    #   jinja2
-    #   nbconvert
+    # via jinja2
 matplotlib==3.8.0
     # via
-    #   e7awgsw
     #   qctrl-visualizer
-    #   qubecalib
-    #   qubex
     #   quel-ic-config
 matplotlib-inline==0.1.7
     # via
@@ -322,90 +226,82 @@ matplotlib-inline==0.1.7
     #   ipython
 mdurl==0.1.2
     # via markdown-it-py
-mistune==3.1.3
-    # via nbconvert
 ml-dtypes==0.5.3
     # via
     #   jax
     #   jaxlib
 mongomock==4.1.2
+mpmath==1.3.0
+    # via sympy
 mypy==1.15.0
     # via pytest-mypy
 mypy-extensions==1.0.0
     # via mypy
-nbclient==0.10.2
-    # via nbconvert
-nbconvert==7.16.6
-    # via
-    #   jupyter
-    #   jupyter-server
 nbformat==5.10.4
-    # via
-    #   jupyter-server
-    #   nbclient
-    #   nbconvert
+    # via qubex
 nest-asyncio==1.6.0
     # via ipykernel
+netcdf4==1.7.3
+    # via qxcore
 networkx==3.4.2 ; python_full_version < '3.11'
-    # via qubex
-networkx==3.5 ; python_full_version >= '3.11'
-    # via qubex
-notebook==7.4.5
-    # via jupyter
-notebook-shim==0.2.4
     # via
-    #   jupyterlab
-    #   notebook
+    #   qubex
+    #   qxsimulator
+networkx==3.5 ; python_full_version >= '3.11'
+    # via
+    #   qubex
+    #   qxsimulator
 numpy==1.26.0
     # via
+    #   cftime
     #   chex
     #   clarabel
     #   cma
     #   contourpy
     #   cvxpy
-    #   e7awgsw
+    #   e7awghal
     #   jax
     #   jaxlib
     #   matplotlib
     #   ml-dtypes
+    #   netcdf4
     #   optax
     #   osqp
-    #   pylabrad
+    #   pandas
     #   qctrl-visualizer
     #   qdash
-    #   qubecalib
     #   qubex
     #   quel-ic-config
     #   qutip
+    #   qxcore
+    #   qxdriver-quel1
+    #   qxpulse
+    #   qxschema
+    #   qxsimulator
+    #   qxvisualizer
     #   scikit-learn
     #   scipy
     #   scs
+    #   typedunits
 openai==2.21.0
 opt-einsum==3.4.0
     # via jax
 optax==0.2.5
-    # via qubex
+    # via qxsimulator
 osqp==1.0.4
     # via cvxpy
-overrides==7.7.0
-    # via jupyter-server
 packaging==24.2
     # via
     #   gunicorn
     #   ipykernel
-    #   jupyter-events
-    #   jupyter-server
-    #   jupyterlab
-    #   jupyterlab-server
     #   matplotlib
     #   mongomock
-    #   nbconvert
     #   plotly
     #   pytest
     #   quel-ic-config
     #   qutip
-pandocfilters==1.5.1
-    # via nbconvert
+pandas==2.2.3
+    # via quel-ic-config
 parso==0.8.4
     # via jedi
 passlib==1.7.4
@@ -417,38 +313,39 @@ pillow==11.3.0
     # via
     #   matplotlib
     #   reportlab
-pip==24.0
-    # via qubex
 platformdirs==4.3.6
     # via jupyter-core
 plotly==5.24.1
     # via
-    #   qubecalib
     #   qubex
+    #   qxdriver-quel1
+    #   qxpulse
+    #   qxsimulator
+    #   qxvisualizer
 pluggy==1.5.0
     # via pytest
-prometheus-client==0.21.1
-    # via jupyter-server
+polars==1.9.0
+    # via quel-ic-config
 prompt-toolkit==3.0.51
+    # via ipython
+protobuf==7.34.1
     # via
-    #   ipython
-    #   jupyter-console
+    #   qxcore
+    #   typedunits
 psutil==7.0.0
-    # via ipykernel
-ptyprocess==0.7.0 ; os_name != 'nt' or (sys_platform != 'emscripten' and sys_platform != 'win32')
     # via
-    #   pexpect
-    #   terminado
+    #   flufl-lock
+    #   ipykernel
+psygnal==0.15.1
+    # via anywidget
+ptyprocess==0.7.0 ; sys_platform != 'emscripten' and sys_platform != 'win32'
+    # via pexpect
 pure-eval==0.2.3
     # via stack-data
 pyasn1==0.4.8
     # via
-    #   pyasn1-modules
     #   python-jose
     #   rsa
-    #   service-identity
-pyasn1-modules==0.4.1
-    # via service-identity
 pybind11-stubgen==2.5.5
     # via quel-ic-config
 pycparser==2.22
@@ -456,12 +353,14 @@ pycparser==2.22
 pydantic==2.4.2
     # via
     #   bunnet
+    #   e7awghal
     #   fastapi
     #   lazy-model
     #   openai
     #   pydantic-settings
     #   qubex
     #   quel-ic-config
+    #   qxcore
 pydantic-core==2.10.1
     # via pydantic
 pydantic-settings==2.2.1
@@ -469,21 +368,15 @@ pygments==2.19.1
     # via
     #   ipython
     #   ipython-pygments-lexers
-    #   jupyter-console
-    #   nbconvert
     #   rich
-pylabrad==0.98.2
-    # via e7awgsw
 pymongo==4.8.0
     # via
     #   bunnet
     #   qdash
-pyopenssl==25.1.0
-    # via pylabrad
 pyparsing==3.2.3
     # via
     #   matplotlib
-    #   pylabrad
+    #   typedunits
 pyserial==3.5
     # via qubex
 pytest==8.3.2
@@ -493,19 +386,17 @@ pytest==8.3.2
     #   pytest-env
     #   pytest-mock
     #   pytest-mypy
-    #   qubecalib
 pytest-asyncio==0.24.0
 pytest-cov==5.0.0
 pytest-env==1.1.3
 pytest-mock==3.14.1
-    # via qubecalib
 pytest-mypy==0.10.3
 python-dateutil==2.9.0.post0
     # via
-    #   arrow
     #   croniter
     #   jupyter-client
     #   matplotlib
+    #   pandas
     #   pendulum
 python-dotenv==1.0.1
     # via
@@ -513,62 +404,61 @@ python-dotenv==1.0.1
     #   uvicorn
 python-jose==3.4.0
 python-json-logger==3.3.0
-    # via jupyter-events
 python-multipart==0.0.20
     # via fastapi
+python-ulid==2.7.0
+    # via quel-ic-config
 pytz==2025.2
-    # via croniter
+    # via
+    #   croniter
+    #   pandas
 pywin32==308 ; platform_python_implementation != 'PyPy' and sys_platform == 'win32'
     # via jupyter-core
-pywinpty==2.0.15 ; os_name == 'nt'
-    # via
-    #   jupyter-server
-    #   jupyter-server-terminals
-    #   terminado
 pyyaml==6.0.1
     # via
-    #   jupyter-events
-    #   qubecalib
     #   qubex
     #   quel-ic-config
+    #   qxdriver-quel1
     #   uvicorn
 pyzmq==27.0.1
     # via
     #   ipykernel
     #   jupyter-client
-    #   jupyter-console
-    #   jupyter-server
 qctrl-visualizer==8.0.2
-    # via qubex
-qubecalib @ git+https://github.com/qiqb-osaka/qube-calib.git@487227c1154aa087e55b9fee1eabda2a164d299c
-    # via qubex
-qubex @ git+https://github.com/amachino/qubex.git@516c40048a357afeaeb4c1971f39982a5b826155
-quel-clock-master @ git+https://github.com/quel-inc/quelware.git@c839e8b1a6fde4b4ece3d5f415015829857e775e#subdirectory=quel_clock_master
     # via
-    #   qubecalib
-    #   quel-ic-config
-quel-ic-config @ git+https://github.com/quel-inc/quelware.git@c839e8b1a6fde4b4ece3d5f415015829857e775e#subdirectory=quel_ic_config
-    # via qubecalib
+    #   qubex
+    #   qxsimulator
+qubex @ git+https://github.com/amachino/qubex.git@4ff845c237edca1b2a7d65a9ff4712883a241e85
+quel-ic-config==0.10.7
+    # via qxdriver-quel1
 qutip==5.2.0
+    # via qxsimulator
+qxcore @ git+https://github.com/amachino/qubex.git@4ff845c237edca1b2a7d65a9ff4712883a241e85#subdirectory=packages/qxcore
+    # via
+    #   qubex
+    #   qxschema
+qxdriver-quel1 @ git+https://github.com/amachino/qubex.git@4ff845c237edca1b2a7d65a9ff4712883a241e85#subdirectory=packages/qxdriver-quel1
     # via qubex
+qxfitting @ git+https://github.com/amachino/qubex.git@4ff845c237edca1b2a7d65a9ff4712883a241e85#subdirectory=packages/qxfitting
+    # via qubex
+qxpulse @ git+https://github.com/amachino/qubex.git@4ff845c237edca1b2a7d65a9ff4712883a241e85#subdirectory=packages/qxpulse
+    # via
+    #   qubex
+    #   qxsimulator
+qxschema @ git+https://github.com/amachino/qubex.git@4ff845c237edca1b2a7d65a9ff4712883a241e85#subdirectory=packages/qxschema
+    # via qubex
+qxsimulator @ git+https://github.com/amachino/qubex.git@4ff845c237edca1b2a7d65a9ff4712883a241e85#subdirectory=packages/qxsimulator
+    # via qubex
+qxvisualizer @ git+https://github.com/amachino/qubex.git@4ff845c237edca1b2a7d65a9ff4712883a241e85#subdirectory=packages/qxvisualizer
+    # via
+    #   qubex
+    #   qxpulse
+    #   qxsimulator
 referencing==0.36.2
     # via
     #   jsonschema
     #   jsonschema-specifications
-    #   jupyter-events
 reportlab==4.4.3
-requests==2.32.3
-    # via
-    #   jupyterlab-server
-    #   pylabrad
-rfc3339-validator==0.1.4
-    # via
-    #   jsonschema
-    #   jupyter-events
-rfc3986-validator==0.1.1
-    # via
-    #   jsonschema
-    #   jupyter-events
 rich==13.9.4
     # via
     #   qubex
@@ -588,52 +478,35 @@ ruamel-yaml-clib==0.2.15 ; platform_python_implementation == 'CPython'
 ruff==0.5.5
 scikit-learn==1.7.1
     # via qubex
-scipy==1.15.3 ; python_full_version < '3.11'
+scipy==1.13.1
     # via
     #   clarabel
     #   cvxpy
+    #   e7awghal
     #   jax
     #   jaxlib
     #   osqp
     #   qctrl-visualizer
     #   qubex
     #   qutip
-    #   scikit-learn
-    #   scs
-scipy==1.16.1 ; python_full_version >= '3.11'
-    # via
-    #   clarabel
-    #   cvxpy
-    #   jax
-    #   jaxlib
-    #   osqp
-    #   qctrl-visualizer
-    #   qubex
-    #   qutip
+    #   qxpulse
+    #   qxsimulator
     #   scikit-learn
     #   scs
 scs==3.2.7.post2
     # via cvxpy
-send2trash==1.8.3
-    # via jupyter-server
 sentinels==1.1.1
     # via mongomock
-service-identity==24.2.0
-    # via pylabrad
 setuptools==80.9.0
     # via
     #   chex
-    #   incremental
-    #   jupyterlab
     #   osqp
-    #   zope-interface
 shellingham==1.5.4
     # via typer
 six==1.17.0
     # via
     #   ecdsa
     #   python-dateutil
-    #   rfc3339-validator
 slack-sdk==3.36.0
 smmap==5.0.2
     # via gitdb
@@ -642,29 +515,21 @@ sniffio==1.3.1
     #   anyio
     #   httpx
     #   openai
-soupsieve==2.7
-    # via beautifulsoup4
 stack-data==0.6.3
     # via ipython
 starlette==0.37.2
     # via fastapi
+sympy==1.14.0
+    # via qxcore
 tenacity==9.1.2
     # via plotly
-terminado==0.18.1
-    # via
-    #   jupyter-server
-    #   jupyter-server-terminals
 threadpoolctl==3.6.0
     # via scikit-learn
-tinycss2==1.4.0
-    # via bleach
 toml==0.10.2
     # via bunnet
 tomli==2.2.1 ; python_full_version <= '3.11'
     # via
     #   coverage
-    #   incremental
-    #   jupyterlab
     #   mypy
     #   pytest
     #   pytest-env
@@ -674,69 +539,57 @@ tornado==6.5.2
     # via
     #   ipykernel
     #   jupyter-client
-    #   jupyter-server
-    #   jupyterlab
-    #   notebook
-    #   terminado
 tqdm==4.66.5
     # via
     #   openai
-    #   qubecalib
     #   qubex
+    #   qxdriver-quel1
 traitlets==5.14.3
     # via
     #   ipykernel
     #   ipython
     #   ipywidgets
     #   jupyter-client
-    #   jupyter-console
     #   jupyter-core
-    #   jupyter-events
-    #   jupyter-server
-    #   jupyterlab
     #   matplotlib-inline
-    #   nbclient
-    #   nbconvert
     #   nbformat
-twisted==25.5.0
-    # via pylabrad
-typer==0.14.0
-    # via fastapi-cli
+typedunits==0.0.1
+    # via
+    #   qubex
+    #   qxcore
+typer==0.24.1
+    # via
+    #   fastapi-cli
+    #   quel-ic-config
 types-croniter==6.0.0.20250809
 types-python-dateutil==2.9.0.20250809
-    # via arrow
 types-pyyaml==6.0.12.20250809
-    # via qubecalib
 types-requests==2.32.4.20250913
-typing-extensions==4.12.2
+typing-extensions==4.15.0
     # via
     #   anyio
-    #   async-lru
-    #   beautifulsoup4
+    #   anywidget
     #   bunnet
     #   chex
     #   fastapi
     #   ipython
-    #   mistune
     #   mypy
     #   openai
     #   pydantic
     #   pydantic-core
-    #   pyopenssl
+    #   qubex
+    #   qxcore
+    #   qxpulse
     #   referencing
     #   rich
     #   rich-toolkit
-    #   twisted
-    #   typer
     #   uvicorn
 tzdata==2025.2
-    # via pendulum
-uri-template==1.3.0
-    # via jsonschema
-urllib3==2.3.0
     # via
-    #   requests
-    #   types-requests
+    #   pandas
+    #   pendulum
+urllib3==2.3.0
+    # via types-requests
 uvicorn==0.34.0
     # via
     #   fastapi
@@ -747,17 +600,7 @@ watchfiles==1.0.4
     # via uvicorn
 wcwidth==0.2.13
     # via prompt-toolkit
-webcolors==24.11.1
-    # via jsonschema
-webencodings==0.5.1
-    # via
-    #   bleach
-    #   tinycss2
-websocket-client==1.8.0
-    # via jupyter-server
 websockets==15.0
     # via uvicorn
 widgetsnbextension==4.0.14
     # via ipywidgets
-zope-interface==7.2
-    # via twisted

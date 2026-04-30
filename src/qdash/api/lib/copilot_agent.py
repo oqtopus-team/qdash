@@ -17,7 +17,9 @@ from openai import AsyncOpenAI, BadRequestError
 from qdash.api.lib.copilot_analysis import AnalysisResponse, TaskAnalysisContext
 
 if TYPE_CHECKING:
-    from qdash.api.lib.copilot_config import CopilotConfig
+    from qdash.api.lib.copilot_config import CopilotConfig, ModelConfig
+else:
+    from qdash.api.lib.copilot_config import CopilotConfig, ModelConfig
 
 logger = logging.getLogger(__name__)
 
@@ -29,16 +31,26 @@ on a square-lattice chip with fixed couplers.
 Your role:
 - Interpret experimental results (graphs, parameters, metrics)
 - Diagnose potential issues based on the data
+- Cross-reference with past cases provided in the "Past cases" section to identify similar patterns or recurring issues
 - Provide actionable recommendations
 - Explain findings clearly to experimentalists
 
 Always ground your analysis in the provided experimental context.
 When discussing results, reference specific parameter values and thresholds.
+IMPORTANT: If a "Past cases" section is provided, you MUST discuss those cases in your
+analysis. Compare the current result with each past case, noting similarities and
+differences. Even if no case exactly matches, explain which case is most relevant and why.
 
 You have access to tools that can fetch data from the calibration database.
 When the user asks about parameters or results from other experiments,
 use the available tools to retrieve the data rather than saying it's unavailable.
 The current qubit context (chip_id, qid) is provided in the system prompt below.
+
+Tool results are returned in JSON format.
+Some tools (get_chip_parameter_timeseries, get_chip_summary) store full data
+server-side and return only a summary with a `data_key` field.
+In execute_python_analysis, access stored data via data["<data_key>"]
+(e.g., data["t1"]). Do NOT pass context_data manually.
 """
 
 MAX_TOOL_ROUNDS = 10
@@ -145,8 +157,9 @@ AGENT_TOOLS: list[dict[str, Any]] = [
             "Use this when you need to perform calculations, statistical analysis, "
             "or generate Plotly charts from data retrieved by other tools. "
             "Available libraries: numpy, pandas, scipy, scipy.stats, plotly, math, statistics, "
-            "json, datetime, collections. "
-            "Pass data from previous tool calls via context_data (accessible as 'data' in code). "
+            "json, datetime, collections, io. "
+            "Stored tool results are automatically available as data['<data_key>'] "
+            "(e.g., data['t1'], data['chip_summary']). Do NOT pass data manually. "
             "Set a 'result' variable as a dict with 'output' (text) and optionally "
             "'chart' (single Plotly spec or a list of Plotly specs, each with 'data' and 'layout' keys). "
             "You can use plotly.graph_objects, plotly.express, or plotly.subplots."
@@ -157,14 +170,11 @@ AGENT_TOOLS: list[dict[str, Any]] = [
                 "code": {
                     "type": "string",
                     "description": (
-                        "Python code to execute. Use 'data' to access context_data. "
+                        "Python code to execute. Use data['<key>'] to access stored tool results "
+                        "(e.g., data['t1']['timeseries'] for timeseries data). "
                         "Set result = {'output': '...', 'chart': {'data': [...], 'layout': {...}}} "
                         "for single chart, or 'chart': [chart1, chart2, ...] for multiple charts."
                     ),
-                },
-                "context_data": {
-                    "type": "object",
-                    "description": "Data from previous tool calls to make available as 'data' variable in the code.",
                 },
             },
             "required": ["code"],
@@ -175,8 +185,9 @@ AGENT_TOOLS: list[dict[str, Any]] = [
         "type": "function",
         "name": "get_chip_summary",
         "description": (
-            "Get a summary of all qubits on a chip with per-qubit parameters and "
-            "computed statistics (mean, median, std, min, max) for numeric parameters. "
+            "Get a summary of all qubits on a chip. Returns: "
+            "(1) statistics: per-parameter mean/median/std/min/max across all qubits, "
+            "(2) qubits: dict mapping qid to {param: value} for each qubit. "
             "Use this for chip-wide analysis or when the user asks about overall chip quality."
         ),
         "parameters": {
@@ -583,14 +594,20 @@ Example response:
 
 RESPONSE_FORMAT_INSTRUCTION = """\
 
-You MUST respond with a valid JSON object matching this schema:
+You MUST respond with a valid JSON object (no prose, no code fences) matching this schema:
 {
   "summary": "One-line result summary",
-  "assessment": "good or warning or bad",
+  "assessment": "good" | "warning" | "bad",
   "explanation": "Detailed analysis and interpretation",
   "potential_issues": ["issue1", "issue2"],
   "recommendations": ["action1", "action2"]
 }
+
+Rules:
+- `potential_issues` and `recommendations` MUST be JSON arrays of strings. Use an empty array `[]` when nothing applies — never a single string or null.
+- `assessment` MUST be exactly one of `good`, `warning`, `bad` (lowercase).
+- Write the user-facing text fields (`summary`, `explanation`, items in `potential_issues` and `recommendations`) in the user's response language as instructed above. Keep technical terms like T1, T2, fidelity in English.
+- Do not add keys outside this schema.
 """
 
 
@@ -600,7 +617,7 @@ def _build_client(config: CopilotConfig) -> AsyncOpenAI:
 
     if provider == "ollama":
         base_url = os.environ.get("OLLAMA_URL", "http://localhost:11434") + "/v1"
-        return AsyncOpenAI(base_url=base_url, api_key="ollama")
+        return AsyncOpenAI(base_url=base_url, api_key=os.environ.get("OLLAMA_API_KEY", "ollama"))
     elif provider == "openai":
         return AsyncOpenAI()  # uses OPENAI_API_KEY env var
     elif provider == "anthropic":
@@ -948,26 +965,198 @@ def _parse_response(content: str) -> AnalysisResponse:
         )
 
 
-def _legacy_to_blocks(response: AnalysisResponse) -> dict[str, Any]:
-    """Convert a legacy AnalysisResponse to blocks format."""
+_ASSESSMENT_LABELS_JA = {
+    "good": ("✅", "良好"),
+    "warning": ("⚠️", "要注意"),
+    "warn": ("⚠️", "要注意"),
+    "bad": ("❌", "不良"),
+    "poor": ("❌", "不良"),
+}
+_ASSESSMENT_LABELS_EN = {
+    "good": ("✅", "Good"),
+    "warning": ("⚠️", "Warning"),
+    "warn": ("⚠️", "Warning"),
+    "bad": ("❌", "Bad"),
+    "poor": ("❌", "Bad"),
+}
+
+_SECTION_LABELS = {
+    "ja": {
+        "summary": "概要",
+        "explanation": "詳細",
+        "issues": "潜在的な問題",
+        "recommendations": "推奨アクション",
+        "assessment": "評価",
+    },
+    "en": {
+        "summary": "Summary",
+        "explanation": "Details",
+        "issues": "Potential Issues",
+        "recommendations": "Recommendations",
+        "assessment": "Assessment",
+    },
+}
+
+
+def _format_assessment_badge(assessment: str | None, lang: str) -> str:
+    if not assessment:
+        return ""
+    key = assessment.strip().lower()
+    table = _ASSESSMENT_LABELS_JA if lang == "ja" else _ASSESSMENT_LABELS_EN
+    emoji, label = table.get(key, ("", assessment))
+    return f"{emoji} **{label}**".strip()
+
+
+_LANG_FULLNAME = {"ja": "Japanese (日本語)", "en": "English"}
+
+
+def _looks_like_target_language(text: str, lang: str) -> bool:
+    """Cheap heuristic: does `text` already look like it's in `lang`?"""
+    if not text:
+        return True
+    if lang == "ja":
+        # Any CJK character → assume already Japanese enough.
+        return any("\u3040" <= ch <= "\u30ff" or "\u4e00" <= ch <= "\u9fff" for ch in text)
+    if lang == "en":
+        return all(ord(ch) < 0x3000 for ch in text)
+    return True
+
+
+async def _translate_analysis_response(
+    response: AnalysisResponse,
+    target_lang: str,
+    general_model: ModelConfig,
+) -> AnalysisResponse:
+    """Translate an AnalysisResponse via the general (non-specialized) model.
+
+    Used when a calibration-specialized analysis model replies in English but
+    the user expects a different language (e.g. Japanese). Only free-form
+    text fields are translated; `assessment` is left untouched.
+    """
+    lang_key = "ja" if target_lang.startswith("ja") else "en"
+    fields_needing = []
+    if response.summary and not _looks_like_target_language(response.summary, lang_key):
+        fields_needing.append("summary")
+    if response.explanation and not _looks_like_target_language(response.explanation, lang_key):
+        fields_needing.append("explanation")
+    if any(i and not _looks_like_target_language(i, lang_key) for i in response.potential_issues):
+        fields_needing.append("potential_issues")
+    if any(r and not _looks_like_target_language(r, lang_key) for r in response.recommendations):
+        fields_needing.append("recommendations")
+
+    if not fields_needing:
+        return response
+
+    lang_name = _LANG_FULLNAME.get(lang_key, target_lang)
+    payload = {
+        "summary": response.summary or "",
+        "explanation": response.explanation or "",
+        "potential_issues": list(response.potential_issues),
+        "recommendations": list(response.recommendations),
+    }
+    system = (
+        f"You translate technical quantum-calibration analysis into natural, fluent {lang_name}. "
+        "Preserve all numeric values, units, and technical terms like T1, T2, fidelity, Rabi, "
+        "R², π-pulse, I/Q in their original form. Keep the same JSON shape. "
+        "Do not add, remove, or reinterpret content — only translate."
+    )
+    user = (
+        "Translate the string values in this JSON into "
+        f"{lang_name}. Return a JSON object with the SAME keys and array lengths.\n\n"
+        + json.dumps(payload, ensure_ascii=False)
+    )
+
+    try:
+        translator_config = CopilotConfig(model=general_model)
+        client = _build_client(translator_config)
+        kwargs: dict[str, Any] = {
+            "model": general_model.name,
+            "messages": [
+                {"role": "system", "content": system},
+                {"role": "user", "content": user},
+            ],
+            "response_format": {"type": "json_object"},
+        }
+        if general_model.temperature is not None:
+            kwargs["temperature"] = 0.2
+        try:
+            completion = await client.chat.completions.create(**kwargs)
+        except BadRequestError as exc:
+            if "temperature" in str(exc):
+                kwargs.pop("temperature", None)
+                completion = await client.chat.completions.create(**kwargs)
+            else:
+                raise
+        content = completion.choices[0].message.content or "{}"
+        data = json.loads(_strip_code_fences(content))
+    except Exception as exc:
+        logger.warning("Translation to %s failed, using original text: %s", lang_key, exc)
+        return response
+
+    def _coerce_list(val: Any, fallback: list[str]) -> list[str]:
+        if isinstance(val, list):
+            return [str(x) for x in val if x]
+        if isinstance(val, str) and val:
+            return [val]
+        return fallback
+
+    return response.model_copy(
+        update={
+            "summary": str(data.get("summary") or response.summary),
+            "explanation": str(data.get("explanation") or response.explanation),
+            "potential_issues": _coerce_list(
+                data.get("potential_issues"), list(response.potential_issues)
+            ),
+            "recommendations": _coerce_list(
+                data.get("recommendations"), list(response.recommendations)
+            ),
+        }
+    )
+
+
+def _legacy_to_blocks(
+    response: AnalysisResponse, config: CopilotConfig | None = None
+) -> dict[str, Any]:
+    """Convert a legacy AnalysisResponse to a multi-block human-friendly response.
+
+    Emits one block per semantic section (assessment badge, summary, explanation,
+    issues, recommendations) so that the frontend can render them separately — e.g.
+    as dedicated cards once richer block types land.
+    """
+    lang_raw = (config.response_language if config else "ja") or "ja"
+    lang = "ja" if lang_raw.startswith("ja") else "en"
+    labels = _SECTION_LABELS[lang]
+
     blocks: list[dict[str, Any]] = []
 
-    # Summary + explanation as text block
-    parts: list[str] = []
-    if response.summary:
-        parts.append(response.summary)
-    if response.explanation:
-        parts.append(response.explanation)
-    if response.potential_issues:
-        parts.append("\n**Potential Issues:**")
-        for issue in response.potential_issues:
-            parts.append(f"- {issue}")
-    if response.recommendations:
-        parts.append("\n**Recommendations:**")
-        for rec in response.recommendations:
-            parts.append(f"- {rec}")
+    def _text_block(content: str) -> None:
+        if content and content.strip():
+            blocks.append({"type": "text", "content": content, "chart": None})
 
-    blocks.append({"type": "text", "content": "\n\n".join(parts), "chart": None})
+    badge = _format_assessment_badge(response.assessment, lang)
+    summary = (response.summary or "").strip()
+    if badge or summary:
+        header = f"### {labels['assessment']}: {badge}" if badge else ""
+        body = summary
+        _text_block("\n\n".join(p for p in (header, body) if p))
+
+    explanation = (response.explanation or "").strip()
+    if explanation and explanation != summary:
+        _text_block(f"**{labels['explanation']}**\n\n{explanation}")
+
+    issues = [i for i in response.potential_issues if i and str(i).strip()]
+    if issues:
+        issue_lines = "\n".join(f"- {issue}" for issue in issues)
+        _text_block(f"**{labels['issues']}**\n\n{issue_lines}")
+
+    recs = [r for r in response.recommendations if r and str(r).strip()]
+    if recs:
+        rec_lines = "\n".join(f"- {rec}" for rec in recs)
+        _text_block(f"**{labels['recommendations']}**\n\n{rec_lines}")
+
+    if not blocks:
+        fallback = explanation or summary or ""
+        blocks.append({"type": "text", "content": fallback, "chart": None})
 
     return {
         "blocks": blocks,
@@ -975,7 +1164,7 @@ def _legacy_to_blocks(response: AnalysisResponse) -> dict[str, Any]:
     }
 
 
-def _parse_blocks_response(content: str) -> dict[str, Any]:
+def _parse_blocks_response(content: str, config: CopilotConfig | None = None) -> dict[str, Any]:
     """Parse LLM response into blocks format dict, with fallback to legacy."""
     text = _strip_code_fences(content)
 
@@ -985,7 +1174,7 @@ def _parse_blocks_response(content: str) -> dict[str, Any]:
             return dict(data)
         # Legacy format returned — convert
         response = AnalysisResponse(**data)
-        return _legacy_to_blocks(response)
+        return _legacy_to_blocks(response, config)
     except (json.JSONDecodeError, ValueError):
         # Plain text fallback
         return {
@@ -994,18 +1183,70 @@ def _parse_blocks_response(content: str) -> dict[str, Any]:
         }
 
 
-def _wrap_chart_executors(
-    tool_executors: ToolExecutors,
-) -> tuple[ToolExecutors, list[dict[str, Any]]]:
-    """Wrap tool executors to intercept chart results from chart-generating tools.
+_STORED_TOOLS: dict[str, Any] = {
+    "get_chip_parameter_timeseries": lambda args: args["parameter_name"],
+    "get_chip_summary": lambda _args: "chip_summary",
+}
 
-    Charts from ``generate_chip_heatmap`` and ``execute_python_analysis`` are
-    collected so they can be injected directly into the blocks response,
-    avoiding the need for the LLM to reproduce large chart JSON.
+
+def _build_llm_summary(full_result: dict[str, Any], data_key: str) -> dict[str, Any]:
+    """Replace list items with schema info and attach data_key.
+
+    The LLM receives only a compact summary (schema + row count) instead of
+    the full dataset, which is stored server-side in ``data_store``.
+    """
+    summary: dict[str, Any] = {}
+    for key, value in full_result.items():
+        if isinstance(value, list):
+            if value and isinstance(value[0], dict):
+                summary[key] = {"_schema": list(value[0].keys()), "_rows": len(value)}
+            else:
+                summary[key] = {"_rows": len(value)}
+        else:
+            summary[key] = value
+    summary["data_key"] = data_key
+    summary["_note"] = (
+        f"Full data available as data['{data_key}'] in execute_python_analysis. "
+        f"Do NOT pass data manually."
+    )
+    return summary
+
+
+def _wrap_tool_executors(
+    tool_executors: ToolExecutors,
+    data_store: dict[str, Any],
+) -> tuple[ToolExecutors, list[dict[str, Any]]]:
+    """Wrap tool executors to handle data store and chart collection.
+
+    - **Stored tools** (``get_chip_parameter_timeseries``, ``get_chip_summary``):
+      full results go to *data_store*; the LLM receives only a summary.
+    - **Heatmap**: chart is collected for direct injection into the response.
+    - **execute_python_analysis**: *data_store* is auto-injected as ``data``;
+      charts are collected.
     """
     collected_charts: list[dict[str, Any]] = []
     wrapped = dict(tool_executors)
 
+    # Stored tools: full data → data_store, summary → LLM
+    for tool_name, key_fn in _STORED_TOOLS.items():
+        original = wrapped.get(tool_name)
+        if original:
+
+            def stored_wrapper(
+                args: dict[str, Any],
+                _orig: Any = original,
+                _kfn: Any = key_fn,
+            ) -> Any:
+                result = _orig(args)
+                if isinstance(result, dict) and "error" not in result:
+                    key = _kfn(args) if callable(_kfn) else _kfn
+                    data_store[key] = result
+                    return _build_llm_summary(result, key)
+                return result
+
+            wrapped[tool_name] = stored_wrapper
+
+    # Heatmap: chart collection
     original_heatmap = wrapped.get("generate_chip_heatmap")
     if original_heatmap:
 
@@ -1025,25 +1266,25 @@ def _wrap_chart_executors(
 
         wrapped["generate_chip_heatmap"] = heatmap_wrapper
 
-    original_python = wrapped.get("execute_python_analysis")
-    if original_python:
+    # execute_python_analysis: data_store auto-injected + chart collection
+    def python_wrapper(args: dict[str, Any]) -> Any:
+        from qdash.api.lib.copilot_sandbox import execute_python_analysis
 
-        def python_wrapper(args: dict[str, Any], _orig: Any = original_python) -> Any:
-            result = _orig(args)
-            if isinstance(result, dict) and result.get("chart"):
-                chart = result["chart"]
-                if isinstance(chart, list):
-                    collected_charts.extend(chart)
-                else:
-                    collected_charts.append(chart)
-                return {
-                    "output": result.get("output", ""),
-                    "chart": None,
-                    "chart_note": "Chart(s) generated. They will be automatically appended to your response.",
-                }
-            return result
+        result = execute_python_analysis(args["code"], data_store)
+        if isinstance(result, dict) and result.get("chart"):
+            chart = result["chart"]
+            if isinstance(chart, list):
+                collected_charts.extend(chart)
+            else:
+                collected_charts.append(chart)
+            return {
+                "output": result.get("output", ""),
+                "chart": None,
+                "chart_note": "Chart(s) generated. They will be automatically appended to your response.",
+            }
+        return result
 
-        wrapped["execute_python_analysis"] = python_wrapper
+    wrapped["execute_python_analysis"] = python_wrapper
 
     return wrapped, collected_charts
 
@@ -1093,7 +1334,11 @@ def _wrap_rate_limited_executors(tool_executors: ToolExecutors) -> ToolExecutors
 
 
 def _sanitize_nan(obj: Any) -> Any:
-    """Recursively replace NaN/Inf float values with None for valid JSON."""
+    """Recursively replace NaN/Inf float values with None for valid JSON.
+
+    Preserves non-primitive types (e.g. numpy arrays) so that Plotly
+    chart specs remain valid.
+    """
     if isinstance(obj, float) and (math.isnan(obj) or math.isinf(obj)):
         return None
     if isinstance(obj, dict):
@@ -1210,6 +1455,12 @@ async def _run_responses_api(
                 else:
                     try:
                         tool_result = executor(args)
+                    except KeyError as e:
+                        logger.warning("Tool %s missing required argument: %s", fc.name, e)
+                        tool_result = {
+                            "error": f"Missing required argument: {e}. "
+                            f"Please provide all required parameters."
+                        }
                     except Exception as e:
                         logger.warning("Tool %s execution failed: %s", fc.name, e)
                         tool_result = {"error": str(e)}
@@ -1371,6 +1622,13 @@ async def run_analysis(
         Blocks-format response: {"blocks": [...], "assessment": ...}
 
     """
+    # Allow a dedicated analysis model (e.g. calibration-specialized LLM) to
+    # override the general chat model for task result analysis. Keep a
+    # reference to the original general model so we can use it for post-
+    # processing (e.g. translation to the user's response language).
+    general_model = config.model
+    if config.analysis_model is not None:
+        config = config.model_copy(update={"model": config.analysis_model})
     client = _build_client(config)
     provider = config.model.provider
 
@@ -1392,7 +1650,18 @@ async def run_analysis(
         content = await _run_chat_completions(client, messages, config)
         # Ollama still uses legacy schema; convert to blocks
         response = _parse_response(content)
-        return _legacy_to_blocks(response)
+        # Calibration-specialized models often ignore language instructions and
+        # reply in English. If the user expects a different language, translate
+        # the free-form fields via the general (frontier) model.
+        target_lang = (config.response_language or "en").lower()
+        should_translate = (
+            target_lang != "en"
+            and general_model.provider != "ollama"
+            and general_model is not config.model
+        )
+        if should_translate:
+            response = await _translate_analysis_response(response, target_lang, general_model)
+        return _legacy_to_blocks(response, config)
     else:
         # OpenAI: use Responses API with blocks schema (strict: False for flexible chart objects)
         system_prompt = (
@@ -1408,11 +1677,12 @@ async def run_analysis(
             user_message, image_base64, conversation_history, expected_images
         )
 
-        # Wrap chart-generating tools to collect charts for direct injection
+        # Wrap tools: data store + chart collection + rate limiting
         if tool_executors:
             wrapped_executors: ToolExecutors | None = None
+            data_store: dict[str, Any] = {}
             rate_limited = _wrap_rate_limited_executors(tool_executors)
-            wrapped_executors, collected_charts = _wrap_chart_executors(rate_limited)
+            wrapped_executors, collected_charts = _wrap_tool_executors(rate_limited, data_store)
         else:
             wrapped_executors, collected_charts = None, []
 
@@ -1427,7 +1697,7 @@ async def run_analysis(
             on_tool_call=on_tool_call,
             on_status=on_status,
         )
-        return _inject_collected_charts(_parse_blocks_response(content), collected_charts)
+        return _inject_collected_charts(_parse_blocks_response(content, config), collected_charts)
 
 
 def blocks_to_markdown(result: dict[str, Any]) -> str:
@@ -1460,6 +1730,12 @@ CHAT_SYSTEM_PROMPT = """\
 You are an expert in superconducting qubit calibration.
 You analyze calibration results for fixed-frequency transmon qubits
 on a square-lattice chip with fixed couplers.
+
+Tool results are returned in JSON format.
+Some tools (get_chip_parameter_timeseries, get_chip_summary) store full data
+server-side and return only a summary with a `data_key` field.
+In execute_python_analysis, access stored data via data["<data_key>"]
+(e.g., data["t1"]). Do NOT pass context_data manually.
 
 Your role:
 - Answer questions about qubit calibration data and parameters
@@ -1512,11 +1788,14 @@ When showing data trends, create charts using the blocks response format.
 ## Using execute_python_analysis
 
 For complex analysis (correlations, statistics, distributions, fitting), use execute_python_analysis:
-1. First, retrieve data using get_qubit_params, get_parameter_timeseries, etc.
-2. Then call execute_python_analysis with:
-   - "code": Python code that uses 'data' variable to access context_data
-   - "context_data": Pass the retrieved data as a dict
-3. Available libraries: numpy, pandas, scipy, scipy.stats, plotly (graph_objects, express, subplots), math, statistics, json, datetime, collections
+1. First, retrieve data using get_chip_parameter_timeseries, get_chip_summary, etc.
+   These "stored" tools save full data server-side and return a summary with a `data_key`.
+2. Then call execute_python_analysis with only "code" — NO context_data needed.
+   Stored data is automatically available as `data["<data_key>"]`.
+   For example, after calling get_chip_parameter_timeseries for "t1":
+   - `data["t1"]["timeseries"]` contains the full timeseries list
+   - `data["t1"]["qubits"]` contains per-qubit stats
+3. Available libraries: numpy, pandas, scipy, scipy.stats, plotly (graph_objects, express, subplots), math, statistics, json, datetime, collections, io.
 4. In the code, set a 'result' variable:
    ```python
    result = {
@@ -1560,7 +1839,7 @@ When you analyse data, ALWAYS provide evidence with your conclusions:
    | 0     | 45.2   | stable | 43.1 | 46.0 |
    | 1     | 38.7   | decreasing | 37.5 | 42.3 |
 
-2. **Charts**: Use execute_python_analysis to create Plotly charts for visual evidence — bar charts comparing qubits, scatter plots for trends, histograms for distributions, etc. Pass the data from previous tool calls via context_data.
+2. **Charts**: Use execute_python_analysis to create Plotly charts for visual evidence — bar charts comparing qubits, scatter plots for trends, histograms for distributions, etc. Stored tool data is automatically available as data["<data_key>"].
 
 3. **Statistics**: Always report chip-wide statistics (mean, median, stdev, min, max) returned by tools. Highlight outliers (values > 2 stdev from mean).
 
@@ -1654,15 +1933,16 @@ async def run_chat(
         )
         content = await _run_chat_completions(client, messages, config)
         response = _parse_response(content)
-        return _legacy_to_blocks(response)
+        return _legacy_to_blocks(response, config)
     else:
         input_items = _build_input(user_message, image_base64, conversation_history)
 
-        # Wrap chart-generating tools to collect charts for direct injection
+        # Wrap tools: data store + chart collection + rate limiting
         if tool_executors:
             wrapped_executors: ToolExecutors | None = None
+            data_store: dict[str, Any] = {}
             rate_limited = _wrap_rate_limited_executors(tool_executors)
-            wrapped_executors, collected_charts = _wrap_chart_executors(rate_limited)
+            wrapped_executors, collected_charts = _wrap_tool_executors(rate_limited, data_store)
         else:
             wrapped_executors, collected_charts = None, []
 
@@ -1677,4 +1957,4 @@ async def run_chat(
             on_tool_call=on_tool_call,
             on_status=on_status,
         )
-        return _inject_collected_charts(_parse_blocks_response(content), collected_charts)
+        return _inject_collected_charts(_parse_blocks_response(content, config), collected_charts)

@@ -10,8 +10,9 @@ import {
 } from "react";
 
 import { themeChange } from "theme-change";
+import type { ThemeName } from "@/constants/themes";
 
-type Theme = string; // Allow all daisyUI themes
+type Theme = ThemeName;
 
 interface ThemeContextProps {
   theme: Theme;
@@ -42,13 +43,13 @@ function getActualTheme(baseTheme: string, isDev: boolean): string {
 }
 
 // Get base theme name from dev-specific theme
-function getBaseTheme(actualTheme: string): string {
+function getBaseTheme(actualTheme: string): Theme {
   for (const [base, dev] of Object.entries(DEV_THEME_MAP)) {
     if (actualTheme === dev) {
-      return base;
+      return base as Theme;
     }
   }
-  return actualTheme;
+  return actualTheme as Theme;
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {

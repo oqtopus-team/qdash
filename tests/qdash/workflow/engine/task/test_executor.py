@@ -17,6 +17,7 @@ from qdash.workflow.engine.task.types import TaskExecutionError, TaskProtocol
 class MockTask:
     """Mock task for testing."""
 
+    input_parameters: ClassVar[dict[str, Any]] = {}
     run_parameters: ClassVar[dict[str, Any]] = {}
 
     def __init__(
@@ -30,7 +31,6 @@ class MockTask:
         self._task_type = task_type
         self.r2_threshold = r2_threshold
         self.backend = backend
-        self.input_parameters: dict[str, Any] = {}
 
     def get_name(self) -> str:
         return self.name
@@ -252,6 +252,24 @@ class TestTaskExecutorExecuteTask:
         session: Any = MockSession()
 
         with pytest.raises(FidelityValidationError, match="Fidelity exceeds 100%"):
+            executor.execute_task(task, session, "0")
+
+        mock_state_manager.update_task_status_to_failed.assert_called_once()
+
+    def test_execute_task_raises_value_error_on_validate_fidelity_failure(
+        self,
+        executor: TaskExecutor,
+        mock_result_processor: MagicMock,
+        mock_state_manager: MagicMock,
+    ) -> None:
+        """Test execute_task converts FidelityValidationError from validate_fidelity to ValueError."""
+        mock_result_processor.validate_fidelity.side_effect = FidelityValidationError(
+            "Fidelity exceeds 100%"
+        )
+        task = MockTask()
+        session: Any = MockSession()
+
+        with pytest.raises(ValueError, match="Fidelity exceeds 100%"):
             executor.execute_task(task, session, "0")
 
         mock_state_manager.update_task_status_to_failed.assert_called_once()
@@ -689,8 +707,8 @@ class TestSnapshotOverrides:
         result = executor.execute_task(task, session, "0")
 
         assert result["success"] is True
-        # Snapshot should have been queried (called twice: before and after preprocess)
-        assert mock_snapshot_loader.get_snapshot.call_count == 2
+        # Snapshot should have been queried once (before preprocess in step 1.5)
+        assert mock_snapshot_loader.get_snapshot.call_count == 1
 
     def test_execute_without_snapshot_loader_skips_overrides(
         self, mock_state_manager: MagicMock

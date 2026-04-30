@@ -51,7 +51,7 @@ describe("type exports", () => {
   });
 
   it("ProvenanceTab accepts valid values", () => {
-    const values: ProvenanceTab[] = ["history", "lineage", "compare", "seeds"];
-    expect(values).toHaveLength(4);
+    const values: ProvenanceTab[] = ["history", "lineage", "compare"];
+    expect(values).toHaveLength(3);
   });
 });
