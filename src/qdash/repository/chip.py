@@ -375,6 +375,10 @@ class MongoChipRepository:
                     "chip_id": doc.chip_id,
                     "status": doc.status,
                     "data": doc.data,
+                    "note": doc.note.model_dump(mode="json"),
+                    "metric_notes": {
+                        k: v.model_dump(mode="json") for k, v in doc.metric_notes.items()
+                    },
                 }
                 for doc in docs
             ],
@@ -409,6 +413,8 @@ class MongoChipRepository:
             "chip_id": doc.chip_id,
             "status": doc.status,
             "data": doc.data,
+            "note": doc.note.model_dump(mode="json"),
+            "metric_notes": {k: v.model_dump(mode="json") for k, v in doc.metric_notes.items()},
         }
 
     def list_couplings(
@@ -449,6 +455,10 @@ class MongoChipRepository:
                     "chip_id": doc.chip_id,
                     "status": doc.status,
                     "data": doc.data,
+                    "note": doc.note.model_dump(mode="json"),
+                    "metric_notes": {
+                        k: v.model_dump(mode="json") for k, v in doc.metric_notes.items()
+                    },
                 }
                 for doc in docs
             ],
@@ -485,6 +495,8 @@ class MongoChipRepository:
             "chip_id": doc.chip_id,
             "status": doc.status,
             "data": doc.data,
+            "note": doc.note.model_dump(mode="json"),
+            "metric_notes": {k: v.model_dump(mode="json") for k, v in doc.metric_notes.items()},
         }
 
     def aggregate_metrics_summary(

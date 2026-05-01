@@ -17,6 +17,7 @@ from qdash.repository.execution_lock import MongoExecutionLockRepository
 # Filesystem implementations
 from qdash.repository.filesystem import FilesystemCalibDataSaver
 from qdash.repository.flow import MongoFlowRepository
+from qdash.repository.note_event import MongoNoteEventRepository
 from qdash.repository.project import MongoProjectRepository
 from qdash.repository.project_membership import MongoProjectMembershipRepository
 from qdash.repository.protocols import (
@@ -70,6 +71,7 @@ __all__ = [
     "MongoExecutionCounterRepository",
     "MongoExecutionHistoryRepository",
     "MongoExecutionLockRepository",
+    "MongoNoteEventRepository",
     "MongoExecutionRepository",
     "MongoFlowRepository",
     "MongoProjectRepository",

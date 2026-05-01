@@ -6,6 +6,7 @@ from pydantic import ConfigDict, Field, field_validator
 from pymongo import ASCENDING, DESCENDING, IndexModel
 from qdash.common.datetime_utils import ensure_timezone, parse_elapsed_time
 from qdash.datamodel.execution import ExecutionModel
+from qdash.datamodel.note import NoteModel
 from qdash.datamodel.system_info import SystemInfoModel
 from qdash.datamodel.task import BaseTaskResultModel
 
@@ -44,6 +45,12 @@ class TaskResultHistoryDocument(Document):
     output_parameter_names: list[str] = Field(..., description="The output parameter names")
     run_parameters: dict[str, Any] = Field(default_factory=dict, description="The run parameters")
     note: dict[str, Any] = Field(..., description="The note")
+    # NOTE: ``note`` above is the workflow's calibration metadata.
+    # ``user_note`` is the dashboard-facing free-form note attached to this task result.
+    user_note: NoteModel = Field(
+        default_factory=NoteModel,
+        description="Free-form user note attached to this task result (dashboard)",
+    )
     figure_path: list[str] = Field(..., description="The path to the figure")
     json_figure_path: list[str] = Field([], description="The path to the JSON figure")
     raw_data_path: list[str] = Field([], description="The path to the raw data")
@@ -145,6 +152,19 @@ class TaskResultHistoryDocument(Document):
             IndexModel(
                 [("project_id", ASCENDING), ("source_task_id", ASCENDING)],
                 sparse=True,
+            ),
+            # Partial sparse index for the dashboard notes summary so we don't
+            # scan all task results to find the few that have user notes.
+            IndexModel(
+                [
+                    ("project_id", ASCENDING),
+                    ("chip_id", ASCENDING),
+                    ("user_note.updated_at", DESCENDING),
+                ],
+                name="project_chip_user_note_idx",
+                # Mongo partial filters don't allow $ne, so use $type to match
+                # docs whose user_note.updated_at is an actual date (i.e. set).
+                partialFilterExpression={"user_note.updated_at": {"$type": "date"}},
             ),
         ]
 

@@ -24,6 +24,7 @@ from qdash.api.services.issue_knowledge_service import IssueKnowledgeService
 from qdash.api.services.issue_service import IssueService
 from qdash.api.services.manual_update_service import ManualUpdateService
 from qdash.api.services.metrics_service import MetricsService
+from qdash.api.services.note_service import NoteService
 from qdash.api.services.project_service import ProjectService
 from qdash.api.services.provenance_service import ProvenanceService
 from qdash.api.services.seed_import_service import SeedImportService
@@ -302,6 +303,12 @@ def get_task_service() -> TaskService:
     return TaskService(
         task_definition_repository=get_task_definition_repository(),
     )
+
+
+@lru_cache(maxsize=1)
+def get_note_service() -> NoteService:
+    """Get the unified note service instance."""
+    return NoteService()
 
 
 @lru_cache(maxsize=1)

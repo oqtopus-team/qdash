@@ -18,6 +18,7 @@ import {
   Files,
   GitBranch,
   Inbox,
+  LayoutDashboard,
   LayoutGrid,
   ListTodo,
   LogOut,
@@ -173,6 +174,23 @@ export function Sidebar() {
           >
             <Inbox size={18} />
             {(isOpen || isMobileOpen) && <span className="ml-2">Inbox</span>}
+          </Link>
+        </li>
+        <li>
+          <Link
+            href="/dashboard"
+            className={
+              isMobileOpen
+                ? linkClass(isActive("/dashboard"))
+                : desktopLinkClass(isActive("/dashboard"))
+            }
+            title="Dashboard"
+            onClick={handleLinkClick}
+          >
+            <LayoutDashboard size={18} />
+            {(isOpen || isMobileOpen) && (
+              <span className="ml-2">Dashboard</span>
+            )}
           </Link>
         </li>
         <li>

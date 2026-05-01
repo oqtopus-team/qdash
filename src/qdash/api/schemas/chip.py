@@ -3,8 +3,9 @@
 from datetime import datetime, timedelta
 from typing import Any
 
-from pydantic import BaseModel, field_serializer, field_validator
+from pydantic import BaseModel, Field, field_serializer, field_validator
 from qdash.common.datetime_utils import format_elapsed_time, parse_elapsed_time
+from qdash.datamodel.note import NoteModel
 
 
 class ChipResponse(BaseModel):
@@ -115,6 +116,8 @@ class QubitResponse(BaseModel):
     chip_id: str
     status: str = "pending"
     data: dict[str, Any] = {}
+    note: NoteModel = Field(default_factory=NoteModel)
+    metric_notes: dict[str, NoteModel] = Field(default_factory=dict)
 
 
 class ListQubitsResponse(BaseModel):
@@ -133,6 +136,8 @@ class CouplingResponse(BaseModel):
     chip_id: str
     status: str = "pending"
     data: dict[str, Any] = {}
+    note: NoteModel = Field(default_factory=NoteModel)
+    metric_notes: dict[str, NoteModel] = Field(default_factory=dict)
 
 
 class ListCouplingsResponse(BaseModel):
