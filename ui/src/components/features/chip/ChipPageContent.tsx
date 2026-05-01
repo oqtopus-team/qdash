@@ -9,6 +9,7 @@ import { formatDateTime } from "@/lib/utils/datetime";
 
 import { CouplingGrid } from "./CouplingGrid";
 import { TaskResultGrid } from "./TaskResultGrid";
+import { ChipManageModal } from "./ChipManageModal";
 import { CreateChipModal } from "./modals/CreateChipModal";
 
 import type { Task, MuxDetailResponseDetail, TaskInfo } from "@/schemas";
@@ -104,6 +105,7 @@ export function ChipPageContent() {
   const [selectedTaskInfo, setSelectedTaskInfo] =
     useState<SelectedTaskInfo | null>(null);
   const [isCreateChipModalOpen, setIsCreateChipModalOpen] = useState(false);
+  const [isManageChipModalOpen, setIsManageChipModalOpen] = useState(false);
 
   // Track previous date to distinguish modal navigation from external navigation
   const [previousDate, setPreviousDate] = useState(selectedDate);
@@ -355,26 +357,37 @@ export function ChipPageContent() {
             description="View calibration tasks and qubit results"
             actions={
               canEdit && (
-                <button
-                  className="btn btn-primary btn-sm w-fit"
-                  onClick={() => setIsCreateChipModalOpen(true)}
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-5 w-5"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
+                <div className="flex items-center gap-2 w-fit">
+                  {selectedChip && (
+                    <button
+                      className="btn btn-ghost btn-sm w-fit"
+                      onClick={() => setIsManageChipModalOpen(true)}
+                      title="Edit chip metadata or delete this chip"
+                    >
+                      Manage
+                    </button>
+                  )}
+                  <button
+                    className="btn btn-primary btn-sm w-fit"
+                    onClick={() => setIsCreateChipModalOpen(true)}
                   >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 4v16m8-8H4"
-                    />
-                  </svg>
-                  Create Chip
-                </button>
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-5 w-5"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 4v16m8-8H4"
+                      />
+                    </svg>
+                    Create Chip
+                  </button>
+                </div>
               )
             }
             className="mb-0"
@@ -703,6 +716,15 @@ export function ChipPageContent() {
           setSelectedChip(chipId);
         }}
       />
+
+      {/* Manage Chip Modal */}
+      {isManageChipModalOpen && selectedChip && (
+        <ChipManageModal
+          chipId={selectedChip}
+          onClose={() => setIsManageChipModalOpen(false)}
+          onDeleted={() => setSelectedChip("")}
+        />
+      )}
     </PageContainer>
   );
 }

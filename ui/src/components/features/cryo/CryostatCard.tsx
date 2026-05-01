@@ -7,7 +7,6 @@ import {
   ChevronDown,
   ChevronRight,
   Plus,
-  Snowflake,
   Trash2,
   X,
 } from "lucide-react";
@@ -128,7 +127,6 @@ export function CryostatCard({
           ) : (
             <ChevronRight className="h-4 w-4 flex-shrink-0" />
           )}
-          <Snowflake className="h-6 w-6 text-info flex-shrink-0" />
           <div className="min-w-0 flex-1">
             <div className="flex items-baseline gap-2 flex-wrap">
               <span className="font-bold text-lg">{cryo.cryo_id}</span>
@@ -150,7 +148,7 @@ export function CryostatCard({
               </span>
             </div>
             <div className="text-xs text-base-content/60 mt-0.5 flex flex-wrap gap-x-3">
-              {cryo.location && <span>📍 {cryo.location}</span>}
+              {cryo.location && <span>{cryo.location}</span>}
               <span>
                 {stats.totalCooldowns} cool-down
                 {stats.totalCooldowns !== 1 ? "s" : ""}

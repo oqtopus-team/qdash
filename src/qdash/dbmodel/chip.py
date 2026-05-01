@@ -5,6 +5,7 @@ from bunnet import Document
 from pydantic import ConfigDict, Field
 from pymongo import ASCENDING, DESCENDING, IndexModel
 from qdash.common.datetime_utils import now
+from qdash.datamodel.note import NoteModel
 from qdash.datamodel.system_info import SystemInfoModel
 
 
@@ -42,6 +43,10 @@ class ChipDocument(Document):
     installed_at: datetime = Field(
         default_factory=now,
         description="The time when the chip was installed",
+    )
+    note: NoteModel = Field(
+        default_factory=NoteModel,
+        description="Free-form user note attached to this chip",
     )
 
     system_info: SystemInfoModel = Field(..., description="The system information")
