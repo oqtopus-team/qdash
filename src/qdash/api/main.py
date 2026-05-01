@@ -11,7 +11,9 @@ from qdash.api.routers import (
     calibration,
     chip,
     config,
+    cooldown,
     copilot,
+    cryostat,
     device_topology,
     execution,
     file,
@@ -19,6 +21,7 @@ from qdash.api.routers import (
     issue,
     issue_knowledge,
     metrics,
+    note,
     project,
     provenance,
     settings,
@@ -114,6 +117,9 @@ app.include_router(flow.router, tags=["flow"], dependencies=auth_dependency)
 app.include_router(
     metrics.router, prefix="/metrics", tags=["metrics"], dependencies=auth_dependency
 )
+app.include_router(note.router, tags=["note"], dependencies=auth_dependency)
+app.include_router(cryostat.router, tags=["cryostat"], dependencies=auth_dependency)
+app.include_router(cooldown.router, tags=["cooldown"], dependencies=auth_dependency)
 app.include_router(
     topology.router, prefix="/topology", tags=["topology"], dependencies=auth_dependency
 )

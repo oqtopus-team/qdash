@@ -16,6 +16,7 @@ import { useListChips, useGetChip } from "@/client/chip/chip";
 import { useGetChipMetrics } from "@/client/metrics/metrics";
 import { QuantumLoader } from "@/components/ui/QuantumLoader";
 import { ChipSelector } from "@/components/selectors/ChipSelector";
+import { CooldownSelector } from "@/components/selectors/CooldownSelector";
 import { PageContainer } from "@/components/ui/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { MetricsPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
@@ -415,6 +416,23 @@ export function MetricsPageContent() {
                 <ChipSelector
                   selectedChip={selectedChip}
                   onChipSelect={setSelectedChip}
+                />
+              </PageFiltersBar.Item>
+
+              <PageFiltersBar.Item>
+                <CooldownSelector
+                  chipId={selectedChip}
+                  onPick={(cd) => {
+                    setRangeMode("absolute");
+                    setStartDate(
+                      new Date(cd.started_at).toISOString().slice(0, 10),
+                    );
+                    setEndDate(
+                      cd.ended_at
+                        ? new Date(cd.ended_at).toISOString().slice(0, 10)
+                        : new Date().toISOString().slice(0, 10),
+                    );
+                  }}
                 />
               </PageFiltersBar.Item>
 

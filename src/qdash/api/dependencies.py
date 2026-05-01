@@ -16,7 +16,9 @@ from qdash.api.services.auth_service import AuthService
 from qdash.api.services.calibration_service import CalibrationService
 from qdash.api.services.chip_service import ChipService
 from qdash.api.services.config_service import ConfigService
+from qdash.api.services.cooldown_service import CooldownService
 from qdash.api.services.copilot_data_service import CopilotDataService
+from qdash.api.services.cryostat_service import CryostatService
 from qdash.api.services.device_topology_service import DeviceTopologyService
 from qdash.api.services.execution_service import ExecutionService
 from qdash.api.services.file_service import FileService
@@ -24,6 +26,7 @@ from qdash.api.services.issue_knowledge_service import IssueKnowledgeService
 from qdash.api.services.issue_service import IssueService
 from qdash.api.services.manual_update_service import ManualUpdateService
 from qdash.api.services.metrics_service import MetricsService
+from qdash.api.services.note_service import NoteService
 from qdash.api.services.project_service import ProjectService
 from qdash.api.services.provenance_service import ProvenanceService
 from qdash.api.services.seed_import_service import SeedImportService
@@ -41,6 +44,8 @@ from qdash.repository import (
 )
 from qdash.repository.backend import MongoBackendRepository
 from qdash.repository.calibration_note import MongoCalibrationNoteRepository
+from qdash.repository.cooldown import MongoCooldownRepository
+from qdash.repository.cryostat import MongoCryostatRepository
 from qdash.repository.execution_history import MongoExecutionHistoryRepository
 from qdash.repository.execution_lock import MongoExecutionLockRepository
 from qdash.repository.provenance import (
@@ -301,6 +306,39 @@ def get_task_service() -> TaskService:
     """Get the task service instance."""
     return TaskService(
         task_definition_repository=get_task_definition_repository(),
+    )
+
+
+@lru_cache(maxsize=1)
+def get_note_service() -> NoteService:
+    """Get the unified note service instance."""
+    return NoteService()
+
+
+@lru_cache(maxsize=1)
+def get_cryostat_repository() -> MongoCryostatRepository:
+    """Get the cryostat repository instance."""
+    return MongoCryostatRepository()
+
+
+@lru_cache(maxsize=1)
+def get_cryostat_service() -> CryostatService:
+    """Get the cryostat service instance."""
+    return CryostatService(cryostat_repository=get_cryostat_repository())
+
+
+@lru_cache(maxsize=1)
+def get_cooldown_repository() -> MongoCooldownRepository:
+    """Get the cool-down repository instance."""
+    return MongoCooldownRepository()
+
+
+@lru_cache(maxsize=1)
+def get_cooldown_service() -> CooldownService:
+    """Get the cool-down service instance."""
+    return CooldownService(
+        cooldown_repository=get_cooldown_repository(),
+        cryostat_repository=get_cryostat_repository(),
     )
 
 

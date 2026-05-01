@@ -47,7 +47,10 @@
       "WebFetch(domain:github.com)",
       "mcp__context7__resolve-library-id",
       "mcp__context7__query-docs",
-      "WebFetch(domain:vercel.com)"
+      "WebFetch(domain:vercel.com)",
+      "Bash(bunx tsc *)",
+      "Bash(bunx prettier *)",
+      "Bash(bunx eslint *)"
     ],
     "deny": []
   },

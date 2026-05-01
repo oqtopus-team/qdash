@@ -29,6 +29,12 @@ class QubitHistoryDocument(Document):
     status: str = Field(..., description="The status of the qubit")
     chip_id: str = Field(..., description="The chip ID")
     data: dict[str, Any] = Field(..., description="The data of the qubit")
+    cooldown_id: str = Field(
+        default="",
+        description=(
+            "Cool-down cycle this snapshot belongs to (denormalized from chip.current_cooldown_id)."
+        ),
+    )
     system_info: SystemInfoModel = Field(..., description="The system information")
     recorded_date: str = Field(
         default_factory=lambda: now().strftime("%Y%m%d"),
@@ -60,9 +66,22 @@ class QubitHistoryDocument(Document):
         ]
 
     @classmethod
+    def _resolve_cooldown_id(cls, *, project_id: str | None, chip_id: str | None) -> str:
+        """Look up the chip's current_cooldown_id at write time."""
+        if not project_id or not chip_id:
+            return ""
+        from qdash.dbmodel.chip import ChipDocument
+
+        chip = ChipDocument.find_one({"project_id": project_id, "chip_id": chip_id}).run()
+        if chip is None:
+            return ""
+        return getattr(chip, "current_cooldown_id", None) or ""
+
+    @classmethod
     def create_history(cls, qubit: QubitModel) -> "QubitHistoryDocument":
         """Create a history record from a QubitDocument."""
         today = now().strftime("%Y%m%d")
+        cooldown_id = cls._resolve_cooldown_id(project_id=qubit.project_id, chip_id=qubit.chip_id)
         existing_history = cls.find_one(
             {
                 "project_id": qubit.project_id,
@@ -76,6 +95,7 @@ class QubitHistoryDocument(Document):
             history = existing_history
             history.data = qubit.data
             history.status = qubit.status
+            history.cooldown_id = cooldown_id
         else:
             # Create a new history record
             history = cls(
@@ -85,6 +105,7 @@ class QubitHistoryDocument(Document):
                 status=qubit.status,
                 chip_id=qubit.chip_id,
                 data=qubit.data,
+                cooldown_id=cooldown_id,
                 system_info=SystemInfoModel(),
             )
         history.save()

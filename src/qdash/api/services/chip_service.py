@@ -321,6 +321,7 @@ class ChipService:
                 qubit_count=s.get("qubit_count", 0),
                 coupling_count=s.get("coupling_count", 0),
                 installed_at=s.get("installed_at"),
+                current_cooldown_id=s.get("current_cooldown_id"),
             )
             for s in summaries
         ]
@@ -351,6 +352,7 @@ class ChipService:
             qubit_count=summary.get("qubit_count", 0),
             coupling_count=summary.get("coupling_count", 0),
             installed_at=summary.get("installed_at"),
+            current_cooldown_id=summary.get("current_cooldown_id"),
         )
 
     def list_qubits(
@@ -391,11 +393,15 @@ class ChipService:
         )
         return (
             [
-                QubitResponse(
-                    qid=q["qid"],
-                    chip_id=q["chip_id"],
-                    status=q.get("status", "pending"),
-                    data=q.get("data", {}),
+                QubitResponse.model_validate(
+                    {
+                        "qid": q["qid"],
+                        "chip_id": q["chip_id"],
+                        "status": q.get("status", "pending"),
+                        "data": q.get("data", {}),
+                        "note": q.get("note") or {},
+                        "metric_notes": q.get("metric_notes") or {},
+                    }
                 )
                 for q in qubits
             ],
@@ -423,11 +429,15 @@ class ChipService:
         qubit = self._chip_repo.find_qubit(project_id, chip_id, qid)
         if qubit is None:
             return None
-        return QubitResponse(
-            qid=qubit["qid"],
-            chip_id=qubit["chip_id"],
-            status=qubit.get("status", "pending"),
-            data=qubit.get("data", {}),
+        return QubitResponse.model_validate(
+            {
+                "qid": qubit["qid"],
+                "chip_id": qubit["chip_id"],
+                "status": qubit.get("status", "pending"),
+                "data": qubit.get("data", {}),
+                "note": qubit.get("note") or {},
+                "metric_notes": qubit.get("metric_notes") or {},
+            }
         )
 
     def list_couplings(
@@ -464,11 +474,15 @@ class ChipService:
         )
         return (
             [
-                CouplingResponse(
-                    qid=c["qid"],
-                    chip_id=c["chip_id"],
-                    status=c.get("status", "pending"),
-                    data=c.get("data", {}),
+                CouplingResponse.model_validate(
+                    {
+                        "qid": c["qid"],
+                        "chip_id": c["chip_id"],
+                        "status": c.get("status", "pending"),
+                        "data": c.get("data", {}),
+                        "note": c.get("note") or {},
+                        "metric_notes": c.get("metric_notes") or {},
+                    }
                 )
                 for c in couplings
             ],
@@ -498,11 +512,15 @@ class ChipService:
         coupling = self._chip_repo.find_coupling(project_id, chip_id, coupling_id)
         if coupling is None:
             return None
-        return CouplingResponse(
-            qid=coupling["qid"],
-            chip_id=coupling["chip_id"],
-            status=coupling.get("status", "pending"),
-            data=coupling.get("data", {}),
+        return CouplingResponse.model_validate(
+            {
+                "qid": coupling["qid"],
+                "chip_id": coupling["chip_id"],
+                "status": coupling.get("status", "pending"),
+                "data": coupling.get("data", {}),
+                "note": coupling.get("note") or {},
+                "metric_notes": coupling.get("metric_notes") or {},
+            }
         )
 
     def get_metrics_summary(self, project_id: str, chip_id: str) -> MetricsSummaryResponse | None:

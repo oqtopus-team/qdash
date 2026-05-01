@@ -22,6 +22,7 @@ import { useManualOverrides } from "@/hooks/useManualOverrides";
 
 import { ParametersTable } from "./ParametersTable";
 import { TaskResultIssues } from "./TaskResultIssues";
+import { TaskResultMemo } from "./TaskResultMemo";
 import type { AnalysisContext } from "@/hooks/useAnalysisChat";
 import type { MetricHistoryItem } from "./MetricHistoryView";
 import { useAnalysisChatContext } from "@/contexts/AnalysisChatContext";
@@ -642,6 +643,11 @@ export function QubitMetricHistoryModal({
               />
             )}
         </div>
+      )}
+
+      {/* Memo (above issues) */}
+      {selectedTask?.task_id && (
+        <TaskResultMemo taskId={selectedTask.task_id} chipId={chipId} />
       )}
 
       {/* Issues */}
