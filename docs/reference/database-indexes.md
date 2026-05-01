@@ -133,6 +133,15 @@ db.task_result_history.create_index([("project_id", 1), ("chip_id", 1), ("start_
 db.task_result_history.create_index([
     ("project_id", 1), ("chip_id", 1), ("name", 1), ("qid", 1), ("start_at", -1)
 ])  # Latest task result queries
+
+# Partial sparse index for the dashboard notes summary — only indexes rows
+# that have a user note, so chip_notes_summary doesn't scan the entire
+# task_result_history collection.
+db.task_result_history.create_index(
+    [("project_id", 1), ("chip_id", 1), ("user_note.updated_at", -1)],
+    name="project_chip_user_note_idx",
+    partialFilterExpression={"user_note.updated_at": {"$type": "date"}},
+)
 ```
 
 **Usage**: Used by `ExecutionService._fetch_tasks_for_execution()` for retrieving tasks by execution
@@ -145,6 +154,32 @@ TaskResultHistoryDocument.find({
     "execution_id": execution_id,
 }).sort([("start_at", ASCENDING)])
 ```
+
+### NoteEventDocument
+
+Append-only audit log for every note edit (qubit / coupling / metric / task). Powers the per-chip timeline, per-target timeline, and full-text knowledge search.
+
+```python
+db.note_event.create_index(
+    [("project_id", 1), ("chip_id", 1), ("created_at", -1)],
+    name="chip_chrono_idx",
+)
+db.note_event.create_index(
+    [("project_id", 1), ("scope", 1), ("target_id", 1), ("created_at", -1)],
+    name="target_chrono_idx",
+)
+db.note_event.create_index(
+    [("content", "text")],
+    name="content_text_idx",
+    default_language="english",
+)
+```
+
+**Usage**: Written by `NoteService` on every upsert/delete. Read by:
+
+- `GET /chips/{chip_id}/note-events` — chip timeline
+- `GET /note-events/by-target?scope=&target_id=` — per-target timeline
+- `GET /note-events/search?q=` — cross-chip text search
 
 ## Performance Impact
 

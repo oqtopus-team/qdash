@@ -92,6 +92,10 @@ export default withMermaid(
               text: "Projects and Sharing",
               link: "/user-guide/projects-and-sharing",
             },
+            {
+              text: "Dashboard",
+              link: "/user-guide/dashboard",
+            },
           ],
         },
         {
@@ -187,6 +191,7 @@ export default withMermaid(
               text: "Square Lattice",
               link: "/architecture/square-lattice-topology",
             },
+            { text: "Notes", link: "/architecture/notes" },
           ],
         },
         {

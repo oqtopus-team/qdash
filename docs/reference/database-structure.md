@@ -25,8 +25,9 @@ QDash uses MongoDB via the Bunnet ODM with a project-centric multi-tenant model.
 | `tag`                 | TagDocument               | Project-level tag management                    |
 | `execution_lock`      | ExecutionLockDocument     | Exclusive execution lock                        |
 | `execution_counter`   | ExecutionCounterDocument  | Execution ID counter                            |
-| `calibration_note`    | CalibrationNoteDocument   | Calibration notes                               |
+| `calibration_note`    | CalibrationNoteDocument   | Calibration notes (workflow internal)           |
 | `flows`               | FlowDocument              | User-defined flows                              |
+| `note_event`          | NoteEventDocument         | Audit log for every note edit (write-through)   |
 
 ---
 
@@ -41,6 +42,23 @@ class SystemInfoModel(BaseModel):
     created_at: str  # ISO8601 timestamp (Asia/Tokyo)
     updated_at: str  # ISO8601 timestamp (Asia/Tokyo)
 ```
+
+---
+
+### NoteModel
+
+Free-form note attached to a model (qubit, coupling, task result). Embedded
+inline on the parent document; an audit row is also written to `note_event`
+on every edit.
+
+```python
+class NoteModel(BaseModel):
+    content: str = ""              # Free-form text
+    updated_by: str = ""           # Username of the last editor
+    updated_at: datetime | None = None  # None until first set
+```
+
+`updated_at = None` distinguishes "never noted" from "noted then cleared".
 
 ---
 
@@ -390,6 +408,8 @@ class QubitDocument(Document):
     status: str = "pending"
     chip_id: str
     data: dict
+    note: NoteModel = NoteModel()                  # Free-form per-qubit note
+    metric_notes: dict[str, NoteModel] = {}        # Per-metric notes (key = metric_key)
     system_info: SystemInfoModel
 ```
 
@@ -397,6 +417,11 @@ class QubitDocument(Document):
 
 - `update_calib_data(username, qid, chip_id, output_parameters)` - Update calibration data
 - `update_status(qid, chip_id, status)` - Update status
+
+**Note Fields:**
+
+- `note` - General free-form note about the qubit itself (e.g. "used in paper X", "replaced 2026-04-15"). Edited via `PUT /chips/{chip}/qubits/{qid}/note`.
+- `metric_notes[metric_key]` - Per-metric annotations (e.g. T1 specific notes). Edited via `PUT /chips/{chip}/qubits/{qid}/metric-notes/{metric_key}`.
 
 ---
 
@@ -417,8 +442,15 @@ class CouplingDocument(Document):
     status: str = "pending"
     chip_id: str
     data: dict
+    note: NoteModel = NoteModel()                  # Free-form per-coupling note
+    metric_notes: dict[str, NoteModel] = {}        # Per-metric notes
     system_info: SystemInfoModel
 ```
+
+**Note Fields:**
+
+- `note` - General free-form note about the coupling. Edited via `PUT /chips/{chip}/couplings/{coupling_id}/note`.
+- `metric_notes[metric_key]` - Per-metric annotations. Edited via `PUT /chips/{chip}/couplings/{coupling_id}/metric-notes/{metric_key}`.
 
 ---
 
@@ -478,6 +510,7 @@ Primary storage for task execution results. Linked to executions via `execution_
 - `(project_id, execution_id)` - Join with execution_history
 - `(project_id, chip_id, start_at)` - Time-based queries
 - `(project_id, chip_id, name, qid, start_at)` - Latest task result queries
+- `(project_id, chip_id, user_note.updated_at)` - **Partial sparse**: only docs with a user note. Powers `chip_notes_summary` without scanning the entire collection.
 
 ```python
 class TaskResultHistoryDocument(Document):
@@ -491,7 +524,8 @@ class TaskResultHistoryDocument(Document):
     input_parameters: dict
     output_parameters: dict
     output_parameter_names: list[str]
-    note: dict
+    note: dict                              # Internal calibration metadata (workflow)
+    user_note: NoteModel = NoteModel()      # Dashboard-facing free-form note
     figure_path: list[str]
     json_figure_path: list[str]
     raw_data_path: list[str]
@@ -505,6 +539,11 @@ class TaskResultHistoryDocument(Document):
     tags: list[str]
     chip_id: str
 ```
+
+**Note Fields:**
+
+- `note` (existing) - Workflow internal calibration metadata (`dict`). Used by orchestrator / qubex backend.
+- `user_note` (NEW) - Dashboard free-form note attached to this measurement. Edited via `PUT /task-results/{task_id}/note`. Indexed via partial sparse index for cheap chip-wide listing.
 
 ---
 
@@ -732,6 +771,44 @@ class CalibrationNoteDocument(Document):
     timestamp: str  # ISO8601
     system_info: SystemInfoModel
 ```
+
+---
+
+### NoteEventDocument
+
+**Collection:** `note_event`
+
+Append-only audit log. The `NoteService` writes one row here on every
+upsert/delete of a note (qubit, qubit metric, coupling, coupling metric, task
+result). Used for: edit history, per-target timeline, full-text search across
+all notes (knowledge view, LLM context).
+
+**Indexes:**
+
+- `(project_id, chip_id, created_at DESC)` - Chip-scoped chronological feed.
+- `(project_id, scope, target_id, created_at DESC)` - Per-target timeline.
+- `text(content)` - Full-text search across note contents within a project.
+
+```python
+class NoteEventDocument(Document):
+    project_id: str
+    chip_id: str
+    scope: str           # qubit | qubit_metric | coupling | coupling_metric | task_result
+    target_id: str       # qid for qubit/qubit_metric, coupling_id, or task_id
+    metric_key: str = "" # only set for *_metric scopes
+    action: str          # upsert | delete
+    actor: str           # username
+    content: str = ""    # Note content at time of action ("" for delete)
+    extra: dict[str, str] = {}  # e.g. {"qid": "5", "task_name": "T1"}
+    created_at: datetime
+```
+
+The collection is **never updated in place** — every entry is a new
+immutable event. Two read patterns are exposed:
+
+- `GET /chips/{chip_id}/note-events` (chip timeline)
+- `GET /note-events/by-target?scope=&target_id=` (per-target timeline)
+- `GET /note-events/search?q=` (cross-chip text search)
 
 ---
 

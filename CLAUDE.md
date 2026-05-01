@@ -57,6 +57,9 @@ For detailed setup instructions, see [docs/development/setup.md](docs/developmen
 | API Design         | [docs/development/api/design.md](docs/development/api/design.md)             |
 | Development Flow   | [docs/development/development-flow.md](docs/development/development-flow.md) |
 | Database Structure | [docs/reference/database-structure.md](docs/reference/database-structure.md) |
+| Database Indexes   | [docs/reference/database-indexes.md](docs/reference/database-indexes.md)     |
+| Notes Architecture | [docs/architecture/notes.md](docs/architecture/notes.md)                     |
+| Dashboard Guide    | [docs/user-guide/dashboard.md](docs/user-guide/dashboard.md)                 |
 | Docs Guidelines    | [docs/development/docs-guidelines.md](docs/development/docs-guidelines.md)   |
 
 ## Claude Code Custom Commands
