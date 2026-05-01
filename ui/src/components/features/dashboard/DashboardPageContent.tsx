@@ -75,12 +75,8 @@ function scaleData(
 }
 
 export function DashboardPageContent() {
-  const {
-    selectedChip,
-    selectionMode,
-    setSelectedChip,
-    setSelectionMode,
-  } = useMetricsUrlState();
+  const { selectedChip, selectionMode, setSelectedChip, setSelectionMode } =
+    useMetricsUrlState();
 
   const { startDate, endDate, setStartDate, setEndDate, setQuickRange } =
     useRangeModeUrlState();
@@ -316,9 +312,7 @@ export function DashboardPageContent() {
               <CooldownSelector
                 chipId={selectedChip}
                 onPick={(cd) => {
-                  setStartDate(
-                    dateToDateTimeLocal(new Date(cd.started_at)),
-                  );
+                  setStartDate(dateToDateTimeLocal(new Date(cd.started_at)));
                   setEndDate(
                     dateToDateTimeLocal(
                       cd.ended_at ? new Date(cd.ended_at) : new Date(),
@@ -612,4 +606,3 @@ export function DashboardPageContent() {
     </PageContainer>
   );
 }
-
