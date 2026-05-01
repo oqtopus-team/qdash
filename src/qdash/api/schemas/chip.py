@@ -31,6 +31,7 @@ class ChipResponse(BaseModel):
     qubit_count: int = 0
     coupling_count: int = 0
     installed_at: datetime | None = None
+    current_cooldown_id: str | None = None
 
 
 class CreateChipRequest(BaseModel):

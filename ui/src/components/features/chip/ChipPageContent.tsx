@@ -21,6 +21,7 @@ import {
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { TaskDetailModal } from "@/components/features/chip/modals/TaskDetailModal";
 import { ChipSelector } from "@/components/selectors/ChipSelector";
+import { CooldownSelector } from "@/components/selectors/CooldownSelector";
 import { DateSelector } from "@/components/selectors/DateSelector";
 import { TaskSelector } from "@/components/selectors/TaskSelector";
 import { PageContainer } from "@/components/ui/PageContainer";
@@ -418,6 +419,19 @@ export function ChipPageContent() {
                   selectedDate={selectedDate}
                   onDateSelect={setSelectedDate}
                   disabled={!selectedChip}
+                />
+              </PageFiltersBar.Item>
+              <PageFiltersBar.Item className="sm:min-w-48">
+                <CooldownSelector
+                  chipId={selectedChip}
+                  onPick={(cd) => {
+                    // Jump to the most recent day within the cool-down so the
+                    // chip page shows its end-of-cool-down state.
+                    const target = cd.ended_at
+                      ? new Date(cd.ended_at)
+                      : new Date();
+                    setSelectedDate(target.toISOString().slice(0, 10));
+                  }}
                 />
               </PageFiltersBar.Item>
               <PageFiltersBar.Item className="sm:min-w-96">

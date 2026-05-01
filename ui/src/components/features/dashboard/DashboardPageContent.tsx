@@ -9,6 +9,7 @@ import { useGetChipMetrics } from "@/client/metrics/metrics";
 import { useGetChipNotesSummary } from "@/client/note/note";
 import type { TargetNoteEntry } from "@/schemas";
 import { ChipSelector } from "@/components/selectors/ChipSelector";
+import { CooldownSelector } from "@/components/selectors/CooldownSelector";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { LinearGauge } from "@/components/ui/LinearGauge";
@@ -419,6 +420,22 @@ export function DashboardPageContent() {
               <ChipSelector
                 selectedChip={selectedChip}
                 onChipSelect={setSelectedChip}
+              />
+            </PageFiltersBar.Item>
+            <PageFiltersBar.Item>
+              <CooldownSelector
+                chipId={selectedChip}
+                onPick={(cd) => {
+                  setRangeMode("absolute");
+                  setStartDate(
+                    new Date(cd.started_at).toISOString().slice(0, 10),
+                  );
+                  setEndDate(
+                    cd.ended_at
+                      ? new Date(cd.ended_at).toISOString().slice(0, 10)
+                      : new Date().toISOString().slice(0, 10),
+                  );
+                }}
               />
             </PageFiltersBar.Item>
           </PageFiltersBar.Group>

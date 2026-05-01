@@ -96,6 +96,10 @@ export default withMermaid(
               text: "Dashboard",
               link: "/user-guide/dashboard",
             },
+            {
+              text: "Cryostats & Cool-downs",
+              link: "/user-guide/cryo",
+            },
           ],
         },
         {

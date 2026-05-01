@@ -4,8 +4,10 @@ from qdash.dbmodel.backend import BackendDocument
 from qdash.dbmodel.calibration_note import CalibrationNoteDocument
 from qdash.dbmodel.chip import ChipDocument
 from qdash.dbmodel.chip_history import ChipHistoryDocument
+from qdash.dbmodel.cooldown import CooldownDocument
 from qdash.dbmodel.coupling import CouplingDocument
 from qdash.dbmodel.coupling_history import CouplingHistoryDocument
+from qdash.dbmodel.cryostat import CryostatDocument
 from qdash.dbmodel.execution_counter import ExecutionCounterDocument
 from qdash.dbmodel.execution_history import ExecutionHistoryDocument
 from qdash.dbmodel.execution_lock import ExecutionLockDocument
@@ -52,6 +54,8 @@ def document_models() -> list[Any]:
         IssueDocument,
         IssueKnowledgeDocument,
         NoteEventDocument,
+        CryostatDocument,
+        CooldownDocument,
         # Provenance tracking
         ParameterVersionDocument,
         ProvenanceRelationDocument,

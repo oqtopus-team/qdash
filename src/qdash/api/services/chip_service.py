@@ -321,6 +321,7 @@ class ChipService:
                 qubit_count=s.get("qubit_count", 0),
                 coupling_count=s.get("coupling_count", 0),
                 installed_at=s.get("installed_at"),
+                current_cooldown_id=s.get("current_cooldown_id"),
             )
             for s in summaries
         ]
@@ -351,6 +352,7 @@ class ChipService:
             qubit_count=summary.get("qubit_count", 0),
             coupling_count=summary.get("coupling_count", 0),
             installed_at=summary.get("installed_at"),
+            current_cooldown_id=summary.get("current_cooldown_id"),
         )
 
     def list_qubits(

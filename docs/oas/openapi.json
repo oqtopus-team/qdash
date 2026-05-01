@@ -8796,6 +8796,806 @@
         }
       }
     },
+    "/cryostats": {
+      "get": {
+        "tags": [
+          "cryostat"
+        ],
+        "summary": "List all cryostats",
+        "operationId": "listCryostats",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListCryostatsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "cryostat"
+        ],
+        "summary": "Create a cryostat",
+        "operationId": "createCryostat",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CryostatCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CryostatResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/cryostats/{cryo_id}": {
+      "get": {
+        "tags": [
+          "cryostat"
+        ],
+        "summary": "Get a cryostat by id",
+        "operationId": "getCryostat",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "cryo_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Cryo Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CryostatResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "cryostat"
+        ],
+        "summary": "Update a cryostat",
+        "operationId": "updateCryostat",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "cryo_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Cryo Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CryostatUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CryostatResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "cryostat"
+        ],
+        "summary": "Delete a cryostat",
+        "operationId": "deleteCryostat",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "cryo_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Cryo Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/cooldowns": {
+      "get": {
+        "tags": [
+          "cooldown"
+        ],
+        "summary": "List cool-downs (optionally filter by cryostat or chip)",
+        "operationId": "listCooldowns",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "cryo_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by cryostat",
+              "title": "Cryo Id"
+            },
+            "description": "Filter by cryostat"
+          },
+          {
+            "name": "chip_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by chip membership",
+              "title": "Chip Id"
+            },
+            "description": "Filter by chip membership"
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListCooldownsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "cooldown"
+        ],
+        "summary": "Create a cool-down",
+        "operationId": "createCooldown",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CooldownCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CooldownResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/cooldowns/{cooldown_id}": {
+      "get": {
+        "tags": [
+          "cooldown"
+        ],
+        "summary": "Get a cool-down by id",
+        "operationId": "getCooldown",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "cooldown_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Cooldown Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CooldownResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "cooldown"
+        ],
+        "summary": "Update a cool-down",
+        "operationId": "updateCooldown",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "cooldown_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Cooldown Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CooldownUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CooldownResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "cooldown"
+        ],
+        "summary": "Delete a cool-down",
+        "operationId": "deleteCooldown",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "cooldown_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Cooldown Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/cooldowns/{cooldown_id}/chips/{chip_id}": {
+      "post": {
+        "tags": [
+          "cooldown"
+        ],
+        "summary": "Assign a chip to a cool-down",
+        "operationId": "assignChipToCooldown",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "cooldown_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Cooldown Id"
+            }
+          },
+          {
+            "name": "chip_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Chip Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CooldownResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "cooldown"
+        ],
+        "summary": "Unassign a chip from a cool-down",
+        "operationId": "unassignChipFromCooldown",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "cooldown_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Cooldown Id"
+            }
+          },
+          {
+            "name": "chip_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Chip Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CooldownResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/topology/list": {
       "get": {
         "tags": [
@@ -10569,6 +11369,17 @@
               }
             ],
             "title": "Installed At"
+          },
+          "current_cooldown_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Cooldown Id"
           }
         },
         "type": "object",
@@ -10617,6 +11428,155 @@
         "type": "object",
         "title": "ConfigReloadResponse",
         "description": "Response model for config cache reload."
+      },
+      "CooldownCreateRequest": {
+        "properties": {
+          "cooldown_id": {
+            "type": "string",
+            "maxLength": 100,
+            "title": "Cooldown Id",
+            "description": "Project-unique identifier (e.g. '2026-001')"
+          },
+          "cryo_id": {
+            "type": "string",
+            "title": "Cryo Id",
+            "description": "Cryostat the cool-down belongs to"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 2000,
+            "title": "Description",
+            "default": ""
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Started At"
+          },
+          "ended_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ended At"
+          },
+          "chip_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Chip Ids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "cooldown_id",
+          "cryo_id",
+          "started_at"
+        ],
+        "title": "CooldownCreateRequest",
+        "description": "Body for creating a cool-down."
+      },
+      "CooldownResponse": {
+        "properties": {
+          "cooldown_id": {
+            "type": "string",
+            "title": "Cooldown Id"
+          },
+          "cryo_id": {
+            "type": "string",
+            "title": "Cryo Id"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Started At"
+          },
+          "ended_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ended At"
+          },
+          "chip_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Chip Ids"
+          },
+          "note": {
+            "$ref": "#/components/schemas/NoteModel"
+          }
+        },
+        "type": "object",
+        "required": [
+          "cooldown_id",
+          "cryo_id",
+          "description",
+          "started_at",
+          "ended_at",
+          "chip_ids"
+        ],
+        "title": "CooldownResponse",
+        "description": "Single cool-down record."
+      },
+      "CooldownUpdateRequest": {
+        "properties": {
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "ended_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ended At"
+          }
+        },
+        "type": "object",
+        "title": "CooldownUpdateRequest",
+        "description": "Body for updating a cool-down. All fields optional."
       },
       "Coupling": {
         "properties": {
@@ -10729,6 +11689,218 @@
         ],
         "title": "CreateChipRequest",
         "description": "Request model for creating a new chip.\n\nAttributes\n----------\n    chip_id (str): The ID of the chip to create.\n    size (int): The size of the chip (64, 144, 256, or 1024).\n    topology_id (str | None): Topology template ID. If not provided, defaults to 'square-lattice-mux-{size}'."
+      },
+      "CryostatCreateRequest": {
+        "properties": {
+          "cryo_id": {
+            "type": "string",
+            "maxLength": 100,
+            "title": "Cryo Id",
+            "description": "Project-unique identifier"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Name",
+            "default": ""
+          },
+          "manufacturer": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Manufacturer",
+            "default": ""
+          },
+          "model": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Model",
+            "default": ""
+          },
+          "location": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Location",
+            "default": ""
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "description": "active | maintenance | decommissioned",
+            "default": "active"
+          },
+          "commissioned_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Commissioned At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "cryo_id"
+        ],
+        "title": "CryostatCreateRequest",
+        "description": "Body for creating a cryostat."
+      },
+      "CryostatResponse": {
+        "properties": {
+          "cryo_id": {
+            "type": "string",
+            "title": "Cryo Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "manufacturer": {
+            "type": "string",
+            "title": "Manufacturer"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "location": {
+            "type": "string",
+            "title": "Location"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "commissioned_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Commissioned At"
+          },
+          "decommissioned_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decommissioned At"
+          },
+          "note": {
+            "$ref": "#/components/schemas/NoteModel"
+          }
+        },
+        "type": "object",
+        "required": [
+          "cryo_id",
+          "name",
+          "manufacturer",
+          "model",
+          "location",
+          "status",
+          "commissioned_at",
+          "decommissioned_at"
+        ],
+        "title": "CryostatResponse",
+        "description": "Single cryostat record."
+      },
+      "CryostatUpdateRequest": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "manufacturer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Manufacturer"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "location": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "commissioned_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Commissioned At"
+          },
+          "decommissioned_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decommissioned At"
+          }
+        },
+        "type": "object",
+        "title": "CryostatUpdateRequest",
+        "description": "Body for updating a cryostat. All fields optional."
       },
       "DegradationTrendResponse": {
         "properties": {
@@ -12517,6 +13689,22 @@
         "title": "ListChipsResponse",
         "description": "Response model for listing chips."
       },
+      "ListCooldownsResponse": {
+        "properties": {
+          "cooldowns": {
+            "items": {
+              "$ref": "#/components/schemas/CooldownResponse"
+            },
+            "type": "array",
+            "title": "Cooldowns"
+          }
+        },
+        "type": "object",
+        "required": [
+          "cooldowns"
+        ],
+        "title": "ListCooldownsResponse"
+      },
       "ListCouplingsResponse": {
         "properties": {
           "couplings": {
@@ -12548,6 +13736,22 @@
         ],
         "title": "ListCouplingsResponse",
         "description": "Response model for listing couplings with pagination."
+      },
+      "ListCryostatsResponse": {
+        "properties": {
+          "cryostats": {
+            "items": {
+              "$ref": "#/components/schemas/CryostatResponse"
+            },
+            "type": "array",
+            "title": "Cryostats"
+          }
+        },
+        "type": "object",
+        "required": [
+          "cryostats"
+        ],
+        "title": "ListCryostatsResponse"
       },
       "ListExecutionsResponse": {
         "properties": {

@@ -28,6 +28,8 @@ QDash uses MongoDB via the Bunnet ODM with a project-centric multi-tenant model.
 | `calibration_note`    | CalibrationNoteDocument   | Calibration notes (workflow internal)           |
 | `flows`               | FlowDocument              | User-defined flows                              |
 | `note_event`          | NoteEventDocument         | Audit log for every note edit (write-through)   |
+| `cryostat`            | CryostatDocument          | Cryostat (dilution refrigerator) entity         |
+| `cooldown`            | CooldownDocument          | One cool-down cycle of one cryostat             |
 
 ---
 
@@ -302,20 +304,6 @@ class BackendModel(BaseModel):
 
 ---
 
-### FridgeModel
-
-Model representing fridge data.
-
-```python
-class FridgeModel(BaseModel):
-    device_id: str          # Device ID
-    timestamp: datetime     # Timestamp
-    data: dict              # Data
-    system_info: SystemInfoModel
-```
-
----
-
 ## Database Documents (dbmodel)
 
 ### ProjectDocument
@@ -376,6 +364,7 @@ class ChipDocument(Document):
     username: str                # Creator/owner username
     chip_id: str = "SAMPLE"
     size: int = 64
+    current_cooldown_id: str | None = None  # Cool-down the chip is currently loaded in
     qubits: dict[str, QubitModel] = {}
     couplings: dict[str, CouplingModel] = {}
     installed_at: str  # ISO8601
@@ -809,6 +798,80 @@ immutable event. Two read patterns are exposed:
 - `GET /chips/{chip_id}/note-events` (chip timeline)
 - `GET /note-events/by-target?scope=&target_id=` (per-target timeline)
 - `GET /note-events/search?q=` (cross-chip text search)
+
+---
+
+### CryostatDocument
+
+**Collection:** `cryostat`
+
+A long-lived piece of lab hardware (dilution refrigerator). Cool-downs reference this entity via ``cryo_id``.
+
+**Indexes:**
+
+- `(project_id, cryo_id)` - Unique compound index
+
+```python
+class CryostatDocument(Document):
+    project_id: str
+    cryo_id: str                 # Project-unique (e.g. "K-101")
+    name: str = ""
+    manufacturer: str = ""
+    model: str = ""
+    location: str = ""
+    status: str = "active"       # active | maintenance | decommissioned
+    commissioned_at: datetime | None = None
+    decommissioned_at: datetime | None = None
+    note: NoteModel              # Free-form note (shared NoteModel)
+    system_info: SystemInfoModel
+```
+
+CRUD endpoints under `/cryostats`. The `/cryo` UI page manages these.
+
+---
+
+### CooldownDocument
+
+**Collection:** `cooldown`
+
+One cool-down / warm-up cycle of one cryostat. The cool-down's `cooldown_id` is denormalized onto every task result, qubit history, and coupling history written while the chip is loaded into the cool-down — see [history denormalization](#history-denormalization-of-cooldown_id) below.
+
+**Indexes:**
+
+- `(project_id, cooldown_id)` - Unique compound index
+- `(project_id, cryo_id, started_at DESC)` - Cool-downs by cryostat (newest first)
+- `(project_id, chip_ids, started_at DESC)` - Cool-downs containing a chip
+- `(project_id, started_at DESC)` - Project-wide chronological list
+
+```python
+class CooldownDocument(Document):
+    project_id: str
+    cooldown_id: str             # Project-unique (e.g. "2026-001")
+    cryo_id: str                 # Owning cryostat
+    description: str = ""
+    started_at: datetime
+    ended_at: datetime | None = None  # None = ongoing
+    chip_ids: list[str] = []     # Chips loaded into this cool-down
+    note: NoteModel
+    system_info: SystemInfoModel
+```
+
+CRUD endpoints under `/cooldowns`. Chip assignment via:
+
+- `POST /cooldowns/{cooldown_id}/chips/{chip_id}` — assign (also sets `chip.current_cooldown_id` if the cool-down is active)
+- `DELETE /cooldowns/{cooldown_id}/chips/{chip_id}` — unassign (also clears `chip.current_cooldown_id` if it pointed here)
+
+#### History denormalization of `cooldown_id`
+
+When the workflow persists calibration data, the chip's `current_cooldown_id` is copied at write time onto:
+
+- `TaskResultHistoryDocument.cooldown_id`
+- `QubitHistoryDocument.cooldown_id`
+- `CouplingHistoryDocument.cooldown_id`
+
+This lets dashboards and metrics queries filter "show me only data from cool-down 2026-001" with a direct indexed lookup, instead of joining on time ranges.
+
+A partial sparse index `(project_id, cooldown_id, start_at DESC)` on `task_result_history` ensures that cool-down filters scan only annotated rows.
 
 ---
 

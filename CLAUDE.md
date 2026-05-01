@@ -60,6 +60,7 @@ For detailed setup instructions, see [docs/development/setup.md](docs/developmen
 | Database Indexes   | [docs/reference/database-indexes.md](docs/reference/database-indexes.md)     |
 | Notes Architecture | [docs/architecture/notes.md](docs/architecture/notes.md)                     |
 | Dashboard Guide    | [docs/user-guide/dashboard.md](docs/user-guide/dashboard.md)                 |
+| Cryo Guide         | [docs/user-guide/cryo.md](docs/user-guide/cryo.md)                           |
 | Docs Guidelines    | [docs/development/docs-guidelines.md](docs/development/docs-guidelines.md)   |
 
 ## Claude Code Custom Commands

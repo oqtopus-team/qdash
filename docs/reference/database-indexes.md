@@ -142,6 +142,14 @@ db.task_result_history.create_index(
     name="project_chip_user_note_idx",
     partialFilterExpression={"user_note.updated_at": {"$type": "date"}},
 )
+
+# Cool-down filter — list task results for a specific cool-down cycle.
+# Sparse so empty (legacy) rows are not indexed.
+db.task_result_history.create_index(
+    [("project_id", 1), ("cooldown_id", 1), ("start_at", -1)],
+    name="project_cooldown_start_idx",
+    partialFilterExpression={"cooldown_id": {"$gt": ""}},
+)
 ```
 
 **Usage**: Used by `ExecutionService._fetch_tasks_for_execution()` for retrieving tasks by execution
@@ -153,6 +161,35 @@ TaskResultHistoryDocument.find({
     "project_id": project_id,
     "execution_id": execution_id,
 }).sort([("start_at", ASCENDING)])
+```
+
+### CryostatDocument
+
+```python
+db.cryostat.create_index(
+    [("project_id", 1), ("cryo_id", 1)], unique=True, name="project_cryo_unique"
+)
+```
+
+### CooldownDocument
+
+```python
+db.cooldown.create_index(
+    [("project_id", 1), ("cooldown_id", 1)],
+    unique=True,
+    name="project_cooldown_unique",
+)
+db.cooldown.create_index(
+    [("project_id", 1), ("cryo_id", 1), ("started_at", -1)],
+    name="project_cryo_started_idx",
+)
+db.cooldown.create_index(
+    [("project_id", 1), ("chip_ids", 1), ("started_at", -1)],
+    name="project_chip_idx",
+)
+db.cooldown.create_index(
+    [("project_id", 1), ("started_at", -1)], name="project_started_idx"
+)
 ```
 
 ### NoteEventDocument

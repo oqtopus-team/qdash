@@ -8,7 +8,9 @@ from qdash.repository.backend import MongoBackendRepository
 from qdash.repository.calibration_note import MongoCalibrationNoteRepository
 from qdash.repository.chip import MongoChipRepository
 from qdash.repository.chip_history import MongoChipHistoryRepository
+from qdash.repository.cooldown import MongoCooldownRepository
 from qdash.repository.coupling import MongoCouplingCalibrationRepository
+from qdash.repository.cryostat import MongoCryostatRepository
 from qdash.repository.execution import MongoExecutionRepository
 from qdash.repository.execution_counter import MongoExecutionCounterRepository
 from qdash.repository.execution_history import MongoExecutionHistoryRepository
@@ -67,7 +69,9 @@ __all__ = [
     "MongoCalibrationNoteRepository",
     "MongoChipHistoryRepository",
     "MongoChipRepository",
+    "MongoCooldownRepository",
     "MongoCouplingCalibrationRepository",
+    "MongoCryostatRepository",
     "MongoExecutionCounterRepository",
     "MongoExecutionHistoryRepository",
     "MongoExecutionLockRepository",

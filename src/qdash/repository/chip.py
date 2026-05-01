@@ -292,6 +292,7 @@ class MongoChipRepository:
                 "size": doc.size,
                 "topology_id": doc.topology_id,
                 "installed_at": doc.installed_at,
+                "current_cooldown_id": getattr(doc, "current_cooldown_id", None),
                 "qubit_count": qubit_counts.get(doc.chip_id, 0),
                 "coupling_count": coupling_counts.get(doc.chip_id, 0),
             }
@@ -328,6 +329,7 @@ class MongoChipRepository:
             "size": doc.size,
             "topology_id": doc.topology_id,
             "installed_at": doc.installed_at,
+            "current_cooldown_id": getattr(doc, "current_cooldown_id", None),
             "qubit_count": qubit_counts.get(chip_id, 0),
             "coupling_count": coupling_counts.get(chip_id, 0),
         }
