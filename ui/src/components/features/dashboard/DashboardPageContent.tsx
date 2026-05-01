@@ -23,7 +23,7 @@ import { useMetricsUrlState, useRangeModeUrlState } from "@/hooks/useUrlState";
 import { dateToDateTimeLocal } from "@/lib/utils/datetime";
 
 import { DashboardCdfChart } from "./DashboardCdfChart";
-import { DashboardCouplingList } from "./DashboardCouplingList";
+import { DashboardCouplingGrid } from "./DashboardCouplingGrid";
 import { DashboardNotesSummary } from "./DashboardNotesSummary";
 import { DashboardQubitGrid } from "./DashboardQubitGrid";
 import { DashboardSummaryTable } from "./DashboardSummaryTable";
@@ -552,9 +552,10 @@ export function DashboardPageContent() {
                         </div>
                         <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 items-start">
                           <div className="xl:col-span-2 min-w-0">
-                            <DashboardCouplingList
+                            <DashboardCouplingGrid
                               metricData={couplingMetricData[m.key]}
                               unit={m.unit}
+                              topologyId={topologyId}
                               colors={colors}
                               notedTargets={noted}
                               crossMetricNotedTargets={crossMetricNoted}
