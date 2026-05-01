@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 
-import { Plus } from "lucide-react";
+import { Plus, X } from "lucide-react";
 
 import { useListChips } from "@/client/chip/chip";
 import {
@@ -273,8 +273,12 @@ function ModalShell({
       <div className="modal-box w-full max-w-2xl">
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-lg font-bold">{title}</h3>
-          <button className="btn btn-ghost btn-sm btn-square" onClick={onClose}>
-            ✕
+          <button
+            className="btn btn-ghost btn-sm btn-square"
+            onClick={onClose}
+            aria-label="Close"
+          >
+            <X className="h-4 w-4" />
           </button>
         </div>
         {children}

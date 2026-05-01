@@ -18,6 +18,7 @@ from qdash.api.lib.project import (  # noqa: TCH002
 )
 from qdash.api.schemas.chip import (
     ChipDatesResponse,
+    ChipDeletionImpactResponse,
     ChipResponse,
     CouplingResponse,
     CreateChipRequest,
@@ -29,7 +30,9 @@ from qdash.api.schemas.chip import (
     MetricsSummaryResponse,
     MuxDetailResponse,
     QubitResponse,
+    UpdateChipRequest,
 )
+from qdash.api.schemas.success import SuccessResponse
 from qdash.api.services.chip_initializer import ChipInitializer
 from qdash.api.services.chip_service import ChipService  # noqa: TCH002
 
@@ -119,6 +122,60 @@ def create_chip(
     except Exception as e:
         logger.error(f"Error creating chip {request.chip_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to create chip: {e!s}") from e
+
+
+@router.patch(
+    "/chips/{chip_id}",
+    response_model=ChipResponse,
+    summary="Update chip metadata (topology_id, note)",
+    operation_id="updateChip",
+)
+def update_chip(
+    chip_id: str,
+    body: UpdateChipRequest,
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    service: Annotated[ChipService, Depends(get_chip_service)],
+) -> ChipResponse:
+    return service.update_chip(
+        project_id=ctx.project_id,
+        chip_id=chip_id,
+        body=body,
+        username=ctx.user.username,
+    )
+
+
+@router.get(
+    "/chips/{chip_id}/deletion-impact",
+    response_model=ChipDeletionImpactResponse,
+    summary="Preview what would be affected by deleting this chip",
+    operation_id="getChipDeletionImpact",
+)
+def get_chip_deletion_impact(
+    chip_id: str,
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    service: Annotated[ChipService, Depends(get_chip_service)],
+) -> ChipDeletionImpactResponse:
+    return service.get_deletion_impact(project_id=ctx.project_id, chip_id=chip_id)
+
+
+@router.delete(
+    "/chips/{chip_id}",
+    response_model=SuccessResponse,
+    summary="Delete a chip (refuses if related data exists unless force=true)",
+    operation_id="deleteChip",
+)
+def delete_chip(
+    chip_id: str,
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    service: Annotated[ChipService, Depends(get_chip_service)],
+    force: Annotated[
+        bool,
+        Query(
+            description="If true, also delete the chip's qubits and couplings (history retained for audit).",
+        ),
+    ] = False,
+) -> SuccessResponse:
+    return service.delete_chip(project_id=ctx.project_id, chip_id=chip_id, force=force)
 
 
 @router.get(

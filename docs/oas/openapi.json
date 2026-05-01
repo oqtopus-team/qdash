@@ -2768,6 +2768,277 @@
         }
       }
     },
+    "/chips/{chip_id}": {
+      "patch": {
+        "tags": [
+          "chip"
+        ],
+        "summary": "Update chip metadata (topology_id, note)",
+        "operationId": "updateChip",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chip_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Chip Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateChipRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChipResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "chip"
+        ],
+        "summary": "Delete a chip (refuses if related data exists unless force=true)",
+        "operationId": "deleteChip",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chip_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Chip Id"
+            }
+          },
+          {
+            "name": "force",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "If true, also delete the chip's qubits and couplings (history retained for audit).",
+              "default": false,
+              "title": "Force"
+            },
+            "description": "If true, also delete the chip's qubits and couplings (history retained for audit)."
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "chip"
+        ],
+        "summary": "Get chip details",
+        "description": "Get chip details including metadata and counts.\n\nReturns chip metadata (size, topology, qubit/coupling counts).\nFor detailed qubit/coupling data, use the dedicated endpoints.\n\nParameters\n----------\nchip_id : str\n    ID of the chip\nctx : ProjectContext\n    Project context with user and project information\nchip_service : ChipService\n    Service for chip operations\n\nReturns\n-------\nChipResponse\n    Chip details",
+        "operationId": "getChip",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chip_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Chip Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChipResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chips/{chip_id}/deletion-impact": {
+      "get": {
+        "tags": [
+          "chip"
+        ],
+        "summary": "Preview what would be affected by deleting this chip",
+        "operationId": "getChipDeletionImpact",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chip_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Chip Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChipDeletionImpactResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/chips/{chip_id}/dates": {
       "get": {
         "tags": [
@@ -2952,70 +3223,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ListMuxResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/chips/{chip_id}": {
-      "get": {
-        "tags": [
-          "chip"
-        ],
-        "summary": "Get chip details",
-        "description": "Get chip details including metadata and counts.\n\nReturns chip metadata (size, topology, qubit/coupling counts).\nFor detailed qubit/coupling data, use the dedicated endpoints.\n\nParameters\n----------\nchip_id : str\n    ID of the chip\nctx : ProjectContext\n    Project context with user and project information\nchip_service : ChipService\n    Service for chip operations\n\nReturns\n-------\nChipResponse\n    Chip details",
-        "operationId": "getChip",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "chip_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Chip Id"
-            }
-          },
-          {
-            "name": "X-Project-Id",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Project-Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ChipResponse"
                 }
               }
             }
@@ -11207,6 +11414,62 @@
         "title": "ChipDatesResponse",
         "description": "Response model for chip dates."
       },
+      "ChipDeletionImpactResponse": {
+        "properties": {
+          "chip_id": {
+            "type": "string",
+            "title": "Chip Id"
+          },
+          "qubits": {
+            "type": "integer",
+            "title": "Qubits",
+            "description": "QubitDocument rows that would be hard-deleted"
+          },
+          "couplings": {
+            "type": "integer",
+            "title": "Couplings",
+            "description": "CouplingDocument rows that would be hard-deleted"
+          },
+          "task_results": {
+            "type": "integer",
+            "title": "Task Results",
+            "description": "task_result_history rows kept for audit (not deleted)"
+          },
+          "qubit_history_snapshots": {
+            "type": "integer",
+            "title": "Qubit History Snapshots",
+            "description": "qubit_history rows kept for audit (not deleted)"
+          },
+          "coupling_history_snapshots": {
+            "type": "integer",
+            "title": "Coupling History Snapshots",
+            "description": "coupling_history rows kept for audit (not deleted)"
+          },
+          "cooldowns_referencing": {
+            "type": "integer",
+            "title": "Cooldowns Referencing",
+            "description": "Cool-downs that include this chip and would have it removed"
+          },
+          "can_delete_safely": {
+            "type": "boolean",
+            "title": "Can Delete Safely",
+            "description": "True if no QubitDocument or CouplingDocument rows exist (DELETE without force succeeds). When false, force=true is required."
+          }
+        },
+        "type": "object",
+        "required": [
+          "chip_id",
+          "qubits",
+          "couplings",
+          "task_results",
+          "qubit_history_snapshots",
+          "coupling_history_snapshots",
+          "cooldowns_referencing",
+          "can_delete_safely"
+        ],
+        "title": "ChipDeletionImpactResponse",
+        "description": "Counts of related rows that would be affected by deleting this chip."
+      },
       "ChipMetricsResponse": {
         "properties": {
           "chip_id": {
@@ -11380,6 +11643,9 @@
               }
             ],
             "title": "Current Cooldown Id"
+          },
+          "note": {
+            "$ref": "#/components/schemas/NoteModel"
           }
         },
         "type": "object",
@@ -17839,6 +18105,37 @@
         "type": "object",
         "title": "UITaskFilesSettings",
         "description": "Task files editor settings."
+      },
+      "UpdateChipRequest": {
+        "properties": {
+          "topology_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Topology Id"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 5000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note",
+            "description": "Free-form note text (overwrites note.content)"
+          }
+        },
+        "type": "object",
+        "title": "UpdateChipRequest",
+        "description": "Body for updating chip metadata. All fields optional."
       },
       "UpdateScheduleRequest": {
         "properties": {

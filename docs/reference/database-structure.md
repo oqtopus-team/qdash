@@ -368,8 +368,11 @@ class ChipDocument(Document):
     qubits: dict[str, QubitModel] = {}
     couplings: dict[str, CouplingModel] = {}
     installed_at: str  # ISO8601
+    note: NoteModel              # Free-form note (serial #, fab batch, design doc link…)
     system_info: SystemInfoModel
 ```
+
+**Editable via** `PATCH /chips/{chip_id}` (topology_id, note). **Deletable via** `DELETE /chips/{chip_id}` (refuses if qubits/couplings exist; `?force=true` cascades). Use `GET /chips/{chip_id}/deletion-impact` for a preflight count before deleting.
 
 **Key Methods:**
 
