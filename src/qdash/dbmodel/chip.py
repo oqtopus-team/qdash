@@ -28,6 +28,14 @@ class ChipDocument(Document):
     chip_id: str = Field("SAMPLE", description="The chip ID")
     username: str = Field(..., description="The username of the user who created the chip")
     size: int = Field(64, description="The size of the chip")
+    current_cooldown_id: str | None = Field(
+        default=None,
+        description=(
+            "ID of the cool-down cycle the chip is currently loaded in. "
+            "Updated by cool-down assign/unassign endpoints. None when the "
+            "chip is not in any active cool-down."
+        ),
+    )
     topology_id: str | None = Field(
         None, description="Topology template ID (e.g., 'square-lattice-mux-64')"
     )

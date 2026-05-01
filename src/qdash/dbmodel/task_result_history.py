@@ -6,6 +6,7 @@ from pydantic import ConfigDict, Field, field_validator
 from pymongo import ASCENDING, DESCENDING, IndexModel
 from qdash.common.datetime_utils import ensure_timezone, parse_elapsed_time
 from qdash.datamodel.execution import ExecutionModel
+from qdash.datamodel.note import NoteModel
 from qdash.datamodel.system_info import SystemInfoModel
 from qdash.datamodel.task import BaseTaskResultModel
 
@@ -44,6 +45,12 @@ class TaskResultHistoryDocument(Document):
     output_parameter_names: list[str] = Field(..., description="The output parameter names")
     run_parameters: dict[str, Any] = Field(default_factory=dict, description="The run parameters")
     note: dict[str, Any] = Field(..., description="The note")
+    # NOTE: ``note`` above is the workflow's calibration metadata.
+    # ``user_note`` is the dashboard-facing free-form note attached to this task result.
+    user_note: NoteModel = Field(
+        default_factory=NoteModel,
+        description="Free-form user note attached to this task result (dashboard)",
+    )
     figure_path: list[str] = Field(..., description="The path to the figure")
     json_figure_path: list[str] = Field([], description="The path to the JSON figure")
     raw_data_path: list[str] = Field([], description="The path to the raw data")
@@ -57,6 +64,13 @@ class TaskResultHistoryDocument(Document):
     execution_id: str = Field(..., description="The execution ID")
     tags: list[str] = Field(..., description="The tags")
     chip_id: str = Field(..., description="The chip ID")
+    cooldown_id: str = Field(
+        default="",
+        description=(
+            "Cool-down cycle this task ran in (denormalized from chip.current_cooldown_id "
+            "at write time). Empty if the chip wasn't assigned to a cool-down."
+        ),
+    )
 
     source_task_id: str | None = Field(
         None,
@@ -146,7 +160,47 @@ class TaskResultHistoryDocument(Document):
                 [("project_id", ASCENDING), ("source_task_id", ASCENDING)],
                 sparse=True,
             ),
+            # Partial sparse index for the dashboard notes summary so we don't
+            # scan all task results to find the few that have user notes.
+            IndexModel(
+                [
+                    ("project_id", ASCENDING),
+                    ("chip_id", ASCENDING),
+                    ("user_note.updated_at", DESCENDING),
+                ],
+                name="project_chip_user_note_idx",
+                # Mongo partial filters don't allow $ne, so use $type to match
+                # docs whose user_note.updated_at is an actual date (i.e. set).
+                partialFilterExpression={"user_note.updated_at": {"$type": "date"}},
+            ),
+            # Cool-down filter: list task results that ran in a specific
+            # cool-down. Sparse so empty (legacy) rows are not indexed.
+            IndexModel(
+                [
+                    ("project_id", ASCENDING),
+                    ("cooldown_id", ASCENDING),
+                    ("start_at", DESCENDING),
+                ],
+                name="project_cooldown_start_idx",
+                partialFilterExpression={"cooldown_id": {"$gt": ""}},
+            ),
         ]
+
+    @classmethod
+    def _resolve_cooldown_id(cls, *, project_id: str | None, chip_id: str) -> str:
+        """Look up the chip's current_cooldown_id at write time.
+
+        Empty string if the chip has no active cool-down or isn't found.
+        """
+        if not project_id:
+            return ""
+        # Local import to avoid circular dependency at module import time.
+        from qdash.dbmodel.chip import ChipDocument
+
+        chip = ChipDocument.find_one({"project_id": project_id, "chip_id": chip_id}).run()
+        if chip is None:
+            return ""
+        return getattr(chip, "current_cooldown_id", None) or ""
 
     @classmethod
     def from_datamodel(
@@ -178,6 +232,10 @@ class TaskResultHistoryDocument(Document):
             execution_id=execution_model.execution_id,
             tags=execution_model.tags,
             chip_id=execution_model.chip_id,
+            cooldown_id=cls._resolve_cooldown_id(
+                project_id=execution_model.project_id,
+                chip_id=execution_model.chip_id,
+            ),
         )
 
     @classmethod
@@ -215,5 +273,10 @@ class TaskResultHistoryDocument(Document):
         doc.execution_id = execution_model.execution_id
         doc.tags = execution_model.tags
         doc.chip_id = execution_model.chip_id
+        # Refresh the cool-down tag in case it changed between writes.
+        doc.cooldown_id = cls._resolve_cooldown_id(
+            project_id=execution_model.project_id,
+            chip_id=execution_model.chip_id,
+        )
         doc.save()
         return doc

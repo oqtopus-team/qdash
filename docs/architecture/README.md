@@ -20,6 +20,12 @@ Technical architecture documentation for QDash components.
   - Lineage/impact graph traversal
   - MongoDB schema and indexing
 
+- **[Notes](./notes.md)** - Three-layer note system (inline + audit log)
+  - Inline notes on Qubit / Coupling / TaskResult documents
+  - `note_event` write-through audit log
+  - Performance indexes (partial sparse + text search)
+  - Endpoints for the dashboard, knowledge feed, full-text search
+
 ### Calibration Workflow
 
 - **[1-Qubit Scheduler](./one-qubit-scheduler.md)** - Single-qubit calibration scheduling

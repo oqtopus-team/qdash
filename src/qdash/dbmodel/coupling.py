@@ -4,6 +4,7 @@ from bunnet import Document
 from pydantic import ConfigDict, Field
 from pymongo import ASCENDING, IndexModel
 from qdash.datamodel.coupling import CouplingModel
+from qdash.datamodel.note import NoteModel
 from qdash.datamodel.system_info import SystemInfoModel
 from qdash.dbmodel.coupling_history import CouplingHistoryDocument
 
@@ -28,6 +29,14 @@ class CouplingDocument(Document):
     status: str = Field("pending", description="The status of the coupling")
     chip_id: str = Field(..., description="The chip ID")
     data: dict[str, Any] = Field(..., description="The data of the coupling")
+    note: NoteModel = Field(
+        default_factory=NoteModel,
+        description="Free-form user note attached to this coupling",
+    )
+    metric_notes: dict[str, NoteModel] = Field(
+        default_factory=dict,
+        description="Per-metric notes keyed by metric_key",
+    )
     system_info: SystemInfoModel = Field(..., description="The system information")
 
     model_config = ConfigDict(
