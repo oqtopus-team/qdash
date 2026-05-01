@@ -83,7 +83,7 @@ export function DashboardQubitGrid({
   unit,
   topologyId,
   colors,
-  maxCellSize = 120,
+  maxCellSize = 60,
   notedQids,
   crossMetricNotedQids,
   notesByTarget,
@@ -164,10 +164,10 @@ export function DashboardQubitGrid({
 
   return (
     <div
-      className="grid gap-1 mx-auto w-full"
+      className="grid gap-0.5 mx-auto w-full"
       style={{
         gridTemplateColumns: `repeat(${gridCols}, minmax(0, 1fr))`,
-        maxWidth: `${gridCols * maxCellSize + (gridCols - 1) * 4}px`,
+        maxWidth: `${gridCols * maxCellSize + (gridCols - 1) * 2}px`,
       }}
     >
       {cells.map(({ row, col, qid }) => {
@@ -220,7 +220,7 @@ export function DashboardQubitGrid({
             aria-label={titleText}
           >
             <span
-              className={`absolute top-1 left-1 text-xs font-semibold px-1 rounded ${
+              className={`absolute top-0.5 left-0.5 text-[10px] font-semibold px-1 rounded leading-tight ${
                 bg ? "bg-black/30 text-white" : "bg-base-200 text-base-content"
               }`}
             >
@@ -243,11 +243,13 @@ export function DashboardQubitGrid({
               </span>
             )}
             {value !== null ? (
-              <span className="text-sm font-bold text-white drop-shadow leading-tight mt-3">
+              <span className="text-[11px] font-bold text-white drop-shadow leading-tight mt-1.5">
                 {value.toFixed(2)}
               </span>
             ) : (
-              <span className="text-xs text-base-content/40 mt-3">N/A</span>
+              <span className="text-[10px] text-base-content/40 mt-1.5">
+                N/A
+              </span>
             )}
           </Tag>
         );
