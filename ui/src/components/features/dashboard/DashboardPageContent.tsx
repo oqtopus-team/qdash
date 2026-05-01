@@ -2,8 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-import { SlidersHorizontal } from "lucide-react";
-
 import { useListChips, useGetChip } from "@/client/chip/chip";
 import { useGetChipMetrics } from "@/client/metrics/metrics";
 import { useGetChipNotesSummary } from "@/client/note/note";
@@ -17,9 +15,12 @@ import { PageContainer } from "@/components/ui/PageContainer";
 import { PageFiltersBar } from "@/components/ui/PageFiltersBar";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { QuantumLoader } from "@/components/ui/QuantumLoader";
+import { TimeRangeSelector } from "@/components/ui/TimeRangeSelector";
 import { MetricsPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
 import { useMetricsConfig } from "@/hooks/useMetricsConfig";
-import { useMetricsUrlState } from "@/hooks/useUrlState";
+import { useMetricsQueryParams } from "@/hooks/useMetricsQueryParams";
+import { useMetricsUrlState, useRangeModeUrlState } from "@/hooks/useUrlState";
+import { dateToDateTimeLocal } from "@/lib/utils/datetime";
 
 import { DashboardCdfChart } from "./DashboardCdfChart";
 import { DashboardCouplingList } from "./DashboardCouplingList";
@@ -76,20 +77,13 @@ function scaleData(
 export function DashboardPageContent() {
   const {
     selectedChip,
-    rangeMode,
-    timeRange,
     selectionMode,
-    customDays,
-    startDate,
-    endDate,
     setSelectedChip,
-    setRangeMode,
-    setTimeRange,
     setSelectionMode,
-    setCustomDays,
-    setStartDate,
-    setEndDate,
   } = useMetricsUrlState();
+
+  const { startDate, endDate, setStartDate, setEndDate, setQuickRange } =
+    useRangeModeUrlState();
 
   const {
     qubitMetrics,
@@ -127,34 +121,12 @@ export function DashboardPageContent() {
     }
   }, [selectedChip, chipsData, setSelectedChip]);
 
-  const isAbsolute = rangeMode === "absolute";
-  const relativeWithinHours =
-    timeRange === "custom"
-      ? (customDays ?? 90) * 24
-      : timeRange === "1d"
-        ? 24
-        : timeRange === "7d"
-          ? 24 * 7
-          : timeRange === "30d"
-            ? 24 * 30
-            : 24 * 7;
-
-  const absoluteStartIso = startDate ? `${startDate}T00:00:00` : null;
-  const absoluteEndIso = endDate ? `${endDate}T23:59:59` : null;
-
-  const queryParams = isAbsolute
-    ? {
-        start_at: absoluteStartIso,
-        end_at: absoluteEndIso,
-        selection_mode: selectionMode,
-      }
-    : {
-        within_hours: relativeWithinHours,
-        selection_mode: selectionMode,
-      };
-
-  const hasAbsoluteBound = Boolean(startDate || endDate);
-  const canFetch = !!selectedChip && (!isAbsolute || hasAbsoluteBound);
+  const { queryParams, canFetch } = useMetricsQueryParams({
+    selectionMode,
+    startDate,
+    endDate,
+    selectedChip,
+  });
 
   const { data, isLoading, isError } = useGetChipMetrics(
     selectedChip,
@@ -335,69 +307,29 @@ export function DashboardPageContent() {
         <PageFiltersBar>
           <PageFiltersBar.Group>
             <PageFiltersBar.Item>
-              <select
-                className="select select-sm select-bordered"
-                value={rangeMode}
-                onChange={(e) =>
-                  setRangeMode(e.target.value as "relative" | "absolute")
-                }
-                title="Switch between relative range (last N days) and absolute date range"
-              >
-                <option value="relative">Relative</option>
-                <option value="absolute">Absolute</option>
-              </select>
+              <ChipSelector
+                selectedChip={selectedChip}
+                onChipSelect={setSelectedChip}
+              />
             </PageFiltersBar.Item>
-
             <PageFiltersBar.Item>
-              {rangeMode === "relative" ? (
-                <div className="flex items-center gap-2">
-                  <div className="join rounded-lg overflow-hidden">
-                    {(
-                      [
-                        ["1d", "1D", "Last 1 Day"],
-                        ["7d", "7D", "Last 7 Days"],
-                        ["30d", "30D", "Last 30 Days"],
-                      ] as const
-                    ).map(([value, mobile, desktop]) => (
-                      <button
-                        key={value}
-                        className={`join-item btn btn-sm ${
-                          timeRange === value ? "btn-primary" : ""
-                        }`}
-                        onClick={() => setTimeRange(value)}
-                      >
-                        <span className="hidden sm:inline">{desktop}</span>
-                        <span className="sm:hidden">{mobile}</span>
-                      </button>
-                    ))}
-                    <button
-                      className={`join-item btn btn-sm gap-1 ${
-                        timeRange === "custom" ? "btn-primary" : ""
-                      }`}
-                      onClick={() => setTimeRange("custom")}
-                      title="Set a custom time range in days"
-                    >
-                      <SlidersHorizontal className="h-3.5 w-3.5" />
-                      <span className="hidden sm:inline">Custom</span>
-                    </button>
-                  </div>
-                  {timeRange === "custom" && (
-                    <CustomDaysInput
-                      value={customDays ?? 90}
-                      onChange={setCustomDays}
-                    />
-                  )}
-                </div>
-              ) : (
-                <AbsoluteDateRangePicker
-                  startDate={startDate}
-                  endDate={endDate}
-                  onStartChange={setStartDate}
-                  onEndChange={setEndDate}
-                />
-              )}
+              <CooldownSelector
+                chipId={selectedChip}
+                onPick={(cd) => {
+                  setStartDate(
+                    dateToDateTimeLocal(new Date(cd.started_at)),
+                  );
+                  setEndDate(
+                    dateToDateTimeLocal(
+                      cd.ended_at ? new Date(cd.ended_at) : new Date(),
+                    ),
+                  );
+                }}
+              />
             </PageFiltersBar.Item>
+          </PageFiltersBar.Group>
 
+          <PageFiltersBar.Group>
             <PageFiltersBar.Item>
               <div className="join rounded-lg overflow-hidden">
                 {(["latest", "best", "average"] as const).map((mode) => (
@@ -414,32 +346,15 @@ export function DashboardPageContent() {
               </div>
             </PageFiltersBar.Item>
           </PageFiltersBar.Group>
-
-          <PageFiltersBar.Group>
-            <PageFiltersBar.Item>
-              <ChipSelector
-                selectedChip={selectedChip}
-                onChipSelect={setSelectedChip}
-              />
-            </PageFiltersBar.Item>
-            <PageFiltersBar.Item>
-              <CooldownSelector
-                chipId={selectedChip}
-                onPick={(cd) => {
-                  setRangeMode("absolute");
-                  setStartDate(
-                    new Date(cd.started_at).toISOString().slice(0, 10),
-                  );
-                  setEndDate(
-                    cd.ended_at
-                      ? new Date(cd.ended_at).toISOString().slice(0, 10)
-                      : new Date().toISOString().slice(0, 10),
-                  );
-                }}
-              />
-            </PageFiltersBar.Item>
-          </PageFiltersBar.Group>
         </PageFiltersBar>
+
+        <TimeRangeSelector
+          startDate={startDate}
+          endDate={endDate}
+          onStartDateChange={setStartDate}
+          onEndDateChange={setEndDate}
+          onQuickRange={setQuickRange}
+        />
 
         {/* Body */}
         {!selectedChip ? (
@@ -687,8 +602,8 @@ export function DashboardPageContent() {
           metricKey={editingNote.metricKey}
           metricTitle={editingNote.metricTitle}
           metricUnit={editingNote.metricUnit}
-          startAt={isAbsolute ? absoluteStartIso : null}
-          endAt={isAbsolute ? absoluteEndIso : null}
+          startAt={queryParams.start_at}
+          endAt={queryParams.end_at}
           chipNote={editingExisting}
           otherNotes={editingOtherNotes}
           onClose={() => setEditingNote(null)}
@@ -698,88 +613,3 @@ export function DashboardPageContent() {
   );
 }
 
-function AbsoluteDateRangePicker({
-  startDate,
-  endDate,
-  onStartChange,
-  onEndChange,
-}: {
-  startDate: string | null;
-  endDate: string | null;
-  onStartChange: (value: string | null) => void;
-  onEndChange: (value: string | null) => void;
-}) {
-  const inverted =
-    startDate !== null && endDate !== null && startDate > endDate;
-  return (
-    <div className="flex flex-col gap-1">
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <label className="flex items-center gap-2">
-          <span className="label-text">From</span>
-          <input
-            type="date"
-            className="input input-sm input-bordered tabular-nums w-32"
-            value={startDate ?? ""}
-            onChange={(e) => onStartChange(e.target.value || null)}
-            max={endDate ?? undefined}
-            aria-label="Start date"
-          />
-        </label>
-        <label className="flex items-center gap-2">
-          <span className="label-text">To</span>
-          <input
-            type="date"
-            className="input input-sm input-bordered tabular-nums w-32"
-            value={endDate ?? ""}
-            onChange={(e) => onEndChange(e.target.value || null)}
-            min={startDate ?? undefined}
-            aria-label="End date"
-          />
-        </label>
-      </div>
-      {inverted && (
-        <span className="text-xs text-error">
-          Start date must be on or before end date
-        </span>
-      )}
-    </div>
-  );
-}
-
-function CustomDaysInput({
-  value,
-  onChange,
-}: {
-  value: number;
-  onChange: (days: number) => void;
-}) {
-  const [local, setLocal] = useState(String(value));
-  useEffect(() => {
-    setLocal(String(value));
-  }, [value]);
-  const commit = () => {
-    const parsed = parseInt(local, 10);
-    if (parsed > 0 && parsed <= 3650) onChange(parsed);
-    else setLocal(String(value));
-  };
-  return (
-    <div className="flex items-center gap-1.5">
-      <input
-        type="number"
-        min={1}
-        max={3650}
-        value={local}
-        onChange={(e) => setLocal(e.target.value)}
-        onBlur={commit}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") {
-            commit();
-            (e.target as HTMLInputElement).blur();
-          }
-        }}
-        className="input input-sm input-bordered w-20 text-center tabular-nums"
-      />
-      <span className="text-sm text-base-content/70">days</span>
-    </div>
-  );
-}
