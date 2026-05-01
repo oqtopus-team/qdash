@@ -7,7 +7,7 @@ import { ExternalLink, StickyNote } from "lucide-react";
 
 import type { NoteEntryWithMetric } from "./ChipNoteEditor";
 
-export interface TaskNoteEntry {
+interface TaskNoteEntry {
   taskId: string;
   qid: string;
   content: string;
