@@ -26,6 +26,7 @@ import { useMetricsUrlState } from "@/hooks/useUrlState";
 import { getDaisySelectStyles } from "@/lib/react-select-theme";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { getTimezoneOffsetString } from "@/lib/utils/datetime";
 import { PageFiltersBar } from "@/components/ui/PageFiltersBar";
 
 type MetricOption = {
@@ -138,8 +139,12 @@ export function MetricsPageContent() {
             ? 24 * 30
             : 24 * 7; // Default to 7 days
 
-  const absoluteStartIso = startDate ? `${startDate}T00:00:00` : null;
-  const absoluteEndIso = endDate ? `${endDate}T23:59:59` : null;
+  const absoluteStartIso = startDate
+    ? `${startDate}T00:00:00${getTimezoneOffsetString()}`
+    : null;
+  const absoluteEndIso = endDate
+    ? `${endDate}T23:59:59${getTimezoneOffsetString()}`
+    : null;
 
   const metricsQueryParams = isAbsolute
     ? {
