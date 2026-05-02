@@ -1,0 +1,11 @@
+title = "QDash Gitleaks Configuration"
+
+[allowlist]
+  description = "Global allowlist"
+  paths = [
+    '''\.devcontainer/requirements\.txt''',
+    '''ui/bun\.lock''',
+    '''docs/oas/openapi\.json''',
+    '''ui/src/client/''',
+    '''ui/src/schemas/''',
+  ]

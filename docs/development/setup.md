@@ -191,6 +191,29 @@ task build-docs
 task tbls-docs
 ```
 
+## Secret Scanning Tools
+
+DevContainer users are automatically set up with Gitleaks and Trufflehog. For local development outside the DevContainer, install the tools manually:
+
+**macOS:**
+
+```shell
+brew install gitleaks trufflehog
+```
+
+**Linux:**
+
+Download binaries from GitHub Releases:
+
+- [Gitleaks Releases](https://github.com/gitleaks/gitleaks/releases)
+- [Trufflehog Releases](https://github.com/trufflesecurity/trufflehog/releases)
+
+After installing the tools, enable the pre-commit hook:
+
+```shell
+uv run pre-commit install
+```
+
 ## Environment Variables
 
 Key environment variables are configured in `.env`. See `.env.example` for available options:

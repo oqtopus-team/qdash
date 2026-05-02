@@ -76,6 +76,21 @@ Below is the correspondence between prefixes and labels:
 | ci:       | `ci`            | Adding or updating CI configuration and scripts                                                        |
 | chore:    | `chore`         | Minor changes or maintenance tasks                                                                     |
 
+## Secret Scanning
+
+Gitleaks automatically scans staged files on every commit via a pre-commit hook. If a secret is detected, the commit is blocked.
+
+| Command                  | Description                                              |
+| ------------------------ | -------------------------------------------------------- |
+| `task scan-leaks`        | Scan the entire repository with Gitleaks                 |
+| `task scan-leaks-staged` | Scan staged files only                                   |
+| `task scan-secrets`      | Scan git history with Trufflehog (verified secrets only) |
+| `task scan-secrets-all`  | Scan git history with Trufflehog (all findings)          |
+
+The `task check` command includes `scan-leaks`, so running it before push covers secret scanning.
+
+If a finding is a false positive, add the path or pattern to `.gitleaks.toml` under `[allowlist]`.
+
 ## Claude Code Custom Commands
 
 The project includes custom slash commands for Claude Code to assist with development:
