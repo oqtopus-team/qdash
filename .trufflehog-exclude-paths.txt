@@ -1,3 +1,4 @@
 scripts/migrate_user_tokens\.py
 docs/design/api-testing-guidelines\.md
 tests/conftest\.py
+\.gitleaks\.toml
