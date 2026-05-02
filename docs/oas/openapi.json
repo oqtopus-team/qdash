@@ -11788,6 +11788,19 @@
           },
           "note": {
             "$ref": "#/components/schemas/NoteModel"
+          },
+          "wiring_info": {
+            "type": "string",
+            "title": "Wiring Info",
+            "default": ""
+          },
+          "wiring_blocks": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Wiring Blocks"
           }
         },
         "type": "object",
@@ -11838,6 +11851,34 @@
               }
             ],
             "title": "Ended At"
+          },
+          "wiring_info": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wiring Info",
+            "description": "Markdown export of the wiring document (derived from wiring_blocks)"
+          },
+          "wiring_blocks": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wiring Blocks",
+            "description": "BlockNote document JSON. Source of truth when present."
           }
         },
         "type": "object",

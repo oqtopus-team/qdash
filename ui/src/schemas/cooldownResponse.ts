@@ -7,6 +7,7 @@
  */
 import type { CooldownResponseEndedAt } from "./cooldownResponseEndedAt";
 import type { NoteModel } from "./noteModel";
+import type { CooldownResponseWiringBlocksItem } from "./cooldownResponseWiringBlocksItem";
 
 /**
  * Single cool-down record.
@@ -19,4 +20,6 @@ export interface CooldownResponse {
   ended_at: CooldownResponseEndedAt;
   chip_ids: string[];
   note?: NoteModel;
+  wiring_info?: string;
+  wiring_blocks?: CooldownResponseWiringBlocksItem[];
 }

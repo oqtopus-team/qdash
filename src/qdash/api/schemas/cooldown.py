@@ -1,6 +1,7 @@
 """Schemas for cool-down endpoints."""
 
 from datetime import datetime
+from typing import Any
 
 from pydantic import BaseModel, Field
 from qdash.datamodel.note import NoteModel
@@ -25,6 +26,14 @@ class CooldownUpdateRequest(BaseModel):
     description: str | None = None
     started_at: datetime | None = None
     ended_at: datetime | None = None
+    wiring_info: str | None = Field(
+        default=None,
+        description="Markdown export of the wiring document (derived from wiring_blocks)",
+    )
+    wiring_blocks: list[dict[str, Any]] | None = Field(
+        default=None,
+        description="BlockNote document JSON. Source of truth when present.",
+    )
 
 
 class CooldownResponse(BaseModel):
@@ -37,6 +46,8 @@ class CooldownResponse(BaseModel):
     ended_at: datetime | None
     chip_ids: list[str]
     note: NoteModel = Field(default_factory=NoteModel)
+    wiring_info: str = Field(default="")
+    wiring_blocks: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class ListCooldownsResponse(BaseModel):

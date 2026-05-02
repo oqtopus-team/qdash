@@ -50,6 +50,28 @@ Click **End** on an active cool-down. This:
 
 Subsequent calibration writes will have an empty `cooldown_id`.
 
+## Wiring info
+
+Each cool-down has a **Wiring info** section in its detail panel for recording
+how the fridge was wired up for that cycle (MUX assignments, attenuation,
+filters, diagrams, etc.). The editor is a Notion-style block editor that is
+**always editable** — there is no separate edit/view toggle, and changes save
+automatically (~1 s after you stop typing). A subtle *Saving… / Saved · Xs
+ago* indicator at the top-right of the section shows the autosave status.
+
+- Type <kbd>/</kbd> to insert a block: **table**, image, heading, bullet /
+  numbered / check list, toggle, quote, code, divider.
+- **Tables**: hover a row or column edge to add or delete; drag edges to
+  resize. Right-click a cell for the cell menu.
+- **Images**: paste a screenshot with <kbd>⌘/Ctrl+V</kbd>, drag a file in, or
+  insert via the slash menu. Images are embedded inline as base64; max 5 MB
+  per image to keep cool-down documents within Mongo's 16 MiB limit.
+- Drag the <kbd>⠿</kbd> handle in the left margin to reorder blocks.
+- Existing Markdown notes are imported automatically the first time the
+  section is opened.
+- Each save persists both the rich block representation (authoritative) and a
+  Markdown export (for fallback rendering and search).
+
 ## Filtering by cool-down
 
 The dashboard's filter bar shows a **Cool-down…** dropdown next to the chip
