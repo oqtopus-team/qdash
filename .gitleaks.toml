@@ -9,3 +9,7 @@ title = "QDash Gitleaks Configuration"
     '''ui/src/client/''',
     '''ui/src/schemas/''',
   ]
+  regexTarget = "match"
+  regexes = [
+    '''mongodb://root:example@mongo:27017''',
+  ]

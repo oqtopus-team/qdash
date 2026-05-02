@@ -219,7 +219,7 @@ from dataclasses import dataclass
 @dataclass
 class TestSettings:
     """Test configuration settings."""
-    mongo_test_dsn: str = os.getenv("MONGO_TEST_DSN", "mongodb://root:example@mongo:27017")
+    mongo_test_dsn: str = os.getenv("MONGO_TEST_DSN", "mongodb://localhost:27017")
     mongo_test_db: str = os.getenv("MONGO_TEST_DB", "qdash_test")
 
 
