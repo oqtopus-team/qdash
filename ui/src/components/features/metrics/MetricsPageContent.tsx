@@ -138,8 +138,8 @@ export function MetricsPageContent() {
             ? 24 * 30
             : 24 * 7; // Default to 7 days
 
-  const absoluteStartIso = startDate ? `${startDate}T00:00:00` : null;
-  const absoluteEndIso = endDate ? `${endDate}T23:59:59` : null;
+  const absoluteStartIso = startDate ? `${startDate}T00:00:00+09:00` : null;
+  const absoluteEndIso = endDate ? `${endDate}T23:59:59+09:00` : null;
 
   const metricsQueryParams = isAbsolute
     ? {
