@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { AlertCircle, Check, Loader2 } from "lucide-react";
 
-export type SaveState = "idle" | "saving" | "saved" | "error";
+type SaveState = "idle" | "saving" | "saved" | "error";
 
 function useNow(intervalMs: number, enabled: boolean): number {
   const [now, setNow] = useState(() => Date.now());
@@ -74,7 +74,7 @@ interface UseDebouncedAutosaveOptions<T> {
   save: (value: T) => Promise<void>;
 }
 
-export interface AutosaveHandle<T> {
+interface AutosaveHandle<T> {
   state: SaveState;
   savedAt: Date | null;
   /** Schedule a save (debounced). */

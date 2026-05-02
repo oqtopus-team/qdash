@@ -31,7 +31,7 @@ async function uploadAsDataUrl(file: File): Promise<string> {
   return fileToDataUrl(file);
 }
 
-export interface WiringBlockEditorProps {
+interface WiringBlockEditorProps {
   /** Current document, as opaque BlockNote JSON objects. */
   initialBlocks: Record<string, unknown>[] | undefined;
   /** Markdown to import on first mount when no blocks are present (migration). */
