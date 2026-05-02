@@ -66,7 +66,7 @@ RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
 
 # 3.2 Secret scanning tools (gitleaks + trufflehog)
 RUN GITLEAKS_VERSION="8.30.1" && \
-    curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_amd64.tar.gz" \
+    curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
       | tar xz -C /usr/local/bin gitleaks && \
     chmod +x /usr/local/bin/gitleaks
 
