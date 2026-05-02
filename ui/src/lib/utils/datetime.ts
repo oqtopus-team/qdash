@@ -15,7 +15,7 @@ export function toDateTimeLocal(isoString: string): string {
 }
 
 export function toIsoSeconds(dt: string): string {
-  if (dt.length === 16) return `${dt}:00`;
+  if (dt.length === 16) return `${dt}:00+09:00`;
   return dt;
 }
 
