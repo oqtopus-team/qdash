@@ -30,6 +30,7 @@ from qdash.api.services.metrics_service import MetricsService
 from qdash.api.services.note_service import NoteService
 from qdash.api.services.project_service import ProjectService
 from qdash.api.services.provenance_service import ProvenanceService
+from qdash.api.services.reanalysis_service import ReanalysisService
 from qdash.api.services.seed_import_service import SeedImportService
 from qdash.api.services.task_file_service import TaskFileService
 from qdash.api.services.task_result_service import TaskResultService
@@ -406,6 +407,12 @@ def get_task_file_service() -> TaskFileService:
 def get_file_service() -> FileService:
     """Get the file service instance."""
     return FileService()
+
+
+@lru_cache(maxsize=1)
+def get_reanalysis_service() -> ReanalysisService:
+    """Get the spectroscopy-reanalysis service instance."""
+    return ReanalysisService()
 
 
 @lru_cache(maxsize=1)

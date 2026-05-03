@@ -15,11 +15,17 @@ import type { Task } from "@/schemas";
 import { useGetTaskResult } from "@/client/task/task";
 import { InteractiveFigureContent } from "@/components/charts/InteractiveFigureContent";
 import { TaskFigure } from "@/components/charts/TaskFigure";
+import { ReanalysisPanel } from "@/components/features/qubit/ReanalysisPanel";
 import {
   formatDate as formatDateUtil,
   formatTime as formatTimeUtil,
   formatDateTime as formatDateTimeUtil,
 } from "@/lib/utils/datetime";
+
+const REANALYZABLE_TASKS = new Set([
+  "CheckResonatorSpectroscopy",
+  "CheckQubitSpectroscopy",
+]);
 
 interface TaskDetailModalProps {
   isOpen: boolean;
@@ -656,6 +662,21 @@ export function TaskDetailModal({
                           </tbody>
                         </table>
                       </div>
+                    </div>
+                  )}
+
+                {/* Re-analysis Panel (preview-only re-run for spectroscopy tasks) */}
+                {chipId &&
+                  task.name &&
+                  REANALYZABLE_TASKS.has(task.name) &&
+                  task.task_id && (
+                    <div className="mb-6">
+                      <ReanalysisPanel
+                        chipId={chipId}
+                        qubitId={qid}
+                        taskName={task.name}
+                        sourceTaskId={task.task_id}
+                      />
                     </div>
                   )}
 

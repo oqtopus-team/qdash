@@ -162,6 +162,7 @@ class TaskResultResponse(BaseModel):
     task_id: str
     task_name: str
     qid: str
+    chip_id: str = ""
     status: str
     execution_id: str
     flow_name: str = ""

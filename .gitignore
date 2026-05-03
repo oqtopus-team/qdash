@@ -249,3 +249,5 @@ src/tools/schedule/*
 docs/internal/*
 docs/papers/*
 config/qubex-config
+scripts/estimate_qubit_frequency
+scripts/estimate-resonator-frequency

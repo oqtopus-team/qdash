@@ -9,12 +9,18 @@ from __future__ import annotations
 
 import functools
 import itertools
+import operator
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, NamedTuple, cast
 
 import numpy as np
 import numpy.typing as npt
 import scipy.ndimage
+from qdash.analysis.spectroscopy.representative_y import (
+    FirstPointMeetingWidthFromTipStrategy,
+    HorizontalRunLengthEstimator,
+    PeakRepresentativeYStrategy,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -66,6 +72,7 @@ class F01Result(NamedTuple):
     idx_x: int
     idx_y: int
     frequency: float
+    repr_db: float
     label: int
     moment: float
     quality_level: int
@@ -132,13 +139,43 @@ class QubitResponse:
         ys: Sequence[float],
         zs: Sequence[Sequence[float]],
         config: EstimateQubitFrequencyConfig,
+        peak_repr_y_strategy: PeakRepresentativeYStrategy | None = None,
     ):
         self.xs = np.asarray(xs, dtype=np.float64)
         self.ys = np.asarray(ys, dtype=np.float64)
         self.zs = np.asarray(zs, dtype=np.float64)
         self.config = config
+        self.peak_repr_y_strategy = peak_repr_y_strategy or FirstPointMeetingWidthFromTipStrategy(
+            HorizontalRunLengthEstimator(), min_width=2
+        )
 
         self._validate_input()
+
+    def compute_representative_y(self, target_label: int) -> int:
+        """Find the y-row that represents the labelled peak (used for repr_db)."""
+        repr_y_min = int(self.zs.shape[0])
+
+        for peak in sorted(self.peaks, key=operator.attrgetter("height"), reverse=True):
+            idx_x = peak.x_start
+            idx_y = self.zs.shape[0] - peak.height
+
+            if idx_y > repr_y_min:
+                break
+
+            label = cast(int, self.zs_labeled[idx_y, idx_x])
+            if label != target_label:
+                continue
+
+            mask = self.zs_labeled == label
+            repr_y = self.peak_repr_y_strategy.compute_representative_y(
+                mask=mask,
+                tip_x=int(idx_x),
+                tip_y=int(idx_y),
+            )
+            if repr_y < repr_y_min:
+                repr_y_min = repr_y
+
+        return repr_y_min
 
     @functools.cached_property
     def zs_labeled(self) -> npt.NDArray[np.int32]:
@@ -169,12 +206,19 @@ class QubitResponse:
 
         frequency = cast(float, self.xs[idx_x])
         label = cast(int, self.zs_labeled[idx_y, idx_x])
+
+        repr_y = self.compute_representative_y(label)
+        repr_db = (
+            float(self.ys[repr_y]) if repr_y < self.zs.shape[0] else float(self.config.top_power)
+        )
+
         moment = self.compute_moment(self.zs, self.zs_labeled, self.levers, self.y_diffs, label)
         quality_level_idx = np.searchsorted(self.config.f01_moment_thresholds, moment, side="left")
         return F01Result(
             idx_x=int(idx_x),
             idx_y=idx_y,
             frequency=frequency,
+            repr_db=repr_db,
             label=label,
             moment=moment,
             quality_level=int(quality_level_idx),
@@ -336,11 +380,41 @@ class QubitResponse:
         return labeled * np.isin(labeled, valid_labels).astype(np.int32)
 
 
+def _retry_trim(
+    xs: Sequence[float],
+    ys: Sequence[float],
+    zs: Sequence[Sequence[float]],
+    config: EstimateQubitFrequencyConfig,
+) -> tuple[
+    Sequence[float], Sequence[float], Sequence[Sequence[float]], EstimateQubitFrequencyConfig
+]:
+    """Drop the highest-power row and lower top_power to that row's value.
+
+    Used to recover from cases where the topmost power row carries spurious
+    noise that prevents f01 detection.
+    """
+    new_top_power = float(ys[-1])
+    new_ys = list(ys[:-1])
+    new_zs = list(zs[:-1])
+    new_config = EstimateQubitFrequencyConfig(
+        binarize_threshold_sigma_plus=config.binarize_threshold_sigma_plus,
+        binarize_threshold_sigma_minus=config.binarize_threshold_sigma_minus,
+        top_power=new_top_power,
+        f01_height_min=config.f01_height_min,
+        f01_moment_thresholds=config.f01_moment_thresholds,
+        f12_distance_min=config.f12_distance_min,
+        f12_distance_max=config.f12_distance_max,
+        f12_height_min=config.f12_height_min,
+    )
+    return xs, new_ys, new_zs, new_config
+
+
 def estimate_qubit_frequency(
     xs: Sequence[float],
     ys: Sequence[float],
     zs: Sequence[Sequence[float]],
     config: EstimateQubitFrequencyConfig | None = None,
+    retry_with_trim: bool = False,
 ) -> QubitFrequencyResult:
     """Estimate qubit frequencies from 2D spectroscopy data.
 
@@ -349,6 +423,9 @@ def estimate_qubit_frequency(
         ys: Power values (y-axis, in dB).
         zs: 2D intensity data (power x frequency).
         config: Configuration for the estimation algorithm.
+        retry_with_trim: If True and no f01 is detected on the first pass,
+            drop the topmost power row (lowering ``top_power`` to that row)
+            and try again. Mitigates spurious noise on the highest-power row.
 
     Returns:
         QubitFrequencyResult containing f01 and f12 frequency information.
@@ -357,6 +434,10 @@ def estimate_qubit_frequency(
         config = EstimateQubitFrequencyConfig()
 
     qubit_response = QubitResponse(xs, ys, zs, config)
+
+    if qubit_response.f01 is None and retry_with_trim and len(ys) >= 3:
+        xs, ys, zs, config = _retry_trim(xs, ys, zs, config)
+        qubit_response = QubitResponse(xs, ys, zs, config)
 
     return QubitFrequencyResult(
         f01=qubit_response.f01,
@@ -367,6 +448,7 @@ def estimate_qubit_frequency(
 def estimate_qubit_frequency_from_figure(
     fig: go.Figure,
     config: EstimateQubitFrequencyConfig | None = None,
+    retry_with_trim: bool = False,
 ) -> QubitFrequencyResult:
     """Estimate qubit frequencies from a plotly figure.
 
@@ -375,6 +457,7 @@ def estimate_qubit_frequency_from_figure(
              Expected to have a heatmap trace with x (frequency),
              y (power), and z (intensity) data.
         config: Configuration for the estimation algorithm.
+        retry_with_trim: See :func:`estimate_qubit_frequency`.
 
     Returns:
         QubitFrequencyResult containing f01 and f12 frequency information.
@@ -384,7 +467,7 @@ def estimate_qubit_frequency_from_figure(
     ys = list(trace.y)
     zs = list(trace.z)
 
-    return estimate_qubit_frequency(xs, ys, zs, config)
+    return estimate_qubit_frequency(xs, ys, zs, config, retry_with_trim=retry_with_trim)
 
 
 def create_marked_figure(
@@ -415,6 +498,15 @@ def create_marked_figure(
             line_color=f01_color,
             line_dash="dash",
         )
+        marked_fig.add_trace(
+            pgo.Scatter(
+                x=[result.f01.frequency],
+                y=[result.f01.repr_db],
+                mode="markers",
+                marker={"color": f01_color, "size": 8, "symbol": "x"},
+                showlegend=False,
+            )
+        )
 
     if result.f12 is not None:
         marked_fig.add_vline(
@@ -430,17 +522,19 @@ def create_marked_figure(
 def estimate_and_mark_figure(
     fig: go.Figure,
     config: EstimateQubitFrequencyConfig | None = None,
+    retry_with_trim: bool = False,
 ) -> tuple[go.Figure, QubitFrequencyResult]:
     """Estimate qubit frequencies and create a marked figure.
 
     Args:
         fig: Plotly figure containing the spectroscopy data.
         config: Configuration for the estimation algorithm.
+        retry_with_trim: See :func:`estimate_qubit_frequency`.
 
     Returns:
         A tuple of (marked_figure, result).
     """
-    result = estimate_qubit_frequency_from_figure(fig, config)
+    result = estimate_qubit_frequency_from_figure(fig, config, retry_with_trim=retry_with_trim)
     marked_fig = create_marked_figure(fig, result)
 
     return marked_fig, result
