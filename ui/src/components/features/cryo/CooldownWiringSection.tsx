@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 
 import { useUpdateCooldown } from "@/client/cooldown/cooldown";
 
+import { CooldownWiringHistory } from "./CooldownWiringHistory";
 import { SaveStatus, useDebouncedAutosave } from "./SaveStatus";
 
 const WiringBlockEditor = dynamic(
@@ -94,6 +95,10 @@ export function CooldownWiringSection({
         Type <kbd className="kbd kbd-xs">/</kbd> for blocks (table, image,
         heading, list, toggle, code, …). Paste images with{" "}
         <kbd className="kbd kbd-xs">⌘/Ctrl+V</kbd>. Changes save automatically.
+      </div>
+
+      <div className="mt-3">
+        <CooldownWiringHistory cooldownId={cooldownId} />
       </div>
     </div>
   );

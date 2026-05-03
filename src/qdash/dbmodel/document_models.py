@@ -5,6 +5,7 @@ from qdash.dbmodel.calibration_note import CalibrationNoteDocument
 from qdash.dbmodel.chip import ChipDocument
 from qdash.dbmodel.chip_history import ChipHistoryDocument
 from qdash.dbmodel.cooldown import CooldownDocument
+from qdash.dbmodel.cooldown_wiring_event import CooldownWiringEventDocument
 from qdash.dbmodel.coupling import CouplingDocument
 from qdash.dbmodel.coupling_history import CouplingHistoryDocument
 from qdash.dbmodel.cryostat import CryostatDocument
@@ -56,6 +57,7 @@ def document_models() -> list[Any]:
         NoteEventDocument,
         CryostatDocument,
         CooldownDocument,
+        CooldownWiringEventDocument,
         # Provenance tracking
         ParameterVersionDocument,
         ProvenanceRelationDocument,

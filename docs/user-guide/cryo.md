@@ -72,6 +72,22 @@ ago* indicator at the top-right of the section shows the autosave status.
 - Each save persists both the rich block representation (authoritative) and a
   Markdown export (for fallback rendering and search).
 
+### Wiring history (checkpoints)
+
+Autosave keeps the *current* wiring up to date but does not preserve a
+history. When the wiring actually changes during a cool-down (e.g. a MUX line
+is swapped, attenuators are added), record a **checkpoint**:
+
+1. Below the editor, click **Save checkpoint**.
+2. Briefly describe what changed (required, e.g. *"Swapped MUX line on Q3
+   readout after warm-up"*) and confirm.
+
+Each checkpoint captures the actor, the comment, and a Markdown snapshot of
+the wiring at that moment. Checkpoints appear in the **Wiring history** list
+underneath the editor — click an entry to expand it and view the snapshot.
+Snapshots are append-only, so you can always trace which configuration
+produced which calibration data within the same cool-down.
+
 ## Filtering by cool-down
 
 The dashboard's filter bar shows a **Cool-down…** dropdown next to the chip
