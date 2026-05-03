@@ -78,6 +78,7 @@ class FidelityCondition(BaseModel):
     min: float
     max: float
     is_within_24h: bool = True
+    metric: str | None = None
 
 
 class Condition(BaseModel):
