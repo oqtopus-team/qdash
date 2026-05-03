@@ -3419,6 +3419,172 @@
         }
       }
     },
+    "/chips/{chip_id}/qubits/{qid}/reanalyze/resonator-spectroscopy": {
+      "post": {
+        "tags": [
+          "chip"
+        ],
+        "summary": "Re-run resonator spectroscopy analysis on a stored task result (preview)",
+        "description": "Re-run the resonator-spectroscopy analysis on a previously stored figure.\n\nReturns the marked figure and the re-estimated `readout_frequency` for\nthe requested qubit. The DB is **not** mutated; this is a preview only.",
+        "operationId": "reanalyzeResonatorSpectroscopy",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chip_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Chip Id"
+            }
+          },
+          {
+            "name": "qid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Qid"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReanalyzeResonatorSpectroscopyRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReanalyzeResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chips/{chip_id}/qubits/{qid}/reanalyze/qubit-spectroscopy": {
+      "post": {
+        "tags": [
+          "chip"
+        ],
+        "summary": "Re-run qubit spectroscopy analysis on a stored task result (preview)",
+        "description": "Re-run the qubit-spectroscopy analysis on a previously stored figure.\n\nReturns the marked figure and the re-estimated `qubit_frequency`,\n`f01_repr_db`, `f01_quality_level`, and `anharmonicity` for the requested\nqubit. The DB is **not** mutated; this is a preview only.",
+        "operationId": "reanalyzeQubitSpectroscopy",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chip_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Chip Id"
+            }
+          },
+          {
+            "name": "qid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Qid"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReanalyzeQubitSpectroscopyRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReanalyzeResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/chips/{chip_id}/couplings": {
       "get": {
         "tags": [
@@ -16532,6 +16698,299 @@
         "title": "ReExecutionEntry",
         "description": "A child task result created by re-execution."
       },
+      "ReanalyzeOutputParameter": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "value": {
+            "type": "number",
+            "title": "Value"
+          },
+          "unit": {
+            "type": "string",
+            "title": "Unit",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "value"
+        ],
+        "title": "ReanalyzeOutputParameter",
+        "description": "A single re-analyzed output value."
+      },
+      "ReanalyzeQubitSpectroscopyParams": {
+        "properties": {
+          "binarize_threshold_sigma_plus": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Binarize Threshold Sigma Plus"
+          },
+          "binarize_threshold_sigma_minus": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Binarize Threshold Sigma Minus"
+          },
+          "top_power": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Top Power"
+          },
+          "f01_height_min": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "F01 Height Min"
+          },
+          "f12_distance_min": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "F12 Distance Min"
+          },
+          "f12_distance_max": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "F12 Distance Max"
+          },
+          "f12_height_min": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "F12 Height Min"
+          },
+          "retry_with_trim": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retry With Trim",
+            "description": "If true, retry after trimming the highest-power row when no f01 is found."
+          }
+        },
+        "type": "object",
+        "title": "ReanalyzeQubitSpectroscopyParams",
+        "description": "Optional analysis-parameter overrides for qubit spectroscopy."
+      },
+      "ReanalyzeQubitSpectroscopyRequest": {
+        "properties": {
+          "source_task_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Task Id",
+            "description": "Task result to re-analyze. If omitted, the latest matching task result for the (chip_id, qid) is used."
+          },
+          "parameters": {
+            "$ref": "#/components/schemas/ReanalyzeQubitSpectroscopyParams"
+          }
+        },
+        "type": "object",
+        "title": "ReanalyzeQubitSpectroscopyRequest",
+        "description": "Request body for re-running CheckQubitSpectroscopy analysis."
+      },
+      "ReanalyzeResonatorSpectroscopyParams": {
+        "properties": {
+          "num_resonators": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Num Resonators",
+            "description": "Number of resonators to detect in the MUX (typically 4)."
+          },
+          "high_power_min": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "High Power Min",
+            "description": "Minimum power (dB) for the high-power region."
+          },
+          "high_power_max": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "High Power Max",
+            "description": "Maximum power (dB) for the high-power region."
+          },
+          "low_power": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Low Power",
+            "description": "Power level (dB) sampled for low-power peaks."
+          },
+          "bare_shift_estimator_type": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "config",
+                  "high_frequency_strength"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bare Shift Estimator Type",
+            "description": "If 'high_frequency_strength', the high/low-power boundary is auto-detected from the FFT energy of each row, overriding high_power_min/max/low_power."
+          },
+          "bare_shift_strength_limit": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bare Shift Strength Limit",
+            "description": "Strength cutoff for the high_frequency_strength estimator."
+          }
+        },
+        "type": "object",
+        "title": "ReanalyzeResonatorSpectroscopyParams",
+        "description": "Optional analysis-parameter overrides for resonator spectroscopy.\n\nAny field left ``None`` falls back to the default in\n:class:`EstimateResonatorFrequencyConfig`."
+      },
+      "ReanalyzeResonatorSpectroscopyRequest": {
+        "properties": {
+          "source_task_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Task Id",
+            "description": "Task result to re-analyze. If omitted, the latest matching task result for the (chip_id, qid) is used."
+          },
+          "parameters": {
+            "$ref": "#/components/schemas/ReanalyzeResonatorSpectroscopyParams"
+          }
+        },
+        "type": "object",
+        "title": "ReanalyzeResonatorSpectroscopyRequest",
+        "description": "Request body for re-running CheckResonatorSpectroscopy analysis."
+      },
+      "ReanalyzeResponse": {
+        "properties": {
+          "source_task_id": {
+            "type": "string",
+            "title": "Source Task Id",
+            "description": "Task result whose data was re-analyzed."
+          },
+          "source_task_name": {
+            "type": "string",
+            "title": "Source Task Name"
+          },
+          "qid": {
+            "type": "string",
+            "title": "Qid"
+          },
+          "figure": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Figure",
+            "description": "Plotly figure JSON of the re-analyzed result with markers."
+          },
+          "output_parameters": {
+            "items": {
+              "$ref": "#/components/schemas/ReanalyzeOutputParameter"
+            },
+            "type": "array",
+            "title": "Output Parameters"
+          },
+          "committed": {
+            "type": "boolean",
+            "title": "Committed",
+            "description": "Always false in this version; persisting changes will land later.",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "source_task_id",
+          "source_task_name",
+          "qid",
+          "figure",
+          "output_parameters"
+        ],
+        "title": "ReanalyzeResponse",
+        "description": "Preview response from a reanalyze endpoint.\n\n``figure`` carries a Plotly figure as a plain JSON dict so the UI can\nrender it directly. The DB is *not* mutated by this endpoint; commit\nwill be added in a follow-up."
+      },
       "RecalibrationRecommendationResponse": {
         "properties": {
           "source_entity_id": {
@@ -18158,6 +18617,11 @@
           "qid": {
             "type": "string",
             "title": "Qid"
+          },
+          "chip_id": {
+            "type": "string",
+            "title": "Chip Id",
+            "default": ""
           },
           "status": {
             "type": "string",

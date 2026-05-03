@@ -10,6 +10,12 @@ import { useGetQubitTaskHistory } from "@/client/task-result/task-result";
 import { PlotlyRenderer } from "@/components/charts/PlotlyRenderer";
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { TaskGridView } from "@/components/features/chip/TaskGridView";
+import { ReanalysisPanel } from "@/components/features/qubit/ReanalysisPanel";
+
+const REANALYZABLE_TASKS = new Set([
+  "CheckResonatorSpectroscopy",
+  "CheckQubitSpectroscopy",
+]);
 
 interface TaskHistoryViewerProps {
   chipId: string;
@@ -399,6 +405,18 @@ export function TaskHistoryViewer({
                           </tbody>
                         </table>
                       </div>
+                    </div>
+                  )}
+
+                  {/* Reanalysis Panel (preview-only re-run of analysis) */}
+                  {REANALYZABLE_TASKS.has(selectedTask.name ?? "") && (
+                    <div className="mb-6">
+                      <ReanalysisPanel
+                        chipId={chipId}
+                        qubitId={qubitId}
+                        taskName={selectedTask.name ?? ""}
+                        sourceTaskId={selectedTask.taskId}
+                      />
                     </div>
                   )}
 

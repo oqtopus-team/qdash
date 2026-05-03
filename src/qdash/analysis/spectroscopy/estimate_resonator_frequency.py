@@ -17,6 +17,7 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
     import plotly.graph_objs as go
+    from qdash.analysis.spectroscopy.bare_shift import BareShiftBoundary
 
 import numpy as np
 from scipy.ndimage import convolve1d
@@ -70,13 +71,33 @@ class Resonance:
         return -1
 
     @functools.cached_property
-    def score(self) -> tuple[float, float]:
-        """Score tuple (high_power_grad, low_power_prominence) for ranking."""
-        return (self.high_power_grad, self.low_power_prominence)
+    def score(self) -> tuple[bool, bool, float, float]:
+        """Score tuple used to rank resonances.
+
+        Order of preference (descending):
+          1. has a high-power peak group
+          2. has a low-power peak
+          3. high_power_grad (more strongly downward-sloped is better)
+          4. max_prominence across all peaks
+        """
+        return (
+            self.has_high_power_peaks,
+            self.has_low_power_peak,
+            self.high_power_grad,
+            self.max_prominence,
+        )
+
+    @functools.cached_property
+    def has_high_power_peaks(self) -> bool:
+        return bool(self.high_power_peaks)
+
+    @functools.cached_property
+    def has_low_power_peak(self) -> bool:
+        return bool(self.low_power_peak)
 
     @functools.cached_property
     def high_power_grad(self) -> float:
-        """Maximum gradient in the high-power peak group."""
+        """Maximum (least-negative) downward gradient between high-power peaks."""
         if len(self.peaks) <= 1:
             return float("-inf")
         return max(self._compute_grad(p0, p1) for p0, p1 in itertools.combinations(self.peaks, 2))
@@ -92,16 +113,21 @@ class Resonance:
         return peaks
 
     @property
-    def low_power_prominence(self) -> float:
-        """Prominence of the low-power peak."""
-        return self.low_power_peak.prominence if self.low_power_peak else 0.0
+    def max_prominence(self) -> float:
+        """Maximum prominence across all peaks of this resonance."""
+        if not self.peaks:
+            return 0.0
+        return max(peak.prominence for peak in self.peaks)
 
     @staticmethod
     def _compute_grad(p0: Peak, p1: Peak) -> float:
-        """Compute gradient between two peaks."""
+        """Compute gradient between two peaks; -inf if not strictly downward."""
         if p0.x == p1.x:
             return float("-inf")
-        return float((p1.y - p0.y) / (p1.x - p0.x))
+        grad = float((p1.y - p0.y) / (p1.x - p0.x))
+        if grad > 0:
+            return float("-inf")
+        return grad
 
 
 @dataclass
@@ -115,7 +141,7 @@ class FindPeaksConfig:
 
 @dataclass
 class GroupPeaksConfig:
-    """Configuration for peak grouping."""
+    """Configuration for high-power peak grouping."""
 
     x_backward_max: int = 2
     x_distance_max: int = 25
@@ -123,14 +149,15 @@ class GroupPeaksConfig:
 
 @dataclass
 class ComposeResonancesConfig:
-    """Configuration for resonance composition."""
+    """Configuration for high/low-power peak pairing into resonances."""
 
     x_distance_max: int = 25
+    x_backward_max: int = 2
 
 
 @dataclass
 class GroupResonancesConfig:
-    """Configuration for resonance grouping."""
+    """Configuration for nearby-resonance grouping."""
 
     x_distance_max: int = 25
 
@@ -140,8 +167,8 @@ class EstimateResonatorFrequencyConfig:
     """Configuration for resonator frequency estimation."""
 
     num_resonators: int = 4
-    high_power_min: float = -20.0
-    high_power_max: float = 0.0
+    high_power_min: float | None = -20.0
+    high_power_max: float | None = 0.0
     low_power: float = -30.0
     find_peaks_conf_high: FindPeaksConfig = field(default_factory=FindPeaksConfig)
     find_peaks_conf_low: FindPeaksConfig = field(
@@ -152,6 +179,20 @@ class EstimateResonatorFrequencyConfig:
         default_factory=ComposeResonancesConfig
     )
     group_resonances_conf: GroupResonancesConfig = field(default_factory=GroupResonancesConfig)
+
+    def with_boundary(self, boundary: BareShiftBoundary) -> EstimateResonatorFrequencyConfig:
+        """Return a copy of this config with power bounds taken from a boundary."""
+        return EstimateResonatorFrequencyConfig(
+            num_resonators=self.num_resonators,
+            high_power_min=boundary.high_power_min,
+            high_power_max=boundary.high_power_max,
+            low_power=boundary.low_power,
+            find_peaks_conf_high=self.find_peaks_conf_high,
+            find_peaks_conf_low=self.find_peaks_conf_low,
+            group_peaks_conf=self.group_peaks_conf,
+            compose_resonances_conf=self.compose_resonances_conf,
+            group_resonances_conf=self.group_resonances_conf,
+        )
 
 
 def _detect_peaks(
@@ -224,38 +265,48 @@ def _compose_resonances(
     peak_groups: Sequence[PeakGroup],
     low_power_peaks: Sequence[Peak],
     x_distance_max: int,
+    x_backward_max: int,
 ) -> list[Resonance]:
-    """Compose resonances by matching high-power peak groups with low-power peaks."""
+    """Pair adjacent high-power groups and low-power peaks into resonances.
+
+    Walks the merged-and-sorted sequence of peak groups and low-power peaks
+    once. When a low/high pair is adjacent and the offset is within the
+    geometric tolerances, the two are paired into a single Resonance and the
+    second item is consumed (``skip``). Otherwise the leading item becomes a
+    standalone resonance.
+    """
     arr_high: list[tuple[PeakGroup | Peak, int]] = [(peak_group, 0) for peak_group in peak_groups]
     arr_low: list[tuple[PeakGroup | Peak, int]] = [(peak, 1) for peak in low_power_peaks]
 
     arr = sorted(arr_high + arr_low, key=lambda item: (item[0].x, item[1]))
-    arr_items: list[PeakGroup | Peak] = [item[0] for item in arr]
+    items: list[PeakGroup | Peak | None] = [item[0] for item in arr]
+    items.append(None)
 
     resonances: list[Resonance] = []
+    skip = False
 
-    for p0, p1 in itertools.pairwise(arr_items):
+    for p0, p1 in itertools.pairwise(items):
+        if skip:
+            skip = False
+            continue
+
         match p0, p1:
-            case Peak(), _:
-                if resonances and (_peak := resonances[-1].low_power_peak) and p0.x == _peak.x:
-                    pass
+            case Peak(), PeakGroup():
+                if p1.x - p0.x <= x_backward_max:
+                    resonances.append(Resonance(p1, p0))
+                    skip = True
                 else:
                     resonances.append(Resonance(None, p0))
             case PeakGroup(), Peak():
                 if p1.x - p0.x < (p0.y - p1.y) * x_distance_max:
                     resonances.append(Resonance(p0, p1))
+                    skip = True
                 else:
                     resonances.append(Resonance(p0, None))
-            case PeakGroup(), PeakGroup():
+            case Peak(), (Peak() | None):
+                resonances.append(Resonance(None, p0))
+            case PeakGroup(), (PeakGroup() | None):
                 resonances.append(Resonance(p0, None))
-
-    if arr_items:
-        last = arr_items[-1]
-        if isinstance(last, PeakGroup):
-            resonances.append(Resonance(last, None))
-        elif isinstance(last, Peak):
-            if not (resonances and (_peak := resonances[-1].low_power_peak) and last.x == _peak.x):
-                resonances.append(Resonance(None, last))
 
     return resonances
 
@@ -290,36 +341,21 @@ def _arg_closest(arr: Sequence[float], v: float) -> int:
     return int(np.argmin([abs(x - v) for x in arr]))
 
 
-def estimate_resonator_frequency(
-    xs: Sequence[float],
+def _detect_high_power_peak_groups(
     ys: Sequence[float],
     zs: Sequence[Sequence[float]],
-    config: EstimateResonatorFrequencyConfig | None = None,
-) -> tuple[list[Resonance], list[float]]:
-    """Estimate resonator frequencies from 2D spectroscopy data.
-
-    Args:
-        xs: Frequency values (x-axis).
-        ys: Power values (y-axis).
-        zs: 2D intensity data (power x frequency).
-        config: Configuration for the estimation algorithm.
-
-    Returns:
-        A tuple of (resonances, frequencies) where resonances is a list of
-        detected Resonance objects and frequencies is a list of estimated
-        resonator frequencies in the same units as xs.
-    """
-    if config is None:
-        config = EstimateResonatorFrequencyConfig()
+    config: EstimateResonatorFrequencyConfig,
+) -> list[PeakGroup]:
+    """Detect and group peaks across the high-power rows of zs."""
+    if config.high_power_min is None or config.high_power_max is None:
+        return []
 
     y_idx_high_min = _arg_closest(ys, config.high_power_min)
     y_idx_high_max = _arg_closest(ys, config.high_power_max)
-    y_idx_low = _arg_closest(ys, config.low_power)
 
     if y_idx_high_min > y_idx_high_max:
         y_idx_high_min, y_idx_high_max = y_idx_high_max, y_idx_high_min
 
-    # 1. Detect peaks in the high-power region
     high_power_peaks: list[Peak] = []
     for y_idx in range(y_idx_high_min, y_idx_high_max + 1):
         peak_xs, prominences = _detect_peaks(
@@ -334,13 +370,20 @@ def estimate_resonator_frequency(
             for peak_idx, prominence in zip(peak_xs, prominences, strict=False)
         )
 
-    peak_groups = _group_peaks(
+    return _group_peaks(
         high_power_peaks,
         config.group_peaks_conf.x_backward_max,
         config.group_peaks_conf.x_distance_max,
     )
 
-    # 2. Detect peaks in the low-power region
+
+def _detect_low_power_peaks(
+    ys: Sequence[float],
+    zs: Sequence[Sequence[float]],
+    config: EstimateResonatorFrequencyConfig,
+) -> list[Peak]:
+    """Detect peaks in the low-power row of zs."""
+    y_idx_low = _arg_closest(ys, config.low_power)
     peak_xs, prominences = _detect_peaks(
         trace=zs[y_idx_low],
         num_resonators=config.num_resonators * 2,
@@ -348,36 +391,79 @@ def estimate_resonator_frequency(
         distance=config.find_peaks_conf_low.distance,
         prominence=config.find_peaks_conf_low.prominence,
     )
-    low_power_peaks = [
+    return [
         Peak(peak_idx, y_idx_low, prominence)
         for peak_idx, prominence in zip(peak_xs, prominences, strict=False)
     ]
 
-    # 3. Compose and score resonances
+
+def _select_resonances(
+    peak_groups: Sequence[PeakGroup],
+    low_power_peaks: Sequence[Peak],
+    config: EstimateResonatorFrequencyConfig,
+) -> tuple[list[Resonance], list[Resonance]]:
+    """Compose, group and rank resonances; return (selected, rejected)."""
     composed = _compose_resonances(
-        peak_groups, low_power_peaks, config.compose_resonances_conf.x_distance_max
+        peak_groups,
+        low_power_peaks,
+        config.compose_resonances_conf.x_distance_max,
+        config.compose_resonances_conf.x_backward_max,
     )
     grouped = _group_resonances(composed, config.group_resonances_conf.x_distance_max)
 
-    resonances = []
+    selected: list[Resonance] = []
+    rejected: list[Resonance] = []
     for res_group in grouped:
         sorted_group = sorted(res_group, key=attrgetter("score"), reverse=True)
-        resonances.append(sorted_group[0])
+        selected.append(sorted_group[0])
+        rejected.extend(sorted_group[1:])
 
-    resonances = sorted(resonances, key=attrgetter("score"), reverse=True)
-    resonances = resonances[: config.num_resonators]
-    resonances = sorted(resonances, key=attrgetter("x"))
+    selected = sorted(selected, key=attrgetter("score"), reverse=True)
+    rejected.extend(selected[config.num_resonators :])
+    selected = selected[: config.num_resonators]
 
-    # Convert x indices to frequencies
-    frequencies = [float(xs[r.x]) for r in resonances]
+    selected = sorted(selected, key=attrgetter("x"))
+    rejected = sorted(rejected, key=attrgetter("x"))
 
-    return resonances, frequencies
+    return selected, rejected
+
+
+def estimate_resonator_frequency(
+    xs: Sequence[float],
+    ys: Sequence[float],
+    zs: Sequence[Sequence[float]],
+    config: EstimateResonatorFrequencyConfig | None = None,
+) -> tuple[list[Resonance], list[Resonance], list[float]]:
+    """Estimate resonator frequencies from 2D spectroscopy data.
+
+    Args:
+        xs: Frequency values (x-axis).
+        ys: Power values (y-axis).
+        zs: 2D intensity data (power x frequency).
+        config: Configuration for the estimation algorithm.
+
+    Returns:
+        A tuple of (resonances, rejected, frequencies):
+        - resonances: list of selected Resonance objects (top ``num_resonators``).
+        - rejected: list of Resonance objects rejected by grouping/scoring.
+        - frequencies: list of estimated resonator frequencies (same units as xs).
+    """
+    if config is None:
+        config = EstimateResonatorFrequencyConfig()
+
+    peak_groups = _detect_high_power_peak_groups(ys, zs, config)
+    low_power_peaks = _detect_low_power_peaks(ys, zs, config)
+    selected, rejected = _select_resonances(peak_groups, low_power_peaks, config)
+
+    frequencies = [float(xs[r.x]) for r in selected]
+
+    return selected, rejected, frequencies
 
 
 def estimate_resonator_frequency_from_figure(
     fig: go.Figure,
     config: EstimateResonatorFrequencyConfig | None = None,
-) -> tuple[list[Resonance], list[float]]:
+) -> tuple[list[Resonance], list[Resonance], list[float]]:
     """Estimate resonator frequencies from a plotly figure.
 
     Args:
@@ -387,9 +473,8 @@ def estimate_resonator_frequency_from_figure(
         config: Configuration for the estimation algorithm.
 
     Returns:
-        A tuple of (resonances, frequencies).
+        A tuple of (resonances, rejected, frequencies).
     """
-    # Extract data from plotly figure
     trace = fig.data[0]
     xs = list(trace.x)
     ys = list(trace.y)
@@ -436,10 +521,8 @@ def create_marked_figure(
     """
     import plotly.graph_objects as pgo
 
-    # Create a new figure based on the original
     marked_fig = pgo.Figure(fig)
 
-    # Get the data arrays from the figure
     trace = fig.data[0]
     xs = list(trace.x)
     ys = list(trace.y)
@@ -448,9 +531,7 @@ def create_marked_figure(
     if rejected_resonances:
         all_resonances.extend(rejected_resonances)
 
-    # Add markers for high-power peaks if enabled
     if show_high_power_peaks:
-        # Collect all peak groups and sort by x position
         peak_groups = sorted(
             [res.high_power_peaks for res in all_resonances if res.high_power_peaks is not None],
             key=lambda pg: pg.x,
@@ -475,7 +556,6 @@ def create_marked_figure(
                 )
             )
 
-    # Add vertical lines for selected resonances
     for resonance in resonances:
         marked_fig.add_vline(
             x=xs[resonance.x],
@@ -484,7 +564,6 @@ def create_marked_figure(
             line_dash="dash",
         )
 
-    # Add vertical lines for rejected resonances
     if rejected_resonances:
         for resonance in rejected_resonances:
             marked_fig.add_vline(
@@ -512,80 +591,8 @@ def estimate_and_mark_figure(
     Returns:
         A tuple of (marked_figure, resonances, frequencies).
     """
-    if config is None:
-        config = EstimateResonatorFrequencyConfig()
+    resonances, rejected, frequencies = estimate_resonator_frequency_from_figure(fig, config)
 
-    # Extract data from plotly figure
-    trace = fig.data[0]
-    xs = list(trace.x)
-    ys = list(trace.y)
-    zs = list(trace.z)
-
-    # Run estimation to get both selected and rejected resonances
-    y_idx_high_min = _arg_closest(ys, config.high_power_min)
-    y_idx_high_max = _arg_closest(ys, config.high_power_max)
-    y_idx_low = _arg_closest(ys, config.low_power)
-
-    if y_idx_high_min > y_idx_high_max:
-        y_idx_high_min, y_idx_high_max = y_idx_high_max, y_idx_high_min
-
-    # 1. Detect peaks in the high-power region
-    high_power_peaks: list[Peak] = []
-    for y_idx in range(y_idx_high_min, y_idx_high_max + 1):
-        peak_xs, prominences = _detect_peaks(
-            trace=zs[y_idx],
-            num_resonators=config.num_resonators * 2,
-            smooth_sigma=config.find_peaks_conf_high.smooth_sigma,
-            distance=config.find_peaks_conf_high.distance,
-            prominence=config.find_peaks_conf_high.prominence,
-        )
-        high_power_peaks.extend(
-            Peak(peak_idx, y_idx, prominence)
-            for peak_idx, prominence in zip(peak_xs, prominences, strict=False)
-        )
-
-    peak_groups = _group_peaks(
-        high_power_peaks,
-        config.group_peaks_conf.x_backward_max,
-        config.group_peaks_conf.x_distance_max,
-    )
-
-    # 2. Detect peaks in the low-power region
-    peak_xs, prominences = _detect_peaks(
-        trace=zs[y_idx_low],
-        num_resonators=config.num_resonators * 2,
-        smooth_sigma=config.find_peaks_conf_low.smooth_sigma,
-        distance=config.find_peaks_conf_low.distance,
-        prominence=config.find_peaks_conf_low.prominence,
-    )
-    low_power_peaks = [
-        Peak(peak_idx, y_idx_low, prominence)
-        for peak_idx, prominence in zip(peak_xs, prominences, strict=False)
-    ]
-
-    # 3. Compose and score resonances
-    composed = _compose_resonances(
-        peak_groups, low_power_peaks, config.compose_resonances_conf.x_distance_max
-    )
-    grouped = _group_resonances(composed, config.group_resonances_conf.x_distance_max)
-
-    all_resonances = []
-    rejected = []
-    for res_group in grouped:
-        sorted_group = sorted(res_group, key=attrgetter("score"), reverse=True)
-        all_resonances.append(sorted_group[0])
-        rejected.extend(sorted_group[1:])
-
-    all_resonances = sorted(all_resonances, key=attrgetter("score"), reverse=True)
-    rejected.extend(all_resonances[config.num_resonators :])
-    resonances = all_resonances[: config.num_resonators]
-    resonances = sorted(resonances, key=attrgetter("x"))
-    rejected = sorted(rejected, key=attrgetter("x"))
-
-    # Convert x indices to frequencies
-    frequencies = [float(xs[r.x]) for r in resonances]
-
-    # Create marked figure
     marked_fig = create_marked_figure(
         fig,
         resonances,

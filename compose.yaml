@@ -78,6 +78,7 @@ services:
       - prefect-server
     volumes:
       - ./src/qdash/workflow:/app/qdash/workflow
+      - ./src/qdash/analysis:/app/qdash/analysis # Shared spectroscopy analysis (also used by api)
       - ./src/qdash/dbmodel:/app/qdash/dbmodel
       - ./src/qdash/datamodel:/app/qdash/datamodel
       - ./src/qdash/common:/app/qdash/common
@@ -107,6 +108,7 @@ services:
       - deployment-service
     volumes:
       - ./src/qdash/workflow:/app/qdash/workflow
+      - ./src/qdash/analysis:/app/qdash/analysis # Shared spectroscopy analysis
       - ./src/qdash/dbmodel:/app/qdash/dbmodel
       - ./src/qdash/datamodel:/app/qdash/datamodel
       - ./src/qdash/common:/app/qdash/common
@@ -137,6 +139,7 @@ services:
       - "${API_PORT:-5715}:${API_PORT:-5715}"
     volumes:
       - ./src/qdash/api:/app/qdash/api
+      - ./src/qdash/analysis:/app/qdash/analysis # Shared spectroscopy analysis (used by reanalysis service)
       - ./src/qdash/dbmodel:/app/qdash/dbmodel
       - ./src/qdash/datamodel:/app/qdash/datamodel
       - ./src/qdash/common:/app/qdash/common
