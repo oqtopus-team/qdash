@@ -12,6 +12,7 @@ from qdash.api.routers import (
     chip,
     config,
     cooldown,
+    cooldown_wiring_event,
     copilot,
     cryostat,
     device_topology,
@@ -120,6 +121,11 @@ app.include_router(
 app.include_router(note.router, tags=["note"], dependencies=auth_dependency)
 app.include_router(cryostat.router, tags=["cryostat"], dependencies=auth_dependency)
 app.include_router(cooldown.router, tags=["cooldown"], dependencies=auth_dependency)
+app.include_router(
+    cooldown_wiring_event.router,
+    tags=["cooldown-wiring"],
+    dependencies=auth_dependency,
+)
 app.include_router(
     topology.router, prefix="/topology", tags=["topology"], dependencies=auth_dependency
 )

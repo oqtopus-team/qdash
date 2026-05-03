@@ -50,7 +50,8 @@
       "WebFetch(domain:vercel.com)",
       "Bash(bunx tsc *)",
       "Bash(bunx prettier *)",
-      "Bash(bunx eslint *)"
+      "Bash(bunx eslint *)",
+      "Bash(task check *)"
     ],
     "deny": []
   },

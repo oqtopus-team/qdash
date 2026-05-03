@@ -9803,6 +9803,165 @@
         }
       }
     },
+    "/cooldowns/{cooldown_id}/wiring-checkpoint": {
+      "post": {
+        "tags": [
+          "cooldown-wiring"
+        ],
+        "summary": "Record a wiring change checkpoint within a cool-down",
+        "operationId": "createCooldownWiringCheckpoint",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "cooldown_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Cooldown Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CooldownWiringCheckpointRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CooldownWiringEventResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/cooldowns/{cooldown_id}/wiring-events": {
+      "get": {
+        "tags": [
+          "cooldown-wiring"
+        ],
+        "summary": "List wiring change history for a cool-down",
+        "operationId": "listCooldownWiringEvents",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "cooldown_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Cooldown Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 100,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "skip",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Skip"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListCooldownWiringEventsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/topology/list": {
       "get": {
         "tags": [
@@ -11884,6 +12043,78 @@
         "type": "object",
         "title": "CooldownUpdateRequest",
         "description": "Body for updating a cool-down. All fields optional."
+      },
+      "CooldownWiringCheckpointRequest": {
+        "properties": {
+          "comment": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Comment",
+            "description": "Why the wiring changed at this point in time"
+          }
+        },
+        "type": "object",
+        "required": [
+          "comment"
+        ],
+        "title": "CooldownWiringCheckpointRequest",
+        "description": "Body for recording a wiring change checkpoint within a cool-down."
+      },
+      "CooldownWiringEventResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "cooldown_id": {
+            "type": "string",
+            "title": "Cooldown Id"
+          },
+          "actor": {
+            "type": "string",
+            "title": "Actor"
+          },
+          "action": {
+            "type": "string",
+            "title": "Action"
+          },
+          "comment": {
+            "type": "string",
+            "title": "Comment"
+          },
+          "wiring_info_snapshot": {
+            "type": "string",
+            "title": "Wiring Info Snapshot"
+          },
+          "block_count": {
+            "type": "integer",
+            "title": "Block Count"
+          },
+          "image_count": {
+            "type": "integer",
+            "title": "Image Count"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "cooldown_id",
+          "actor",
+          "action",
+          "comment",
+          "wiring_info_snapshot",
+          "block_count",
+          "image_count",
+          "created_at"
+        ],
+        "title": "CooldownWiringEventResponse",
+        "description": "One wiring-history entry for a cool-down."
       },
       "Coupling": {
         "properties": {
@@ -13995,6 +14226,22 @@
         ],
         "title": "ListChipsResponse",
         "description": "Response model for listing chips."
+      },
+      "ListCooldownWiringEventsResponse": {
+        "properties": {
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/CooldownWiringEventResponse"
+            },
+            "type": "array",
+            "title": "Events"
+          }
+        },
+        "type": "object",
+        "required": [
+          "events"
+        ],
+        "title": "ListCooldownWiringEventsResponse"
       },
       "ListCooldownsResponse": {
         "properties": {
