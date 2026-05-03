@@ -176,8 +176,9 @@ class DeviceTopologyService:
                 continue
 
             use_24h = request.condition.qubit_fidelity.is_within_24h
+            qubit_fidelity_metric = request.condition.qubit_fidelity.metric or "x90_gate_fidelity"
             x90_gate_fidelity = _get_value_within_24h_fallback(
-                qubit_doc.data.get("x90_gate_fidelity", {}), use_24h, 0.25
+                qubit_doc.data.get(qubit_fidelity_metric, {}), use_24h, 0.25
             )
             t1 = _get_value_within_24h_fallback(qubit_doc.data.get("t1", {}), use_24h, 100.0)
             t2 = _get_value_within_24h_fallback(qubit_doc.data.get("t2_echo", {}), use_24h, 100.0)
@@ -249,8 +250,11 @@ class DeviceTopologyService:
 
                 coupling_key = f"{control}-{target}"
                 coupling_doc = coupling_models.get(coupling_key)
+                coupling_fidelity_metric = (
+                    request.condition.coupling_fidelity.metric or "zx90_gate_fidelity"
+                )
                 coupling_data = (
-                    coupling_doc.data.get("zx90_gate_fidelity", {}) if coupling_doc else {}
+                    coupling_doc.data.get(coupling_fidelity_metric, {}) if coupling_doc else {}
                 )
                 zx90_gate_fidelity = _get_value_within_24h_fallback(
                     coupling_data,

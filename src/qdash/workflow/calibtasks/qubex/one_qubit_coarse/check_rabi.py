@@ -130,7 +130,7 @@ class CheckRabi(QubexTask):
         print("default amplitude (a.u.): ", control_amplitude_param.value)
         maximum_rabi_frequency = rabi_frequency / default_amp
         ratio = maximum_rabi_frequency / 1000
-        self.output_parameters["control_amplitude"].value = 0.0125 / ratio
+        self.output_parameters["control_amplitude"].value = min(0.0125 / ratio, 0.99)
         self.output_parameters["maximum_rabi_frequency"].value = maximum_rabi_frequency
         output_parameters = self.attach_execution_id(execution_id)
         figures = [result.data[label].fit()["fig"]]
