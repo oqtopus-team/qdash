@@ -33,6 +33,9 @@ from qdash.workflow.calibtasks.qubex.cw.check_resonator_spectroscopy import (
     CheckResonatorSpectroscopy,
 )
 from qdash.workflow.calibtasks.qubex.measurement.readout_classification import ReadoutClassification
+from qdash.workflow.calibtasks.qubex.one_qubit_coarse.check_coarse_chevron import (
+    CheckCoarseChevron,
+)
 from qdash.workflow.calibtasks.qubex.one_qubit_coarse.check_dispersive_shift import (
     CheckDispersiveShift,
 )
@@ -90,6 +93,7 @@ __all__ = [
     "CheckT1Average",
     "CheckT2Echo",
     "CheckT2EchoAverage",
+    "CheckCoarseChevron",
     "ChevronPattern",
     "CreateHPIPulse",
     "CreatePIPulse",

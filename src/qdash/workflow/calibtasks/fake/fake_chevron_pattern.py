@@ -163,7 +163,18 @@ class FakeChevronPattern(FakeTask):
             height=500,
         )
 
+        marked_fig = go.Figure(fig)
+        marked_fig.add_vline(
+            x=result["qubit_frequency"],
+            line_width=1,
+            line_color="red",
+            line_dash="dash",
+            annotation_text=f"f = {result['qubit_frequency']:.6f} GHz",
+            annotation_position="top",
+            annotation_font_color="red",
+        )
+
         return PostProcessResult(
             output_parameters=output_parameters,
-            figures=[fig],
+            figures=[fig, marked_fig],
         )

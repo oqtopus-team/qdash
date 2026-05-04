@@ -19,10 +19,14 @@ CONTROL_AMPLITUDE_MIN = 1e-4
 CONTROL_AMPLITUDE_MAX = 1.0
 
 
-class ChevronPattern(QubexTask):
-    """Task to check the chevron pattern."""
+class CheckCoarseChevron(QubexTask):
+    """Coarse chevron pattern that locates the qubit resonance with a wide, sparse sweep.
 
-    name: str = "ChevronPattern"
+    Designed to bracket spectroscopy seeds that may be off by up to ~60 MHz, so the
+    downstream ChevronPattern can use a narrow ±10 MHz window for the fine measurement.
+    """
+
+    name: str = "CheckCoarseChevron"
     task_type: str = "qubit"
     timeout: int = 60 * 240
     input_parameters: ClassVar[dict[str, ParameterModel | None]] = {
@@ -44,12 +48,12 @@ class ChevronPattern(QubexTask):
         ),
     }
     output_parameters: ClassVar[dict[str, ParameterModel]] = {
-        "qubit_frequency": ParameterModel(unit="GHz", description="Qubit bare frequency"),
+        "qubit_frequency": ParameterModel(unit="GHz", description="Qubit bare frequency (coarse)"),
         "control_amplitude": ParameterModel(
-            unit="a.u.", description="Control pulse amplitude used for chevron pattern"
+            unit="a.u.", description="Control pulse amplitude used for coarse chevron"
         ),
         "readout_amplitude": ParameterModel(
-            unit="a.u.", description="Readout amplitude used for chevron pattern"
+            unit="a.u.", description="Readout amplitude used for coarse chevron"
         ),
     }
 
@@ -57,7 +61,6 @@ class ChevronPattern(QubexTask):
         """Preprocess: load params from DB and validate control_amplitude."""
         result = super().preprocess(backend, qid)
 
-        # Validate control_amplitude from input_parameters
         param = self.input_parameters.get("control_amplitude")
         value = param.value if param is not None else None
         if (
@@ -90,11 +93,9 @@ class ChevronPattern(QubexTask):
         label = self.get_qubit_label(backend, qid)
         result = run_result.raw_result
         self.output_parameters["qubit_frequency"].value = result["resonant_frequencies"][label]
-        # Record the control_amplitude actually used in run()
         self.output_parameters["control_amplitude"].value = result.get(
             "control_amplitude_used", DEFAULT_CONTROL_AMPLITUDE
         )
-        # Record the readout_amplitude actually used
         ra_param = self.run_parameters.get("readout_amplitude")
         if ra_param is not None:
             self.output_parameters["readout_amplitude"].value = ra_param.get_value()
@@ -135,15 +136,12 @@ class ChevronPattern(QubexTask):
         assert readout_frequency is not None
         assert qubit_frequency is not None
 
-        # Get readout_amplitude from run_parameters
         ra_param = self.run_parameters.get("readout_amplitude")
         readout_amp = ra_param.get_value() if ra_param is not None else DEFAULT_READOUT_AMPLITUDE
 
-        # Get control_amplitude from input_parameters (loaded from DB or default)
         ca_param = self.input_parameters.get("control_amplitude")
         ctrl_amp_value = ca_param.value if ca_param is not None else DEFAULT_CONTROL_AMPLITUDE
 
-        # Fallback to default if control_amplitude value is invalid
         if (
             ctrl_amp_value is None
             or not isinstance(ctrl_amp_value, (int, float))
@@ -158,7 +156,7 @@ class ChevronPattern(QubexTask):
             ctrl_amp_value = DEFAULT_CONTROL_AMPLITUDE
 
         print(
-            f"[run] ChevronPattern params for {labels[0]}: "
+            f"[run] CheckCoarseChevron params for {labels[0]}: "
             f"control_amplitude={ctrl_amp_value}, "
             f"qubit_frequency={qubit_frequency.value}, "
             f"readout_amplitude={readout_amp}, "
@@ -171,8 +169,8 @@ class ChevronPattern(QubexTask):
                 amplitudes={labels[0]: ctrl_amp_value},
                 frequencies={labels[0]: qubit_frequency.value},
                 targets=labels,
-                detuning_range=np.linspace(-0.01, 0.01, 11),
-                time_range=np.arange(0, 201, 8),
+                detuning_range=np.linspace(-0.075, 0.075, 31),
+                time_range=np.arange(0, 101, 8),
             )
 
         self.save_calibration(backend)

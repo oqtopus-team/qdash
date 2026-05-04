@@ -48,6 +48,7 @@ backends:
       - CheckElectricalDelay
 
       # One Qubit Coarse Calibration
+      - CheckCoarseChevron
       - ChevronPattern
       - CheckQubit
       - CheckQubitFrequency
@@ -128,6 +129,7 @@ categories:
     - CheckElectricalDelay
 
   "1Q Coarse":
+    - CheckCoarseChevron
     - ChevronPattern
     - CheckQubit
     - CheckQubitFrequency
