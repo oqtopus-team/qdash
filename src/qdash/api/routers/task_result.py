@@ -17,6 +17,8 @@ from qdash.api.schemas.flow import ExecuteFlowResponse
 from qdash.api.schemas.task_result import (
     LatestTaskResultResponse,
     TaskHistoryResponse,
+    TaskResultExcludeRequest,
+    TaskResultExcludeResponse,
     TimeSeriesData,
 )
 from qdash.api.services.flow_service import FlowService  # noqa: TCH002
@@ -489,6 +491,57 @@ async def re_execute_task_result(
         parameter_overrides=parameter_overrides,
         update_params=update_params,
         reconfigure=reconfigure,
+    )
+
+
+# =============================================================================
+# Exclusion
+# =============================================================================
+
+
+@router.post(
+    "/task-results/{task_id}/exclude",
+    response_model=TaskResultExcludeResponse,
+    summary="Toggle exclusion of a task result from metrics aggregations",
+    operation_id="setTaskResultExcluded",
+)
+def set_task_result_excluded(
+    task_id: str,
+    body: TaskResultExcludeRequest,
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+) -> TaskResultExcludeResponse:
+    """Toggle the excluded flag on a task result.
+
+    Excluded measurements are skipped when aggregating metrics for the
+    dashboard / metrics screens. Raw data is preserved. Any project member
+    can toggle exclusion; the most recent toggler is recorded.
+    """
+    from qdash.common.datetime_utils import now
+    from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
+    from starlette.exceptions import HTTPException
+
+    doc = TaskResultHistoryDocument.find_one(
+        {"project_id": ctx.project_id, "task_id": task_id}
+    ).run()
+
+    if doc is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Task result '{task_id}' not found",
+        )
+
+    doc.excluded = body.excluded
+    doc.excluded_reason = body.reason if body.excluded else ""
+    doc.excluded_by = ctx.user.username
+    doc.excluded_at = now()
+    doc.save()
+
+    return TaskResultExcludeResponse(
+        task_id=doc.task_id,
+        excluded=doc.excluded,
+        excluded_reason=doc.excluded_reason,
+        excluded_by=doc.excluded_by,
+        excluded_at=doc.excluded_at,
     )
 
 

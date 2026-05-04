@@ -5,6 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
+import type { FidelityConditionMetric } from "./fidelityConditionMetric";
 
 /**
  * Condition for fidelity filtering.
@@ -13,4 +14,5 @@ export interface FidelityCondition {
   min: number;
   max: number;
   is_within_24h?: boolean;
+  metric?: FidelityConditionMetric;
 }

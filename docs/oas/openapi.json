@@ -5163,6 +5163,80 @@
         }
       }
     },
+    "/task-results/{task_id}/exclude": {
+      "post": {
+        "tags": [
+          "task-result"
+        ],
+        "summary": "Toggle exclusion of a task result from metrics aggregations",
+        "description": "Toggle the excluded flag on a task result.\n\nExcluded measurements are skipped when aggregating metrics for the\ndashboard / metrics screens. Raw data is preserved. Any project member\ncan toggle exclusion; the most recent toggler is recorded.",
+        "operationId": "setTaskResultExcluded",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Task Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskResultExcludeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskResultExcludeResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/task-results/figures/download": {
       "post": {
         "tags": [
@@ -13257,6 +13331,17 @@
             "type": "boolean",
             "title": "Is Within 24H",
             "default": true
+          },
+          "metric": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metric"
           }
         },
         "type": "object",
@@ -15180,6 +15265,39 @@
               }
             ],
             "title": "Output Parameters"
+          },
+          "excluded": {
+            "type": "boolean",
+            "title": "Excluded",
+            "default": false
+          },
+          "excluded_reason": {
+            "type": "string",
+            "title": "Excluded Reason",
+            "default": ""
+          },
+          "excluded_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Excluded By"
+          },
+          "excluded_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Excluded At"
           }
         },
         "type": "object",
@@ -18603,6 +18721,74 @@
         "type": "object",
         "title": "TaskResult",
         "description": "TaskResult is a Pydantic model that represents a task result."
+      },
+      "TaskResultExcludeRequest": {
+        "properties": {
+          "excluded": {
+            "type": "boolean",
+            "title": "Excluded"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "excluded"
+        ],
+        "title": "TaskResultExcludeRequest",
+        "description": "Request body for toggling exclusion on a task result."
+      },
+      "TaskResultExcludeResponse": {
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "title": "Task Id"
+          },
+          "excluded": {
+            "type": "boolean",
+            "title": "Excluded"
+          },
+          "excluded_reason": {
+            "type": "string",
+            "title": "Excluded Reason"
+          },
+          "excluded_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Excluded By"
+          },
+          "excluded_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Excluded At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "task_id",
+          "excluded",
+          "excluded_reason",
+          "excluded_by",
+          "excluded_at"
+        ],
+        "title": "TaskResultExcludeResponse",
+        "description": "Response after toggling exclusion on a task result."
       },
       "TaskResultResponse": {
         "properties": {

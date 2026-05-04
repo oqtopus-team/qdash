@@ -77,6 +77,26 @@ class TaskResultHistoryDocument(Document):
         description="Task result ID that triggered this re-execution (cross-reference to parent)",
     )
 
+    excluded: bool = Field(
+        default=False,
+        description=(
+            "True if this measurement has been manually excluded from metrics aggregations "
+            "(dashboard / metrics screens). Raw data is preserved."
+        ),
+    )
+    excluded_reason: str = Field(
+        default="",
+        description="Free-form reason recorded when the measurement was excluded.",
+    )
+    excluded_by: str | None = Field(
+        default=None,
+        description="Username of the user who toggled exclusion most recently.",
+    )
+    excluded_at: datetime | None = Field(
+        default=None,
+        description="Timestamp of the most recent exclusion toggle.",
+    )
+
     model_config = ConfigDict(
         from_attributes=True,
     )
