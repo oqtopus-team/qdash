@@ -72,3 +72,20 @@ class TimeSeriesData(BaseModel):
     data: dict[str, list[ParameterModel]] = {}
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
+
+
+class TaskResultExcludeRequest(BaseModel):
+    """Request body for toggling exclusion on a task result."""
+
+    excluded: bool
+    reason: str = ""
+
+
+class TaskResultExcludeResponse(BaseModel):
+    """Response after toggling exclusion on a task result."""
+
+    task_id: str
+    excluded: bool
+    excluded_reason: str
+    excluded_by: str | None
+    excluded_at: datetime | None

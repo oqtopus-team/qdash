@@ -8,6 +8,7 @@ import { ChevronRight, History, FileText, GitBranch, Bot } from "lucide-react";
 import type { Task } from "@/schemas";
 
 import { formatDateTime, formatDateTimeCompact } from "@/lib/utils/datetime";
+import { isChipMetricsQuery } from "@/lib/utils/queryInvalidation";
 
 import { useGetQubitTaskHistory } from "@/client/task-result/task-result";
 import { useUpdateCalibrationParameters } from "@/client/calibration/calibration";
@@ -90,8 +91,7 @@ export function TaskHistoryModal({
             >,
           },
         });
-        await queryClient.invalidateQueries({ queryKey: ["/metrics"] });
-        await queryClient.invalidateQueries({ queryKey: ["/chip"] });
+        await queryClient.invalidateQueries({ predicate: isChipMetricsQuery });
         await queryClient.invalidateQueries({
           queryKey: [`/calibrations/manual-edits/${qid}`],
         });

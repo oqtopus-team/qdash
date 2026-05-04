@@ -342,6 +342,7 @@ class MongoTaskResultHistoryRepository:
             "project_id": project_id,
             "task_type": entity_type,
             "status": "completed",
+            "excluded": {"$ne": True},
             "$or": [{f"output_parameters.{m}": {"$exists": True}} for m in metric_keys],
         }
         start_at_filter = _build_start_at_filter(cutoff_time, end_time)
@@ -449,6 +450,7 @@ class MongoTaskResultHistoryRepository:
             "project_id": project_id,
             "task_type": entity_type,
             "status": "completed",
+            "excluded": {"$ne": True},
             "$or": [{f"output_parameters.{m}": {"$exists": True}} for m in metric_keys],
         }
         start_at_filter = _build_start_at_filter(cutoff_time, end_time)
@@ -520,6 +522,7 @@ class MongoTaskResultHistoryRepository:
             "project_id": project_id,
             "task_type": entity_type,
             "status": "completed",
+            "excluded": {"$ne": True},
             "$or": [{f"output_parameters.{m}": {"$exists": True}} for m in metric_keys],
         }
         start_at_filter = _build_start_at_filter(cutoff_time, end_time)

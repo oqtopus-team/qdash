@@ -35,6 +35,8 @@ import type {
   HTTPValidationError,
   LatestTaskResultResponse,
   TaskHistoryResponse,
+  TaskResultExcludeRequest,
+  TaskResultExcludeResponse,
   TimeSeriesData,
 } from "../../schemas";
 
@@ -1525,6 +1527,103 @@ export const useReExecuteTaskResult = <
   TContext
 > => {
   const mutationOptions = getReExecuteTaskResultMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+/**
+ * Toggle the excluded flag on a task result.
+
+Excluded measurements are skipped when aggregating metrics for the
+dashboard / metrics screens. Raw data is preserved. Any project member
+can toggle exclusion; the most recent toggler is recorded.
+ * @summary Toggle exclusion of a task result from metrics aggregations
+ */
+export const setTaskResultExcluded = (
+  taskId: string,
+  taskResultExcludeRequest: TaskResultExcludeRequest,
+  options?: SecondParameter<typeof customInstance>,
+  signal?: AbortSignal,
+) => {
+  return customInstance<TaskResultExcludeResponse>(
+    {
+      url: `/task-results/${taskId}/exclude`,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      data: taskResultExcludeRequest,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getSetTaskResultExcludedMutationOptions = <
+  TError = HTTPValidationError,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof setTaskResultExcluded>>,
+    TError,
+    { taskId: string; data: TaskResultExcludeRequest },
+    TContext
+  >;
+  request?: SecondParameter<typeof customInstance>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof setTaskResultExcluded>>,
+  TError,
+  { taskId: string; data: TaskResultExcludeRequest },
+  TContext
+> => {
+  const mutationKey = ["setTaskResultExcluded"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof setTaskResultExcluded>>,
+    { taskId: string; data: TaskResultExcludeRequest }
+  > = (props) => {
+    const { taskId, data } = props ?? {};
+
+    return setTaskResultExcluded(taskId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SetTaskResultExcludedMutationResult = NonNullable<
+  Awaited<ReturnType<typeof setTaskResultExcluded>>
+>;
+export type SetTaskResultExcludedMutationBody = TaskResultExcludeRequest;
+export type SetTaskResultExcludedMutationError = HTTPValidationError;
+
+/**
+ * @summary Toggle exclusion of a task result from metrics aggregations
+ */
+export const useSetTaskResultExcluded = <
+  TError = HTTPValidationError,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof setTaskResultExcluded>>,
+      TError,
+      { taskId: string; data: TaskResultExcludeRequest },
+      TContext
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof setTaskResultExcluded>>,
+  TError,
+  { taskId: string; data: TaskResultExcludeRequest },
+  TContext
+> => {
+  const mutationOptions = getSetTaskResultExcludedMutationOptions(options);
 
   return useMutation(mutationOptions, queryClient);
 };
