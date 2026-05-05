@@ -17,6 +17,7 @@ import { TaskFigure } from "@/components/charts/TaskFigure";
 import { ParametersTable } from "@/components/features/metrics/ParametersTable";
 import { useManualOverrides } from "@/hooks/useManualOverrides";
 import { TaskResultIssues } from "@/components/features/metrics/TaskResultIssues";
+import { TaskResultMemo } from "@/components/features/metrics/TaskResultMemo";
 import type { AnalysisContext } from "@/hooks/useAnalysisChat";
 import { useAnalysisChatContext } from "@/contexts/AnalysisChatContext";
 
@@ -430,6 +431,14 @@ export function CouplingTaskHistoryModal({
         </div>
       )}
 
+      {selectedTask?.task_id && (
+        <TaskResultMemo
+          taskId={selectedTask.task_id}
+          chipId={chipId}
+          hideWhenEmpty
+        />
+      )}
+
       {/* Parameters */}
       {selectedTask && (
         <div className="flex flex-col gap-2 mt-2">
@@ -496,7 +505,10 @@ export function CouplingTaskHistoryModal({
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="modal-box w-full sm:w-11/12 max-w-5xl bg-base-100 p-3 sm:p-6">
+      <div
+        className="modal-box w-full sm:w-11/12 max-w-5xl bg-base-100 p-3 sm:p-6"
+        onClick={(event) => event.stopPropagation()}
+      >
         <div className="flex justify-between items-center mb-3 sm:mb-4">
           <h3 className="font-bold text-base sm:text-lg truncate pr-2">
             {taskName} - {couplingId}

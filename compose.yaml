@@ -123,7 +123,7 @@ services:
     environment:
       - PREFECT_API_URL=http://prefect-server:4200/api
       - PREFECT_LOGGING_SETTINGS_PATH=/app/config/logging/prefect.yaml
-      - PYTHONPATH=/app:/app/qdash/workflow:/app/qdash/dbmodel:/app/qdash
+      - PYTHONPATH=/app:/app/qdash:/app/qdash/workflow:/app/qdash/dbmodel
       - DEFAULT_BACKEND=${DEFAULT_BACKEND:-qubex}
     networks:
       - custom_net
@@ -186,10 +186,6 @@ services:
       - .env
     environment:
       - PORT=${UI_PORT:-5714}
-      - OLLAMA_URL=${OLLAMA_URL:-http://host.docker.internal:11434}
-      - OLLAMA_MODEL=${OLLAMA_MODEL:-gpt-oss:20b}
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     ports:
       - "${UI_PORT:-5714}:${UI_PORT:-5714}"
     depends_on:

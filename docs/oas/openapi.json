@@ -11571,6 +11571,17 @@
             "type": "array",
             "title": "Conversation History",
             "description": "Previous conversation messages [{role, content}, ...]"
+          },
+          "model_override": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelConfig"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional per-request model override for task result analysis. When unset, the configured analysis_model/model selection is used."
           }
         },
         "type": "object",
@@ -13909,10 +13920,56 @@
             "description": "Case outcome",
             "default": "resolved"
           },
+          "human_label": {
+            "type": "string",
+            "title": "Human Label",
+            "description": "Human review label",
+            "default": ""
+          },
+          "failure_mode_labels": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Failure Mode Labels",
+            "description": "Failure labels"
+          },
+          "case_type": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Case Type",
+            "description": "Knowledge case type labels"
+          },
+          "model_error_type": {
+            "type": "string",
+            "title": "Model Error Type",
+            "description": "Verifier error/outcome type",
+            "default": ""
+          },
+          "resolution_label": {
+            "type": "string",
+            "title": "Resolution Label",
+            "description": "Structured resolution label",
+            "default": ""
+          },
           "symptom": {
             "type": "string",
             "title": "Symptom",
             "description": "Observed symptom",
+            "default": ""
+          },
+          "model_prediction": {
+            "type": "string",
+            "title": "Model Prediction",
+            "description": "Verifier/model prediction summary",
+            "default": ""
+          },
+          "human_review_decision": {
+            "type": "string",
+            "title": "Human Review Decision",
+            "description": "Human review decision summary",
             "default": ""
           },
           "root_cause": {
@@ -13927,6 +13984,12 @@
             "description": "How the issue was resolved",
             "default": ""
           },
+          "boundary_criteria": {
+            "type": "string",
+            "title": "Boundary Criteria",
+            "description": "Boundary criteria",
+            "default": ""
+          },
           "lesson_learned": {
             "items": {
               "type": "string"
@@ -13934,6 +13997,24 @@
             "type": "array",
             "title": "Lesson Learned",
             "description": "Key takeaways"
+          },
+          "applicability": {
+            "type": "string",
+            "title": "Applicability",
+            "description": "When this case should be retrieved",
+            "default": ""
+          },
+          "counterexample": {
+            "type": "string",
+            "title": "Counterexample",
+            "description": "What rule this case counters",
+            "default": ""
+          },
+          "prompt_guidance": {
+            "type": "string",
+            "title": "Prompt Guidance",
+            "description": "Prompt/checklist guidance",
+            "default": ""
           },
           "figure_paths": {
             "items": {
@@ -14034,6 +14115,73 @@
             "title": "Severity",
             "description": "Updated severity"
           },
+          "human_label": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Human Label",
+            "description": "Human label"
+          },
+          "failure_mode_labels": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "maxItems": 50
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Failure Mode Labels"
+          },
+          "case_type": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "maxItems": 50
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Case Type"
+          },
+          "model_error_type": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Error Type"
+          },
+          "resolution_label": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolution Label"
+          },
           "symptom": {
             "anyOf": [
               {
@@ -14046,6 +14194,30 @@
             ],
             "title": "Symptom",
             "description": "Updated symptom"
+          },
+          "model_prediction": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 5000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Prediction"
+          },
+          "human_review_decision": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 5000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Human Review Decision"
           },
           "root_cause": {
             "anyOf": [
@@ -14073,6 +14245,18 @@
             "title": "Resolution",
             "description": "Updated resolution"
           },
+          "boundary_criteria": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 5000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Boundary Criteria"
+          },
           "lesson_learned": {
             "anyOf": [
               {
@@ -14088,6 +14272,42 @@
             ],
             "title": "Lesson Learned",
             "description": "Updated lessons"
+          },
+          "applicability": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 5000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Applicability"
+          },
+          "counterexample": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 5000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Counterexample"
+          },
+          "prompt_guidance": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 5000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prompt Guidance"
           }
         },
         "type": "object",
@@ -14244,9 +14464,50 @@
             "title": "Status",
             "default": "resolved"
           },
+          "human_label": {
+            "type": "string",
+            "title": "Human Label",
+            "default": ""
+          },
+          "failure_mode_labels": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Failure Mode Labels",
+            "default": []
+          },
+          "case_type": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Case Type",
+            "default": []
+          },
+          "model_error_type": {
+            "type": "string",
+            "title": "Model Error Type",
+            "default": ""
+          },
+          "resolution_label": {
+            "type": "string",
+            "title": "Resolution Label",
+            "default": ""
+          },
           "symptom": {
             "type": "string",
             "title": "Symptom",
+            "default": ""
+          },
+          "model_prediction": {
+            "type": "string",
+            "title": "Model Prediction",
+            "default": ""
+          },
+          "human_review_decision": {
+            "type": "string",
+            "title": "Human Review Decision",
             "default": ""
           },
           "root_cause": {
@@ -14259,6 +14520,11 @@
             "title": "Resolution",
             "default": ""
           },
+          "boundary_criteria": {
+            "type": "string",
+            "title": "Boundary Criteria",
+            "default": ""
+          },
           "lesson_learned": {
             "items": {
               "type": "string"
@@ -14266,6 +14532,21 @@
             "type": "array",
             "title": "Lesson Learned",
             "default": []
+          },
+          "applicability": {
+            "type": "string",
+            "title": "Applicability",
+            "default": ""
+          },
+          "counterexample": {
+            "type": "string",
+            "title": "Counterexample",
+            "default": ""
+          },
+          "prompt_guidance": {
+            "type": "string",
+            "title": "Prompt Guidance",
+            "default": ""
           }
         },
         "type": "object",
@@ -15393,6 +15674,62 @@
         ],
         "title": "MetricsSummaryResponse",
         "description": "Response model for aggregated metrics summary.\n\nReturns statistical summary computed by the database.\nMinimal data transfer (~0.1KB).\nMetrics are loaded dynamically from metrics.yaml config."
+      },
+      "ModelConfig": {
+        "properties": {
+          "provider": {
+            "type": "string",
+            "title": "Provider",
+            "default": "openai"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "default": "gpt-4.1"
+          },
+          "temperature": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Temperature",
+            "default": 0.7
+          },
+          "max_output_tokens": {
+            "type": "integer",
+            "title": "Max Output Tokens",
+            "default": 16384
+          },
+          "base_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Url"
+          },
+          "api_key_env": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Api Key Env"
+          }
+        },
+        "type": "object",
+        "title": "ModelConfig",
+        "description": "Model configuration for CopilotKit."
       },
       "MuxDetailResponse": {
         "properties": {

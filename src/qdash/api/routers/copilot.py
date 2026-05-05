@@ -25,7 +25,7 @@ from qdash.api.lib.copilot_analysis import (
     AnalyzeRequest,
     ChatRequest,
 )
-from qdash.api.lib.copilot_config import load_copilot_config
+from qdash.api.lib.copilot_config import CopilotConfig, load_copilot_config
 from qdash.api.lib.sse import SSETaskBridge, sse_event
 from qdash.api.services.copilot_data_service import CopilotDataService
 from qdash.datamodel.task_knowledge import get_task_knowledge
@@ -33,6 +33,13 @@ from qdash.datamodel.task_knowledge import get_task_knowledge
 router = APIRouter()
 public_router = APIRouter()
 logger = logging.getLogger(__name__)
+
+
+def _config_with_request_model(config: CopilotConfig, request: AnalyzeRequest) -> CopilotConfig:
+    """Apply a per-request analysis model override when one is provided."""
+    if request.analysis_model_override is None:
+        return config
+    return config.model_copy(update={"analysis_model": request.analysis_model_override})
 
 
 @router.get(
@@ -101,6 +108,7 @@ async def analyze_task_result(
     config = load_copilot_config()
     if not config.enabled:
         raise HTTPException(status_code=503, detail="Copilot is not enabled")
+    analysis_config = _config_with_request_model(config, request)
 
     # Build analysis context (resolves knowledge, qubit params, images, etc.)
     ctx = copilot_data_service.build_analysis_context(
@@ -109,7 +117,7 @@ async def analyze_task_result(
         qid=request.qid,
         task_id=request.task_id,
         image_base64=request.image_base64,
-        config=config,
+        config=analysis_config,
     )
 
     # Build tool executors for function calling
@@ -122,7 +130,7 @@ async def analyze_task_result(
         result = await run_analysis(
             context=ctx.context,
             user_message=request.message,
-            config=config,
+            config=analysis_config,
             image_base64=ctx.image_base64,
             expected_images=ctx.expected_images,
             conversation_history=request.conversation_history,
@@ -160,6 +168,7 @@ async def analyze_task_result_stream(
         if not config.enabled:
             yield sse_event("error", {"step": "init", "detail": "Copilot is not enabled"})
             return
+        analysis_config = _config_with_request_model(config, request)
 
         # Build analysis context
         yield sse_event(
@@ -173,7 +182,7 @@ async def analyze_task_result_stream(
             qid=request.qid,
             task_id=request.task_id,
             image_base64=request.image_base64,
-            config=config,
+            config=analysis_config,
         )
 
         # Emit image loading status
@@ -203,7 +212,7 @@ async def analyze_task_result_stream(
                 run_analysis,
                 context=ctx.context,
                 user_message=request.message,
-                config=config,
+                config=analysis_config,
                 image_base64=ctx.image_base64,
                 expected_images=ctx.expected_images,
                 conversation_history=request.conversation_history,

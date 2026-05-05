@@ -175,13 +175,15 @@ export function DashboardPageContent() {
 
   const taskNotes = useMemo(
     () =>
-      (summary?.task_notes ?? []).map((t) => ({
-        taskId: t.task_id,
-        qid: t.qid,
-        content: t.note?.content ?? "",
-        username: t.note?.updated_by ?? "",
-        updatedAt: t.note?.updated_at ?? "",
-      })),
+      (summary?.task_notes ?? [])
+        .map((t) => ({
+          taskId: t.task_id,
+          qid: t.qid,
+          content: stripAiTriageSection(t.note?.content ?? ""),
+          username: t.note?.updated_by ?? "",
+          updatedAt: t.note?.updated_at ?? "",
+        }))
+        .filter((t) => t.content.trim().length > 0),
     [summary],
   );
 
@@ -606,4 +608,8 @@ export function DashboardPageContent() {
       )}
     </PageContainer>
   );
+}
+
+function stripAiTriageSection(content: string): string {
+  return content.replace(/^## AI triage\n\n.*?(?:\n\n---\n\n|$)/s, "").trim();
 }

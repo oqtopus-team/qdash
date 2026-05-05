@@ -14,12 +14,12 @@ from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING, Any
 
 from openai import AsyncOpenAI, BadRequestError
-from qdash.api.lib.copilot_analysis import AnalysisResponse, TaskAnalysisContext
+from qdash.common.copilot.analysis import AnalysisResponse, TaskAnalysisContext
 
 if TYPE_CHECKING:
-    from qdash.api.lib.copilot_config import CopilotConfig, ModelConfig
+    from qdash.common.copilot.config import CopilotConfig, ModelConfig
 else:
-    from qdash.api.lib.copilot_config import CopilotConfig, ModelConfig
+    from qdash.common.copilot.config import CopilotConfig, ModelConfig
 
 logger = logging.getLogger(__name__)
 
@@ -1375,7 +1375,7 @@ def _wrap_tool_executors(
 
     # execute_python_analysis: data_store auto-injected + chart collection
     def python_wrapper(args: dict[str, Any]) -> Any:
-        from qdash.api.lib.copilot_sandbox import execute_python_analysis
+        from qdash.common.copilot.sandbox import execute_python_analysis
 
         result = execute_python_analysis(args["code"], data_store)
         if isinstance(result, dict) and result.get("chart"):

@@ -18,6 +18,12 @@ import {
 import { useAnalysisChatContext } from "@/contexts/AnalysisChatContext";
 import { ChatPlotlyChart } from "@/components/features/chat/ChatPlotlyChart";
 import { CodeBlock } from "@/components/features/chat/CodeBlock";
+import { useGetCopilotConfig } from "@/client/copilot/copilot";
+import {
+  buildAnalysisModelOptions,
+  getStoredAnalysisModelKey,
+  resolveAnalysisModelOption,
+} from "@/lib/copilotModels";
 
 // ---------------------------------------------------------------------------
 // Drag hook
@@ -263,11 +269,25 @@ export function MiniChatWindow() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [activeSessionId],
   );
+  const { data: copilotConfigResponse } = useGetCopilotConfig();
+  const modelOptions = useMemo(
+    () => buildAnalysisModelOptions(copilotConfigResponse?.data ?? null),
+    [copilotConfigResponse?.data],
+  );
+  const selectedModel = resolveAnalysisModelOption(
+    modelOptions,
+    getStoredAnalysisModelKey(),
+  );
+  const modelOverride = effectiveContext ? selectedModel.model : null;
+  const effectiveModelName =
+    selectedModel.model?.name ??
+    selectedModel.label.replace(/^Configured:\s*/, "");
 
   const { messages, isLoading, statusMessage, sendMessage } = useAnalysisChat(
     effectiveContext ?? null,
     {
       initialMessages,
+      modelOverride,
       onMessagesChange: (msgs) => {
         if (!activeSessionId || !effectiveContext) return;
         setSessionMessages(effectiveContext, msgs);
@@ -332,7 +352,7 @@ export function MiniChatWindow() {
           <Bot className="w-4 h-4 text-primary flex-shrink-0" />
           <span className="text-xs font-bold truncate">
             {effectiveContext
-              ? `${effectiveContext.taskName} / ${effectiveContext.qid}`
+              ? `${effectiveContext.taskName} / ${effectiveContext.qid} / ${effectiveModelName}`
               : "AI Chat"}
           </span>
         </div>

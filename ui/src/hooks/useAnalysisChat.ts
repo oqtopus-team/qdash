@@ -3,6 +3,8 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { flushSync } from "react-dom";
 
+import type { ModelOverride } from "@/lib/copilotModels";
+
 export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
@@ -143,6 +145,7 @@ export function useAnalysisChat(
   options?: {
     initialMessages?: ChatMessage[];
     onMessagesChange?: (messages: ChatMessage[]) => void;
+    modelOverride?: ModelOverride | null;
   },
 ) {
   const [messages, setMessagesRaw] = useState<ChatMessage[]>(
@@ -210,6 +213,7 @@ export function useAnalysisChat(
               task_id: context.taskId,
               message: userMessage,
               image_base64: imageBase64 || null,
+              model_override: options?.modelOverride ?? null,
               conversation_history: messages.map((m) => ({
                 role: m.role,
                 content: m.content,
@@ -303,7 +307,7 @@ export function useAnalysisChat(
         abortRef.current = null;
       }
     },
-    [context, messages, setMessages],
+    [context, messages, options?.modelOverride, setMessages],
   );
 
   const clearMessages = useCallback(() => {

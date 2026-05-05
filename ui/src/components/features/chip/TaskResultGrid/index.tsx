@@ -3,6 +3,7 @@
 import {
   Check,
   Download,
+  Bot,
   X,
   ZoomIn,
   ZoomOut,
@@ -38,6 +39,7 @@ interface TaskResultGridProps {
   selectedDate: string;
   gridSize: number;
   onDateChange?: (date: string) => void;
+  aiTriageTaskIds?: Set<string>;
 }
 
 interface SelectedTaskInfo {
@@ -110,6 +112,7 @@ interface GridCellProps {
   isDownloadMode: boolean;
   isSelectedForDownload: boolean;
   canBeDownloaded: boolean;
+  hasAiTriageNote: boolean;
   onClick: () => void;
 }
 
@@ -124,6 +127,7 @@ const GridCell = memo(function GridCell({
   isDownloadMode,
   isSelectedForDownload,
   canBeDownloaded,
+  hasAiTriageNote,
   onClick,
 }: GridCellProps) {
   if (!task) {
@@ -158,9 +162,18 @@ const GridCell = memo(function GridCell({
             {qid}
           </div>
         )}
+        {hasAiTriageNote && (
+          <div
+            className="absolute top-0.5 right-0.5 rounded bg-warning text-warning-content p-0.5 shadow-sm"
+            title="AI triage needs review"
+          >
+            <Bot size={10} />
+          </div>
+        )}
         {/* Hover tooltip */}
         <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-base-100 text-base-content text-xs rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
           {qid}: {task.status}
+          {hasAiTriageNote ? " · AI triage needs review" : ""}
         </div>
         {isDownloadMode && canBeDownloaded && isSelectedForDownload && (
           <div className="absolute inset-0 flex items-center justify-center bg-primary/20">
@@ -205,6 +218,14 @@ const GridCell = memo(function GridCell({
           {qid}
         </div>
       )}
+      {hasAiTriageNote && (
+        <div
+          className="absolute top-1 right-1 rounded bg-warning text-warning-content p-1 shadow-sm"
+          title="AI triage needs review"
+        >
+          <Bot size={14} />
+        </div>
+      )}
       <div
         className={`absolute bottom-1 right-1 w-2 h-2 rounded-full ${getStatusColor(task.status)}`}
       />
@@ -234,6 +255,7 @@ export function TaskResultGrid({
   selectedTask,
   selectedDate,
   gridSize: defaultGridSize,
+  aiTriageTaskIds,
 }: TaskResultGridProps) {
   // Get topology configuration
   const {
@@ -539,6 +561,9 @@ export function TaskResultGrid({
           : null;
         const isSelectedForDownload = selectedForDownload.has(qid);
         const canBeDownloaded = hasJsonFigures(qid);
+        const hasAiTriageNote = Boolean(
+          task?.task_id && aiTriageTaskIds?.has(task.task_id),
+        );
 
         return (
           <GridCell
@@ -553,6 +578,7 @@ export function TaskResultGrid({
             isDownloadMode={downloadSelectionEnabled}
             isSelectedForDownload={isSelectedForDownload}
             canBeDownloaded={canBeDownloaded}
+            hasAiTriageNote={hasAiTriageNote}
             onClick={() => {
               if (downloadSelectionEnabled) {
                 if (canBeDownloaded) {

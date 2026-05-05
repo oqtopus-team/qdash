@@ -12,9 +12,10 @@ response_language: ja
 
 # Model configuration
 # `model` is used for general chat (side-panel Q&A, tool use, explanations).
-# `analysis_model` (optional) overrides `model` ONLY for task result analysis —
-# use a calibration-specialized LLM here while keeping general chat on a
-# versatile frontier model.
+# `analysis_models` lists selectable models for task result analysis.
+# The first entry is the default. If omitted, QDash falls back to the general
+# `model` below. The older single `analysis_model` key is still supported for
+# local overrides.
 model:
   # Provider: "openai", "anthropic", or "ollama"
   provider: openai
@@ -25,13 +26,25 @@ model:
   # Maximum tokens for response
   max_output_tokens: 4096
 
-# Specialized model for task result analysis (chevron patterns, Rabi, etc.)
-# Comment out to fall back to the general `model` above.
-analysis_model:
-  provider: ollama
-  name: nvidia/Ising-Calibration-1-35B-A3B
-  temperature: 0.7
-  max_output_tokens: 4096
+# Specialized models for task result analysis (chevron patterns, Rabi, etc.).
+analysis_models:
+  - provider: ollama
+    name: gemma4:31b
+    # Ollama endpoint. Set GEMMA_BASE_URL to your Ollama server URL,
+    # e.g. http://localhost:11434. QDash appends /v1 automatically.
+    base_url: env:GEMMA_BASE_URL
+    # Optional. If unset or missing, Ollama uses a dummy "ollama" API key.
+    api_key_env: GEMMA_API_KEY
+    temperature: 0.2
+    max_output_tokens: 1200
+  - provider: ollama
+    name: nvidia/Ising-Calibration-1-35B-A3B
+    temperature: 0.7
+    max_output_tokens: 4096
+  - provider: openai
+    name: gpt-5.4
+    temperature: 0.7
+    max_output_tokens: 4096
 
 # Metrics to include in multi-metric evaluation
 # Only these metrics will be used for overall chip health scoring
@@ -132,6 +145,19 @@ analysis:
   enabled: true
   # Whether to send result figures to the LLM (requires multimodal model)
   multimodal: true
+  # Limit reference images for lower-latency local VLM triage. The actual
+  # experiment figure is still sent separately.
+  max_expected_images: 2
+  # Task results whose notes should receive automatic AI triage. Both completed
+  # and failed results are eligible; the hook runs asynchronously after history
+  # persistence and does not block calibration progress.
+  ai_triage_tasks:
+    - CheckQubitSpectroscopy
+    - CheckResonatorSpectroscopy
+  ai_triage_message: >-
+    Review this calibration result and attach a concise operational
+    triage note. Be strict about PASS: history consistency alone is not enough
+    to accept visually unsupported output parameters.
   # Maximum conversation turns to maintain in context
   max_conversation_turns: 10
 

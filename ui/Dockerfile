@@ -46,8 +46,6 @@ ENV NEXT_PUBLIC_ENV=$NEXT_PUBLIC_ENV
 ENV NEXT_PUBLIC_PREFECT_URL=$NEXT_PUBLIC_PREFECT_URL
 ENV INTERNAL_API_URL=$INTERNAL_API_URL
 ENV NEXT_PUBLIC_COPILOT_ENABLED=$NEXT_PUBLIC_COPILOT_ENABLED
-# Ollama settings are passed at runtime via environment variables:
-# OLLAMA_URL, OLLAMA_MODEL
 
 # Copy standalone output (includes minimal node_modules)
 COPY --from=builder /app/.next/standalone ./

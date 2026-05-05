@@ -11,7 +11,7 @@ from __future__ import annotations
 from functools import lru_cache
 
 from pydantic import BaseModel
-from qdash.api.lib.config_loader import ConfigLoader
+from qdash.common.config_loader import ConfigLoader
 
 
 class ScoringThreshold(BaseModel):

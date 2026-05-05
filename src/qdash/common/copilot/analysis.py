@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from pydantic import BaseModel, Field, field_validator
-from qdash.api.lib.copilot_config import ModelConfig  # noqa: TCH002
+from qdash.common.copilot.config import ModelConfig  # noqa: TCH002
 
 
 @dataclass
