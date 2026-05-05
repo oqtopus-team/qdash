@@ -1,9 +1,10 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 
 import { keepPreviousData } from "@tanstack/react-query";
+import { Bot } from "lucide-react";
 
 import { formatDateTime } from "@/lib/utils/datetime";
 
@@ -15,6 +16,7 @@ import { CreateChipModal } from "./modals/CreateChipModal";
 import type { Task, MuxDetailResponseDetail, TaskInfo } from "@/schemas";
 
 import { useListChipMuxes, useGetChip, useListChips } from "@/client/chip/chip";
+import { useGetChipNotesSummary } from "@/client/note/note";
 import {
   useListTaskInfo,
   useGetTaskFileSettings,
@@ -116,6 +118,21 @@ export function ChipPageContent() {
 
   // Get task list from task-files API
   const { data: taskInfoData } = useListTaskInfo({ backend: defaultBackend });
+
+  const { data: notesSummaryData } = useGetChipNotesSummary(selectedChip, {
+    query: { enabled: !!selectedChip, staleTime: 30_000 },
+  });
+
+  const aiTriageTaskIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const entry of notesSummaryData?.data?.task_notes ?? []) {
+      const content = entry.note?.content ?? "";
+      if (isAiTriageReviewRequired(content)) {
+        ids.add(entry.task_id);
+      }
+    }
+    return ids;
+  }, [notesSummaryData]);
 
   // Use custom hook for date navigation
   const {
@@ -510,6 +527,7 @@ export function ChipPageContent() {
               selectedDate={selectedDate}
               gridSize={gridSize}
               onDateChange={setSelectedDate}
+              aiTriageTaskIds={aiTriageTaskIds}
             />
           ) : viewMode === "2q" ? (
             <CouplingGrid
@@ -611,6 +629,10 @@ export function ChipPageContent() {
                                     }
 
                                     const figurePath = getFigurePath(task);
+                                    const hasAiTriageNote = Boolean(
+                                      task.task_id &&
+                                      aiTriageTaskIds.has(task.task_id),
+                                    );
 
                                     return (
                                       <div key={qid} className="relative group">
@@ -629,15 +651,28 @@ export function ChipPageContent() {
                                             <div className="text-sm font-medium mb-2">
                                               <div className="flex justify-between items-center mb-1">
                                                 <span>QID: {qid}</span>
-                                                <div
-                                                  className={`w-2 h-2 rounded-full ${
-                                                    task.status === "completed"
-                                                      ? "bg-success"
-                                                      : task.status === "failed"
-                                                        ? "bg-error"
-                                                        : "bg-warning"
-                                                  }`}
-                                                />
+                                                <div className="flex items-center gap-1">
+                                                  {hasAiTriageNote && (
+                                                    <span
+                                                      className="badge badge-warning badge-xs gap-1"
+                                                      title="AI triage needs review"
+                                                    >
+                                                      <Bot className="h-3 w-3" />
+                                                      Review
+                                                    </span>
+                                                  )}
+                                                  <div
+                                                    className={`w-2 h-2 rounded-full ${
+                                                      task.status ===
+                                                      "completed"
+                                                        ? "bg-success"
+                                                        : task.status ===
+                                                            "failed"
+                                                          ? "bg-error"
+                                                          : "bg-warning"
+                                                    }`}
+                                                  />
+                                                </div>
                                               </div>
                                               {task.end_at && (
                                                 <div className="text-xs text-base-content/60">
@@ -662,11 +697,12 @@ export function ChipPageContent() {
 
                                         {/* Detail Analysis Button */}
                                         <button
-                                          onClick={() =>
+                                          onClick={(event) => {
+                                            event.stopPropagation();
                                             router.push(
                                               `/chip/${selectedChip}/qubit/${qid}`,
-                                            )
-                                          }
+                                            );
+                                          }}
                                           className="absolute top-2 right-2 btn btn-xs btn-primary opacity-0 group-hover:opacity-100 transition-opacity duration-200"
                                           title="Detailed Analysis"
                                         >
@@ -726,5 +762,28 @@ export function ChipPageContent() {
         />
       )}
     </PageContainer>
+  );
+}
+
+function isAiTriageReviewRequired(content: string): boolean {
+  if (!content.includes("## AI triage")) return false;
+
+  const decisionMatch = content.match(
+    /(?:^|\n)\s*(?:-?\s*)?(?:Decision|判定)\s*:\s*`?([A-Z_]+)`?/i,
+  );
+  const decision = decisionMatch?.[1]?.toUpperCase();
+  if (decision === "REVIEW" || decision === "FAIL") return true;
+
+  const needsReviewMatch = content.match(
+    /(?:^|\n)\s*(?:-?\s*)?(?:Needs review|要レビュー)\s*:\s*([^\n]+)/i,
+  );
+  if (!needsReviewMatch) return false;
+
+  const needsReview = needsReviewMatch[1]
+    .replace(/[`*]/g, "")
+    .trim()
+    .toLowerCase();
+  return Boolean(
+    needsReview && needsReview !== "none" && needsReview !== "なし",
   );
 }

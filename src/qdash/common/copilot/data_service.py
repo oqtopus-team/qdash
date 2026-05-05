@@ -13,11 +13,11 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from bunnet import SortDirection
-from qdash.api.lib.json_utils import sanitize_for_json
+from qdash.common.json_utils import sanitize_for_json
 
 if TYPE_CHECKING:
-    from qdash.api.lib.copilot_analysis import AnalysisContextResult
-    from qdash.api.lib.copilot_config import CopilotConfig
+    from qdash.common.copilot.analysis import AnalysisContextResult
+    from qdash.common.copilot.config import CopilotConfig
 
 logger = logging.getLogger(__name__)
 
@@ -1123,7 +1123,7 @@ class CopilotDataService:
         previously inlined in both ``analyze_task_result`` and
         ``analyze_task_result_stream``.
         """
-        from qdash.api.lib.copilot_analysis import (
+        from qdash.common.copilot.analysis import (
             AnalysisContextResult,
             TaskAnalysisContext,
         )
@@ -1209,7 +1209,7 @@ class CopilotDataService:
         Note: ``execute_python_analysis`` is overridden by ``_wrap_tool_executors``
         in ``copilot_agent.py`` to auto-inject the data_store.
         """
-        from qdash.api.lib.copilot_sandbox import execute_python_analysis
+        from qdash.common.copilot.sandbox import execute_python_analysis
 
         return {
             "get_qubit_params": lambda args: self.load_qubit_params(args["chip_id"], args["qid"]),

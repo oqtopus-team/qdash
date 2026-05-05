@@ -34,14 +34,36 @@ export interface IssueKnowledgeResponse {
   qid?: string;
   /** Case outcome */
   resolution_status?: string;
+  /** Human review label */
+  human_label?: string;
+  /** Failure labels */
+  failure_mode_labels?: string[];
+  /** Knowledge case type labels */
+  case_type?: string[];
+  /** Verifier error/outcome type */
+  model_error_type?: string;
+  /** Structured resolution label */
+  resolution_label?: string;
   /** Observed symptom */
   symptom?: string;
+  /** Verifier/model prediction summary */
+  model_prediction?: string;
+  /** Human review decision summary */
+  human_review_decision?: string;
   /** Identified root cause */
   root_cause?: string;
   /** How the issue was resolved */
   resolution?: string;
+  /** Boundary criteria */
+  boundary_criteria?: string;
   /** Key takeaways */
   lesson_learned?: string[];
+  /** When this case should be retrieved */
+  applicability?: string;
+  /** What rule this case counters */
+  counterexample?: string;
+  /** Prompt/checklist guidance */
+  prompt_guidance?: string;
   /** Task result figure paths */
   figure_paths?: string[];
   /** Image URLs from issue thread */

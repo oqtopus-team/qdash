@@ -20,6 +20,7 @@ import {
   MessageSquare,
   Maximize2,
   ImageIcon,
+  Cpu,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import ReactMarkdown from "react-markdown";
@@ -36,6 +37,13 @@ import {
 } from "@/contexts/AnalysisChatContext";
 import { ChatPlotlyChart } from "@/components/features/chat/ChatPlotlyChart";
 import { CodeBlock } from "@/components/features/chat/CodeBlock";
+import { useGetCopilotConfig } from "@/client/copilot/copilot";
+import {
+  buildAnalysisModelOptions,
+  getStoredAnalysisModelKey,
+  resolveAnalysisModelOption,
+  setStoredAnalysisModelKey,
+} from "@/lib/copilotModels";
 
 interface AnalysisChatPanelProps {
   context: AnalysisContext | null;
@@ -405,10 +413,35 @@ export function AnalysisChatPanel({
   } = useAnalysisChatContext();
 
   const [showSessions, setShowSessions] = useState(false);
+  const [selectedModelKey, setSelectedModelKey] = useState(
+    getStoredAnalysisModelKey,
+  );
 
   // The context to use for the chat: prefer active session's context
   const effectiveContext = activeSession?.context ?? context;
   const isGeneralMode = !effectiveContext;
+
+  const { data: copilotConfigResponse } = useGetCopilotConfig();
+  const modelOptions = useMemo(
+    () => buildAnalysisModelOptions(copilotConfigResponse?.data ?? null),
+    [copilotConfigResponse?.data],
+  );
+  const selectedModel = resolveAnalysisModelOption(
+    modelOptions,
+    selectedModelKey,
+  );
+  const modelOverride = effectiveContext
+    ? (selectedModel?.model ?? null)
+    : null;
+  const effectiveModelName =
+    selectedModel?.model?.name ??
+    selectedModel?.label.replace(/^Configured:\s*/, "") ??
+    "Configured model";
+
+  const handleModelChange = (key: string) => {
+    setSelectedModelKey(key);
+    setStoredAnalysisModelKey(key);
+  };
 
   // Restore messages from active session
   const initialMessages = useMemo(
@@ -424,6 +457,7 @@ export function AnalysisChatPanel({
     effectiveContext ?? null,
     {
       initialMessages,
+      modelOverride,
       onMessagesChange: (msgs) => {
         if (!activeSessionId) return;
         if (effectiveContext) {
@@ -500,12 +534,33 @@ export function AnalysisChatPanel({
             </h3>
             {effectiveContext && (
               <p className="text-xs text-base-content/50 truncate">
-                {effectiveContext.taskName} / {effectiveContext.qid}
+                {effectiveContext.taskName} / {effectiveContext.qid} /{" "}
+                {effectiveModelName}
               </p>
             )}
           </div>
         </div>
         <div className="flex items-center gap-0.5">
+          {effectiveContext && modelOptions.length > 1 && (
+            <label
+              className="flex items-center gap-1 mr-1"
+              title="Analysis model"
+            >
+              <Cpu className="w-3.5 h-3.5 text-base-content/40" />
+              <select
+                className="select select-bordered select-xs w-36 text-xs"
+                value={selectedModel.key}
+                onChange={(event) => handleModelChange(event.target.value)}
+                disabled={isLoading}
+              >
+                {modelOptions.map((option) => (
+                  <option key={option.key} value={option.key}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           <button
             onClick={handleNewSession}
             className="btn btn-ghost btn-xs btn-square"

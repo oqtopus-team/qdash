@@ -15,6 +15,7 @@ import type { Task } from "@/schemas";
 import { useGetTaskResult } from "@/client/task/task";
 import { InteractiveFigureContent } from "@/components/charts/InteractiveFigureContent";
 import { TaskFigure } from "@/components/charts/TaskFigure";
+import { TaskResultMemo } from "@/components/features/metrics/TaskResultMemo";
 import { ReanalysisPanel } from "@/components/features/qubit/ReanalysisPanel";
 import {
   formatDate as formatDateUtil,
@@ -220,6 +221,7 @@ export function TaskDetailModal({
   };
 
   const precision = variant === "detailed" ? 6 : 4;
+  const noteTaskId = task.task_id || taskId;
 
   const modalTitle =
     variant === "detailed" && taskName
@@ -234,7 +236,10 @@ export function TaskDetailModal({
       aria-modal="true"
       role="dialog"
     >
-      <div className="modal-box w-fit min-w-[500px] max-w-[95vw] h-fit max-h-[95vh] p-6 rounded-2xl shadow-xl bg-base-100 overflow-y-auto">
+      <div
+        className="modal-box w-fit min-w-[500px] max-w-[95vw] h-fit max-h-[95vh] p-6 rounded-2xl shadow-xl bg-base-100 overflow-y-auto"
+        onClick={(event) => event.stopPropagation()}
+      >
         <div className="flex justify-between items-center mb-6">
           <h3 id="modal-title" className="font-bold text-xl">
             {modalTitle}
@@ -541,6 +546,14 @@ export function TaskDetailModal({
                   </div>
                 )}
               </div>
+            )}
+
+            {noteTaskId && (
+              <TaskResultMemo
+                taskId={noteTaskId}
+                chipId={chipId}
+                hideWhenEmpty
+              />
             )}
 
             {/* Parameters Tables (detailed variant only) */}

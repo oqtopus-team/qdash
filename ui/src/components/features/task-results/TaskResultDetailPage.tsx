@@ -25,6 +25,7 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { ParametersTable } from "@/components/features/metrics/ParametersTable";
+import { TaskResultMemo } from "@/components/features/metrics/TaskResultMemo";
 import { ReanalysisPanel } from "@/components/features/qubit/ReanalysisPanel";
 import { MarkdownContent } from "@/components/ui/MarkdownContent";
 import { MarkdownEditor } from "@/components/ui/MarkdownEditor";
@@ -748,6 +749,8 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
           </div>
         )}
       </div>
+
+      <TaskResultMemo taskId={taskId} chipId={taskResult.chip_id} />
 
       {/* Divider: Issues */}
       <div className="divider text-xs text-base-content/40">

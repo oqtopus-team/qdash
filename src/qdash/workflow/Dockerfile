@@ -31,6 +31,8 @@ RUN uv pip install --upgrade --system --no-cache-dir pydantic
 RUN uv pip install --upgrade --system --no-cache-dir pydantic-settings
 ## for multiprocess parallel execution (install after pydantic upgrade)
 RUN uv pip install --system --no-cache-dir prefect-dask>=0.3.0
+## for automatic AI triage using the OpenAI-compatible Copilot client
+RUN uv pip install --system --no-cache-dir "openai>=1.75.0"
 
 FROM prefecthq/prefect:3-python3.11
 
