@@ -215,4 +215,4 @@ dev = [
     "setuptools>=80.9.0",
 ]
 [tool.uv.sources]
-qubex = { git = "https://github.com/amachino/qubex.git", branch = "develop" }
+qubex = { git = "https://github.com/orangekame3/qubex.git", branch = "fix/estimate_control_amp_response" }

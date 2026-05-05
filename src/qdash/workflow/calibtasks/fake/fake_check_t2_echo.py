@@ -23,7 +23,7 @@ class FakeCheckT2Echo(FakeTask):
     Note: Uses same name as qubex task for seamless backend switching.
 
     Inputs:
-        qubit_frequency: From ChevronPattern (loaded from DB)
+        qubit_frequency: From CheckFineChevron (loaded from DB)
         hpi_amplitude: From CheckHPI (loaded from DB)
 
     Outputs:
@@ -37,7 +37,7 @@ class FakeCheckT2Echo(FakeTask):
     input_parameters: ClassVar[dict[str, ParameterModel | None]] = {
         "qubit_frequency": ParameterModel(
             unit="GHz",
-            description="Qubit frequency from ChevronPattern",
+            description="Qubit frequency from CheckFineChevron",
         ),
         "hpi_amplitude": ParameterModel(
             unit="a.u.",

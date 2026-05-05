@@ -111,8 +111,14 @@ class CheckQubitSpectroscopy(QubexTask):
         ),
     }
     output_parameters: ClassVar[dict[str, ParameterModel]] = {
-        "qubit_frequency": ParameterModel(
-            unit="GHz", description="Estimated qubit frequency (f01) from spectroscopy"
+        "coarse_qubit_frequency": ParameterModel(
+            unit="GHz",
+            description=(
+                "Coarse f01 estimate from spectroscopy (5 MHz grid). NOT a calibrated "
+                "qubit_frequency (those come from a Rabi-detuning fit such as "
+                "CheckCoarseChevron); this is intended as a seed for downstream "
+                "frequency-refinement tasks."
+            ),
         ),
         "anharmonicity": ParameterModel(
             unit="GHz",
@@ -130,6 +136,16 @@ class CheckQubitSpectroscopy(QubexTask):
             description=(
                 "Discrete quality score (0..len(f01_moment_thresholds)) for the "
                 "detected f01 peak. Higher = more confident."
+            ),
+        ),
+        "coarse_control_amplitude": ParameterModel(
+            unit="a.u.",
+            description=(
+                "Coarse drive-amplitude threshold derived from f01_repr_db "
+                "(amplitude = 10**(repr_db/20)). NOT a calibrated control_amplitude "
+                "(those come from a Rabi-rate-based fit such as CheckControlAmplitude); "
+                "this is the lowest drive amplitude at which the f01 peak first "
+                "appears, intended as a seed for downstream amplitude calibration."
             ),
         ),
     }
@@ -223,11 +239,22 @@ class CheckQubitSpectroscopy(QubexTask):
 
         # Create a deep copy of output_parameters to avoid sharing state
         output_params_copy = copy.deepcopy(self.output_parameters)
-        output_params_copy["qubit_frequency"].value = estimated_frequency
+        output_params_copy["coarse_qubit_frequency"].value = estimated_frequency
         if estimated_anharmonicity is not None:
             output_params_copy["anharmonicity"].value = estimated_anharmonicity
         if estimated_repr_db is not None:
             output_params_copy["f01_repr_db"].value = estimated_repr_db
+            # Coarse drive amplitude from the lowest power where the f01 peak
+            # first appears. qubit_spectroscopy uses
+            #   amplitude = sqrt(10**(power_db/10)) = 10**(power_db/20)
+            # to map its dB y-axis to the drive amplitude, so we invert that.
+            coarse_control_amplitude = float(10 ** (estimated_repr_db / 20))
+            output_params_copy["coarse_control_amplitude"].value = coarse_control_amplitude
+            print(
+                f"Coarse control amplitude for qid={qid}: "
+                f"{coarse_control_amplitude:.6f} a.u. "
+                f"(from f01_repr_db={estimated_repr_db:.2f} dB)"
+            )
         if estimated_quality_level is not None:
             output_params_copy["f01_quality_level"].value = estimated_quality_level
         for value in output_params_copy.values():

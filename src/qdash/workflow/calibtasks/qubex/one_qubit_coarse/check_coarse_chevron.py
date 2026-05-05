@@ -23,14 +23,17 @@ class CheckCoarseChevron(QubexTask):
     """Coarse chevron pattern that locates the qubit resonance with a wide, sparse sweep.
 
     Designed to bracket spectroscopy seeds that may be off by up to ~60 MHz, so the
-    downstream ChevronPattern can use a narrow ±10 MHz window for the fine measurement.
+    downstream CheckFineChevron can use a narrow ±10 MHz window for the fine measurement.
     """
 
     name: str = "CheckCoarseChevron"
     task_type: str = "qubit"
     timeout: int = 60 * 240
     input_parameters: ClassVar[dict[str, ParameterModel | None]] = {
-        "qubit_frequency": None,
+        # Coarse f01 from CheckQubitSpectroscopy (refined by CheckControlAmplitude
+        # if it ran). The chevron's wide ±75 MHz sweep is centered on this; the
+        # task then writes back the proper qubit_frequency from fit_detuned_rabi.
+        "coarse_qubit_frequency": None,
         "readout_frequency": None,
         "control_amplitude": ParameterModel(
             value=DEFAULT_CONTROL_AMPLITUDE, unit="a.u.", description="Control pulse amplitude"
@@ -132,7 +135,7 @@ class CheckCoarseChevron(QubexTask):
         labels = [exp.get_qubit_label(int(qid))]
 
         readout_frequency = self.input_parameters["readout_frequency"]
-        qubit_frequency = self.input_parameters["qubit_frequency"]
+        qubit_frequency = self.input_parameters["coarse_qubit_frequency"]
         assert readout_frequency is not None
         assert qubit_frequency is not None
 
@@ -158,7 +161,7 @@ class CheckCoarseChevron(QubexTask):
         print(
             f"[run] CheckCoarseChevron params for {labels[0]}: "
             f"control_amplitude={ctrl_amp_value}, "
-            f"qubit_frequency={qubit_frequency.value}, "
+            f"coarse_qubit_frequency={qubit_frequency.value}, "
             f"readout_amplitude={readout_amp}, "
             f"readout_frequency={readout_frequency.value}"
         )

@@ -19,10 +19,14 @@ CONTROL_AMPLITUDE_MIN = 1e-4
 CONTROL_AMPLITUDE_MAX = 1.0
 
 
-class ChevronPattern(QubexTask):
-    """Task to check the chevron pattern."""
+class CheckFineChevron(QubexTask):
+    """Fine chevron pattern that refines qubit_frequency with a narrow ±10 MHz sweep.
 
-    name: str = "ChevronPattern"
+    Runs after CheckCoarseChevron has located the qubit within ~MHz; this task
+    further refines qubit_frequency and the chevron-derived control_amplitude.
+    """
+
+    name: str = "CheckFineChevron"
     task_type: str = "qubit"
     timeout: int = 60 * 240
     input_parameters: ClassVar[dict[str, ParameterModel | None]] = {
@@ -158,7 +162,7 @@ class ChevronPattern(QubexTask):
             ctrl_amp_value = DEFAULT_CONTROL_AMPLITUDE
 
         print(
-            f"[run] ChevronPattern params for {labels[0]}: "
+            f"[run] CheckFineChevron params for {labels[0]}: "
             f"control_amplitude={ctrl_amp_value}, "
             f"qubit_frequency={qubit_frequency.value}, "
             f"readout_amplitude={readout_amp}, "
