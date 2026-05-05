@@ -81,10 +81,22 @@ class KnowledgeCaseResponse(BaseModel):
     chip_id: str = ""
     qid: str = ""
     status: str = "resolved"
+    human_label: str = ""
+    failure_mode_labels: list[str] = []
+    case_type: list[str] = []
+    model_error_type: str = ""
+    resolution_label: str = ""
     symptom: str = ""
+    model_prediction: str = ""
+    human_review_decision: str = ""
     root_cause: str = ""
     resolution: str = ""
+    boundary_criteria: str = ""
     lesson_learned: list[str] = []
+    applicability: str = ""
+    counterexample: str = ""
+    prompt_guidance: str = ""
+    model_config = ConfigDict(protected_namespaces=())
 
 
 class TaskKnowledgeResponse(BaseModel):

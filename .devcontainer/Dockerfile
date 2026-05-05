@@ -114,9 +114,10 @@ WORKDIR /workspace/qdash/ui
 
 # Copy only package.json and bun.lock (cache optimization)
 COPY ./ui/package.json ./package.json
+COPY ./ui/bun.lock ./bun.lock
 
 # Install dependencies
-RUN bun install
+RUN bun install --frozen-lockfile
 # ========================================
 # Stage 5: Final image
 # ========================================
@@ -130,6 +131,10 @@ RUN echo "umask 022" >> /etc/profile && \
 # Install Claude Code (native install)
 RUN curl -fsSL https://claude.ai/install.sh | bash
 ENV PATH="/root/.local/bin:${PATH}"
+
+# Install OpenAI Codex CLI
+RUN npm install -g @openai/codex && \
+    codex --version
 
 # Configure Zsh (execute last)
 ENV SHELL=/bin/zsh

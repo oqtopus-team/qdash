@@ -47,10 +47,21 @@ Be concise but precise. Use English for all fields.
 {{
   "title": "Short descriptive title of the case",
   "severity": "critical | warning | info",
+  "human_label": "CORRECT | SUSPICIOUS | MISASSIGNMENT | NO_SIGNAL | ANOMALY | empty if unknown",
+  "failure_mode_labels": ["weak_signal", "ambiguous_assignment", "model_missed_issue"],
+  "case_type": ["positive_example | negative_example | boundary_case | counterexample | prompt_guidance | operator_note"],
+  "model_error_type": "true_positive | false_positive | true_negative | false_negative | not_applicable | empty if unknown",
+  "resolution_label": "accept_heuristic | override_parameter | rerun_task | adjust_search_range | update_heuristic | update_review_policy | add_task_knowledge | ignore_known_artifact | empty if unknown",
   "symptom": "What was observed (1-3 sentences)",
+  "model_prediction": "What the model/verifier predicted, if discussed",
+  "human_review_decision": "What the human reviewer decided, if discussed",
   "root_cause": "Why it happened (1-3 sentences)",
   "resolution": "How it was resolved (1-3 sentences)",
-  "lesson_learned": ["Key takeaway 1", "Key takeaway 2"]
+  "boundary_criteria": "Criteria that make this a boundary case or counterexample, if applicable",
+  "lesson_learned": ["Key takeaway 1", "Key takeaway 2"],
+  "applicability": "When this case should be retrieved in future analyses",
+  "counterexample": "What overly broad rule this case counters, if applicable",
+  "prompt_guidance": "Prompt or checklist guidance derived from this case"
 }}
 
 Respond with ONLY the JSON object, no other text.
@@ -74,10 +85,21 @@ class IssueKnowledgeService:
             chip_id=doc.chip_id,
             qid=doc.qid,
             resolution_status=doc.resolution_status,
+            human_label=doc.human_label,
+            failure_mode_labels=doc.failure_mode_labels,
+            case_type=doc.case_type,
+            model_error_type=doc.model_error_type,
+            resolution_label=doc.resolution_label,
             symptom=doc.symptom,
+            model_prediction=doc.model_prediction,
+            human_review_decision=doc.human_review_decision,
             root_cause=doc.root_cause,
             resolution=doc.resolution,
+            boundary_criteria=doc.boundary_criteria,
             lesson_learned=doc.lesson_learned,
+            applicability=doc.applicability,
+            counterexample=doc.counterexample,
+            prompt_guidance=doc.prompt_guidance,
             figure_paths=doc.figure_paths,
             thread_image_urls=doc.thread_image_urls,
             reviewed_by=doc.reviewed_by,
@@ -213,10 +235,21 @@ class IssueKnowledgeService:
             chip_id=chip_id,
             qid=qid,
             resolution_status="resolved",
+            human_label=validated.get("human_label", ""),
+            failure_mode_labels=validated.get("failure_mode_labels", []),
+            case_type=validated.get("case_type", []),
+            model_error_type=validated.get("model_error_type", ""),
+            resolution_label=validated.get("resolution_label", ""),
             symptom=validated.get("symptom", ""),
+            model_prediction=validated.get("model_prediction", ""),
+            human_review_decision=validated.get("human_review_decision", ""),
             root_cause=validated.get("root_cause", ""),
             resolution=validated.get("resolution", ""),
+            boundary_criteria=validated.get("boundary_criteria", ""),
             lesson_learned=validated.get("lesson_learned", []),
+            applicability=validated.get("applicability", ""),
+            counterexample=validated.get("counterexample", ""),
+            prompt_guidance=validated.get("prompt_guidance", ""),
             figure_paths=figure_paths,
             thread_image_urls=thread_image_urls,
         )
@@ -247,8 +280,32 @@ class IssueKnowledgeService:
         else:
             validated["severity"] = "warning"
 
+        # Short label fields
+        for key in ("human_label", "model_error_type", "resolution_label"):
+            val = data.get(key)
+            if isinstance(val, str):
+                validated[key] = val.strip()[:64]
+
+        # Label lists
+        for key in ("failure_mode_labels", "case_type"):
+            val = data.get(key)
+            if isinstance(val, list):
+                validated[key] = [
+                    str(item).strip()[:64] for item in val[:50] if isinstance(item, str)
+                ]
+
         # Free-text fields – truncate to 5000 chars
-        for key in ("symptom", "root_cause", "resolution"):
+        for key in (
+            "symptom",
+            "model_prediction",
+            "human_review_decision",
+            "root_cause",
+            "resolution",
+            "boundary_criteria",
+            "applicability",
+            "counterexample",
+            "prompt_guidance",
+        ):
             val = data.get(key)
             if isinstance(val, str):
                 validated[key] = val.strip()[:5000]
@@ -364,10 +421,21 @@ class IssueKnowledgeService:
         knowledge_id: str,
         title: str | None = None,
         severity: str | None = None,
+        human_label: str | None = None,
+        failure_mode_labels: list[str] | None = None,
+        case_type: list[str] | None = None,
+        model_error_type: str | None = None,
+        resolution_label: str | None = None,
         symptom: str | None = None,
+        model_prediction: str | None = None,
+        human_review_decision: str | None = None,
         root_cause: str | None = None,
         resolution: str | None = None,
+        boundary_criteria: str | None = None,
         lesson_learned: list[str] | None = None,
+        applicability: str | None = None,
+        counterexample: str | None = None,
+        prompt_guidance: str | None = None,
     ) -> IssueKnowledgeResponse:
         """Update a knowledge draft's content."""
         from bson import ObjectId
@@ -384,14 +452,36 @@ class IssueKnowledgeService:
             doc.title = title
         if severity is not None:
             doc.severity = severity
+        if human_label is not None:
+            doc.human_label = human_label
+        if failure_mode_labels is not None:
+            doc.failure_mode_labels = failure_mode_labels
+        if case_type is not None:
+            doc.case_type = case_type
+        if model_error_type is not None:
+            doc.model_error_type = model_error_type
+        if resolution_label is not None:
+            doc.resolution_label = resolution_label
         if symptom is not None:
             doc.symptom = symptom
+        if model_prediction is not None:
+            doc.model_prediction = model_prediction
+        if human_review_decision is not None:
+            doc.human_review_decision = human_review_decision
         if root_cause is not None:
             doc.root_cause = root_cause
         if resolution is not None:
             doc.resolution = resolution
+        if boundary_criteria is not None:
+            doc.boundary_criteria = boundary_criteria
         if lesson_learned is not None:
             doc.lesson_learned = lesson_learned
+        if applicability is not None:
+            doc.applicability = applicability
+        if counterexample is not None:
+            doc.counterexample = counterexample
+        if prompt_guidance is not None:
+            doc.prompt_guidance = prompt_guidance
 
         doc.system_info.update_time()
         doc.save()
@@ -429,6 +519,16 @@ class IssueKnowledgeService:
             meta.append(f"- qid: {doc.qid}")
         if doc.resolution_status:
             meta.append(f"- status: {doc.resolution_status}")
+        if doc.human_label:
+            meta.append(f"- human_label: {doc.human_label}")
+        if doc.failure_mode_labels:
+            meta.append(f"- failure_mode_labels: {', '.join(doc.failure_mode_labels)}")
+        if doc.case_type:
+            meta.append(f"- case_type: {', '.join(doc.case_type)}")
+        if doc.model_error_type:
+            meta.append(f"- model_error_type: {doc.model_error_type}")
+        if doc.resolution_label:
+            meta.append(f"- resolution_label: {doc.resolution_label}")
         if doc.issue_id:
             meta.append(f"- issue_id: {doc.issue_id}")
         if meta:
@@ -437,16 +537,28 @@ class IssueKnowledgeService:
 
         if doc.symptom:
             lines.extend(["## Symptom", "", doc.symptom, ""])
+        if doc.model_prediction:
+            lines.extend(["## Model prediction", "", doc.model_prediction, ""])
+        if doc.human_review_decision:
+            lines.extend(["## Human review decision", "", doc.human_review_decision, ""])
         if doc.root_cause:
             lines.extend(["## Root cause", "", doc.root_cause, ""])
         if doc.resolution:
             lines.extend(["## Resolution", "", doc.resolution, ""])
+        if doc.boundary_criteria:
+            lines.extend(["## Boundary criteria", "", doc.boundary_criteria, ""])
         if doc.lesson_learned:
             lines.append("## Lesson learned")
             lines.append("")
             for lesson in doc.lesson_learned:
                 lines.append(f"- {lesson}")
             lines.append("")
+        if doc.applicability:
+            lines.extend(["## Applicability", "", doc.applicability, ""])
+        if doc.counterexample:
+            lines.extend(["## Counterexample", "", doc.counterexample, ""])
+        if doc.prompt_guidance:
+            lines.extend(["## Prompt guidance", "", doc.prompt_guidance, ""])
 
         if doc.figure_paths:
             lines.append("## Figures")
