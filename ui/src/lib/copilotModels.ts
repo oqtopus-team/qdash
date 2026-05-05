@@ -7,16 +7,16 @@ export interface ModelOverride {
   api_key_env?: string | null;
 }
 
-export interface ModelOption {
+interface ModelOption {
   key: string;
   label: string;
   model: ModelOverride | null;
   isConfiguredDefault?: boolean;
 }
 
-export const ANALYSIS_MODEL_STORAGE_KEY = "qdash_analysis_model_key";
+const ANALYSIS_MODEL_STORAGE_KEY = "qdash_analysis_model_key";
 
-export function readModel(value: unknown): ModelOverride | null {
+function readModel(value: unknown): ModelOverride | null {
   if (!value || typeof value !== "object") return null;
   const raw = value as Record<string, unknown>;
   if (typeof raw.provider !== "string" || typeof raw.name !== "string") {
@@ -44,7 +44,7 @@ export function readModel(value: unknown): ModelOverride | null {
   };
 }
 
-export function modelIdentity(model: ModelOverride): string {
+function modelIdentity(model: ModelOverride): string {
   return `${model.provider}:${model.name}`;
 }
 
