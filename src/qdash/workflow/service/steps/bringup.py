@@ -29,8 +29,16 @@ class BringUp(CalibrationStep):
     """Bring-up calibration step for initial qubit characterization.
 
     Executes BRINGUP_TASKS:
-    - CheckResonatorSpectroscopy (MUX-level): Estimates resonator_frequency
-    - CheckQubitSpectroscopy (Qubit-level): Estimates qubit_frequency, anharmonicity
+    - CheckResonatorSpectroscopy (MUX-level): Estimates readout_frequency
+    - Configure: Apply readout_frequency to backend
+    - CheckQubitSpectroscopy: Estimates coarse_qubit_frequency, anharmonicity, coarse_control_amplitude
+    - CheckControlAmplitude: Refines control_amplitude via sqrt-Lorentzian fit
+    - Configure: Apply qubit_frequency / control_amplitude to backend
+    - CheckCoarseChevron: Coarse Rabi chevron, ±75 MHz, qubit_frequency to ~MHz
+    - CheckRabi: Refines control_amplitude (Rabi-rate-derived)
+    - CheckFineChevron (x2): Refines qubit_frequency, ±10 MHz, with the latest control_amplitude
+    - CheckRabi (x2): Refines control_amplitude with the latest qubit_frequency
+      Two fine/rabi iterations converge to sub-kHz qubit_frequency for typical transmons.
 
     MUX-level tasks run once per MUX for the representative qubit (qid % 4 == 0).
     Qubit-level tasks run for each qubit individually.
@@ -192,13 +200,14 @@ class BringUp(CalibrationStep):
                     freq_param.value if hasattr(freq_param, "value") else freq_param
                 )
 
-        # Qubit frequency and anharmonicity from CheckQubitSpectroscopy
+        # Coarse qubit frequency and anharmonicity from CheckQubitSpectroscopy
         qubit_result = raw.get("CheckQubitSpectroscopy", {})
         if qubit_result and not qubit_result.get("skipped", False):
-            # Qubit frequency (f01)
-            qubit_freq_param = qubit_result.get("qubit_frequency")
+            # Coarse qubit frequency (f01) — proper qubit_frequency comes from
+            # CheckCoarseChevron's Rabi-detuning fit.
+            qubit_freq_param = qubit_result.get("coarse_qubit_frequency")
             if qubit_freq_param is not None:
-                metrics["qubit_frequency"] = (
+                metrics["coarse_qubit_frequency"] = (
                     qubit_freq_param.value
                     if hasattr(qubit_freq_param, "value")
                     else qubit_freq_param
@@ -210,5 +219,16 @@ class BringUp(CalibrationStep):
                 value = anharm_param.value if hasattr(anharm_param, "value") else anharm_param
                 if value is not None:
                     metrics["anharmonicity"] = value
+
+        # Proper qubit frequency from CheckCoarseChevron
+        chevron_result = raw.get("CheckCoarseChevron", {})
+        if chevron_result and not chevron_result.get("skipped", False):
+            qubit_freq_param = chevron_result.get("qubit_frequency")
+            if qubit_freq_param is not None:
+                metrics["qubit_frequency"] = (
+                    qubit_freq_param.value
+                    if hasattr(qubit_freq_param, "value")
+                    else qubit_freq_param
+                )
 
         return metrics

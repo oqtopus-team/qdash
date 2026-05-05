@@ -23,7 +23,7 @@ class FakeRandomizedBenchmarking(FakeTask):
     Note: Uses same name as qubex task for seamless backend switching.
 
     Inputs:
-        qubit_frequency: From ChevronPattern
+        qubit_frequency: From CheckFineChevron
         rabi_amplitude: From CheckRabi
         t1: From CheckT1
         t2_echo: From CheckT2Echo
@@ -40,7 +40,7 @@ class FakeRandomizedBenchmarking(FakeTask):
     input_parameters: ClassVar[dict[str, ParameterModel | None]] = {
         "qubit_frequency": ParameterModel(
             unit="GHz",
-            description="Qubit frequency from ChevronPattern",
+            description="Qubit frequency from CheckFineChevron",
         ),
         "rabi_amplitude": ParameterModel(
             unit="",

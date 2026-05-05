@@ -1,4 +1,4 @@
-"""Fake ChevronPattern task for testing provenance without real hardware."""
+"""Fake CheckFineChevron task for testing provenance without real hardware."""
 
 from typing import ClassVar
 
@@ -14,7 +14,7 @@ from qdash.workflow.calibtasks.fake.base import FakeTask
 from qdash.workflow.engine.backend.fake import FakeBackend
 
 
-class FakeChevronPattern(FakeTask):
+class FakeCheckFineChevron(FakeTask):
     """Fake task to simulate chevron pattern calibration.
 
     This is the entry point task that determines the qubit frequency.
@@ -27,7 +27,7 @@ class FakeChevronPattern(FakeTask):
         readout_frequency: Simulated readout resonator frequency (GHz)
     """
 
-    name: str = "ChevronPattern"  # Same name as qubex task for backend-agnostic workflows
+    name: str = "CheckFineChevron"  # Same name as qubex task for backend-agnostic workflows
     task_type: str = "qubit"
     timeout: int = 60
 
@@ -66,7 +66,7 @@ class FakeChevronPattern(FakeTask):
     }
 
     def preprocess(self, backend: FakeBackend, qid: str) -> PreProcessResult:
-        """Preprocess the task - no input dependencies for ChevronPattern."""
+        """Preprocess the task - no input dependencies for CheckFineChevron."""
         return PreProcessResult(input_parameters=self.input_parameters)
 
     def run(self, backend: FakeBackend, qid: str) -> RunResult:

@@ -398,7 +398,7 @@ _CATEGORIES: list[tuple[str, str, list[str]]] = [
             "CheckDispersiveShift",
             "CheckOptimalReadoutAmplitude",
             "ReadoutClassification",
-            "ChevronPattern",
+            "CheckFineChevron",
         ],
     ),
     (

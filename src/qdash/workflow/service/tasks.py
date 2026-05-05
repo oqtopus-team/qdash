@@ -30,9 +30,22 @@ Example:
 # - MUX-level tasks (is_mux_level=True) run once per MUX for representative qubit
 # - Qubit-level tasks run for each qubit individually
 BRINGUP_TASKS: list[str] = [
-    "CheckResonatorSpectroscopy",  # MUX-level: estimates resonator_frequency
-    "CheckQubitSpectroscopy",  # Qubit-level: estimates qubit_frequency, anharmonicity
-    "ChevronPattern",  # Qubit-level: estimates readout_amplitude
+    "CheckResonatorSpectroscopy",  # MUX-level: estimates readout_frequency
+    "Configure",  # Apply readout_frequency to backend
+    "CheckQubitSpectroscopy",  # Qubit-level: coarse_qubit_frequency, anharmonicity, coarse_control_amplitude
+    "CheckControlAmplitude",  # Qubit-level: refines control_amplitude via sqrt-Lorentzian fit
+    "Configure",  # Apply qubit_frequency / control_amplitude to backend
+    # Iterative coarse→fine refinement of (qubit_frequency, control_amplitude).
+    # CheckRabi refines control_amplitude (Rabi-rate-derived) using the latest
+    # qubit_frequency; CheckFineChevron refines qubit_frequency using the latest
+    # control_amplitude. Two fine/rabi iterations after coarse converge to
+    # sub-kHz qubit_frequency for typical transmons.
+    "CheckCoarseChevron",
+    "CheckRabi",
+    "CheckFineChevron",
+    "CheckRabi",
+    "CheckFineChevron",
+    "CheckRabi",
 ]
 
 

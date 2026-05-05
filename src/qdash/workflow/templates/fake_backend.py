@@ -9,7 +9,7 @@ Backend Switching:
     - backend_name=None: Use default from config/backend.yaml
 
 Available Fake Tasks (same names as qubex for seamless switching):
-    - ChevronPattern: Entry point, outputs qubit_frequency, readout_frequency
+    - CheckFineChevron: Entry point, outputs qubit_frequency, readout_frequency
     - CreateHPIPulse: Depends on qubit_frequency, outputs hpi_amplitude, hpi_length
     - CheckRabi: Depends on qubit_frequency
     - CheckRamsey: Depends on qubit_frequency, hpi_amplitude
@@ -32,7 +32,7 @@ Example:
         chip_id="64Qv3",
         qids=["0", "1"],
         backend_name="fake",
-        tasks=["ChevronPattern", "CheckRabi", "CheckT1", "CheckT2Echo", "RandomizedBenchmarking"],
+        tasks=["CheckFineChevron", "CheckRabi", "CheckT1", "CheckT2Echo", "RandomizedBenchmarking"],
     )
 
     # Switch to production (qubex)
@@ -70,7 +70,7 @@ def fake_calibration(
         username: User name (from UI)
         chip_id: Chip ID (default: "64Q")
         qids: Qubit IDs to calibrate (default: ["0", "1", "2", "3"])
-        tasks: Task names to run. Default: ["ChevronPattern", "CheckRabi", "CheckT1", "CheckT2Echo"]
+        tasks: Task names to run. Default: ["CheckFineChevron", "CheckRabi", "CheckT1", "CheckT2Echo"]
                For full provenance test, add "RandomizedBenchmarking".
         backend_name: Backend to use ("fake" for testing, "qubex" for production,
                       None for default from backend.yaml)
@@ -85,7 +85,7 @@ def fake_calibration(
 
     if tasks is None:
         tasks = [
-            "ChevronPattern",
+            "CheckFineChevron",
             "CreateHPIPulse",
             "CheckRabi",
             "CheckT1",
