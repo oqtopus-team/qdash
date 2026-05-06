@@ -22,6 +22,23 @@ AI_TRIAGE_SEPARATOR = "\n\n---\n\n"
 AI_TRIAGE_SECTION_RE = re.compile(r"^## AI triage\n\n.*?(?:\n\n---\n\n|$)", re.DOTALL)
 MAX_AI_TRIAGE_NOTE_CHARS = 4500
 AI_TRIAGE_WORKERS = 2
+AI_TRIAGE_FORMAT_REMINDER = """\
+
+Required output format:
+Return JSON, but the JSON `explanation` string must start exactly with this
+markdown block. Do not put prose before it.
+
+**Review triage**
+- Decision: `PASS` | `PASS_WITH_NOTE` | `REVIEW` | `FAIL`
+- Human label suggestion: `CORRECT` | `SUSPICIOUS` | `MISASSIGNMENT` | `NO_SIGNAL` | `ANOMALY`
+- Accepted parameter(s): ...
+- Needs review: ...
+- Primary reason: ...
+- Closest knowledge case: ...
+- Suggested labels: ...
+- Recommended action: ...
+- Optional note: ...
+"""
 
 _EXECUTOR = ThreadPoolExecutor(max_workers=AI_TRIAGE_WORKERS, thread_name_prefix="ai-triage")
 _IN_FLIGHT_TASK_IDS: set[str] = set()
@@ -331,7 +348,7 @@ def _run_ai_triage(
     result = asyncio.run(
         run_analysis(
             context=ctx.context,
-            user_message=config.analysis.ai_triage_message,
+            user_message=f"{config.analysis.ai_triage_message}\n\n{AI_TRIAGE_FORMAT_REMINDER}",
             config=config,
             image_base64=ctx.image_base64,
             expected_images=ctx.expected_images,

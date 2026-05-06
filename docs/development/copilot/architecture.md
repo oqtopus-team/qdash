@@ -58,14 +58,14 @@ analysis_models:
     api_key_env: GEMMA_API_KEY
     keep_alive: 30m
     temperature: 0.2
-    max_output_tokens: 1200
+    max_output_tokens: 4096
   - provider: ollama
     name: gemma4:26b
     base_url: env:GEMMA_BASE_URL
     api_key_env: GEMMA_API_KEY
     keep_alive: 30m
     temperature: 0.2
-    max_output_tokens: 1200
+    max_output_tokens: 4096
 
 # Metrics for chip health evaluation
 evaluation_metrics:
@@ -87,8 +87,8 @@ analysis:
   enabled: true
   multimodal: true
   max_expected_images: 2
-  ai_triage_max_expected_images: 0
-  ai_triage_max_output_tokens: 1024
+  ai_triage_max_expected_images: null
+  ai_triage_max_output_tokens: null
   ai_triage_tasks: [CheckQubitSpectroscopy, CheckResonatorSpectroscopy]
   ai_triage_message: >-
     Review this calibration result and attach a concise operational triage note.
@@ -137,9 +137,10 @@ Automatic AI triage attaches an LLM-generated operational review note to selecte
 - **Configuration**: `analysis.ai_triage_tasks` and `analysis.ai_triage_message` in `config/copilot.yaml`
 - **Execution model**: asynchronous background thread pool, de-duplicated by `task_id`
 - **Model selection**: `analysis_model`, then the first `analysis_models` entry, then the general `model`
-- **Local VLM speed path**: `analysis.ai_triage_max_expected_images` overrides
-  `analysis.max_expected_images` only for automatic triage, and
-  `analysis.ai_triage_max_output_tokens` caps only the selected triage model.
+- **AI triage quality path**: automatic triage inherits
+  `analysis.max_expected_images` and the selected model's `max_output_tokens`
+  by default. Set `analysis.ai_triage_max_expected_images` or
+  `analysis.ai_triage_max_output_tokens` only for an explicit low-latency mode.
 - **Storage**: task-result `user_note.content`, under a `## AI triage` Markdown section
 - **UI**: task detail modals render the note as Markdown; chip page badges are shown only when the triage decision requires review
 

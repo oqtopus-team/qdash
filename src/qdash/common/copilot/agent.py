@@ -86,6 +86,23 @@ and use the following markdown shape:
 - Recommended action: one short operator action
 - Optional note: one short caveat only when useful, otherwise `none`
 
+For reliable parsing, the JSON `explanation` string MUST start exactly with
+`**Review triage**`. Every triage field line MUST begin with hyphen-space
+(`- `). Do not omit the hyphens, do not bold the field names, and do not put
+ordinary prose before the triage block. Use this exact skeleton before any
+detailed explanation:
+
+**Review triage**
+- Decision: `PASS` | `PASS_WITH_NOTE` | `REVIEW` | `FAIL`
+- Human label suggestion: `CORRECT` | `SUSPICIOUS` | `MISASSIGNMENT` | `NO_SIGNAL` | `ANOMALY`
+- Accepted parameter(s): ...
+- Needs review: ...
+- Primary reason: ...
+- Closest knowledge case: ...
+- Suggested labels: ...
+- Recommended action: ...
+- Optional note: ...
+
 Keep the triage fields internally consistent:
 - Use `PASS` only when all important output parameters are visually and physically supported.
   For `PASS`, set `Needs review: none`, `Suggested labels: none`, and make the recommended
@@ -1822,8 +1839,42 @@ async def _run_chat_completions(
             response = await client.chat.completions.create(**kwargs)
         else:
             raise
-    message = response.choices[0].message
+    choice = response.choices[0]
+    message = choice.message
     content = message.content or ""
+    reasoning_chars = 0
+    for field in ("reasoning", "reasoning_content", "thinking"):
+        value = getattr(message, field, None)
+        if isinstance(value, str):
+            reasoning_chars += len(value)
+    usage = getattr(response, "usage", None)
+    prompt_tokens = getattr(usage, "prompt_tokens", None) if usage else None
+    completion_tokens = getattr(usage, "completion_tokens", None) if usage else None
+    total_tokens = getattr(usage, "total_tokens", None) if usage else None
+    finish_reason = getattr(choice, "finish_reason", None)
+    logger.info(
+        "Chat completion finished: provider=%s model=%s finish_reason=%s "
+        "content_chars=%d reasoning_chars=%d prompt_tokens=%s completion_tokens=%s total_tokens=%s",
+        config.model.provider,
+        config.model.name,
+        finish_reason,
+        len(content),
+        reasoning_chars,
+        prompt_tokens,
+        completion_tokens,
+        total_tokens,
+    )
+    if finish_reason == "length":
+        logger.warning(
+            "Chat completion hit token limit before stop: provider=%s model=%s "
+            "content_chars=%d reasoning_chars=%d completion_tokens=%s max_tokens=%s",
+            config.model.provider,
+            config.model.name,
+            len(content),
+            reasoning_chars,
+            completion_tokens,
+            config.model.max_output_tokens,
+        )
     if content:
         return content
 
@@ -1838,6 +1889,12 @@ async def _run_chat_completions(
                 "Chat completion returned empty content; using message.%s fallback", field
             )
             return value
+    logger.warning(
+        "Chat completion returned no usable text: provider=%s model=%s finish_reason=%s",
+        config.model.provider,
+        config.model.name,
+        finish_reason,
+    )
     return ""
 
 
