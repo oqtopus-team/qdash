@@ -156,8 +156,11 @@ analysis:
     - CheckResonatorSpectroscopy
   ai_triage_message: >-
     Review this calibration result and attach a concise operational
-    triage note. Be strict about PASS: history consistency alone is not enough
-    to accept visually unsupported output parameters.
+    triage note. Auto-pass results that are good enough for routine parameter
+    update. History consistency alone is not enough to accept visually
+    unsupported output parameters, but weak f12 support by itself should usually
+    become PASS_WITH_NOTE when f01 is clearly supported and no stronger
+    competing transition is visible.
   # Maximum conversation turns to maintain in context
   max_conversation_turns: 10
 

@@ -78,9 +78,18 @@ Keep the triage fields internally consistent:
 - Use `PASS_WITH_NOTE` only when all output parameters that would be updated are
   acceptable without human intervention, but there is a minor caveat or optional
   follow-up. Put non-blocking caveats in `Optional note`, not in `Needs review`.
+- For `CheckQubitSpectroscopy`, a weak or missing f12 is not automatically
+  review-blocking when f01 is clearly supported, the f12/anharmonicity value is
+  plausible if present, and there is no stronger competing transition. Prefer
+  `PASS_WITH_NOTE` for this weak-f12-only boundary. Use `REVIEW` only when f01
+  itself is weak/ambiguous, f12/anharmonicity is unsupported enough to make an
+  automatic parameter update unsafe, or a competing feature could change the
+  selected transition.
 - Use `REVIEW` when any important output parameter should not be auto-accepted without a
-  human check. If you use labels such as `weak_signal`, `boundary_case`, `ambiguous_doublet`,
-  or `frequency_offset` for a parameter that affects acceptance, prefer `REVIEW`.
+  human check. If you use labels such as `ambiguous_doublet` or `frequency_offset`
+  for a parameter that affects acceptance, prefer `REVIEW`. Do not make
+  `weak_signal` or `boundary_case` alone review-blocking when the detailed
+  explanation says the result is acceptable for automatic use.
 - If the detailed explanation says a parameter should be treated cautiously, maintained
   from history, not overwritten, rechecked before update, or used only as a reference value,
   then that parameter MUST appear in `Needs review` and the decision MUST be `REVIEW`.
