@@ -1182,14 +1182,8 @@ def _parse_response(content: str) -> AnalysisResponse:
         fallback_response = _extract_triage_fallback(content)
         if fallback_response is not None:
             return fallback_response
-        # If JSON parsing fails, treat the entire response as explanation
-        return AnalysisResponse(
-            summary="Analysis complete",
-            assessment="warning",
-            explanation=content,
-            potential_issues=[],
-            recommendations=[],
-        )
+        logger.warning("Local model response omitted required review triage block: %s", content)
+        return _missing_triage_response(content)
 
 
 _ASSESSMENT_LABELS_JA = {
