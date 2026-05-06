@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
+from typing import Any
 
 import pytest
 from qdash.api.lib.copilot_agent import _parse_response, _run_chat_completions
@@ -42,7 +43,7 @@ async def test_run_chat_completions_passes_ollama_keep_alive_and_num_ctx() -> No
             message = SimpleNamespace(content='{"summary":"ok","explanation":"ok"}')
             return SimpleNamespace(choices=[SimpleNamespace(message=message)])
 
-    client = SimpleNamespace(chat=SimpleNamespace(completions=_Completions()))
+    client: Any = SimpleNamespace(chat=SimpleNamespace(completions=_Completions()))
     config = CopilotConfig(
         model=ModelConfig(
             provider="ollama",
