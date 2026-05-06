@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { Pencil, Save, StickyNote, Trash2, X } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -48,7 +48,10 @@ export function TaskResultMemo({
 
   const [isEditing, setIsEditing] = useState(false);
   const [draft, setDraft] = useState(noteContent);
-  const aiTriageSummary = getAiTriageSummary(noteContent);
+  const aiTriageSummary = useMemo(
+    () => getAiTriageSummary(noteContent),
+    [noteContent],
+  );
   const [isExpanded, setIsExpanded] = useState(!aiTriageSummary);
 
   useEffect(() => {
@@ -103,6 +106,14 @@ export function TaskResultMemo({
         <h3 className="text-sm font-semibold flex items-center gap-2">
           <StickyNote className="h-4 w-4" />
           Note
+          {aiTriageSummary?.decision && (
+            <span
+              className={`badge badge-xs ${getAiTriageDecisionBadgeClass(aiTriageSummary.decision)}`}
+              title="AI triage decision"
+            >
+              {aiTriageSummary.decision}
+            </span>
+          )}
           {note?.updated_by && (
             <span className="text-xs font-normal text-base-content/60">
               · last edit by {note.updated_by}
@@ -205,7 +216,9 @@ export function TaskResultMemo({
   );
 }
 
-function getAiTriageSummary(content: string): { summary: string } | null {
+function getAiTriageSummary(
+  content: string,
+): { summary: string; decision: string | null } | null {
   const header = "## AI triage";
   const headerIndex = content.indexOf(header);
   if (headerIndex === -1) return null;
@@ -220,8 +233,9 @@ function getAiTriageSummary(content: string): { summary: string } | null {
 
   const lines = body.split(/\r?\n/);
   const summaryLines: string[] = [header];
+  let decision: string | null = null;
   const importantLinePattern =
-    /^(Review triage|Decision:|判定:|Human label suggestion:|Accepted parameter\(s\):|受理されたパラメータ:|Needs review:|要レビュー:|Primary reason:|主な理由:|Closest knowledge case:|最も近い知識事例:|Suggested labels:|推奨ラベル:|Recommended action:|推奨アクション:|Optional note:)/i;
+    /^(?:[-*]\s*)?(?:\*\*)?(Review triage|Decision|判定|Human label suggestion|Accepted parameter\(s\)|受理されたパラメータ|Needs review|要レビュー|Primary reason|主な理由|Closest knowledge case|最も近い知識事例|Suggested labels|推奨ラベル|Recommended action|推奨アクション|Optional note)(?:\*\*)?\s*:?/i;
 
   for (const line of lines) {
     const trimmed = line.trim();
@@ -233,6 +247,7 @@ function getAiTriageSummary(content: string): { summary: string } | null {
     }
     if (importantLinePattern.test(trimmed)) {
       summaryLines.push(line);
+      decision ??= extractAiTriageDecision(trimmed);
       continue;
     }
     if (summaryLines.length <= 2) {
@@ -241,8 +256,27 @@ function getAiTriageSummary(content: string): { summary: string } | null {
   }
 
   const summary = summaryLines.join("\n").trim();
-  if (!summary || summary === section.trim()) return null;
-  return { summary };
+  if (!summary || (summary === section.trim() && !decision)) return null;
+  return { summary, decision };
+}
+
+function extractAiTriageDecision(line: string): string | null {
+  const match = line.match(/(?:Decision|判定)\s*:\s*`?([A-Z_]+)`?/i);
+  return match?.[1]?.toUpperCase() ?? null;
+}
+
+function getAiTriageDecisionBadgeClass(decision: string): string {
+  switch (decision) {
+    case "PASS":
+      return "badge-success";
+    case "PASS_WITH_NOTE":
+    case "REVIEW":
+      return "badge-warning";
+    case "FAIL":
+      return "badge-error";
+    default:
+      return "badge-ghost";
+  }
 }
 
 function extractErrorMessage(err: unknown): string {

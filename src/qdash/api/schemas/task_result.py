@@ -4,7 +4,9 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, field_serializer, field_validator
+from qdash.api.lib.copilot_config import ModelConfig
 from qdash.common.datetime_utils import format_elapsed_time, parse_elapsed_time
+from qdash.datamodel.note import AiTriageReviewModel
 from qdash.datamodel.task import ParameterModel
 
 
@@ -30,6 +32,7 @@ class TaskResult(BaseModel):
     elapsed_time: timedelta | None = None
     task_type: str | None = None
     default_view: bool = True
+    ai_triage: AiTriageReviewModel | None = None
 
     @field_validator("elapsed_time", mode="before")
     @classmethod
@@ -89,3 +92,36 @@ class TaskResultExcludeResponse(BaseModel):
     excluded_reason: str
     excluded_by: str | None
     excluded_at: datetime | None
+
+
+class BulkAiTriageRequest(BaseModel):
+    """Request body for bulk AI triage review."""
+
+    model_config = ConfigDict(protected_namespaces=())
+
+    chip_id: str
+    task: str
+    entity_type: str = "qubit"
+    date: str | None = None
+    task_ids: list[str] | None = None
+    model_override: ModelConfig | None = None
+
+
+class BulkAiTriageResponse(BaseModel):
+    """Response after enqueueing bulk AI triage review."""
+
+    chip_id: str
+    task: str
+    entity_type: str
+    date: str | None = None
+    requested_count: int
+    task_ids: list[str]
+    skipped_reason: str | None = None
+
+
+class DownloadFiguresAsZipRequest(BaseModel):
+    """Request body for downloading task-result artifacts as a ZIP archive."""
+
+    paths: list[str] = []
+    filename: str = "figures.zip"
+    ai_triage_task_ids: list[str] = []

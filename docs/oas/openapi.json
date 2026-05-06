@@ -5090,6 +5090,71 @@
         }
       }
     },
+    "/task-results/ai-triage/bulk": {
+      "post": {
+        "tags": [
+          "task-result"
+        ],
+        "summary": "Request bulk AI triage review for latest task results",
+        "description": "Enqueue AI triage review for the current latest task result per entity.",
+        "operationId": "requestBulkAiTriageReview",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkAiTriageRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkAiTriageResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/task-results/{task_id}/re-execute": {
       "post": {
         "tags": [
@@ -5243,17 +5308,40 @@
           "task-result"
         ],
         "summary": "Download multiple figures as a ZIP file",
-        "description": "Download multiple calibration figures as a ZIP file.\n\nCreates a ZIP archive containing all requested figure files and returns it\nas a streaming response.\n\nParameters\n----------\npaths : list[str]\n    List of absolute file paths to the calibration figures\nfilename : str\n    Filename for the ZIP archive (default: \"figures.zip\")\n\nReturns\n-------\nStreamingResponse\n    ZIP archive containing all requested files\n\nRaises\n------\nHTTPException\n    400 if no paths are provided or if any path does not exist",
+        "description": "Download multiple calibration figures as a ZIP file.\n\nCreates a ZIP archive containing all requested figure files and returns it\nas a streaming response.\n\nParameters\n----------\nbody.paths : list[str]\n    List of absolute file paths to the calibration figures\nbody.filename : str\n    Filename for the ZIP archive (default: \"figures.zip\")\n\nReturns\n-------\nStreamingResponse\n    ZIP archive containing all requested files\n\nRaises\n------\nHTTPException\n    400 if no paths are provided or if any path does not exist",
         "operationId": "downloadFiguresAsZip",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/Body_downloadFiguresAsZip"
+                "$ref": "#/components/schemas/DownloadFiguresAsZipRequest"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "200": {
@@ -5274,12 +5362,7 @@
               }
             }
           }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
+        }
       }
     },
     "/issues": {
@@ -11458,6 +11541,69 @@
         "title": "AddMemberRequest",
         "description": "Request to add a member to a project (always as viewer)."
       },
+      "AiTriageReviewModel": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "description": "AI triage status: requested, running, completed, or failed",
+            "default": ""
+          },
+          "requested_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested At",
+            "description": "Timestamp when AI triage was requested"
+          },
+          "requested_by": {
+            "type": "string",
+            "title": "Requested By",
+            "description": "Username that requested AI triage",
+            "default": ""
+          },
+          "model_provider": {
+            "type": "string",
+            "title": "Model Provider",
+            "description": "Provider for the selected AI triage model",
+            "default": ""
+          },
+          "model_name": {
+            "type": "string",
+            "title": "Model Name",
+            "description": "Name of the selected AI triage model",
+            "default": ""
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At",
+            "description": "Timestamp when AI triage completed or failed"
+          },
+          "error": {
+            "type": "string",
+            "title": "Error",
+            "description": "Failure detail if AI triage failed",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "title": "AiTriageReviewModel",
+        "description": "Persistent state for an AI triage review request on a task result."
+      },
       "AllConfigResponse": {
         "properties": {
           "ui": {
@@ -11666,29 +11812,6 @@
         "title": "BackendResponseModel",
         "description": "Response model for backend operations.\n\nInherits from BackendModel and is used to format the response\nfor backend-related API endpoints."
       },
-      "Body_downloadFiguresAsZip": {
-        "properties": {
-          "paths": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Paths",
-            "description": "List of file paths to include in the ZIP"
-          },
-          "filename": {
-            "type": "string",
-            "title": "Filename",
-            "description": "Filename for the ZIP archive",
-            "default": "figures.zip"
-          }
-        },
-        "type": "object",
-        "required": [
-          "paths"
-        ],
-        "title": "Body_downloadFiguresAsZip"
-      },
       "Body_login": {
         "properties": {
           "username": {
@@ -11740,6 +11863,124 @@
         },
         "type": "object",
         "title": "Body_reExecuteTaskResult"
+      },
+      "BulkAiTriageRequest": {
+        "properties": {
+          "chip_id": {
+            "type": "string",
+            "title": "Chip Id"
+          },
+          "task": {
+            "type": "string",
+            "title": "Task"
+          },
+          "entity_type": {
+            "type": "string",
+            "title": "Entity Type",
+            "default": "qubit"
+          },
+          "date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date"
+          },
+          "task_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Ids"
+          },
+          "model_override": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelConfig"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "chip_id",
+          "task"
+        ],
+        "title": "BulkAiTriageRequest",
+        "description": "Request body for bulk AI triage review."
+      },
+      "BulkAiTriageResponse": {
+        "properties": {
+          "chip_id": {
+            "type": "string",
+            "title": "Chip Id"
+          },
+          "task": {
+            "type": "string",
+            "title": "Task"
+          },
+          "entity_type": {
+            "type": "string",
+            "title": "Entity Type"
+          },
+          "date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date"
+          },
+          "requested_count": {
+            "type": "integer",
+            "title": "Requested Count"
+          },
+          "task_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Task Ids"
+          },
+          "skipped_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Skipped Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "chip_id",
+          "task",
+          "entity_type",
+          "requested_count",
+          "task_ids"
+        ],
+        "title": "BulkAiTriageResponse",
+        "description": "Response after enqueueing bulk AI triage review."
       },
       "CalibrationNoteResponse": {
         "properties": {
@@ -12936,6 +13177,34 @@
         "type": "object",
         "title": "DeviceTopologyRequest",
         "description": "Request model for device topology."
+      },
+      "DownloadFiguresAsZipRequest": {
+        "properties": {
+          "paths": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Paths",
+            "default": []
+          },
+          "filename": {
+            "type": "string",
+            "title": "Filename",
+            "default": "figures.zip"
+          },
+          "ai_triage_task_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Ai Triage Task Ids",
+            "default": []
+          }
+        },
+        "type": "object",
+        "title": "DownloadFiguresAsZipRequest",
+        "description": "Request body for downloading task-result artifacts as a ZIP archive."
       },
       "ExecuteFlowRequest": {
         "properties": {
@@ -19053,6 +19322,16 @@
             "type": "boolean",
             "title": "Default View",
             "default": true
+          },
+          "ai_triage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AiTriageReviewModel"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",

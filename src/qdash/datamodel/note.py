@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class NoteModel(BaseModel):
@@ -16,4 +16,39 @@ class NoteModel(BaseModel):
     updated_by: str = Field(default="", description="Username of the last editor")
     updated_at: datetime | None = Field(
         default=None, description="Timestamp of the last edit; None if never edited"
+    )
+
+
+class AiTriageReviewModel(BaseModel):
+    """Persistent state for an AI triage review request on a task result."""
+
+    model_config = ConfigDict(protected_namespaces=())
+
+    status: str = Field(
+        default="",
+        description="AI triage status: requested, running, completed, or failed",
+    )
+    requested_at: datetime | None = Field(
+        default=None,
+        description="Timestamp when AI triage was requested",
+    )
+    requested_by: str = Field(
+        default="",
+        description="Username that requested AI triage",
+    )
+    model_provider: str = Field(
+        default="",
+        description="Provider for the selected AI triage model",
+    )
+    model_name: str = Field(
+        default="",
+        description="Name of the selected AI triage model",
+    )
+    completed_at: datetime | None = Field(
+        default=None,
+        description="Timestamp when AI triage completed or failed",
+    )
+    error: str = Field(
+        default="",
+        description="Failure detail if AI triage failed",
     )

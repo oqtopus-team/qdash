@@ -9,12 +9,15 @@ from __future__ import annotations
 import io
 import logging
 import zipfile
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
 from pathlib import Path
+from threading import Lock
 from typing import TYPE_CHECKING, Any
 
 from bunnet import SortDirection
 from qdash.api.schemas.task_result import (
+    BulkAiTriageResponse,
     LatestTaskResultResponse,
     TaskHistoryResponse,
     TaskResult,
@@ -36,6 +39,19 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+AI_TRIAGE_ACTOR = "qdash-ai"
+AI_TRIAGE_HEADER = "## AI triage"
+AI_TRIAGE_SEPARATOR = "\n\n---\n\n"
+MAX_AI_TRIAGE_NOTE_CHARS = 4500
+AI_TRIAGE_WORKERS = 2
+
+_AI_TRIAGE_EXECUTOR = ThreadPoolExecutor(
+    max_workers=AI_TRIAGE_WORKERS,
+    thread_name_prefix="api-ai-triage",
+)
+_AI_TRIAGE_IN_FLIGHT_TASK_IDS: set[str] = set()
+_AI_TRIAGE_IN_FLIGHT_LOCK = Lock()
+
 
 def _document_to_task_result(doc: TaskResultHistoryDocument) -> TaskResult:
     """Convert a TaskResultHistoryDocument to a TaskResult schema."""
@@ -56,7 +72,16 @@ def _document_to_task_result(doc: TaskResultHistoryDocument) -> TaskResult:
         end_at=doc.end_at,
         elapsed_time=parse_elapsed_time(doc.elapsed_time),
         task_type=doc.task_type,
+        ai_triage=doc.ai_triage,
     )
+
+
+def _truncate_ai_triage_markdown(markdown: str) -> str:
+    """Keep AI triage note content bounded while preserving a tail marker."""
+    budget = MAX_AI_TRIAGE_NOTE_CHARS - 200
+    if len(markdown) <= budget:
+        return markdown
+    return markdown[:budget].rstrip() + "\n\n[truncated]"
 
 
 class TaskResultService:
@@ -309,6 +334,93 @@ class TaskResultService:
 
         return TimeSeriesData(data=timeseries_by_qid)
 
+    def request_bulk_ai_triage(
+        self,
+        *,
+        project_id: str,
+        chip_id: str,
+        task: str,
+        entity_type: str,
+        date: str | None = None,
+        task_ids: list[str] | None = None,
+        model_override: Any | None = None,
+        requested_by: str = "",
+    ) -> BulkAiTriageResponse:
+        """Enqueue AI triage review for the latest task results on a chip."""
+        from starlette.exceptions import HTTPException
+
+        if entity_type not in {"qubit", "coupling"}:
+            raise HTTPException(status_code=400, detail="entity_type must be 'qubit' or 'coupling'")
+
+        config = self._load_ai_triage_config()
+        skipped_reason = self._get_ai_triage_skip_reason(config, task)
+        if skipped_reason is not None:
+            return BulkAiTriageResponse(
+                chip_id=chip_id,
+                task=task,
+                entity_type=entity_type,
+                date=None if date is None or date == "latest" else date,
+                requested_count=0,
+                task_ids=[],
+                skipped_reason=skipped_reason,
+            )
+        triage_config = config
+        if model_override is not None:
+            triage_config = config.model_copy(update={"analysis_model": model_override})
+        selected_model = self._select_analysis_model(triage_config)
+
+        is_latest = date is None or date == "latest"
+        if is_latest:
+            qids = self._get_entity_ids(project_id, chip_id, entity_type)
+            query_filter: dict[str, Any] = {
+                "project_id": project_id,
+                "chip_id": chip_id,
+                "name": task,
+                "qid": {"$in": qids},
+            }
+        else:
+            historical_date = date or ""
+            qids = self._get_historical_entity_ids(
+                project_id, chip_id, entity_type, historical_date
+            )
+            parsed_date = parse_date(historical_date, "YYYYMMDD")
+            query_filter = {
+                "project_id": project_id,
+                "chip_id": chip_id,
+                "name": task,
+                "qid": {"$in": qids},
+                "start_at": {"$gte": start_of_day(parsed_date), "$lt": end_of_day(parsed_date)},
+            }
+        if task_ids:
+            query_filter["task_id"] = {"$in": task_ids}
+
+        all_results = self._task_result_repo.find(
+            query_filter,
+            sort=[("end_at", SortDirection.DESCENDING)],
+        )
+        latest_results = self._organize_by_qid(all_results)
+        requested_task_ids = set(task_ids or [])
+
+        enqueued_task_ids: list[str] = []
+        for qid in qids:
+            doc = latest_results.get(qid)
+            if doc is None:
+                continue
+            if requested_task_ids and doc.task_id not in requested_task_ids:
+                continue
+            self._mark_ai_triage_requested(doc, requested_by, selected_model)
+            self._enqueue_ai_triage_for_document(doc, model_override)
+            enqueued_task_ids.append(doc.task_id)
+
+        return BulkAiTriageResponse(
+            chip_id=chip_id,
+            task=task,
+            entity_type=entity_type,
+            date=None if is_latest else date,
+            requested_count=len(enqueued_task_ids),
+            task_ids=enqueued_task_ids,
+        )
+
     def _get_entity_ids(self, project_id: str, chip_id: str, entity_type: str) -> list[str]:
         """Get entity IDs for a chip."""
         if entity_type == "qubit":
@@ -351,9 +463,214 @@ class TaskResultService:
         return task_results
 
     @staticmethod
+    def _enqueue_ai_triage_for_document(
+        doc: TaskResultHistoryDocument,
+        model_override: Any | None = None,
+    ) -> None:
+        """Enqueue API-side AI triage review for a task result document."""
+        with _AI_TRIAGE_IN_FLIGHT_LOCK:
+            if doc.task_id in _AI_TRIAGE_IN_FLIGHT_TASK_IDS:
+                return
+            _AI_TRIAGE_IN_FLIGHT_TASK_IDS.add(doc.task_id)
+
+        _AI_TRIAGE_EXECUTOR.submit(
+            TaskResultService._run_ai_triage_for_task_result,
+            doc.project_id,
+            doc.chip_id,
+            doc.qid,
+            doc.name,
+            doc.task_id,
+            model_override,
+        )
+
+    @staticmethod
+    def _mark_ai_triage_requested(
+        doc: TaskResultHistoryDocument,
+        requested_by: str,
+        selected_model: Any,
+    ) -> None:
+        """Persist that an AI triage request was accepted for this task result."""
+        from qdash.datamodel.note import AiTriageReviewModel
+
+        doc.ai_triage = AiTriageReviewModel(
+            status="requested",
+            requested_at=now(),
+            requested_by=requested_by,
+            model_provider=getattr(selected_model, "provider", ""),
+            model_name=getattr(selected_model, "name", ""),
+        )
+        doc.save()
+
+    @staticmethod
+    def _load_ai_triage_config() -> Any:
+        """Load Copilot config lazily so tests can patch it."""
+        from qdash.api.lib.copilot_config import load_copilot_config
+
+        return load_copilot_config()
+
+    @staticmethod
+    def _get_ai_triage_skip_reason(config: Any, task: str) -> str | None:
+        """Return why bulk AI triage should be skipped for this task."""
+        if not config.enabled:
+            return "copilot_disabled"
+        if not config.analysis.enabled:
+            return "analysis_disabled"
+        if task not in config.analysis.ai_triage_tasks:
+            return "task_not_configured"
+        return None
+
+    @staticmethod
+    def _run_ai_triage_for_task_result(
+        project_id: str | None,
+        chip_id: str,
+        qid: str,
+        task_name: str,
+        task_id: str,
+        model_override: Any | None = None,
+    ) -> None:
+        """Run AI triage in the API process and upsert the dashboard note."""
+        try:
+            import asyncio
+
+            from qdash.api.lib.copilot_agent import blocks_to_markdown, run_analysis
+            from qdash.api.lib.copilot_config import load_copilot_config
+            from qdash.api.services.copilot_data_service import CopilotDataService
+
+            config = load_copilot_config()
+            if model_override is not None:
+                config = config.model_copy(update={"analysis_model": model_override})
+            selected_model = TaskResultService._select_analysis_model(config)
+            TaskResultService._set_ai_triage_status(project_id, task_id, "running")
+            ctx = CopilotDataService().build_analysis_context(
+                task_name=task_name,
+                chip_id=chip_id,
+                qid=qid,
+                task_id=task_id,
+                image_base64=None,
+                config=config,
+            )
+            result = asyncio.run(
+                run_analysis(
+                    context=ctx.context,
+                    user_message=config.analysis.ai_triage_message,
+                    config=config,
+                    image_base64=ctx.image_base64,
+                    expected_images=ctx.expected_images,
+                    conversation_history=[],
+                    tool_executors=None,
+                )
+            )
+            markdown = blocks_to_markdown(result).strip()
+            if markdown:
+                model_label = f"{selected_model.provider}/{selected_model.name}"
+                TaskResultService._upsert_ai_triage_note(
+                    project_id,
+                    task_id,
+                    markdown,
+                    model_label,
+                )
+            else:
+                TaskResultService._set_ai_triage_status(
+                    project_id,
+                    task_id,
+                    "failed",
+                    error="AI triage returned empty content",
+                )
+        except Exception as exc:
+            logger.warning("AI triage failed for task result %s: %s", task_id, exc)
+            TaskResultService._set_ai_triage_status(
+                project_id,
+                task_id,
+                "failed",
+                error=str(exc),
+            )
+        finally:
+            with _AI_TRIAGE_IN_FLIGHT_LOCK:
+                _AI_TRIAGE_IN_FLIGHT_TASK_IDS.discard(task_id)
+
+    @staticmethod
+    def _set_ai_triage_status(
+        project_id: str | None,
+        task_id: str,
+        status: str,
+        *,
+        error: str = "",
+    ) -> None:
+        """Persist AI triage status without changing the requested model metadata."""
+        from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
+
+        doc = TaskResultHistoryDocument.find_one(
+            {"project_id": project_id, "task_id": task_id}
+        ).run()
+        if doc is None:
+            logger.warning("AI triage status skipped: task result not found %s", task_id)
+            return
+
+        doc.ai_triage.status = status
+        doc.ai_triage.error = error[:500]
+        if status in {"completed", "failed"}:
+            doc.ai_triage.completed_at = now()
+        doc.save()
+
+    @staticmethod
+    def _upsert_ai_triage_note(
+        project_id: str | None,
+        task_id: str,
+        markdown: str,
+        model_label: str,
+    ) -> None:
+        """Insert or replace the AI triage section in the task-result note."""
+        import re
+
+        from qdash.common.datetime_utils import now
+        from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
+
+        section_re = re.compile(r"^## AI triage\n\n.*?(?:\n\n---\n\n|$)", re.DOTALL)
+        doc = TaskResultHistoryDocument.find_one(
+            {"project_id": project_id, "task_id": task_id}
+        ).run()
+        if doc is None:
+            logger.warning("AI triage note skipped: task result not found %s", task_id)
+            return
+
+        existing = doc.user_note.content or ""
+        triage_section = (
+            f"{AI_TRIAGE_HEADER}\n\n"
+            f"*Reviewed by: {model_label} at {now().isoformat()}*\n\n"
+            f"{_truncate_ai_triage_markdown(markdown)}"
+        )
+        if section_re.search(existing):
+            remainder = section_re.sub("", existing).strip()
+            content = (
+                f"{triage_section}{AI_TRIAGE_SEPARATOR}{remainder}" if remainder else triage_section
+            )
+        elif existing.strip():
+            content = f"{triage_section}{AI_TRIAGE_SEPARATOR}{existing.rstrip()}"
+        else:
+            content = triage_section
+
+        doc.user_note.content = content[:MAX_AI_TRIAGE_NOTE_CHARS]
+        doc.user_note.updated_by = AI_TRIAGE_ACTOR
+        doc.user_note.updated_at = now()
+        doc.ai_triage.status = "completed"
+        doc.ai_triage.completed_at = now()
+        doc.ai_triage.error = ""
+        doc.save()
+
+    @staticmethod
+    def _select_analysis_model(config: Any) -> Any:
+        """Return the effective model used for task-result analysis."""
+        return config.analysis_model or (
+            config.analysis_models[0] if config.analysis_models else config.model
+        )
+
+    @staticmethod
     def create_figures_zip(
         paths: list[str],
         filename: str,
+        *,
+        project_id: str | None = None,
+        ai_triage_task_ids: list[str] | None = None,
     ) -> tuple[io.BytesIO, str]:
         """Create a ZIP archive from the given file paths.
 
@@ -377,8 +694,12 @@ class TaskResultService:
         """
         from starlette.exceptions import HTTPException
 
-        if not paths:
-            raise HTTPException(status_code=400, detail="No paths provided")
+        ai_triage_entries = TaskResultService._load_ai_triage_note_entries(
+            project_id=project_id,
+            task_ids=ai_triage_task_ids or [],
+        )
+        if not paths and not ai_triage_entries:
+            raise HTTPException(status_code=400, detail="No files provided")
 
         missing = [p for p in paths if not Path(p).exists()]
         if missing:
@@ -392,6 +713,8 @@ class TaskResultService:
             for file_path in paths:
                 path = Path(file_path)
                 zf.write(path, path.name)
+            for entry_name, content in ai_triage_entries:
+                zf.writestr(entry_name, content)
         zip_buffer.seek(0)
 
         safe_filename = (
@@ -401,3 +724,61 @@ class TaskResultService:
             safe_filename += ".zip"
 
         return zip_buffer, safe_filename
+
+    @staticmethod
+    def _load_ai_triage_note_entries(
+        *,
+        project_id: str | None,
+        task_ids: list[str],
+    ) -> list[tuple[str, str]]:
+        """Return ZIP entries containing AI triage markdown sections for task results."""
+        if not task_ids:
+            return []
+
+        from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
+
+        docs = TaskResultHistoryDocument.find(
+            {"project_id": project_id, "task_id": {"$in": task_ids}}
+        ).run()
+        docs_by_task_id = {doc.task_id: doc for doc in docs}
+
+        entries: list[tuple[str, str]] = []
+        used_names: set[str] = set()
+        for task_id in task_ids:
+            doc = docs_by_task_id.get(task_id)
+            if doc is None:
+                continue
+            content = TaskResultService._extract_ai_triage_section(doc.user_note.content)
+            if not content:
+                continue
+            qid = doc.qid or "unknown"
+            base_name = TaskResultService._safe_zip_entry_name(
+                f"ai_triage/{doc.name}_{qid}_{doc.task_id}.md"
+            )
+            entry_name = base_name
+            suffix = 2
+            while entry_name in used_names:
+                entry_name = base_name.replace(".md", f"_{suffix}.md")
+                suffix += 1
+            used_names.add(entry_name)
+            entries.append((entry_name, content))
+        return entries
+
+    @staticmethod
+    def _extract_ai_triage_section(content: str) -> str:
+        """Extract only the AI triage section from a task-result note."""
+        import re
+
+        if not content:
+            return ""
+        match = re.search(r"^## AI triage\n\n.*?(?=\n\n---\n\n|$)", content, re.DOTALL)
+        return match.group(0).strip() + "\n" if match else ""
+
+    @staticmethod
+    def _safe_zip_entry_name(name: str) -> str:
+        """Sanitise an in-archive filename while preserving simple directories."""
+        parts = []
+        for part in name.split("/"):
+            safe_part = "".join(c if c.isalnum() or c in "._-" else "_" for c in part).strip("_")
+            parts.append(safe_part or "entry")
+        return "/".join(parts)

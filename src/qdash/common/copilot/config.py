@@ -111,7 +111,9 @@ def load_copilot_config() -> CopilotConfig:
         if "scoring" in data:
             scoring = {}
             for key, value in data["scoring"].items():
-                scoring[key] = ScoringThreshold(**value)
+                scoring[key] = (
+                    value if isinstance(value, ScoringThreshold) else ScoringThreshold(**value)
+                )
             data["scoring"] = scoring
 
         return CopilotConfig(**data)

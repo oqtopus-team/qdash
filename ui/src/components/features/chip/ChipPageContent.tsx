@@ -540,6 +540,7 @@ export function ChipPageContent() {
               selectedDate={selectedDate}
               gridSize={gridSize}
               onDateChange={setSelectedDate}
+              aiTriageTaskIds={aiTriageTaskIds}
             />
           ) : (
             <div className="space-y-4">
