@@ -22,8 +22,10 @@ import type {
 } from "@tanstack/react-query";
 
 import type {
-  BodyDownloadFiguresAsZip,
   BodyReExecuteTaskResult,
+  BulkAiTriageRequest,
+  BulkAiTriageResponse,
+  DownloadFiguresAsZipRequest,
   ExecuteFlowResponse,
   GetCouplingTaskHistoryParams,
   GetHistoricalCouplingTaskResultsParams,
@@ -1418,6 +1420,98 @@ export function useGetTimeseriesTaskResults<
 }
 
 /**
+ * Enqueue AI triage review for the current latest task result per entity.
+ * @summary Request bulk AI triage review for latest task results
+ */
+export const requestBulkAiTriageReview = (
+  bulkAiTriageRequest: BulkAiTriageRequest,
+  options?: SecondParameter<typeof customInstance>,
+  signal?: AbortSignal,
+) => {
+  return customInstance<BulkAiTriageResponse>(
+    {
+      url: `/task-results/ai-triage/bulk`,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      data: bulkAiTriageRequest,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getRequestBulkAiTriageReviewMutationOptions = <
+  TError = HTTPValidationError,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof requestBulkAiTriageReview>>,
+    TError,
+    { data: BulkAiTriageRequest },
+    TContext
+  >;
+  request?: SecondParameter<typeof customInstance>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof requestBulkAiTriageReview>>,
+  TError,
+  { data: BulkAiTriageRequest },
+  TContext
+> => {
+  const mutationKey = ["requestBulkAiTriageReview"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof requestBulkAiTriageReview>>,
+    { data: BulkAiTriageRequest }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return requestBulkAiTriageReview(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type RequestBulkAiTriageReviewMutationResult = NonNullable<
+  Awaited<ReturnType<typeof requestBulkAiTriageReview>>
+>;
+export type RequestBulkAiTriageReviewMutationBody = BulkAiTriageRequest;
+export type RequestBulkAiTriageReviewMutationError = HTTPValidationError;
+
+/**
+ * @summary Request bulk AI triage review for latest task results
+ */
+export const useRequestBulkAiTriageReview = <
+  TError = HTTPValidationError,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof requestBulkAiTriageReview>>,
+      TError,
+      { data: BulkAiTriageRequest },
+      TContext
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof requestBulkAiTriageReview>>,
+  TError,
+  { data: BulkAiTriageRequest },
+  TContext
+> => {
+  const mutationOptions = getRequestBulkAiTriageReviewMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+/**
  * Re-execute a single task using the system single-task-executor deployment.
 
 Looks up the TaskResultHistoryDocument to extract task_name, qid, chip_id,
@@ -1635,9 +1729,9 @@ as a streaming response.
 
 Parameters
 ----------
-paths : list[str]
+body.paths : list[str]
     List of absolute file paths to the calibration figures
-filename : str
+body.filename : str
     Filename for the ZIP archive (default: "figures.zip")
 
 Returns
@@ -1652,7 +1746,7 @@ HTTPException
  * @summary Download multiple figures as a ZIP file
  */
 export const downloadFiguresAsZip = (
-  bodyDownloadFiguresAsZip: BodyDownloadFiguresAsZip,
+  downloadFiguresAsZipRequest: DownloadFiguresAsZipRequest,
   options?: SecondParameter<typeof customInstance>,
   signal?: AbortSignal,
 ) => {
@@ -1661,7 +1755,7 @@ export const downloadFiguresAsZip = (
       url: `/task-results/figures/download`,
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      data: bodyDownloadFiguresAsZip,
+      data: downloadFiguresAsZipRequest,
       signal,
     },
     options,
@@ -1675,14 +1769,14 @@ export const getDownloadFiguresAsZipMutationOptions = <
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof downloadFiguresAsZip>>,
     TError,
-    { data: BodyDownloadFiguresAsZip },
+    { data: DownloadFiguresAsZipRequest },
     TContext
   >;
   request?: SecondParameter<typeof customInstance>;
 }): UseMutationOptions<
   Awaited<ReturnType<typeof downloadFiguresAsZip>>,
   TError,
-  { data: BodyDownloadFiguresAsZip },
+  { data: DownloadFiguresAsZipRequest },
   TContext
 > => {
   const mutationKey = ["downloadFiguresAsZip"];
@@ -1696,7 +1790,7 @@ export const getDownloadFiguresAsZipMutationOptions = <
 
   const mutationFn: MutationFunction<
     Awaited<ReturnType<typeof downloadFiguresAsZip>>,
-    { data: BodyDownloadFiguresAsZip }
+    { data: DownloadFiguresAsZipRequest }
   > = (props) => {
     const { data } = props ?? {};
 
@@ -1709,7 +1803,7 @@ export const getDownloadFiguresAsZipMutationOptions = <
 export type DownloadFiguresAsZipMutationResult = NonNullable<
   Awaited<ReturnType<typeof downloadFiguresAsZip>>
 >;
-export type DownloadFiguresAsZipMutationBody = BodyDownloadFiguresAsZip;
+export type DownloadFiguresAsZipMutationBody = DownloadFiguresAsZipRequest;
 export type DownloadFiguresAsZipMutationError = HTTPValidationError;
 
 /**
@@ -1723,7 +1817,7 @@ export const useDownloadFiguresAsZip = <
     mutation?: UseMutationOptions<
       Awaited<ReturnType<typeof downloadFiguresAsZip>>,
       TError,
-      { data: BodyDownloadFiguresAsZip },
+      { data: DownloadFiguresAsZipRequest },
       TContext
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -1732,7 +1826,7 @@ export const useDownloadFiguresAsZip = <
 ): UseMutationResult<
   Awaited<ReturnType<typeof downloadFiguresAsZip>>,
   TError,
-  { data: BodyDownloadFiguresAsZip },
+  { data: DownloadFiguresAsZipRequest },
   TContext
 > => {
   const mutationOptions = getDownloadFiguresAsZipMutationOptions(options);

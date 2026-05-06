@@ -6,7 +6,7 @@ from pydantic import ConfigDict, Field, field_validator
 from pymongo import ASCENDING, DESCENDING, IndexModel
 from qdash.common.datetime_utils import ensure_timezone, parse_elapsed_time
 from qdash.datamodel.execution import ExecutionModel
-from qdash.datamodel.note import NoteModel
+from qdash.datamodel.note import AiTriageReviewModel, NoteModel
 from qdash.datamodel.system_info import SystemInfoModel
 from qdash.datamodel.task import BaseTaskResultModel
 
@@ -50,6 +50,10 @@ class TaskResultHistoryDocument(Document):
     user_note: NoteModel = Field(
         default_factory=NoteModel,
         description="Free-form user note attached to this task result (dashboard)",
+    )
+    ai_triage: AiTriageReviewModel = Field(
+        default_factory=AiTriageReviewModel,
+        description="Persistent AI triage review request state for this task result",
     )
     figure_path: list[str] = Field(..., description="The path to the figure")
     json_figure_path: list[str] = Field([], description="The path to the JSON figure")

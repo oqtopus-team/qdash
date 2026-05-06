@@ -31,6 +31,8 @@ _IN_FLIGHT_LOCK = Lock()
 def enqueue_ai_triage_note(
     task: BaseTaskResultModel,
     execution_model: ExecutionModel,
+    *,
+    overwrite_existing: bool = False,
 ) -> None:
     """Schedule AI triage note attachment without blocking calibration progress."""
     try:
@@ -78,7 +80,12 @@ def enqueue_ai_triage_note(
         task_snapshot = task.model_copy(deep=True)
         execution_snapshot = execution_model.model_copy(deep=True)
         try:
-            _EXECUTOR.submit(_run_enqueued_ai_triage, task_snapshot, execution_snapshot)
+            _EXECUTOR.submit(
+                _run_enqueued_ai_triage,
+                task_snapshot,
+                execution_snapshot,
+                overwrite_existing,
+            )
         except Exception:
             with _IN_FLIGHT_LOCK:
                 _IN_FLIGHT_TASK_IDS.discard(task.task_id)
@@ -97,10 +104,15 @@ def enqueue_ai_triage_note(
 def _run_enqueued_ai_triage(
     task: BaseTaskResultModel,
     execution_model: ExecutionModel,
+    overwrite_existing: bool,
 ) -> None:
     """Run queued AI triage and clear the in-flight marker."""
     try:
-        maybe_attach_ai_triage_note(task, execution_model)
+        maybe_attach_ai_triage_note(
+            task,
+            execution_model,
+            overwrite_existing=overwrite_existing,
+        )
     finally:
         with _IN_FLIGHT_LOCK:
             _IN_FLIGHT_TASK_IDS.discard(task.task_id)
@@ -109,6 +121,8 @@ def _run_enqueued_ai_triage(
 def maybe_attach_ai_triage_note(
     task: BaseTaskResultModel,
     execution_model: ExecutionModel,
+    *,
+    overwrite_existing: bool = False,
 ) -> None:
     """Attach an AI-generated triage section to a task-result note.
 
@@ -143,7 +157,7 @@ def maybe_attach_ai_triage_note(
                 getattr(task, "qid", ""),
             )
             return
-        if _has_ai_triage_note(task, execution_model):
+        if not overwrite_existing and _has_ai_triage_note(task, execution_model):
             _log_info(
                 "AI triage skipped: task=%s task_id=%s existing_note=true",
                 task.name,
@@ -169,7 +183,7 @@ def maybe_attach_ai_triage_note(
                 task.task_id,
             )
             return
-        _upsert_ai_triage_note(task, execution_model, markdown)
+        _upsert_ai_triage_note(task, execution_model, markdown, selected_model)
         _log_info("AI triage note saved: task=%s task_id=%s", task.name, task.task_id)
     except Exception as exc:
         _log_warning("AI triage failed for task %s (%s): %s", task.name, task.task_id, exc)
@@ -283,11 +297,15 @@ def _upsert_ai_triage_note(
     task: BaseTaskResultModel,
     execution_model: ExecutionModel,
     markdown: str,
+    model: ModelConfig,
 ) -> None:
     """Insert or replace the AI triage section in the task-result note."""
     existing = _get_existing_task_note_content(task, execution_model)
 
-    triage_section = f"{AI_TRIAGE_HEADER}\n\n{_truncate_markdown(markdown)}"
+    triage_section = (
+        f"{AI_TRIAGE_HEADER}\n\n{_format_review_metadata(model)}\n\n"
+        f"{_truncate_markdown(markdown)}"
+    )
     if AI_TRIAGE_SECTION_RE.search(existing):
         remainder = AI_TRIAGE_SECTION_RE.sub("", existing).strip()
         content = (
@@ -342,3 +360,10 @@ def _truncate_markdown(markdown: str) -> str:
     if len(markdown) <= budget:
         return markdown
     return markdown[:budget].rstrip() + "\n\n[truncated]"
+
+
+def _format_review_metadata(model: ModelConfig) -> str:
+    """Return a compact metadata line for the model that produced the review."""
+    from qdash.common.datetime_utils import now
+
+    return f"*Reviewed by: {model.provider}/{model.name} at {now().isoformat()}*"
