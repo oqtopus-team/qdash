@@ -39,7 +39,7 @@ analysis_models:
     # repeated cold model loads between short qdash reviews.
     keep_alive: 30m
     temperature: 0.2
-    max_output_tokens: 1200
+    max_output_tokens: 4096
   - provider: ollama
     name: gemma4:26b
     # Faster local VLM option. Some Ollama/OpenAI-compatible deployments place
@@ -49,7 +49,7 @@ analysis_models:
     api_key_env: GEMMA_API_KEY
     keep_alive: 30m
     temperature: 0.2
-    max_output_tokens: 1200
+    max_output_tokens: 4096
   - provider: ollama
     name: nvidia/Ising-Calibration-1-35B-A3B
     temperature: 0.7
@@ -158,14 +158,13 @@ analysis:
   enabled: true
   # Whether to send result figures to the LLM (requires multimodal model)
   multimodal: true
-  # Limit reference images for lower-latency local VLM triage. The actual
-  # experiment figure is still sent separately.
+  # Reference images to send during task analysis and automatic AI triage.
   max_expected_images: 2
-  # Automatic AI triage uses faster defaults than side-panel chat. Local VLMs
-  # are latency-sensitive, so the triage hook skips historical reference images
-  # by default and caps the response length.
-  ai_triage_max_expected_images: 0
-  ai_triage_max_output_tokens: 1024
+  # Automatic AI triage prioritizes review quality by default and inherits the
+  # same reference-image and output-token settings as task analysis. Set these
+  # optional overrides only when a lower-latency triage mode is required.
+  ai_triage_max_expected_images: null
+  ai_triage_max_output_tokens: null
   # Task results whose notes should receive automatic AI triage. Both completed
   # and failed results are eligible; the hook runs asynchronously after history
   # persistence and does not block calibration progress.

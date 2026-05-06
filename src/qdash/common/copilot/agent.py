@@ -86,6 +86,23 @@ and use the following markdown shape:
 - Recommended action: one short operator action
 - Optional note: one short caveat only when useful, otherwise `none`
 
+For reliable parsing, the JSON `explanation` string MUST start exactly with
+`**Review triage**`. Every triage field line MUST begin with hyphen-space
+(`- `). Do not omit the hyphens, do not bold the field names, and do not put
+ordinary prose before the triage block. Use this exact skeleton before any
+detailed explanation:
+
+**Review triage**
+- Decision: `PASS` | `PASS_WITH_NOTE` | `REVIEW` | `FAIL`
+- Human label suggestion: `CORRECT` | `SUSPICIOUS` | `MISASSIGNMENT` | `NO_SIGNAL` | `ANOMALY`
+- Accepted parameter(s): ...
+- Needs review: ...
+- Primary reason: ...
+- Closest knowledge case: ...
+- Suggested labels: ...
+- Recommended action: ...
+- Optional note: ...
+
 Keep the triage fields internally consistent:
 - Use `PASS` only when all important output parameters are visually and physically supported.
   For `PASS`, set `Needs review: none`, `Suggested labels: none`, and make the recommended

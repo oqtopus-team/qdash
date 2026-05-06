@@ -58,8 +58,8 @@ class AnalysisConfig(BaseModel):
     multimodal: bool = True
     max_conversation_turns: int = 10
     max_expected_images: int | None = None
-    ai_triage_max_expected_images: int | None = 0
-    ai_triage_max_output_tokens: int | None = 1024
+    ai_triage_max_expected_images: int | None = None
+    ai_triage_max_output_tokens: int | None = None
     ai_triage_tasks: list[str] = []
     ai_triage_message: str = (
         "Review this completed calibration result and attach a concise operational triage note."
