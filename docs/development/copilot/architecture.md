@@ -57,7 +57,6 @@ analysis_models:
     base_url: env:GEMMA_BASE_URL
     api_key_env: GEMMA_API_KEY
     keep_alive: 30m
-    num_ctx: 8192
     temperature: 0.2
     max_output_tokens: 1200
 
