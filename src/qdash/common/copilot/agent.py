@@ -81,10 +81,24 @@ Keep the triage fields internally consistent:
 - For `CheckQubitSpectroscopy`, a weak or missing f12 is not automatically
   review-blocking when f01 is clearly supported, the f12/anharmonicity value is
   plausible if present, and there is no stronger competing transition. Prefer
-  `PASS_WITH_NOTE` for this weak-f12-only boundary. Use `REVIEW` only when f01
-  itself is weak/ambiguous, f12/anharmonicity is unsupported enough to make an
-  automatic parameter update unsafe, or a competing feature could change the
-  selected transition.
+  `PASS_WITH_NOTE` for this weak-f12-only boundary. Shallow anharmonicity around
+  -0.16 to -0.18 GHz is a caveat, not a review blocker, when f01 is clear.
+  Use `REVIEW` when f01 itself is weak/ambiguous, when both f01 and f12 are
+  only plausible from history/physics rather than clearly supported by the
+  current image, or when a competing feature could change the selected f01.
+  A close f01-region doublet or multiple nearby peaks with similar length,
+  strength, and shape is review-blocking even if the marked f01 is physically
+  plausible, because the automatic update may choose the wrong f01 candidate.
+  Treat the "Ambiguous f01/f12 support missed by VLM" case as a pattern-level
+  safety case, not as a qid-specific rule. Keep `REVIEW` when the f01 assignment
+  is visually ambiguous because two or more nearby f01-like candidates have
+  similar length/intensity, or when the f01/f12 pair is only weakly supported
+  and acceptance would rely mainly on plausible frequencies or history. Do not
+  apply this safety case to clear-f01/weak-f12-only results; those should follow
+  the weak f12 precedent and normally become `PASS_WITH_NOTE`.
+  Do not claim that marked lines are absent when task output parameters include
+  f01/f12 values or a marked image is provided; assess support at the supplied
+  frequencies instead.
 - Use `REVIEW` when any important output parameter should not be auto-accepted without a
   human check. If you use labels such as `ambiguous_doublet` or `frequency_offset`
   for a parameter that affects acceptance, prefer `REVIEW`. Do not make
@@ -796,14 +810,18 @@ def _build_system_prompt(
         img_instructions = ["\n## Image analysis"]
         if has_expected_images and has_experiment_image:
             img_instructions.append(
-                "Reference images showing expected results are provided along with "
-                "the actual experimental result image. Compare the actual result with "
-                "these references to identify deviations, anomalies, or quality issues."
+                "Reference images and past-case images are provided along with the "
+                "actual experimental result image. Use the image labels and task "
+                "knowledge to distinguish good expected examples from warning or "
+                "failure cases. Compare the actual result with these references to "
+                "identify deviations, anomalies, boundary cases, or repeated model "
+                "failure patterns."
             )
         elif has_expected_images:
             img_instructions.append(
-                "Reference images showing expected results are provided. "
-                "Use them to understand what a good result looks like for this task."
+                "Reference images and past-case images are provided. Use the image "
+                "labels and task knowledge to distinguish good expected examples "
+                "from warning or failure cases."
             )
         elif has_experiment_image:
             img_instructions.append(
