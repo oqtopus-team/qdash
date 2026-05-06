@@ -159,12 +159,13 @@ analysis:
     triage note. Auto-pass results that are good enough for routine parameter
     update. History consistency alone is not enough to accept visually
     unsupported output parameters, but weak f12 support by itself should usually
-    become PASS_WITH_NOTE when f01 is clearly supported and no stronger
-    competing transition is visible. Do not escalate only because f12 is weak
-    or anharmonicity is shallow when f01 is clear; keep REVIEW when the f01
-    assignment is ambiguous because nearby f01-like peaks have similar length
-    and intensity, or when the f01/f12 pair itself is visually ambiguous and
-    acceptance would rely mainly on physically plausible frequencies or history.
+    become PASS_WITH_NOTE when f01 is clearly supported and no clearly stronger
+    competing transition is visible. Do not escalate only because f12 is weak,
+    anharmonicity is shallow, or nearby f01-like peaks have similar length and
+    intensity when the marked f01 is still visibly supported and physically
+    plausible; put that caveat in PASS_WITH_NOTE. Keep REVIEW for absent,
+    off-marker, or clearly weaker f01 support, or when a clearly stronger
+    competing f01 candidate would materially change the update.
   # Maximum conversation turns to maintain in context
   max_conversation_turns: 10
 

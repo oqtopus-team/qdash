@@ -80,22 +80,25 @@ Keep the triage fields internally consistent:
   follow-up. Put non-blocking caveats in `Optional note`, not in `Needs review`.
 - For `CheckQubitSpectroscopy`, a weak or missing f12 is not automatically
   review-blocking when f01 is clearly supported, the f12/anharmonicity value is
-  plausible if present, and there is no stronger competing transition. Prefer
+  plausible if present, and there is no clearly stronger competing transition. Prefer
   `PASS_WITH_NOTE` for this weak-f12-only boundary. Shallow anharmonicity around
   -0.16 to -0.18 GHz is a caveat, not a review blocker, when f01 is clear.
-  Use `REVIEW` when f01 itself is weak/ambiguous, when both f01 and f12 are
-  only plausible from history/physics rather than clearly supported by the
-  current image, or when a competing feature could change the selected f01.
   A close f01-region doublet or multiple nearby peaks with similar length,
-  strength, and shape is review-blocking even if the marked f01 is physically
-  plausible, because the automatic update may choose the wrong f01 candidate.
+  strength, and shape is not review-blocking by itself when the marked f01 is
+  still one of the strongest visible candidates, is aligned with a spectroscopy
+  response, and the selected f01/f12 values are physically plausible. Prefer
+  `PASS_WITH_NOTE` for this close-candidate boundary and put the ambiguity in
+  `Optional note`, not `Needs review`.
+  Use `REVIEW` when f01 itself is absent, off-marker, or too weak to support an
+  update, when a clearly stronger competing f01-like feature would materially
+  change the selected f01, or when both f01 and f12 are only plausible from
+  history/physics rather than supported by the current image.
   Treat the "Ambiguous f01/f12 support missed by VLM" case as a pattern-level
-  safety case, not as a qid-specific rule. Keep `REVIEW` when the f01 assignment
-  is visually ambiguous because two or more nearby f01-like candidates have
-  similar length/intensity, or when the f01/f12 pair is only weakly supported
-  and acceptance would rely mainly on plausible frequencies or history. Do not
-  apply this safety case to clear-f01/weak-f12-only results; those should follow
-  the weak f12 precedent and normally become `PASS_WITH_NOTE`.
+  boundary case, not as a qid-specific rule. Do not use it as a blanket reason
+  to review every close f01-region doublet. If the marked f01 remains visually
+  supported and plausible, return `PASS_WITH_NOTE`; reserve `REVIEW` for cases
+  with no visible f01 support, off-marker assignment, or a clearly stronger
+  competing f01 candidate.
   Do not claim that marked lines are absent when task output parameters include
   f01/f12 values or a marked image is provided; assess support at the supplied
   frequencies instead.
