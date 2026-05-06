@@ -10,6 +10,7 @@ import json
 import logging
 import math
 import os
+import re
 from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING, Any
 
@@ -22,6 +23,14 @@ else:
     from qdash.common.copilot.config import CopilotConfig, ModelConfig
 
 logger = logging.getLogger(__name__)
+
+TRIAGE_DECISIONS = ("PASS_WITH_NOTE", "PASS", "REVIEW", "FAIL")
+TRIAGE_ASSESSMENT = {
+    "PASS": "good",
+    "PASS_WITH_NOTE": "warning",
+    "REVIEW": "warning",
+    "FAIL": "bad",
+}
 
 SYSTEM_PROMPT_BASE = """\
 You are an expert in superconducting qubit calibration.
@@ -1072,6 +1081,52 @@ def _strip_code_fences(text: str) -> str:
     return text
 
 
+def _extract_triage_fallback(content: str) -> AnalysisResponse | None:
+    """Build a legacy response from a free-form review triage block."""
+    fields = {
+        "Decision": "",
+        "Human label suggestion": "",
+        "Accepted parameter(s)": "",
+        "Needs review": "",
+        "Primary reason": "",
+        "Closest knowledge case": "",
+        "Suggested labels": "",
+        "Recommended action": "",
+        "Optional note": "",
+    }
+    for field in fields:
+        match = re.search(rf"^\s*[-*]\s+{re.escape(field)}:\s*(.*)$", content, re.M)
+        if not match:
+            continue
+        value = match.group(1).strip().strip("`")
+        if field == "Decision":
+            for decision in TRIAGE_DECISIONS:
+                if re.search(rf"\b{decision}\b", value):
+                    value = decision
+                    break
+        fields[field] = value
+
+    decision = fields["Decision"]
+    if not decision:
+        return None
+
+    triage = "\n".join(
+        [
+            "**Review triage**",
+            *(f"- {field}: {value or 'none'}" for field, value in fields.items()),
+        ]
+    )
+    return AnalysisResponse(
+        summary=fields["Primary reason"] or "Analysis complete",
+        assessment=TRIAGE_ASSESSMENT.get(decision, "warning"),
+        explanation=triage,
+        potential_issues=(
+            [] if decision in {"PASS", "PASS_WITH_NOTE"} else [fields["Primary reason"]]
+        ),
+        recommendations=[fields["Recommended action"]] if fields["Recommended action"] else [],
+    )
+
+
 def _parse_response(content: str) -> AnalysisResponse:
     """Parse LLM response into AnalysisResponse, handling JSON and plain text."""
     text = _strip_code_fences(content)
@@ -1080,6 +1135,8 @@ def _parse_response(content: str) -> AnalysisResponse:
         data = json.loads(text)
         return AnalysisResponse(**data)
     except (json.JSONDecodeError, ValueError):
+        if response := _extract_triage_fallback(content):
+            return response
         # If JSON parsing fails, treat the entire response as explanation
         return AnalysisResponse(
             summary="Analysis complete",
@@ -1697,12 +1754,24 @@ async def _run_chat_completions(
     config: CopilotConfig,
 ) -> str:
     """Call Chat Completions API (Ollama fallback) and return the content."""
+    extra_body: dict[str, Any] = {}
+    if config.model.provider == "ollama":
+        options: dict[str, Any] = {}
+        if config.model.keep_alive:
+            extra_body["keep_alive"] = config.model.keep_alive
+        if config.model.num_ctx is not None:
+            options["num_ctx"] = config.model.num_ctx
+        if options:
+            extra_body["options"] = options
+
     kwargs: dict[str, Any] = {
         "model": config.model.name,
         "messages": messages,
         "max_tokens": config.model.max_output_tokens,
         "response_format": {"type": "json_object"},
     }
+    if extra_body:
+        kwargs["extra_body"] = extra_body
     if config.model.temperature is not None:
         kwargs["temperature"] = config.model.temperature
     try:

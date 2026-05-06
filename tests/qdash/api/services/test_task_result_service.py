@@ -206,6 +206,36 @@ def test_request_bulk_ai_triage_skips_task_not_configured() -> None:
     assert repo.last_query is None
 
 
+def test_bulk_ai_triage_config_applies_local_vlm_defaults_only_to_triage() -> None:
+    config = CopilotConfig(
+        enabled=True,
+        model=ModelConfig(provider="openai", name="gpt-4.1", max_output_tokens=4096),
+        analysis_models=[ModelConfig(provider="ollama", name="gemma4:26b", max_output_tokens=4096)],
+        analysis=AnalysisConfig(
+            enabled=True,
+            max_expected_images=2,
+            ai_triage_max_expected_images=0,
+            ai_triage_max_output_tokens=1024,
+        ),
+    )
+
+    triage_config = TaskResultService._ai_triage_config(config)
+
+    assert config.analysis.max_expected_images == 2
+    assert config.analysis_models[0].max_output_tokens == 4096
+    assert triage_config.analysis.max_expected_images == 0
+    assert triage_config.analysis_model is not None
+    assert triage_config.analysis_model.max_output_tokens == 1024
+
+
+def test_bulk_ai_triage_forced_markdown_marks_missing_f01_as_no_signal() -> None:
+    markdown = TaskResultService._forced_ai_triage_markdown("CheckQubitSpectroscopy", {})
+
+    assert markdown is not None
+    assert "- Decision: `FAIL`" in markdown
+    assert "- Human label suggestion: `NO_SIGNAL`" in markdown
+
+
 def test_create_figures_zip_includes_ai_triage_markdown(tmp_path) -> None:
     figure = tmp_path / "figure.json"
     figure.write_text('{"data":[]}', encoding="utf-8")
