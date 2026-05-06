@@ -11,6 +11,10 @@ import { formatDateTime } from "@/lib/utils/datetime";
 import { CouplingGrid } from "./CouplingGrid";
 import { TaskResultGrid } from "./TaskResultGrid";
 import { ChipManageModal } from "./ChipManageModal";
+import {
+  getAiTriageBadgeState,
+  type AiTriageBadgeState,
+} from "./aiTriageBadge";
 import { CreateChipModal } from "./modals/CreateChipModal";
 
 import type { Task, MuxDetailResponseDetail, TaskInfo } from "@/schemas";
@@ -123,15 +127,16 @@ export function ChipPageContent() {
     query: { enabled: !!selectedChip, staleTime: 30_000 },
   });
 
-  const aiTriageTaskIds = useMemo(() => {
-    const ids = new Set<string>();
+  const aiTriageBadgesByTaskId = useMemo(() => {
+    const badges = new Map<string, AiTriageBadgeState>();
     for (const entry of notesSummaryData?.data?.task_notes ?? []) {
       const content = entry.note?.content ?? "";
-      if (isAiTriageReviewRequired(content)) {
-        ids.add(entry.task_id);
+      const badge = getAiTriageBadgeState(content);
+      if (badge) {
+        badges.set(entry.task_id, badge);
       }
     }
-    return ids;
+    return badges;
   }, [notesSummaryData]);
 
   // Use custom hook for date navigation
@@ -527,7 +532,7 @@ export function ChipPageContent() {
               selectedDate={selectedDate}
               gridSize={gridSize}
               onDateChange={setSelectedDate}
-              aiTriageTaskIds={aiTriageTaskIds}
+              aiTriageBadgesByTaskId={aiTriageBadgesByTaskId}
             />
           ) : viewMode === "2q" ? (
             <CouplingGrid
@@ -540,7 +545,7 @@ export function ChipPageContent() {
               selectedDate={selectedDate}
               gridSize={gridSize}
               onDateChange={setSelectedDate}
-              aiTriageTaskIds={aiTriageTaskIds}
+              aiTriageBadgesByTaskId={aiTriageBadgesByTaskId}
             />
           ) : (
             <div className="space-y-4">
@@ -630,10 +635,9 @@ export function ChipPageContent() {
                                     }
 
                                     const figurePath = getFigurePath(task);
-                                    const hasAiTriageNote = Boolean(
-                                      task.task_id &&
-                                      aiTriageTaskIds.has(task.task_id),
-                                    );
+                                    const aiTriageBadge = task.task_id
+                                      ? aiTriageBadgesByTaskId.get(task.task_id)
+                                      : null;
 
                                     return (
                                       <div key={qid} className="relative group">
@@ -653,13 +657,15 @@ export function ChipPageContent() {
                                               <div className="flex justify-between items-center mb-1">
                                                 <span>QID: {qid}</span>
                                                 <div className="flex items-center gap-1">
-                                                  {hasAiTriageNote && (
+                                                  {aiTriageBadge && (
                                                     <span
-                                                      className="badge badge-warning badge-xs gap-1"
-                                                      title="AI triage needs review"
+                                                      className={`badge ${aiTriageBadge.badgeClass} badge-xs gap-1`}
+                                                      title={
+                                                        aiTriageBadge.title
+                                                      }
                                                     >
                                                       <Bot className="h-3 w-3" />
-                                                      Review
+                                                      {aiTriageBadge.label}
                                                     </span>
                                                   )}
                                                   <div
@@ -763,28 +769,5 @@ export function ChipPageContent() {
         />
       )}
     </PageContainer>
-  );
-}
-
-function isAiTriageReviewRequired(content: string): boolean {
-  if (!content.includes("## AI triage")) return false;
-
-  const decisionMatch = content.match(
-    /(?:^|\n)\s*(?:-?\s*)?(?:Decision|判定)\s*:\s*`?([A-Z_]+)`?/i,
-  );
-  const decision = decisionMatch?.[1]?.toUpperCase();
-  if (decision === "REVIEW" || decision === "FAIL") return true;
-
-  const needsReviewMatch = content.match(
-    /(?:^|\n)\s*(?:-?\s*)?(?:Needs review|要レビュー)\s*:\s*([^\n]+)/i,
-  );
-  if (!needsReviewMatch) return false;
-
-  const needsReview = needsReviewMatch[1]
-    .replace(/[`*]/g, "")
-    .trim()
-    .toLowerCase();
-  return Boolean(
-    needsReview && needsReview !== "none" && needsReview !== "なし",
   );
 }

@@ -28,6 +28,7 @@ import {
   requestBulkAiTriageReview,
 } from "@/client/task-result/task-result";
 import { AiTriageConfirmModal } from "@/components/features/chip/AiTriageConfirmModal";
+import type { AiTriageBadgeState } from "@/components/features/chip/aiTriageBadge";
 import {
   DownloadConfirmModal,
   type DownloadItemCounts,
@@ -58,7 +59,7 @@ interface TaskResultGridProps {
   selectedDate: string;
   gridSize: number;
   onDateChange?: (date: string) => void;
-  aiTriageTaskIds?: Set<string>;
+  aiTriageBadgesByTaskId?: Map<string, AiTriageBadgeState>;
 }
 
 interface SelectedTaskInfo {
@@ -171,7 +172,7 @@ interface GridCellProps {
   isAiTriageMode: boolean;
   isSelectedForAiTriage: boolean;
   canBeAiTriaged: boolean;
-  hasAiTriageNote: boolean;
+  aiTriageBadge: AiTriageBadgeState | null;
   isAiTriagePending: boolean;
   onClick: () => void;
 }
@@ -190,7 +191,7 @@ const GridCell = memo(function GridCell({
   isAiTriageMode,
   isSelectedForAiTriage,
   canBeAiTriaged,
-  hasAiTriageNote,
+  aiTriageBadge,
   isAiTriagePending,
   onClick,
 }: GridCellProps) {
@@ -239,10 +240,10 @@ const GridCell = memo(function GridCell({
           >
             <LoaderCircle size={10} className="animate-spin" />
           </div>
-        ) : hasAiTriageNote ? (
+        ) : aiTriageBadge ? (
           <div
-            className="absolute top-0.5 right-0.5 rounded bg-warning text-warning-content p-0.5 shadow-sm"
-            title="AI triage needs review"
+            className={`absolute top-0.5 right-0.5 rounded ${aiTriageBadge.iconClass} p-0.5 shadow-sm`}
+            title={aiTriageBadge.title}
           >
             <Bot size={10} />
           </div>
@@ -251,7 +252,7 @@ const GridCell = memo(function GridCell({
         <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-base-100 text-base-content text-xs rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
           {qid}: {task.status}
           {isAiTriagePending ? " · AI triage review requested" : ""}
-          {hasAiTriageNote ? " · AI triage needs review" : ""}
+          {aiTriageBadge ? ` · ${aiTriageBadge.tooltip}` : ""}
         </div>
         {isSelectionMode && canBeSelected && isSelected && (
           <div className="absolute inset-0 flex items-center justify-center bg-primary/20">
@@ -299,10 +300,10 @@ const GridCell = memo(function GridCell({
         >
           <LoaderCircle size={14} className="animate-spin" />
         </div>
-      ) : hasAiTriageNote ? (
+      ) : aiTriageBadge ? (
         <div
-          className="absolute top-1 right-1 rounded bg-warning text-warning-content p-1 shadow-sm"
-          title="AI triage needs review"
+          className={`absolute top-1 right-1 rounded ${aiTriageBadge.iconClass} p-1 shadow-sm`}
+          title={aiTriageBadge.title}
         >
           <Bot size={14} />
         </div>
@@ -336,7 +337,7 @@ export function TaskResultGrid({
   selectedTask,
   selectedDate,
   gridSize: defaultGridSize,
-  aiTriageTaskIds,
+  aiTriageBadgesByTaskId,
 }: TaskResultGridProps) {
   const queryClient = useQueryClient();
   // Get topology configuration
@@ -453,23 +454,23 @@ export function TaskResultGrid({
       counts.figureImages += toPathList(task?.figure_path).length;
       counts.jsonFigures += toPathList(task?.json_figure_path).length;
       counts.rawData += toPathList(task?.raw_data_path).length;
-      if (task?.task_id && aiTriageTaskIds?.has(task.task_id)) {
+      if (task?.task_id && aiTriageBadgesByTaskId?.has(task.task_id)) {
         counts.aiTriageNotes += 1;
       }
     });
     return counts;
-  }, [aiTriageTaskIds, selectedForDownload, taskResponse?.data?.result]);
+  }, [aiTriageBadgesByTaskId, selectedForDownload, taskResponse?.data?.result]);
 
   useEffect(() => {
-    if (!aiTriageTaskIds || pendingAiTriageTaskIds.size === 0) return;
+    if (!aiTriageBadgesByTaskId || pendingAiTriageTaskIds.size === 0) return;
     setPendingAiTriageTaskIds((prev) => {
       const next = new Set(prev);
-      for (const taskId of aiTriageTaskIds) {
+      for (const taskId of aiTriageBadgesByTaskId.keys()) {
         next.delete(taskId);
       }
       return next.size === prev.size ? prev : next;
     });
-  }, [aiTriageTaskIds, pendingAiTriageTaskIds.size]);
+  }, [aiTriageBadgesByTaskId, pendingAiTriageTaskIds.size]);
 
   useEffect(() => {
     if (visiblePendingAiTriageCount === 0) return;
@@ -824,9 +825,9 @@ export function TaskResultGrid({
           : null;
         const isSelectedForDownload = selectedForDownload.has(qid);
         const canBeDownloaded = hasJsonFigures(qid);
-        const hasAiTriageNote = Boolean(
-          task?.task_id && aiTriageTaskIds?.has(task.task_id),
-        );
+        const aiTriageBadge = task?.task_id
+          ? (aiTriageBadgesByTaskId?.get(task.task_id) ?? null)
+          : null;
         const isAiTriagePending = Boolean(
           task?.task_id &&
           (pendingAiTriageTaskIds.has(task.task_id) ||
@@ -849,7 +850,7 @@ export function TaskResultGrid({
             isAiTriageMode={aiTriageSelectionEnabled}
             isSelectedForAiTriage={selectedForAiTriage.has(qid)}
             canBeAiTriaged={canAiTriageQid(qid)}
-            hasAiTriageNote={hasAiTriageNote}
+            aiTriageBadge={aiTriageBadge}
             isAiTriagePending={isAiTriagePending}
             onClick={() => {
               if (downloadSelectionEnabled) {
