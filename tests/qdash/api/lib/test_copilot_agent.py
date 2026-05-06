@@ -33,6 +33,18 @@ def test_parse_response_accepts_review_triage_markdown_without_json() -> None:
     assert "- Decision: PASS_WITH_NOTE" in response.explanation
 
 
+def test_parse_response_converts_missing_triage_json_to_safe_review() -> None:
+    response = _parse_response(
+        '{"summary":"解析完了","assessment":"warning","explanation":"解析完了"}'
+    )
+
+    assert response.assessment == "warning"
+    assert response.summary == "AI triage response did not include the required review block."
+    assert response.explanation.startswith("**Review triage**")
+    assert "- Decision: `REVIEW`" in response.explanation
+    assert "- Suggested labels: `model_format_error`" in response.explanation
+
+
 @pytest.mark.asyncio
 async def test_run_chat_completions_passes_ollama_keep_alive_and_num_ctx() -> None:
     captured = {}

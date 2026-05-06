@@ -31,6 +31,12 @@ TRIAGE_ASSESSMENT = {
     "REVIEW": "warning",
     "FAIL": "bad",
 }
+TRIAGE_BLOCK_PREFIXES = (
+    "**review triage**",
+    "review triage",
+    "**レビューのトリアージ**",
+    "レビューのトリアージ",
+)
 
 SYSTEM_PROMPT_BASE = """\
 You are an expert in superconducting qubit calibration.
@@ -1127,13 +1133,50 @@ def _extract_triage_fallback(content: str) -> AnalysisResponse | None:
     )
 
 
+def _has_triage_block(text: str) -> bool:
+    """Return True when text starts with the required review-triage block."""
+    return text.lower().lstrip().startswith(TRIAGE_BLOCK_PREFIXES)
+
+
+def _missing_triage_response(content: str) -> AnalysisResponse:
+    """Return a safe review note when a local model omits required triage fields."""
+    summary = "AI triage response did not include the required review block."
+    triage = "\n".join(
+        [
+            "**Review triage**",
+            "- Decision: `REVIEW`",
+            "- Human label suggestion: `SUSPICIOUS`",
+            "- Accepted parameter(s): `none`",
+            "- Needs review: `all output parameters`",
+            f"- Primary reason: {summary}",
+            "- Closest knowledge case: `none`",
+            "- Suggested labels: `model_format_error`",
+            "- Recommended action: Open the task result and review the plot manually.",
+            "- Optional note: The raw local-model response was missing the triage block.",
+        ]
+    )
+    return AnalysisResponse(
+        summary=summary,
+        assessment="warning",
+        explanation=triage,
+        potential_issues=[summary],
+        recommendations=["Open the task result and review the plot manually."],
+    )
+
+
 def _parse_response(content: str) -> AnalysisResponse:
     """Parse LLM response into AnalysisResponse, handling JSON and plain text."""
     text = _strip_code_fences(content)
 
     try:
         data = json.loads(text)
-        return AnalysisResponse(**data)
+        response = AnalysisResponse(**data)
+        if response.explanation and _has_triage_block(response.explanation):
+            return response
+        if response := _extract_triage_fallback(response.explanation or content):
+            return response
+        logger.warning("Local model response omitted required review triage block: %s", content)
+        return _missing_triage_response(content)
     except (json.JSONDecodeError, ValueError):
         if response := _extract_triage_fallback(content):
             return response

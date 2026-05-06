@@ -36,9 +36,8 @@ analysis_models:
     # Optional. If unset or missing, Ollama uses a dummy "ollama" API key.
     api_key_env: GEMMA_API_KEY
     # Keep the local VLM resident between automatic triage requests and avoid
-    # the 256k default context allocation for short qdash reviews.
+    # repeated cold model loads between short qdash reviews.
     keep_alive: 30m
-    num_ctx: 8192
     temperature: 0.2
     max_output_tokens: 1200
   - provider: ollama
