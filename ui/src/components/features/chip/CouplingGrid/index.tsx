@@ -28,6 +28,7 @@ import {
   requestBulkAiTriageReview,
 } from "@/client/task-result/task-result";
 import { AiTriageConfirmModal } from "@/components/features/chip/AiTriageConfirmModal";
+import type { AiTriageBadgeState } from "@/components/features/chip/aiTriageBadge";
 import {
   DownloadConfirmModal,
   type DownloadItemCounts,
@@ -58,7 +59,7 @@ interface CouplingGridProps {
   selectedDate: string;
   gridSize: number;
   onDateChange?: (date: string) => void;
-  aiTriageTaskIds?: Set<string>;
+  aiTriageBadgesByTaskId?: Map<string, AiTriageBadgeState>;
 }
 
 interface SelectedTaskInfo {
@@ -143,7 +144,7 @@ export function CouplingGrid({
   selectedTask,
   selectedDate,
   gridSize: defaultGridSize,
-  aiTriageTaskIds,
+  aiTriageBadgesByTaskId,
 }: CouplingGridProps) {
   const queryClient = useQueryClient();
   // Get topology configuration
@@ -280,23 +281,23 @@ export function CouplingGrid({
       counts.figureImages += toPathList(task?.figure_path).length;
       counts.jsonFigures += toPathList(task?.json_figure_path).length;
       counts.rawData += toPathList(task?.raw_data_path).length;
-      if (task?.task_id && aiTriageTaskIds?.has(task.task_id)) {
+      if (task?.task_id && aiTriageBadgesByTaskId?.has(task.task_id)) {
         counts.aiTriageNotes += 1;
       }
     });
     return counts;
-  }, [aiTriageTaskIds, selectedForDownload, taskResponse?.data?.result]);
+  }, [aiTriageBadgesByTaskId, selectedForDownload, taskResponse?.data?.result]);
 
   useEffect(() => {
-    if (!aiTriageTaskIds || pendingAiTriageTaskIds.size === 0) return;
+    if (!aiTriageBadgesByTaskId || pendingAiTriageTaskIds.size === 0) return;
     setPendingAiTriageTaskIds((prev) => {
       const next = new Set(prev);
-      for (const taskId of aiTriageTaskIds) {
+      for (const taskId of aiTriageBadgesByTaskId.keys()) {
         next.delete(taskId);
       }
       return next.size === prev.size ? prev : next;
     });
-  }, [aiTriageTaskIds, pendingAiTriageTaskIds.size]);
+  }, [aiTriageBadgesByTaskId, pendingAiTriageTaskIds.size]);
 
   useEffect(() => {
     if (visiblePendingAiTriageCount === 0) return;
@@ -759,9 +760,9 @@ export function CouplingGrid({
             (pendingAiTriageTaskIds.has(task.task_id) ||
               isAiTriageReviewPending(task)),
           );
-          const hasAiTriageNote = Boolean(
-            task.task_id && aiTriageTaskIds?.has(task.task_id),
-          );
+          const aiTriageBadge = task.task_id
+            ? (aiTriageBadgesByTaskId?.get(task.task_id) ?? null)
+            : null;
 
           const statusColor =
             task.status === "completed"
@@ -815,10 +816,10 @@ export function CouplingGrid({
                     <LoaderCircle size={10} className="animate-spin" />
                   </div>
                 )}
-                {!isAiTriagePending && hasAiTriageNote && (
+                {!isAiTriagePending && aiTriageBadge && (
                   <div
-                    className="absolute top-0 right-0 rounded bg-warning text-warning-content p-0.5 shadow-sm"
-                    title="AI triage needs review"
+                    className={`absolute top-0 right-0 rounded ${aiTriageBadge.iconClass} p-0.5 shadow-sm`}
+                    title={aiTriageBadge.title}
                   >
                     <Bot size={10} />
                   </div>
@@ -826,7 +827,7 @@ export function CouplingGrid({
                 <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 bg-base-100 text-base-content text-xs rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
                   {task.couplingId}: {task.status}
                   {isAiTriagePending ? " · AI triage review requested" : ""}
-                  {hasAiTriageNote ? " · AI triage needs review" : ""}
+                  {aiTriageBadge ? ` · ${aiTriageBadge.tooltip}` : ""}
                 </div>
               </button>
             );
@@ -894,10 +895,10 @@ export function CouplingGrid({
                   <LoaderCircle size={14} className="animate-spin" />
                 </div>
               )}
-              {!isAiTriagePending && hasAiTriageNote && (
+              {!isAiTriagePending && aiTriageBadge && (
                 <div
-                  className="absolute top-1 right-1 rounded bg-warning text-warning-content p-1 shadow-sm"
-                  title="AI triage needs review"
+                  className={`absolute top-1 right-1 rounded ${aiTriageBadge.iconClass} p-1 shadow-sm`}
+                  title={aiTriageBadge.title}
                 >
                   <Bot size={14} />
                 </div>
