@@ -539,6 +539,7 @@ class TaskResultService:
             config = load_copilot_config()
             if model_override is not None:
                 config = config.model_copy(update={"analysis_model": model_override})
+            config = TaskResultService._ai_triage_config(config)
             selected_model = TaskResultService._select_analysis_model(config)
             TaskResultService._set_ai_triage_status(project_id, task_id, "running")
             ctx = CopilotDataService().build_analysis_context(
@@ -549,18 +550,24 @@ class TaskResultService:
                 image_base64=None,
                 config=config,
             )
-            result = asyncio.run(
-                run_analysis(
-                    context=ctx.context,
-                    user_message=config.analysis.ai_triage_message,
-                    config=config,
-                    image_base64=ctx.image_base64,
-                    expected_images=ctx.expected_images,
-                    conversation_history=[],
-                    tool_executors=None,
+            if forced := TaskResultService._forced_ai_triage_markdown(
+                task_name,
+                ctx.context.output_parameters,
+            ):
+                markdown = forced
+            else:
+                result = asyncio.run(
+                    run_analysis(
+                        context=ctx.context,
+                        user_message=config.analysis.ai_triage_message,
+                        config=config,
+                        image_base64=ctx.image_base64,
+                        expected_images=ctx.expected_images,
+                        conversation_history=[],
+                        tool_executors=None,
+                    )
                 )
-            )
-            markdown = blocks_to_markdown(result).strip()
+                markdown = blocks_to_markdown(result).strip()
             if markdown:
                 model_label = f"{selected_model.provider}/{selected_model.name}"
                 TaskResultService._upsert_ai_triage_note(
@@ -662,6 +669,64 @@ class TaskResultService:
         """Return the effective model used for task-result analysis."""
         return config.analysis_model or (
             config.analysis_models[0] if config.analysis_models else config.model
+        )
+
+    @staticmethod
+    def _ai_triage_config(config: Any) -> Any:
+        """Apply AI-triage-only speed defaults without changing side-panel chat."""
+        analysis = config.analysis
+        if analysis.ai_triage_max_expected_images is not None:
+            analysis = analysis.model_copy(
+                update={"max_expected_images": analysis.ai_triage_max_expected_images}
+            )
+        model = TaskResultService._select_analysis_model(config)
+        if analysis.ai_triage_max_output_tokens is not None:
+            model = model.model_copy(
+                update={"max_output_tokens": analysis.ai_triage_max_output_tokens}
+            )
+        return config.model_copy(update={"analysis": analysis, "analysis_model": model})
+
+    @staticmethod
+    def _param_value(params: dict[str, Any], *names: str) -> Any:
+        """Return a compact output-parameter value from possible parameter names."""
+        for name in names:
+            if name not in params:
+                continue
+            raw = params[name]
+            if isinstance(raw, dict):
+                return raw.get("value")
+            return raw
+        return None
+
+    @staticmethod
+    def _forced_ai_triage_markdown(task_name: str, output_params: dict[str, Any]) -> str | None:
+        """Apply deterministic safety guards before asking a local VLM."""
+        if task_name != "CheckQubitSpectroscopy":
+            return None
+        f01 = TaskResultService._param_value(
+            output_params,
+            "coarse_qubit_frequency",
+            "coarse_qubit_frequency_ghz",
+            "f01_frequency",
+            "f01_frequency_ghz",
+        )
+        if f01 is not None:
+            return None
+        return "\n".join(
+            [
+                "**Review triage**",
+                "- Decision: `FAIL`",
+                "- Human label suggestion: `NO_SIGNAL`",
+                "- Accepted parameter(s): `none`",
+                "- Needs review: `none`",
+                "- Primary reason: No f01 output parameter was detected, so the "
+                "result is not safe for automatic update.",
+                "- Closest knowledge case: `none`",
+                "- Suggested labels: `no_signal`",
+                "- Recommended action: Rerun qubit spectroscopy with an adjusted "
+                "frequency range or drive power.",
+                "- Optional note: Deterministic safety guard applied before local VLM review.",
+            ]
         )
 
     @staticmethod

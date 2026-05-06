@@ -53,9 +53,11 @@ model:
 
 analysis_models:
   - provider: ollama
-    name: gemma4:31b
+    name: gemma4:26b
     base_url: env:GEMMA_BASE_URL
     api_key_env: GEMMA_API_KEY
+    keep_alive: 30m
+    num_ctx: 8192
     temperature: 0.2
     max_output_tokens: 1200
 
@@ -78,6 +80,9 @@ scoring:
 analysis:
   enabled: true
   multimodal: true
+  max_expected_images: 2
+  ai_triage_max_expected_images: 0
+  ai_triage_max_output_tokens: 1024
   ai_triage_tasks: [CheckQubitSpectroscopy, CheckResonatorSpectroscopy]
   ai_triage_message: >-
     Review this calibration result and attach a concise operational triage note.
@@ -126,12 +131,20 @@ Automatic AI triage attaches an LLM-generated operational review note to selecte
 - **Configuration**: `analysis.ai_triage_tasks` and `analysis.ai_triage_message` in `config/copilot.yaml`
 - **Execution model**: asynchronous background thread pool, de-duplicated by `task_id`
 - **Model selection**: `analysis_model`, then the first `analysis_models` entry, then the general `model`
+- **Local VLM speed path**: `analysis.ai_triage_max_expected_images` overrides
+  `analysis.max_expected_images` only for automatic triage, and
+  `analysis.ai_triage_max_output_tokens` caps only the selected triage model.
 - **Storage**: task-result `user_note.content`, under a `## AI triage` Markdown section
 - **UI**: task detail modals render the note as Markdown; chip page badges are shown only when the triage decision requires review
 
 The hook is best effort. It must not block calibration progress and must not change the task outcome when the LLM request fails. Both successful and failed task results are eligible when the task name is listed in `ai_triage_tasks`.
 
 For `CheckResonatorSpectroscopy`, QDash records one AI triage note per MUX group. The representative result is the qid where `int(qid) % 4 == 0`; copied sibling resonator results are skipped to avoid duplicate LLM calls and duplicate notes.
+
+For `CheckQubitSpectroscopy`, QDash applies a deterministic safety guard before
+calling the VLM: if no f01-like output parameter is present, the note is marked
+as `FAIL` / `NO_SIGNAL`. This avoids accepting an empty parameter update when a
+compact local model returns an overly optimistic free-form response.
 
 The expected triage note begins with a compact review block:
 
