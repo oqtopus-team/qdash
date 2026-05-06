@@ -45,6 +45,16 @@ def test_parse_response_converts_missing_triage_json_to_safe_review() -> None:
     assert "- Suggested labels: `model_format_error`" in response.explanation
 
 
+def test_parse_response_converts_plain_missing_triage_text_to_safe_review() -> None:
+    response = _parse_response("解析完了")
+
+    assert response.assessment == "warning"
+    assert response.summary == "AI triage response did not include the required review block."
+    assert response.explanation.startswith("**Review triage**")
+    assert "- Decision: `REVIEW`" in response.explanation
+    assert "- Suggested labels: `model_format_error`" in response.explanation
+
+
 @pytest.mark.asyncio
 async def test_run_chat_completions_passes_ollama_keep_alive_and_num_ctx() -> None:
     captured = {}
@@ -72,3 +82,24 @@ async def test_run_chat_completions_passes_ollama_keep_alive_and_num_ctx() -> No
         "keep_alive": "30m",
         "options": {"num_ctx": 8192},
     }
+
+
+@pytest.mark.asyncio
+async def test_run_chat_completions_uses_reasoning_when_content_is_empty() -> None:
+    class _Completions:
+        async def create(self, **kwargs):
+            message = SimpleNamespace(content="", reasoning="reasoning triage text")
+            return SimpleNamespace(choices=[SimpleNamespace(message=message)])
+
+    client: Any = SimpleNamespace(chat=SimpleNamespace(completions=_Completions()))
+    config = CopilotConfig(
+        model=ModelConfig(
+            provider="ollama",
+            name="gemma4:26b",
+            temperature=0,
+        )
+    )
+
+    content = await _run_chat_completions(client, [{"role": "user", "content": "hi"}], config)
+
+    assert content == "reasoning triage text"
