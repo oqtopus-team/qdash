@@ -41,6 +41,15 @@ analysis_models:
     temperature: 0.2
     max_output_tokens: 1200
   - provider: ollama
+    name: gemma4:31b
+    # Slower fallback model for local VLM triage when 26b returns malformed or
+    # under-specified review notes. Keep this selectable, but not the default.
+    base_url: env:GEMMA_BASE_URL
+    api_key_env: GEMMA_API_KEY
+    keep_alive: 30m
+    temperature: 0.2
+    max_output_tokens: 1200
+  - provider: ollama
     name: nvidia/Ising-Calibration-1-35B-A3B
     temperature: 0.7
     max_output_tokens: 4096
