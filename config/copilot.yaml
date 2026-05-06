@@ -29,7 +29,7 @@ model:
 # Specialized models for task result analysis (chevron patterns, Rabi, etc.).
 analysis_models:
   - provider: ollama
-    name: gemma4:31b
+    name: gemma4:26b
     # Ollama endpoint. Set GEMMA_BASE_URL to your Ollama server URL,
     # e.g. http://localhost:11434. QDash appends /v1 automatically.
     base_url: env:GEMMA_BASE_URL
@@ -38,17 +38,25 @@ analysis_models:
     # Keep the local VLM resident between automatic triage requests and avoid
     # repeated cold model loads between short qdash reviews.
     keep_alive: 30m
-    temperature: 0.2
+    # Gemma 4 best-practice sampling for stable local VLM triage.
+    temperature: 1.0
+    top_p: 0.95
+    top_k: 64
+    reasoning_effort: none
+    disable_thinking_instruction: true
     max_output_tokens: 4096
   - provider: ollama
-    name: gemma4:26b
-    # Faster local VLM option. Some Ollama/OpenAI-compatible deployments place
-    # its generated text in reasoning fields, so QDash keeps a parser fallback
-    # for this model but does not make it the default.
+    name: gemma4:31b
+    # Higher-stability local VLM fallback. It is slower than 26B but showed
+    # fewer format failures in qdash triage spot checks.
     base_url: env:GEMMA_BASE_URL
     api_key_env: GEMMA_API_KEY
     keep_alive: 30m
-    temperature: 0.2
+    temperature: 1.0
+    top_p: 0.95
+    top_k: 64
+    reasoning_effort: none
+    disable_thinking_instruction: true
     max_output_tokens: 4096
   - provider: ollama
     name: nvidia/Ising-Calibration-1-35B-A3B

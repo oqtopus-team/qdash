@@ -53,18 +53,26 @@ model:
 
 analysis_models:
   - provider: ollama
-    name: gemma4:31b
-    base_url: env:GEMMA_BASE_URL
-    api_key_env: GEMMA_API_KEY
-    keep_alive: 30m
-    temperature: 0.2
-    max_output_tokens: 4096
-  - provider: ollama
     name: gemma4:26b
     base_url: env:GEMMA_BASE_URL
     api_key_env: GEMMA_API_KEY
     keep_alive: 30m
-    temperature: 0.2
+    temperature: 1.0
+    top_p: 0.95
+    top_k: 64
+    reasoning_effort: none
+    disable_thinking_instruction: true
+    max_output_tokens: 4096
+  - provider: ollama
+    name: gemma4:31b
+    base_url: env:GEMMA_BASE_URL
+    api_key_env: GEMMA_API_KEY
+    keep_alive: 30m
+    temperature: 1.0
+    top_p: 0.95
+    top_k: 64
+    reasoning_effort: none
+    disable_thinking_instruction: true
     max_output_tokens: 4096
 
 # Metrics for chip health evaluation

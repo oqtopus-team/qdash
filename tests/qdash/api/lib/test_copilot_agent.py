@@ -56,7 +56,7 @@ def test_parse_response_converts_plain_missing_triage_text_to_safe_review() -> N
 
 
 @pytest.mark.asyncio
-async def test_run_chat_completions_passes_ollama_keep_alive_and_num_ctx() -> None:
+async def test_run_chat_completions_passes_ollama_options() -> None:
     captured = {}
 
     class _Completions:
@@ -72,7 +72,10 @@ async def test_run_chat_completions_passes_ollama_keep_alive_and_num_ctx() -> No
             name="gemma4:26b",
             keep_alive="30m",
             num_ctx=8192,
-            temperature=0,
+            temperature=1.0,
+            top_p=0.95,
+            top_k=64,
+            reasoning_effort="none",
         )
     )
 
@@ -80,8 +83,11 @@ async def test_run_chat_completions_passes_ollama_keep_alive_and_num_ctx() -> No
 
     assert captured["extra_body"] == {
         "keep_alive": "30m",
-        "options": {"num_ctx": 8192},
+        "options": {"num_ctx": 8192, "top_k": 64},
     }
+    assert captured["temperature"] == 1.0
+    assert captured["top_p"] == 0.95
+    assert captured["reasoning_effort"] == "none"
 
 
 @pytest.mark.asyncio
