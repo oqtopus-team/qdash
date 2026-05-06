@@ -1182,14 +1182,8 @@ def _parse_response(content: str) -> AnalysisResponse:
         fallback_response = _extract_triage_fallback(content)
         if fallback_response is not None:
             return fallback_response
-        # If JSON parsing fails, treat the entire response as explanation
-        return AnalysisResponse(
-            summary="Analysis complete",
-            assessment="warning",
-            explanation=content,
-            potential_issues=[],
-            recommendations=[],
-        )
+        logger.warning("Local model response omitted required review triage block: %s", content)
+        return _missing_triage_response(content)
 
 
 _ASSESSMENT_LABELS_JA = {
@@ -1828,7 +1822,23 @@ async def _run_chat_completions(
             response = await client.chat.completions.create(**kwargs)
         else:
             raise
-    return response.choices[0].message.content or ""
+    message = response.choices[0].message
+    content = message.content or ""
+    if content:
+        return content
+
+    # Some local thinking models served through Ollama's OpenAI-compatible
+    # endpoint place generated text in non-standard reasoning fields while
+    # leaving content empty. Treat that as raw model output so the triage parser
+    # can extract a compact review block or mark it as a format error.
+    for field in ("reasoning", "reasoning_content", "thinking"):
+        value = getattr(message, field, None)
+        if isinstance(value, str) and value.strip():
+            logger.warning(
+                "Chat completion returned empty content; using message.%s fallback", field
+            )
+            return value
+    return ""
 
 
 async def run_analysis(

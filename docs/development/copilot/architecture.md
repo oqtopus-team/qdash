@@ -53,14 +53,14 @@ model:
 
 analysis_models:
   - provider: ollama
-    name: gemma4:26b
+    name: gemma4:31b
     base_url: env:GEMMA_BASE_URL
     api_key_env: GEMMA_API_KEY
     keep_alive: 30m
     temperature: 0.2
     max_output_tokens: 1200
   - provider: ollama
-    name: gemma4:31b
+    name: gemma4:26b
     base_url: env:GEMMA_BASE_URL
     api_key_env: GEMMA_API_KEY
     keep_alive: 30m
