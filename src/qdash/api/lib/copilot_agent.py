@@ -1143,13 +1143,15 @@ def _parse_response(content: str) -> AnalysisResponse:
         response = AnalysisResponse(**data)
         if response.explanation and _has_triage_block(response.explanation):
             return response
-        if response := _extract_triage_fallback(response.explanation or content):
-            return response
+        fallback_response = _extract_triage_fallback(response.explanation or content)
+        if fallback_response is not None:
+            return fallback_response
         logger.warning("Local model response omitted required review triage block: %s", content)
         return _missing_triage_response(content)
     except (json.JSONDecodeError, ValueError):
-        if response := _extract_triage_fallback(content):
-            return response
+        fallback_response = _extract_triage_fallback(content)
+        if fallback_response is not None:
+            return fallback_response
         # If JSON parsing fails, treat the entire response as explanation
         return AnalysisResponse(
             summary="Analysis complete",
