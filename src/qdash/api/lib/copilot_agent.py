@@ -771,7 +771,7 @@ def _build_language_instruction(config: CopilotConfig | None) -> str:
 
     parts: list[str] = []
 
-    if thinking_lang != response_lang:
+    if thinking_lang != response_lang and not config.model.disable_thinking_instruction:
         parts.append(f"Think and reason internally in {thinking_lang} for technical precision.")
 
     if response_lang == "ja":
@@ -1787,6 +1787,8 @@ async def _run_chat_completions(
             extra_body["keep_alive"] = config.model.keep_alive
         if config.model.num_ctx is not None:
             options["num_ctx"] = config.model.num_ctx
+        if config.model.top_k is not None:
+            options["top_k"] = config.model.top_k
         if options:
             extra_body["options"] = options
 
@@ -1800,12 +1802,24 @@ async def _run_chat_completions(
         kwargs["extra_body"] = extra_body
     if config.model.temperature is not None:
         kwargs["temperature"] = config.model.temperature
+    if config.model.top_p is not None:
+        kwargs["top_p"] = config.model.top_p
+    if config.model.reasoning_effort:
+        kwargs["reasoning_effort"] = config.model.reasoning_effort
     try:
         response = await client.chat.completions.create(**kwargs)
     except BadRequestError as exc:
         if "temperature" in str(exc) and "temperature" in kwargs:
             logger.info("Model does not support temperature, retrying without it")
             kwargs.pop("temperature")
+            response = await client.chat.completions.create(**kwargs)
+        elif "top_p" in str(exc) and "top_p" in kwargs:
+            logger.info("Model does not support top_p, retrying without it")
+            kwargs.pop("top_p")
+            response = await client.chat.completions.create(**kwargs)
+        elif "reasoning_effort" in str(exc) and "reasoning_effort" in kwargs:
+            logger.info("Model does not support reasoning_effort, retrying without it")
+            kwargs.pop("reasoning_effort")
             response = await client.chat.completions.create(**kwargs)
         else:
             raise

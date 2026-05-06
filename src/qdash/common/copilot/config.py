@@ -42,6 +42,10 @@ class ModelConfig(BaseModel):
     api_key_env: str | None = None
     keep_alive: str | None = None
     num_ctx: int | None = None
+    top_p: float | None = None
+    top_k: int | None = None
+    reasoning_effort: str | None = None
+    disable_thinking_instruction: bool = False
 
 
 class Suggestion(BaseModel):
