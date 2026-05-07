@@ -1628,8 +1628,7 @@ export const useReExecuteTaskResult = <
  * Toggle the excluded flag on a task result.
 
 Excluded measurements are skipped when aggregating metrics for the
-dashboard / metrics screens. Raw data is preserved. Any project member
-can toggle exclusion; the most recent toggler is recorded.
+dashboard / metrics screens. Raw data is preserved.
  * @summary Toggle exclusion of a task result from metrics aggregations
  */
 export const setTaskResultExcluded = (

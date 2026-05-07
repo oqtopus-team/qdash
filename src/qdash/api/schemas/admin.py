@@ -90,6 +90,7 @@ class MemberListResponse(BaseModel):
 
 
 class AddMemberRequest(BaseModel):
-    """Request to add a member to a project (always as viewer)."""
+    """Request to add a member to a project."""
 
     username: str
+    role: ProjectRole = ProjectRole.VIEWER

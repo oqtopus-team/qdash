@@ -190,7 +190,7 @@ Parameters
 request : CreateChipRequest
     Chip creation request containing chip_id and size
 ctx : ProjectContext
-    Project context with owner permission
+    Project context with editor permission
 
 Returns
 -------

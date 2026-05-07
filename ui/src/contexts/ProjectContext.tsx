@@ -27,12 +27,22 @@ interface ProjectContextType {
   projectId: string | null;
   role: ProjectRole | null;
   isOwner: boolean;
+  isEditor: boolean;
   isViewer: boolean;
-  canEdit: boolean; // Only owner can edit (simplified permission model)
+  canEdit: boolean;
+  can: (permission: ProjectPermission) => boolean;
   loading: boolean;
   switchProject: (projectId: string) => void;
   refreshProjects: () => void;
 }
+
+type ProjectPermission = "read" | "write" | "admin";
+
+const ROLE_PERMISSIONS: Record<ProjectRole, ProjectPermission[]> = {
+  owner: ["read", "write", "admin"],
+  editor: ["read", "write"],
+  viewer: ["read"],
+};
 
 const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
 
@@ -136,8 +146,14 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
   }, [refetch]);
 
   const isOwner = role === "owner";
+  const isEditor = role === "editor";
   const isViewer = role === "viewer";
-  const canEdit = isOwner; // Only owner can edit (simplified permission model)
+  const can = useCallback(
+    (permission: ProjectPermission) =>
+      role ? ROLE_PERMISSIONS[role].includes(permission) : false,
+    [role],
+  );
+  const canEdit = can("write");
 
   return (
     <ProjectContext.Provider
@@ -147,8 +163,10 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
         projectId,
         role,
         isOwner,
+        isEditor,
         isViewer,
         canEdit,
+        can,
         loading: isLoading,
         switchProject,
         refreshProjects,

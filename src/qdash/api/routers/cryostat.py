@@ -10,6 +10,7 @@ from qdash.api.dependencies import get_cryostat_service  # noqa: TCH002
 from qdash.api.lib.project import (  # noqa: TCH002
     ProjectContext,
     get_project_context,
+    get_project_context_editor,
 )
 from qdash.api.schemas.cryostat import (
     CryostatCreateRequest,
@@ -60,7 +61,7 @@ def get_cryostat(
 )
 def create_cryostat(
     body: CryostatCreateRequest,
-    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
     service: Annotated[CryostatService, Depends(get_cryostat_service)],
 ) -> CryostatResponse:
     return service.create(project_id=ctx.project_id, body=body)
@@ -75,7 +76,7 @@ def create_cryostat(
 def update_cryostat(
     cryo_id: str,
     body: CryostatUpdateRequest,
-    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
     service: Annotated[CryostatService, Depends(get_cryostat_service)],
 ) -> CryostatResponse:
     return service.update(project_id=ctx.project_id, cryo_id=cryo_id, body=body)
@@ -89,7 +90,7 @@ def update_cryostat(
 )
 def delete_cryostat(
     cryo_id: str,
-    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
     service: Annotated[CryostatService, Depends(get_cryostat_service)],
 ) -> SuccessResponse:
     return service.delete(project_id=ctx.project_id, cryo_id=cryo_id)

@@ -709,7 +709,7 @@
           "admin"
         ],
         "summary": "Add member to project",
-        "description": "Add a member to a project as viewer (admin only).",
+        "description": "Add a member to a project (admin only).",
         "operationId": "addProjectMemberAdmin",
         "security": [
           {
@@ -2714,7 +2714,7 @@
           "chip"
         ],
         "summary": "Create a new chip",
-        "description": "Create a new chip in the current project.\n\nParameters\n----------\nrequest : CreateChipRequest\n    Chip creation request containing chip_id and size\nctx : ProjectContext\n    Project context with owner permission\n\nReturns\n-------\nChipResponse\n    Created chip information\n\nRaises\n------\nHTTPException\n    If chip_id already exists or size is invalid",
+        "description": "Create a new chip in the current project.\n\nParameters\n----------\nrequest : CreateChipRequest\n    Chip creation request containing chip_id and size\nctx : ProjectContext\n    Project context with editor permission\n\nReturns\n-------\nChipResponse\n    Created chip information\n\nRaises\n------\nHTTPException\n    If chip_id already exists or size is invalid",
         "operationId": "createChip",
         "security": [
           {
@@ -5239,7 +5239,7 @@
           "task-result"
         ],
         "summary": "Toggle exclusion of a task result from metrics aggregations",
-        "description": "Toggle the excluded flag on a task result.\n\nExcluded measurements are skipped when aggregating metrics for the\ndashboard / metrics screens. Raw data is preserved. Any project member\ncan toggle exclusion; the most recent toggler is recorded.",
+        "description": "Toggle the excluded flag on a task result.\n\nExcluded measurements are skipped when aggregating metrics for the\ndashboard / metrics screens. Raw data is preserved.",
         "operationId": "setTaskResultExcluded",
         "security": [
           {
@@ -12809,6 +12809,10 @@
           "username": {
             "type": "string",
             "title": "Username"
+          },
+          "role": {
+            "$ref": "#/components/schemas/ProjectRole",
+            "default": "viewer"
           }
         },
         "type": "object",
@@ -12816,7 +12820,7 @@
           "username"
         ],
         "title": "AddMemberRequest",
-        "description": "Request to add a member to a project (always as viewer)."
+        "description": "Request to add a member to a project."
       },
       "AiTriageReviewModel": {
         "properties": {
@@ -19101,10 +19105,11 @@
         "type": "string",
         "enum": [
           "owner",
+          "editor",
           "viewer"
         ],
         "title": "ProjectRole",
-        "description": "Role of a member inside a project.\n\nSimplified model:\n- OWNER: Full access to project (read, write, admin)\n- VIEWER: Read-only access (for invited members)"
+        "description": "Role of a member inside a project.\n\nRoles intentionally stay coarse-grained:\n- OWNER: Project administration plus write access\n- EDITOR: Operational write access\n- VIEWER: Read-only access"
       },
       "ProjectUpdate": {
         "properties": {

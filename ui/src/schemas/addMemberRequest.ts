@@ -5,10 +5,12 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
+import type { ProjectRole } from "./projectRole";
 
 /**
- * Request to add a member to a project (always as viewer).
+ * Request to add a member to a project.
  */
 export interface AddMemberRequest {
   username: string;
+  role?: ProjectRole;
 }

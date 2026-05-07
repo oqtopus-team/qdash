@@ -473,12 +473,12 @@ class ProjectService:
                 detail=f"User '{new_owner_username}' not found",
             )
 
-        # Update old owner membership to viewer
+        # Keep the previous owner as an editor after transferring administration.
         old_owner_membership = self._membership_repo.find_one(
             {"project_id": project_id, "username": project.owner_username}
         )
         if old_owner_membership:
-            old_owner_membership.role = ProjectRole.VIEWER
+            old_owner_membership.role = ProjectRole.EDITOR
             old_owner_membership.system_info.update_time()
             self._membership_repo.save(old_owner_membership)
 
