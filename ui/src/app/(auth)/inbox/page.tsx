@@ -1,5 +1,5 @@
-import { InboxPageContent } from "@/components/features/inbox/InboxPageContent";
+import { NotificationsInboxPageContent } from "@/components/features/inbox/NotificationsInboxPageContent";
 
 export default function InboxPage() {
-  return <InboxPageContent />;
+  return <NotificationsInboxPageContent />;
 }

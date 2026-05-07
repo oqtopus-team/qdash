@@ -9,6 +9,7 @@ import type { UserWithTokenFullName } from "./userWithTokenFullName";
 import type { UserWithTokenDisabled } from "./userWithTokenDisabled";
 import type { UserWithTokenDefaultProjectId } from "./userWithTokenDefaultProjectId";
 import type { SystemRole } from "./systemRole";
+import type { UserWithTokenInitialPassword } from "./userWithTokenInitialPassword";
 
 /**
  * User model with access token for login/register responses.
@@ -18,6 +19,8 @@ export interface UserWithToken {
   full_name?: UserWithTokenFullName;
   disabled?: UserWithTokenDisabled;
   default_project_id?: UserWithTokenDefaultProjectId;
+  must_change_password?: boolean;
   system_role?: SystemRole;
   access_token: string;
+  initial_password?: UserWithTokenInitialPassword;
 }

@@ -16,6 +16,7 @@ from qdash.dbmodel.flow import FlowDocument
 from qdash.dbmodel.issue import IssueDocument
 from qdash.dbmodel.issue_knowledge import IssueKnowledgeDocument
 from qdash.dbmodel.note_event import NoteEventDocument
+from qdash.dbmodel.notification import NotificationDocument
 from qdash.dbmodel.project import ProjectDocument
 from qdash.dbmodel.project_membership import ProjectMembershipDocument
 from qdash.dbmodel.provenance import (
@@ -55,6 +56,7 @@ def document_models() -> list[Any]:
         IssueDocument,
         IssueKnowledgeDocument,
         NoteEventDocument,
+        NotificationDocument,
         CryostatDocument,
         CooldownDocument,
         CooldownWiringEventDocument,

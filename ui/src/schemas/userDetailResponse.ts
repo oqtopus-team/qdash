@@ -20,6 +20,7 @@ export interface UserDetailResponse {
   disabled?: boolean;
   system_role?: SystemRole;
   default_project_id?: UserDetailResponseDefaultProjectId;
+  must_change_password?: boolean;
   created_at?: UserDetailResponseCreatedAt;
   updated_at?: UserDetailResponseUpdatedAt;
 }

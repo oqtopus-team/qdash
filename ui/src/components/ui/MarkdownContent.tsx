@@ -56,10 +56,11 @@ function MermaidDiagram({ code }: { code: string }) {
   );
 }
 
-const MENTION_RE = /@(qdash)\b/gi;
+const MENTION_RE = /@([A-Za-z0-9_.-]+)\b/g;
+const HAS_MENTION_RE = /@([A-Za-z0-9_.-]+)\b/;
 
 /**
- * Splits text into segments, wrapping @qdash mentions with a highlight span.
+ * Splits text into segments, wrapping @mentions with a highlight span.
  */
 function highlightMentions(text: string): React.ReactNode {
   const parts: React.ReactNode[] = [];
@@ -164,7 +165,7 @@ const markdownComponents: Record<string, React.ComponentType<any>> = {
     return (
       <p {...props}>
         {React.Children.map(children, (child) => {
-          if (typeof child === "string" && MENTION_RE.test(child)) {
+          if (typeof child === "string" && HAS_MENTION_RE.test(child)) {
             return highlightMentions(child);
           }
           return child;
@@ -177,7 +178,7 @@ const markdownComponents: Record<string, React.ComponentType<any>> = {
     return (
       <li {...props}>
         {React.Children.map(children, (child) => {
-          if (typeof child === "string" && MENTION_RE.test(child)) {
+          if (typeof child === "string" && HAS_MENTION_RE.test(child)) {
             return highlightMentions(child);
           }
           return child;

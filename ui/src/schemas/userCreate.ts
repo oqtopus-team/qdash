@@ -5,6 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
+import type { UserCreatePassword } from "./userCreatePassword";
 import type { UserCreateFullName } from "./userCreateFullName";
 
 /**
@@ -12,6 +13,7 @@ import type { UserCreateFullName } from "./userCreateFullName";
  */
 export interface UserCreate {
   username: string;
-  password: string;
+  password?: UserCreatePassword;
   full_name?: UserCreateFullName;
+  create_default_project?: boolean;
 }

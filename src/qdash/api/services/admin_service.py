@@ -37,6 +37,7 @@ class AdminService:
             disabled=user.disabled,
             system_role=user.system_role,
             default_project_id=user.default_project_id,
+            must_change_password=user.must_change_password,
             created_at=user.system_info.created_at if user.system_info else None,
             updated_at=user.system_info.updated_at if user.system_info else None,
         )
@@ -62,6 +63,7 @@ class AdminService:
                     disabled=u.disabled,
                     system_role=u.system_role,
                     default_project_id=project_id,
+                    must_change_password=u.must_change_password,
                 )
             )
 

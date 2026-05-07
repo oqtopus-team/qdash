@@ -15,4 +15,5 @@ export interface TokenResponse {
   token_type?: string;
   username: string;
   default_project_id?: TokenResponseDefaultProjectId;
+  must_change_password?: boolean;
 }

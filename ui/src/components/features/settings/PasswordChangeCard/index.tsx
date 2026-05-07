@@ -1,10 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 
 import { Toast } from "../Toast";
 
-import { useChangePassword } from "@/client/auth/auth";
+import {
+  getGetCurrentUserQueryKey,
+  useChangePassword,
+} from "@/client/auth/auth";
 
 const EyeIcon = () => (
   <svg
@@ -46,6 +50,7 @@ const EyeSlashIcon = () => (
 );
 
 export function PasswordChangeCard() {
+  const queryClient = useQueryClient();
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -67,6 +72,9 @@ export function PasswordChangeCard() {
         setCurrentPassword("");
         setNewPassword("");
         setConfirmPassword("");
+        queryClient.invalidateQueries({
+          queryKey: getGetCurrentUserQueryKey(),
+        });
       },
       onError: (error: unknown) => {
         const errorMessage =

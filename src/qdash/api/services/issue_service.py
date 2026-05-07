@@ -6,7 +6,7 @@ import json
 import logging
 import re
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from uuid import uuid4
 
 from qdash.api.lib.json_utils import sanitize_for_json
@@ -16,6 +16,9 @@ from qdash.common.paths import CALIB_DATA_BASE
 from qdash.datamodel.project import ProjectRole
 from qdash.dbmodel.issue import IssueDocument
 from starlette.exceptions import HTTPException
+
+if TYPE_CHECKING:
+    from qdash.api.services.notification_service import NotificationService
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +41,9 @@ FILENAME_PATTERN = re.compile(r"^[0-9a-f\-]{36}\.(png|jpg|gif|webp)$")
 
 class IssueService:
     """Service for issue CRUD operations."""
+
+    def __init__(self, notification_service: NotificationService | None = None) -> None:
+        self._notifications = notification_service
 
     @staticmethod
     def _to_response(doc: IssueDocument, reply_count: int = 0) -> IssueResponse:
@@ -214,6 +220,31 @@ class IssueService:
         )
         doc.insert()
 
+        if self._notifications:
+            root_issue_id = str(doc.id)
+            parent_author: str | None = None
+            root_title = doc.title
+            if parent_id is not None:
+                from bson import ObjectId
+
+                parent_doc = IssueDocument.find_one(
+                    {"_id": ObjectId(parent_id), "project_id": project_id}
+                ).run()
+                if parent_doc:
+                    root_issue_id = str(parent_doc.id)
+                    parent_author = parent_doc.username
+                    root_title = parent_doc.title
+            self._notifications.notify_issue_event(
+                project_id=project_id,
+                issue_id=str(doc.id),
+                root_issue_id=root_issue_id,
+                task_id=task_id,
+                actor_username=username,
+                content=content,
+                title=root_title,
+                parent_author=parent_author,
+            )
+
         return self._to_response(doc)
 
     def update_issue(
@@ -247,6 +278,26 @@ class IssueService:
         doc.content = content
         doc.system_info.update_time()
         doc.save()
+
+        if self._notifications:
+            root_issue_id = str(doc.id)
+            root_title = doc.title
+            if doc.parent_id is not None:
+                root_doc = IssueDocument.find_one(
+                    {"_id": ObjectId(doc.parent_id), "project_id": project_id}
+                ).run()
+                if root_doc:
+                    root_issue_id = str(root_doc.id)
+                    root_title = root_doc.title
+            self._notifications.notify_issue_event(
+                project_id=project_id,
+                issue_id=str(doc.id),
+                root_issue_id=root_issue_id,
+                task_id=doc.task_id,
+                actor_username=username,
+                content=content,
+                title=root_title,
+            )
 
         return self._to_response(doc)
 

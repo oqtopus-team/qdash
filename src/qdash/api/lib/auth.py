@@ -76,6 +76,7 @@ def get_user(username: str) -> UserInDB | None:
             full_name=user.full_name,
             disabled=user.disabled,
             default_project_id=user.default_project_id,
+            must_change_password=user.must_change_password,
             system_role=user.system_role,
             hashed_password=user.hashed_password,
             access_token=user.access_token,
@@ -96,6 +97,7 @@ def get_user_by_token(access_token: str) -> UserInDB | None:
             full_name=user.full_name,
             disabled=user.disabled,
             default_project_id=user.default_project_id,
+            must_change_password=user.must_change_password,
             system_role=user.system_role,
             hashed_password=user.hashed_password,
             access_token=user.access_token,
@@ -166,6 +168,7 @@ def get_current_user(
         full_name=user.full_name,
         disabled=user.disabled,
         default_project_id=user.default_project_id,
+        must_change_password=user.must_change_password,
         system_role=user.system_role,
     )
 
@@ -219,6 +222,7 @@ def get_current_active_user(
         full_name=user.full_name,
         disabled=user.disabled,
         default_project_id=user.default_project_id,
+        must_change_password=user.must_change_password,
         system_role=user.system_role,
     )
 
