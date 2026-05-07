@@ -3585,7 +3585,7 @@ workflow = [
     { name = "pymongo", specifier = "==4.8.0" },
     { name = "python-dotenv", specifier = "==1.0.1" },
     { name = "pyyaml", specifier = "==6.0.1" },
-    { name = "qubex", extras = ["backend"], git = "https://github.com/orangekame3/qubex.git?branch=fix%2Festimate_control_amp_response" },
+    { name = "qubex", extras = ["backend"], git = "https://github.com/amachino/qubex.git?branch=develop" },
     { name = "reportlab", specifier = ">=4.4.1" },
     { name = "ruamel-yaml", specifier = ">=0.18.0" },
     { name = "slack-sdk", specifier = "==3.36.0" },
@@ -3595,7 +3595,7 @@ workflow = [
 [[package]]
 name = "qubex"
 version = "1.5.0b4"
-source = { git = "https://github.com/orangekame3/qubex.git?branch=fix%2Festimate_control_amp_response#fa8c6ac1c5022af0667c861d3349f4621a102966" }
+source = { git = "https://github.com/amachino/qubex.git?branch=develop#fbdef9d7bf3e86c2b92ab4aa9723181d8b8c153f" }
 dependencies = [
     { name = "anywidget" },
     { name = "cma" },
@@ -3686,7 +3686,7 @@ wheels = [
 [[package]]
 name = "qxcore"
 version = "1.5.0b4"
-source = { git = "https://github.com/orangekame3/qubex.git?subdirectory=packages%2Fqxcore&branch=fix%2Festimate_control_amp_response#fa8c6ac1c5022af0667c861d3349f4621a102966" }
+source = { git = "https://github.com/amachino/qubex.git?subdirectory=packages%2Fqxcore&branch=develop#fbdef9d7bf3e86c2b92ab4aa9723181d8b8c153f" }
 dependencies = [
     { name = "netcdf4" },
     { name = "numpy" },
@@ -3700,7 +3700,7 @@ dependencies = [
 [[package]]
 name = "qxdriver-quel1"
 version = "1.5.0b4"
-source = { git = "https://github.com/orangekame3/qubex.git?subdirectory=packages%2Fqxdriver-quel1&branch=fix%2Festimate_control_amp_response#fa8c6ac1c5022af0667c861d3349f4621a102966" }
+source = { git = "https://github.com/amachino/qubex.git?subdirectory=packages%2Fqxdriver-quel1&branch=develop#fbdef9d7bf3e86c2b92ab4aa9723181d8b8c153f" }
 dependencies = [
     { name = "numpy" },
     { name = "plotly" },
@@ -3712,12 +3712,12 @@ dependencies = [
 [[package]]
 name = "qxfitting"
 version = "1.5.0b4"
-source = { git = "https://github.com/orangekame3/qubex.git?subdirectory=packages%2Fqxfitting&branch=fix%2Festimate_control_amp_response#fa8c6ac1c5022af0667c861d3349f4621a102966" }
+source = { git = "https://github.com/amachino/qubex.git?subdirectory=packages%2Fqxfitting&branch=develop#fbdef9d7bf3e86c2b92ab4aa9723181d8b8c153f" }
 
 [[package]]
 name = "qxpulse"
 version = "1.5.0b4"
-source = { git = "https://github.com/orangekame3/qubex.git?subdirectory=packages%2Fqxpulse&branch=fix%2Festimate_control_amp_response#fa8c6ac1c5022af0667c861d3349f4621a102966" }
+source = { git = "https://github.com/amachino/qubex.git?subdirectory=packages%2Fqxpulse&branch=develop#fbdef9d7bf3e86c2b92ab4aa9723181d8b8c153f" }
 dependencies = [
     { name = "numpy" },
     { name = "plotly" },
@@ -3729,7 +3729,7 @@ dependencies = [
 [[package]]
 name = "qxschema"
 version = "1.5.0b4"
-source = { git = "https://github.com/orangekame3/qubex.git?subdirectory=packages%2Fqxschema&branch=fix%2Festimate_control_amp_response#fa8c6ac1c5022af0667c861d3349f4621a102966" }
+source = { git = "https://github.com/amachino/qubex.git?subdirectory=packages%2Fqxschema&branch=develop#fbdef9d7bf3e86c2b92ab4aa9723181d8b8c153f" }
 dependencies = [
     { name = "numpy" },
     { name = "qxcore" },
@@ -3738,7 +3738,7 @@ dependencies = [
 [[package]]
 name = "qxsimulator"
 version = "1.5.0b4"
-source = { git = "https://github.com/orangekame3/qubex.git?subdirectory=packages%2Fqxsimulator&branch=fix%2Festimate_control_amp_response#fa8c6ac1c5022af0667c861d3349f4621a102966" }
+source = { git = "https://github.com/amachino/qubex.git?subdirectory=packages%2Fqxsimulator&branch=develop#fbdef9d7bf3e86c2b92ab4aa9723181d8b8c153f" }
 dependencies = [
     { name = "ipython", version = "8.37.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "ipython", version = "9.4.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
@@ -3759,7 +3759,7 @@ dependencies = [
 [[package]]
 name = "qxvisualizer"
 version = "1.5.0b4"
-source = { git = "https://github.com/orangekame3/qubex.git?subdirectory=packages%2Fqxvisualizer&branch=fix%2Festimate_control_amp_response#fa8c6ac1c5022af0667c861d3349f4621a102966" }
+source = { git = "https://github.com/amachino/qubex.git?subdirectory=packages%2Fqxvisualizer&branch=develop#fbdef9d7bf3e86c2b92ab4aa9723181d8b8c153f" }
 dependencies = [
     { name = "numpy" },
     { name = "plotly" },

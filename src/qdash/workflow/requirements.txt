@@ -558,28 +558,28 @@ qctrl-visualizer==8.0.2
     # via
     #   qubex
     #   qxsimulator
-qubex @ git+https://github.com/orangekame3/qubex.git@fa8c6ac1c5022af0667c861d3349f4621a102966
+qubex @ git+https://github.com/amachino/qubex.git@fbdef9d7bf3e86c2b92ab4aa9723181d8b8c153f
 quel-ic-config==0.10.7
     # via qxdriver-quel1
 qutip==5.2.0
     # via qxsimulator
-qxcore @ git+https://github.com/orangekame3/qubex.git@fa8c6ac1c5022af0667c861d3349f4621a102966#subdirectory=packages/qxcore
+qxcore @ git+https://github.com/amachino/qubex.git@fbdef9d7bf3e86c2b92ab4aa9723181d8b8c153f#subdirectory=packages/qxcore
     # via
     #   qubex
     #   qxschema
-qxdriver-quel1 @ git+https://github.com/orangekame3/qubex.git@fa8c6ac1c5022af0667c861d3349f4621a102966#subdirectory=packages/qxdriver-quel1
+qxdriver-quel1 @ git+https://github.com/amachino/qubex.git@fbdef9d7bf3e86c2b92ab4aa9723181d8b8c153f#subdirectory=packages/qxdriver-quel1
     # via qubex
-qxfitting @ git+https://github.com/orangekame3/qubex.git@fa8c6ac1c5022af0667c861d3349f4621a102966#subdirectory=packages/qxfitting
+qxfitting @ git+https://github.com/amachino/qubex.git@fbdef9d7bf3e86c2b92ab4aa9723181d8b8c153f#subdirectory=packages/qxfitting
     # via qubex
-qxpulse @ git+https://github.com/orangekame3/qubex.git@fa8c6ac1c5022af0667c861d3349f4621a102966#subdirectory=packages/qxpulse
+qxpulse @ git+https://github.com/amachino/qubex.git@fbdef9d7bf3e86c2b92ab4aa9723181d8b8c153f#subdirectory=packages/qxpulse
     # via
     #   qubex
     #   qxsimulator
-qxschema @ git+https://github.com/orangekame3/qubex.git@fa8c6ac1c5022af0667c861d3349f4621a102966#subdirectory=packages/qxschema
+qxschema @ git+https://github.com/amachino/qubex.git@fbdef9d7bf3e86c2b92ab4aa9723181d8b8c153f#subdirectory=packages/qxschema
     # via qubex
-qxsimulator @ git+https://github.com/orangekame3/qubex.git@fa8c6ac1c5022af0667c861d3349f4621a102966#subdirectory=packages/qxsimulator
+qxsimulator @ git+https://github.com/amachino/qubex.git@fbdef9d7bf3e86c2b92ab4aa9723181d8b8c153f#subdirectory=packages/qxsimulator
     # via qubex
-qxvisualizer @ git+https://github.com/orangekame3/qubex.git@fa8c6ac1c5022af0667c861d3349f4621a102966#subdirectory=packages/qxvisualizer
+qxvisualizer @ git+https://github.com/amachino/qubex.git@fbdef9d7bf3e86c2b92ab4aa9723181d8b8c153f#subdirectory=packages/qxvisualizer
     # via
     #   qubex
     #   qxpulse
