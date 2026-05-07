@@ -23,6 +23,7 @@ import { useMetricsUrlState, useRangeModeUrlState } from "@/hooks/useUrlState";
 import { dateToDateTimeLocal } from "@/lib/utils/datetime";
 
 import { DashboardCdfChart } from "./DashboardCdfChart";
+import { DashboardAiInsights } from "./DashboardAiInsights";
 import { DashboardCouplingGrid } from "./DashboardCouplingGrid";
 import { DashboardNotesSummary } from "./DashboardNotesSummary";
 import { DashboardQubitGrid } from "./DashboardQubitGrid";
@@ -380,6 +381,21 @@ export function DashboardPageContent() {
           />
         ) : (
           <>
+            {/* Chip-level operational insights */}
+            <Card
+              variant="default"
+              padding="md"
+              title="AI Insights"
+              description="High-signal operational patterns extracted from task triage and dashboard context."
+            >
+              <DashboardAiInsights
+                chipId={selectedChip}
+                selectionMode={selectionMode}
+                startAt={queryParams.start_at}
+                endAt={queryParams.end_at}
+              />
+            </Card>
+
             {/* All notes overview */}
             <Card
               variant="default"
