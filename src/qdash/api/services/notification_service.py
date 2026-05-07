@@ -194,6 +194,51 @@ class NotificationService:
                 dedupe_key=f"mention:note_event:{note_event_id}:{recipient}",
             )
 
+    def notify_forum_event(
+        self,
+        *,
+        project_id: str,
+        post_id: str,
+        root_post_id: str,
+        actor_username: str,
+        content: str,
+        title: str,
+        parent_author: str | None = None,
+    ) -> None:
+        """Create mention and reply notifications for a forum thread."""
+        target_url = f"/forum/{root_post_id}"
+        mentioned = self._active_project_recipients(
+            project_id, self.extract_mentions(content), actor_username
+        )
+
+        for recipient in mentioned:
+            self.create_notification(
+                project_id=project_id,
+                recipient_username=recipient,
+                actor_username=actor_username,
+                kind="forum_mention",
+                source_type="forum_post",
+                source_id=post_id,
+                target_url=target_url,
+                title=f"{actor_username} mentioned you in {title}",
+                excerpt=content,
+                dedupe_key=f"mention:forum_post:{post_id}:{recipient}",
+            )
+
+        if parent_author and parent_author != actor_username and parent_author not in mentioned:
+            self.create_notification(
+                project_id=project_id,
+                recipient_username=parent_author,
+                actor_username=actor_username,
+                kind="forum_reply",
+                source_type="forum_post",
+                source_id=post_id,
+                target_url=target_url,
+                title=f"{actor_username} replied to {title}",
+                excerpt=content,
+                dedupe_key=f"forum_reply:{post_id}:{parent_author}",
+            )
+
     def list_notifications(
         self,
         *,

@@ -195,7 +195,7 @@ const markdownComponents: Record<string, React.ComponentType<any>> = {
  * returned by the task-knowledge API.
  */
 function urlTransform(url: string): string {
-  if (url.startsWith("data:")) return url;
+  if (/^data:image\/(png|jpe?g|gif|webp);base64,/i.test(url)) return url;
   // Fall back to the built-in sanitisation for everything else.
   const colon = url.indexOf(":");
   const questionMark = url.indexOf("?");

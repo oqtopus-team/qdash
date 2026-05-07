@@ -8,8 +8,8 @@ from pydantic import ConfigDict, Field
 from pymongo import ASCENDING, DESCENDING, IndexModel
 from qdash.common.datetime_utils import now
 
-NotificationKind = Literal["mention", "issue_reply", "note_mention"]
-NotificationSourceType = Literal["issue", "note_event"]
+NotificationKind = Literal["mention", "issue_reply", "note_mention", "forum_mention", "forum_reply"]
+NotificationSourceType = Literal["issue", "note_event", "forum_post"]
 
 
 class NotificationDocument(Document):
@@ -18,8 +18,8 @@ class NotificationDocument(Document):
     project_id: str = Field(..., description="Owning project identifier")
     recipient_username: str = Field(..., description="User who should receive this notification")
     actor_username: str = Field(..., description="User who triggered this notification")
-    kind: str = Field(..., description="mention | issue_reply | note_mention")
-    source_type: str = Field(..., description="issue | note_event")
+    kind: str = Field(..., description="mention | issue_reply | note_mention | forum_*")
+    source_type: str = Field(..., description="issue | note_event | forum_post")
     source_id: str = Field(..., description="Source document identifier")
     target_url: str = Field(..., description="Frontend URL to open from the inbox")
     title: str = Field(..., description="Notification title")

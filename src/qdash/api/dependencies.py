@@ -23,6 +23,7 @@ from qdash.api.services.cryostat_service import CryostatService
 from qdash.api.services.device_topology_service import DeviceTopologyService
 from qdash.api.services.execution_service import ExecutionService
 from qdash.api.services.file_service import FileService
+from qdash.api.services.forum_service import ForumService
 from qdash.api.services.issue_knowledge_service import IssueKnowledgeService
 from qdash.api.services.issue_service import IssueService
 from qdash.api.services.manual_update_service import ManualUpdateService
@@ -279,6 +280,12 @@ def get_provenance_service() -> ProvenanceService:
 def get_issue_service() -> IssueService:
     """Get the issue service instance."""
     return IssueService(notification_service=get_notification_service())
+
+
+@lru_cache(maxsize=1)
+def get_forum_service() -> ForumService:
+    """Get the forum service instance."""
+    return ForumService(notification_service=get_notification_service())
 
 
 @lru_cache(maxsize=1)
