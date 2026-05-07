@@ -36,6 +36,8 @@ import type { ForumPostResponse } from "@/schemas";
 
 import { getForumCategory, toForumCategoryDefinition } from "./categories";
 
+const REPLY_PAGE_SIZE = 100;
+
 function isEdited(createdAt: string, updatedAt: string): boolean {
   return (
     Math.abs(new Date(updatedAt).getTime() - new Date(createdAt).getTime()) >
@@ -161,6 +163,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
   const [editRootContent, setEditRootContent] = useState("");
   const [editingReplyId, setEditingReplyId] = useState<string | null>(null);
   const [editReplyContent, setEditReplyContent] = useState("");
+  const [replyLimit, setReplyLimit] = useState(REPLY_PAGE_SIZE);
 
   const { data: postResponse, isLoading: postLoading } = useGetForumPost(
     postId,
@@ -168,7 +171,11 @@ export function ForumDetailPage({ postId }: { postId: string }) {
   );
   const post = postResponse?.data ?? null;
   const { data: repliesResponse, isLoading: repliesLoading } =
-    useGetForumPostReplies(postId, { query: { enabled: !!post } });
+    useGetForumPostReplies(
+      postId,
+      { skip: 0, limit: replyLimit },
+      { query: { enabled: !!post } },
+    );
   const replies = repliesResponse?.data ?? [];
   const { data: categoriesResponse } = useListForumCategories(undefined, {
     query: { staleTime: 60_000 },
@@ -376,21 +383,35 @@ export function ForumDetailPage({ postId }: { postId: string }) {
             <span className="loading loading-spinner loading-sm" />
           </div>
         ) : replies.length > 0 ? (
-          replies.map((reply) => (
-            <PostBody
-              key={reply.id}
-              post={reply}
-              currentUsername={currentUsername}
-              onEdit={() => handleStartEditReply(reply)}
-              onDelete={() => handleDelete(reply.id, false)}
-              editing={editingReplyId === reply.id}
-              editContent={editReplyContent}
-              onContentChange={setEditReplyContent}
-              onCancel={() => setEditingReplyId(null)}
-              onSave={handleSaveReply}
-              saving={updateMutation.isPending}
-            />
-          ))
+          <>
+            {replies.map((reply) => (
+              <PostBody
+                key={reply.id}
+                post={reply}
+                currentUsername={currentUsername}
+                onEdit={() => handleStartEditReply(reply)}
+                onDelete={() => handleDelete(reply.id, false)}
+                editing={editingReplyId === reply.id}
+                editContent={editReplyContent}
+                onContentChange={setEditReplyContent}
+                onCancel={() => setEditingReplyId(null)}
+                onSave={handleSaveReply}
+                saving={updateMutation.isPending}
+              />
+            ))}
+            {replies.length >= replyLimit && (
+              <div className="flex justify-center py-2">
+                <button
+                  className="btn btn-ghost btn-sm"
+                  onClick={() =>
+                    setReplyLimit((current) => current + REPLY_PAGE_SIZE)
+                  }
+                >
+                  Load more
+                </button>
+              </div>
+            )}
+          </>
         ) : (
           <p className="py-2 text-xs text-base-content/40">No replies yet</p>
         )}

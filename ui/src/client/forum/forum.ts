@@ -28,6 +28,7 @@ import type {
   ForumPostCreate,
   ForumPostResponse,
   ForumPostUpdate,
+  GetForumPostRepliesParams,
   HTTPValidationError,
   ListForumCategoriesParams,
   ListForumCategoriesResponse,
@@ -1021,17 +1022,24 @@ export const useDeleteForumPost = <
  */
 export const getForumPostReplies = (
   postId: string,
+  params?: GetForumPostRepliesParams,
   options?: SecondParameter<typeof customInstance>,
   signal?: AbortSignal,
 ) => {
   return customInstance<ForumPostResponse[]>(
-    { url: `/forum/posts/${postId}/replies`, method: "GET", signal },
+    { url: `/forum/posts/${postId}/replies`, method: "GET", params, signal },
     options,
   );
 };
 
-export const getGetForumPostRepliesQueryKey = (postId?: string) => {
-  return [`/forum/posts/${postId}/replies`] as const;
+export const getGetForumPostRepliesQueryKey = (
+  postId?: string,
+  params?: GetForumPostRepliesParams,
+) => {
+  return [
+    `/forum/posts/${postId}/replies`,
+    ...(params ? [params] : []),
+  ] as const;
 };
 
 export const getGetForumPostRepliesQueryOptions = <
@@ -1039,6 +1047,7 @@ export const getGetForumPostRepliesQueryOptions = <
   TError = HTTPValidationError,
 >(
   postId: string,
+  params?: GetForumPostRepliesParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -1053,11 +1062,12 @@ export const getGetForumPostRepliesQueryOptions = <
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
   const queryKey =
-    queryOptions?.queryKey ?? getGetForumPostRepliesQueryKey(postId);
+    queryOptions?.queryKey ?? getGetForumPostRepliesQueryKey(postId, params);
 
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof getForumPostReplies>>
-  > = ({ signal }) => getForumPostReplies(postId, requestOptions, signal);
+  > = ({ signal }) =>
+    getForumPostReplies(postId, params, requestOptions, signal);
 
   return {
     queryKey,
@@ -1081,6 +1091,7 @@ export function useGetForumPostReplies<
   TError = HTTPValidationError,
 >(
   postId: string,
+  params: undefined | GetForumPostRepliesParams,
   options: {
     query: Partial<
       UseQueryOptions<
@@ -1108,6 +1119,7 @@ export function useGetForumPostReplies<
   TError = HTTPValidationError,
 >(
   postId: string,
+  params?: GetForumPostRepliesParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -1133,6 +1145,7 @@ export function useGetForumPostReplies<
   TError = HTTPValidationError,
 >(
   postId: string,
+  params?: GetForumPostRepliesParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -1154,6 +1167,7 @@ export function useGetForumPostReplies<
   TError = HTTPValidationError,
 >(
   postId: string,
+  params?: GetForumPostRepliesParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -1166,7 +1180,11 @@ export function useGetForumPostReplies<
   },
   queryClient?: QueryClient,
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
-  const queryOptions = getGetForumPostRepliesQueryOptions(postId, options);
+  const queryOptions = getGetForumPostRepliesQueryOptions(
+    postId,
+    params,
+    options,
+  );
 
   const query = useQuery(queryOptions, queryClient) as UseQueryResult<
     TData,

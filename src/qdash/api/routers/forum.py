@@ -197,9 +197,11 @@ def get_forum_post_replies(
     post_id: str,
     ctx: Annotated[ProjectContext, Depends(get_project_context)],
     service: Annotated[ForumService, Depends(get_forum_service)],
+    skip: Annotated[int, Query(ge=0, description="Number of replies to skip")] = 0,
+    limit: Annotated[int, Query(ge=1, le=200, description="Max replies to return")] = 100,
 ) -> list[ForumPostResponse]:
     """List replies for a forum thread."""
-    return service.get_replies(project_id=ctx.project_id, post_id=post_id)
+    return service.get_replies(project_id=ctx.project_id, post_id=post_id, skip=skip, limit=limit)
 
 
 @router.patch(
@@ -240,6 +242,7 @@ def delete_forum_post(
         project_id=ctx.project_id,
         post_id=post_id,
         username=ctx.user.username,
+        role=ctx.role,
     )
 
 

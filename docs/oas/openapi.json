@@ -6043,6 +6043,33 @@
             }
           },
           {
+            "name": "skip",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Number of replies to skip",
+              "default": 0,
+              "title": "Skip"
+            },
+            "description": "Number of replies to skip"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "description": "Max replies to return",
+              "default": 100,
+              "title": "Limit"
+            },
+            "description": "Max replies to return"
+          },
+          {
             "name": "X-Project-Id",
             "in": "header",
             "required": false,

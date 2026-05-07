@@ -185,6 +185,50 @@ def test_delete_root_thread_archives_replies_from_normal_listing(test_client, in
     assert replies.json() == []
 
 
+def test_owner_can_delete_member_forum_thread(test_client, init_db):
+    """Project owners can moderate another member's forum thread."""
+    _create_user("owner", "owner_token", ProjectRole.OWNER)
+    _create_user("member", "member_token", ProjectRole.VIEWER)
+    ProjectDocument(
+        project_id="test_project",
+        name="Test Project",
+        owner_username="owner",
+    ).insert()
+
+    root = _create_post(test_client, _headers("member_token"))
+    root_id = root.json()["id"]
+
+    response = test_client.delete(f"/forum/posts/{root_id}", headers=_headers("owner_token"))
+
+    assert response.status_code == 200
+    assert (
+        test_client.get(f"/forum/posts/{root_id}", headers=_headers("owner_token")).status_code
+        == 404
+    )
+
+
+def test_get_forum_replies_is_paginated(test_client, init_db):
+    """Reply listing accepts skip and limit parameters."""
+    _create_user("owner", "owner_token", ProjectRole.OWNER)
+    ProjectDocument(
+        project_id="test_project",
+        name="Test Project",
+        owner_username="owner",
+    ).insert()
+    headers = _headers("owner_token")
+    root = _create_post(test_client, headers)
+    root_id = root.json()["id"]
+    for index in range(3):
+        _create_post(test_client, headers, title=None, content=f"Reply {index}", parent_id=root_id)
+
+    response = test_client.get(f"/forum/posts/{root_id}/replies?skip=1&limit=1", headers=headers)
+
+    assert response.status_code == 200
+    replies = response.json()
+    assert len(replies) == 1
+    assert replies[0]["content"] == "Reply 1"
+
+
 def test_reply_creates_forum_reply_notification(test_client, init_db):
     """Replying to another user's thread creates an in-app notification."""
     _create_user("owner", "owner_token", ProjectRole.OWNER)

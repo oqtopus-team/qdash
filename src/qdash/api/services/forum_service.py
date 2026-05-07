@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import re
 from typing import TYPE_CHECKING
 
@@ -66,6 +67,7 @@ DEFAULT_FORUM_CATEGORIES = [
 ]
 
 CATEGORY_KEY_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
+logger = logging.getLogger(__name__)
 
 
 class ForumService:
@@ -328,7 +330,9 @@ class ForumService:
 
         return self._to_response(doc, reply_count=reply_count)
 
-    def get_replies(self, *, project_id: str, post_id: str) -> list[ForumPostResponse]:
+    def get_replies(
+        self, *, project_id: str, post_id: str, skip: int = 0, limit: int = 100
+    ) -> list[ForumPostResponse]:
         """List replies for a forum thread."""
         root_doc = ForumPostDocument.find_one(
             {
@@ -346,6 +350,8 @@ class ForumService:
                 {"project_id": project_id, "parent_id": post_id, "is_deleted": False}
             )
             .sort("system_info.created_at")
+            .skip(skip)
+            .limit(limit)
             .to_list()
         )
         return [self._to_response(doc) for doc in docs]
@@ -392,15 +398,18 @@ class ForumService:
         if self._notifications:
             root_post = root_doc or doc
             parent_author = root_doc.username if root_doc else None
-            self._notifications.notify_forum_event(
-                project_id=project_id,
-                post_id=str(doc.id),
-                root_post_id=str(root_post.id),
-                actor_username=username,
-                content=content,
-                title=root_post.title or "Forum thread",
-                parent_author=parent_author,
-            )
+            try:
+                self._notifications.notify_forum_event(
+                    project_id=project_id,
+                    post_id=str(doc.id),
+                    root_post_id=str(root_post.id),
+                    actor_username=username,
+                    content=content,
+                    title=root_post.title or "Forum thread",
+                    parent_author=parent_author,
+                )
+            except Exception:
+                logger.exception("Failed to create forum notifications for post %s", doc.id)
 
         return self._to_response(doc)
 
@@ -438,26 +447,38 @@ class ForumService:
                 if root_doc:
                     root_post_id = str(root_doc.id)
                     root_title = root_doc.title
-            self._notifications.notify_forum_event(
-                project_id=project_id,
-                post_id=str(doc.id),
-                root_post_id=root_post_id,
-                actor_username=username,
-                content=content,
-                title=root_title or "Forum thread",
-            )
+            try:
+                self._notifications.notify_forum_event(
+                    project_id=project_id,
+                    post_id=str(doc.id),
+                    root_post_id=root_post_id,
+                    actor_username=username,
+                    content=content,
+                    title=root_title or "Forum thread",
+                )
+            except Exception:
+                logger.exception("Failed to create forum notifications for post %s", doc.id)
 
         return self._to_response(doc)
 
-    def delete_post(self, *, project_id: str, post_id: str, username: str) -> SuccessResponse:
+    def delete_post(
+        self,
+        *,
+        project_id: str,
+        post_id: str,
+        username: str,
+        role: ProjectRole | None,
+    ) -> SuccessResponse:
         """Delete a forum post."""
         doc = ForumPostDocument.find_one(
             {"_id": ObjectId(post_id), "project_id": project_id, "is_deleted": False}
         ).run()
         if doc is None:
             raise HTTPException(status_code=404, detail="Forum post not found")
-        if doc.username != username:
-            raise HTTPException(status_code=403, detail="You can only delete your own posts")
+        if doc.username != username and role != ProjectRole.OWNER:
+            raise HTTPException(
+                status_code=403, detail="Only the author or project owner can delete this post"
+            )
 
         doc.is_deleted = True
         doc.system_info.update_time()

@@ -180,6 +180,7 @@ export * from "./getFileContentParams";
 export * from "./getFlowResponse";
 export * from "./getFlowResponseDefaultParameters";
 export * from "./getFlowResponseDefaultRunParameters";
+export * from "./getForumPostRepliesParams";
 export * from "./getGitStatus200";
 export * from "./getHistoricalCouplingTaskResultsParams";
 export * from "./getHistoricalQubitTaskResultsParams";
