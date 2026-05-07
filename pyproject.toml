@@ -185,7 +185,7 @@ api = [
     "prefect-client"
 ]
 workflow = [
-   "prefect",
+    "prefect[dask]>=3,<4",
    "pymongo==4.8.0",
     "bunnet==1.3.0",
     "slack-sdk==3.36.0",
@@ -200,7 +200,6 @@ workflow = [
     "ruamel.yaml>=0.18.0",
     "pydantic",
     "pydantic-settings",
-    "prefect-dask",
     "openai",
     "fastapi",
     "uvicorn[standard]"
