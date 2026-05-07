@@ -12,10 +12,8 @@ import {
 
 import type { ForumCategoryResponse } from "@/schemas";
 
-export type ForumCategoryId = string;
-
 export type ForumCategoryDefinition = {
-  id: ForumCategoryId;
+  id: string;
   label: string;
   shortLabel: string;
   description: string;
@@ -93,7 +91,7 @@ export function toForumCategoryDefinition(
 }
 
 export function getForumCategory(
-  category: ForumCategoryId,
+  category: string,
   categories: ForumCategoryDefinition[] = DEFAULT_FORUM_CATEGORIES,
 ) {
   return (
