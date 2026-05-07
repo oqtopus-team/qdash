@@ -1,6 +1,6 @@
 # Authentication and User Management
 
-QDash uses JWT-based authentication with a two-tier role system: system roles (admin/user) and project roles (owner/viewer). Only administrators can create new user accounts.
+QDash uses JWT-based authentication with a two-tier role system: system roles (admin/user) and project roles (owner/editor/viewer). Only administrators can create new user accounts.
 
 ## System Roles
 

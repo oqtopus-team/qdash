@@ -1,5 +1,5 @@
-import { NotificationsInboxPageContent } from "@/components/features/inbox/NotificationsInboxPageContent";
+import { redirect } from "next/navigation";
 
-export default function InboxPage() {
-  return <NotificationsInboxPageContent />;
+export default function LegacyInboxRedirectPage() {
+  redirect("/notifications");
 }
