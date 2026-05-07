@@ -155,8 +155,8 @@ exclude_lines = [
 
 [dependency-groups]
 api = [
-    "fastapi==0.111.1",
-    "uvicorn[standard]==0.34.0",
+    "fastapi",
+    "uvicorn[standard]",
     "gunicorn==22.0.0",
     "python-dotenv==1.0.1",
     "pymongo==4.8.0",
@@ -182,6 +182,7 @@ api = [
     "croniter>=6.0.0",  # For cron schedule parsing
     "python-json-logger>=3.3.0",  # For structured JSON logging
     "openai>=1.0.0",  # For copilot agent (LLM chat/analysis)
+    "prefect-client"
 ]
 workflow = [
     "pymongo==4.8.0",
@@ -196,6 +197,13 @@ workflow = [
     "gitpython>=3.1.44",
     "reportlab>=4.4.1",
     "ruamel.yaml>=0.18.0",
+    "pydantic",
+    "pydantic-settings",
+    "prefect-dask",
+    "openai",
+    "fastapi",
+    "uvicorn[standard]"
+
     ]
 dev = [
     "ruff==0.5.5",
