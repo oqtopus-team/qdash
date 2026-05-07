@@ -24,13 +24,16 @@ from __future__ import annotations
 
 import logging
 import traceback
+from importlib import import_module
 from typing import TYPE_CHECKING, Any
 
 from prefect import flow, get_run_logger, task
 
 # DaskTaskRunner is optional - only needed for multiprocess parallel execution
+DaskTaskRunner: Any
 try:
-    from prefect_dask import DaskTaskRunner
+    prefect_dask: Any = import_module("prefect_dask")
+    DaskTaskRunner = prefect_dask.DaskTaskRunner
 
     _DASK_AVAILABLE = True
 except ImportError:

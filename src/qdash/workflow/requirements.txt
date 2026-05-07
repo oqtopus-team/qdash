@@ -6,50 +6,104 @@ absl-py==2.3.1
     #   optax
 aiocoap==0.4.14
     # via quel-ic-config
+aiosqlite==0.22.1
+    # via prefect
+alembic==1.18.4
+    # via prefect
+amplitude-analytics==1.2.3
+    # via prefect
 annotated-doc==0.0.4
     # via typer
 annotated-types==0.7.0
     # via pydantic
+anyio==4.8.0
+    # via
+    #   httpx
+    #   openai
+    #   prefect
+    #   starlette
+    #   watchfiles
 anywidget==0.9.21
     # via qubex
 appnope==0.1.4 ; sys_platform == 'darwin'
     # via ipykernel
+apprise==1.10.0
+    # via prefect
+asgi-lifespan==2.1.0
+    # via prefect
 asttokens==3.0.0
     # via stack-data
+async-timeout==5.0.1 ; python_full_version < '3.11.3'
+    # via
+    #   asyncpg
+    #   redis
+asyncpg==0.31.0
+    # via prefect
 atpublic==7.0.0
     # via flufl-lock
 attrs==24.3.0
     # via
+    #   cyclopts
     #   jsonschema
     #   referencing
     #   typedunits
+beartype==0.22.9
+    # via py-key-value-aio
 bunnet==1.3.0
     # via qdash
+burner-redis==0.1.6
+    # via pydocket
+cachetools==7.1.1
+    # via
+    #   prefect
+    #   py-key-value-aio
 certifi==2025.1.31
-    # via netcdf4
-cffi==1.17.1
+    # via
+    #   apprise
+    #   httpcore
+    #   httpx
+    #   netcdf4
+    #   requests
+cffi==2.0.0
     # via
     #   clarabel
+    #   cryptography
     #   pyzmq
 cftime==1.6.5
     # via netcdf4
 charset-normalizer==3.4.1
-    # via reportlab
+    # via
+    #   reportlab
+    #   requests
 chex==0.1.90
     # via optax
 clarabel==0.11.1
     # via cvxpy
-click==8.3.1
+click==8.1.8
     # via
+    #   apprise
     #   bunnet
+    #   dask
+    #   distributed
+    #   prefect
+    #   rich-toolkit
     #   typer
+    #   uvicorn
+cloudpickle==3.1.2
+    # via
+    #   dask
+    #   distributed
+    #   prefect
+    #   pydocket
 cma==4.3.0
     # via qubex
-colorama==0.4.6 ; sys_platform == 'win32'
+colorama==0.4.6
     # via
     #   click
+    #   griffecli
     #   ipython
     #   tqdm
+    #   uvicorn
 comm==0.2.3
     # via
     #   ipykernel
@@ -58,24 +112,59 @@ contourpy==1.3.2 ; python_full_version < '3.11'
     # via matplotlib
 contourpy==1.3.3 ; python_full_version >= '3.11'
     # via matplotlib
+coolname==5.0.0
+    # via prefect
+cronsim==2.7
+    # via pydocket
+cryptography==48.0.0
+    # via prefect
 cvxpy==1.7.1
     # via qubex
 cycler==0.12.1
     # via matplotlib
+cyclopts==4.11.2
+    # via prefect
 cython==3.2.4
     # via typedunits
+dask==2026.3.0
+    # via distributed
+dateparser==1.4.0
+    # via prefect
 debugpy==1.8.16
     # via ipykernel
 decorator==5.2.1
     # via ipython
+distributed==2026.3.0
+    # via prefect-dask
+distro==1.9.0
+    # via openai
 dnspython==2.7.0
-    # via pymongo
+    # via
+    #   email-validator
+    #   pymongo
+docker==7.1.0
+    # via prefect
+docstring-parser==0.18.0
+    # via cyclopts
+docutils==0.22.4
+    # via rich-rst
 e7awghal==0.1.5
     # via quel-ic-config
-exceptiongroup==1.2.2 ; python_full_version < '3.11'
-    # via ipython
+email-validator==2.2.0
+    # via fastapi
+exceptiongroup==1.2.2
+    # via
+    #   anyio
+    #   ipython
+    #   prefect
+    #   pydocket
+    #   taskgroup
 executing==2.2.0
     # via stack-data
+fastapi==0.111.1
+    # via prefect
+fastapi-cli==0.0.7
+    # via fastapi
 fastjsonschema==2.21.1
     # via nbformat
 filelock==3.17.0
@@ -83,9 +172,60 @@ flufl-lock==8.1.0
     # via quel-ic-config
 fonttools==4.59.0
     # via matplotlib
+fsspec==2026.4.0
+    # via
+    #   dask
+    #   prefect
 gitdb==4.0.12
     # via gitpython
 gitpython==3.1.45
+graphviz==0.21
+    # via prefect
+greenlet==3.5.0
+    # via sqlalchemy
+griffe==2.0.2
+    # via prefect
+griffecli==2.0.2
+    # via griffe
+griffelib==2.0.2
+    # via
+    #   griffe
+    #   griffecli
+h11==0.14.0
+    # via
+    #   httpcore
+    #   uvicorn
+h2==4.3.0
+    # via httpx
+hpack==4.1.0
+    # via h2
+httpcore==1.0.7
+    # via
+    #   httpx
+    #   prefect
+httptools==0.6.4
+    # via uvicorn
+httpx==0.27.2
+    # via
+    #   fastapi
+    #   openai
+    #   prefect
+humanize==4.15.0
+    # via
+    #   jinja2-humanize-extension
+    #   prefect
+hyperframe==6.1.0
+    # via h2
+idna==3.10
+    # via
+    #   anyio
+    #   email-validator
+    #   httpx
+    #   requests
+importlib-metadata==8.7.1
+    # via
+    #   dask
+    #   opentelemetry-api
 ipykernel==6.30.1
     # via qubex
 ipython==8.37.0 ; python_full_version < '3.11'
@@ -127,15 +267,30 @@ jaxlib==0.7.0 ; python_full_version >= '3.11'
 jedi==0.19.2
     # via ipython
 jinja2==3.1.6
-    # via osqp
+    # via
+    #   distributed
+    #   fastapi
+    #   jinja2-humanize-extension
+    #   osqp
+    #   prefect
+jinja2-humanize-extension==0.4.0
+    # via prefect
+jiter==0.13.0
+    # via openai
 joblib==1.5.1
     # via
     #   osqp
     #   scikit-learn
+jsonpatch==1.33
+    # via prefect
 jsonpickle==3.4.2
     # via qubex
+jsonpointer==3.1.1
+    # via jsonpatch
 jsonschema==4.23.0
-    # via nbformat
+    # via
+    #   nbformat
+    #   prefect
 jsonschema-specifications==2024.10.1
     # via jsonschema
 jupyter-client==8.6.3
@@ -153,10 +308,20 @@ kiwisolver==1.4.8
     # via matplotlib
 lazy-model==0.2.0
     # via bunnet
+locket==1.0.0
+    # via
+    #   distributed
+    #   partd
+mako==1.3.12
+    # via alembic
+markdown==3.10.2
+    # via apprise
 markdown-it-py==3.0.0
     # via rich
 markupsafe==3.0.2
-    # via jinja2
+    # via
+    #   jinja2
+    #   mako
 matplotlib==3.8.0
     # via
     #   qctrl-visualizer
@@ -173,6 +338,8 @@ ml-dtypes==0.5.3
     #   jaxlib
 mpmath==1.3.0
     # via sympy
+msgpack==1.1.2
+    # via distributed
 nbformat==5.10.4
     # via qubex
 nest-asyncio==1.6.0
@@ -219,25 +386,43 @@ numpy==1.26.0
     #   scipy
     #   scs
     #   typedunits
+oauthlib==3.3.1
+    # via requests-oauthlib
+openai==2.21.0
+opentelemetry-api==1.41.1
+    # via
+    #   prefect
+    #   pydocket
 opt-einsum==3.4.0
     # via jax
 optax==0.2.5
     # via qxsimulator
+orjson==3.11.9
+    # via prefect
 osqp==1.0.4
     # via cvxpy
 packaging==24.2
     # via
+    #   dask
+    #   distributed
     #   ipykernel
     #   matplotlib
     #   plotly
+    #   prefect
     #   quel-ic-config
     #   qutip
 pandas==2.2.3
     # via quel-ic-config
 parso==0.8.4
     # via jedi
+partd==1.4.2
+    # via dask
+pathspec==1.1.1
+    # via prefect
 pendulum==3.1.0
-    # via qdash
+    # via
+    #   prefect
+    #   qdash
 pexpect==4.9.0 ; sys_platform != 'emscripten' and sys_platform != 'win32'
     # via ipython
 pillow==11.3.0
@@ -253,8 +438,18 @@ plotly==5.24.1
     #   qxpulse
     #   qxsimulator
     #   qxvisualizer
+pluggy==1.6.0
+    # via prefect
 polars==1.9.0
     # via quel-ic-config
+prefect==3.7.0
+    # via prefect-dask
+prefect-dask==0.3.6
+    # via prefect
+prometheus-client==0.25.0
+    # via
+    #   prefect
+    #   pydocket
 prompt-toolkit==3.0.51
     # via ipython
 protobuf==7.34.1
@@ -263,6 +458,7 @@ protobuf==7.34.1
     #   typedunits
 psutil==7.0.0
     # via
+    #   distributed
     #   flufl-lock
     #   ipykernel
 psygnal==0.15.1
@@ -271,20 +467,35 @@ ptyprocess==0.7.0 ; sys_platform != 'emscripten' and sys_platform != 'win32'
     # via pexpect
 pure-eval==0.2.3
     # via stack-data
+py-key-value-aio==0.4.4
+    # via pydocket
 pybind11-stubgen==2.5.5
     # via quel-ic-config
-pycparser==2.22
+pycparser==2.22 ; implementation_name != 'PyPy'
     # via cffi
-pydantic==2.4.2
+pydantic==2.13.4
     # via
     #   bunnet
     #   e7awghal
+    #   fastapi
     #   lazy-model
+    #   openai
+    #   prefect
+    #   pydantic-extra-types
+    #   pydantic-settings
     #   qubex
     #   quel-ic-config
     #   qxcore
-pydantic-core==2.10.1
-    # via pydantic
+pydantic-core==2.46.4
+    # via
+    #   prefect
+    #   pydantic
+pydantic-extra-types==2.11.1
+    # via prefect
+pydantic-settings==2.14.0
+    # via prefect
+pydocket==0.20.1
+    # via prefect
 pygments==2.19.1
     # via
     #   ipython
@@ -302,22 +513,43 @@ pyserial==3.5
     # via qubex
 python-dateutil==2.9.0.post0
     # via
+    #   dateparser
     #   jupyter-client
     #   matplotlib
     #   pandas
     #   pendulum
+    #   prefect
 python-dotenv==1.0.1
+    # via
+    #   pydantic-settings
+    #   uvicorn
+python-json-logger==3.3.0
+    # via pydocket
+python-multipart==0.0.20
+    # via fastapi
+python-slugify==8.0.4
+    # via prefect
 python-ulid==2.7.0
     # via quel-ic-config
 pytz==2025.2
-    # via pandas
-pywin32==308 ; platform_python_implementation != 'PyPy' and sys_platform == 'win32'
-    # via jupyter-core
+    # via
+    #   dateparser
+    #   pandas
+    #   prefect
+pywin32==308 ; sys_platform == 'win32'
+    # via
+    #   docker
+    #   jupyter-core
 pyyaml==6.0.1
     # via
+    #   apprise
+    #   dask
+    #   distributed
+    #   prefect
     #   qubex
     #   quel-ic-config
     #   qxdriver-quel1
+    #   uvicorn
 pyzmq==27.0.1
     # via
     #   ipykernel
@@ -352,22 +584,51 @@ qxvisualizer @ git+https://github.com/orangekame3/qubex.git@fa8c6ac1c5022af0667c
     #   qubex
     #   qxpulse
     #   qxsimulator
+readchar==4.2.2
+    # via prefect
+redis==7.4.0
+    # via
+    #   py-key-value-aio
+    #   pydocket
 referencing==0.36.2
     # via
     #   jsonschema
     #   jsonschema-specifications
+regex==2026.4.4
+    # via dateparser
 reportlab==4.4.3
+requests==2.33.1
+    # via
+    #   apprise
+    #   docker
+    #   requests-oauthlib
+requests-oauthlib==2.0.0
+    # via apprise
+rfc3339-validator==0.1.4
+    # via prefect
 rich==13.9.4
     # via
+    #   cyclopts
+    #   prefect
+    #   pydocket
     #   qubex
+    #   rich-rst
+    #   rich-toolkit
     #   typer
+rich-rst==1.3.2
+    # via cyclopts
+rich-toolkit==0.13.2
+    # via fastapi-cli
 rpds-py==0.23.1
     # via
     #   jsonschema
     #   referencing
 ruamel-yaml==0.18.17
+    # via prefect
 ruamel-yaml-clib==0.2.15 ; platform_python_implementation == 'CPython'
-    # via ruamel-yaml
+    # via
+    #   prefect
+    #   ruamel-yaml
 scikit-learn==1.7.1
     # via qubex
 scipy==1.13.1
@@ -387,6 +648,8 @@ scipy==1.13.1
     #   scs
 scs==3.2.7.post2
     # via cvxpy
+semver==3.0.4
+    # via prefect
 setuptools==80.9.0
     # via
     #   chex
@@ -394,28 +657,63 @@ setuptools==80.9.0
 shellingham==1.5.4
     # via typer
 six==1.17.0
-    # via python-dateutil
+    # via
+    #   python-dateutil
+    #   rfc3339-validator
 slack-sdk==3.36.0
 smmap==5.0.2
     # via gitdb
+sniffio==1.3.1
+    # via
+    #   anyio
+    #   asgi-lifespan
+    #   httpx
+    #   openai
+    #   prefect
+sortedcontainers==2.4.0
+    # via distributed
+sqlalchemy==2.0.49
+    # via
+    #   alembic
+    #   prefect
 stack-data==0.6.3
     # via ipython
+starlette==0.37.2
+    # via fastapi
 sympy==1.14.0
     # via qxcore
+taskgroup==0.2.2 ; python_full_version < '3.11'
+    # via pydocket
+tblib==3.2.2
+    # via distributed
 tenacity==9.1.2
     # via plotly
+text-unidecode==1.3
+    # via python-slugify
 threadpoolctl==3.6.0
     # via scikit-learn
 toml==0.10.2
-    # via bunnet
+    # via
+    #   bunnet
+    #   prefect
+tomli==2.2.1 ; python_full_version < '3.11'
+    # via
+    #   alembic
+    #   cyclopts
 toolz==1.0.0
-    # via chex
+    # via
+    #   chex
+    #   dask
+    #   distributed
+    #   partd
 tornado==6.5.2
     # via
+    #   distributed
     #   ipykernel
     #   jupyter-client
 tqdm==4.66.5
     # via
+    #   openai
     #   qubex
     #   qxdriver-quel1
 traitlets==5.14.3
@@ -431,26 +729,78 @@ typedunits==0.0.1
     # via
     #   qubex
     #   qxcore
-typer==0.24.1
-    # via quel-ic-config
+typer==0.23.1
+    # via
+    #   fastapi-cli
+    #   pydocket
+    #   quel-ic-config
 typing-extensions==4.15.0
     # via
+    #   alembic
+    #   anyio
     #   anywidget
     #   bunnet
     #   chex
+    #   cryptography
+    #   cyclopts
+    #   fastapi
     #   ipython
+    #   openai
+    #   opentelemetry-api
+    #   prefect
+    #   py-key-value-aio
     #   pydantic
     #   pydantic-core
+    #   pydantic-extra-types
+    #   pydocket
     #   qubex
     #   qxcore
     #   qxpulse
     #   referencing
     #   rich
+    #   rich-toolkit
+    #   sqlalchemy
+    #   taskgroup
+    #   typing-inspection
+    #   uvicorn
+typing-inspection==0.4.2
+    # via
+    #   pydantic
+    #   pydantic-settings
 tzdata==2025.2
     # via
+    #   apprise
     #   pandas
     #   pendulum
+    #   pydocket
+    #   tzlocal
+tzlocal==5.3.1
+    # via dateparser
+uncalled-for==0.3.2
+    # via pydocket
+urllib3==2.3.0
+    # via
+    #   distributed
+    #   docker
+    #   requests
+uvicorn==0.34.0
+    # via
+    #   fastapi
+    #   fastapi-cli
+    #   prefect
+uvloop==0.21.0 ; platform_python_implementation != 'PyPy' and sys_platform != 'cygwin' and sys_platform != 'win32'
+    # via uvicorn
+watchfiles==1.0.4
+    # via uvicorn
 wcwidth==0.2.13
     # via prompt-toolkit
+websockets==16.0
+    # via
+    #   prefect
+    #   uvicorn
 widgetsnbextension==4.0.14
     # via ipywidgets
+zict==3.0.0
+    # via distributed
+zipp==3.23.1
+    # via importlib-metadata

@@ -10,7 +10,7 @@ import os
 import uuid as uuid_module
 from logging import getLogger
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from fastapi import FastAPI, HTTPException
 from prefect.client.orchestration import get_client
@@ -105,8 +105,9 @@ async def register_deployment(request: RegisterDeploymentRequest) -> RegisterDep
         if request.old_deployment_id:
             try:
                 logger.info(f"Attempting to delete old deployment: {request.old_deployment_id}")
+                old_deployment_id = cast(uuid_module.UUID, request.old_deployment_id)
                 async with get_client() as client:
-                    await client.delete_deployment(request.old_deployment_id)
+                    await client.delete_deployment(old_deployment_id)
                     logger.info(f"Deleted old deployment: {request.old_deployment_id}")
             except Exception as e:
                 logger.warning(
@@ -239,9 +240,10 @@ async def set_schedule(request: SetScheduleRequest) -> SetScheduleResponse:
                     logger.info(f"Deleted existing schedule: {existing.id}")
 
                 # Create new schedule
+                schedules: list[tuple[Any, bool]] = [(cron_schedule, request.active)]
                 await client.create_deployment_schedules(
                     deployment_id,
-                    [(cron_schedule, request.active)],
+                    schedules,
                 )
                 logger.info("Successfully created deployment schedule")
 
@@ -306,8 +308,9 @@ async def create_scheduled_run(request: CreateScheduledRunRequest) -> CreateSche
 
         async with get_client() as client:
             try:
+                deployment_id = cast(uuid_module.UUID, request.deployment_id)
                 flow_run = await client.create_flow_run_from_deployment(
-                    deployment_id=request.deployment_id,
+                    deployment_id=deployment_id,
                     state=Scheduled(scheduled_time=scheduled_time),
                     parameters=request.parameters or {},
                 )

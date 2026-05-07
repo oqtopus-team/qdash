@@ -1,4 +1,4 @@
-FROM prefecthq/prefect:3-python3.11 AS builder
+FROM python:3.11-slim-bookworm AS builder
 
 WORKDIR /app
 
@@ -12,6 +12,7 @@ RUN apt-get update \
     libcairo2-dev \
     cmake \
     wget \
+    git \
     libgirepository1.0-dev \
     gobject-introspection \
     gir1.2-gtk-3.0 \
@@ -26,17 +27,22 @@ COPY ./src/qdash/workflow/requirements.txt ./
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 ENV UV_HTTP_TIMEOUT=300
 RUN uv pip install --system --no-cache-dir -r requirements.txt
-## for update pydantic ignoring quel-ic-config dependency
-RUN uv pip install --upgrade --system --no-cache-dir pydantic
-RUN uv pip install --upgrade --system --no-cache-dir pydantic-settings
-## for multiprocess parallel execution (install after pydantic upgrade)
-RUN uv pip install --system --no-cache-dir prefect-dask>=0.3.0
-## for automatic AI triage using the OpenAI-compatible Copilot client
-RUN uv pip install --system --no-cache-dir "openai>=1.75.0"
 
-FROM prefecthq/prefect:3-python3.11
+FROM python:3.11-slim-bookworm
 
 WORKDIR /app
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+    libhdf5-dev \
+    tzdata \
+    curl \
+    libcairo2 \
+    libgirepository-1.0-1 \
+    gir1.2-gtk-3.0 \
+    git \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
 ENV TZ=Asia/Tokyo
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
