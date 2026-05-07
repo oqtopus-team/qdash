@@ -83,7 +83,7 @@ function NotificationRow({
   );
 }
 
-export function NotificationsInboxPageContent() {
+export function NotificationsPageContent() {
   const { data, isLoading, error } = useNotifications(false);
   const { markRead, markAllRead } = useNotificationActions();
   const notifications = data?.data.notifications ?? [];
@@ -98,8 +98,8 @@ export function NotificationsInboxPageContent() {
   return (
     <PageContainer>
       <PageHeader
-        title="Inbox"
-        description="Mentions, replies, and notifications that need your attention"
+        title="Notifications"
+        description="Mentions, replies, and app notifications that need your attention"
       />
 
       <div className="mb-4 flex items-center justify-between gap-3">
@@ -133,7 +133,7 @@ export function NotificationsInboxPageContent() {
         ) : notifications.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-2 py-16 text-center">
             <Bell className="h-8 w-8 text-base-content/30" />
-            <p className="font-medium">Inbox is empty</p>
+            <p className="font-medium">No notifications</p>
             <p className="max-w-md text-sm text-base-content/55">
               Mentions in issues and notes, issue replies, and future app
               notifications will appear here.
