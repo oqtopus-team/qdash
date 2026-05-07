@@ -1,4 +1,4 @@
-FROM prefecthq/prefect:3-python3.11 AS builder
+FROM python:3.11-slim-bookworm AS builder
 
 WORKDIR /app
 
@@ -27,9 +27,21 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 ENV UV_HTTP_TIMEOUT=300
 RUN uv pip install --system --no-cache-dir -r requirements.txt
 
-FROM prefecthq/prefect:3-python3.11
+FROM python:3.11-slim-bookworm
 
 WORKDIR /app
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+    libhdf5-dev \
+    tzdata \
+    curl \
+    libcairo2 \
+    libgirepository-1.0-1 \
+    gir1.2-gtk-3.0 \
+    git \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
 ENV TZ=Asia/Tokyo
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
