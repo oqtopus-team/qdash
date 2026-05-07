@@ -171,17 +171,16 @@ def list_members(
     operation_id="inviteProjectMember",
 )
 def invite_member(
-    project_id: str,
     invite_data: MemberInvite,
-    admin: Annotated[User, Depends(get_admin_user)],
+    ctx: Annotated[ProjectContext, Depends(get_project_context_owner_from_path)],
     service: Annotated[ProjectService, Depends(get_project_service)],
 ) -> MemberResponse:
-    """Invite a user to the project. Admin only."""
+    """Invite a user to the project. Owner only."""
     membership = service.invite_member(
-        project_id=project_id,
+        project_id=ctx.project_id,
         username=invite_data.username,
         role=invite_data.role,
-        admin_username=admin.username,
+        admin_username=ctx.user.username,
     )
     return ProjectService.to_member_response(membership)
 
@@ -193,15 +192,14 @@ def invite_member(
     operation_id="updateProjectMember",
 )
 def update_member(
-    project_id: str,
     username: str,
     update_data: MemberUpdate,
-    admin: Annotated[User, Depends(get_admin_user)],
+    ctx: Annotated[ProjectContext, Depends(get_project_context_owner_from_path)],
     service: Annotated[ProjectService, Depends(get_project_service)],
 ) -> MemberResponse:
-    """Update a member's role. Admin only."""
+    """Update a member's role. Owner only."""
     membership = service.update_member(
-        project_id=project_id,
+        project_id=ctx.project_id,
         username=username,
         role=update_data.role,
     )
@@ -215,16 +213,15 @@ def update_member(
     operation_id="removeProjectMember",
 )
 def remove_member(
-    project_id: str,
     username: str,
-    admin: Annotated[User, Depends(get_admin_user)],
+    ctx: Annotated[ProjectContext, Depends(get_project_context_owner_from_path)],
     service: Annotated[ProjectService, Depends(get_project_service)],
 ) -> None:
-    """Remove a member from the project. Admin only."""
+    """Remove a member from the project. Owner only."""
     service.remove_member(
-        project_id=project_id,
+        project_id=ctx.project_id,
         username=username,
-        admin_username=admin.username,
+        admin_username=ctx.user.username,
     )
 
 

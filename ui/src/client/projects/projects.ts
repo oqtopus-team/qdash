@@ -740,7 +740,7 @@ export function useListProjectMembers<
 }
 
 /**
- * Invite a user to the project. Admin only.
+ * Invite a user to the project. Owner only.
  * @summary Invite a member
  */
 export const inviteProjectMember = (
@@ -833,7 +833,7 @@ export const useInviteProjectMember = <
   return useMutation(mutationOptions, queryClient);
 };
 /**
- * Update a member's role. Admin only.
+ * Update a member's role. Owner only.
  * @summary Update member role
  */
 export const updateProjectMember = (
@@ -925,7 +925,7 @@ export const useUpdateProjectMember = <
   return useMutation(mutationOptions, queryClient);
 };
 /**
- * Remove a member from the project. Admin only.
+ * Remove a member from the project. Owner only.
  * @summary Remove member
  */
 export const removeProjectMember = (

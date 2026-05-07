@@ -283,6 +283,12 @@ class ProjectService:
                 detail=f"Project '{project_id}' not found",
             )
 
+        if role == ProjectRole.OWNER:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Use ownership transfer to assign the owner role",
+            )
+
         target_user = self._user_repo.find_one({"username": username})
         if not target_user:
             raise HTTPException(
@@ -356,6 +362,12 @@ class ProjectService:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Cannot change the owner's role",
+            )
+
+        if role == ProjectRole.OWNER:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Use ownership transfer to assign the owner role",
             )
 
         membership = self._membership_repo.find_one(
