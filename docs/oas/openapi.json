@@ -1179,7 +1179,7 @@
           "projects"
         ],
         "summary": "Invite a member",
-        "description": "Invite a user to the project. Admin only.",
+        "description": "Invite a user to the project. Owner only.",
         "operationId": "inviteProjectMember",
         "security": [
           {
@@ -1193,8 +1193,10 @@
             "required": true,
             "schema": {
               "type": "string",
+              "description": "Project identifier",
               "title": "Project Id"
-            }
+            },
+            "description": "Project identifier"
           }
         ],
         "requestBody": {
@@ -1241,7 +1243,7 @@
           "projects"
         ],
         "summary": "Update member role",
-        "description": "Update a member's role. Admin only.",
+        "description": "Update a member's role. Owner only.",
         "operationId": "updateProjectMember",
         "security": [
           {
@@ -1250,15 +1252,6 @@
         ],
         "parameters": [
           {
-            "name": "project_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Project Id"
-            }
-          },
-          {
             "name": "username",
             "in": "path",
             "required": true,
@@ -1266,6 +1259,17 @@
               "type": "string",
               "title": "Username"
             }
+          },
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Project identifier",
+              "title": "Project Id"
+            },
+            "description": "Project identifier"
           }
         ],
         "requestBody": {
@@ -1310,7 +1314,7 @@
           "projects"
         ],
         "summary": "Remove member",
-        "description": "Remove a member from the project. Admin only.",
+        "description": "Remove a member from the project. Owner only.",
         "operationId": "removeProjectMember",
         "security": [
           {
@@ -1319,15 +1323,6 @@
         ],
         "parameters": [
           {
-            "name": "project_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Project Id"
-            }
-          },
-          {
             "name": "username",
             "in": "path",
             "required": true,
@@ -1335,6 +1330,17 @@
               "type": "string",
               "title": "Username"
             }
+          },
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Project identifier",
+              "title": "Project Id"
+            },
+            "description": "Project identifier"
           }
         ],
         "responses": {
