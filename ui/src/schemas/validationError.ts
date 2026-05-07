@@ -6,12 +6,9 @@
  * OpenAPI spec version: 0.0.1
  */
 import type { ValidationErrorLocItem } from "./validationErrorLocItem";
-import type { ValidationErrorCtx } from "./validationErrorCtx";
 
 export interface ValidationError {
   loc: ValidationErrorLocItem[];
   msg: string;
   type: string;
-  input?: unknown;
-  ctx?: ValidationErrorCtx;
 }

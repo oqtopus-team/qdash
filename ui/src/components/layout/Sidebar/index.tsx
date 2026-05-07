@@ -41,6 +41,7 @@ import { FluentEmoji, getAvatarEmoji } from "@/components/ui/FluentEmoji";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProject } from "@/contexts/ProjectContext";
 import { useSidebar } from "@/contexts/SidebarContext";
+import { useUnreadNotificationCount } from "@/hooks/useNotifications";
 import { DARK_THEMES } from "@/constants/themes";
 
 const PREFECT_URL =
@@ -70,6 +71,9 @@ export function Sidebar() {
   const { canEdit } = useProject();
   const { user, logout: authLogout } = useAuth();
   const { theme, setTheme } = useTheme();
+  const { data: unreadNotificationsResponse } = useUnreadNotificationCount();
+  const unreadNotifications =
+    unreadNotificationsResponse?.data.unread_count ?? 0;
   const isAdmin = user?.system_role === "admin";
   const isDarkTheme = DARK_THEMES.includes(
     theme as (typeof DARK_THEMES)[number],
@@ -175,6 +179,11 @@ export function Sidebar() {
           >
             <Inbox size={18} />
             {(isOpen || isMobileOpen) && <span className="ml-2">Inbox</span>}
+            {unreadNotifications > 0 && (
+              <span className="badge badge-primary badge-xs ml-auto">
+                {unreadNotifications > 99 ? "99+" : unreadNotifications}
+              </span>
+            )}
           </Link>
         </li>
         <li>

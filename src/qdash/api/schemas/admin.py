@@ -15,6 +15,7 @@ class UserListItem(BaseModel):
     disabled: bool = False
     system_role: SystemRole = SystemRole.USER
     default_project_id: str | None = None
+    must_change_password: bool = False
 
 
 class ProjectListItem(BaseModel):
@@ -58,6 +59,7 @@ class UserDetailResponse(BaseModel):
     disabled: bool = False
     system_role: SystemRole = SystemRole.USER
     default_project_id: str | None = None
+    must_change_password: bool = False
     created_at: datetime | None = None
     updated_at: datetime | None = None
 

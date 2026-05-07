@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -30,6 +30,7 @@ import {
   useReopenIssue,
 } from "@/client/issue/issue";
 import { useProject } from "@/contexts/ProjectContext";
+import { useListProjectMembers } from "@/client/projects/projects";
 import { useQueryClient } from "@tanstack/react-query";
 import { useExtractKnowledge } from "@/hooks/useIssueKnowledge";
 
@@ -63,7 +64,7 @@ function isEdited(createdAt: string, updatedAt: string): boolean {
 export function IssueDetailPage({ issueId }: { issueId: string }) {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { isOwner } = useProject();
+  const { isOwner, projectId } = useProject();
   const currentUser = getCurrentUsername();
   const [replyText, setReplyText] = useState("");
   const [editingIssue, setEditingIssue] = useState(false);
@@ -72,6 +73,9 @@ export function IssueDetailPage({ issueId }: { issueId: string }) {
   const [editingReplyId, setEditingReplyId] = useState<string | null>(null);
   const [editReplyContent, setEditReplyContent] = useState("");
   const { uploadImage } = useImageUpload();
+  const { data: membersResponse } = useListProjectMembers(projectId ?? "", {
+    query: { enabled: !!projectId },
+  });
 
   // Fetch issue
   const { data: issueResponse, isLoading: issueLoading } = useGetIssue(
@@ -114,6 +118,14 @@ export function IssueDetailPage({ issueId }: { issueId: string }) {
   const { extract: extractKnowledge, isExtracting } = useExtractKnowledge();
 
   const canManage = isOwner || currentUser === issue?.username;
+  const mentionCandidates = useMemo(() => {
+    const members =
+      membersResponse?.data.members
+        ?.filter((member) => member.username !== currentUser)
+        .map((member) => ({ id: member.username, label: member.username })) ??
+      [];
+    return [{ id: "qdash", label: "AI Assistant" }, ...members];
+  }, [currentUser, membersResponse?.data.members]);
 
   const handleClose = () => {
     closeMutation.mutate(
@@ -583,7 +595,7 @@ export function IssueDetailPage({ issueId }: { issueId: string }) {
           submitLabel="Reply"
           isSubmitting={isSubmitting || isGenerating}
           onImageUpload={uploadImage}
-          mentionCandidates={[{ id: "qdash", label: "AI Assistant" }]}
+          mentionCandidates={mentionCandidates}
         />
       </div>
     </div>

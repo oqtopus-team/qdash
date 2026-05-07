@@ -18,5 +18,6 @@ export interface User {
   full_name?: UserFullName;
   disabled?: UserDisabled;
   default_project_id?: UserDefaultProjectId;
+  must_change_password?: boolean;
   system_role?: SystemRole;
 }

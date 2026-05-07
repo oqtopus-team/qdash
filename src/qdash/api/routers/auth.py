@@ -64,6 +64,7 @@ def login(
         token_type="bearer",
         username=user.username,
         default_project_id=user.default_project_id,
+        must_change_password=user.must_change_password,
     )
 
 
@@ -107,15 +108,20 @@ def register_user(
             detail="Only administrators can create new users",
         )
 
-    user, _access_token = auth_service.register_user(user_data, current_user.username)
-    auth_service.onboard_user(user)
+    user, _access_token, initial_password = auth_service.register_user(
+        user_data, current_user.username
+    )
+    if user_data.create_default_project:
+        auth_service.onboard_user(user)
 
     return UserWithToken(
         username=user.username,
         full_name=user.full_name,
         disabled=user.disabled,
         default_project_id=user.default_project_id,
+        must_change_password=user.must_change_password,
         access_token=user.access_token,
+        initial_password=initial_password,
     )
 
 

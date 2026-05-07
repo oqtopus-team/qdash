@@ -470,3 +470,93 @@ class TestAdminCreateProjectForUser:
         """Returns 404 for non-existent user."""
         response = test_client.post("/admin/users/nonexistent/project", headers=admin_headers)
         assert response.status_code == 404
+
+
+class TestAdminRegisterUser:
+    """Tests for admin-managed user registration."""
+
+    @pytest.fixture
+    def admin_user(self, init_db):
+        """Create admin user."""
+        user = UserDocument(
+            username="admin",
+            full_name="Admin User",
+            hashed_password="hashed",
+            access_token="admin-token",
+            disabled=False,
+            system_role=SystemRole.ADMIN,
+            default_project_id="proj-admin",
+            system_info=SystemInfoModel(),
+        )
+        user.insert()
+        yield user
+
+    @pytest.fixture
+    def admin_headers(self):
+        """Admin authentication headers."""
+        return {"Authorization": "Bearer admin-token"}
+
+    def test_register_user_generates_temporary_password(
+        self, test_client, admin_user, admin_headers
+    ):
+        """Admin can create a user without choosing a password."""
+        response = test_client.post(
+            "/auth/register",
+            headers=admin_headers,
+            json={
+                "username": "generateduser",
+                "full_name": "Generated User",
+                "create_default_project": True,
+            },
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["username"] == "generateduser"
+        assert data["must_change_password"] is True
+        assert data["initial_password"]
+        assert data["access_token"]
+        assert data["default_project_id"]
+
+        login_response = test_client.post(
+            "/auth/login",
+            data={"username": "generateduser", "password": data["initial_password"]},
+        )
+        assert login_response.status_code == 200
+        assert login_response.json()["must_change_password"] is True
+
+    def test_register_user_without_default_project(self, test_client, admin_user, admin_headers):
+        """Admin can create an account without provisioning a default project."""
+        response = test_client.post(
+            "/auth/register",
+            headers=admin_headers,
+            json={"username": "accountonly"},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["username"] == "accountonly"
+        assert data["default_project_id"] is None
+        assert data["initial_password"]
+
+    def test_change_password_clears_must_change_password(
+        self, test_client, admin_user, admin_headers
+    ):
+        """Changing password clears the first-login password-change flag."""
+        register_response = test_client.post(
+            "/auth/register",
+            headers=admin_headers,
+            json={"username": "changeme"},
+        )
+        assert register_response.status_code == 200
+        initial_password = register_response.json()["initial_password"]
+        token = register_response.json()["access_token"]
+
+        change_response = test_client.post(
+            "/auth/change-password",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"current_password": initial_password, "new_password": "changed-password"},
+        )
+        assert change_response.status_code == 200
+
+        user = UserDocument.find_one({"username": "changeme"}).run()
+        assert user is not None
+        assert user.must_change_password is False

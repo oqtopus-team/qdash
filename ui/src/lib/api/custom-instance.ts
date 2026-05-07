@@ -25,6 +25,10 @@ AXIOS_INSTANCE.interceptors.request.use((config) => {
     }
     if (config.headers instanceof AxiosHeaders) {
       config.headers.set("Authorization", `Bearer ${decodedToken}`);
+      const projectId = localStorage.getItem("qdash_current_project_id");
+      if (projectId) {
+        config.headers.set("X-Project-Id", projectId);
+      }
       console.debug("Setting Authorization header for URL:", config.url);
     }
   }

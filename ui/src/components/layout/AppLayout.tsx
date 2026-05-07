@@ -1,6 +1,7 @@
 "use client";
 
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect } from "react";
 
 import { Navbar } from "./Navbar";
 import { Sidebar } from "./Sidebar";
@@ -9,6 +10,7 @@ import { MiniChatWindow } from "./MiniChatWindow";
 
 import { SidebarProvider } from "@/contexts/SidebarContext";
 import { AnalysisChatProvider } from "@/contexts/AnalysisChatContext";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -19,7 +21,19 @@ const PUBLIC_PATHS = ["/login"];
 
 export function AppLayout({ children }: AppLayoutProps) {
   const pathname = usePathname();
+  const router = useRouter();
+  const { user } = useAuth();
   const isPublicPage = PUBLIC_PATHS.includes(pathname);
+
+  useEffect(() => {
+    if (
+      !isPublicPage &&
+      user?.must_change_password &&
+      pathname !== "/settings"
+    ) {
+      router.replace("/settings");
+    }
+  }, [isPublicPage, pathname, router, user?.must_change_password]);
 
   // Public pages (login, etc.) - render without sidebar/navbar
   if (isPublicPage) {

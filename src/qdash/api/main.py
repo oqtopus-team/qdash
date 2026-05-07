@@ -24,6 +24,7 @@ from qdash.api.routers import (
     issue_knowledge,
     metrics,
     note,
+    notification,
     project,
     provenance,
     settings,
@@ -120,6 +121,7 @@ app.include_router(
     metrics.router, prefix="/metrics", tags=["metrics"], dependencies=auth_dependency
 )
 app.include_router(note.router, tags=["note"], dependencies=auth_dependency)
+app.include_router(notification.router, tags=["notification"], dependencies=auth_dependency)
 app.include_router(cryostat.router, tags=["cryostat"], dependencies=auth_dependency)
 app.include_router(cooldown.router, tags=["cooldown"], dependencies=auth_dependency)
 app.include_router(

@@ -129,14 +129,16 @@ export function AdminPageContent() {
 
   const handleCreateUser = async (userData: {
     username: string;
-    password: string;
     full_name?: string;
-  }) => {
+    create_default_project?: boolean;
+  }): Promise<string | null> => {
     try {
-      await registerUserMutation.mutateAsync({ data: userData });
+      const response = await registerUserMutation.mutateAsync({
+        data: userData,
+      });
       queryClient.invalidateQueries({ queryKey: getListAllUsersQueryKey() });
       queryClient.invalidateQueries({ queryKey: getListAllProjectsQueryKey() });
-      setIsCreateModalOpen(false);
+      return response.data.initial_password ?? null;
     } catch (err) {
       console.error("Failed to create user:", err);
       throw err;
@@ -314,7 +316,7 @@ export function AdminPageContent() {
                       <div>
                         {userItem.default_project_id ? (
                           <span className="badge badge-success badge-sm">
-                            Has Project
+                            Default Project
                           </span>
                         ) : (
                           <button
@@ -327,7 +329,7 @@ export function AdminPageContent() {
                             {createProjectMutation.isPending ? (
                               <span className="loading loading-spinner loading-xs"></span>
                             ) : (
-                              "Add Project"
+                              "Create Default"
                             )}
                           </button>
                         )}
@@ -361,7 +363,7 @@ export function AdminPageContent() {
                     <th>Username</th>
                     <th>Full Name</th>
                     <th>System Role</th>
-                    <th>Project</th>
+                    <th>Default Project</th>
                     <th>Status</th>
                     <th>Actions</th>
                   </tr>
@@ -385,7 +387,7 @@ export function AdminPageContent() {
                       <td>
                         {userItem.default_project_id ? (
                           <span className="badge badge-success badge-sm">
-                            Has Project
+                            Default Project
                           </span>
                         ) : (
                           <button
@@ -398,7 +400,7 @@ export function AdminPageContent() {
                             {createProjectMutation.isPending ? (
                               <span className="loading loading-spinner loading-xs"></span>
                             ) : (
-                              "Add Project"
+                              "Create Default"
                             )}
                           </button>
                         )}
@@ -943,16 +945,20 @@ function CreateUserModal({
   onClose: () => void;
   onSave: (userData: {
     username: string;
-    password: string;
     full_name?: string;
-  }) => Promise<void>;
+    create_default_project?: boolean;
+  }) => Promise<string | null>;
   isLoading: boolean;
   error: Error | unknown | null;
 }) {
   const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
+  const [createDefaultProject, setCreateDefaultProject] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
+  const [temporaryPassword, setTemporaryPassword] = useState<string | null>(
+    null,
+  );
+  const [copied, setCopied] = useState(false);
 
   const handleSave = async () => {
     setLocalError(null);
@@ -961,24 +967,24 @@ function CreateUserModal({
       setLocalError("Username is required");
       return;
     }
-    if (!password.trim()) {
-      setLocalError("Password is required");
-      return;
-    }
-    if (password.length < 4) {
-      setLocalError("Password must be at least 4 characters");
-      return;
-    }
 
     try {
-      await onSave({
+      const generatedPassword = await onSave({
         username: username.trim(),
-        password,
         full_name: fullName.trim() || undefined,
+        create_default_project: createDefaultProject,
       });
+      setTemporaryPassword(generatedPassword);
     } catch {
       // Error is handled by the mutation
     }
+  };
+
+  const handleCopyPassword = async () => {
+    if (!temporaryPassword) return;
+    await navigator.clipboard.writeText(temporaryPassword);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   const displayError =
@@ -996,67 +1002,113 @@ function CreateUserModal({
           </div>
         )}
 
-        <div className="space-y-4">
-          <div className="form-control">
-            <label className="label">
-              <span className="label-text font-medium">Username *</span>
-            </label>
-            <input
-              type="text"
-              className="input input-bordered w-full"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder="Enter username"
-            />
-          </div>
-
-          <div className="form-control">
-            <label className="label">
-              <span className="label-text font-medium">Password *</span>
-            </label>
-            <input
-              type="password"
-              className="input input-bordered w-full"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter password"
-            />
-          </div>
-
-          <div className="form-control">
-            <label className="label">
-              <span className="label-text font-medium">Full Name</span>
-            </label>
-            <input
-              type="text"
-              className="input input-bordered w-full"
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              placeholder="Enter full name (optional)"
-            />
-            <label className="label">
-              <span className="label-text-alt text-base-content/60">
-                A default project will be created for this user
+        {temporaryPassword ? (
+          <div className="space-y-4">
+            <div className="alert alert-success">
+              <span>
+                User <span className="font-mono font-semibold">{username}</span>{" "}
+                was created. Share this temporary password securely.
               </span>
+            </div>
+            <div className="form-control">
+              <label className="label">
+                <span className="label-text font-medium">
+                  Temporary Password
+                </span>
+              </label>
+              <div className="join w-full">
+                <input
+                  className="input input-bordered join-item w-full font-mono"
+                  value={temporaryPassword}
+                  readOnly
+                />
+                <button
+                  type="button"
+                  className={`btn join-item ${copied ? "btn-success" : "btn-primary"}`}
+                  onClick={handleCopyPassword}
+                >
+                  {copied ? "Copied" : "Copy"}
+                </button>
+              </div>
+              <label className="label">
+                <span className="label-text-alt text-base-content/60">
+                  This password is shown only once. The user must change it
+                  after signing in.
+                </span>
+              </label>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="form-control">
+              <label className="label">
+                <span className="label-text font-medium">Username *</span>
+              </label>
+              <input
+                type="text"
+                className="input input-bordered w-full"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="Enter username"
+              />
+            </div>
+
+            <div className="form-control">
+              <label className="label">
+                <span className="label-text font-medium">Full Name</span>
+              </label>
+              <input
+                type="text"
+                className="input input-bordered w-full"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                placeholder="Enter full name (optional)"
+              />
+              <label className="label">
+                <span className="label-text-alt text-base-content/60">
+                  A temporary password will be generated for this user
+                </span>
+              </label>
+            </div>
+            <label className="form-control cursor-pointer rounded-lg border border-base-300 bg-base-100 p-3">
+              <div className="flex items-start gap-3">
+                <input
+                  type="checkbox"
+                  className="checkbox checkbox-primary mt-1"
+                  checked={createDefaultProject}
+                  onChange={(event) =>
+                    setCreateDefaultProject(event.target.checked)
+                  }
+                />
+                <div>
+                  <div className="font-medium">Create default project</div>
+                  <div className="text-sm text-base-content/60">
+                    Provision a personal project for this user and set it as
+                    their default project.
+                  </div>
+                </div>
+              </div>
             </label>
           </div>
-        </div>
+        )}
 
         <div className="modal-action">
           <button className="btn" onClick={onClose}>
-            Cancel
+            {temporaryPassword ? "Close" : "Cancel"}
           </button>
-          <button
-            className="btn btn-primary"
-            onClick={handleSave}
-            disabled={isLoading}
-          >
-            {isLoading ? (
-              <span className="loading loading-spinner loading-sm"></span>
-            ) : (
-              "Create User"
-            )}
-          </button>
+          {!temporaryPassword && (
+            <button
+              className="btn btn-primary"
+              onClick={handleSave}
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <span className="loading loading-spinner loading-sm"></span>
+              ) : (
+                "Create User"
+              )}
+            </button>
+          )}
         </div>
       </div>
       <form method="dialog" className="modal-backdrop">

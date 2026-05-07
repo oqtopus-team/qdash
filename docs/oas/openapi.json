@@ -14,6 +14,11 @@
     },
     "version": "0.0.1"
   },
+  "servers": [
+    {
+      "url": "/api"
+    }
+  ],
   "paths": {
     "/auth/login": {
       "post": {
@@ -9326,6 +9331,258 @@
         }
       }
     },
+    "/notifications": {
+      "get": {
+        "tags": [
+          "notification"
+        ],
+        "summary": "List current user's notifications",
+        "description": "List notifications addressed to the current user.",
+        "operationId": "listNotifications",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "unread_only",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Only return unread notifications",
+              "default": false,
+              "title": "Unread Only"
+            },
+            "description": "Only return unread notifications"
+          },
+          {
+            "name": "skip",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Skip"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListNotificationsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/notifications/unread-count": {
+      "get": {
+        "tags": [
+          "notification"
+        ],
+        "summary": "Get unread notification count",
+        "description": "Return unread notification count for the current user.",
+        "operationId": "getUnreadNotificationCount",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnreadNotificationCountResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/notifications/{notification_id}/read": {
+      "patch": {
+        "tags": [
+          "notification"
+        ],
+        "summary": "Mark a notification as read",
+        "description": "Mark one notification as read.",
+        "operationId": "markNotificationRead",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "notification_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Notification Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/notifications/read-all": {
+      "patch": {
+        "tags": [
+          "notification"
+        ],
+        "summary": "Mark all notifications as read",
+        "description": "Mark all matching notifications as read.",
+        "operationId": "markAllNotificationsRead",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "integer"
+                  },
+                  "title": "Response Markallnotificationsread"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/cryostats": {
       "get": {
         "tags": [
@@ -10418,6 +10675,154 @@
             "HTTPBearer": []
           }
         ]
+      }
+    },
+    "/dashboard/chips/{chip_id}/ai-insights": {
+      "get": {
+        "tags": [
+          "dashboard"
+        ],
+        "summary": "Generate dashboard-level AI insight candidates",
+        "description": "Return compact operational insights for the dashboard.\n\nThe first implementation is deterministic: it extracts high-signal patterns\nfrom persisted AI triage notes and task-result metadata. A later LLM\nsynthesis layer can consume the same structured candidate contract.",
+        "operationId": "getDashboardAiInsights",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chip_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Chip Id"
+            }
+          },
+          {
+            "name": "task_name",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional task-name filter",
+              "title": "Task Name"
+            },
+            "description": "Optional task-name filter"
+          },
+          {
+            "name": "latest_only",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "If true, use only the latest result per task and target",
+              "default": true,
+              "title": "Latest Only"
+            },
+            "description": "If true, use only the latest result per task and target"
+          },
+          {
+            "name": "selection_mode",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Dashboard selection mode; accepted for filter-state traceability",
+              "title": "Selection Mode"
+            },
+            "description": "Dashboard selection mode; accepted for filter-state traceability"
+          },
+          {
+            "name": "start_at",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Dashboard lower time bound; accepted for filter-state traceability",
+              "title": "Start At"
+            },
+            "description": "Dashboard lower time bound; accepted for filter-state traceability"
+          },
+          {
+            "name": "end_at",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Dashboard upper time bound; accepted for filter-state traceability",
+              "title": "End At"
+            },
+            "description": "Dashboard upper time bound; accepted for filter-state traceability"
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DashboardAiInsightsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/provenance/entities/{entity_id}": {
@@ -12932,6 +13337,120 @@
         "title": "CryostatUpdateRequest",
         "description": "Body for updating a cryostat. All fields optional."
       },
+      "DashboardAiInsightsResponse": {
+        "properties": {
+          "chip_id": {
+            "type": "string",
+            "title": "Chip Id"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary"
+          },
+          "insights": {
+            "items": {
+              "$ref": "#/components/schemas/DashboardInsight"
+            },
+            "type": "array",
+            "title": "Insights"
+          },
+          "suppressed": {
+            "$ref": "#/components/schemas/DashboardInsightSuppressed"
+          }
+        },
+        "type": "object",
+        "required": [
+          "chip_id",
+          "summary"
+        ],
+        "title": "DashboardAiInsightsResponse",
+        "description": "Dashboard-level AI insight response."
+      },
+      "DashboardInsight": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "info",
+              "warning",
+              "critical"
+            ],
+            "title": "Severity"
+          },
+          "affected_targets": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Affected Targets"
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "triage_cluster",
+              "model_failure",
+              "data_consistency",
+              "metric_outlier",
+              "coverage_gap",
+              "provenance_impact",
+              "note_cluster",
+              "other"
+            ],
+            "title": "Category",
+            "default": "other"
+          },
+          "evidence": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Evidence"
+          },
+          "recommended_action": {
+            "type": "string",
+            "title": "Recommended Action"
+          },
+          "confidence": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ],
+            "title": "Confidence",
+            "default": "medium"
+          }
+        },
+        "type": "object",
+        "required": [
+          "title",
+          "severity",
+          "recommended_action"
+        ],
+        "title": "DashboardInsight",
+        "description": "One operator-facing dashboard insight."
+      },
+      "DashboardInsightSuppressed": {
+        "properties": {
+          "routine_pass_count": {
+            "type": "integer",
+            "title": "Routine Pass Count",
+            "default": 0
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "title": "DashboardInsightSuppressed",
+        "description": "Summary of routine items intentionally omitted from the insight card."
+      },
       "DegradationTrendResponse": {
         "properties": {
           "parameter_name": {
@@ -15298,6 +15817,43 @@
         "title": "ListNoteEventsResponse",
         "description": "Paginated note-event feed."
       },
+      "ListNotificationsResponse": {
+        "properties": {
+          "notifications": {
+            "items": {
+              "$ref": "#/components/schemas/NotificationResponse"
+            },
+            "type": "array",
+            "title": "Notifications"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "unread_count": {
+            "type": "integer",
+            "title": "Unread Count"
+          },
+          "skip": {
+            "type": "integer",
+            "title": "Skip"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          }
+        },
+        "type": "object",
+        "required": [
+          "notifications",
+          "total",
+          "unread_count",
+          "skip",
+          "limit"
+        ],
+        "title": "ListNotificationsResponse",
+        "description": "Paginated notifications for the current user."
+      },
       "ListQubitsResponse": {
         "properties": {
           "qubits": {
@@ -15994,6 +16550,66 @@
               }
             ],
             "title": "Api Key Env"
+          },
+          "keep_alive": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Keep Alive"
+          },
+          "num_ctx": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Num Ctx"
+          },
+          "top_p": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Top P"
+          },
+          "top_k": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Top K"
+          },
+          "reasoning_effort": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning Effort"
+          },
+          "disable_thinking_instruction": {
+            "type": "boolean",
+            "title": "Disable Thinking Instruction",
+            "default": false
           }
         },
         "type": "object",
@@ -16336,6 +16952,83 @@
         ],
         "title": "NoteUpsertRequest",
         "description": "Body for upserting a note."
+      },
+      "NotificationResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "project_id": {
+            "type": "string",
+            "title": "Project Id"
+          },
+          "recipient_username": {
+            "type": "string",
+            "title": "Recipient Username"
+          },
+          "actor_username": {
+            "type": "string",
+            "title": "Actor Username"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "source_type": {
+            "type": "string",
+            "title": "Source Type"
+          },
+          "source_id": {
+            "type": "string",
+            "title": "Source Id"
+          },
+          "target_url": {
+            "type": "string",
+            "title": "Target Url"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "excerpt": {
+            "type": "string",
+            "title": "Excerpt",
+            "default": ""
+          },
+          "read_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Read At"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "project_id",
+          "recipient_username",
+          "actor_username",
+          "kind",
+          "source_type",
+          "source_id",
+          "target_url",
+          "title",
+          "created_at"
+        ],
+        "title": "NotificationResponse",
+        "description": "Single notification row."
       },
       "OutputParameterInfoResponse": {
         "properties": {
@@ -19600,6 +20293,11 @@
               }
             ],
             "title": "Default Project Id"
+          },
+          "must_change_password": {
+            "type": "boolean",
+            "title": "Must Change Password",
+            "default": false
           }
         },
         "type": "object",
@@ -19659,6 +20357,21 @@
         "type": "object",
         "title": "UITaskFilesSettings",
         "description": "Task files editor settings."
+      },
+      "UnreadNotificationCountResponse": {
+        "properties": {
+          "unread_count": {
+            "type": "integer",
+            "minimum": 0,
+            "title": "Unread Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "unread_count"
+        ],
+        "title": "UnreadNotificationCountResponse",
+        "description": "Unread notification count."
       },
       "UpdateChipRequest": {
         "properties": {
@@ -19836,6 +20549,11 @@
             ],
             "title": "Default Project Id"
           },
+          "must_change_password": {
+            "type": "boolean",
+            "title": "Must Change Password",
+            "default": false
+          },
           "system_role": {
             "$ref": "#/components/schemas/SystemRole",
             "default": "user"
@@ -19855,7 +20573,14 @@
             "title": "Username"
           },
           "password": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Password"
           },
           "full_name": {
@@ -19868,12 +20593,16 @@
               }
             ],
             "title": "Full Name"
+          },
+          "create_default_project": {
+            "type": "boolean",
+            "title": "Create Default Project",
+            "default": false
           }
         },
         "type": "object",
         "required": [
-          "username",
-          "password"
+          "username"
         ],
         "title": "UserCreate",
         "description": "User creation model for registration (admin only)."
@@ -19914,6 +20643,11 @@
               }
             ],
             "title": "Default Project Id"
+          },
+          "must_change_password": {
+            "type": "boolean",
+            "title": "Must Change Password",
+            "default": false
           },
           "created_at": {
             "anyOf": [
@@ -19983,6 +20717,11 @@
               }
             ],
             "title": "Default Project Id"
+          },
+          "must_change_password": {
+            "type": "boolean",
+            "title": "Must Change Password",
+            "default": false
           }
         },
         "type": "object",
@@ -20053,6 +20792,11 @@
             ],
             "title": "Default Project Id"
           },
+          "must_change_password": {
+            "type": "boolean",
+            "title": "Must Change Password",
+            "default": false
+          },
           "system_role": {
             "$ref": "#/components/schemas/SystemRole",
             "default": "user"
@@ -20060,6 +20804,17 @@
           "access_token": {
             "type": "string",
             "title": "Access Token"
+          },
+          "initial_password": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Initial Password"
           }
         },
         "type": "object",
@@ -20112,13 +20867,6 @@
           "type": {
             "type": "string",
             "title": "Error Type"
-          },
-          "input": {
-            "title": "Input"
-          },
-          "ctx": {
-            "type": "object",
-            "title": "Context"
           }
         },
         "type": "object",
@@ -20224,10 +20972,5 @@
         "scheme": "bearer"
       }
     }
-  },
-  "servers": [
-    {
-      "url": "/api"
-    }
-  ]
+  }
 }

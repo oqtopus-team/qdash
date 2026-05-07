@@ -8,6 +8,11 @@
 import type { ModelConfigTemperature } from "./modelConfigTemperature";
 import type { ModelConfigBaseUrl } from "./modelConfigBaseUrl";
 import type { ModelConfigApiKeyEnv } from "./modelConfigApiKeyEnv";
+import type { ModelConfigKeepAlive } from "./modelConfigKeepAlive";
+import type { ModelConfigNumCtx } from "./modelConfigNumCtx";
+import type { ModelConfigTopP } from "./modelConfigTopP";
+import type { ModelConfigTopK } from "./modelConfigTopK";
+import type { ModelConfigReasoningEffort } from "./modelConfigReasoningEffort";
 
 /**
  * Model configuration for CopilotKit.
@@ -19,4 +24,10 @@ export interface ModelConfig {
   max_output_tokens?: number;
   base_url?: ModelConfigBaseUrl;
   api_key_env?: ModelConfigApiKeyEnv;
+  keep_alive?: ModelConfigKeepAlive;
+  num_ctx?: ModelConfigNumCtx;
+  top_p?: ModelConfigTopP;
+  top_k?: ModelConfigTopK;
+  reasoning_effort?: ModelConfigReasoningEffort;
+  disable_thinking_instruction?: boolean;
 }

@@ -6,4 +6,4 @@
  * OpenAPI spec version: 0.0.1
  */
 
-export type ValidationErrorCtx = { [key: string]: unknown };
+export type NotificationResponseReadAt = string | null;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Cpu } from "lucide-react";
 
 import { useTheme } from "@/contexts/ThemeContext";
@@ -90,8 +90,14 @@ function CopilotSettingsPanel() {
 
 export default function SettingsPage() {
   const { theme, setTheme, isDevEnv } = useTheme();
-  const { accessToken } = useAuth();
+  const { accessToken, user } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>("appearance");
+
+  useEffect(() => {
+    if (user?.must_change_password) {
+      setActiveTab("account");
+    }
+  }, [user?.must_change_password]);
 
   // Limit theme options in dev environment
   const themes = isDevEnv ? DEV_THEMES : AVAILABLE_THEMES;
@@ -279,7 +285,17 @@ export default function SettingsPage() {
           ) : activeTab === "copilot" ? (
             <CopilotSettingsPanel />
           ) : activeTab === "account" ? (
-            <PasswordChangeCard key="account" />
+            <div className="space-y-4" key="account">
+              {user?.must_change_password && (
+                <div className="alert alert-warning">
+                  <span>
+                    You are using a temporary password. Change it before
+                    continuing regular work.
+                  </span>
+                </div>
+              )}
+              <PasswordChangeCard />
+            </div>
           ) : (
             <div className="card bg-base-200 shadow-lg" key="api">
               <div className="card-body">

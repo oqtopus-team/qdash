@@ -31,6 +31,10 @@ class UserDocument(Document):
         default=None,
         description="Project ID automatically provisioned for the user",
     )
+    must_change_password: bool = Field(
+        default=False,
+        description="Whether the user must change password on next login",
+    )
     disabled: bool = Field(default=False, description="Whether the user is disabled")
     system_role: SystemRole = Field(
         default=SystemRole.USER,

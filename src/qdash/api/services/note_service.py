@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from qdash.api.schemas.note import (
     ChipNotesSummaryResponse,
     ListNoteEventsResponse,
@@ -18,6 +20,10 @@ from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
 from qdash.repository.note_event import MongoNoteEventRepository
 from starlette.exceptions import HTTPException
 
+if TYPE_CHECKING:
+    from qdash.api.services.notification_service import NotificationService
+    from qdash.dbmodel.note_event import NoteEventDocument
+
 
 def _make_note(content: str, username: str) -> NoteModel:
     return NoteModel(content=content, updated_by=username, updated_at=now())
@@ -30,8 +36,13 @@ class NoteService:
     log + knowledge feed).
     """
 
-    def __init__(self, event_repo: MongoNoteEventRepository | None = None) -> None:
+    def __init__(
+        self,
+        event_repo: MongoNoteEventRepository | None = None,
+        notification_service: NotificationService | None = None,
+    ) -> None:
         self._events = event_repo or MongoNoteEventRepository()
+        self._notifications = notification_service
 
     def _log(
         self,
@@ -45,8 +56,8 @@ class NoteService:
         actor: str,
         content: str,
         extra: dict[str, str] | None = None,
-    ) -> None:
-        self._events.append(
+    ) -> NoteEventDocument:
+        event = self._events.append(
             project_id=project_id,
             chip_id=chip_id,
             scope=scope,
@@ -56,6 +67,46 @@ class NoteService:
             actor=actor,
             content=content,
             extra=extra or {},
+        )
+        if action == "upsert":
+            self._notify_note_mentions(
+                event_id=str(event.id),
+                project_id=project_id,
+                chip_id=chip_id,
+                scope=scope,
+                target_id=target_id,
+                actor=actor,
+                content=content,
+            )
+        return event
+
+    @staticmethod
+    def _note_target_url(*, scope: str, chip_id: str, target_id: str) -> str:
+        if scope == "task_result":
+            return f"/task-results/{target_id}"
+        return f"/chip?chip_id={chip_id}"
+
+    def _notify_note_mentions(
+        self,
+        *,
+        event_id: str,
+        project_id: str,
+        chip_id: str,
+        scope: str,
+        target_id: str,
+        actor: str,
+        content: str,
+    ) -> None:
+        if not self._notifications or not content:
+            return
+        label = scope.replace("_", " ")
+        self._notifications.notify_note_mentions(
+            project_id=project_id,
+            note_event_id=event_id,
+            actor_username=actor,
+            content=content,
+            target_url=self._note_target_url(scope=scope, chip_id=chip_id, target_id=target_id),
+            title=f"{actor} mentioned you in a {label} note",
         )
 
     # ---------- qubit ----------

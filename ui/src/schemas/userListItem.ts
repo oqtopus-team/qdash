@@ -18,4 +18,5 @@ export interface UserListItem {
   disabled?: boolean;
   system_role?: SystemRole;
   default_project_id?: UserListItemDefaultProjectId;
+  must_change_password?: boolean;
 }
