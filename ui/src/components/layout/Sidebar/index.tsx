@@ -25,6 +25,7 @@ import {
   LogOut,
   Brain,
   CircleDot,
+  MessagesSquare,
   Moon,
   Settings,
   ShieldCheck,
@@ -380,6 +381,21 @@ export function Sidebar() {
           >
             <CircleDot size={18} />
             {(isOpen || isMobileOpen) && <span className="ml-2">Issues</span>}
+          </Link>
+        </li>
+        <li>
+          <Link
+            href="/forum"
+            className={
+              isMobileOpen
+                ? linkClass(pathname.startsWith("/forum"))
+                : desktopLinkClass(pathname.startsWith("/forum"))
+            }
+            title="Forum"
+            onClick={handleLinkClick}
+          >
+            <MessagesSquare size={18} />
+            {(isOpen || isMobileOpen) && <span className="ml-2">Forum</span>}
           </Link>
         </li>
         <li>
