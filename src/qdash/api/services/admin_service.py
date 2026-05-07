@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
+from typing import TYPE_CHECKING
 
 from fastapi import HTTPException, status
 from qdash.api.schemas.admin import (
@@ -15,7 +16,6 @@ from qdash.api.schemas.admin import (
     UserListItem,
     UserListResponse,
 )
-from qdash.datamodel.project import ProjectRole
 from qdash.datamodel.system_info import SystemInfoModel
 from qdash.datamodel.user import SystemRole
 from qdash.dbmodel.project import ProjectDocument
@@ -23,6 +23,9 @@ from qdash.dbmodel.project_membership import ProjectMembershipDocument
 from qdash.dbmodel.user import UserDocument
 
 logger = logging.getLogger(__name__)
+
+if TYPE_CHECKING:
+    from qdash.datamodel.project import ProjectRole
 
 
 class AdminService:
@@ -228,8 +231,10 @@ class AdminService:
 
         return MemberListResponse(members=members, total=len(members))
 
-    def add_project_member(self, project_id: str, username: str, admin_username: str) -> MemberItem:
-        """Add a member to a project as viewer."""
+    def add_project_member(
+        self, project_id: str, username: str, role: ProjectRole, admin_username: str
+    ) -> MemberItem:
+        """Add a member to a project."""
         project = ProjectDocument.find_one({"project_id": project_id}).run()
         if not project:
             raise HTTPException(
@@ -254,12 +259,12 @@ class AdminService:
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail=f"User '{username}' is already a member",
                 )
-            existing.role = ProjectRole.VIEWER
+            existing.role = role
             existing.status = "active"
             existing.invited_by = admin_username
             existing.system_info.update_time()
             existing.save()
-            logger.info(f"Reactivated {username} in project {project_id} as viewer")
+            logger.info("Reactivated %s in project %s as %s", username, project_id, role.value)
             return MemberItem(
                 username=existing.username,
                 full_name=user.full_name,
@@ -270,14 +275,14 @@ class AdminService:
         membership = ProjectMembershipDocument(
             project_id=project_id,
             username=username,
-            role=ProjectRole.VIEWER,
+            role=role,
             status="active",
             invited_by=admin_username,
             system_info=SystemInfoModel(),
         )
         membership.insert()
 
-        logger.info(f"Added {username} to project {project_id} as viewer")
+        logger.info("Added %s to project %s as %s", username, project_id, role.value)
         return MemberItem(
             username=membership.username,
             full_name=user.full_name,

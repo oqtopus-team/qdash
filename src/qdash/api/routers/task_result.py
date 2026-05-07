@@ -11,7 +11,7 @@ from qdash.api.dependencies import get_flow_service, get_task_result_service  # 
 from qdash.api.lib.project import (  # noqa: TCH002
     ProjectContext,
     get_project_context,
-    get_project_context_owner,
+    get_project_context_editor,
 )
 from qdash.api.schemas.flow import ExecuteFlowResponse
 from qdash.api.schemas.task_result import (
@@ -414,7 +414,7 @@ def get_timeseries_task_results(
 )
 def request_bulk_ai_triage_review(
     body: BulkAiTriageRequest,
-    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
     service: Annotated[TaskResultService, Depends(get_task_result_service)],
 ) -> BulkAiTriageResponse:
     """Enqueue AI triage review for the current latest task result per entity."""
@@ -443,7 +443,7 @@ def request_bulk_ai_triage_review(
 )
 async def re_execute_task_result(
     task_id: str,
-    ctx: Annotated[ProjectContext, Depends(get_project_context_owner)],
+    ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
     service: Annotated[TaskResultService, Depends(get_task_result_service)],
     flow_service: Annotated[FlowService, Depends(get_flow_service)],
     parameter_overrides: Annotated[
@@ -540,13 +540,12 @@ async def re_execute_task_result(
 def set_task_result_excluded(
     task_id: str,
     body: TaskResultExcludeRequest,
-    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
 ) -> TaskResultExcludeResponse:
     """Toggle the excluded flag on a task result.
 
     Excluded measurements are skipped when aggregating metrics for the
-    dashboard / metrics screens. Raw data is preserved. Any project member
-    can toggle exclusion; the most recent toggler is recorded.
+    dashboard / metrics screens. Raw data is preserved.
     """
     from qdash.common.datetime_utils import now
     from qdash.dbmodel.task_result_history import TaskResultHistoryDocument

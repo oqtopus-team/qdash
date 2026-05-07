@@ -8,7 +8,7 @@ from qdash.api.dependencies import (
     get_flow_schedule_service,
     get_flow_service,
 )
-from qdash.api.lib.project import ProjectContext, get_project_context
+from qdash.api.lib.project import ProjectContext, get_project_context, get_project_context_editor
 from qdash.api.schemas.flow import (
     DeleteScheduleResponse,
     ExecuteFlowRequest,
@@ -45,7 +45,7 @@ logger = getLogger("uvicorn.app")
 )
 async def save_flow(
     request: SaveFlowRequest,
-    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
     service: Annotated[FlowService, Depends(get_flow_service)],
 ) -> SaveFlowResponse:
     """Save a Flow to file system and MongoDB."""
@@ -161,7 +161,7 @@ async def list_all_flow_schedules(
 )
 async def delete_flow_schedule(
     schedule_id: str,
-    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
     schedule_service: Annotated[FlowScheduleService, Depends(get_flow_schedule_service)],
 ) -> DeleteScheduleResponse:
     """Delete a Flow schedule (cron or one-time)."""
@@ -177,7 +177,7 @@ async def delete_flow_schedule(
 async def update_flow_schedule(
     schedule_id: str,
     request: UpdateScheduleRequest,
-    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
     schedule_service: Annotated[FlowScheduleService, Depends(get_flow_schedule_service)],
 ) -> UpdateScheduleResponse:
     """Update a Flow schedule (cron schedules only)."""
@@ -215,7 +215,7 @@ async def get_flow(
 async def execute_flow(
     name: str,
     request: ExecuteFlowRequest,
-    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
     service: Annotated[FlowService, Depends(get_flow_service)],
 ) -> ExecuteFlowResponse:
     """Execute a Flow via Prefect deployment."""
@@ -229,7 +229,7 @@ async def execute_flow(
 )
 async def delete_flow(
     name: str,
-    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
     service: Annotated[FlowService, Depends(get_flow_service)],
 ) -> dict[str, str]:
     """Delete a Flow."""
@@ -245,7 +245,7 @@ async def delete_flow(
 async def schedule_flow(
     name: str,
     request: ScheduleFlowRequest,
-    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
     schedule_service: Annotated[FlowScheduleService, Depends(get_flow_schedule_service)],
 ) -> ScheduleFlowResponse:
     """Schedule a Flow execution with cron or one-time schedule."""

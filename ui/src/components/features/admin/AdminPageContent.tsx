@@ -7,6 +7,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import type {
   UserListItem,
   SystemRole,
+  ProjectRole,
   ProjectListItem,
   MemberItem,
 } from "@/schemas";
@@ -180,12 +181,12 @@ export function AdminPageContent() {
     }
   };
 
-  const handleAddMember = async (username: string) => {
+  const handleAddMember = async (username: string, role: ProjectRole) => {
     if (!selectedProject) return;
 
     await addMemberMutation.mutateAsync({
       projectId: selectedProject.project_id,
-      data: { username },
+      data: { username, role },
     });
     queryClient.invalidateQueries({ queryKey: getListAllProjectsQueryKey() });
   };
@@ -1132,7 +1133,7 @@ function MembersModal({
   project: ProjectListItem;
   users: UserListItem[];
   onClose: () => void;
-  onAddMember: (username: string) => Promise<void>;
+  onAddMember: (username: string, role: ProjectRole) => Promise<void>;
   onRemoveMember: (username: string) => Promise<void>;
   isAddingMember: boolean;
   isRemovingMember: boolean;
@@ -1140,6 +1141,7 @@ function MembersModal({
 }) {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [selectedUsername, setSelectedUsername] = useState("");
+  const [selectedRole, setSelectedRole] = useState<ProjectRole>("viewer");
   const [removingUsername, setRemovingUsername] = useState<string | null>(null);
   const [localError, setLocalError] = useState<string | null>(null);
 
@@ -1166,8 +1168,9 @@ function MembersModal({
     }
 
     try {
-      await onAddMember(selectedUsername);
+      await onAddMember(selectedUsername, selectedRole);
       setSelectedUsername("");
+      setSelectedRole("viewer");
       setIsAddModalOpen(false);
       refetch();
     } catch {
@@ -1186,6 +1189,8 @@ function MembersModal({
     switch (role) {
       case "owner":
         return "badge-secondary";
+      case "editor":
+        return "badge-primary";
       case "viewer":
         return "badge-ghost";
       default:
@@ -1289,7 +1294,7 @@ function MembersModal({
         {isAddModalOpen && (
           <dialog className="modal modal-open" style={{ zIndex: 100 }}>
             <div className="modal-box">
-              <h3 className="font-bold text-lg mb-4">Add Member as Viewer</h3>
+              <h3 className="font-bold text-lg mb-4">Add Member</h3>
 
               {(localError || !!addMemberError) && (
                 <div className="alert alert-error mb-4">
@@ -1321,6 +1326,22 @@ function MembersModal({
                   </select>
                 </div>
 
+                <div className="form-control">
+                  <label className="label">
+                    <span className="label-text font-medium">Role</span>
+                  </label>
+                  <select
+                    className="select select-bordered ml-2"
+                    value={selectedRole}
+                    onChange={(e) =>
+                      setSelectedRole(e.target.value as ProjectRole)
+                    }
+                  >
+                    <option value="viewer">Viewer</option>
+                    <option value="editor">Editor</option>
+                  </select>
+                </div>
+
                 <div className="alert alert-info">
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -1336,7 +1357,8 @@ function MembersModal({
                     ></path>
                   </svg>
                   <span className="text-sm">
-                    Members are added as viewers with read-only access.
+                    Viewers can read project data. Editors can also operate
+                    workflows, notes, chips, and calibration data.
                   </span>
                 </div>
               </div>
@@ -1356,7 +1378,7 @@ function MembersModal({
                   {isAddingMember ? (
                     <span className="loading loading-spinner loading-sm"></span>
                   ) : (
-                    "Add as Viewer"
+                    "Add Member"
                   )}
                 </button>
               </div>

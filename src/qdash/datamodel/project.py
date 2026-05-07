@@ -7,13 +7,43 @@ from qdash.datamodel.system_info import SystemInfoModel
 class ProjectRole(str, Enum):
     """Role of a member inside a project.
 
-    Simplified model:
-    - OWNER: Full access to project (read, write, admin)
-    - VIEWER: Read-only access (for invited members)
+    Roles intentionally stay coarse-grained:
+    - OWNER: Project administration plus write access
+    - EDITOR: Operational write access
+    - VIEWER: Read-only access
     """
 
     OWNER = "owner"
+    EDITOR = "editor"
     VIEWER = "viewer"
+
+
+class ProjectPermission(str, Enum):
+    """Coarse project permissions shared by API dependencies and UI."""
+
+    READ = "read"
+    WRITE = "write"
+    ADMIN = "admin"
+
+
+ROLE_PERMISSIONS: dict[ProjectRole, frozenset[ProjectPermission]] = {
+    ProjectRole.OWNER: frozenset(
+        {
+            ProjectPermission.READ,
+            ProjectPermission.WRITE,
+            ProjectPermission.ADMIN,
+        }
+    ),
+    ProjectRole.EDITOR: frozenset({ProjectPermission.READ, ProjectPermission.WRITE}),
+    ProjectRole.VIEWER: frozenset({ProjectPermission.READ}),
+}
+
+
+def role_has_permission(role: ProjectRole | None, permission: ProjectPermission) -> bool:
+    """Return whether a project role includes the requested coarse permission."""
+    if role is None:
+        return False
+    return permission in ROLE_PERMISSIONS[role]
 
 
 class ProjectModel(BaseModel):

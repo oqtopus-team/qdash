@@ -988,7 +988,7 @@ export function useListProjectMembersAdmin<
 }
 
 /**
- * Add a member to a project as viewer (admin only).
+ * Add a member to a project (admin only).
  * @summary Add member to project
  */
 export const addProjectMemberAdmin = (

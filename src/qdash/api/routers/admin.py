@@ -195,11 +195,12 @@ def add_project_member_admin(
     admin: Annotated[User, Depends(get_admin_user)],
     service: Annotated[AdminService, Depends(get_admin_service)],
 ) -> MemberItem:
-    """Add a member to a project as viewer (admin only)."""
+    """Add a member to a project (admin only)."""
     logger.debug(f"Admin {admin.username} adding {request.username} to project {project_id}")
     return service.add_project_member(
         project_id=project_id,
         username=request.username,
+        role=request.role,
         admin_username=admin.username,
     )
 

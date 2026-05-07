@@ -17,7 +17,7 @@ from qdash.api.dependencies import (  # noqa: TCH002
 from qdash.api.lib.project import (  # noqa: TCH002
     ProjectContext,
     get_project_context,
-    get_project_context_owner,
+    get_project_context_editor,
 )
 from qdash.api.schemas.chip import (
     ChipDatesResponse,
@@ -80,7 +80,7 @@ def list_chips(
 )
 def create_chip(
     request: CreateChipRequest,
-    ctx: Annotated[ProjectContext, Depends(get_project_context_owner)],
+    ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
 ) -> ChipResponse:
     """Create a new chip in the current project.
 
@@ -89,7 +89,7 @@ def create_chip(
     request : CreateChipRequest
         Chip creation request containing chip_id and size
     ctx : ProjectContext
-        Project context with owner permission
+        Project context with editor permission
 
     Returns
     -------
@@ -142,7 +142,7 @@ def create_chip(
 def update_chip(
     chip_id: str,
     body: UpdateChipRequest,
-    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
     service: Annotated[ChipService, Depends(get_chip_service)],
 ) -> ChipResponse:
     return service.update_chip(
@@ -175,7 +175,7 @@ def get_chip_deletion_impact(
 )
 def delete_chip(
     chip_id: str,
-    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
     service: Annotated[ChipService, Depends(get_chip_service)],
     force: Annotated[
         bool,

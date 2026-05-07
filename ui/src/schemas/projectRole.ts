@@ -9,14 +9,16 @@
 /**
  * Role of a member inside a project.
 
-Simplified model:
-- OWNER: Full access to project (read, write, admin)
-- VIEWER: Read-only access (for invited members)
+Roles intentionally stay coarse-grained:
+- OWNER: Project administration plus write access
+- EDITOR: Operational write access
+- VIEWER: Read-only access
  */
 export type ProjectRole = (typeof ProjectRole)[keyof typeof ProjectRole];
 
 // eslint-disable-next-line @typescript-eslint/no-redeclare
 export const ProjectRole = {
   owner: "owner",
+  editor: "editor",
   viewer: "viewer",
 } as const;
