@@ -25,8 +25,11 @@ QDash uses MongoDB via the Bunnet ODM with a project-centric multi-tenant model.
 | `tag`                 | TagDocument               | Project-level tag management                    |
 | `execution_lock`      | ExecutionLockDocument     | Exclusive execution lock                        |
 | `execution_counter`   | ExecutionCounterDocument  | Execution ID counter                            |
-| `calibration_note`    | CalibrationNoteDocument   | Calibration notes                               |
+| `calibration_note`    | CalibrationNoteDocument   | Calibration notes (workflow internal)           |
 | `flows`               | FlowDocument              | User-defined flows                              |
+| `note_event`          | NoteEventDocument         | Audit log for every note edit (write-through)   |
+| `cryostat`            | CryostatDocument          | Cryostat (dilution refrigerator) entity         |
+| `cooldown`            | CooldownDocument          | One cool-down cycle of one cryostat             |
 
 ---
 
@@ -41,6 +44,23 @@ class SystemInfoModel(BaseModel):
     created_at: str  # ISO8601 timestamp (Asia/Tokyo)
     updated_at: str  # ISO8601 timestamp (Asia/Tokyo)
 ```
+
+---
+
+### NoteModel
+
+Free-form note attached to a model (qubit, coupling, task result). Embedded
+inline on the parent document; an audit row is also written to `note_event`
+on every edit.
+
+```python
+class NoteModel(BaseModel):
+    content: str = ""              # Free-form text
+    updated_by: str = ""           # Username of the last editor
+    updated_at: datetime | None = None  # None until first set
+```
+
+`updated_at = None` distinguishes "never noted" from "noted then cleared".
 
 ---
 
@@ -284,20 +304,6 @@ class BackendModel(BaseModel):
 
 ---
 
-### FridgeModel
-
-Model representing fridge data.
-
-```python
-class FridgeModel(BaseModel):
-    device_id: str          # Device ID
-    timestamp: datetime     # Timestamp
-    data: dict              # Data
-    system_info: SystemInfoModel
-```
-
----
-
 ## Database Documents (dbmodel)
 
 ### ProjectDocument
@@ -358,11 +364,15 @@ class ChipDocument(Document):
     username: str                # Creator/owner username
     chip_id: str = "SAMPLE"
     size: int = 64
+    current_cooldown_id: str | None = None  # Cool-down the chip is currently loaded in
     qubits: dict[str, QubitModel] = {}
     couplings: dict[str, CouplingModel] = {}
     installed_at: str  # ISO8601
+    note: NoteModel              # Free-form note (serial #, fab batch, design doc link…)
     system_info: SystemInfoModel
 ```
+
+**Editable via** `PATCH /chips/{chip_id}` (topology_id, note). **Deletable via** `DELETE /chips/{chip_id}` (refuses if qubits/couplings exist; `?force=true` cascades). Use `GET /chips/{chip_id}/deletion-impact` for a preflight count before deleting.
 
 **Key Methods:**
 
@@ -390,6 +400,8 @@ class QubitDocument(Document):
     status: str = "pending"
     chip_id: str
     data: dict
+    note: NoteModel = NoteModel()                  # Free-form per-qubit note
+    metric_notes: dict[str, NoteModel] = {}        # Per-metric notes (key = metric_key)
     system_info: SystemInfoModel
 ```
 
@@ -397,6 +409,11 @@ class QubitDocument(Document):
 
 - `update_calib_data(username, qid, chip_id, output_parameters)` - Update calibration data
 - `update_status(qid, chip_id, status)` - Update status
+
+**Note Fields:**
+
+- `note` - General free-form note about the qubit itself (e.g. "used in paper X", "replaced 2026-04-15"). Edited via `PUT /chips/{chip}/qubits/{qid}/note`.
+- `metric_notes[metric_key]` - Per-metric annotations (e.g. T1 specific notes). Edited via `PUT /chips/{chip}/qubits/{qid}/metric-notes/{metric_key}`.
 
 ---
 
@@ -417,8 +434,15 @@ class CouplingDocument(Document):
     status: str = "pending"
     chip_id: str
     data: dict
+    note: NoteModel = NoteModel()                  # Free-form per-coupling note
+    metric_notes: dict[str, NoteModel] = {}        # Per-metric notes
     system_info: SystemInfoModel
 ```
+
+**Note Fields:**
+
+- `note` - General free-form note about the coupling. Edited via `PUT /chips/{chip}/couplings/{coupling_id}/note`.
+- `metric_notes[metric_key]` - Per-metric annotations. Edited via `PUT /chips/{chip}/couplings/{coupling_id}/metric-notes/{metric_key}`.
 
 ---
 
@@ -478,6 +502,7 @@ Primary storage for task execution results. Linked to executions via `execution_
 - `(project_id, execution_id)` - Join with execution_history
 - `(project_id, chip_id, start_at)` - Time-based queries
 - `(project_id, chip_id, name, qid, start_at)` - Latest task result queries
+- `(project_id, chip_id, user_note.updated_at)` - **Partial sparse**: only docs with a user note. Powers `chip_notes_summary` without scanning the entire collection.
 
 ```python
 class TaskResultHistoryDocument(Document):
@@ -491,7 +516,8 @@ class TaskResultHistoryDocument(Document):
     input_parameters: dict
     output_parameters: dict
     output_parameter_names: list[str]
-    note: dict
+    note: dict                              # Internal calibration metadata (workflow)
+    user_note: NoteModel = NoteModel()      # Dashboard-facing free-form note
     figure_path: list[str]
     json_figure_path: list[str]
     raw_data_path: list[str]
@@ -505,6 +531,11 @@ class TaskResultHistoryDocument(Document):
     tags: list[str]
     chip_id: str
 ```
+
+**Note Fields:**
+
+- `note` (existing) - Workflow internal calibration metadata (`dict`). Used by orchestrator / qubex backend.
+- `user_note` (NEW) - Dashboard free-form note attached to this measurement. Edited via `PUT /task-results/{task_id}/note`. Indexed via partial sparse index for cheap chip-wide listing.
 
 ---
 
@@ -732,6 +763,118 @@ class CalibrationNoteDocument(Document):
     timestamp: str  # ISO8601
     system_info: SystemInfoModel
 ```
+
+---
+
+### NoteEventDocument
+
+**Collection:** `note_event`
+
+Append-only audit log. The `NoteService` writes one row here on every
+upsert/delete of a note (qubit, qubit metric, coupling, coupling metric, task
+result). Used for: edit history, per-target timeline, full-text search across
+all notes (knowledge view, LLM context).
+
+**Indexes:**
+
+- `(project_id, chip_id, created_at DESC)` - Chip-scoped chronological feed.
+- `(project_id, scope, target_id, created_at DESC)` - Per-target timeline.
+- `text(content)` - Full-text search across note contents within a project.
+
+```python
+class NoteEventDocument(Document):
+    project_id: str
+    chip_id: str
+    scope: str           # qubit | qubit_metric | coupling | coupling_metric | task_result
+    target_id: str       # qid for qubit/qubit_metric, coupling_id, or task_id
+    metric_key: str = "" # only set for *_metric scopes
+    action: str          # upsert | delete
+    actor: str           # username
+    content: str = ""    # Note content at time of action ("" for delete)
+    extra: dict[str, str] = {}  # e.g. {"qid": "5", "task_name": "T1"}
+    created_at: datetime
+```
+
+The collection is **never updated in place** — every entry is a new
+immutable event. Two read patterns are exposed:
+
+- `GET /chips/{chip_id}/note-events` (chip timeline)
+- `GET /note-events/by-target?scope=&target_id=` (per-target timeline)
+- `GET /note-events/search?q=` (cross-chip text search)
+
+---
+
+### CryostatDocument
+
+**Collection:** `cryostat`
+
+A long-lived piece of lab hardware (dilution refrigerator). Cool-downs reference this entity via ``cryo_id``.
+
+**Indexes:**
+
+- `(project_id, cryo_id)` - Unique compound index
+
+```python
+class CryostatDocument(Document):
+    project_id: str
+    cryo_id: str                 # Project-unique (e.g. "K-101")
+    name: str = ""
+    manufacturer: str = ""
+    model: str = ""
+    location: str = ""
+    status: str = "active"       # active | maintenance | decommissioned
+    commissioned_at: datetime | None = None
+    decommissioned_at: datetime | None = None
+    note: NoteModel              # Free-form note (shared NoteModel)
+    system_info: SystemInfoModel
+```
+
+CRUD endpoints under `/cryostats`. The `/cryo` UI page manages these.
+
+---
+
+### CooldownDocument
+
+**Collection:** `cooldown`
+
+One cool-down / warm-up cycle of one cryostat. The cool-down's `cooldown_id` is denormalized onto every task result, qubit history, and coupling history written while the chip is loaded into the cool-down — see [history denormalization](#history-denormalization-of-cooldown_id) below.
+
+**Indexes:**
+
+- `(project_id, cooldown_id)` - Unique compound index
+- `(project_id, cryo_id, started_at DESC)` - Cool-downs by cryostat (newest first)
+- `(project_id, chip_ids, started_at DESC)` - Cool-downs containing a chip
+- `(project_id, started_at DESC)` - Project-wide chronological list
+
+```python
+class CooldownDocument(Document):
+    project_id: str
+    cooldown_id: str             # Project-unique (e.g. "2026-001")
+    cryo_id: str                 # Owning cryostat
+    description: str = ""
+    started_at: datetime
+    ended_at: datetime | None = None  # None = ongoing
+    chip_ids: list[str] = []     # Chips loaded into this cool-down
+    note: NoteModel
+    system_info: SystemInfoModel
+```
+
+CRUD endpoints under `/cooldowns`. Chip assignment via:
+
+- `POST /cooldowns/{cooldown_id}/chips/{chip_id}` — assign (also sets `chip.current_cooldown_id` if the cool-down is active)
+- `DELETE /cooldowns/{cooldown_id}/chips/{chip_id}` — unassign (also clears `chip.current_cooldown_id` if it pointed here)
+
+#### History denormalization of `cooldown_id`
+
+When the workflow persists calibration data, the chip's `current_cooldown_id` is copied at write time onto:
+
+- `TaskResultHistoryDocument.cooldown_id`
+- `QubitHistoryDocument.cooldown_id`
+- `CouplingHistoryDocument.cooldown_id`
+
+This lets dashboards and metrics queries filter "show me only data from cool-down 2026-001" with a direct indexed lookup, instead of joining on time ranges.
+
+A partial sparse index `(project_id, cooldown_id, start_at DESC)` on `task_result_history` ensures that cool-down filters scan only annotated rows.
 
 ---
 

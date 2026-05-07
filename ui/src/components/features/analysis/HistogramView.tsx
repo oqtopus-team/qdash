@@ -11,9 +11,14 @@ import { ChipSelector } from "@/components/selectors/ChipSelector";
 import { DataTable } from "@/components/ui/DataTable";
 import { ErrorCard } from "@/components/ui/ErrorCard";
 import { QuantumLoader } from "@/components/ui/QuantumLoader";
+import { TimeRangeSelector } from "@/components/ui/TimeRangeSelector";
 import { useCSVExport } from "@/hooks/useCSVExport";
 import { useMetricsConfig } from "@/hooks/useMetricsConfig";
-import { useHistogramUrlState } from "@/hooks/useUrlState";
+import { useMetricsQueryParams } from "@/hooks/useMetricsQueryParams";
+import {
+  useHistogramUrlState,
+  useRangeModeUrlState,
+} from "@/hooks/useUrlState";
 import { naturalSortQIDs } from "@/lib/utils/qid";
 
 interface HistogramDataPoint {
@@ -37,19 +42,20 @@ export function HistogramView() {
   // URL state management
   const {
     selectedChip,
-    timeRange,
     selectionMode,
     selectedParameter,
     showAsErrorRate,
     customThreshold,
     setSelectedChip,
-    setTimeRange,
     setSelectionMode,
     setSelectedParameter,
     setShowAsErrorRate,
     setCustomThreshold,
     isInitialized,
   } = useHistogramUrlState();
+
+  const { startDate, endDate, setStartDate, setEndDate, setQuickRange } =
+    useRangeModeUrlState();
 
   // Load metrics configuration from backend
   const {
@@ -180,19 +186,13 @@ export function HistogramView() {
     }
   }, [selectedChip, chipsResponse, setSelectedChip]);
 
-  // Convert time range to hours
-  const withinHours = useMemo(() => {
-    switch (timeRange) {
-      case "1d":
-        return 24;
-      case "7d":
-        return 24 * 7;
-      case "30d":
-        return 24 * 30;
-      default:
-        return 24 * 7;
-    }
-  }, [timeRange]);
+  // Build API params
+  const { queryParams: metricsQueryParams, canFetch } = useMetricsQueryParams({
+    selectionMode,
+    startDate,
+    endDate,
+    selectedChip,
+  });
 
   // Fetch metrics data using the same API as metrics page
   const {
@@ -200,19 +200,12 @@ export function HistogramView() {
     isLoading,
     isError,
     error,
-  } = useGetChipMetrics(
-    selectedChip,
-    {
-      within_hours: withinHours,
-      selection_mode: selectionMode,
+  } = useGetChipMetrics(selectedChip, metricsQueryParams, {
+    query: {
+      enabled: canFetch,
+      staleTime: 30000,
     },
-    {
-      query: {
-        enabled: !!selectedChip,
-        staleTime: 30000,
-      },
-    },
-  );
+  });
 
   // Extract and transform raw data from metrics API for histogram (single metric)
   const histogramData = useMemo(() => {
@@ -545,7 +538,7 @@ export function HistogramView() {
       bargap: 0.1,
       annotations: [
         {
-          text: `Time range: ${timeRange === "1d" ? "Last 1 Day" : timeRange === "7d" ? "Last 7 Days" : "Last 30 Days"} | Mode: ${selectionMode === "latest" ? "Latest" : selectionMode === "best" ? "Best" : "Average"}<br>Sample size: ${histogramData.length} ${isCoupling ? "coupling pairs" : "qubits"}`,
+          text: `Time range: ${startDate} — ${endDate} | Mode: ${selectionMode === "latest" ? "Latest" : selectionMode === "best" ? "Best" : "Average"}<br>Sample size: ${histogramData.length} ${isCoupling ? "coupling pairs" : "qubits"}`,
           showarrow: false,
           xref: "paper" as const,
           yref: "paper" as const,
@@ -561,7 +554,8 @@ export function HistogramView() {
     selectedParameter,
     currentMetricConfig,
     metricType,
-    timeRange,
+    startDate,
+    endDate,
     selectionMode,
     histogramData,
     showAsErrorRate,
@@ -589,12 +583,12 @@ export function HistogramView() {
       String(row.value.toFixed(6)),
       selectedParameter,
       isCoupling ? "coupling_pair" : "qubit",
-      timeRange,
+      `${startDate}..${endDate}`,
       selectionMode,
       timestamp,
     ]);
 
-    const filename = `histogram_${selectedParameter}_${selectedChip}_${timeRange}_${selectionMode}_${timestamp
+    const filename = `histogram_${selectedParameter}_${selectedChip}_${selectionMode}_${timestamp
       .slice(0, 19)
       .replace(/[:-]/g, "")}.csv`;
 
@@ -794,29 +788,17 @@ export function HistogramView() {
               </div>
             </div>
 
-            {/* Row 1b: Time Range + Mode + Display Toggle + Export */}
-            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-              <div className="join h-8 sm:h-9">
-                <button
-                  className={`join-item btn btn-sm h-full ${timeRange === "1d" ? "btn-primary" : ""}`}
-                  onClick={() => setTimeRange("1d")}
-                >
-                  1D
-                </button>
-                <button
-                  className={`join-item btn btn-sm h-full ${timeRange === "7d" ? "btn-primary" : ""}`}
-                  onClick={() => setTimeRange("7d")}
-                >
-                  7D
-                </button>
-                <button
-                  className={`join-item btn btn-sm h-full ${timeRange === "30d" ? "btn-primary" : ""}`}
-                  onClick={() => setTimeRange("30d")}
-                >
-                  30D
-                </button>
-              </div>
+            {/* Time Range */}
+            <TimeRangeSelector
+              startDate={startDate}
+              endDate={endDate}
+              onStartDateChange={setStartDate}
+              onEndDateChange={setEndDate}
+              onQuickRange={setQuickRange}
+            />
 
+            {/* Mode + Display Toggle + Export */}
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
               <div className="join h-8 sm:h-9">
                 <button
                   className={`join-item btn btn-xs sm:btn-sm h-full ${selectionMode === "latest" ? "btn-primary" : ""}`}

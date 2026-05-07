@@ -102,10 +102,21 @@ def update_issue_knowledge(
         knowledge_id=knowledge_id,
         title=body.title,
         severity=body.severity,
+        human_label=body.human_label,
+        failure_mode_labels=body.failure_mode_labels,
+        case_type=body.case_type,
+        model_error_type=body.model_error_type,
+        resolution_label=body.resolution_label,
         symptom=body.symptom,
+        model_prediction=body.model_prediction,
+        human_review_decision=body.human_review_decision,
         root_cause=body.root_cause,
         resolution=body.resolution,
+        boundary_criteria=body.boundary_criteria,
         lesson_learned=body.lesson_learned,
+        applicability=body.applicability,
+        counterexample=body.counterexample,
+        prompt_guidance=body.prompt_guidance,
     )
 
 

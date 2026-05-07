@@ -353,7 +353,7 @@ class QubexTask(BaseTask):
             ```python
             # Single parameter override
             task_details = {
-                "ChevronPattern": {
+                "CheckFineChevron": {
                     "input_parameters": {
                         "readout_amplitude": {"value": 0.15}
                     }
@@ -362,7 +362,7 @@ class QubexTask(BaseTask):
 
             # Multiple parameter overrides
             task_details = {
-                "ChevronPattern": {
+                "CheckFineChevron": {
                     "input_parameters": {
                         "qubit_frequency": {"value": 5.2},
                         "readout_amplitude": {"value": 0.15}

@@ -1,19 +1,26 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 
 import { keepPreviousData } from "@tanstack/react-query";
+import { Bot } from "lucide-react";
 
 import { formatDateTime } from "@/lib/utils/datetime";
 
 import { CouplingGrid } from "./CouplingGrid";
 import { TaskResultGrid } from "./TaskResultGrid";
+import { ChipManageModal } from "./ChipManageModal";
+import {
+  getAiTriageBadgeState,
+  type AiTriageBadgeState,
+} from "./aiTriageBadge";
 import { CreateChipModal } from "./modals/CreateChipModal";
 
 import type { Task, MuxDetailResponseDetail, TaskInfo } from "@/schemas";
 
 import { useListChipMuxes, useGetChip, useListChips } from "@/client/chip/chip";
+import { useGetChipNotesSummary } from "@/client/note/note";
 import {
   useListTaskInfo,
   useGetTaskFileSettings,
@@ -21,6 +28,7 @@ import {
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { TaskDetailModal } from "@/components/features/chip/modals/TaskDetailModal";
 import { ChipSelector } from "@/components/selectors/ChipSelector";
+import { CooldownSelector } from "@/components/selectors/CooldownSelector";
 import { DateSelector } from "@/components/selectors/DateSelector";
 import { TaskSelector } from "@/components/selectors/TaskSelector";
 import { PageContainer } from "@/components/ui/PageContainer";
@@ -103,6 +111,7 @@ export function ChipPageContent() {
   const [selectedTaskInfo, setSelectedTaskInfo] =
     useState<SelectedTaskInfo | null>(null);
   const [isCreateChipModalOpen, setIsCreateChipModalOpen] = useState(false);
+  const [isManageChipModalOpen, setIsManageChipModalOpen] = useState(false);
 
   // Track previous date to distinguish modal navigation from external navigation
   const [previousDate, setPreviousDate] = useState(selectedDate);
@@ -113,6 +122,22 @@ export function ChipPageContent() {
 
   // Get task list from task-files API
   const { data: taskInfoData } = useListTaskInfo({ backend: defaultBackend });
+
+  const { data: notesSummaryData } = useGetChipNotesSummary(selectedChip, {
+    query: { enabled: !!selectedChip, staleTime: 30_000 },
+  });
+
+  const aiTriageBadgesByTaskId = useMemo(() => {
+    const badges = new Map<string, AiTriageBadgeState>();
+    for (const entry of notesSummaryData?.data?.task_notes ?? []) {
+      const content = entry.note?.content ?? "";
+      const badge = getAiTriageBadgeState(content);
+      if (badge) {
+        badges.set(entry.task_id, badge);
+      }
+    }
+    return badges;
+  }, [notesSummaryData]);
 
   // Use custom hook for date navigation
   const {
@@ -354,26 +379,37 @@ export function ChipPageContent() {
             description="View calibration tasks and qubit results"
             actions={
               canEdit && (
-                <button
-                  className="btn btn-primary btn-sm w-fit"
-                  onClick={() => setIsCreateChipModalOpen(true)}
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-5 w-5"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
+                <div className="flex items-center gap-2 w-fit">
+                  {selectedChip && (
+                    <button
+                      className="btn btn-ghost btn-sm w-fit"
+                      onClick={() => setIsManageChipModalOpen(true)}
+                      title="Edit chip metadata or delete this chip"
+                    >
+                      Manage
+                    </button>
+                  )}
+                  <button
+                    className="btn btn-primary btn-sm w-fit"
+                    onClick={() => setIsCreateChipModalOpen(true)}
                   >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 4v16m8-8H4"
-                    />
-                  </svg>
-                  Create Chip
-                </button>
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-5 w-5"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 4v16m8-8H4"
+                      />
+                    </svg>
+                    Create Chip
+                  </button>
+                </div>
               )
             }
             className="mb-0"
@@ -418,6 +454,19 @@ export function ChipPageContent() {
                   selectedDate={selectedDate}
                   onDateSelect={setSelectedDate}
                   disabled={!selectedChip}
+                />
+              </PageFiltersBar.Item>
+              <PageFiltersBar.Item className="sm:min-w-48">
+                <CooldownSelector
+                  chipId={selectedChip}
+                  onPick={(cd) => {
+                    // Jump to the most recent day within the cool-down so the
+                    // chip page shows its end-of-cool-down state.
+                    const target = cd.ended_at
+                      ? new Date(cd.ended_at)
+                      : new Date();
+                    setSelectedDate(target.toISOString().slice(0, 10));
+                  }}
                 />
               </PageFiltersBar.Item>
               <PageFiltersBar.Item className="sm:min-w-96">
@@ -483,6 +532,7 @@ export function ChipPageContent() {
               selectedDate={selectedDate}
               gridSize={gridSize}
               onDateChange={setSelectedDate}
+              aiTriageBadgesByTaskId={aiTriageBadgesByTaskId}
             />
           ) : viewMode === "2q" ? (
             <CouplingGrid
@@ -495,6 +545,7 @@ export function ChipPageContent() {
               selectedDate={selectedDate}
               gridSize={gridSize}
               onDateChange={setSelectedDate}
+              aiTriageBadgesByTaskId={aiTriageBadgesByTaskId}
             />
           ) : (
             <div className="space-y-4">
@@ -584,6 +635,9 @@ export function ChipPageContent() {
                                     }
 
                                     const figurePath = getFigurePath(task);
+                                    const aiTriageBadge = task.task_id
+                                      ? aiTriageBadgesByTaskId.get(task.task_id)
+                                      : null;
 
                                     return (
                                       <div key={qid} className="relative group">
@@ -602,15 +656,30 @@ export function ChipPageContent() {
                                             <div className="text-sm font-medium mb-2">
                                               <div className="flex justify-between items-center mb-1">
                                                 <span>QID: {qid}</span>
-                                                <div
-                                                  className={`w-2 h-2 rounded-full ${
-                                                    task.status === "completed"
-                                                      ? "bg-success"
-                                                      : task.status === "failed"
-                                                        ? "bg-error"
-                                                        : "bg-warning"
-                                                  }`}
-                                                />
+                                                <div className="flex items-center gap-1">
+                                                  {aiTriageBadge && (
+                                                    <span
+                                                      className={`badge ${aiTriageBadge.badgeClass} badge-xs gap-1`}
+                                                      title={
+                                                        aiTriageBadge.title
+                                                      }
+                                                    >
+                                                      <Bot className="h-3 w-3" />
+                                                      {aiTriageBadge.label}
+                                                    </span>
+                                                  )}
+                                                  <div
+                                                    className={`w-2 h-2 rounded-full ${
+                                                      task.status ===
+                                                      "completed"
+                                                        ? "bg-success"
+                                                        : task.status ===
+                                                            "failed"
+                                                          ? "bg-error"
+                                                          : "bg-warning"
+                                                    }`}
+                                                  />
+                                                </div>
                                               </div>
                                               {task.end_at && (
                                                 <div className="text-xs text-base-content/60">
@@ -635,11 +704,12 @@ export function ChipPageContent() {
 
                                         {/* Detail Analysis Button */}
                                         <button
-                                          onClick={() =>
+                                          onClick={(event) => {
+                                            event.stopPropagation();
                                             router.push(
                                               `/chip/${selectedChip}/qubit/${qid}`,
-                                            )
-                                          }
+                                            );
+                                          }}
                                           className="absolute top-2 right-2 btn btn-xs btn-primary opacity-0 group-hover:opacity-100 transition-opacity duration-200"
                                           title="Detailed Analysis"
                                         >
@@ -689,6 +759,15 @@ export function ChipPageContent() {
           setSelectedChip(chipId);
         }}
       />
+
+      {/* Manage Chip Modal */}
+      {isManageChipModalOpen && selectedChip && (
+        <ChipManageModal
+          chipId={selectedChip}
+          onClose={() => setIsManageChipModalOpen(false)}
+          onDeleted={() => setSelectedChip("")}
+        />
+      )}
     </PageContainer>
   );
 }

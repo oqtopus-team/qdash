@@ -375,8 +375,9 @@ class CalibService:
             from prefect.context import get_run_context
 
             ctx = get_run_context()
-            if ctx and ctx.flow_run and ctx.flow_run.parameters:
-                value = ctx.flow_run.parameters.get("source_execution_id")
+            flow_run = getattr(ctx, "flow_run", None)
+            if flow_run and flow_run.parameters:
+                value = flow_run.parameters.get("source_execution_id")
                 return str(value) if value is not None else None
         except Exception:
             logger.debug("No Prefect run context available for source_execution_id")
@@ -390,8 +391,9 @@ class CalibService:
             from prefect.context import get_run_context
 
             ctx = get_run_context()
-            if ctx and ctx.flow_run:
-                flow_run_id = str(ctx.flow_run.id)
+            flow_run = getattr(ctx, "flow_run", None)
+            if flow_run:
+                flow_run_id = str(flow_run.id)
                 es = self.execution_service
                 if es is not None:
                     es.update_note("flow_run_id", flow_run_id)

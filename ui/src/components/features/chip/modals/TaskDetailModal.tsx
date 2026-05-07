@@ -15,11 +15,18 @@ import type { Task } from "@/schemas";
 import { useGetTaskResult } from "@/client/task/task";
 import { InteractiveFigureContent } from "@/components/charts/InteractiveFigureContent";
 import { TaskFigure } from "@/components/charts/TaskFigure";
+import { TaskResultMemo } from "@/components/features/metrics/TaskResultMemo";
+import { ReanalysisPanel } from "@/components/features/qubit/ReanalysisPanel";
 import {
   formatDate as formatDateUtil,
   formatTime as formatTimeUtil,
   formatDateTime as formatDateTimeUtil,
 } from "@/lib/utils/datetime";
+
+const REANALYZABLE_TASKS = new Set([
+  "CheckResonatorSpectroscopy",
+  "CheckQubitSpectroscopy",
+]);
 
 interface TaskDetailModalProps {
   isOpen: boolean;
@@ -214,6 +221,7 @@ export function TaskDetailModal({
   };
 
   const precision = variant === "detailed" ? 6 : 4;
+  const noteTaskId = task.task_id || taskId;
 
   const modalTitle =
     variant === "detailed" && taskName
@@ -228,7 +236,10 @@ export function TaskDetailModal({
       aria-modal="true"
       role="dialog"
     >
-      <div className="modal-box w-fit min-w-[500px] max-w-[95vw] h-fit max-h-[95vh] p-6 rounded-2xl shadow-xl bg-base-100 overflow-y-auto">
+      <div
+        className="modal-box w-fit min-w-[500px] max-w-[95vw] h-fit max-h-[95vh] p-6 rounded-2xl shadow-xl bg-base-100 overflow-y-auto"
+        onClick={(event) => event.stopPropagation()}
+      >
         <div className="flex justify-between items-center mb-6">
           <h3 id="modal-title" className="font-bold text-xl">
             {modalTitle}
@@ -537,6 +548,14 @@ export function TaskDetailModal({
               </div>
             )}
 
+            {noteTaskId && (
+              <TaskResultMemo
+                taskId={noteTaskId}
+                chipId={chipId}
+                hideWhenEmpty
+              />
+            )}
+
             {/* Parameters Tables (detailed variant only) */}
             {variant === "detailed" && (
               <>
@@ -656,6 +675,21 @@ export function TaskDetailModal({
                           </tbody>
                         </table>
                       </div>
+                    </div>
+                  )}
+
+                {/* Re-analysis Panel (preview-only re-run for spectroscopy tasks) */}
+                {chipId &&
+                  task.name &&
+                  REANALYZABLE_TASKS.has(task.name) &&
+                  task.task_id && (
+                    <div className="mb-6">
+                      <ReanalysisPanel
+                        chipId={chipId}
+                        qubitId={qid}
+                        taskName={task.name}
+                        sourceTaskId={task.task_id}
+                      />
                     </div>
                   )}
 

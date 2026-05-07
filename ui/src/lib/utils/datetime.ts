@@ -1,6 +1,40 @@
 import { formatInTimeZone, toZonedTime } from "date-fns-tz";
 
+export function dateToDateTimeLocal(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  const h = String(date.getHours()).padStart(2, "0");
+  const min = String(date.getMinutes()).padStart(2, "0");
+  return `${y}-${m}-${d}T${h}:${min}`;
+}
+
+export function toDateTimeLocal(isoString: string): string {
+  if (isoString.includes("T")) return isoString.slice(0, 16);
+  return `${isoString}T00:00`;
+}
+
+export function toIsoSeconds(dt: string): string {
+  if (dt.length === 16) return `${dt}:00${getTimezoneOffsetString()}`;
+  return dt;
+}
+
 const DEFAULT_TIMEZONE = process.env.NEXT_PUBLIC_TIMEZONE || "Asia/Tokyo";
+
+export function getTimezoneOffsetString(
+  timezone: string = DEFAULT_TIMEZONE,
+): string {
+  const fmt = new Intl.DateTimeFormat("en-US", {
+    timeZone: timezone,
+    timeZoneName: "longOffset",
+  });
+  const part = fmt
+    .formatToParts(new Date())
+    .find((p) => p.type === "timeZoneName");
+  const raw = part?.value ?? "GMT";
+  if (raw === "GMT") return "+00:00";
+  return raw.replace("GMT", "");
+}
 
 /**
  * Format a UTC datetime string to local timezone.

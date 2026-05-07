@@ -2,7 +2,7 @@
 # Stage 1: Base image and system packages
 # Change frequency: Low - Most likely to be cached
 # ========================================
-FROM python:3.10.14-slim-bookworm as base
+FROM python:3.11.14-slim-bookworm as base
 
 # Install system packages by category
 # Docker CLI + compose plugin (Docker official installation)
@@ -86,9 +86,7 @@ WORKDIR /workspace/qdash
 
 # Install Python dependencies (copy only requirements.txt)
 COPY ./.devcontainer/requirements.txt ./requirements.txt
-RUN uv pip install --system --no-cache -r requirements.txt && \
-    uv pip install --system --no-cache "prefect>=3.0.0"
-
+RUN uv pip install --system --no-cache -r requirements.txt
 # ========================================
 # Stage 3: Node.js environment
 # ========================================
@@ -114,9 +112,10 @@ WORKDIR /workspace/qdash/ui
 
 # Copy only package.json and bun.lock (cache optimization)
 COPY ./ui/package.json ./package.json
+COPY ./ui/bun.lock ./bun.lock
 
 # Install dependencies
-RUN bun install
+RUN bun install --frozen-lockfile
 # ========================================
 # Stage 5: Final image
 # ========================================
@@ -130,6 +129,10 @@ RUN echo "umask 022" >> /etc/profile && \
 # Install Claude Code (native install)
 RUN curl -fsSL https://claude.ai/install.sh | bash
 ENV PATH="/root/.local/bin:${PATH}"
+
+# Install OpenAI Codex CLI
+RUN npm install -g @openai/codex && \
+    codex --version
 
 # Configure Zsh (execute last)
 ENV SHELL=/bin/zsh

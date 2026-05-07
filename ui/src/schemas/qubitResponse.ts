@@ -6,6 +6,8 @@
  * OpenAPI spec version: 0.0.1
  */
 import type { QubitResponseData } from "./qubitResponseData";
+import type { NoteModel } from "./noteModel";
+import type { QubitResponseMetricNotes } from "./qubitResponseMetricNotes";
 
 /**
  * Response model for a single qubit.
@@ -15,4 +17,6 @@ export interface QubitResponse {
   chip_id: string;
   status?: string;
   data?: QubitResponseData;
+  note?: NoteModel;
+  metric_notes?: QubitResponseMetricNotes;
 }

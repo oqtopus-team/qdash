@@ -38,6 +38,7 @@ export interface TaskResultResponse {
   task_id: string;
   task_name: string;
   qid: string;
+  chip_id?: string;
   status: string;
   execution_id: string;
   flow_name?: string;

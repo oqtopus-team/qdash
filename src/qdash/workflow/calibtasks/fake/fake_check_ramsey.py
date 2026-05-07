@@ -18,13 +18,13 @@ class FakeCheckRamsey(FakeTask):
     """Fake task to simulate Ramsey fringe measurement.
 
     Ramsey experiment measures T2* (dephasing time) and refines qubit frequency.
-    This task takes the initial qubit_frequency from ChevronPattern and outputs
+    This task takes the initial qubit_frequency from CheckFineChevron and outputs
     a more precise qubit_frequency along with t2_star.
 
     Note: Uses same name as qubex task for seamless backend switching.
 
     Inputs:
-        qubit_frequency: Initial qubit frequency from ChevronPattern (GHz)
+        qubit_frequency: Initial qubit frequency from CheckFineChevron (GHz)
         hpi_amplitude: Half-pi pulse amplitude from CheckHPI
 
     Outputs:
@@ -40,7 +40,7 @@ class FakeCheckRamsey(FakeTask):
     input_parameters: ClassVar[dict[str, ParameterModel | None]] = {
         "qubit_frequency": ParameterModel(
             unit="GHz",
-            description="Initial qubit frequency from ChevronPattern",
+            description="Initial qubit frequency from CheckFineChevron",
         ),
         "hpi_amplitude": ParameterModel(
             unit="a.u.",

@@ -8,6 +8,7 @@ import { ChevronRight, History, FileText, GitBranch, Bot } from "lucide-react";
 import type { Task } from "@/schemas";
 
 import { formatDateTime, formatDateTimeCompact } from "@/lib/utils/datetime";
+import { isChipMetricsQuery } from "@/lib/utils/queryInvalidation";
 
 import { useGetQubitTaskHistory } from "@/client/task-result/task-result";
 import { useUpdateCalibrationParameters } from "@/client/calibration/calibration";
@@ -15,6 +16,7 @@ import { TaskFigure } from "@/components/charts/TaskFigure";
 import { ParametersTable } from "@/components/features/metrics/ParametersTable";
 import { useManualOverrides } from "@/hooks/useManualOverrides";
 import { TaskResultIssues } from "@/components/features/metrics/TaskResultIssues";
+import { TaskResultMemo } from "@/components/features/metrics/TaskResultMemo";
 import type { AnalysisContext } from "@/hooks/useAnalysisChat";
 import { useAnalysisChatContext } from "@/contexts/AnalysisChatContext";
 import { AnalysisChatPanel } from "@/components/features/metrics/AnalysisChatPanel";
@@ -90,8 +92,7 @@ export function TaskHistoryModal({
             >,
           },
         });
-        await queryClient.invalidateQueries({ queryKey: ["/metrics"] });
-        await queryClient.invalidateQueries({ queryKey: ["/chip"] });
+        await queryClient.invalidateQueries({ predicate: isChipMetricsQuery });
         await queryClient.invalidateQueries({
           queryKey: [`/calibrations/manual-edits/${qid}`],
         });
@@ -401,6 +402,14 @@ export function TaskHistoryModal({
         </div>
       )}
 
+      {selectedTask?.task_id && (
+        <TaskResultMemo
+          taskId={selectedTask.task_id}
+          chipId={chipId}
+          hideWhenEmpty
+        />
+      )}
+
       {/* Parameters */}
       {selectedTask && (
         <div className="flex flex-col gap-2 mt-2">
@@ -471,6 +480,7 @@ export function TaskHistoryModal({
         className={`modal-box w-full bg-base-100 p-0 flex flex-col transition-[max-width] duration-300 ease-in-out ${
           isChatOpen ? "sm:w-[96vw] max-w-[88rem]" : "sm:w-11/12 max-w-5xl"
         }`}
+        onClick={(event) => event.stopPropagation()}
       >
         <div className="flex justify-between items-center px-3 sm:px-6 pt-3 sm:pt-5 pb-2 sm:pb-3 border-b border-base-300">
           <h3 className="font-bold text-base sm:text-lg truncate pr-2">

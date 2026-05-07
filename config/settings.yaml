@@ -12,7 +12,7 @@
 #   - fake: Testing backend with simulated measurements (no hardware required)
 #
 # Both backends use IDENTICAL task names, enabling seamless switching:
-#   task_names = ["ChevronPattern", "CheckRabi", "CheckT1"]
+#   task_names = ["CheckFineChevron", "CheckRabi", "CheckT1"]
 #
 #   # For testing without hardware
 #   config = CalibConfig(backend_name="fake", ...)
@@ -21,7 +21,7 @@
 #   config = CalibConfig(backend_name="qubex", ...)
 #
 # Fake backend available tasks (same names as qubex):
-#   - ChevronPattern: Entry point, outputs qubit_frequency, readout_frequency
+#   - CheckFineChevron: Entry point, outputs qubit_frequency, readout_frequency
 #   - CheckRabi: Rabi oscillation measurement
 #   - CheckT1: T1 relaxation time measurement
 #   - CheckT2Echo: T2 echo (Hahn echo) measurement

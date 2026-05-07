@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { Cpu } from "lucide-react";
 
 import { useTheme } from "@/contexts/ThemeContext";
 import { PasswordChangeCard } from "@/components/features/settings/PasswordChangeCard";
@@ -8,8 +9,84 @@ import { PageContainer } from "@/components/ui/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { useAuth } from "@/contexts/AuthContext";
 import { AVAILABLE_THEMES, DEV_THEMES } from "@/constants/themes";
+import { useGetCopilotConfig } from "@/client/copilot/copilot";
+import {
+  buildAnalysisModelOptions,
+  getStoredAnalysisModelKey,
+  resolveAnalysisModelOption,
+  setStoredAnalysisModelKey,
+} from "@/lib/copilotModels";
 
-type Tab = "appearance" | "account" | "api";
+type Tab = "appearance" | "copilot" | "account" | "api";
+
+function CopilotSettingsPanel() {
+  const [selectedModelKey, setSelectedModelKey] = useState(
+    getStoredAnalysisModelKey,
+  );
+  const { data: copilotConfigResponse, isLoading } = useGetCopilotConfig();
+  const modelOptions = useMemo(
+    () => buildAnalysisModelOptions(copilotConfigResponse?.data ?? null),
+    [copilotConfigResponse?.data],
+  );
+  const selectedModel = resolveAnalysisModelOption(
+    modelOptions,
+    selectedModelKey,
+  );
+
+  const handleModelChange = (key: string) => {
+    setSelectedModelKey(key);
+    setStoredAnalysisModelKey(key);
+  };
+
+  return (
+    <div className="card bg-base-200 shadow-lg" key="copilot">
+      <div className="card-body">
+        <h2 className="card-title text-xl mb-4">Copilot Settings</h2>
+        <div className="flex flex-col gap-6">
+          <div className="flex flex-col gap-3">
+            <label className="text-sm font-medium">
+              Default analysis model
+            </label>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <select
+                className="select select-bordered w-full sm:max-w-md"
+                value={selectedModel.key}
+                onChange={(event) => handleModelChange(event.target.value)}
+                disabled={isLoading}
+              >
+                {modelOptions.map((option) => (
+                  <option key={option.key} value={option.key}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              <div className="badge badge-neutral gap-1 w-fit">
+                <Cpu className="h-3 w-3" />
+                {selectedModel.model?.provider ?? "configured"}
+              </div>
+            </div>
+            <p className="text-sm text-base-content/60">
+              This controls the default model used when asking about calibration
+              task results in Ask AI. The available choices come from
+              copilot.yaml.
+            </p>
+          </div>
+
+          <div className="bg-base-100 rounded-lg p-4">
+            <div className="text-xs font-semibold text-base-content/50 mb-2">
+              Current effective model
+            </div>
+            <div className="font-mono text-sm break-all">
+              {selectedModel.model
+                ? `${selectedModel.model.provider}:${selectedModel.model.name}`
+                : selectedModel.label}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function SettingsPage() {
   const { theme, setTheme, isDevEnv } = useTheme();
@@ -52,6 +129,12 @@ export default function SettingsPage() {
             onClick={() => setActiveTab("appearance")}
           >
             Appearance
+          </a>
+          <a
+            className={`tab ${activeTab === "copilot" ? "tab-active" : ""}`}
+            onClick={() => setActiveTab("copilot")}
+          >
+            Copilot
           </a>
           <a
             className={`tab ${activeTab === "account" ? "tab-active" : ""}`}
@@ -193,6 +276,8 @@ export default function SettingsPage() {
                 </div>
               </div>
             </div>
+          ) : activeTab === "copilot" ? (
+            <CopilotSettingsPanel />
           ) : activeTab === "account" ? (
             <PasswordChangeCard key="account" />
           ) : (

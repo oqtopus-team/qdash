@@ -17,6 +17,7 @@ import { useListChips, useGetChip } from "@/client/chip/chip";
 import { useGetChipMetrics } from "@/client/metrics/metrics";
 import { QuantumLoader } from "@/components/ui/QuantumLoader";
 import { ChipSelector } from "@/components/selectors/ChipSelector";
+import { CooldownSelector } from "@/components/selectors/CooldownSelector";
 import { PageContainer } from "@/components/ui/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { MetricsPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
@@ -25,6 +26,7 @@ import { useMetricsUrlState } from "@/hooks/useUrlState";
 import { getDaisySelectStyles } from "@/lib/react-select-theme";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { getTimezoneOffsetString } from "@/lib/utils/datetime";
 import { PageFiltersBar } from "@/components/ui/PageFiltersBar";
 
 type MetricOption = {
@@ -137,8 +139,12 @@ export function MetricsPageContent() {
             ? 24 * 30
             : 24 * 7; // Default to 7 days
 
-  const absoluteStartIso = startDate ? `${startDate}T00:00:00` : null;
-  const absoluteEndIso = endDate ? `${endDate}T23:59:59` : null;
+  const absoluteStartIso = startDate
+    ? `${startDate}T00:00:00${getTimezoneOffsetString()}`
+    : null;
+  const absoluteEndIso = endDate
+    ? `${endDate}T23:59:59${getTimezoneOffsetString()}`
+    : null;
 
   const metricsQueryParams = isAbsolute
     ? {
@@ -558,6 +564,23 @@ export function MetricsPageContent() {
                 <ChipSelector
                   selectedChip={selectedChip}
                   onChipSelect={setSelectedChip}
+                />
+              </PageFiltersBar.Item>
+
+              <PageFiltersBar.Item>
+                <CooldownSelector
+                  chipId={selectedChip}
+                  onPick={(cd) => {
+                    setRangeMode("absolute");
+                    setStartDate(
+                      new Date(cd.started_at).toISOString().slice(0, 10),
+                    );
+                    setEndDate(
+                      cd.ended_at
+                        ? new Date(cd.ended_at).toISOString().slice(0, 10)
+                        : new Date().toISOString().slice(0, 10),
+                    );
+                  }}
                 />
               </PageFiltersBar.Item>
 

@@ -29,6 +29,12 @@ class CouplingHistoryDocument(Document):
     status: str = Field(..., description="The status of the coupling")
     chip_id: str = Field(..., description="The chip ID")
     data: dict[str, Any] = Field(..., description="The data of the coupling")
+    cooldown_id: str = Field(
+        default="",
+        description=(
+            "Cool-down cycle this snapshot belongs to (denormalized from chip.current_cooldown_id)."
+        ),
+    )
     system_info: SystemInfoModel = Field(..., description="The system information")
     recorded_date: str = Field(
         default_factory=lambda: now().strftime("%Y%m%d"),
@@ -60,9 +66,24 @@ class CouplingHistoryDocument(Document):
         ]
 
     @classmethod
+    def _resolve_cooldown_id(cls, *, project_id: str | None, chip_id: str | None) -> str:
+        """Look up the chip's current_cooldown_id at write time."""
+        if not project_id or not chip_id:
+            return ""
+        from qdash.dbmodel.chip import ChipDocument
+
+        chip = ChipDocument.find_one({"project_id": project_id, "chip_id": chip_id}).run()
+        if chip is None:
+            return ""
+        return getattr(chip, "current_cooldown_id", None) or ""
+
+    @classmethod
     def create_history(cls, coupling: CouplingModel) -> "CouplingHistoryDocument":
         """Create a history record from a CouplingDocument."""
         today = now().strftime("%Y%m%d")
+        cooldown_id = cls._resolve_cooldown_id(
+            project_id=coupling.project_id, chip_id=coupling.chip_id
+        )
         existing_history = cls.find_one(
             {
                 "project_id": coupling.project_id,
@@ -76,6 +97,7 @@ class CouplingHistoryDocument(Document):
             history = existing_history
             history.data = coupling.data
             history.status = coupling.status
+            history.cooldown_id = cooldown_id
         else:
             history = cls(
                 project_id=coupling.project_id,
@@ -84,6 +106,7 @@ class CouplingHistoryDocument(Document):
                 status=coupling.status,
                 chip_id=coupling.chip_id,
                 data=coupling.data,
+                cooldown_id=cooldown_id,
                 system_info=SystemInfoModel(),
             )
         history.save()

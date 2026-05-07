@@ -25,6 +25,8 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { ParametersTable } from "@/components/features/metrics/ParametersTable";
+import { TaskResultMemo } from "@/components/features/metrics/TaskResultMemo";
+import { ReanalysisPanel } from "@/components/features/qubit/ReanalysisPanel";
 import { MarkdownContent } from "@/components/ui/MarkdownContent";
 import { MarkdownEditor } from "@/components/ui/MarkdownEditor";
 import { useImageUpload } from "@/hooks/useImageUpload";
@@ -38,6 +40,11 @@ import {
 import { useProject } from "@/contexts/ProjectContext";
 import { formatDateTime, formatRelativeTime } from "@/lib/utils/datetime";
 import { useToast } from "@/components/ui/Toast";
+
+const REANALYZABLE_TASKS = new Set([
+  "CheckResonatorSpectroscopy",
+  "CheckQubitSpectroscopy",
+]);
 
 /** Extract the display value from a parameter entry (may be a dict with `value` key or a plain value). */
 function extractParamValue(entry: unknown): string {
@@ -663,6 +670,18 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
         </div>
       )}
 
+      {/* Re-analysis (preview-only re-run for spectroscopy tasks) */}
+      {taskResult.chip_id && REANALYZABLE_TASKS.has(taskResult.task_name) && (
+        <div className="mb-6">
+          <ReanalysisPanel
+            chipId={taskResult.chip_id}
+            qubitId={taskResult.qid}
+            taskName={taskResult.task_name}
+            sourceTaskId={taskResult.task_id}
+          />
+        </div>
+      )}
+
       {/* Parameters */}
       <div className="space-y-4 mb-6">
         {taskResult.input_parameters &&
@@ -730,6 +749,8 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
           </div>
         )}
       </div>
+
+      <TaskResultMemo taskId={taskId} chipId={taskResult.chip_id} />
 
       {/* Divider: Issues */}
       <div className="divider text-xs text-base-content/40">

@@ -10,6 +10,7 @@ import json
 import logging
 import math
 import os
+import re
 from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING, Any
 
@@ -22,6 +23,20 @@ else:
     from qdash.api.lib.copilot_config import CopilotConfig, ModelConfig
 
 logger = logging.getLogger(__name__)
+
+TRIAGE_DECISIONS = ("PASS_WITH_NOTE", "PASS", "REVIEW", "FAIL")
+TRIAGE_ASSESSMENT = {
+    "PASS": "good",
+    "PASS_WITH_NOTE": "warning",
+    "REVIEW": "warning",
+    "FAIL": "bad",
+}
+TRIAGE_BLOCK_PREFIXES = (
+    "**review triage**",
+    "review triage",
+    "**レビューのトリアージ**",
+    "レビューのトリアージ",
+)
 
 SYSTEM_PROMPT_BASE = """\
 You are an expert in superconducting qubit calibration.
@@ -51,6 +66,71 @@ Some tools (get_chip_parameter_timeseries, get_chip_summary) store full data
 server-side and return only a summary with a `data_key` field.
 In execute_python_analysis, access stored data via data["<data_key>"]
 (e.g., data["t1"]). Do NOT pass context_data manually.
+"""
+
+REVIEW_TRIAGE_INSTRUCTION = """\
+## Review triage output
+
+When answering about a calibration task result, begin your first text block with
+a short review triage summary before the detailed explanation. Keep it concise
+and use the following markdown shape:
+
+**Review triage**
+- Decision: `PASS` | `PASS_WITH_NOTE` | `REVIEW` | `FAIL`
+- Human label suggestion: `CORRECT` | `SUSPICIOUS` | `MISASSIGNMENT` | `NO_SIGNAL` | `ANOMALY`
+- Accepted parameter(s): parameter names and values that are well supported, or `none`
+- Needs review: parameter names and values that are weak, ambiguous, or risky, or `none`
+- Primary reason: one short sentence grounded in the plot/data
+- Closest knowledge case: case title or `none`
+- Suggested labels: comma-separated labels such as `weak_signal`, `boundary_case`, `model_overconservative`, `model_missed_issue`, or `none`
+- Recommended action: one short operator action
+- Optional note: one short caveat only when useful, otherwise `none`
+
+For reliable parsing, the JSON `explanation` string MUST start exactly with
+`**Review triage**`. Every triage field line MUST begin with hyphen-space
+(`- `). Do not omit the hyphens, do not bold the field names, and do not put
+ordinary prose before the triage block. Use this exact skeleton before any
+detailed explanation:
+
+**Review triage**
+- Decision: `PASS` | `PASS_WITH_NOTE` | `REVIEW` | `FAIL`
+- Human label suggestion: `CORRECT` | `SUSPICIOUS` | `MISASSIGNMENT` | `NO_SIGNAL` | `ANOMALY`
+- Accepted parameter(s): ...
+- Needs review: ...
+- Primary reason: ...
+- Closest knowledge case: ...
+- Suggested labels: ...
+- Recommended action: ...
+- Optional note: ...
+
+Keep the triage fields internally consistent:
+- Use `PASS` only when all important output parameters are visually and physically supported.
+  For `PASS`, set `Needs review: none`, `Suggested labels: none`, and make the recommended
+  action an accept/use action rather than a remeasurement action.
+- Use `PASS_WITH_NOTE` only when all output parameters that would be updated are
+  acceptable without human intervention, but there is a minor caveat or optional
+  follow-up. Put non-blocking caveats in `Optional note`, not in `Needs review`.
+- Use `REVIEW` when any important output parameter should not be auto-accepted without a
+  human check. If you use labels such as `weak_signal`, `boundary_case`, `ambiguous_doublet`,
+  or `frequency_offset` for a parameter that affects acceptance, prefer `REVIEW`.
+- If the detailed explanation says a parameter should be treated cautiously, maintained
+  from history, not overwritten, rechecked before update, or used only as a reference value,
+  then that parameter MUST appear in `Needs review` and the decision MUST be `REVIEW`.
+- Do not set `Needs review: none` if the recommended action includes rechecking,
+  maintaining, withholding, or not overwriting any output parameter.
+- In `Accepted parameter(s)`, list only parameters you would allow the workflow to update
+  automatically from this result. If a parameter is plausible but not update-safe, put it
+  in `Needs review`, not in `Accepted parameter(s)`.
+- Use `FAIL` for no visible signal, clear misassignment, measurement failure, or anomaly.
+- Assessment consistency: set the top-level assessment to `good` for `PASS`,
+  `warning` for `PASS_WITH_NOTE` or `REVIEW`, and `bad` for `FAIL`.
+
+Then continue with the detailed explanation. In the detailed explanation:
+- Separate visual support for each key parameter instead of giving one blended confidence.
+- If f01/f12, resonator/Purcell, or similar paired features are involved, evaluate each feature independently.
+- Use past cases as operational knowledge: state which case is closest, which lessons apply, and which lessons do not apply.
+- Avoid overclaiming from visual plausibility alone; distinguish "visually supported", "plausible from history/physics", and "needs review".
+- End with action-oriented recommendations that an operator can execute.
 """
 
 MAX_TOOL_ROUNDS = 10
@@ -607,6 +687,10 @@ Rules:
 - `potential_issues` and `recommendations` MUST be JSON arrays of strings. Use an empty array `[]` when nothing applies — never a single string or null.
 - `assessment` MUST be exactly one of `good`, `warning`, `bad` (lowercase).
 - Write the user-facing text fields (`summary`, `explanation`, items in `potential_issues` and `recommendations`) in the user's response language as instructed above. Keep technical terms like T1, T2, fidelity in English.
+- The `explanation` field MUST begin with the exact review triage markdown described above, starting with `**Review triage**`.
+- Put the triage fields inside `explanation`; do not add extra JSON keys for them.
+- Keep `assessment` consistent with the triage decision: `good` for `PASS`, `warning` for `PASS_WITH_NOTE` or `REVIEW`, and `bad` for `FAIL`.
+- Keep the response concise for interactive use: after the triage, write at most 6 short bullets or 3 short paragraphs in `explanation`, at most 3 potential issues, and at most 3 recommendations.
 - Do not add keys outside this schema.
 """
 
@@ -614,18 +698,60 @@ Rules:
 def _build_client(config: CopilotConfig) -> AsyncOpenAI:
     """Build an AsyncOpenAI client based on provider configuration."""
     provider = config.model.provider
+    base_url = _resolve_model_config_value(config.model.base_url, field_name="base_url")
+    api_key_env = config.model.api_key_env
 
     if provider == "ollama":
-        base_url = os.environ.get("OLLAMA_URL", "http://localhost:11434") + "/v1"
-        return AsyncOpenAI(base_url=base_url, api_key=os.environ.get("OLLAMA_API_KEY", "ollama"))
+        default_endpoint = os.environ.get("OLLAMA_URL") or "http://localhost:11434"
+        endpoint = (base_url or default_endpoint).rstrip("/")
+        if not endpoint.endswith("/v1"):
+            endpoint = f"{endpoint}/v1"
+        key_env = api_key_env or "OLLAMA_API_KEY"
+        return AsyncOpenAI(base_url=endpoint, api_key=os.environ.get(key_env, "ollama"))
     elif provider == "openai":
-        return AsyncOpenAI()  # uses OPENAI_API_KEY env var
+        if base_url:
+            base_url = _normalize_openai_compatible_base_url(base_url)
+            key = os.environ.get(api_key_env or "OPENAI_API_KEY", "local")
+            return AsyncOpenAI(base_url=base_url, api_key=key)
+        return AsyncOpenAI(api_key=os.environ.get(api_key_env or "OPENAI_API_KEY"))
     elif provider == "anthropic":
         raise ValueError(
             "Anthropic provider is not supported with openai SDK. Use openai or ollama."
         )
     else:
         raise ValueError(f"Unknown LLM provider: {provider}")
+
+
+def _normalize_openai_compatible_base_url(base_url: str) -> str:
+    """Normalize local OpenAI-compatible endpoints to the SDK's expected base URL."""
+    endpoint = base_url.rstrip("/")
+    if not endpoint.endswith("/v1"):
+        endpoint = f"{endpoint}/v1"
+    return endpoint
+
+
+def _resolve_model_config_value(value: str | None, *, field_name: str) -> str | None:
+    """Resolve model config strings that reference environment variables.
+
+    Supports ``env:VAR_NAME`` and ``${VAR_NAME}`` forms. Resolution happens when
+    the model is selected, so optional local model entries do not require their
+    environment variables to exist at startup.
+    """
+    if not value:
+        return value
+    if value.startswith("env:"):
+        env_name = value.removeprefix("env:").strip()
+        resolved = os.environ.get(env_name)
+        if not resolved:
+            raise ValueError(f"{field_name} environment variable is not set: {env_name}")
+        return resolved
+    if value.startswith("${") and value.endswith("}"):
+        env_name = value[2:-1].strip()
+        resolved = os.environ.get(env_name)
+        if not resolved:
+            raise ValueError(f"{field_name} environment variable is not set: {env_name}")
+        return resolved
+    return value
 
 
 def _build_language_instruction(config: CopilotConfig | None) -> str:
@@ -645,7 +771,7 @@ def _build_language_instruction(config: CopilotConfig | None) -> str:
 
     parts: list[str] = []
 
-    if thinking_lang != response_lang:
+    if thinking_lang != response_lang and not config.model.disable_thinking_instruction:
         parts.append(f"Think and reason internally in {thinking_lang} for technical precision.")
 
     if response_lang == "ja":
@@ -711,6 +837,7 @@ def _build_system_prompt(
 
     # Task knowledge
     parts.append(context.task_knowledge_prompt)
+    parts.append(REVIEW_TRIAGE_INSTRUCTION)
 
     # Scoring thresholds from deployment config
     if config and config.scoring:
@@ -947,22 +1074,103 @@ def _strip_code_fences(text: str) -> str:
     return text
 
 
+def _extract_triage_fallback(content: str) -> AnalysisResponse | None:
+    """Build a legacy response from a free-form review triage block."""
+    fields = {
+        "Decision": "",
+        "Human label suggestion": "",
+        "Accepted parameter(s)": "",
+        "Needs review": "",
+        "Primary reason": "",
+        "Closest knowledge case": "",
+        "Suggested labels": "",
+        "Recommended action": "",
+        "Optional note": "",
+    }
+    for field in fields:
+        match = re.search(rf"^\s*[-*]\s+{re.escape(field)}:\s*(.*)$", content, re.M)
+        if not match:
+            continue
+        value = match.group(1).strip().strip("`")
+        if field == "Decision":
+            for decision in TRIAGE_DECISIONS:
+                if re.search(rf"\b{decision}\b", value):
+                    value = decision
+                    break
+        fields[field] = value
+
+    decision = fields["Decision"]
+    if not decision:
+        return None
+
+    triage = "\n".join(
+        [
+            "**Review triage**",
+            *(f"- {field}: {value or 'none'}" for field, value in fields.items()),
+        ]
+    )
+    return AnalysisResponse(
+        summary=fields["Primary reason"] or "Analysis complete",
+        assessment=TRIAGE_ASSESSMENT.get(decision, "warning"),
+        explanation=triage,
+        potential_issues=(
+            [] if decision in {"PASS", "PASS_WITH_NOTE"} else [fields["Primary reason"]]
+        ),
+        recommendations=[fields["Recommended action"]] if fields["Recommended action"] else [],
+    )
+
+
+def _has_triage_block(text: str) -> bool:
+    """Return True when text starts with the required review-triage block."""
+    return text.lower().lstrip().startswith(TRIAGE_BLOCK_PREFIXES)
+
+
+def _missing_triage_response(content: str) -> AnalysisResponse:
+    """Return a safe review note when a local model omits required triage fields."""
+    summary = "AI triage response did not include the required review block."
+    triage = "\n".join(
+        [
+            "**Review triage**",
+            "- Decision: `REVIEW`",
+            "- Human label suggestion: `SUSPICIOUS`",
+            "- Accepted parameter(s): `none`",
+            "- Needs review: `all output parameters`",
+            f"- Primary reason: {summary}",
+            "- Closest knowledge case: `none`",
+            "- Suggested labels: `model_format_error`",
+            "- Recommended action: Open the task result and review the plot manually.",
+            "- Optional note: The raw local-model response was missing the triage block.",
+        ]
+    )
+    return AnalysisResponse(
+        summary=summary,
+        assessment="warning",
+        explanation=triage,
+        potential_issues=[summary],
+        recommendations=["Open the task result and review the plot manually."],
+    )
+
+
 def _parse_response(content: str) -> AnalysisResponse:
     """Parse LLM response into AnalysisResponse, handling JSON and plain text."""
     text = _strip_code_fences(content)
 
     try:
         data = json.loads(text)
-        return AnalysisResponse(**data)
+        response = AnalysisResponse(**data)
+        if response.explanation and _has_triage_block(response.explanation):
+            return response
+        fallback_response = _extract_triage_fallback(response.explanation or content)
+        if fallback_response is not None:
+            return fallback_response
+        logger.warning("Local model response omitted required review triage block: %s", content)
+        return _missing_triage_response(content)
     except (json.JSONDecodeError, ValueError):
-        # If JSON parsing fails, treat the entire response as explanation
-        return AnalysisResponse(
-            summary="Analysis complete",
-            assessment="warning",
-            explanation=content,
-            potential_issues=[],
-            recommendations=[],
-        )
+        fallback_response = _extract_triage_fallback(content)
+        if fallback_response is not None:
+            return fallback_response
+        logger.warning("Local model response omitted required review triage block: %s", content)
+        return _missing_triage_response(content)
 
 
 _ASSESSMENT_LABELS_JA = {
@@ -1133,15 +1341,27 @@ def _legacy_to_blocks(
         if content and content.strip():
             blocks.append({"type": "text", "content": content, "chart": None})
 
-    badge = _format_assessment_badge(response.assessment, lang)
     summary = (response.summary or "").strip()
+    explanation = (response.explanation or "").strip()
+
+    # Local/Ollama analysis uses the legacy JSON schema. If the model followed
+    # the review-triage instruction, preserve that operational triage as the
+    # first visible block instead of burying it under the generic assessment
+    # badge.
+    normalized_explanation = explanation.lower().lstrip()
+    explanation_starts_with_triage = normalized_explanation.startswith(
+        ("**review triage**", "review triage", "**レビューのトリアージ**", "レビューのトリアージ")
+    )
+    if explanation and explanation != summary and explanation_starts_with_triage:
+        _text_block(explanation)
+
+    badge = _format_assessment_badge(response.assessment, lang)
     if badge or summary:
         header = f"### {labels['assessment']}: {badge}" if badge else ""
         body = summary
         _text_block("\n\n".join(p for p in (header, body) if p))
 
-    explanation = (response.explanation or "").strip()
-    if explanation and explanation != summary:
+    if explanation and explanation != summary and not explanation_starts_with_triage:
         _text_block(f"**{labels['explanation']}**\n\n{explanation}")
 
     issues = [i for i in response.potential_issues if i and str(i).strip()]
@@ -1560,14 +1780,32 @@ async def _run_chat_completions(
     config: CopilotConfig,
 ) -> str:
     """Call Chat Completions API (Ollama fallback) and return the content."""
+    extra_body: dict[str, Any] = {}
+    if config.model.provider == "ollama":
+        options: dict[str, Any] = {}
+        if config.model.keep_alive:
+            extra_body["keep_alive"] = config.model.keep_alive
+        if config.model.num_ctx is not None:
+            options["num_ctx"] = config.model.num_ctx
+        if config.model.top_k is not None:
+            options["top_k"] = config.model.top_k
+        if options:
+            extra_body["options"] = options
+
     kwargs: dict[str, Any] = {
         "model": config.model.name,
         "messages": messages,
         "max_tokens": config.model.max_output_tokens,
         "response_format": {"type": "json_object"},
     }
+    if extra_body:
+        kwargs["extra_body"] = extra_body
     if config.model.temperature is not None:
         kwargs["temperature"] = config.model.temperature
+    if config.model.top_p is not None:
+        kwargs["top_p"] = config.model.top_p
+    if config.model.reasoning_effort:
+        kwargs["reasoning_effort"] = config.model.reasoning_effort
     try:
         response = await client.chat.completions.create(**kwargs)
     except BadRequestError as exc:
@@ -1575,9 +1813,73 @@ async def _run_chat_completions(
             logger.info("Model does not support temperature, retrying without it")
             kwargs.pop("temperature")
             response = await client.chat.completions.create(**kwargs)
+        elif "top_p" in str(exc) and "top_p" in kwargs:
+            logger.info("Model does not support top_p, retrying without it")
+            kwargs.pop("top_p")
+            response = await client.chat.completions.create(**kwargs)
+        elif "reasoning_effort" in str(exc) and "reasoning_effort" in kwargs:
+            logger.info("Model does not support reasoning_effort, retrying without it")
+            kwargs.pop("reasoning_effort")
+            response = await client.chat.completions.create(**kwargs)
         else:
             raise
-    return response.choices[0].message.content or ""
+    choice = response.choices[0]
+    message = choice.message
+    content = message.content or ""
+    reasoning_chars = 0
+    for field in ("reasoning", "reasoning_content", "thinking"):
+        value = getattr(message, field, None)
+        if isinstance(value, str):
+            reasoning_chars += len(value)
+    usage = getattr(response, "usage", None)
+    prompt_tokens = getattr(usage, "prompt_tokens", None) if usage else None
+    completion_tokens = getattr(usage, "completion_tokens", None) if usage else None
+    total_tokens = getattr(usage, "total_tokens", None) if usage else None
+    finish_reason = getattr(choice, "finish_reason", None)
+    logger.info(
+        "Chat completion finished: provider=%s model=%s finish_reason=%s "
+        "content_chars=%d reasoning_chars=%d prompt_tokens=%s completion_tokens=%s total_tokens=%s",
+        config.model.provider,
+        config.model.name,
+        finish_reason,
+        len(content),
+        reasoning_chars,
+        prompt_tokens,
+        completion_tokens,
+        total_tokens,
+    )
+    if finish_reason == "length":
+        logger.warning(
+            "Chat completion hit token limit before stop: provider=%s model=%s "
+            "content_chars=%d reasoning_chars=%d completion_tokens=%s max_tokens=%s",
+            config.model.provider,
+            config.model.name,
+            len(content),
+            reasoning_chars,
+            completion_tokens,
+            config.model.max_output_tokens,
+        )
+    if content:
+        return content
+
+    # Some local thinking models served through Ollama's OpenAI-compatible
+    # endpoint place generated text in non-standard reasoning fields while
+    # leaving content empty. Treat that as raw model output so the triage parser
+    # can extract a compact review block or mark it as a format error.
+    for field in ("reasoning", "reasoning_content", "thinking"):
+        value = getattr(message, field, None)
+        if isinstance(value, str) and value.strip():
+            logger.warning(
+                "Chat completion returned empty content; using message.%s fallback", field
+            )
+            return value
+    logger.warning(
+        "Chat completion returned no usable text: provider=%s model=%s finish_reason=%s",
+        config.model.provider,
+        config.model.name,
+        finish_reason,
+    )
+    return ""
 
 
 async def run_analysis(
@@ -1627,8 +1929,11 @@ async def run_analysis(
     # reference to the original general model so we can use it for post-
     # processing (e.g. translation to the user's response language).
     general_model = config.model
-    if config.analysis_model is not None:
-        config = config.model_copy(update={"model": config.analysis_model})
+    analysis_model = config.analysis_model
+    if analysis_model is None and config.analysis_models:
+        analysis_model = config.analysis_models[0]
+    if analysis_model is not None:
+        config = config.model_copy(update={"model": analysis_model})
     client = _build_client(config)
     provider = config.model.provider
 

@@ -18,10 +18,13 @@ import { useGetExecution } from "@/client/execution/execution";
 import { useUpdateCalibrationParameters } from "@/client/calibration/calibration";
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { formatDateTime, formatDateTimeCompact } from "@/lib/utils/datetime";
+import { isChipMetricsQuery } from "@/lib/utils/queryInvalidation";
 import { useManualOverrides } from "@/hooks/useManualOverrides";
 
 import { ParametersTable } from "./ParametersTable";
 import { TaskResultIssues } from "./TaskResultIssues";
+import { TaskResultMemo } from "./TaskResultMemo";
+import { TaskResultExcludeButton } from "./TaskResultExcludeButton";
 import type { AnalysisContext } from "@/hooks/useAnalysisChat";
 import type { MetricHistoryItem } from "./MetricHistoryView";
 import { useAnalysisChatContext } from "@/contexts/AnalysisChatContext";
@@ -185,6 +188,18 @@ export function QubitMetricHistoryModal({
 
   const selectedTask = executionTasks[selectedTaskIndex] ?? null;
 
+  // Find the metric history item that corresponds to the selected task,
+  // so the exclude button knows which task_id to flag and shows current state.
+  const selectedHistoryItem = useMemo(() => {
+    if (!selectedGroup) return null;
+    const taskId = selectedTask?.task_id;
+    if (taskId) {
+      const exact = selectedGroup.items.find((it) => it.task_id === taskId);
+      if (exact) return exact;
+    }
+    return selectedGroup.items[0] ?? null;
+  }, [selectedGroup, selectedTask?.task_id]);
+
   // Build analysis context for the AI chat panel
   const analysisContext: AnalysisContext | null = useMemo(() => {
     if (!selectedTask || !selectedExecutionId) return null;
@@ -212,8 +227,7 @@ export function QubitMetricHistoryModal({
           },
         });
         // Invalidate metrics queries so grid and history refresh
-        await queryClient.invalidateQueries({ queryKey: ["/metrics"] });
-        await queryClient.invalidateQueries({ queryKey: ["/chip"] });
+        await queryClient.invalidateQueries({ predicate: isChipMetricsQuery });
         await queryClient.invalidateQueries({
           queryKey: [`/calibrations/manual-edits/${qid}`],
         });
@@ -291,6 +305,8 @@ export function QubitMetricHistoryModal({
 
             const isSelected = selectedExecutionId === group.executionId;
 
+            const isExcluded = Boolean(metricItem?.excluded);
+
             return (
               <button
                 key={group.executionId}
@@ -302,11 +318,15 @@ export function QubitMetricHistoryModal({
                   isSelected
                     ? "bg-primary text-primary-content border-primary"
                     : "bg-base-200 hover:bg-base-300 border-transparent hover:border-primary/30"
-                }`}
+                } ${isExcluded ? "opacity-60" : ""}`}
               >
                 <div className="flex justify-between items-start">
                   <div className="min-w-0 flex-1">
-                    <div className="font-bold text-lg">
+                    <div
+                      className={`font-bold text-lg ${
+                        isExcluded ? "line-through" : ""
+                      }`}
+                    >
                       {formatMetricValue(metricItem?.value, metricUnit, 4)}{" "}
                       <span className="text-sm font-normal opacity-80">
                         {metricUnit}
@@ -320,15 +340,24 @@ export function QubitMetricHistoryModal({
                         {metricItem.name}
                       </div>
                     )}
-                    {idx === 0 && (
-                      <span
-                        className={`badge badge-xs mt-1 ${
-                          isSelected ? "badge-primary-content" : "badge-success"
-                        }`}
-                      >
-                        Latest
-                      </span>
-                    )}
+                    <div className="flex flex-wrap items-center gap-1 mt-1">
+                      {idx === 0 && (
+                        <span
+                          className={`badge badge-xs ${
+                            isSelected
+                              ? "badge-primary-content"
+                              : "badge-success"
+                          }`}
+                        >
+                          Latest
+                        </span>
+                      )}
+                      {isExcluded && (
+                        <span className="badge badge-xs badge-warning gap-1">
+                          Excluded
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <div className="flex items-center gap-1">
                     <span className="text-xs opacity-60">#{idx + 1}</span>
@@ -573,7 +602,7 @@ export function QubitMetricHistoryModal({
             </div>
           )}
           {/* Provenance link and Ask AI */}
-          <div className="pt-2 mt-2 border-t border-base-300 flex items-center gap-2">
+          <div className="pt-2 mt-2 border-t border-base-300 flex items-center gap-2 flex-wrap">
             <Link
               href={`/provenance?parameter=${encodeURIComponent(metricName)}&qid=${encodeURIComponent(qid)}&tab=lineage`}
               className="btn btn-xs btn-outline gap-1"
@@ -589,6 +618,15 @@ export function QubitMetricHistoryModal({
                 <Bot className="h-3 w-3" />
                 Ask AI
               </button>
+            )}
+            {selectedHistoryItem?.task_id && (
+              <TaskResultExcludeButton
+                taskId={selectedHistoryItem.task_id}
+                excluded={Boolean(selectedHistoryItem.excluded)}
+                excludedReason={selectedHistoryItem.excluded_reason}
+                excludedBy={selectedHistoryItem.excluded_by}
+                excludedAt={selectedHistoryItem.excluded_at}
+              />
             )}
           </div>
         </div>
@@ -642,6 +680,11 @@ export function QubitMetricHistoryModal({
               />
             )}
         </div>
+      )}
+
+      {/* Memo (above issues) */}
+      {selectedTask?.task_id && (
+        <TaskResultMemo taskId={selectedTask.task_id} chipId={chipId} />
       )}
 
       {/* Issues */}

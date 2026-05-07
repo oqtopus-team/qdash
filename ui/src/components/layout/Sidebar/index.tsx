@@ -18,7 +18,9 @@ import {
   Files,
   GitBranch,
   Inbox,
+  LayoutDashboard,
   LayoutGrid,
+  Snowflake,
   ListTodo,
   LogOut,
   Brain,
@@ -177,6 +179,23 @@ export function Sidebar() {
         </li>
         <li>
           <Link
+            href="/dashboard"
+            className={
+              isMobileOpen
+                ? linkClass(isActive("/dashboard"))
+                : desktopLinkClass(isActive("/dashboard"))
+            }
+            title="Dashboard"
+            onClick={handleLinkClick}
+          >
+            <LayoutDashboard size={18} />
+            {(isOpen || isMobileOpen) && (
+              <span className="ml-2">Dashboard</span>
+            )}
+          </Link>
+        </li>
+        <li>
+          <Link
             href="/metrics"
             className={
               isMobileOpen
@@ -203,6 +222,21 @@ export function Sidebar() {
           >
             <Cpu size={18} />
             {(isOpen || isMobileOpen) && <span className="ml-2">Chip</span>}
+          </Link>
+        </li>
+        <li>
+          <Link
+            href="/cryo"
+            className={
+              isMobileOpen
+                ? linkClass(isActive("/cryo"))
+                : desktopLinkClass(isActive("/cryo"))
+            }
+            title="Cryo"
+            onClick={handleLinkClick}
+          >
+            <Snowflake size={18} />
+            {(isOpen || isMobileOpen) && <span className="ml-2">Cryo</span>}
           </Link>
         </li>
         <li>

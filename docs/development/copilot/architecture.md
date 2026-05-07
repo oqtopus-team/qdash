@@ -20,6 +20,8 @@ Both modes use the same underlying LLM agent with tool-calling capabilities, san
 | `src/qdash/api/routers/copilot.py` | FastAPI router with `/config`, `/analyze`, `/analyze/stream`, `/chat/stream` endpoints; SSE event generation via `SSETaskBridge` |
 | `src/qdash/api/services/copilot_data_service.py` | Data loading service: `build_analysis_context()`, `build_images_sent_metadata()`, qubit/task/history queries, tool executor wiring |
 | `src/qdash/api/lib/copilot_agent.py` | LLM agent: system prompt construction, OpenAI Responses API calls, tool call loop, response parsing |
+| `src/qdash/common/copilot/` | Shared Copilot runtime used outside the API process, including workflow-side automatic triage |
+| `src/qdash/workflow/engine/task/ai_triage.py` | Asynchronous task-result triage hook that writes AI review notes to task history |
 | `src/qdash/api/lib/copilot_sandbox.py` | Sandboxed Python execution: AST validation, restricted builtins, resource limits |
 | `src/qdash/api/lib/copilot_analysis.py` | Pydantic models: `TaskAnalysisContext`, `AnalysisResponse`, `AnalysisContextResult`; request schemas |
 | `src/qdash/api/lib/sse.py` | SSE utilities: `sse_event()` formatter, `SSETaskBridge` for queue-poll-heartbeat-drain pattern |
@@ -49,6 +51,30 @@ model:
   temperature: 0.7
   max_output_tokens: 2048
 
+analysis_models:
+  - provider: ollama
+    name: gemma4:26b
+    base_url: env:GEMMA_BASE_URL
+    api_key_env: GEMMA_API_KEY
+    keep_alive: 30m
+    temperature: 1.0
+    top_p: 0.95
+    top_k: 64
+    reasoning_effort: none
+    disable_thinking_instruction: true
+    max_output_tokens: 4096
+  - provider: ollama
+    name: gemma4:31b
+    base_url: env:GEMMA_BASE_URL
+    api_key_env: GEMMA_API_KEY
+    keep_alive: 30m
+    temperature: 1.0
+    top_p: 0.95
+    top_k: 64
+    reasoning_effort: none
+    disable_thinking_instruction: true
+    max_output_tokens: 4096
+
 # Metrics for chip health evaluation
 evaluation_metrics:
   qubit: [qubit_frequency, anharmonicity, t1, t2_echo, ...]
@@ -68,6 +94,12 @@ scoring:
 analysis:
   enabled: true
   multimodal: true
+  max_expected_images: 2
+  ai_triage_max_expected_images: null
+  ai_triage_max_output_tokens: null
+  ai_triage_tasks: [CheckQubitSpectroscopy, CheckResonatorSpectroscopy]
+  ai_triage_message: >-
+    Review this calibration result and attach a concise operational triage note.
   max_conversation_turns: 10
 ```
 
@@ -79,6 +111,8 @@ Configuration is loaded via `ConfigLoader` with local override support (`copilot
 |----------|---------|
 | `OPENAI_API_KEY` | OpenAI API authentication |
 | `OLLAMA_URL` | Ollama server URL (default: `http://localhost:11434`) |
+| `GEMMA_BASE_URL` | Optional OpenAI-compatible base URL for the Gemma analysis model |
+| `GEMMA_API_KEY` | Optional API key used with the Gemma analysis model |
 | `NEXT_PUBLIC_API_URL` | API base URL for frontend (default: `/api`) |
 
 ## Two Modes
@@ -101,3 +135,43 @@ A standalone page (`/copilot`) for general questions about the calibration syste
 - **Context**: Chip ID, optional qubit ID, scoring thresholds
 - **Use case**: "Compare T1 across all qubits", "Show me the frequency trend for Q16"
 - **Sessions**: Persisted to localStorage with multi-session support
+
+### Automatic AI Triage
+
+Automatic AI triage attaches an LLM-generated operational review note to selected task results after they are persisted. It is designed for tasks where visual or contextual review is valuable, but sending every calibration result to an LLM would be too slow or expensive.
+
+- **Entry point**: `enqueue_ai_triage_note()` in `src/qdash/workflow/engine/task/ai_triage.py`
+- **Trigger**: task-result history save paths in the workflow recorder and repository
+- **Configuration**: `analysis.ai_triage_tasks` and `analysis.ai_triage_message` in `config/copilot.yaml`
+- **Execution model**: asynchronous background thread pool, de-duplicated by `task_id`
+- **Model selection**: `analysis_model`, then the first `analysis_models` entry, then the general `model`
+- **AI triage quality path**: automatic triage inherits
+  `analysis.max_expected_images` and the selected model's `max_output_tokens`
+  by default. Set `analysis.ai_triage_max_expected_images` or
+  `analysis.ai_triage_max_output_tokens` only for an explicit low-latency mode.
+- **Storage**: task-result `user_note.content`, under a `## AI triage` Markdown section
+- **UI**: task detail modals render the note as Markdown; chip page badges are shown only when the triage decision requires review
+
+The hook is best effort. It must not block calibration progress and must not change the task outcome when the LLM request fails. Both successful and failed task results are eligible when the task name is listed in `ai_triage_tasks`.
+
+For `CheckResonatorSpectroscopy`, QDash records one AI triage note per MUX group. The representative result is the qid where `int(qid) % 4 == 0`; copied sibling resonator results are skipped to avoid duplicate LLM calls and duplicate notes.
+
+For `CheckQubitSpectroscopy`, QDash applies a deterministic safety guard before
+calling the VLM: if no f01-like output parameter is present, the note is marked
+as `FAIL` / `NO_SIGNAL`. This avoids accepting an empty parameter update when a
+compact local model returns an overly optimistic free-form response.
+
+The expected triage note begins with a compact review block:
+
+```markdown
+## AI triage
+
+**Review triage**
+- Decision: `PASS` | `PASS_WITH_NOTE` | `REVIEW` | `FAIL`
+- Accepted parameter(s): ...
+- Needs review: ...
+- Primary reason: ...
+- Recommended action: ...
+```
+
+The chip page badge logic intentionally does not mark every AI note. It marks only notes whose `Decision` is `REVIEW` or `FAIL`, or whose `Needs review` field is not `none`.

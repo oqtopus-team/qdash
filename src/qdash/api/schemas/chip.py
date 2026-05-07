@@ -3,8 +3,9 @@
 from datetime import datetime, timedelta
 from typing import Any
 
-from pydantic import BaseModel, field_serializer, field_validator
+from pydantic import BaseModel, Field, field_serializer, field_validator
 from qdash.common.datetime_utils import format_elapsed_time, parse_elapsed_time
+from qdash.datamodel.note import NoteModel
 
 
 class ChipResponse(BaseModel):
@@ -30,6 +31,8 @@ class ChipResponse(BaseModel):
     qubit_count: int = 0
     coupling_count: int = 0
     installed_at: datetime | None = None
+    current_cooldown_id: str | None = None
+    note: NoteModel = Field(default_factory=NoteModel)
 
 
 class CreateChipRequest(BaseModel):
@@ -46,6 +49,44 @@ class CreateChipRequest(BaseModel):
     chip_id: str
     size: int = 64
     topology_id: str | None = None
+
+
+class UpdateChipRequest(BaseModel):
+    """Body for updating chip metadata. All fields optional."""
+
+    topology_id: str | None = None
+    note: str | None = Field(
+        default=None,
+        max_length=5000,
+        description="Free-form note text (overwrites note.content)",
+    )
+
+
+class ChipDeletionImpactResponse(BaseModel):
+    """Counts of related rows that would be affected by deleting this chip."""
+
+    chip_id: str
+    qubits: int = Field(..., description="QubitDocument rows that would be hard-deleted")
+    couplings: int = Field(..., description="CouplingDocument rows that would be hard-deleted")
+    task_results: int = Field(
+        ..., description="task_result_history rows kept for audit (not deleted)"
+    )
+    qubit_history_snapshots: int = Field(
+        ..., description="qubit_history rows kept for audit (not deleted)"
+    )
+    coupling_history_snapshots: int = Field(
+        ..., description="coupling_history rows kept for audit (not deleted)"
+    )
+    cooldowns_referencing: int = Field(
+        ..., description="Cool-downs that include this chip and would have it removed"
+    )
+    can_delete_safely: bool = Field(
+        ...,
+        description=(
+            "True if no QubitDocument or CouplingDocument rows exist (DELETE without "
+            "force succeeds). When false, force=true is required."
+        ),
+    )
 
 
 class ChipDatesResponse(BaseModel):
@@ -115,6 +156,8 @@ class QubitResponse(BaseModel):
     chip_id: str
     status: str = "pending"
     data: dict[str, Any] = {}
+    note: NoteModel = Field(default_factory=NoteModel)
+    metric_notes: dict[str, NoteModel] = Field(default_factory=dict)
 
 
 class ListQubitsResponse(BaseModel):
@@ -133,6 +176,8 @@ class CouplingResponse(BaseModel):
     chip_id: str
     status: str = "pending"
     data: dict[str, Any] = {}
+    note: NoteModel = Field(default_factory=NoteModel)
+    metric_notes: dict[str, NoteModel] = Field(default_factory=dict)
 
 
 class ListCouplingsResponse(BaseModel):

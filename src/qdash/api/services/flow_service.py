@@ -7,7 +7,8 @@ import logging
 import os
 import re
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
+from uuid import UUID
 
 import httpx
 from fastapi import HTTPException
@@ -279,8 +280,9 @@ class FlowService:
         # Delete Prefect deployment
         if flow.deployment_id:
             try:
+                deployment_id = cast(UUID, flow.deployment_id)
                 async with get_client() as client:
-                    await client.delete_deployment(flow.deployment_id)
+                    await client.delete_deployment(deployment_id)
                     logger.info(f"Deleted Prefect deployment: {flow.deployment_id}")
             except Exception as e:
                 logger.warning(f"Failed to delete Prefect deployment (may not exist): {e}")
@@ -363,8 +365,9 @@ class FlowService:
 
         try:
             async with get_client() as client:
+                deployment_id = cast(UUID, flow.deployment_id)
                 flow_run = await client.create_flow_run_from_deployment(
-                    deployment_id=flow.deployment_id,
+                    deployment_id=deployment_id,
                     parameters=parameters,
                 )
 
@@ -459,8 +462,9 @@ class FlowService:
 
         try:
             async with get_client() as client:
+                deployment_id = cast(UUID, flow.deployment_id)
                 flow_run = await client.create_flow_run_from_deployment(
-                    deployment_id=flow.deployment_id,
+                    deployment_id=deployment_id,
                     parameters=parameters,
                 )
 

@@ -10,6 +10,7 @@ from typing import Any
 
 from qdash.api.lib.metrics_config import load_metrics_config
 from qdash.api.schemas.chip import (
+    ChipDeletionImpactResponse,
     ChipResponse,
     CouplingResponse,
     MetricHeatmapResponse,
@@ -17,12 +18,24 @@ from qdash.api.schemas.chip import (
     MuxDetailResponse,
     MuxTask,
     QubitResponse,
+    UpdateChipRequest,
 )
+from qdash.api.schemas.success import SuccessResponse
+from qdash.common.datetime_utils import now
+from qdash.datamodel.note import NoteModel
+from qdash.dbmodel.chip import ChipDocument
+from qdash.dbmodel.cooldown import CooldownDocument
+from qdash.dbmodel.coupling import CouplingDocument
+from qdash.dbmodel.coupling_history import CouplingHistoryDocument
+from qdash.dbmodel.qubit import QubitDocument
+from qdash.dbmodel.qubit_history import QubitHistoryDocument
+from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
 from qdash.repository.protocols import (
     ChipRepository,
     ExecutionCounterRepository,
     TaskResultHistoryRepository,
 )
+from starlette.exceptions import HTTPException
 
 logger = logging.getLogger(__name__)
 
@@ -314,13 +327,17 @@ class ChipService:
         """
         summaries = self._chip_repo.list_summary_by_project(project_id)
         return [
-            ChipResponse(
-                chip_id=s["chip_id"],
-                size=s.get("size", 64),
-                topology_id=s.get("topology_id"),
-                qubit_count=s.get("qubit_count", 0),
-                coupling_count=s.get("coupling_count", 0),
-                installed_at=s.get("installed_at"),
+            ChipResponse.model_validate(
+                {
+                    "chip_id": s["chip_id"],
+                    "size": s.get("size", 64),
+                    "topology_id": s.get("topology_id"),
+                    "qubit_count": s.get("qubit_count", 0),
+                    "coupling_count": s.get("coupling_count", 0),
+                    "installed_at": s.get("installed_at"),
+                    "current_cooldown_id": s.get("current_cooldown_id"),
+                    "note": s.get("note") or {},
+                }
             )
             for s in summaries
         ]
@@ -344,14 +361,110 @@ class ChipService:
         summary = self._chip_repo.find_summary_by_id(project_id, chip_id)
         if summary is None:
             return None
-        return ChipResponse(
-            chip_id=summary["chip_id"],
-            size=summary.get("size", 64),
-            topology_id=summary.get("topology_id"),
-            qubit_count=summary.get("qubit_count", 0),
-            coupling_count=summary.get("coupling_count", 0),
-            installed_at=summary.get("installed_at"),
+        return ChipResponse.model_validate(
+            {
+                "chip_id": summary["chip_id"],
+                "size": summary.get("size", 64),
+                "topology_id": summary.get("topology_id"),
+                "qubit_count": summary.get("qubit_count", 0),
+                "coupling_count": summary.get("coupling_count", 0),
+                "installed_at": summary.get("installed_at"),
+                "current_cooldown_id": summary.get("current_cooldown_id"),
+                "note": summary.get("note") or {},
+            }
         )
+
+    # ---------- chip metadata edit ----------
+
+    def update_chip(
+        self,
+        *,
+        project_id: str,
+        chip_id: str,
+        body: UpdateChipRequest,
+        username: str,
+    ) -> ChipResponse:
+        doc = ChipDocument.find_one(
+            ChipDocument.project_id == project_id,
+            ChipDocument.chip_id == chip_id,
+        ).run()
+        if doc is None:
+            raise HTTPException(status_code=404, detail="Chip not found")
+        if body.topology_id is not None:
+            doc.topology_id = body.topology_id
+        if body.note is not None:
+            doc.note = NoteModel(content=body.note, updated_by=username, updated_at=now())
+        doc.system_info.update_time()
+        doc.save()
+        result = self.get_chip_summary(project_id, chip_id)
+        if result is None:  # pragma: no cover - we just saved it
+            raise HTTPException(status_code=500, detail="Failed to reload chip")
+        return result
+
+    # ---------- chip deletion ----------
+
+    def get_deletion_impact(self, *, project_id: str, chip_id: str) -> ChipDeletionImpactResponse:
+        doc = ChipDocument.find_one(
+            ChipDocument.project_id == project_id,
+            ChipDocument.chip_id == chip_id,
+        ).run()
+        if doc is None:
+            raise HTTPException(status_code=404, detail="Chip not found")
+
+        scope = {"project_id": project_id, "chip_id": chip_id}
+        qubit_count = QubitDocument.find(scope).count()
+        coupling_count = CouplingDocument.find(scope).count()
+        task_result_count = TaskResultHistoryDocument.find(scope).count()
+        qubit_history_count = QubitHistoryDocument.find(scope).count()
+        coupling_history_count = CouplingHistoryDocument.find(scope).count()
+        cooldowns_referencing = CooldownDocument.find(
+            {"project_id": project_id, "chip_ids": chip_id}
+        ).count()
+
+        return ChipDeletionImpactResponse(
+            chip_id=chip_id,
+            qubits=qubit_count,
+            couplings=coupling_count,
+            task_results=task_result_count,
+            qubit_history_snapshots=qubit_history_count,
+            coupling_history_snapshots=coupling_history_count,
+            cooldowns_referencing=cooldowns_referencing,
+            can_delete_safely=(qubit_count == 0 and coupling_count == 0),
+        )
+
+    def delete_chip(self, *, project_id: str, chip_id: str, force: bool) -> SuccessResponse:
+        doc = ChipDocument.find_one(
+            ChipDocument.project_id == project_id,
+            ChipDocument.chip_id == chip_id,
+        ).run()
+        if doc is None:
+            raise HTTPException(status_code=404, detail="Chip not found")
+
+        scope = {"project_id": project_id, "chip_id": chip_id}
+        qubit_count = QubitDocument.find(scope).count()
+        coupling_count = CouplingDocument.find(scope).count()
+
+        if not force and (qubit_count > 0 or coupling_count > 0):
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    f"Chip has {qubit_count} qubit(s) and {coupling_count} coupling(s). "
+                    "Pass force=true to cascade-delete them, or remove them first."
+                ),
+            )
+
+        # Cascade: hard-delete qubit + coupling docs (history retained for audit)
+        QubitDocument.get_motor_collection().delete_many(scope)
+        CouplingDocument.get_motor_collection().delete_many(scope)
+
+        # Detach this chip from any cool-downs that reference it
+        CooldownDocument.get_motor_collection().update_many(
+            {"project_id": project_id, "chip_ids": chip_id},
+            {"$pull": {"chip_ids": chip_id}},
+        )
+
+        doc.delete()
+        return SuccessResponse(message=f"Chip {chip_id} deleted")
 
     def list_qubits(
         self,
@@ -391,11 +504,15 @@ class ChipService:
         )
         return (
             [
-                QubitResponse(
-                    qid=q["qid"],
-                    chip_id=q["chip_id"],
-                    status=q.get("status", "pending"),
-                    data=q.get("data", {}),
+                QubitResponse.model_validate(
+                    {
+                        "qid": q["qid"],
+                        "chip_id": q["chip_id"],
+                        "status": q.get("status", "pending"),
+                        "data": q.get("data", {}),
+                        "note": q.get("note") or {},
+                        "metric_notes": q.get("metric_notes") or {},
+                    }
                 )
                 for q in qubits
             ],
@@ -423,11 +540,15 @@ class ChipService:
         qubit = self._chip_repo.find_qubit(project_id, chip_id, qid)
         if qubit is None:
             return None
-        return QubitResponse(
-            qid=qubit["qid"],
-            chip_id=qubit["chip_id"],
-            status=qubit.get("status", "pending"),
-            data=qubit.get("data", {}),
+        return QubitResponse.model_validate(
+            {
+                "qid": qubit["qid"],
+                "chip_id": qubit["chip_id"],
+                "status": qubit.get("status", "pending"),
+                "data": qubit.get("data", {}),
+                "note": qubit.get("note") or {},
+                "metric_notes": qubit.get("metric_notes") or {},
+            }
         )
 
     def list_couplings(
@@ -464,11 +585,15 @@ class ChipService:
         )
         return (
             [
-                CouplingResponse(
-                    qid=c["qid"],
-                    chip_id=c["chip_id"],
-                    status=c.get("status", "pending"),
-                    data=c.get("data", {}),
+                CouplingResponse.model_validate(
+                    {
+                        "qid": c["qid"],
+                        "chip_id": c["chip_id"],
+                        "status": c.get("status", "pending"),
+                        "data": c.get("data", {}),
+                        "note": c.get("note") or {},
+                        "metric_notes": c.get("metric_notes") or {},
+                    }
                 )
                 for c in couplings
             ],
@@ -498,11 +623,15 @@ class ChipService:
         coupling = self._chip_repo.find_coupling(project_id, chip_id, coupling_id)
         if coupling is None:
             return None
-        return CouplingResponse(
-            qid=coupling["qid"],
-            chip_id=coupling["chip_id"],
-            status=coupling.get("status", "pending"),
-            data=coupling.get("data", {}),
+        return CouplingResponse.model_validate(
+            {
+                "qid": coupling["qid"],
+                "chip_id": coupling["chip_id"],
+                "status": coupling.get("status", "pending"),
+                "data": coupling.get("data", {}),
+                "note": coupling.get("note") or {},
+                "metric_notes": coupling.get("metric_notes") or {},
+            }
         )
 
     def get_metrics_summary(self, project_id: str, chip_id: str) -> MetricsSummaryResponse | None:

@@ -10,7 +10,10 @@ import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from qdash.api.dependencies import get_chip_service  # noqa: TCH002
+from qdash.api.dependencies import (  # noqa: TCH002
+    get_chip_service,
+    get_reanalysis_service,
+)
 from qdash.api.lib.project import (  # noqa: TCH002
     ProjectContext,
     get_project_context,
@@ -18,6 +21,7 @@ from qdash.api.lib.project import (  # noqa: TCH002
 )
 from qdash.api.schemas.chip import (
     ChipDatesResponse,
+    ChipDeletionImpactResponse,
     ChipResponse,
     CouplingResponse,
     CreateChipRequest,
@@ -29,9 +33,17 @@ from qdash.api.schemas.chip import (
     MetricsSummaryResponse,
     MuxDetailResponse,
     QubitResponse,
+    UpdateChipRequest,
 )
+from qdash.api.schemas.reanalysis import (
+    ReanalyzeQubitSpectroscopyRequest,
+    ReanalyzeResonatorSpectroscopyRequest,
+    ReanalyzeResponse,
+)
+from qdash.api.schemas.success import SuccessResponse
 from qdash.api.services.chip_initializer import ChipInitializer
 from qdash.api.services.chip_service import ChipService  # noqa: TCH002
+from qdash.api.services.reanalysis_service import ReanalysisService  # noqa: TCH002
 
 router = APIRouter()
 
@@ -119,6 +131,60 @@ def create_chip(
     except Exception as e:
         logger.error(f"Error creating chip {request.chip_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to create chip: {e!s}") from e
+
+
+@router.patch(
+    "/chips/{chip_id}",
+    response_model=ChipResponse,
+    summary="Update chip metadata (topology_id, note)",
+    operation_id="updateChip",
+)
+def update_chip(
+    chip_id: str,
+    body: UpdateChipRequest,
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    service: Annotated[ChipService, Depends(get_chip_service)],
+) -> ChipResponse:
+    return service.update_chip(
+        project_id=ctx.project_id,
+        chip_id=chip_id,
+        body=body,
+        username=ctx.user.username,
+    )
+
+
+@router.get(
+    "/chips/{chip_id}/deletion-impact",
+    response_model=ChipDeletionImpactResponse,
+    summary="Preview what would be affected by deleting this chip",
+    operation_id="getChipDeletionImpact",
+)
+def get_chip_deletion_impact(
+    chip_id: str,
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    service: Annotated[ChipService, Depends(get_chip_service)],
+) -> ChipDeletionImpactResponse:
+    return service.get_deletion_impact(project_id=ctx.project_id, chip_id=chip_id)
+
+
+@router.delete(
+    "/chips/{chip_id}",
+    response_model=SuccessResponse,
+    summary="Delete a chip (refuses if related data exists unless force=true)",
+    operation_id="deleteChip",
+)
+def delete_chip(
+    chip_id: str,
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    service: Annotated[ChipService, Depends(get_chip_service)],
+    force: Annotated[
+        bool,
+        Query(
+            description="If true, also delete the chip's qubits and couplings (history retained for audit).",
+        ),
+    ] = False,
+) -> SuccessResponse:
+    return service.delete_chip(project_id=ctx.project_id, chip_id=chip_id, force=force)
 
 
 @router.get(
@@ -377,6 +443,61 @@ def get_chip_qubit(
     if qubit is None:
         raise HTTPException(status_code=404, detail=f"Qubit {qid} not found in chip {chip_id}")
     return qubit
+
+
+@router.post(
+    "/chips/{chip_id}/qubits/{qid}/reanalyze/resonator-spectroscopy",
+    response_model=ReanalyzeResponse,
+    summary="Re-run resonator spectroscopy analysis on a stored task result (preview)",
+    operation_id="reanalyzeResonatorSpectroscopy",
+)
+def reanalyze_resonator_spectroscopy(
+    chip_id: str,
+    qid: str,
+    request: ReanalyzeResonatorSpectroscopyRequest,
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    reanalysis_service: Annotated[ReanalysisService, Depends(get_reanalysis_service)],
+) -> ReanalyzeResponse:
+    """Re-run the resonator-spectroscopy analysis on a previously stored figure.
+
+    Returns the marked figure and the re-estimated `readout_frequency` for
+    the requested qubit. The DB is **not** mutated; this is a preview only.
+    """
+    return reanalysis_service.reanalyze_resonator_spectroscopy(
+        project_id=ctx.project_id,
+        chip_id=chip_id,
+        qid=qid,
+        params=request.parameters,
+        source_task_id=request.source_task_id,
+    )
+
+
+@router.post(
+    "/chips/{chip_id}/qubits/{qid}/reanalyze/qubit-spectroscopy",
+    response_model=ReanalyzeResponse,
+    summary="Re-run qubit spectroscopy analysis on a stored task result (preview)",
+    operation_id="reanalyzeQubitSpectroscopy",
+)
+def reanalyze_qubit_spectroscopy(
+    chip_id: str,
+    qid: str,
+    request: ReanalyzeQubitSpectroscopyRequest,
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    reanalysis_service: Annotated[ReanalysisService, Depends(get_reanalysis_service)],
+) -> ReanalyzeResponse:
+    """Re-run the qubit-spectroscopy analysis on a previously stored figure.
+
+    Returns the marked figure and the re-estimated `qubit_frequency`,
+    `f01_repr_db`, `f01_quality_level`, and `anharmonicity` for the requested
+    qubit. The DB is **not** mutated; this is a preview only.
+    """
+    return reanalysis_service.reanalyze_qubit_spectroscopy(
+        project_id=ctx.project_id,
+        chip_id=chip_id,
+        qid=qid,
+        params=request.parameters,
+        source_task_id=request.source_task_id,
+    )
 
 
 @router.get(

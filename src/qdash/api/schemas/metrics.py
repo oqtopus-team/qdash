@@ -48,6 +48,10 @@ class MetricHistoryItem(BaseModel):
     name: str | None = None
     input_parameters: dict[str, Any] | None = None
     output_parameters: dict[str, Any] | None = None
+    excluded: bool = False
+    excluded_reason: str = ""
+    excluded_by: str | None = None
+    excluded_at: datetime | None = None
 
 
 class QubitMetricHistoryResponse(BaseModel):

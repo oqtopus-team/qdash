@@ -44,11 +44,13 @@ backends:
       - CheckResonatorFrequencies
       - CheckQubitSpectroscopy
       - CheckQubitFrequencies
+      - CheckControlAmplitude
       - CheckReadoutAmplitude
       - CheckElectricalDelay
 
       # One Qubit Coarse Calibration
-      - ChevronPattern
+      - CheckCoarseChevron
+      - CheckFineChevron
       - CheckQubit
       - CheckQubitFrequency
       - CheckReadoutFrequency
@@ -95,7 +97,7 @@ backends:
     # Fake backend tasks mirror qubex task names for seamless switching
     tasks:
       # Core calibration flow (with provenance dependencies)
-      - ChevronPattern          # Entry point: outputs qubit_frequency, readout_frequency
+      - CheckFineChevron        # Entry point: outputs qubit_frequency, readout_frequency
       - CheckRamsey             # Depends on: qubit_frequency -> outputs refined qubit_frequency, t2_star
       - CheckRabi               # Depends on: qubit_frequency
       - CheckT1                 # Depends on: qubit_frequency
@@ -124,11 +126,14 @@ categories:
     - CheckResonatorFrequencies
     - CheckQubitSpectroscopy
     - CheckQubitFrequencies
+    - CheckControlAmplitude
     - CheckReadoutAmplitude
     - CheckElectricalDelay
 
   "1Q Coarse":
-    - ChevronPattern
+    - CheckCoarseChevron
+    - CheckFineChevron
+    - ChevronPattern  # legacy alias of CheckFineChevron — kept for UI filtering of historical results
     - CheckQubit
     - CheckQubitFrequency
     - CheckReadoutFrequency

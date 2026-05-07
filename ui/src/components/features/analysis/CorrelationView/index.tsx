@@ -11,9 +11,14 @@ import { ChipSelector } from "@/components/selectors/ChipSelector";
 import { DataTable } from "@/components/ui/DataTable";
 import { ErrorCard } from "@/components/ui/ErrorCard";
 import { QuantumLoader } from "@/components/ui/QuantumLoader";
+import { TimeRangeSelector } from "@/components/ui/TimeRangeSelector";
 import { useCSVExport } from "@/hooks/useCSVExport";
 import { useMetricsConfig } from "@/hooks/useMetricsConfig";
-import { useCorrelationUrlState } from "@/hooks/useUrlState";
+import { useMetricsQueryParams } from "@/hooks/useMetricsQueryParams";
+import {
+  useCorrelationUrlState,
+  useRangeModeUrlState,
+} from "@/hooks/useUrlState";
 
 type MetricOption = {
   value: string;
@@ -68,17 +73,18 @@ export function CorrelationView() {
   // URL state management
   const {
     selectedChip,
-    timeRange,
     selectionMode,
     xParameter,
     yParameter,
     setSelectedChip,
-    setTimeRange,
     setSelectionMode,
     setXParameter,
     setYParameter,
     isInitialized,
   } = useCorrelationUrlState();
+
+  const { startDate, endDate, setStartDate, setEndDate, setQuickRange } =
+    useRangeModeUrlState();
 
   // Load metrics configuration from backend
   const {
@@ -224,19 +230,13 @@ export function CorrelationView() {
     }
   }, [selectedChip, chipsResponse, setSelectedChip]);
 
-  // Convert time range to hours
-  const withinHours = useMemo(() => {
-    switch (timeRange) {
-      case "1d":
-        return 24;
-      case "7d":
-        return 24 * 7;
-      case "30d":
-        return 24 * 30;
-      default:
-        return 24 * 7;
-    }
-  }, [timeRange]);
+  // Build API params
+  const { queryParams: metricsQueryParams, canFetch } = useMetricsQueryParams({
+    selectionMode,
+    startDate,
+    endDate,
+    selectedChip,
+  });
 
   // Fetch metrics data
   const {
@@ -244,19 +244,12 @@ export function CorrelationView() {
     isLoading,
     isError,
     error,
-  } = useGetChipMetrics(
-    selectedChip,
-    {
-      within_hours: withinHours,
-      selection_mode: selectionMode,
+  } = useGetChipMetrics(selectedChip, metricsQueryParams, {
+    query: {
+      enabled: canFetch,
+      staleTime: 30000,
     },
-    {
-      query: {
-        enabled: !!selectedChip,
-        staleTime: 30000,
-      },
-    },
-  );
+  });
 
   // Process correlation data
   const { correlationData, statistics } = useMemo(() => {
@@ -432,9 +425,9 @@ export function CorrelationView() {
         {
           text: statistics
             ? `Correlation: r = ${statistics.correlation.toFixed(3)} (n = ${statistics.sampleSize})<br>` +
-              `Time range: ${timeRange === "1d" ? "Last 1 Day" : timeRange === "7d" ? "Last 7 Days" : "Last 30 Days"} | ` +
+              `Time range: ${startDate} — ${endDate} | ` +
               `Mode: ${selectionMode === "latest" ? "Latest" : selectionMode === "best" ? "Best" : "Average"}`
-            : `Time range: ${timeRange === "1d" ? "Last 1 Day" : timeRange === "7d" ? "Last 7 Days" : "Last 30 Days"} | ` +
+            : `Time range: ${startDate} — ${endDate} | ` +
               `Mode: ${selectionMode === "latest" ? "Latest" : selectionMode === "best" ? "Best" : "Average"}`,
           showarrow: false,
           xref: "paper" as const,
@@ -456,7 +449,8 @@ export function CorrelationView() {
     xMetricConfig,
     yMetricConfig,
     statistics,
-    timeRange,
+    startDate,
+    endDate,
     selectionMode,
   ]);
 
@@ -483,13 +477,13 @@ export function CorrelationView() {
       String(row.xValue.toFixed(6)),
       String(row.yValue.toFixed(6)),
       isCoupling ? "coupling_pair" : "qubit",
-      timeRange,
+      `${startDate}..${endDate}`,
       selectionMode,
       statistics?.correlation.toFixed(6) || "N/A",
       timestamp,
     ]);
 
-    const filename = `correlation_${xParameter}_${yParameter}_${selectedChip}_${timeRange}_${selectionMode}_${timestamp
+    const filename = `correlation_${xParameter}_${yParameter}_${selectedChip}_${selectionMode}_${timestamp
       .slice(0, 19)
       .replace(/[:-]/g, "")}.csv`;
 
@@ -502,7 +496,8 @@ export function CorrelationView() {
     yMetricConfig,
     metricType,
     selectedChip,
-    timeRange,
+    startDate,
+    endDate,
     selectionMode,
     statistics,
     exportToCSV,
@@ -637,29 +632,17 @@ export function CorrelationView() {
               </div>
             </div>
 
-            {/* Row 1b: Time Range + Mode + Export */}
-            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-              <div className="join h-8 sm:h-9">
-                <button
-                  className={`join-item btn btn-sm h-full ${timeRange === "1d" ? "btn-primary" : ""}`}
-                  onClick={() => setTimeRange("1d")}
-                >
-                  1D
-                </button>
-                <button
-                  className={`join-item btn btn-sm h-full ${timeRange === "7d" ? "btn-primary" : ""}`}
-                  onClick={() => setTimeRange("7d")}
-                >
-                  7D
-                </button>
-                <button
-                  className={`join-item btn btn-sm h-full ${timeRange === "30d" ? "btn-primary" : ""}`}
-                  onClick={() => setTimeRange("30d")}
-                >
-                  30D
-                </button>
-              </div>
+            {/* Time Range */}
+            <TimeRangeSelector
+              startDate={startDate}
+              endDate={endDate}
+              onStartDateChange={setStartDate}
+              onEndDateChange={setEndDate}
+              onQuickRange={setQuickRange}
+            />
 
+            {/* Mode + Export */}
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
               <div className="join h-8 sm:h-9">
                 <button
                   className={`join-item btn btn-xs sm:btn-sm h-full ${selectionMode === "latest" ? "btn-primary" : ""}`}

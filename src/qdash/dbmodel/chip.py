@@ -5,6 +5,7 @@ from bunnet import Document
 from pydantic import ConfigDict, Field
 from pymongo import ASCENDING, DESCENDING, IndexModel
 from qdash.common.datetime_utils import now
+from qdash.datamodel.note import NoteModel
 from qdash.datamodel.system_info import SystemInfoModel
 
 
@@ -28,12 +29,24 @@ class ChipDocument(Document):
     chip_id: str = Field("SAMPLE", description="The chip ID")
     username: str = Field(..., description="The username of the user who created the chip")
     size: int = Field(64, description="The size of the chip")
+    current_cooldown_id: str | None = Field(
+        default=None,
+        description=(
+            "ID of the cool-down cycle the chip is currently loaded in. "
+            "Updated by cool-down assign/unassign endpoints. None when the "
+            "chip is not in any active cool-down."
+        ),
+    )
     topology_id: str | None = Field(
         None, description="Topology template ID (e.g., 'square-lattice-mux-64')"
     )
     installed_at: datetime = Field(
         default_factory=now,
         description="The time when the chip was installed",
+    )
+    note: NoteModel = Field(
+        default_factory=NoteModel,
+        description="Free-form user note attached to this chip",
     )
 
     system_info: SystemInfoModel = Field(..., description="The system information")

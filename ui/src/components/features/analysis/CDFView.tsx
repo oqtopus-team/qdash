@@ -12,9 +12,11 @@ import { ChipSelector } from "@/components/selectors/ChipSelector";
 import { DataTable } from "@/components/ui/DataTable";
 import { ErrorCard } from "@/components/ui/ErrorCard";
 import { QuantumLoader } from "@/components/ui/QuantumLoader";
+import { TimeRangeSelector } from "@/components/ui/TimeRangeSelector";
 import { useCSVExport } from "@/hooks/useCSVExport";
 import { useMetricsConfig, type MetricConfig } from "@/hooks/useMetricsConfig";
-import { useCDFUrlState } from "@/hooks/useUrlState";
+import { useMetricsQueryParams } from "@/hooks/useMetricsQueryParams";
+import { useCDFUrlState, useRangeModeUrlState } from "@/hooks/useUrlState";
 
 interface CumulativeDataPoint {
   value: number;
@@ -34,17 +36,18 @@ export function CDFView() {
   // URL state management
   const {
     selectedChip,
-    timeRange,
     selectionMode,
     selectedParameters,
     showAsErrorRate,
     setSelectedChip,
-    setTimeRange,
     setSelectionMode,
     setSelectedParameters,
     setShowAsErrorRate,
     isInitialized,
   } = useCDFUrlState();
+
+  const { startDate, endDate, setStartDate, setEndDate, setQuickRange } =
+    useRangeModeUrlState();
 
   // Load metrics configuration from backend
   const {
@@ -168,19 +171,13 @@ export function CDFView() {
     }
   }, [selectedChip, chipsResponse, setSelectedChip]);
 
-  // Convert time range to hours
-  const withinHours = useMemo(() => {
-    switch (timeRange) {
-      case "1d":
-        return 24;
-      case "7d":
-        return 24 * 7;
-      case "30d":
-        return 24 * 30;
-      default:
-        return 24 * 7;
-    }
-  }, [timeRange]);
+  // Build API params
+  const { queryParams: metricsQueryParams, canFetch } = useMetricsQueryParams({
+    selectionMode,
+    startDate,
+    endDate,
+    selectedChip,
+  });
 
   // Fetch metrics data using the same API as histogram/metrics pages
   const {
@@ -188,19 +185,12 @@ export function CDFView() {
     isLoading,
     isError,
     error,
-  } = useGetChipMetrics(
-    selectedChip,
-    {
-      within_hours: withinHours,
-      selection_mode: selectionMode,
+  } = useGetChipMetrics(selectedChip, metricsQueryParams, {
+    query: {
+      enabled: canFetch,
+      staleTime: 30000,
     },
-    {
-      query: {
-        enabled: !!selectedChip,
-        staleTime: 30000,
-      },
-    },
-  );
+  });
 
   // Process data for CDF visualization
   const processedDataByParameter = useMemo(() => {
@@ -594,7 +584,7 @@ export function CDFView() {
       annotations: primaryData.tableData
         ? [
             {
-              text: `Time range: ${timeRange === "1d" ? "Last 1 Day" : timeRange === "7d" ? "Last 7 Days" : "Last 30 Days"} | Mode: ${selectionMode === "latest" ? "Latest" : selectionMode === "best" ? "Best" : "Average"}<br>Sample size: ${primaryData.tableData.length} ${isCoupling ? "coupling pairs" : "qubits"}`,
+              text: `Time range: ${startDate} — ${endDate} | Mode: ${selectionMode === "latest" ? "Latest" : selectionMode === "best" ? "Best" : "Average"}<br>Sample size: ${primaryData.tableData.length} ${isCoupling ? "coupling pairs" : "qubits"}`,
               showarrow: false,
               xref: "paper" as const,
               yref: "paper" as const,
@@ -614,7 +604,8 @@ export function CDFView() {
     couplingMetrics,
     showAsErrorRate,
     hasPercentageMetrics,
-    timeRange,
+    startDate,
+    endDate,
     selectionMode,
     primaryData,
   ]);
@@ -646,12 +637,12 @@ export function CDFView() {
       String(row.survivalFunction.toFixed(6)),
       primaryParameter,
       isCoupling ? "coupling_pair" : "qubit",
-      timeRange,
+      `${startDate}..${endDate}`,
       selectionMode,
       timestamp,
     ]);
 
-    const filename = `cdf_${primaryParameter}_${selectedChip}_${timeRange}_${selectionMode}_${timestamp
+    const filename = `cdf_${primaryParameter}_${selectedChip}_${selectionMode}_${timestamp
       .slice(0, 19)
       .replace(/[:-]/g, "")}.csv`;
 
@@ -661,7 +652,8 @@ export function CDFView() {
     primaryParameter,
     couplingMetrics,
     selectedChip,
-    timeRange,
+    startDate,
+    endDate,
     selectionMode,
     exportToCSV,
   ]);
@@ -783,29 +775,17 @@ export function CDFView() {
               </div>
             </div>
 
-            {/* Row 1b: Time Range + Mode + Display Toggle + Export */}
-            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-              <div className="join h-8 sm:h-9">
-                <button
-                  className={`join-item btn btn-sm h-full ${timeRange === "1d" ? "btn-primary" : ""}`}
-                  onClick={() => setTimeRange("1d")}
-                >
-                  1D
-                </button>
-                <button
-                  className={`join-item btn btn-sm h-full ${timeRange === "7d" ? "btn-primary" : ""}`}
-                  onClick={() => setTimeRange("7d")}
-                >
-                  7D
-                </button>
-                <button
-                  className={`join-item btn btn-sm h-full ${timeRange === "30d" ? "btn-primary" : ""}`}
-                  onClick={() => setTimeRange("30d")}
-                >
-                  30D
-                </button>
-              </div>
+            {/* Time Range */}
+            <TimeRangeSelector
+              startDate={startDate}
+              endDate={endDate}
+              onStartDateChange={setStartDate}
+              onEndDateChange={setEndDate}
+              onQuickRange={setQuickRange}
+            />
 
+            {/* Mode + Display Toggle + Export */}
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
               <div className="join h-8 sm:h-9">
                 <button
                   className={`join-item btn btn-xs sm:btn-sm h-full ${selectionMode === "latest" ? "btn-primary" : ""}`}

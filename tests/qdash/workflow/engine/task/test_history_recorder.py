@@ -1,6 +1,6 @@
 """Tests for TaskHistoryRecorder."""
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 from qdash.datamodel.execution import ExecutionModel, ExecutionStatusModel
@@ -72,6 +72,35 @@ class TestTaskHistoryRecorder:
         mock_repos["task_result_history"].save.assert_called_once_with(
             sample_task, sample_execution_model
         )
+
+    @patch("qdash.workflow.engine.task.ai_triage.enqueue_ai_triage_note")
+    def test_record_task_result_attaches_ai_triage_note(
+        self,
+        mock_ai_triage: MagicMock,
+        recorder,
+        sample_task,
+        sample_execution_model,
+    ):
+        """Test record_task_result triggers best-effort AI triage attachment."""
+        recorder.record_task_result(sample_task, sample_execution_model)
+
+        mock_ai_triage.assert_called_once_with(sample_task, sample_execution_model)
+
+    @patch("qdash.workflow.engine.task.ai_triage.enqueue_ai_triage_note")
+    def test_record_task_result_continues_on_ai_triage_error(
+        self,
+        mock_ai_triage: MagicMock,
+        recorder,
+        mock_repos,
+        sample_task,
+        sample_execution_model,
+    ):
+        """Test AI triage failures do not fail task result recording."""
+        mock_ai_triage.side_effect = Exception("AI triage error")
+
+        recorder.record_task_result(sample_task, sample_execution_model)
+
+        mock_repos["task_result_history"].save.assert_called_once()
 
     def test_record_task_result_raises_on_error(
         self, recorder, mock_repos, sample_task, sample_execution_model

@@ -17,13 +17,13 @@ from qdash.workflow.engine.backend.fake import FakeBackend
 class FakeCreateHPIPulse(FakeTask):
     """Fake task to simulate Half-Pi (HPI) pulse calibration.
 
-    This task depends on qubit_frequency from ChevronPattern.
+    This task depends on qubit_frequency from CheckFineChevron.
     It simulates calibrating the half-pi pulse parameters.
 
     Note: Uses same name as qubex task for seamless backend switching.
 
     Inputs:
-        qubit_frequency: From ChevronPattern (loaded from DB)
+        qubit_frequency: From CheckFineChevron (loaded from DB)
 
     Outputs:
         hpi_amplitude: Half-pi pulse amplitude
@@ -37,7 +37,7 @@ class FakeCreateHPIPulse(FakeTask):
     input_parameters: ClassVar[dict[str, ParameterModel | None]] = {
         "qubit_frequency": ParameterModel(
             unit="GHz",
-            description="Qubit frequency from ChevronPattern",
+            description="Qubit frequency from CheckFineChevron",
         ),
     }
 

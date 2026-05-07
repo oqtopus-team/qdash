@@ -14,13 +14,13 @@ import httpx
 from croniter import croniter
 from fastapi import HTTPException
 from prefect.client.orchestration import get_client
+from prefect.client.schemas import StateType
 from prefect.client.schemas.filters import (
     DeploymentFilter,
     DeploymentFilterId,
     FlowRunFilter,
     FlowRunFilterState,
     FlowRunFilterStateType,
-    StateType,
 )
 from qdash.api.schemas.flow import (
     DeleteScheduleResponse,
@@ -394,9 +394,10 @@ class FlowScheduleService:
                     for existing in existing_schedules:
                         await client.delete_deployment_schedule(deployment_uuid, existing.id)
 
+                    schedules: list[tuple[Any, bool]] = [(cron_schedule, request.active)]
                     await client.create_deployment_schedules(
                         deployment_uuid,
-                        [(cron_schedule, request.active)],
+                        schedules,
                     )
                 else:
                     # Just update active status on existing schedules

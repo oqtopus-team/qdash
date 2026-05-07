@@ -2768,6 +2768,277 @@
         }
       }
     },
+    "/chips/{chip_id}": {
+      "patch": {
+        "tags": [
+          "chip"
+        ],
+        "summary": "Update chip metadata (topology_id, note)",
+        "operationId": "updateChip",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chip_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Chip Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateChipRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChipResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "chip"
+        ],
+        "summary": "Delete a chip (refuses if related data exists unless force=true)",
+        "operationId": "deleteChip",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chip_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Chip Id"
+            }
+          },
+          {
+            "name": "force",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "If true, also delete the chip's qubits and couplings (history retained for audit).",
+              "default": false,
+              "title": "Force"
+            },
+            "description": "If true, also delete the chip's qubits and couplings (history retained for audit)."
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "chip"
+        ],
+        "summary": "Get chip details",
+        "description": "Get chip details including metadata and counts.\n\nReturns chip metadata (size, topology, qubit/coupling counts).\nFor detailed qubit/coupling data, use the dedicated endpoints.\n\nParameters\n----------\nchip_id : str\n    ID of the chip\nctx : ProjectContext\n    Project context with user and project information\nchip_service : ChipService\n    Service for chip operations\n\nReturns\n-------\nChipResponse\n    Chip details",
+        "operationId": "getChip",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chip_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Chip Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChipResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chips/{chip_id}/deletion-impact": {
+      "get": {
+        "tags": [
+          "chip"
+        ],
+        "summary": "Preview what would be affected by deleting this chip",
+        "operationId": "getChipDeletionImpact",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chip_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Chip Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChipDeletionImpactResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/chips/{chip_id}/dates": {
       "get": {
         "tags": [
@@ -2969,70 +3240,6 @@
         }
       }
     },
-    "/chips/{chip_id}": {
-      "get": {
-        "tags": [
-          "chip"
-        ],
-        "summary": "Get chip details",
-        "description": "Get chip details including metadata and counts.\n\nReturns chip metadata (size, topology, qubit/coupling counts).\nFor detailed qubit/coupling data, use the dedicated endpoints.\n\nParameters\n----------\nchip_id : str\n    ID of the chip\nctx : ProjectContext\n    Project context with user and project information\nchip_service : ChipService\n    Service for chip operations\n\nReturns\n-------\nChipResponse\n    Chip details",
-        "operationId": "getChip",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "chip_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Chip Id"
-            }
-          },
-          {
-            "name": "X-Project-Id",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Project-Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ChipResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/chips/{chip_id}/qubits": {
       "get": {
         "tags": [
@@ -3195,6 +3402,172 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/QubitResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chips/{chip_id}/qubits/{qid}/reanalyze/resonator-spectroscopy": {
+      "post": {
+        "tags": [
+          "chip"
+        ],
+        "summary": "Re-run resonator spectroscopy analysis on a stored task result (preview)",
+        "description": "Re-run the resonator-spectroscopy analysis on a previously stored figure.\n\nReturns the marked figure and the re-estimated `readout_frequency` for\nthe requested qubit. The DB is **not** mutated; this is a preview only.",
+        "operationId": "reanalyzeResonatorSpectroscopy",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chip_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Chip Id"
+            }
+          },
+          {
+            "name": "qid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Qid"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReanalyzeResonatorSpectroscopyRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReanalyzeResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chips/{chip_id}/qubits/{qid}/reanalyze/qubit-spectroscopy": {
+      "post": {
+        "tags": [
+          "chip"
+        ],
+        "summary": "Re-run qubit spectroscopy analysis on a stored task result (preview)",
+        "description": "Re-run the qubit-spectroscopy analysis on a previously stored figure.\n\nReturns the marked figure and the re-estimated `qubit_frequency`,\n`f01_repr_db`, `f01_quality_level`, and `anharmonicity` for the requested\nqubit. The DB is **not** mutated; this is a preview only.",
+        "operationId": "reanalyzeQubitSpectroscopy",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chip_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Chip Id"
+            }
+          },
+          {
+            "name": "qid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Qid"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReanalyzeQubitSpectroscopyRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReanalyzeResponse"
                 }
               }
             }
@@ -4717,6 +5090,71 @@
         }
       }
     },
+    "/task-results/ai-triage/bulk": {
+      "post": {
+        "tags": [
+          "task-result"
+        ],
+        "summary": "Request bulk AI triage review for latest task results",
+        "description": "Enqueue AI triage review for the current latest task result per entity.",
+        "operationId": "requestBulkAiTriageReview",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkAiTriageRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkAiTriageResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/task-results/{task_id}/re-execute": {
       "post": {
         "tags": [
@@ -4790,23 +5228,120 @@
         }
       }
     },
+    "/task-results/{task_id}/exclude": {
+      "post": {
+        "tags": [
+          "task-result"
+        ],
+        "summary": "Toggle exclusion of a task result from metrics aggregations",
+        "description": "Toggle the excluded flag on a task result.\n\nExcluded measurements are skipped when aggregating metrics for the\ndashboard / metrics screens. Raw data is preserved. Any project member\ncan toggle exclusion; the most recent toggler is recorded.",
+        "operationId": "setTaskResultExcluded",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Task Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskResultExcludeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskResultExcludeResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/task-results/figures/download": {
       "post": {
         "tags": [
           "task-result"
         ],
         "summary": "Download multiple figures as a ZIP file",
-        "description": "Download multiple calibration figures as a ZIP file.\n\nCreates a ZIP archive containing all requested figure files and returns it\nas a streaming response.\n\nParameters\n----------\npaths : list[str]\n    List of absolute file paths to the calibration figures\nfilename : str\n    Filename for the ZIP archive (default: \"figures.zip\")\n\nReturns\n-------\nStreamingResponse\n    ZIP archive containing all requested files\n\nRaises\n------\nHTTPException\n    400 if no paths are provided or if any path does not exist",
+        "description": "Download multiple calibration figures as a ZIP file.\n\nCreates a ZIP archive containing all requested figure files and returns it\nas a streaming response.\n\nParameters\n----------\nbody.paths : list[str]\n    List of absolute file paths to the calibration figures\nbody.filename : str\n    Filename for the ZIP archive (default: \"figures.zip\")\n\nReturns\n-------\nStreamingResponse\n    ZIP archive containing all requested files\n\nRaises\n------\nHTTPException\n    400 if no paths are provided or if any path does not exist",
         "operationId": "downloadFiguresAsZip",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/Body_downloadFiguresAsZip"
+                "$ref": "#/components/schemas/DownloadFiguresAsZipRequest"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "200": {
@@ -4827,12 +5362,7 @@
               }
             }
           }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
+        }
       }
     },
     "/issues": {
@@ -7619,6 +8149,2142 @@
         }
       }
     },
+    "/chips/{chip_id}/qubits/{qid}/note": {
+      "put": {
+        "tags": [
+          "note"
+        ],
+        "summary": "Upsert the general note for a qubit",
+        "operationId": "upsertQubitNote",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chip_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Chip Id"
+            }
+          },
+          {
+            "name": "qid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Qid"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoteUpsertRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoteModel"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "note"
+        ],
+        "summary": "Clear the general note for a qubit",
+        "operationId": "deleteQubitNote",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chip_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Chip Id"
+            }
+          },
+          {
+            "name": "qid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Qid"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chips/{chip_id}/qubits/{qid}/metric-notes/{metric_key}": {
+      "put": {
+        "tags": [
+          "note"
+        ],
+        "summary": "Upsert a per-metric note for a qubit",
+        "operationId": "upsertQubitMetricNote",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chip_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Chip Id"
+            }
+          },
+          {
+            "name": "qid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Qid"
+            }
+          },
+          {
+            "name": "metric_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Metric Key"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoteUpsertRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoteModel"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "note"
+        ],
+        "summary": "Delete a per-metric note for a qubit",
+        "operationId": "deleteQubitMetricNote",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chip_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Chip Id"
+            }
+          },
+          {
+            "name": "qid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Qid"
+            }
+          },
+          {
+            "name": "metric_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Metric Key"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chips/{chip_id}/couplings/{coupling_id}/note": {
+      "put": {
+        "tags": [
+          "note"
+        ],
+        "summary": "Upsert the general note for a coupling",
+        "operationId": "upsertCouplingNote",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chip_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Chip Id"
+            }
+          },
+          {
+            "name": "coupling_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Coupling Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoteUpsertRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoteModel"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "note"
+        ],
+        "summary": "Clear the general note for a coupling",
+        "operationId": "deleteCouplingNote",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chip_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Chip Id"
+            }
+          },
+          {
+            "name": "coupling_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Coupling Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chips/{chip_id}/couplings/{coupling_id}/metric-notes/{metric_key}": {
+      "put": {
+        "tags": [
+          "note"
+        ],
+        "summary": "Upsert a per-metric note for a coupling",
+        "operationId": "upsertCouplingMetricNote",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chip_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Chip Id"
+            }
+          },
+          {
+            "name": "coupling_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Coupling Id"
+            }
+          },
+          {
+            "name": "metric_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Metric Key"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoteUpsertRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoteModel"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "note"
+        ],
+        "summary": "Delete a per-metric note for a coupling",
+        "operationId": "deleteCouplingMetricNote",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chip_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Chip Id"
+            }
+          },
+          {
+            "name": "coupling_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Coupling Id"
+            }
+          },
+          {
+            "name": "metric_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Metric Key"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/task-results/{task_id}/note": {
+      "get": {
+        "tags": [
+          "note"
+        ],
+        "summary": "Get the user note for a task result",
+        "operationId": "getTaskNote",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Task Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoteModel"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "note"
+        ],
+        "summary": "Upsert the user note for a task result",
+        "operationId": "upsertTaskNote",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Task Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoteUpsertRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoteModel"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "note"
+        ],
+        "summary": "Clear the user note for a task result",
+        "operationId": "deleteTaskNote",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Task Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chips/{chip_id}/notes-summary": {
+      "get": {
+        "tags": [
+          "note"
+        ],
+        "summary": "List all notes (qubit / coupling / task-result) on a chip",
+        "operationId": "getChipNotesSummary",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chip_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Chip Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChipNotesSummaryResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chips/{chip_id}/note-events": {
+      "get": {
+        "tags": [
+          "note"
+        ],
+        "summary": "Chip-scoped note edit timeline",
+        "operationId": "listChipNoteEvents",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chip_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Chip Id"
+            }
+          },
+          {
+            "name": "skip",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Skip"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListNoteEventsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/note-events/by-target": {
+      "get": {
+        "tags": [
+          "note"
+        ],
+        "summary": "Per-target note edit timeline",
+        "operationId": "listTargetNoteEvents",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "scope",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^(qubit|qubit_metric|coupling|coupling_metric|task_result)$",
+              "description": "Note scope",
+              "title": "Scope"
+            },
+            "description": "Note scope"
+          },
+          {
+            "name": "target_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "qid / coupling_id / task_id",
+              "title": "Target Id"
+            },
+            "description": "qid / coupling_id / task_id"
+          },
+          {
+            "name": "skip",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Skip"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListNoteEventsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/note-events/search": {
+      "get": {
+        "tags": [
+          "note"
+        ],
+        "summary": "Full-text search across note contents",
+        "operationId": "searchNoteEvents",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Free-text search query",
+              "title": "Q"
+            },
+            "description": "Free-text search query"
+          },
+          {
+            "name": "skip",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Skip"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListNoteEventsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/cryostats": {
+      "get": {
+        "tags": [
+          "cryostat"
+        ],
+        "summary": "List all cryostats",
+        "operationId": "listCryostats",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListCryostatsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "cryostat"
+        ],
+        "summary": "Create a cryostat",
+        "operationId": "createCryostat",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CryostatCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CryostatResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/cryostats/{cryo_id}": {
+      "get": {
+        "tags": [
+          "cryostat"
+        ],
+        "summary": "Get a cryostat by id",
+        "operationId": "getCryostat",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "cryo_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Cryo Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CryostatResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "cryostat"
+        ],
+        "summary": "Update a cryostat",
+        "operationId": "updateCryostat",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "cryo_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Cryo Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CryostatUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CryostatResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "cryostat"
+        ],
+        "summary": "Delete a cryostat",
+        "operationId": "deleteCryostat",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "cryo_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Cryo Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/cooldowns": {
+      "get": {
+        "tags": [
+          "cooldown"
+        ],
+        "summary": "List cool-downs (optionally filter by cryostat or chip)",
+        "operationId": "listCooldowns",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "cryo_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by cryostat",
+              "title": "Cryo Id"
+            },
+            "description": "Filter by cryostat"
+          },
+          {
+            "name": "chip_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by chip membership",
+              "title": "Chip Id"
+            },
+            "description": "Filter by chip membership"
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListCooldownsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "cooldown"
+        ],
+        "summary": "Create a cool-down",
+        "operationId": "createCooldown",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CooldownCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CooldownResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/cooldowns/{cooldown_id}": {
+      "get": {
+        "tags": [
+          "cooldown"
+        ],
+        "summary": "Get a cool-down by id",
+        "operationId": "getCooldown",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "cooldown_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Cooldown Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CooldownResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "cooldown"
+        ],
+        "summary": "Update a cool-down",
+        "operationId": "updateCooldown",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "cooldown_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Cooldown Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CooldownUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CooldownResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "cooldown"
+        ],
+        "summary": "Delete a cool-down",
+        "operationId": "deleteCooldown",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "cooldown_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Cooldown Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/cooldowns/{cooldown_id}/chips/{chip_id}": {
+      "post": {
+        "tags": [
+          "cooldown"
+        ],
+        "summary": "Assign a chip to a cool-down",
+        "operationId": "assignChipToCooldown",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "cooldown_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Cooldown Id"
+            }
+          },
+          {
+            "name": "chip_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Chip Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CooldownResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "cooldown"
+        ],
+        "summary": "Unassign a chip from a cool-down",
+        "operationId": "unassignChipFromCooldown",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "cooldown_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Cooldown Id"
+            }
+          },
+          {
+            "name": "chip_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Chip Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CooldownResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/cooldowns/{cooldown_id}/wiring-checkpoint": {
+      "post": {
+        "tags": [
+          "cooldown-wiring"
+        ],
+        "summary": "Record a wiring change checkpoint within a cool-down",
+        "operationId": "createCooldownWiringCheckpoint",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "cooldown_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Cooldown Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CooldownWiringCheckpointRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CooldownWiringEventResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/cooldowns/{cooldown_id}/wiring-events": {
+      "get": {
+        "tags": [
+          "cooldown-wiring"
+        ],
+        "summary": "List wiring change history for a cool-down",
+        "operationId": "listCooldownWiringEvents",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "cooldown_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Cooldown Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 100,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "skip",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Skip"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListCooldownWiringEventsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/topology/list": {
       "get": {
         "tags": [
@@ -8875,6 +11541,69 @@
         "title": "AddMemberRequest",
         "description": "Request to add a member to a project (always as viewer)."
       },
+      "AiTriageReviewModel": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "description": "AI triage status: requested, running, completed, or failed",
+            "default": ""
+          },
+          "requested_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested At",
+            "description": "Timestamp when AI triage was requested"
+          },
+          "requested_by": {
+            "type": "string",
+            "title": "Requested By",
+            "description": "Username that requested AI triage",
+            "default": ""
+          },
+          "model_provider": {
+            "type": "string",
+            "title": "Model Provider",
+            "description": "Provider for the selected AI triage model",
+            "default": ""
+          },
+          "model_name": {
+            "type": "string",
+            "title": "Model Name",
+            "description": "Name of the selected AI triage model",
+            "default": ""
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At",
+            "description": "Timestamp when AI triage completed or failed"
+          },
+          "error": {
+            "type": "string",
+            "title": "Error",
+            "description": "Failure detail if AI triage failed",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "title": "AiTriageReviewModel",
+        "description": "Persistent state for an AI triage review request on a task result."
+      },
       "AllConfigResponse": {
         "properties": {
           "ui": {
@@ -8988,6 +11717,17 @@
             "type": "array",
             "title": "Conversation History",
             "description": "Previous conversation messages [{role, content}, ...]"
+          },
+          "model_override": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelConfig"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional per-request model override for task result analysis. When unset, the configured analysis_model/model selection is used."
           }
         },
         "type": "object",
@@ -9072,29 +11812,6 @@
         "title": "BackendResponseModel",
         "description": "Response model for backend operations.\n\nInherits from BackendModel and is used to format the response\nfor backend-related API endpoints."
       },
-      "Body_downloadFiguresAsZip": {
-        "properties": {
-          "paths": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Paths",
-            "description": "List of file paths to include in the ZIP"
-          },
-          "filename": {
-            "type": "string",
-            "title": "Filename",
-            "description": "Filename for the ZIP archive",
-            "default": "figures.zip"
-          }
-        },
-        "type": "object",
-        "required": [
-          "paths"
-        ],
-        "title": "Body_downloadFiguresAsZip"
-      },
       "Body_login": {
         "properties": {
           "username": {
@@ -9146,6 +11863,124 @@
         },
         "type": "object",
         "title": "Body_reExecuteTaskResult"
+      },
+      "BulkAiTriageRequest": {
+        "properties": {
+          "chip_id": {
+            "type": "string",
+            "title": "Chip Id"
+          },
+          "task": {
+            "type": "string",
+            "title": "Task"
+          },
+          "entity_type": {
+            "type": "string",
+            "title": "Entity Type",
+            "default": "qubit"
+          },
+          "date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date"
+          },
+          "task_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Ids"
+          },
+          "model_override": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelConfig"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "chip_id",
+          "task"
+        ],
+        "title": "BulkAiTriageRequest",
+        "description": "Request body for bulk AI triage review."
+      },
+      "BulkAiTriageResponse": {
+        "properties": {
+          "chip_id": {
+            "type": "string",
+            "title": "Chip Id"
+          },
+          "task": {
+            "type": "string",
+            "title": "Task"
+          },
+          "entity_type": {
+            "type": "string",
+            "title": "Entity Type"
+          },
+          "date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date"
+          },
+          "requested_count": {
+            "type": "integer",
+            "title": "Requested Count"
+          },
+          "task_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Task Ids"
+          },
+          "skipped_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Skipped Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "chip_id",
+          "task",
+          "entity_type",
+          "requested_count",
+          "task_ids"
+        ],
+        "title": "BulkAiTriageResponse",
+        "description": "Response after enqueueing bulk AI triage review."
       },
       "CalibrationNoteResponse": {
         "properties": {
@@ -9230,6 +12065,62 @@
         "title": "ChipDatesResponse",
         "description": "Response model for chip dates."
       },
+      "ChipDeletionImpactResponse": {
+        "properties": {
+          "chip_id": {
+            "type": "string",
+            "title": "Chip Id"
+          },
+          "qubits": {
+            "type": "integer",
+            "title": "Qubits",
+            "description": "QubitDocument rows that would be hard-deleted"
+          },
+          "couplings": {
+            "type": "integer",
+            "title": "Couplings",
+            "description": "CouplingDocument rows that would be hard-deleted"
+          },
+          "task_results": {
+            "type": "integer",
+            "title": "Task Results",
+            "description": "task_result_history rows kept for audit (not deleted)"
+          },
+          "qubit_history_snapshots": {
+            "type": "integer",
+            "title": "Qubit History Snapshots",
+            "description": "qubit_history rows kept for audit (not deleted)"
+          },
+          "coupling_history_snapshots": {
+            "type": "integer",
+            "title": "Coupling History Snapshots",
+            "description": "coupling_history rows kept for audit (not deleted)"
+          },
+          "cooldowns_referencing": {
+            "type": "integer",
+            "title": "Cooldowns Referencing",
+            "description": "Cool-downs that include this chip and would have it removed"
+          },
+          "can_delete_safely": {
+            "type": "boolean",
+            "title": "Can Delete Safely",
+            "description": "True if no QubitDocument or CouplingDocument rows exist (DELETE without force succeeds). When false, force=true is required."
+          }
+        },
+        "type": "object",
+        "required": [
+          "chip_id",
+          "qubits",
+          "couplings",
+          "task_results",
+          "qubit_history_snapshots",
+          "coupling_history_snapshots",
+          "cooldowns_referencing",
+          "can_delete_safely"
+        ],
+        "title": "ChipDeletionImpactResponse",
+        "description": "Counts of related rows that would be affected by deleting this chip."
+      },
       "ChipMetricsResponse": {
         "properties": {
           "chip_id": {
@@ -9311,6 +12202,44 @@
         "title": "ChipMetricsResponse",
         "description": "Complete chip metrics response."
       },
+      "ChipNotesSummaryResponse": {
+        "properties": {
+          "chip_id": {
+            "type": "string",
+            "title": "Chip Id"
+          },
+          "qubits": {
+            "items": {
+              "$ref": "#/components/schemas/TargetNoteEntry"
+            },
+            "type": "array",
+            "title": "Qubits"
+          },
+          "couplings": {
+            "items": {
+              "$ref": "#/components/schemas/TargetNoteEntry"
+            },
+            "type": "array",
+            "title": "Couplings"
+          },
+          "task_notes": {
+            "items": {
+              "$ref": "#/components/schemas/TaskNoteEntry"
+            },
+            "type": "array",
+            "title": "Task Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "chip_id",
+          "qubits",
+          "couplings",
+          "task_notes"
+        ],
+        "title": "ChipNotesSummaryResponse",
+        "description": "All notes for a chip in one fetch — drives the dashboard summary view."
+      },
       "ChipResponse": {
         "properties": {
           "chip_id": {
@@ -9354,6 +12283,20 @@
               }
             ],
             "title": "Installed At"
+          },
+          "current_cooldown_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Cooldown Id"
+          },
+          "note": {
+            "$ref": "#/components/schemas/NoteModel"
           }
         },
         "type": "object",
@@ -9402,6 +12345,268 @@
         "type": "object",
         "title": "ConfigReloadResponse",
         "description": "Response model for config cache reload."
+      },
+      "CooldownCreateRequest": {
+        "properties": {
+          "cooldown_id": {
+            "type": "string",
+            "maxLength": 100,
+            "title": "Cooldown Id",
+            "description": "Project-unique identifier (e.g. '2026-001')"
+          },
+          "cryo_id": {
+            "type": "string",
+            "title": "Cryo Id",
+            "description": "Cryostat the cool-down belongs to"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 2000,
+            "title": "Description",
+            "default": ""
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Started At"
+          },
+          "ended_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ended At"
+          },
+          "chip_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Chip Ids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "cooldown_id",
+          "cryo_id",
+          "started_at"
+        ],
+        "title": "CooldownCreateRequest",
+        "description": "Body for creating a cool-down."
+      },
+      "CooldownResponse": {
+        "properties": {
+          "cooldown_id": {
+            "type": "string",
+            "title": "Cooldown Id"
+          },
+          "cryo_id": {
+            "type": "string",
+            "title": "Cryo Id"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Started At"
+          },
+          "ended_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ended At"
+          },
+          "chip_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Chip Ids"
+          },
+          "note": {
+            "$ref": "#/components/schemas/NoteModel"
+          },
+          "wiring_info": {
+            "type": "string",
+            "title": "Wiring Info",
+            "default": ""
+          },
+          "wiring_blocks": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Wiring Blocks"
+          }
+        },
+        "type": "object",
+        "required": [
+          "cooldown_id",
+          "cryo_id",
+          "description",
+          "started_at",
+          "ended_at",
+          "chip_ids"
+        ],
+        "title": "CooldownResponse",
+        "description": "Single cool-down record."
+      },
+      "CooldownUpdateRequest": {
+        "properties": {
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "ended_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ended At"
+          },
+          "wiring_info": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wiring Info",
+            "description": "Markdown export of the wiring document (derived from wiring_blocks)"
+          },
+          "wiring_blocks": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wiring Blocks",
+            "description": "BlockNote document JSON. Source of truth when present."
+          }
+        },
+        "type": "object",
+        "title": "CooldownUpdateRequest",
+        "description": "Body for updating a cool-down. All fields optional."
+      },
+      "CooldownWiringCheckpointRequest": {
+        "properties": {
+          "comment": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Comment",
+            "description": "Why the wiring changed at this point in time"
+          }
+        },
+        "type": "object",
+        "required": [
+          "comment"
+        ],
+        "title": "CooldownWiringCheckpointRequest",
+        "description": "Body for recording a wiring change checkpoint within a cool-down."
+      },
+      "CooldownWiringEventResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "cooldown_id": {
+            "type": "string",
+            "title": "Cooldown Id"
+          },
+          "actor": {
+            "type": "string",
+            "title": "Actor"
+          },
+          "action": {
+            "type": "string",
+            "title": "Action"
+          },
+          "comment": {
+            "type": "string",
+            "title": "Comment"
+          },
+          "wiring_info_snapshot": {
+            "type": "string",
+            "title": "Wiring Info Snapshot"
+          },
+          "block_count": {
+            "type": "integer",
+            "title": "Block Count"
+          },
+          "image_count": {
+            "type": "integer",
+            "title": "Image Count"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "cooldown_id",
+          "actor",
+          "action",
+          "comment",
+          "wiring_info_snapshot",
+          "block_count",
+          "image_count",
+          "created_at"
+        ],
+        "title": "CooldownWiringEventResponse",
+        "description": "One wiring-history entry for a cool-down."
       },
       "Coupling": {
         "properties": {
@@ -9465,6 +12670,16 @@
             "type": "object",
             "title": "Data",
             "default": {}
+          },
+          "note": {
+            "$ref": "#/components/schemas/NoteModel"
+          },
+          "metric_notes": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/NoteModel"
+            },
+            "type": "object",
+            "title": "Metric Notes"
           }
         },
         "type": "object",
@@ -9504,6 +12719,218 @@
         ],
         "title": "CreateChipRequest",
         "description": "Request model for creating a new chip.\n\nAttributes\n----------\n    chip_id (str): The ID of the chip to create.\n    size (int): The size of the chip (64, 144, 256, or 1024).\n    topology_id (str | None): Topology template ID. If not provided, defaults to 'square-lattice-mux-{size}'."
+      },
+      "CryostatCreateRequest": {
+        "properties": {
+          "cryo_id": {
+            "type": "string",
+            "maxLength": 100,
+            "title": "Cryo Id",
+            "description": "Project-unique identifier"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Name",
+            "default": ""
+          },
+          "manufacturer": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Manufacturer",
+            "default": ""
+          },
+          "model": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Model",
+            "default": ""
+          },
+          "location": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Location",
+            "default": ""
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "description": "active | maintenance | decommissioned",
+            "default": "active"
+          },
+          "commissioned_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Commissioned At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "cryo_id"
+        ],
+        "title": "CryostatCreateRequest",
+        "description": "Body for creating a cryostat."
+      },
+      "CryostatResponse": {
+        "properties": {
+          "cryo_id": {
+            "type": "string",
+            "title": "Cryo Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "manufacturer": {
+            "type": "string",
+            "title": "Manufacturer"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "location": {
+            "type": "string",
+            "title": "Location"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "commissioned_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Commissioned At"
+          },
+          "decommissioned_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decommissioned At"
+          },
+          "note": {
+            "$ref": "#/components/schemas/NoteModel"
+          }
+        },
+        "type": "object",
+        "required": [
+          "cryo_id",
+          "name",
+          "manufacturer",
+          "model",
+          "location",
+          "status",
+          "commissioned_at",
+          "decommissioned_at"
+        ],
+        "title": "CryostatResponse",
+        "description": "Single cryostat record."
+      },
+      "CryostatUpdateRequest": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "manufacturer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Manufacturer"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "location": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "commissioned_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Commissioned At"
+          },
+          "decommissioned_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decommissioned At"
+          }
+        },
+        "type": "object",
+        "title": "CryostatUpdateRequest",
+        "description": "Body for updating a cryostat. All fields optional."
       },
       "DegradationTrendResponse": {
         "properties": {
@@ -9750,6 +13177,34 @@
         "type": "object",
         "title": "DeviceTopologyRequest",
         "description": "Request model for device topology."
+      },
+      "DownloadFiguresAsZipRequest": {
+        "properties": {
+          "paths": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Paths",
+            "default": []
+          },
+          "filename": {
+            "type": "string",
+            "title": "Filename",
+            "default": "figures.zip"
+          },
+          "ai_triage_task_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Ai Triage Task Ids",
+            "default": []
+          }
+        },
+        "type": "object",
+        "title": "DownloadFiguresAsZipRequest",
+        "description": "Request body for downloading task-result artifacts as a ZIP archive."
       },
       "ExecuteFlowRequest": {
         "properties": {
@@ -10156,6 +13611,17 @@
             "type": "boolean",
             "title": "Is Within 24H",
             "default": true
+          },
+          "metric": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metric"
           }
         },
         "type": "object",
@@ -10723,10 +14189,56 @@
             "description": "Case outcome",
             "default": "resolved"
           },
+          "human_label": {
+            "type": "string",
+            "title": "Human Label",
+            "description": "Human review label",
+            "default": ""
+          },
+          "failure_mode_labels": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Failure Mode Labels",
+            "description": "Failure labels"
+          },
+          "case_type": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Case Type",
+            "description": "Knowledge case type labels"
+          },
+          "model_error_type": {
+            "type": "string",
+            "title": "Model Error Type",
+            "description": "Verifier error/outcome type",
+            "default": ""
+          },
+          "resolution_label": {
+            "type": "string",
+            "title": "Resolution Label",
+            "description": "Structured resolution label",
+            "default": ""
+          },
           "symptom": {
             "type": "string",
             "title": "Symptom",
             "description": "Observed symptom",
+            "default": ""
+          },
+          "model_prediction": {
+            "type": "string",
+            "title": "Model Prediction",
+            "description": "Verifier/model prediction summary",
+            "default": ""
+          },
+          "human_review_decision": {
+            "type": "string",
+            "title": "Human Review Decision",
+            "description": "Human review decision summary",
             "default": ""
           },
           "root_cause": {
@@ -10741,6 +14253,12 @@
             "description": "How the issue was resolved",
             "default": ""
           },
+          "boundary_criteria": {
+            "type": "string",
+            "title": "Boundary Criteria",
+            "description": "Boundary criteria",
+            "default": ""
+          },
           "lesson_learned": {
             "items": {
               "type": "string"
@@ -10748,6 +14266,24 @@
             "type": "array",
             "title": "Lesson Learned",
             "description": "Key takeaways"
+          },
+          "applicability": {
+            "type": "string",
+            "title": "Applicability",
+            "description": "When this case should be retrieved",
+            "default": ""
+          },
+          "counterexample": {
+            "type": "string",
+            "title": "Counterexample",
+            "description": "What rule this case counters",
+            "default": ""
+          },
+          "prompt_guidance": {
+            "type": "string",
+            "title": "Prompt Guidance",
+            "description": "Prompt/checklist guidance",
+            "default": ""
           },
           "figure_paths": {
             "items": {
@@ -10848,6 +14384,73 @@
             "title": "Severity",
             "description": "Updated severity"
           },
+          "human_label": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Human Label",
+            "description": "Human label"
+          },
+          "failure_mode_labels": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "maxItems": 50
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Failure Mode Labels"
+          },
+          "case_type": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "maxItems": 50
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Case Type"
+          },
+          "model_error_type": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Error Type"
+          },
+          "resolution_label": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolution Label"
+          },
           "symptom": {
             "anyOf": [
               {
@@ -10860,6 +14463,30 @@
             ],
             "title": "Symptom",
             "description": "Updated symptom"
+          },
+          "model_prediction": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 5000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Prediction"
+          },
+          "human_review_decision": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 5000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Human Review Decision"
           },
           "root_cause": {
             "anyOf": [
@@ -10887,6 +14514,18 @@
             "title": "Resolution",
             "description": "Updated resolution"
           },
+          "boundary_criteria": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 5000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Boundary Criteria"
+          },
           "lesson_learned": {
             "anyOf": [
               {
@@ -10902,6 +14541,42 @@
             ],
             "title": "Lesson Learned",
             "description": "Updated lessons"
+          },
+          "applicability": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 5000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Applicability"
+          },
+          "counterexample": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 5000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Counterexample"
+          },
+          "prompt_guidance": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 5000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prompt Guidance"
           }
         },
         "type": "object",
@@ -11058,9 +14733,50 @@
             "title": "Status",
             "default": "resolved"
           },
+          "human_label": {
+            "type": "string",
+            "title": "Human Label",
+            "default": ""
+          },
+          "failure_mode_labels": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Failure Mode Labels",
+            "default": []
+          },
+          "case_type": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Case Type",
+            "default": []
+          },
+          "model_error_type": {
+            "type": "string",
+            "title": "Model Error Type",
+            "default": ""
+          },
+          "resolution_label": {
+            "type": "string",
+            "title": "Resolution Label",
+            "default": ""
+          },
           "symptom": {
             "type": "string",
             "title": "Symptom",
+            "default": ""
+          },
+          "model_prediction": {
+            "type": "string",
+            "title": "Model Prediction",
+            "default": ""
+          },
+          "human_review_decision": {
+            "type": "string",
+            "title": "Human Review Decision",
             "default": ""
           },
           "root_cause": {
@@ -11073,6 +14789,11 @@
             "title": "Resolution",
             "default": ""
           },
+          "boundary_criteria": {
+            "type": "string",
+            "title": "Boundary Criteria",
+            "default": ""
+          },
           "lesson_learned": {
             "items": {
               "type": "string"
@@ -11080,6 +14801,21 @@
             "type": "array",
             "title": "Lesson Learned",
             "default": []
+          },
+          "applicability": {
+            "type": "string",
+            "title": "Applicability",
+            "default": ""
+          },
+          "counterexample": {
+            "type": "string",
+            "title": "Counterexample",
+            "default": ""
+          },
+          "prompt_guidance": {
+            "type": "string",
+            "title": "Prompt Guidance",
+            "default": ""
           }
         },
         "type": "object",
@@ -11292,6 +15028,38 @@
         "title": "ListChipsResponse",
         "description": "Response model for listing chips."
       },
+      "ListCooldownWiringEventsResponse": {
+        "properties": {
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/CooldownWiringEventResponse"
+            },
+            "type": "array",
+            "title": "Events"
+          }
+        },
+        "type": "object",
+        "required": [
+          "events"
+        ],
+        "title": "ListCooldownWiringEventsResponse"
+      },
+      "ListCooldownsResponse": {
+        "properties": {
+          "cooldowns": {
+            "items": {
+              "$ref": "#/components/schemas/CooldownResponse"
+            },
+            "type": "array",
+            "title": "Cooldowns"
+          }
+        },
+        "type": "object",
+        "required": [
+          "cooldowns"
+        ],
+        "title": "ListCooldownsResponse"
+      },
       "ListCouplingsResponse": {
         "properties": {
           "couplings": {
@@ -11323,6 +15091,22 @@
         ],
         "title": "ListCouplingsResponse",
         "description": "Response model for listing couplings with pagination."
+      },
+      "ListCryostatsResponse": {
+        "properties": {
+          "cryostats": {
+            "items": {
+              "$ref": "#/components/schemas/CryostatResponse"
+            },
+            "type": "array",
+            "title": "Cryostats"
+          }
+        },
+        "type": "object",
+        "required": [
+          "cryostats"
+        ],
+        "title": "ListCryostatsResponse"
       },
       "ListExecutionsResponse": {
         "properties": {
@@ -11490,6 +15274,29 @@
         ],
         "title": "ListMuxResponse",
         "description": "ListMuxResponse is a Pydantic model that represents the response for fetching the multiplexers."
+      },
+      "ListNoteEventsResponse": {
+        "properties": {
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/NoteEventResponse"
+            },
+            "type": "array",
+            "title": "Events"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "description": "0 if the caller didn't request a count (search/list endpoints return paginated rows without a separate count by default).",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "events"
+        ],
+        "title": "ListNoteEventsResponse",
+        "description": "Paginated note-event feed."
       },
       "ListQubitsResponse": {
         "properties": {
@@ -12008,6 +15815,39 @@
               }
             ],
             "title": "Output Parameters"
+          },
+          "excluded": {
+            "type": "boolean",
+            "title": "Excluded",
+            "default": false
+          },
+          "excluded_reason": {
+            "type": "string",
+            "title": "Excluded Reason",
+            "default": ""
+          },
+          "excluded_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Excluded By"
+          },
+          "excluded_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Excluded At"
           }
         },
         "type": "object",
@@ -12103,6 +15943,62 @@
         ],
         "title": "MetricsSummaryResponse",
         "description": "Response model for aggregated metrics summary.\n\nReturns statistical summary computed by the database.\nMinimal data transfer (~0.1KB).\nMetrics are loaded dynamically from metrics.yaml config."
+      },
+      "ModelConfig": {
+        "properties": {
+          "provider": {
+            "type": "string",
+            "title": "Provider",
+            "default": "openai"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "default": "gpt-4.1"
+          },
+          "temperature": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Temperature",
+            "default": 0.7
+          },
+          "max_output_tokens": {
+            "type": "integer",
+            "title": "Max Output Tokens",
+            "default": 16384
+          },
+          "base_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Url"
+          },
+          "api_key_env": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Api Key Env"
+          }
+        },
+        "type": "object",
+        "title": "ModelConfig",
+        "description": "Model configuration for CopilotKit."
       },
       "MuxDetailResponse": {
         "properties": {
@@ -12328,6 +16224,118 @@
         "type": "object",
         "title": "MuxTask",
         "description": "Task information for mux display."
+      },
+      "NoteEventResponse": {
+        "properties": {
+          "project_id": {
+            "type": "string",
+            "title": "Project Id"
+          },
+          "chip_id": {
+            "type": "string",
+            "title": "Chip Id"
+          },
+          "scope": {
+            "type": "string",
+            "title": "Scope",
+            "description": "qubit | qubit_metric | coupling | coupling_metric | task_result"
+          },
+          "target_id": {
+            "type": "string",
+            "title": "Target Id"
+          },
+          "metric_key": {
+            "type": "string",
+            "title": "Metric Key",
+            "default": ""
+          },
+          "action": {
+            "type": "string",
+            "title": "Action",
+            "description": "upsert | delete"
+          },
+          "actor": {
+            "type": "string",
+            "title": "Actor"
+          },
+          "content": {
+            "type": "string",
+            "title": "Content",
+            "default": ""
+          },
+          "extra": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Extra"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "project_id",
+          "chip_id",
+          "scope",
+          "target_id",
+          "action",
+          "actor",
+          "created_at"
+        ],
+        "title": "NoteEventResponse",
+        "description": "One row of the note audit log."
+      },
+      "NoteModel": {
+        "properties": {
+          "content": {
+            "type": "string",
+            "title": "Content",
+            "description": "Free-form note text",
+            "default": ""
+          },
+          "updated_by": {
+            "type": "string",
+            "title": "Updated By",
+            "description": "Username of the last editor",
+            "default": ""
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At",
+            "description": "Timestamp of the last edit; None if never edited"
+          }
+        },
+        "type": "object",
+        "title": "NoteModel",
+        "description": "A free-form note with author and timestamp metadata.\n\n``updated_at`` is ``None`` until someone first writes content. This makes it\npossible to distinguish \"never noted\" from \"noted then cleared\"."
+      },
+      "NoteUpsertRequest": {
+        "properties": {
+          "content": {
+            "type": "string",
+            "maxLength": 5000,
+            "title": "Content",
+            "description": "Note text content"
+          }
+        },
+        "type": "object",
+        "required": [
+          "content"
+        ],
+        "title": "NoteUpsertRequest",
+        "description": "Body for upserting a note."
       },
       "OutputParameterInfoResponse": {
         "properties": {
@@ -13333,6 +17341,16 @@
             "type": "object",
             "title": "Data",
             "default": {}
+          },
+          "note": {
+            "$ref": "#/components/schemas/NoteModel"
+          },
+          "metric_notes": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/NoteModel"
+            },
+            "type": "object",
+            "title": "Metric Notes"
           }
         },
         "type": "object",
@@ -13403,6 +17421,299 @@
         ],
         "title": "ReExecutionEntry",
         "description": "A child task result created by re-execution."
+      },
+      "ReanalyzeOutputParameter": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "value": {
+            "type": "number",
+            "title": "Value"
+          },
+          "unit": {
+            "type": "string",
+            "title": "Unit",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "value"
+        ],
+        "title": "ReanalyzeOutputParameter",
+        "description": "A single re-analyzed output value."
+      },
+      "ReanalyzeQubitSpectroscopyParams": {
+        "properties": {
+          "binarize_threshold_sigma_plus": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Binarize Threshold Sigma Plus"
+          },
+          "binarize_threshold_sigma_minus": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Binarize Threshold Sigma Minus"
+          },
+          "top_power": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Top Power"
+          },
+          "f01_height_min": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "F01 Height Min"
+          },
+          "f12_distance_min": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "F12 Distance Min"
+          },
+          "f12_distance_max": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "F12 Distance Max"
+          },
+          "f12_height_min": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "F12 Height Min"
+          },
+          "retry_with_trim": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retry With Trim",
+            "description": "If true, retry after trimming the highest-power row when no f01 is found."
+          }
+        },
+        "type": "object",
+        "title": "ReanalyzeQubitSpectroscopyParams",
+        "description": "Optional analysis-parameter overrides for qubit spectroscopy."
+      },
+      "ReanalyzeQubitSpectroscopyRequest": {
+        "properties": {
+          "source_task_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Task Id",
+            "description": "Task result to re-analyze. If omitted, the latest matching task result for the (chip_id, qid) is used."
+          },
+          "parameters": {
+            "$ref": "#/components/schemas/ReanalyzeQubitSpectroscopyParams"
+          }
+        },
+        "type": "object",
+        "title": "ReanalyzeQubitSpectroscopyRequest",
+        "description": "Request body for re-running CheckQubitSpectroscopy analysis."
+      },
+      "ReanalyzeResonatorSpectroscopyParams": {
+        "properties": {
+          "num_resonators": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Num Resonators",
+            "description": "Number of resonators to detect in the MUX (typically 4)."
+          },
+          "high_power_min": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "High Power Min",
+            "description": "Minimum power (dB) for the high-power region."
+          },
+          "high_power_max": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "High Power Max",
+            "description": "Maximum power (dB) for the high-power region."
+          },
+          "low_power": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Low Power",
+            "description": "Power level (dB) sampled for low-power peaks."
+          },
+          "bare_shift_estimator_type": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "config",
+                  "high_frequency_strength"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bare Shift Estimator Type",
+            "description": "If 'high_frequency_strength', the high/low-power boundary is auto-detected from the FFT energy of each row, overriding high_power_min/max/low_power."
+          },
+          "bare_shift_strength_limit": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bare Shift Strength Limit",
+            "description": "Strength cutoff for the high_frequency_strength estimator."
+          }
+        },
+        "type": "object",
+        "title": "ReanalyzeResonatorSpectroscopyParams",
+        "description": "Optional analysis-parameter overrides for resonator spectroscopy.\n\nAny field left ``None`` falls back to the default in\n:class:`EstimateResonatorFrequencyConfig`."
+      },
+      "ReanalyzeResonatorSpectroscopyRequest": {
+        "properties": {
+          "source_task_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Task Id",
+            "description": "Task result to re-analyze. If omitted, the latest matching task result for the (chip_id, qid) is used."
+          },
+          "parameters": {
+            "$ref": "#/components/schemas/ReanalyzeResonatorSpectroscopyParams"
+          }
+        },
+        "type": "object",
+        "title": "ReanalyzeResonatorSpectroscopyRequest",
+        "description": "Request body for re-running CheckResonatorSpectroscopy analysis."
+      },
+      "ReanalyzeResponse": {
+        "properties": {
+          "source_task_id": {
+            "type": "string",
+            "title": "Source Task Id",
+            "description": "Task result whose data was re-analyzed."
+          },
+          "source_task_name": {
+            "type": "string",
+            "title": "Source Task Name"
+          },
+          "qid": {
+            "type": "string",
+            "title": "Qid"
+          },
+          "figure": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Figure",
+            "description": "Plotly figure JSON of the re-analyzed result with markers."
+          },
+          "output_parameters": {
+            "items": {
+              "$ref": "#/components/schemas/ReanalyzeOutputParameter"
+            },
+            "type": "array",
+            "title": "Output Parameters"
+          },
+          "committed": {
+            "type": "boolean",
+            "title": "Committed",
+            "description": "Always false in this version; persisting changes will land later.",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "source_task_id",
+          "source_task_name",
+          "qid",
+          "figure",
+          "output_parameters"
+        ],
+        "title": "ReanalyzeResponse",
+        "description": "Preview response from a reanalyze endpoint.\n\n``figure`` carries a Plotly figure as a plain JSON dict so the UI can\nrender it directly. The DB is *not* mutated by this endpoint; commit\nwill be added in a follow-up."
       },
       "RecalibrationRecommendationResponse": {
         "properties": {
@@ -14149,6 +18460,30 @@
         "title": "Tag",
         "description": "Response model for a tag."
       },
+      "TargetNoteEntry": {
+        "properties": {
+          "target_id": {
+            "type": "string",
+            "title": "Target Id"
+          },
+          "note": {
+            "$ref": "#/components/schemas/NoteModel"
+          },
+          "metric_notes": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/NoteModel"
+            },
+            "type": "object",
+            "title": "Metric Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "target_id"
+        ],
+        "title": "TargetNoteEntry",
+        "description": "Per-target row for the dashboard summary (qubit or coupling)."
+      },
       "Task": {
         "properties": {
           "task_id": {
@@ -14702,6 +19037,29 @@
         "title": "TaskKnowledgeSummaryResponse",
         "description": "Summary response for list endpoint (no heavy fields)."
       },
+      "TaskNoteEntry": {
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "title": "Task Id"
+          },
+          "qid": {
+            "type": "string",
+            "title": "Qid"
+          },
+          "note": {
+            "$ref": "#/components/schemas/NoteModel"
+          }
+        },
+        "type": "object",
+        "required": [
+          "task_id",
+          "qid",
+          "note"
+        ],
+        "title": "TaskNoteEntry",
+        "description": "Task-result note row for the dashboard summary."
+      },
       "TaskResponse": {
         "properties": {
           "name": {
@@ -14964,11 +19322,89 @@
             "type": "boolean",
             "title": "Default View",
             "default": true
+          },
+          "ai_triage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AiTriageReviewModel"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
         "title": "TaskResult",
         "description": "TaskResult is a Pydantic model that represents a task result."
+      },
+      "TaskResultExcludeRequest": {
+        "properties": {
+          "excluded": {
+            "type": "boolean",
+            "title": "Excluded"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "excluded"
+        ],
+        "title": "TaskResultExcludeRequest",
+        "description": "Request body for toggling exclusion on a task result."
+      },
+      "TaskResultExcludeResponse": {
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "title": "Task Id"
+          },
+          "excluded": {
+            "type": "boolean",
+            "title": "Excluded"
+          },
+          "excluded_reason": {
+            "type": "string",
+            "title": "Excluded Reason"
+          },
+          "excluded_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Excluded By"
+          },
+          "excluded_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Excluded At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "task_id",
+          "excluded",
+          "excluded_reason",
+          "excluded_by",
+          "excluded_at"
+        ],
+        "title": "TaskResultExcludeResponse",
+        "description": "Response after toggling exclusion on a task result."
       },
       "TaskResultResponse": {
         "properties": {
@@ -14983,6 +19419,11 @@
           "qid": {
             "type": "string",
             "title": "Qid"
+          },
+          "chip_id": {
+            "type": "string",
+            "title": "Chip Id",
+            "default": ""
           },
           "status": {
             "type": "string",
@@ -15218,6 +19659,37 @@
         "type": "object",
         "title": "UITaskFilesSettings",
         "description": "Task files editor settings."
+      },
+      "UpdateChipRequest": {
+        "properties": {
+          "topology_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Topology Id"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 5000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note",
+            "description": "Free-form note text (overwrites note.content)"
+          }
+        },
+        "type": "object",
+        "title": "UpdateChipRequest",
+        "description": "Body for updating chip metadata. All fields optional."
       },
       "UpdateScheduleRequest": {
         "properties": {
