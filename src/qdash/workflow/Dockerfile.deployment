@@ -12,6 +12,7 @@ RUN apt-get update \
     libcairo2-dev \
     cmake \
     wget \
+    git \
     libgirepository1.0-dev \
     gobject-introspection \
     gir1.2-gtk-3.0 \
