@@ -24,6 +24,18 @@ class MongoFlowRepository:
         """
         return FlowDocument.find_by_user_and_name(username, name, project_id)  # type: ignore[no-any-return]
 
+    def find_by_project_and_name(self, project_id: str, name: str) -> FlowDocument | None:
+        """Find flow by project and name.
+
+        Args:
+            project_id: Project identifier
+            name: Flow name
+
+        Returns:
+            FlowDocument if found, None otherwise
+        """
+        return FlowDocument.find_by_project_and_name(project_id, name)  # type: ignore[no-any-return]
+
     def list_by_user(self, username: str, project_id: str) -> list[FlowDocument]:
         """List all flows for a user, sorted by update time (newest first).
 
@@ -35,6 +47,17 @@ class MongoFlowRepository:
             List of FlowDocument objects
         """
         return FlowDocument.list_by_user(username, project_id)  # type: ignore[no-any-return]
+
+    def list_by_project(self, project_id: str) -> list[FlowDocument]:
+        """List all flows for a project, sorted by update time (newest first).
+
+        Args:
+            project_id: Project identifier
+
+        Returns:
+            List of FlowDocument objects
+        """
+        return FlowDocument.list_by_project(project_id)  # type: ignore[no-any-return]
 
     def insert(self, flow: FlowDocument) -> None:
         """Insert a new flow document.
@@ -64,6 +87,18 @@ class MongoFlowRepository:
             True if deleted, False if not found
         """
         return FlowDocument.delete_by_user_and_name(username, name, project_id)  # type: ignore[no-any-return]
+
+    def delete_by_project_and_name(self, project_id: str, name: str) -> bool:
+        """Delete flow by project and name.
+
+        Args:
+            project_id: Project identifier
+            name: Flow name
+
+        Returns:
+            True if deleted, False if not found
+        """
+        return FlowDocument.delete_by_project_and_name(project_id, name)  # type: ignore[no-any-return]
 
     def create_flow(
         self,

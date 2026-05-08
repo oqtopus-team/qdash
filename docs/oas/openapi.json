@@ -7920,7 +7920,7 @@
         "tags": [
           "flow"
         ],
-        "summary": "List all flow schedules for current user",
+        "summary": "List all flow schedules for current project",
         "description": "List all Flow schedules (cron and one-time) for the current project.",
         "operationId": "listAllFlowSchedules",
         "security": [

@@ -83,7 +83,7 @@ class FlowScheduleService:
         request : ScheduleFlowRequest
             Schedule request.
         username : str
-            The username.
+            The username of the user creating the schedule.
         project_id : str
             The project ID.
 
@@ -104,7 +104,7 @@ class FlowScheduleService:
                 detail="Cannot provide both 'cron' and 'scheduled_time'",
             )
 
-        flow = self._flow_repo.find_by_user_and_name(username, name, project_id)
+        flow = self._flow_repo.find_by_project_and_name(project_id, name)
         if not flow:
             raise HTTPException(status_code=404, detail=f"Flow '{name}' not found")
 
@@ -131,10 +131,10 @@ class FlowScheduleService:
 
         # Merge parameters
         parameters: dict[str, Any] = {
-            "username": username,
             "chip_id": flow.chip_id,
             **flow.default_parameters,
             **request.parameters,
+            "username": username,
             "flow_name": name,
             "project_id": project_id,
         }
@@ -163,7 +163,7 @@ class FlowScheduleService:
         Parameters
         ----------
         username : str
-            The username.
+            The username of the requesting user.
         project_id : str
             The project ID.
         limit : int
@@ -178,7 +178,7 @@ class FlowScheduleService:
 
         """
         limit = min(limit, 100)
-        flows = self._flow_repo.list_by_user(username, project_id)
+        flows = self._flow_repo.list_by_project(project_id)
 
         all_schedules: list[FlowScheduleSummary] = []
 
@@ -263,7 +263,7 @@ class FlowScheduleService:
         name : str
             Flow name.
         username : str
-            The username.
+            The username of the requesting user.
         project_id : str
             The project ID.
         limit : int
@@ -279,7 +279,7 @@ class FlowScheduleService:
         """
         limit = min(limit, 100)
 
-        flow = self._flow_repo.find_by_user_and_name(username, name, project_id)
+        flow = self._flow_repo.find_by_project_and_name(project_id, name)
         if not flow:
             raise HTTPException(status_code=404, detail=f"Flow '{name}' not found")
 
@@ -360,7 +360,7 @@ class FlowScheduleService:
         request : UpdateScheduleRequest
             Update request.
         username : str
-            The username.
+            The username of the user updating the schedule.
         project_id : str
             The project ID.
 
@@ -373,12 +373,12 @@ class FlowScheduleService:
         async with get_client() as client:
             try:
                 flow = self._flow_repo.find_one(
-                    {"project_id": project_id, "deployment_id": schedule_id, "username": username}
+                    {"project_id": project_id, "deployment_id": schedule_id}
                 )
                 if not flow:
                     raise HTTPException(
-                        status_code=403,
-                        detail="You don't have permission to update this schedule",
+                        status_code=404,
+                        detail="Schedule not found",
                     )
 
                 deployment_uuid = uuid.UUID(schedule_id)
@@ -434,7 +434,7 @@ class FlowScheduleService:
         schedule_id : str
             Schedule ID (deployment_id for cron, flow_run_id for one-time).
         username : str
-            The username.
+            The username of the user deleting the schedule.
         project_id : str
             The project ID.
 
@@ -451,12 +451,12 @@ class FlowScheduleService:
                 _ = await client.read_deployment(deployment_uuid)
 
                 flow = self._flow_repo.find_one(
-                    {"project_id": project_id, "deployment_id": schedule_id, "username": username}
+                    {"project_id": project_id, "deployment_id": schedule_id}
                 )
                 if not flow:
                     raise HTTPException(
-                        status_code=403,
-                        detail="You don't have permission to delete this schedule",
+                        status_code=404,
+                        detail="Schedule not found",
                     )
 
                 # Delete all schedules on this deployment
@@ -486,13 +486,12 @@ class FlowScheduleService:
                         {
                             "project_id": project_id,
                             "deployment_id": str(flow_run.deployment_id),
-                            "username": username,
                         }
                     )
                     if not flow:
                         raise HTTPException(
-                            status_code=403,
-                            detail="You don't have permission to delete this schedule",
+                            status_code=404,
+                            detail="Schedule not found",
                         )
 
                 await client.delete_flow_run(flow_run_id)

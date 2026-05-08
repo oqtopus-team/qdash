@@ -408,7 +408,7 @@ class CalibService:
 
             flow_repo = MongoFlowRepository()
             flow_name = self.flow_name or ""
-            flow = flow_repo.find_by_user_and_name(self.username, flow_name, self.project_id)
+            flow = flow_repo.find_by_project_and_name(self.project_id, flow_name)
             if flow and flow.default_run_parameters:
                 self.default_run_parameters = flow.default_run_parameters
                 logger.debug(
