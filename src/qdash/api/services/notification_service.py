@@ -55,7 +55,9 @@ class NotificationService:
         return NotificationResponse(
             id=str(doc.id),
             project_id=doc.project_id,
+            recipient_user_id=doc.recipient_user_id,
             recipient_username=doc.recipient_username,
+            actor_user_id=doc.actor_user_id,
             actor_username=doc.actor_username,
             kind=doc.kind,
             source_type=doc.source_type,
@@ -67,9 +69,15 @@ class NotificationService:
             created_at=doc.created_at,
         )
 
+    def _user_id_for_username(self, username: str | None) -> str | None:
+        if not username:
+            return None
+        user = UserDocument.find_one({"username": username}).run()
+        return user.user_id if user else None
+
     def _active_project_recipients(
         self, project_id: str, usernames: Iterable[str], actor_username: str
-    ) -> list[str]:
+    ) -> list[UserDocument]:
         requested = {u for u in usernames if u != actor_username}
         if not requested:
             return []
@@ -84,7 +92,7 @@ class NotificationService:
         users = UserDocument.find(
             {"username": {"$in": list(active_usernames)}, "disabled": {"$ne": True}}
         ).to_list()
-        return sorted({u.username for u in users})
+        return sorted(users, key=lambda u: u.username)
 
     def create_notification(
         self,
@@ -103,7 +111,9 @@ class NotificationService:
         """Create a notification unless an equivalent one already exists."""
         doc = NotificationDocument(
             project_id=project_id,
+            recipient_user_id=self._user_id_for_username(recipient_username),
             recipient_username=recipient_username,
+            actor_user_id=self._user_id_for_username(actor_username),
             actor_username=actor_username,
             kind=kind,
             source_type=source_type,
@@ -141,7 +151,7 @@ class NotificationService:
         for recipient in mentioned:
             self.create_notification(
                 project_id=project_id,
-                recipient_username=recipient,
+                recipient_username=recipient.username,
                 actor_username=actor_username,
                 kind="mention",
                 source_type="issue",
@@ -149,10 +159,15 @@ class NotificationService:
                 target_url=target_url,
                 title=f"{actor_username} mentioned you in {issue_title}",
                 excerpt=content,
-                dedupe_key=f"mention:issue:{issue_id}:{recipient}",
+                dedupe_key=f"mention:issue:{issue_id}:{recipient.user_id or recipient.username}",
             )
 
-        if parent_author and parent_author != actor_username and parent_author not in mentioned:
+        mentioned_usernames = {recipient.username for recipient in mentioned}
+        if (
+            parent_author
+            and parent_author != actor_username
+            and parent_author not in mentioned_usernames
+        ):
             self.create_notification(
                 project_id=project_id,
                 recipient_username=parent_author,
@@ -183,7 +198,7 @@ class NotificationService:
         for recipient in recipients:
             self.create_notification(
                 project_id=project_id,
-                recipient_username=recipient,
+                recipient_username=recipient.username,
                 actor_username=actor_username,
                 kind="note_mention",
                 source_type="note_event",
@@ -191,7 +206,7 @@ class NotificationService:
                 target_url=target_url,
                 title=title,
                 excerpt=content,
-                dedupe_key=f"mention:note_event:{note_event_id}:{recipient}",
+                dedupe_key=f"mention:note_event:{note_event_id}:{recipient.user_id or recipient.username}",
             )
 
     def notify_forum_event(
@@ -214,7 +229,7 @@ class NotificationService:
         for recipient in mentioned:
             self.create_notification(
                 project_id=project_id,
-                recipient_username=recipient,
+                recipient_username=recipient.username,
                 actor_username=actor_username,
                 kind="forum_mention",
                 source_type="forum_post",
@@ -222,10 +237,15 @@ class NotificationService:
                 target_url=target_url,
                 title=f"{actor_username} mentioned you in {title}",
                 excerpt=content,
-                dedupe_key=f"mention:forum_post:{post_id}:{recipient}",
+                dedupe_key=f"mention:forum_post:{post_id}:{recipient.user_id or recipient.username}",
             )
 
-        if parent_author and parent_author != actor_username and parent_author not in mentioned:
+        mentioned_usernames = {recipient.username for recipient in mentioned}
+        if (
+            parent_author
+            and parent_author != actor_username
+            and parent_author not in mentioned_usernames
+        ):
             self.create_notification(
                 project_id=project_id,
                 recipient_username=parent_author,
@@ -249,13 +269,22 @@ class NotificationService:
         limit: int,
     ) -> ListNotificationsResponse:
         """List notifications for a user."""
-        query: dict[str, object] = {"recipient_username": username}
+        user_id = self._user_id_for_username(username)
+        identity_query: dict[str, object]
+        if user_id:
+            identity_query = {
+                "$or": [{"recipient_user_id": user_id}, {"recipient_username": username}]
+            }
+        else:
+            identity_query = {"recipient_username": username}
+        query: dict[str, object] = dict(identity_query)
         if project_id:
             query["project_id"] = project_id
         if unread_only:
             query["read_at"] = None
 
-        unread_query: dict[str, object] = {"recipient_username": username, "read_at": None}
+        unread_query: dict[str, object] = dict(identity_query)
+        unread_query["read_at"] = None
         if project_id:
             unread_query["project_id"] = project_id
 
@@ -276,7 +305,14 @@ class NotificationService:
         self, *, username: str, project_id: str | None
     ) -> UnreadNotificationCountResponse:
         """Return unread notification count for a user."""
-        query: dict[str, object] = {"recipient_username": username, "read_at": None}
+        user_id = self._user_id_for_username(username)
+        if user_id:
+            query: dict[str, object] = {
+                "$or": [{"recipient_user_id": user_id}, {"recipient_username": username}],
+                "read_at": None,
+            }
+        else:
+            query = {"recipient_username": username, "read_at": None}
         if project_id:
             query["project_id"] = project_id
         return UnreadNotificationCountResponse(
@@ -285,9 +321,16 @@ class NotificationService:
 
     def mark_read(self, *, notification_id: str, username: str) -> NotificationResponse:
         """Mark one notification as read."""
-        doc = NotificationDocument.find_one(
-            {"_id": ObjectId(notification_id), "recipient_username": username}
-        ).run()
+        user_id = self._user_id_for_username(username)
+        identity_query: dict[str, object]
+        if user_id:
+            identity_query = {
+                "_id": ObjectId(notification_id),
+                "$or": [{"recipient_user_id": user_id}, {"recipient_username": username}],
+            }
+        else:
+            identity_query = {"_id": ObjectId(notification_id), "recipient_username": username}
+        doc = NotificationDocument.find_one(identity_query).run()
         if doc is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Notification not found"
@@ -299,7 +342,14 @@ class NotificationService:
 
     def mark_all_read(self, *, username: str, project_id: str | None) -> dict[str, int]:
         """Mark all matching notifications as read."""
-        query: dict[str, object] = {"recipient_username": username, "read_at": None}
+        user_id = self._user_id_for_username(username)
+        if user_id:
+            query: dict[str, object] = {
+                "$or": [{"recipient_user_id": user_id}, {"recipient_username": username}],
+                "read_at": None,
+            }
+        else:
+            query = {"recipient_username": username, "read_at": None}
         if project_id:
             query["project_id"] = project_id
         read_at = now()

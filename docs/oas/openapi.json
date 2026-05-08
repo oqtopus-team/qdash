@@ -14012,6 +14012,17 @@
             "type": "string",
             "title": "Cooldown Id"
           },
+          "actor_user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor User Id"
+          },
           "actor": {
             "type": "string",
             "title": "Actor"
@@ -15751,6 +15762,18 @@
             "title": "Category",
             "description": "Forum category key"
           },
+          "user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Id",
+            "description": "Post author user ID"
+          },
           "username": {
             "type": "string",
             "title": "Username",
@@ -16270,6 +16293,18 @@
             "title": "Thread Image Urls",
             "description": "Image URLs from issue thread"
           },
+          "reviewed_by_user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewed By User Id",
+            "description": "Reviewer user ID"
+          },
           "reviewed_by": {
             "anyOf": [
               {
@@ -16280,7 +16315,7 @@
               }
             ],
             "title": "Reviewed By",
-            "description": "Reviewer username"
+            "description": "Reviewer username snapshot"
           },
           "pr_url": {
             "anyOf": [
@@ -16563,6 +16598,18 @@
             "type": "string",
             "title": "Task Id",
             "description": "Associated task ID"
+          },
+          "user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Id",
+            "description": "Issue author user ID"
           },
           "username": {
             "type": "string",
@@ -17647,6 +17694,17 @@
       },
       "MemberItem": {
         "properties": {
+          "user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Id"
+          },
           "username": {
             "type": "string",
             "title": "Username"
@@ -17685,6 +17743,17 @@
             "type": "string",
             "title": "Project Id"
           },
+          "user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Id"
+          },
           "username": {
             "type": "string",
             "title": "Username"
@@ -17695,6 +17764,17 @@
           "status": {
             "type": "string",
             "title": "Status"
+          },
+          "invited_by_user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Invited By User Id"
           },
           "invited_by": {
             "anyOf": [
@@ -17880,6 +17960,17 @@
             "type": "string",
             "title": "Excluded Reason",
             "default": ""
+          },
+          "excluded_by_user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Excluded By User Id"
           },
           "excluded_by": {
             "anyOf": [
@@ -18369,6 +18460,17 @@
             "title": "Action",
             "description": "upsert | delete"
           },
+          "actor_user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor User Id"
+          },
           "actor": {
             "type": "string",
             "title": "Actor"
@@ -18462,9 +18564,31 @@
             "type": "string",
             "title": "Project Id"
           },
+          "recipient_user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recipient User Id"
+          },
           "recipient_username": {
             "type": "string",
             "title": "Recipient Username"
+          },
+          "actor_user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor User Id"
           },
           "actor_username": {
             "type": "string",
@@ -19179,6 +19303,17 @@
             "type": "string",
             "title": "Name"
           },
+          "owner_user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner User Id"
+          },
           "owner_username": {
             "type": "string",
             "title": "Owner Username"
@@ -19226,6 +19361,17 @@
           "project_id": {
             "type": "string",
             "title": "Project Id"
+          },
+          "owner_user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner User Id"
           },
           "owner_username": {
             "type": "string",
@@ -21564,6 +21710,17 @@
             "type": "string",
             "title": "Excluded Reason"
           },
+          "excluded_by_user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Excluded By User Id"
+          },
           "excluded_by": {
             "anyOf": [
               {
@@ -21778,6 +21935,17 @@
             "type": "string",
             "title": "Token Type",
             "default": "bearer"
+          },
+          "user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Id"
           },
           "username": {
             "type": "string",
@@ -22012,6 +22180,17 @@
       },
       "User": {
         "properties": {
+          "user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Id"
+          },
           "username": {
             "type": "string",
             "title": "Username"
@@ -22109,6 +22288,17 @@
       },
       "UserDetailResponse": {
         "properties": {
+          "user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Id"
+          },
           "username": {
             "type": "string",
             "title": "Username"
@@ -22183,6 +22373,17 @@
       },
       "UserListItem": {
         "properties": {
+          "user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Id"
+          },
           "username": {
             "type": "string",
             "title": "Username"
@@ -22255,6 +22456,17 @@
       },
       "UserWithToken": {
         "properties": {
+          "user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Id"
+          },
           "username": {
             "type": "string",
             "title": "Username"

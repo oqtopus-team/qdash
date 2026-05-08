@@ -1,4 +1,5 @@
 from enum import Enum
+from uuid import uuid4
 
 
 class SystemRole(str, Enum):
@@ -10,3 +11,8 @@ class SystemRole(str, Enum):
 
     ADMIN = "admin"
     USER = "user"
+
+
+def generate_user_id() -> str:
+    """Generate an opaque internal user identifier."""
+    return f"usr_{uuid4().hex}"

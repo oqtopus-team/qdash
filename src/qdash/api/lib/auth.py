@@ -72,6 +72,7 @@ def get_user(username: str) -> UserInDB | None:
 
     if user:
         return UserInDB(
+            user_id=user.user_id,
             username=user.username,
             full_name=user.full_name,
             disabled=user.disabled,
@@ -93,6 +94,7 @@ def get_user_by_token(access_token: str) -> UserInDB | None:
 
     if user:
         return UserInDB(
+            user_id=user.user_id,
             username=user.username,
             full_name=user.full_name,
             disabled=user.disabled,
@@ -164,6 +166,7 @@ def get_current_user(
         )
 
     return User(
+        user_id=user.user_id,
         username=user.username,
         full_name=user.full_name,
         disabled=user.disabled,
@@ -218,6 +221,7 @@ def get_current_active_user(
         )
 
     return User(
+        user_id=user.user_id,
         username=user.username,
         full_name=user.full_name,
         disabled=user.disabled,

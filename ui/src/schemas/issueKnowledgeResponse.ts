@@ -5,6 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
+import type { IssueKnowledgeResponseReviewedByUserId } from "./issueKnowledgeResponseReviewedByUserId";
 import type { IssueKnowledgeResponseReviewedBy } from "./issueKnowledgeResponseReviewedBy";
 import type { IssueKnowledgeResponsePrUrl } from "./issueKnowledgeResponsePrUrl";
 
@@ -68,7 +69,9 @@ export interface IssueKnowledgeResponse {
   figure_paths?: string[];
   /** Image URLs from issue thread */
   thread_image_urls?: string[];
-  /** Reviewer username */
+  /** Reviewer user ID */
+  reviewed_by_user_id?: IssueKnowledgeResponseReviewedByUserId;
+  /** Reviewer username snapshot */
   reviewed_by?: IssueKnowledgeResponseReviewedBy;
   /** GitHub PR URL (set on approve) */
   pr_url?: IssueKnowledgeResponsePrUrl;

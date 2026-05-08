@@ -16,8 +16,10 @@ class NotificationDocument(Document):
     """In-app notification addressed to a single user."""
 
     project_id: str = Field(..., description="Owning project identifier")
-    recipient_username: str = Field(..., description="User who should receive this notification")
-    actor_username: str = Field(..., description="User who triggered this notification")
+    recipient_user_id: str | None = Field(default=None, description="Recipient user ID")
+    recipient_username: str = Field(..., description="Recipient username snapshot")
+    actor_user_id: str | None = Field(default=None, description="Actor user ID")
+    actor_username: str = Field(..., description="Actor username snapshot")
     kind: str = Field(..., description="mention | issue_reply | note_mention | forum_*")
     source_type: str = Field(..., description="issue | note_event | forum_post")
     source_id: str = Field(..., description="Source document identifier")
@@ -35,6 +37,22 @@ class NotificationDocument(Document):
 
         name = "notification"
         indexes: ClassVar = [
+            IndexModel(
+                [
+                    ("recipient_user_id", ASCENDING),
+                    ("project_id", ASCENDING),
+                    ("created_at", DESCENDING),
+                ],
+                name="recipient_user_id_project_created_idx",
+            ),
+            IndexModel(
+                [
+                    ("recipient_user_id", ASCENDING),
+                    ("read_at", ASCENDING),
+                    ("created_at", DESCENDING),
+                ],
+                name="recipient_user_id_read_created_idx",
+            ),
             IndexModel(
                 [
                     ("recipient_username", ASCENDING),

@@ -25,6 +25,7 @@ from qdash.common.paths import QUBEX_CONFIG_BASE
 from qdash.datamodel.system_info import SystemInfoModel
 from qdash.dbmodel.provenance import ProvenanceRelationType
 from qdash.dbmodel.qubit import QubitDocument
+from qdash.dbmodel.user import UserDocument
 from qdash.repository.provenance import (
     MongoActivityRepository,
     MongoParameterVersionRepository,
@@ -80,6 +81,11 @@ class SeedImportService:
         if not re.match(r"^[a-zA-Z0-9_-]+$", chip_id):
             raise ValueError(f"Invalid chip_id: {chip_id}")
         return pathlib.Path(self._config_base) / chip_id / "params"
+
+    @staticmethod
+    def _user_id_for_username(username: str) -> str | None:
+        user = UserDocument.find_one({"username": username}).run()
+        return user.user_id if user else None
 
     def import_seeds(
         self,
@@ -471,6 +477,7 @@ class SeedImportService:
             # Create new document
             qubit_doc = QubitDocument(
                 project_id=project_id,
+                user_id=self._user_id_for_username(username),
                 username=username,
                 chip_id=chip_id,
                 qid=normalized_qid,
@@ -482,6 +489,7 @@ class SeedImportService:
             logger.info(f"Created new QubitDocument for {chip_id}/{normalized_qid}")
         else:
             # Update existing document
+            qubit_doc.user_id = self._user_id_for_username(username)
             qubit_doc.data = QubitDocument.merge_calib_data(qubit_doc.data, param_data)
             qubit_doc.system_info.update_time()
             qubit_doc.save()

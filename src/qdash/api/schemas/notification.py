@@ -10,7 +10,9 @@ class NotificationResponse(BaseModel):
 
     id: str
     project_id: str
+    recipient_user_id: str | None = None
     recipient_username: str
+    actor_user_id: str | None = None
     actor_username: str
     kind: str
     source_type: str

@@ -48,6 +48,7 @@ class NoteEventResponse(BaseModel):
     target_id: str
     metric_key: str = ""
     action: str = Field(..., description="upsert | delete")
+    actor_user_id: str | None = None
     actor: str
     content: str = ""
     extra: dict[str, str] = Field(default_factory=dict)

@@ -14,10 +14,12 @@ class ProjectMembershipDocument(Document):
     """Represents a user's membership state in a project."""
 
     project_id: str = Field(..., description="Project identifier")
-    username: str = Field(..., description="Member username")
+    user_id: str | None = Field(default=None, description="Member user ID")
+    username: str = Field(..., description="Member username snapshot")
     role: ProjectRole = Field(default=ProjectRole.VIEWER, description="Assigned project role")
     status: str = Field(default="pending", description="Invitation status")
-    invited_by: str | None = Field(default=None, description="Inviter username")
+    invited_by_user_id: str | None = Field(default=None, description="Inviter user ID")
+    invited_by: str | None = Field(default=None, description="Inviter username snapshot")
     last_accessed_at: datetime | None = Field(default=None, description="Last access timestamp")
     system_info: SystemInfoModel = Field(
         default_factory=SystemInfoModel, description="System info timestamps"
@@ -30,16 +32,28 @@ class ProjectMembershipDocument(Document):
 
         name = "project_membership"
         indexes: ClassVar = [
+            IndexModel(
+                [("project_id", ASCENDING), ("user_id", ASCENDING)],
+                name="membership_project_user_id_idx",
+            ),
             IndexModel([("project_id", ASCENDING), ("username", ASCENDING)], unique=True),
+            IndexModel([("user_id", ASCENDING), ("status", ASCENDING)]),
             IndexModel([("username", ASCENDING), ("status", ASCENDING)]),
         ]
 
     @classmethod
     def get_active_membership(
-        cls, project_id: str, username: str
+        cls, project_id: str, username: str, user_id: str | None = None
     ) -> ProjectMembershipDocument | None:
         """Fetch active membership for the user/project pair."""
-        result = cls.find_one(
-            {"project_id": project_id, "username": username, "status": "active"}
-        ).run()
+        query: dict[str, object]
+        if user_id:
+            query = {
+                "project_id": project_id,
+                "status": "active",
+                "$or": [{"user_id": user_id}, {"username": username}],
+            }
+        else:
+            query = {"project_id": project_id, "username": username, "status": "active"}
+        result = cls.find_one(query).run()
         return cast("ProjectMembershipDocument | None", result)

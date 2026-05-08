@@ -168,6 +168,7 @@ export default withMermaid(
               link: "/reference/database-structure",
             },
             { text: "Database Indexes", link: "/reference/database-indexes" },
+            { text: "Migration to v1.8.0", link: "/reference/migration-v1.8.0" },
             { text: "OpenAPI", link: "/reference/openapi" },
           ],
         },

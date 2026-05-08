@@ -7,6 +7,7 @@ from qdash.datamodel.note import NoteModel
 from qdash.datamodel.qubit import QubitModel
 from qdash.datamodel.system_info import SystemInfoModel
 from qdash.dbmodel.qubit_history import QubitHistoryDocument
+from qdash.dbmodel.user import UserDocument
 
 
 class QubitDocument(Document):
@@ -24,7 +25,8 @@ class QubitDocument(Document):
     """
 
     project_id: str = Field(..., description="Owning project identifier")
-    username: str = Field(..., description="The username of the user who created the qubit")
+    user_id: str | None = Field(default=None, description="Creator user ID")
+    username: str = Field(..., description="Creator username snapshot")
     qid: str = Field(..., description="The qubit ID")
     status: str = Field("pending", description="The status of the qubit")
     chip_id: str = Field(..., description="The chip ID")
@@ -84,12 +86,14 @@ class QubitDocument(Document):
         if qubit_doc is None:
             raise ValueError(f"Qubit {qid} not found in chip {chip_id}")
         # Merge new calibration data into the existing data
+        qubit_doc.user_id = cls._user_id_for_username(username)
         qubit_doc.data = QubitDocument.merge_calib_data(qubit_doc.data, output_parameters)
         qubit_doc.system_info.update_time()
         qubit_doc.save()
         # Create history entry for the updated qubit
         qubit_model = QubitModel(
             project_id=project_id,
+            user_id=qubit_doc.user_id,
             qid=qid,
             chip_id=chip_id,
             data=qubit_doc.data,
@@ -108,3 +112,8 @@ class QubitDocument(Document):
         doc.system_info.update_time()
         doc.save()
         return doc
+
+    @staticmethod
+    def _user_id_for_username(username: str) -> str | None:
+        user = UserDocument.find_one({"username": username}).run()
+        return user.user_id if user else None

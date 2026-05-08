@@ -5,6 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
+import type { IssueResponseUserId } from "./issueResponseUserId";
 import type { IssueResponseTitle } from "./issueResponseTitle";
 import type { IssueResponseParentId } from "./issueResponseParentId";
 
@@ -16,6 +17,8 @@ export interface IssueResponse {
   id: string;
   /** Associated task ID */
   task_id: string;
+  /** Issue author user ID */
+  user_id?: IssueResponseUserId;
   /** Issue author username */
   username: string;
   /** Issue title */

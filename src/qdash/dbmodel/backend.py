@@ -6,6 +6,7 @@ from pydantic import ConfigDict, Field
 from pymongo import ASCENDING, IndexModel
 from qdash.datamodel.backend import BackendModel
 from qdash.datamodel.system_info import SystemInfoModel
+from qdash.dbmodel.user import UserDocument
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +23,8 @@ class BackendDocument(Document):
     """
 
     project_id: str = Field(..., description="Owning project identifier")
-    username: str = Field(..., description="The username of the user who created the task")
+    user_id: str | None = Field(default=None, description="Creator user ID")
+    username: str = Field(..., description="Creator username snapshot")
     name: str = Field(..., description="The name of backend")
     system_info: SystemInfoModel = Field(
         default_factory=SystemInfoModel, description="The system information"
@@ -41,14 +43,21 @@ class BackendDocument(Document):
                 [("project_id", ASCENDING), ("name", ASCENDING), ("username", ASCENDING)],
                 unique=True,
             ),
+            IndexModel([("project_id", ASCENDING), ("user_id", ASCENDING)]),
             IndexModel([("project_id", ASCENDING), ("username", ASCENDING)]),
         ]
+
+    @staticmethod
+    def _user_id_for_username(username: str) -> str | None:
+        user = UserDocument.find_one({"username": username}).run()
+        return user.user_id if user else None
 
     @classmethod
     def from_backend_model(cls, model: BackendModel) -> "BackendDocument":
         """Create a BackendDocument from a BackendModel."""
         return cls(
             project_id=model.project_id,
+            user_id=cls._user_id_for_username(model.username),
             username=model.username,
             name=model.name,
         )

@@ -13,6 +13,7 @@ from pymongo.errors import DuplicateKeyError
 from qdash.common.datetime_utils import now
 from qdash.datamodel.calibration_note import CalibrationNoteModel
 from qdash.dbmodel.calibration_note import CalibrationNoteDocument
+from qdash.dbmodel.user import UserDocument
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +33,11 @@ class MongoCalibrationNoteRepository:
         ...     repo.upsert(updated)
 
     """
+
+    @staticmethod
+    def _user_id_for_username(username: str) -> str | None:
+        user = UserDocument.find_one({"username": username}).run()
+        return user.user_id if user else None
 
     def find_one(
         self,
@@ -171,6 +177,7 @@ class MongoCalibrationNoteRepository:
         """
         from pymongo import ReturnDocument
 
+        user_id = note.user_id or self._user_id_for_username(note.username)
         query = {
             "project_id": note.project_id,
             "execution_id": note.execution_id,
@@ -186,6 +193,7 @@ class MongoCalibrationNoteRepository:
         # $setOnInsert: only set these fields on insert (not on update)
         update = {
             "$set": {
+                "user_id": user_id,
                 "note": note.note,
                 "timestamp": timestamp,
             },
@@ -194,6 +202,7 @@ class MongoCalibrationNoteRepository:
                 "project_id": note.project_id,
                 "execution_id": note.execution_id,
                 "task_id": note.task_id,
+                "user_id": user_id,
                 "username": note.username,
                 "chip_id": note.chip_id,
             },
@@ -262,6 +271,9 @@ class MongoCalibrationNoteRepository:
         if not update_ops:
             return
 
+        username = query_filter.get("username")
+        if username is not None:
+            update_ops["user_id"] = self._user_id_for_username(username)
         update_ops["timestamp"] = now()
 
         collection = CalibrationNoteDocument.get_motor_collection()
@@ -311,6 +323,7 @@ class MongoCalibrationNoteRepository:
         """
         return CalibrationNoteModel(
             project_id=doc.project_id,
+            user_id=doc.user_id,
             username=doc.username,
             chip_id=doc.chip_id,
             execution_id=doc.execution_id,

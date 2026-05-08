@@ -25,8 +25,11 @@ def get_current_user_id(username: str | None = Depends(username_header)) -> str:
         if username:
             logger.debug("Getting current user ID from username")
             user = get_user(username)
+            if user and user.user_id:
+                logger.debug("Current user ID resolved from username")
+                return cast(str, user.user_id)
             if user and user.username:
-                logger.debug(f"Current user ID: {user.username}")
+                logger.debug("Falling back to username as current user ID")
                 return cast(str, user.username)
     except Exception as e:
         logger.debug(f"Error getting user from username: {e}")

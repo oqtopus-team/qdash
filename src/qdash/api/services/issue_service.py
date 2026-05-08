@@ -15,6 +15,7 @@ from qdash.api.schemas.success import SuccessResponse
 from qdash.common.paths import CALIB_DATA_BASE
 from qdash.datamodel.project import ProjectRole
 from qdash.dbmodel.issue import IssueDocument
+from qdash.dbmodel.user import UserDocument
 from starlette.exceptions import HTTPException
 
 if TYPE_CHECKING:
@@ -46,11 +47,21 @@ class IssueService:
         self._notifications = notification_service
 
     @staticmethod
+    def _user_id_for_username(username: str) -> str | None:
+        user = UserDocument.find_one({"username": username}).run()
+        return user.user_id if user else None
+
+    @staticmethod
+    def _is_author(doc: IssueDocument, *, username: str, user_id: str | None) -> bool:
+        return bool((user_id and doc.user_id == user_id) or doc.username == username)
+
+    @staticmethod
     def _to_response(doc: IssueDocument, reply_count: int = 0) -> IssueResponse:
         """Convert an IssueDocument to an IssueResponse schema."""
         return IssueResponse(
             id=str(doc.id),
             task_id=doc.task_id,
+            user_id=doc.user_id,
             username=doc.username,
             title=doc.title,
             content=doc.content,
@@ -213,6 +224,7 @@ class IssueService:
         doc = IssueDocument(
             project_id=project_id,
             task_id=task_id,
+            user_id=self._user_id_for_username(username),
             username=username,
             title=title if parent_id is None else None,
             content=content,
@@ -268,7 +280,8 @@ class IssueService:
         if doc is None:
             raise HTTPException(status_code=404, detail="Issue not found")
 
-        if doc.username != username:
+        user_id = self._user_id_for_username(username)
+        if not self._is_author(doc, username=username, user_id=user_id):
             raise HTTPException(status_code=403, detail="You can only edit your own issues")
 
         # Only update title for root issues
@@ -315,7 +328,8 @@ class IssueService:
         if doc is None:
             raise HTTPException(status_code=404, detail="Issue not found")
 
-        if doc.username != username:
+        user_id = self._user_id_for_username(username)
+        if not self._is_author(doc, username=username, user_id=user_id):
             raise HTTPException(status_code=403, detail="You can only delete your own issues")
 
         doc.delete()
@@ -343,7 +357,11 @@ class IssueService:
         if doc is None:
             raise HTTPException(status_code=404, detail="Issue not found")
 
-        if doc.username != username and role != ProjectRole.OWNER:
+        user_id = self._user_id_for_username(username)
+        if (
+            not self._is_author(doc, username=username, user_id=user_id)
+            and role != ProjectRole.OWNER
+        ):
             raise HTTPException(
                 status_code=403, detail="Only the author or project owner can close this issue"
             )
@@ -374,7 +392,11 @@ class IssueService:
         if doc is None:
             raise HTTPException(status_code=404, detail="Issue not found")
 
-        if doc.username != username and role != ProjectRole.OWNER:
+        user_id = self._user_id_for_username(username)
+        if (
+            not self._is_author(doc, username=username, user_id=user_id)
+            and role != ProjectRole.OWNER
+        ):
             raise HTTPException(
                 status_code=403, detail="Only the author or project owner can reopen this issue"
             )

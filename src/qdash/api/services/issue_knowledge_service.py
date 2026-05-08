@@ -15,12 +15,14 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from qdash.api.services.issue_service import IssueService
 
+from bunnet.exceptions import CollectionWasNotInitialized
 from qdash.api.schemas.issue_knowledge import (
     IssueKnowledgeResponse,
     ListIssueKnowledgeResponse,
 )
 from qdash.api.schemas.success import SuccessResponse
 from qdash.dbmodel.issue_knowledge import IssueKnowledgeDocument
+from qdash.dbmodel.user import UserDocument
 from starlette.exceptions import HTTPException
 
 logger = logging.getLogger(__name__)
@@ -72,7 +74,18 @@ class IssueKnowledgeService:
     """Service for issue knowledge CRUD and AI draft generation."""
 
     @staticmethod
+    def _user_id_for_username(username: str) -> str | None:
+        try:
+            user = UserDocument.find_one({"username": username}).run()
+        except CollectionWasNotInitialized:
+            return None
+        return user.user_id if user else None
+
+    @staticmethod
     def _to_response(doc: IssueKnowledgeDocument) -> IssueKnowledgeResponse:
+        reviewed_by_user_id = getattr(doc, "reviewed_by_user_id", None)
+        if not isinstance(reviewed_by_user_id, str):
+            reviewed_by_user_id = None
         return IssueKnowledgeResponse(
             id=str(doc.id),
             issue_id=doc.issue_id,
@@ -102,6 +115,7 @@ class IssueKnowledgeService:
             prompt_guidance=doc.prompt_guidance,
             figure_paths=doc.figure_paths,
             thread_image_urls=doc.thread_image_urls,
+            reviewed_by_user_id=reviewed_by_user_id,
             reviewed_by=doc.reviewed_by,
             pr_url=doc.pr_url,
             created_at=doc.system_info.created_at,
@@ -752,6 +766,7 @@ class IssueKnowledgeService:
             raise HTTPException(status_code=400, detail="Only drafts can be approved")
 
         doc.status = "approved"
+        doc.reviewed_by_user_id = self._user_id_for_username(username)
         doc.reviewed_by = username
 
         # Generate markdown and create PR
@@ -795,6 +810,7 @@ class IssueKnowledgeService:
             raise HTTPException(status_code=400, detail="Only drafts can be rejected")
 
         doc.status = "rejected"
+        doc.reviewed_by_user_id = self._user_id_for_username(username)
         doc.reviewed_by = username
         doc.system_info.update_time()
         doc.save()

@@ -35,6 +35,7 @@ class IssueResponse(BaseModel):
 
     id: str = Field(..., description="Issue document ID")
     task_id: str = Field(..., description="Associated task ID")
+    user_id: str | None = Field(default=None, description="Issue author user ID")
     username: str = Field(..., description="Issue author username")
     title: str | None = Field(default=None, description="Issue title")
     content: str = Field(..., description="Issue text content")

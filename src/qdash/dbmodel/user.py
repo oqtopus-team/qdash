@@ -4,7 +4,7 @@ from bunnet import Document
 from pydantic import ConfigDict, Field
 from pymongo import ASCENDING, IndexModel
 from qdash.datamodel.system_info import SystemInfoModel
-from qdash.datamodel.user import SystemRole
+from qdash.datamodel.user import SystemRole, generate_user_id
 
 
 class UserDocument(Document):
@@ -12,7 +12,8 @@ class UserDocument(Document):
 
     Attributes
     ----------
-        username (str): The username.
+        user_id (str): The immutable internal user identifier.
+        username (str): The login username.
         hashed_password (str): The hashed password.
         access_token (str): The API access token for authentication.
         full_name (Optional[str]): The full name of the user.
@@ -23,7 +24,8 @@ class UserDocument(Document):
 
     """
 
-    username: str = Field(description="The username")
+    user_id: str | None = Field(default_factory=generate_user_id, description="Internal user ID")
+    username: str = Field(description="The login username")
     hashed_password: str = Field(description="The hashed password")
     access_token: str = Field(description="The API access token for authentication")
     full_name: str | None = Field(default=None, description="The full name of the user")
@@ -51,6 +53,12 @@ class UserDocument(Document):
 
         name = "user"
         indexes: ClassVar = [
+            IndexModel(
+                [("user_id", ASCENDING)],
+                unique=True,
+                partialFilterExpression={"user_id": {"$type": "string"}},
+                name="user_id_unique_idx",
+            ),
             IndexModel([("username", ASCENDING)], unique=True),
             IndexModel([("access_token", ASCENDING)], unique=True),
         ]

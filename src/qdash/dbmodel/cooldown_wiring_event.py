@@ -28,7 +28,8 @@ class CooldownWiringEventDocument(Document):
 
     project_id: str = Field(..., description="Owning project identifier")
     cooldown_id: str = Field(..., description="Cool-down this event belongs to")
-    actor: str = Field(..., description="Username who recorded the checkpoint")
+    actor_user_id: str | None = Field(default=None, description="User ID who recorded checkpoint")
+    actor: str = Field(..., description="Username snapshot who recorded the checkpoint")
     action: str = Field(default="checkpoint", description="checkpoint")
     comment: str = Field(..., description="Why the wiring changed (required at checkpoint time)")
     wiring_info_snapshot: str = Field(
@@ -57,6 +58,14 @@ class CooldownWiringEventDocument(Document):
                     ("created_at", DESCENDING),
                 ],
                 name="cooldown_chrono_idx",
+            ),
+            IndexModel(
+                [
+                    ("project_id", ASCENDING),
+                    ("actor_user_id", ASCENDING),
+                    ("created_at", DESCENDING),
+                ],
+                name="actor_user_id_chrono_idx",
             ),
             # Cross-cooldown text search over comments + snapshots
             IndexModel(

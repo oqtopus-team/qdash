@@ -62,6 +62,7 @@ def login(
     return TokenResponse(
         access_token=user.access_token,
         token_type="bearer",
+        user_id=user.user_id,
         username=user.username,
         default_project_id=user.default_project_id,
         must_change_password=user.must_change_password,
@@ -115,6 +116,7 @@ def register_user(
         auth_service.onboard_user(user)
 
     return UserWithToken(
+        user_id=user.user_id,
         username=user.username,
         full_name=user.full_name,
         disabled=user.disabled,
