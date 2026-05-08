@@ -5,7 +5,9 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
+import type { MemberResponseUserId } from "./memberResponseUserId";
 import type { ProjectRole } from "./projectRole";
+import type { MemberResponseInvitedByUserId } from "./memberResponseInvitedByUserId";
 import type { MemberResponseInvitedBy } from "./memberResponseInvitedBy";
 import type { MemberResponseLastAccessedAt } from "./memberResponseLastAccessedAt";
 
@@ -14,9 +16,11 @@ import type { MemberResponseLastAccessedAt } from "./memberResponseLastAccessedA
  */
 export interface MemberResponse {
   project_id: string;
+  user_id?: MemberResponseUserId;
   username: string;
   role: ProjectRole;
   status: string;
+  invited_by_user_id?: MemberResponseInvitedByUserId;
   invited_by: MemberResponseInvitedBy;
   last_accessed_at: MemberResponseLastAccessedAt;
 }

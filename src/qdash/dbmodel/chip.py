@@ -27,7 +27,8 @@ class ChipDocument(Document):
 
     project_id: str = Field(..., description="Owning project identifier")
     chip_id: str = Field("SAMPLE", description="The chip ID")
-    username: str = Field(..., description="The username of the user who created the chip")
+    user_id: str | None = Field(default=None, description="Creator user ID")
+    username: str = Field(..., description="Creator username snapshot")
     size: int = Field(64, description="The size of the chip")
     current_cooldown_id: str | None = Field(
         default=None,
@@ -66,6 +67,9 @@ class ChipDocument(Document):
             ),
             IndexModel(
                 [("project_id", ASCENDING), ("username", ASCENDING), ("installed_at", DESCENDING)]
+            ),
+            IndexModel(
+                [("project_id", ASCENDING), ("user_id", ASCENDING), ("installed_at", DESCENDING)]
             ),
         ]
 

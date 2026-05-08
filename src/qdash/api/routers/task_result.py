@@ -563,6 +563,7 @@ def set_task_result_excluded(
 
     doc.excluded = body.excluded
     doc.excluded_reason = body.reason if body.excluded else ""
+    doc.excluded_by_user_id = ctx.user.user_id
     doc.excluded_by = ctx.user.username
     doc.excluded_at = now()
     doc.save()
@@ -571,6 +572,7 @@ def set_task_result_excluded(
         task_id=doc.task_id,
         excluded=doc.excluded,
         excluded_reason=doc.excluded_reason,
+        excluded_by_user_id=doc.excluded_by_user_id,
         excluded_by=doc.excluded_by,
         excluded_at=doc.excluded_at,
     )

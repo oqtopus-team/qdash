@@ -5,6 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
+import type { UserWithTokenUserId } from "./userWithTokenUserId";
 import type { UserWithTokenFullName } from "./userWithTokenFullName";
 import type { UserWithTokenDisabled } from "./userWithTokenDisabled";
 import type { UserWithTokenDefaultProjectId } from "./userWithTokenDefaultProjectId";
@@ -15,6 +16,7 @@ import type { UserWithTokenInitialPassword } from "./userWithTokenInitialPasswor
  * User model with access token for login/register responses.
  */
 export interface UserWithToken {
+  user_id?: UserWithTokenUserId;
   username: string;
   full_name?: UserWithTokenFullName;
   disabled?: UserWithTokenDisabled;

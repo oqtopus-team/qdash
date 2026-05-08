@@ -15,9 +15,8 @@ class CouplingModel(BaseModel):
     """
 
     project_id: str | None = Field(None, description="Owning project identifier")
-    username: str | None = Field(
-        None, description="The username of the user who created the coupling"
-    )
+    user_id: str | None = Field(default=None, description="Creator user ID")
+    username: str | None = Field(None, description="Creator username snapshot")
     qid: str = Field(..., description="The coupling ID")
     status: str = Field(default="pending", description="The status of the coupling")
     chip_id: str | None = Field(None, description="The chip ID")

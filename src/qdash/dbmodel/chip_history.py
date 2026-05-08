@@ -32,7 +32,8 @@ class ChipHistoryDocument(Document):
 
     project_id: str = Field(..., description="Owning project identifier")
     chip_id: str = Field(..., description="The chip ID")
-    username: str = Field(..., description="The username of the user who created the chip")
+    user_id: str | None = Field(default=None, description="Creator user ID")
+    username: str = Field(..., description="Creator username snapshot")
     size: int = Field(..., description="The size of the chip")
     topology_id: str | None = Field(None, description="Topology template ID")
     installed_at: datetime = Field(..., description="The time when the chip was installed")
@@ -62,6 +63,9 @@ class ChipHistoryDocument(Document):
             ),
             IndexModel(
                 [("project_id", ASCENDING), ("chip_id", ASCENDING), ("recorded_date", DESCENDING)]
+            ),
+            IndexModel(
+                [("project_id", ASCENDING), ("user_id", ASCENDING), ("recorded_date", DESCENDING)]
             ),
         ]
 
@@ -120,6 +124,7 @@ class ChipHistoryDocument(Document):
             history_doc = cls(
                 project_id=chip_doc.project_id,
                 chip_id=chip_doc.chip_id,
+                user_id=chip_doc.user_id,
                 username=chip_doc.username,
                 size=chip_doc.size,
                 topology_id=chip_doc.topology_id,
@@ -147,6 +152,7 @@ class ChipHistoryDocument(Document):
             if existing_doc:
                 # Update the existing document
                 existing_doc.size = chip_doc.size
+                existing_doc.user_id = chip_doc.user_id
                 existing_doc.topology_id = chip_doc.topology_id
                 existing_doc.installed_at = chip_doc.installed_at
                 existing_doc.system_info = chip_doc.system_info

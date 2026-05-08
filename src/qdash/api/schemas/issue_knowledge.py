@@ -42,7 +42,8 @@ class IssueKnowledgeResponse(BaseModel):
         default_factory=list, description="Image URLs from issue thread"
     )
 
-    reviewed_by: str | None = Field(default=None, description="Reviewer username")
+    reviewed_by_user_id: str | None = Field(default=None, description="Reviewer user ID")
+    reviewed_by: str | None = Field(default=None, description="Reviewer username snapshot")
     pr_url: str | None = Field(default=None, description="GitHub PR URL (set on approve)")
     created_at: datetime = Field(..., description="When the draft was created")
     updated_at: datetime = Field(..., description="When the draft was last updated")

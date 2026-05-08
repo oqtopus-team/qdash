@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 from fastapi import HTTPException, status
 from qdash.api.lib.auth import get_password_hash, get_user, verify_password
 from qdash.datamodel.system_info import SystemInfoModel
-from qdash.datamodel.user import SystemRole
+from qdash.datamodel.user import SystemRole, generate_user_id
 from qdash.dbmodel.user import UserDocument
 
 if TYPE_CHECKING:
@@ -115,6 +115,7 @@ class AuthService:
         system_role = _get_system_role_for_user(user_data.username)
 
         user = UserDocument(
+            user_id=generate_user_id(),
             username=user_data.username,
             hashed_password=hashed_password,
             access_token=access_token,

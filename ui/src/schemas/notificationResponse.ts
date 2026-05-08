@@ -5,6 +5,8 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
+import type { NotificationResponseRecipientUserId } from "./notificationResponseRecipientUserId";
+import type { NotificationResponseActorUserId } from "./notificationResponseActorUserId";
 import type { NotificationResponseReadAt } from "./notificationResponseReadAt";
 
 /**
@@ -13,7 +15,9 @@ import type { NotificationResponseReadAt } from "./notificationResponseReadAt";
 export interface NotificationResponse {
   id: string;
   project_id: string;
+  recipient_user_id?: NotificationResponseRecipientUserId;
   recipient_username: string;
+  actor_user_id?: NotificationResponseActorUserId;
   actor_username: string;
   kind: string;
   source_type: string;

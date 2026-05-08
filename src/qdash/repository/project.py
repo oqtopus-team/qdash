@@ -71,6 +71,7 @@ class MongoProjectRepository:
         self,
         owner_username: str,
         name: str,
+        owner_user_id: str | None = None,
         description: str | None = None,
         tags: list[str] | None = None,
         default_role: ProjectRole = ProjectRole.VIEWER,
@@ -88,6 +89,7 @@ class MongoProjectRepository:
             Created ProjectDocument
         """
         project = ProjectDocument(
+            owner_user_id=owner_user_id,
             owner_username=owner_username,
             name=name,
             description=description,

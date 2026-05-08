@@ -29,7 +29,8 @@ class IssueDocument(Document):
 
     project_id: str = Field(..., description="Owning project identifier")
     task_id: str = Field(..., description="The task ID this issue belongs to")
-    username: str = Field(..., description="The username of the issue author")
+    user_id: str | None = Field(default=None, description="Issue author user ID")
+    username: str = Field(..., description="Issue author username snapshot")
     title: str | None = Field(default=None, description="Issue title. Only for root issues.")
     content: str = Field(..., description="The issue text content")
     parent_id: str | None = Field(

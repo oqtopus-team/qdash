@@ -174,6 +174,7 @@ class MongoQubitCalibrationRepository:
         """
         return QubitModel(
             project_id=project_id,
+            user_id=doc.user_id,
             username=doc.username,
             qid=doc.qid,
             status=doc.status,

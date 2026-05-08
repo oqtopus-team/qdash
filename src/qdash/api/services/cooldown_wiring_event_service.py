@@ -91,6 +91,7 @@ class CooldownWiringEventService:
         return CooldownWiringEventResponse(
             id=str(doc.id),
             cooldown_id=doc.cooldown_id,
+            actor_user_id=doc.actor_user_id,
             actor=doc.actor,
             action=doc.action,
             comment=doc.comment,

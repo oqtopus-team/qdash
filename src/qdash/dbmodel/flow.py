@@ -28,7 +28,8 @@ class FlowDocument(Document):
 
     project_id: str = Field(..., description="Owning project identifier")
     name: str = Field(..., description="Flow name (filename without .py)")
-    username: str = Field(..., description="Creator username")
+    user_id: str | None = Field(default=None, description="Creator user ID")
+    username: str = Field(..., description="Creator username snapshot")
     chip_id: str = Field(..., description="Target chip ID")
     description: str = Field(default="", description="Flow description")
     flow_function_name: str = Field(..., description="Entry point function name")
@@ -75,6 +76,11 @@ class FlowDocument(Document):
                 ("username", ASCENDING),
                 ("created_at", DESCENDING),
             ],  # List by project+user, sorted by creation date
+            [
+                ("project_id", ASCENDING),
+                ("user_id", ASCENDING),
+                ("created_at", DESCENDING),
+            ],  # List by project+user_id, sorted by creation date
             [
                 ("project_id", ASCENDING),
                 ("updated_at", DESCENDING),

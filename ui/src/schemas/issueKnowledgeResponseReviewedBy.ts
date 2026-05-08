@@ -7,6 +7,6 @@
  */
 
 /**
- * Reviewer username
+ * Reviewer username snapshot
  */
 export type IssueKnowledgeResponseReviewedBy = string | null;

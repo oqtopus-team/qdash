@@ -16,7 +16,8 @@ class ProjectDocument(Document):
     project_id: str = Field(
         default_factory=lambda: str(uuid.uuid4()), description="Project identifier"
     )
-    owner_username: str = Field(..., description="Project owner username")
+    owner_user_id: str | None = Field(default=None, description="Project owner user ID")
+    owner_username: str = Field(..., description="Project owner username snapshot")
     name: str = Field(..., description="Project display name")
     description: str | None = Field(default=None, description="Project description")
     tags: list[str] = Field(default_factory=list, description="Project tags")
@@ -35,6 +36,7 @@ class ProjectDocument(Document):
         name = "project"
         indexes: ClassVar = [
             IndexModel([("project_id", ASCENDING)], unique=True),
+            IndexModel([("owner_user_id", ASCENDING), ("name", ASCENDING)]),
             IndexModel([("owner_username", ASCENDING), ("name", ASCENDING)], unique=True),
         ]
 

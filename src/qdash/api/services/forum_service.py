@@ -18,6 +18,7 @@ from qdash.api.schemas.forum import (
 from qdash.api.schemas.success import SuccessResponse
 from qdash.datamodel.project import ProjectRole
 from qdash.dbmodel.forum import ForumCategoryDocument, ForumPostDocument
+from qdash.dbmodel.user import UserDocument
 from starlette.exceptions import HTTPException
 
 if TYPE_CHECKING:
@@ -77,6 +78,15 @@ class ForumService:
         self._notifications = notification_service
 
     @staticmethod
+    def _user_id_for_username(username: str) -> str | None:
+        user = UserDocument.find_one({"username": username}).run()
+        return user.user_id if user else None
+
+    @staticmethod
+    def _is_author(doc: ForumPostDocument, *, username: str, user_id: str | None) -> bool:
+        return bool((user_id and doc.user_id == user_id) or doc.username == username)
+
+    @staticmethod
     def _category_to_response(doc: ForumCategoryDocument) -> ForumCategoryResponse:
         """Convert a category document to an API response."""
         return ForumCategoryResponse(
@@ -98,6 +108,7 @@ class ForumService:
             id=str(doc.id),
             project_id=doc.project_id,
             category=doc.category,
+            user_id=doc.user_id,
             username=doc.username,
             title=doc.title,
             content=doc.content,
@@ -388,6 +399,7 @@ class ForumService:
         doc = ForumPostDocument(
             project_id=project_id,
             category=category,
+            user_id=self._user_id_for_username(username),
             username=username,
             title=title if parent_id is None else None,
             content=content,
@@ -428,7 +440,8 @@ class ForumService:
         ).run()
         if doc is None:
             raise HTTPException(status_code=404, detail="Forum post not found")
-        if doc.username != username:
+        user_id = self._user_id_for_username(username)
+        if not self._is_author(doc, username=username, user_id=user_id):
             raise HTTPException(status_code=403, detail="You can only edit your own posts")
 
         if doc.parent_id is None and title is not None:
@@ -475,7 +488,11 @@ class ForumService:
         ).run()
         if doc is None:
             raise HTTPException(status_code=404, detail="Forum post not found")
-        if doc.username != username and role != ProjectRole.OWNER:
+        user_id = self._user_id_for_username(username)
+        if (
+            not self._is_author(doc, username=username, user_id=user_id)
+            and role != ProjectRole.OWNER
+        ):
             raise HTTPException(
                 status_code=403, detail="Only the author or project owner can delete this post"
             )
@@ -512,7 +529,11 @@ class ForumService:
         ).run()
         if doc is None:
             raise HTTPException(status_code=404, detail="Forum thread not found")
-        if doc.username != username and role != ProjectRole.OWNER:
+        user_id = self._user_id_for_username(username)
+        if (
+            not self._is_author(doc, username=username, user_id=user_id)
+            and role != ProjectRole.OWNER
+        ):
             raise HTTPException(
                 status_code=403, detail="Only the author or project owner can close this thread"
             )
@@ -540,7 +561,11 @@ class ForumService:
         ).run()
         if doc is None:
             raise HTTPException(status_code=404, detail="Forum thread not found")
-        if doc.username != username and role != ProjectRole.OWNER:
+        user_id = self._user_id_for_username(username)
+        if (
+            not self._is_author(doc, username=username, user_id=user_id)
+            and role != ProjectRole.OWNER
+        ):
             raise HTTPException(
                 status_code=403, detail="Only the author or project owner can reopen this thread"
             )

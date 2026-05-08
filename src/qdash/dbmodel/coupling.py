@@ -7,6 +7,7 @@ from qdash.datamodel.coupling import CouplingModel
 from qdash.datamodel.note import NoteModel
 from qdash.datamodel.system_info import SystemInfoModel
 from qdash.dbmodel.coupling_history import CouplingHistoryDocument
+from qdash.dbmodel.user import UserDocument
 
 
 class CouplingDocument(Document):
@@ -24,7 +25,8 @@ class CouplingDocument(Document):
     """
 
     project_id: str = Field(..., description="Owning project identifier")
-    username: str = Field(..., description="The username of the user who created the coupling")
+    user_id: str | None = Field(default=None, description="Creator user ID")
+    username: str = Field(..., description="Creator username snapshot")
     qid: str = Field(..., description="The coupling ID")
     status: str = Field("pending", description="The status of the coupling")
     chip_id: str = Field(..., description="The chip ID")
@@ -83,12 +85,14 @@ class CouplingDocument(Document):
         coupling_doc = cls.find_one({"username": username, "qid": qid, "chip_id": chip_id}).run()
         if coupling_doc is None:
             raise ValueError(f"Coupling {qid} not found in chip {chip_id}")
+        coupling_doc.user_id = cls._user_id_for_username(username)
         coupling_doc.data = CouplingDocument.merge_calib_data(coupling_doc.data, output_parameters)
         coupling_doc.system_info.update_time()
         coupling_doc.save()
         # Create history entry for the updated coupling
         coupling_model = CouplingModel(
             project_id=project_id,
+            user_id=coupling_doc.user_id,
             qid=qid,
             chip_id=chip_id,
             data=coupling_doc.data,
@@ -106,3 +110,8 @@ class CouplingDocument(Document):
         coupling_doc.status = status
         coupling_doc.save()
         return coupling_doc
+
+    @staticmethod
+    def _user_id_for_username(username: str) -> str | None:
+        user = UserDocument.find_one({"username": username}).run()
+        return user.user_id if user else None

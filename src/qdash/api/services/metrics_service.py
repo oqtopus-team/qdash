@@ -366,6 +366,7 @@ class MetricsService:
                     output_parameters=task_doc.output_parameters or None,
                     excluded=getattr(task_doc, "excluded", False),
                     excluded_reason=getattr(task_doc, "excluded_reason", "") or "",
+                    excluded_by_user_id=getattr(task_doc, "excluded_by_user_id", None),
                     excluded_by=getattr(task_doc, "excluded_by", None),
                     excluded_at=getattr(task_doc, "excluded_at", None),
                 )

@@ -5,6 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
+import type { UserListItemUserId } from "./userListItemUserId";
 import type { UserListItemFullName } from "./userListItemFullName";
 import type { SystemRole } from "./systemRole";
 import type { UserListItemDefaultProjectId } from "./userListItemDefaultProjectId";
@@ -13,6 +14,7 @@ import type { UserListItemDefaultProjectId } from "./userListItemDefaultProjectI
  * User summary for admin list view.
  */
 export interface UserListItem {
+  user_id?: UserListItemUserId;
   username: string;
   full_name?: UserListItemFullName;
   disabled?: boolean;

@@ -6,6 +6,7 @@ from pymongo import ASCENDING, DESCENDING, IndexModel
 from qdash.common.datetime_utils import now
 from qdash.datamodel.qubit import QubitModel
 from qdash.datamodel.system_info import SystemInfoModel
+from qdash.dbmodel.user import UserDocument
 
 
 class QubitHistoryDocument(Document):
@@ -24,7 +25,8 @@ class QubitHistoryDocument(Document):
     """
 
     project_id: str = Field(..., description="Owning project identifier")
-    username: str = Field(..., description="The username of the user who created the qubit")
+    user_id: str | None = Field(default=None, description="Creator user ID")
+    username: str = Field(..., description="Creator username snapshot")
     qid: str = Field(..., description="The qubit ID")
     status: str = Field(..., description="The status of the qubit")
     chip_id: str = Field(..., description="The chip ID")
@@ -63,6 +65,9 @@ class QubitHistoryDocument(Document):
             IndexModel(
                 [("project_id", ASCENDING), ("chip_id", ASCENDING), ("recorded_date", DESCENDING)]
             ),
+            IndexModel(
+                [("project_id", ASCENDING), ("user_id", ASCENDING), ("recorded_date", DESCENDING)]
+            ),
         ]
 
     @classmethod
@@ -78,21 +83,32 @@ class QubitHistoryDocument(Document):
         return getattr(chip, "current_cooldown_id", None) or ""
 
     @classmethod
+    def _user_id_for_username(cls, username: str) -> str | None:
+        user = UserDocument.find_one({"username": username}).run()
+        return user.user_id if user else None
+
+    @classmethod
     def create_history(cls, qubit: QubitModel) -> "QubitHistoryDocument":
         """Create a history record from a QubitDocument."""
         today = now().strftime("%Y%m%d")
         cooldown_id = cls._resolve_cooldown_id(project_id=qubit.project_id, chip_id=qubit.chip_id)
+        username = qubit.username
+        if username is None:
+            msg = "QubitDocument.username is required to create history"
+            raise ValueError(msg)
+        user_id = qubit.user_id or cls._user_id_for_username(username)
         existing_history = cls.find_one(
             {
                 "project_id": qubit.project_id,
                 "chip_id": qubit.chip_id,
                 "qid": qubit.qid,
-                "username": qubit.username,
+                "username": username,
                 "recorded_date": today,
             }
         ).run()
         if existing_history:
             history = existing_history
+            history.user_id = user_id
             history.data = qubit.data
             history.status = qubit.status
             history.cooldown_id = cooldown_id
@@ -100,7 +116,8 @@ class QubitHistoryDocument(Document):
             # Create a new history record
             history = cls(
                 project_id=qubit.project_id,
-                username=qubit.username,
+                user_id=user_id,
+                username=username,
                 qid=qubit.qid,
                 status=qubit.status,
                 chip_id=qubit.chip_id,

@@ -52,7 +52,8 @@ class ForumPostDocument(Document):
 
     project_id: str = Field(..., description="Owning project identifier")
     category: str = Field(..., description="Forum category for root threads")
-    username: str = Field(..., description="The username of the post author")
+    user_id: str | None = Field(default=None, description="Post author user ID")
+    username: str = Field(..., description="Post author username snapshot")
     title: str | None = Field(default=None, description="Thread title. Only for root posts.")
     content: str = Field(..., description="Markdown post content")
     parent_id: str | None = Field(
@@ -72,6 +73,14 @@ class ForumPostDocument(Document):
 
         name = "forum_post"
         indexes: ClassVar = [
+            IndexModel(
+                [
+                    ("project_id", ASCENDING),
+                    ("user_id", ASCENDING),
+                    ("system_info.created_at", DESCENDING),
+                ],
+                name="project_user_id_created_idx",
+            ),
             IndexModel(
                 [
                     ("project_id", ASCENDING),

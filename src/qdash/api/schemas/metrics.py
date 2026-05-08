@@ -50,6 +50,7 @@ class MetricHistoryItem(BaseModel):
     output_parameters: dict[str, Any] | None = None
     excluded: bool = False
     excluded_reason: str = ""
+    excluded_by_user_id: str | None = None
     excluded_by: str | None = None
     excluded_at: datetime | None = None
 

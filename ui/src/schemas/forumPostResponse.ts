@@ -5,6 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
+import type { ForumPostResponseUserId } from "./forumPostResponseUserId";
 import type { ForumPostResponseTitle } from "./forumPostResponseTitle";
 import type { ForumPostResponseParentId } from "./forumPostResponseParentId";
 
@@ -18,6 +19,8 @@ export interface ForumPostResponse {
   project_id: string;
   /** Forum category key */
   category: string;
+  /** Post author user ID */
+  user_id?: ForumPostResponseUserId;
   /** Post author username */
   username: string;
   /** Thread title */

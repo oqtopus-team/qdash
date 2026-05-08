@@ -490,6 +490,7 @@ class NoteService:
             target_id=doc.target_id,
             metric_key=doc.metric_key,
             action=doc.action,
+            actor_user_id=doc.actor_user_id,
             actor=doc.actor,
             content=doc.content,
             extra=doc.extra,

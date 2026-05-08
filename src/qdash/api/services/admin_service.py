@@ -24,7 +24,7 @@ from qdash.api.schemas.admin import (
 )
 from qdash.api.services.auth_service import generate_temporary_password
 from qdash.datamodel.system_info import SystemInfoModel
-from qdash.datamodel.user import SystemRole
+from qdash.datamodel.user import SystemRole, generate_user_id
 from qdash.dbmodel.project import ProjectDocument
 from qdash.dbmodel.project_membership import ProjectMembershipDocument
 from qdash.dbmodel.user import UserDocument
@@ -50,9 +50,18 @@ class AdminService:
     """Service for admin user and project management operations."""
 
     @staticmethod
+    def _user_id_for_username(username: str | None) -> str | None:
+        """Resolve a username to a user_id for new relationship writes."""
+        if not username:
+            return None
+        user = UserDocument.find_one({"username": username}).run()
+        return user.user_id if user else None
+
+    @staticmethod
     def _user_to_detail(user: UserDocument) -> UserDetailResponse:
         """Convert a UserDocument to UserDetailResponse."""
         return UserDetailResponse(
+            user_id=user.user_id,
             username=user.username,
             full_name=user.full_name,
             disabled=user.disabled,
@@ -153,6 +162,7 @@ class AdminService:
 
                 initial_password = generate_temporary_password()
                 user = UserDocument(
+                    user_id=generate_user_id(),
                     username=username,
                     full_name=row.get("full_name") or None,
                     hashed_password=get_password_hash(initial_password),
@@ -203,6 +213,7 @@ class AdminService:
             project_id = u.default_project_id or owner_project_map.get(u.username)
             user_list.append(
                 UserListItem(
+                    user_id=u.user_id,
                     username=u.username,
                     full_name=u.full_name,
                     disabled=u.disabled,
@@ -311,6 +322,7 @@ class AdminService:
                 ProjectListItem(
                     project_id=p.project_id,
                     name=p.name,
+                    owner_user_id=p.owner_user_id,
                     owner_username=p.owner_username,
                     description=p.description,
                     member_count=member_count,
@@ -364,6 +376,7 @@ class AdminService:
             user = UserDocument.find_one({"username": m.username}).run()
             members.append(
                 MemberItem(
+                    user_id=m.user_id,
                     username=m.username,
                     full_name=user.full_name if user else None,
                     role=m.role,
@@ -392,7 +405,10 @@ class AdminService:
             )
 
         existing = ProjectMembershipDocument.find_one(
-            {"project_id": project_id, "username": username}
+            {
+                "project_id": project_id,
+                "$or": [{"user_id": user.user_id}, {"username": username}],
+            }
         ).run()
 
         if existing:
@@ -403,11 +419,14 @@ class AdminService:
                 )
             existing.role = role
             existing.status = "active"
+            existing.user_id = user.user_id
             existing.invited_by = admin_username
+            existing.invited_by_user_id = self._user_id_for_username(admin_username)
             existing.system_info.update_time()
             existing.save()
             logger.info("Reactivated %s in project %s as %s", username, project_id, role.value)
             return MemberItem(
+                user_id=existing.user_id,
                 username=existing.username,
                 full_name=user.full_name,
                 role=existing.role,
@@ -416,9 +435,11 @@ class AdminService:
 
         membership = ProjectMembershipDocument(
             project_id=project_id,
+            user_id=user.user_id,
             username=username,
             role=role,
             status="active",
+            invited_by_user_id=self._user_id_for_username(admin_username),
             invited_by=admin_username,
             system_info=SystemInfoModel(),
         )
@@ -426,6 +447,7 @@ class AdminService:
 
         logger.info("Added %s to project %s as %s", username, project_id, role.value)
         return MemberItem(
+            user_id=membership.user_id,
             username=membership.username,
             full_name=user.full_name,
             role=membership.role,

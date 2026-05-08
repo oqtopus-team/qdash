@@ -113,6 +113,7 @@ class ForumPostResponse(BaseModel):
     id: str = Field(..., description="Forum post document ID")
     project_id: str = Field(..., description="Owning project identifier")
     category: str = Field(..., description="Forum category key")
+    user_id: str | None = Field(default=None, description="Post author user ID")
     username: str = Field(..., description="Post author username")
     title: str | None = Field(default=None, description="Thread title")
     content: str = Field(..., description="Markdown content")
