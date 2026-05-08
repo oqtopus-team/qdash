@@ -161,6 +161,78 @@ class TestAdminUsersEndpoints:
         response = test_client.delete("/admin/users/admin", headers=admin_headers)
         assert response.status_code == 400
 
+    def test_bulk_import_users_returns_generated_passwords(
+        self, test_client, admin_user, admin_headers
+    ):
+        """Admin can bulk import users and download generated passwords from response."""
+        csv_content = (
+            "username,full_name,system_role\n"
+            "bulkviewer,Bulk Viewer,user\n"
+            "bulkadmin,Bulk Admin,admin\n"
+        )
+        response = test_client.post(
+            "/admin/users/bulk-import",
+            headers=admin_headers,
+            files={"file": ("users.csv", csv_content, "text/csv")},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["created"] == 2
+        assert data["skipped"] == 0
+        assert data["failed"] == 0
+        assert data["total"] == 2
+
+        first = data["results"][0]
+        assert first["username"] == "bulkviewer"
+        assert first["status"] == "created"
+        assert first["initial_password"]
+        assert "project_id" not in first
+
+        login_response = test_client.post(
+            "/auth/login",
+            data={"username": "bulkviewer", "password": first["initial_password"]},
+        )
+        assert login_response.status_code == 200
+        assert login_response.json()["must_change_password"] is True
+
+        created_admin = UserDocument.find_one({"username": "bulkadmin"}).run()
+        assert created_admin is not None
+        assert created_admin.system_role == SystemRole.ADMIN
+
+    def test_bulk_import_users_skips_existing_user_without_password(
+        self, test_client, admin_user, regular_user, admin_headers
+    ):
+        """Existing users are skipped and do not return password information."""
+        csv_content = "username,full_name\nregularuser,Regular Duplicate\n"
+        response = test_client.post(
+            "/admin/users/bulk-import",
+            headers=admin_headers,
+            files={"file": ("users.csv", csv_content, "text/csv")},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["created"] == 0
+        assert data["skipped"] == 1
+        assert data["results"][0]["status"] == "skipped"
+        assert data["results"][0]["initial_password"] is None
+
+    def test_bulk_import_users_rejects_project_columns(
+        self, test_client, admin_user, admin_headers
+    ):
+        """Bulk import only creates accounts; project membership is managed separately."""
+        csv_content = "username,full_name,project_id\nprojectuser,Project User,proj-001\n"
+        response = test_client.post(
+            "/admin/users/bulk-import",
+            headers=admin_headers,
+            files={"file": ("users.csv", csv_content, "text/csv")},
+        )
+
+        assert response.status_code == 400
+        data = response.json()
+        assert "Unsupported columns" in data["detail"]
+
 
 class TestAdminProjectsEndpoints:
     """Tests for admin project management endpoints."""

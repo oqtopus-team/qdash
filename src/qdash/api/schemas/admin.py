@@ -94,3 +94,28 @@ class AddMemberRequest(BaseModel):
 
     username: str
     role: ProjectRole = ProjectRole.VIEWER
+
+
+# --- Bulk User Import ---
+
+
+class BulkUserImportResult(BaseModel):
+    """Result for a single row in a bulk user import."""
+
+    row_number: int
+    username: str
+    full_name: str | None = None
+    system_role: SystemRole = SystemRole.USER
+    initial_password: str | None = None
+    status: str
+    message: str | None = None
+
+
+class BulkUserImportResponse(BaseModel):
+    """Response for bulk user import."""
+
+    results: list[BulkUserImportResult]
+    created: int
+    skipped: int
+    failed: int
+    total: int

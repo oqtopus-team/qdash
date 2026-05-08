@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { useQueryClient } from "@tanstack/react-query";
+import { Download, Upload } from "lucide-react";
 
 import type {
   UserListItem,
@@ -10,6 +11,7 @@ import type {
   ProjectRole,
   ProjectListItem,
   MemberItem,
+  BulkUserImportResponse,
 } from "@/schemas";
 
 import {
@@ -24,6 +26,7 @@ import {
   useAddProjectMemberAdmin,
   useRemoveProjectMemberAdmin,
   useCreateProjectForUser,
+  useBulkImportUsers,
 } from "@/client/admin/admin";
 import { useRegisterUser, useResetPassword } from "@/client/auth/auth";
 import { SettingsCard } from "@/components/features/settings/SettingsCard";
@@ -44,6 +47,7 @@ export function AdminPageContent() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isBulkImportModalOpen, setIsBulkImportModalOpen] = useState(false);
   const [isDeleteProjectModalOpen, setIsDeleteProjectModalOpen] =
     useState(false);
   const [isMembersModalOpen, setIsMembersModalOpen] = useState(false);
@@ -57,6 +61,7 @@ export function AdminPageContent() {
   const updateUserMutation = useUpdateUserSettings();
   const deleteUserMutation = useDeleteUser();
   const registerUserMutation = useRegisterUser();
+  const bulkImportMutation = useBulkImportUsers();
   const deleteProjectMutation = useAdminDeleteProject();
   const addMemberMutation = useAddProjectMemberAdmin();
   const removeMemberMutation = useRemoveProjectMemberAdmin();
@@ -144,6 +149,17 @@ export function AdminPageContent() {
       console.error("Failed to create user:", err);
       throw err;
     }
+  };
+
+  const handleBulkImportUsers = async (
+    file: File,
+  ): Promise<BulkUserImportResponse> => {
+    const response = await bulkImportMutation.mutateAsync({
+      data: { file },
+    });
+    queryClient.invalidateQueries({ queryKey: getListAllUsersQueryKey() });
+    queryClient.invalidateQueries({ queryKey: getListAllProjectsQueryKey() });
+    return response.data;
   };
 
   const handleDeleteProject = (project: ProjectListItem) => {
@@ -253,28 +269,37 @@ export function AdminPageContent() {
       {activeTab === "users" && (
         <div className="card bg-base-200 shadow-lg">
           <div className="card-body">
-            <div className="flex justify-between items-center mb-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
               <h2 className="card-title">User Management</h2>
-              <button
-                className="btn btn-primary btn-sm"
-                onClick={() => setIsCreateModalOpen(true)}
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-4 w-4"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
+              <div className="flex flex-wrap gap-2">
+                <button
+                  className="btn btn-outline btn-sm"
+                  onClick={() => setIsBulkImportModalOpen(true)}
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 4v16m8-8H4"
-                  />
-                </svg>
-                Create User
-              </button>
+                  <Upload className="h-4 w-4" />
+                  Bulk Import
+                </button>
+                <button
+                  className="btn btn-primary btn-sm"
+                  onClick={() => setIsCreateModalOpen(true)}
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-4 w-4"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 4v16m8-8H4"
+                    />
+                  </svg>
+                  Create User
+                </button>
+              </div>
             </div>
 
             {/* Mobile card view */}
@@ -650,6 +675,15 @@ export function AdminPageContent() {
           onSave={handleCreateUser}
           isLoading={registerUserMutation.isPending}
           error={registerUserMutation.error}
+        />
+      )}
+
+      {isBulkImportModalOpen && (
+        <BulkImportUsersModal
+          onClose={() => setIsBulkImportModalOpen(false)}
+          onImport={handleBulkImportUsers}
+          isLoading={bulkImportMutation.isPending}
+          error={bulkImportMutation.error}
         />
       )}
 
@@ -1107,6 +1141,228 @@ function CreateUserModal({
                 <span className="loading loading-spinner loading-sm"></span>
               ) : (
                 "Create User"
+              )}
+            </button>
+          )}
+        </div>
+      </div>
+      <form method="dialog" className="modal-backdrop">
+        <button onClick={onClose}>close</button>
+      </form>
+    </dialog>
+  );
+}
+
+function csvEscape(value: unknown): string {
+  const text = value == null ? "" : String(value);
+  if (/[",\n\r]/.test(text)) {
+    return `"${text.split('"').join('""')}"`;
+  }
+  return text;
+}
+
+function buildBulkImportResultCsv(result: BulkUserImportResponse): string {
+  const headers = [
+    "row_number",
+    "username",
+    "full_name",
+    "system_role",
+    "initial_password",
+    "status",
+    "message",
+  ];
+  const rows = result.results.map((row) =>
+    [
+      row.row_number,
+      row.username,
+      row.full_name,
+      row.system_role,
+      row.initial_password,
+      row.status,
+      row.message,
+    ]
+      .map(csvEscape)
+      .join(","),
+  );
+  return [headers.join(","), ...rows].join("\n");
+}
+
+function downloadBulkImportResult(result: BulkUserImportResponse) {
+  const csv = buildBulkImportResultCsv(result);
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `qdash-user-import-${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+function BulkImportUsersModal({
+  onClose,
+  onImport,
+  isLoading,
+  error,
+}: {
+  onClose: () => void;
+  onImport: (file: File) => Promise<BulkUserImportResponse>;
+  isLoading: boolean;
+  error: Error | unknown | null;
+}) {
+  const [file, setFile] = useState<File | null>(null);
+  const [result, setResult] = useState<BulkUserImportResponse | null>(null);
+  const [localError, setLocalError] = useState<string | null>(null);
+
+  const handleImport = async () => {
+    setLocalError(null);
+    if (!file) {
+      setLocalError("CSV file is required");
+      return;
+    }
+
+    try {
+      const importResult = await onImport(file);
+      setResult(importResult);
+    } catch {
+      // Error is shown from mutation state.
+    }
+  };
+
+  const displayError =
+    localError || (error ? "Failed to import users from CSV." : null);
+
+  return (
+    <dialog className="modal modal-open">
+      <div className="modal-box max-w-4xl">
+        <h3 className="font-bold text-lg mb-4">Bulk Import Users</h3>
+
+        {displayError && (
+          <div className="alert alert-error mb-4">
+            <span>{displayError}</span>
+          </div>
+        )}
+
+        {result ? (
+          <div className="space-y-4">
+            <div className="stats stats-vertical sm:stats-horizontal w-full bg-base-200">
+              <div className="stat">
+                <div className="stat-title">Created</div>
+                <div className="stat-value text-success">{result.created}</div>
+              </div>
+              <div className="stat">
+                <div className="stat-title">Skipped</div>
+                <div className="stat-value">{result.skipped}</div>
+              </div>
+              <div className="stat">
+                <div className="stat-title">Failed</div>
+                <div className="stat-value text-error">{result.failed}</div>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto rounded-lg border border-base-300">
+              <table className="table table-sm">
+                <thead>
+                  <tr>
+                    <th>Row</th>
+                    <th>Username</th>
+                    <th>Role</th>
+                    <th>Status</th>
+                    <th>Message</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {result.results.map((row) => (
+                    <tr key={`${row.row_number}-${row.username}`}>
+                      <td>{row.row_number}</td>
+                      <td className="font-mono">{row.username || "-"}</td>
+                      <td>{row.system_role || "-"}</td>
+                      <td>
+                        <span
+                          className={`badge badge-sm ${
+                            row.status === "created"
+                              ? "badge-success"
+                              : row.status === "failed"
+                                ? "badge-error"
+                                : "badge-ghost"
+                          }`}
+                        >
+                          {row.status}
+                        </span>
+                      </td>
+                      <td className="max-w-xs truncate">
+                        {row.message || "-"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="alert alert-info">
+              <span>
+                Download the result CSV now. Generated passwords are not stored
+                in plain text and cannot be shown again later.
+              </span>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="form-control">
+              <label className="label">
+                <span className="label-text font-medium">CSV File</span>
+              </label>
+              <input
+                type="file"
+                accept=".csv,text/csv"
+                className="file-input file-input-bordered w-full"
+                onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+              />
+            </div>
+
+            <div className="rounded-lg border border-base-300 bg-base-100 p-3">
+              <div className="text-sm font-medium">Expected columns</div>
+              <pre className="mt-2 overflow-x-auto rounded bg-base-200 p-3 text-xs">
+                username,full_name,system_role
+                {"\n"}
+                alice,Alice Sato,user
+                {"\n"}
+                bob,Bob Tanaka,admin
+              </pre>
+              <p className="mt-2 text-xs text-base-content/60">
+                Add users to projects from the Projects tab after importing
+                accounts.
+              </p>
+            </div>
+          </div>
+        )}
+
+        <div className="modal-action">
+          <button className="btn" onClick={onClose}>
+            {result ? "Close" : "Cancel"}
+          </button>
+          {result ? (
+            <button
+              className="btn btn-primary"
+              onClick={() => downloadBulkImportResult(result)}
+            >
+              <Download className="h-4 w-4" />
+              Download CSV
+            </button>
+          ) : (
+            <button
+              className="btn btn-primary"
+              onClick={handleImport}
+              disabled={isLoading || !file}
+            >
+              {isLoading ? (
+                <span className="loading loading-spinner loading-sm"></span>
+              ) : (
+                <>
+                  <Upload className="h-4 w-4" />
+                  Import Users
+                </>
               )}
             </button>
           )}

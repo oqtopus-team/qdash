@@ -537,6 +537,56 @@
         }
       }
     },
+    "/admin/users/bulk-import": {
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Bulk import users from CSV",
+        "description": "Create users from a CSV file and return generated temporary passwords.",
+        "operationId": "bulkImportUsers",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_bulkImportUsers"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkUserImportResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/admin/projects": {
       "get": {
         "tags": [
@@ -13099,6 +13149,20 @@
         "title": "BackendResponseModel",
         "description": "Response model for backend operations.\n\nInherits from BackendModel and is used to format the response\nfor backend-related API endpoints."
       },
+      "Body_bulkImportUsers": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "format": "binary",
+            "title": "File"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_bulkImportUsers"
+      },
       "Body_login": {
         "properties": {
           "username": {
@@ -13268,6 +13332,104 @@
         ],
         "title": "BulkAiTriageResponse",
         "description": "Response after enqueueing bulk AI triage review."
+      },
+      "BulkUserImportResponse": {
+        "properties": {
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/BulkUserImportResult"
+            },
+            "type": "array",
+            "title": "Results"
+          },
+          "created": {
+            "type": "integer",
+            "title": "Created"
+          },
+          "skipped": {
+            "type": "integer",
+            "title": "Skipped"
+          },
+          "failed": {
+            "type": "integer",
+            "title": "Failed"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "results",
+          "created",
+          "skipped",
+          "failed",
+          "total"
+        ],
+        "title": "BulkUserImportResponse",
+        "description": "Response for bulk user import."
+      },
+      "BulkUserImportResult": {
+        "properties": {
+          "row_number": {
+            "type": "integer",
+            "title": "Row Number"
+          },
+          "username": {
+            "type": "string",
+            "title": "Username"
+          },
+          "full_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Full Name"
+          },
+          "system_role": {
+            "$ref": "#/components/schemas/SystemRole",
+            "default": "user"
+          },
+          "initial_password": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Initial Password"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "row_number",
+          "username",
+          "status"
+        ],
+        "title": "BulkUserImportResult",
+        "description": "Result for a single row in a bulk user import."
       },
       "CalibrationNoteResponse": {
         "properties": {
