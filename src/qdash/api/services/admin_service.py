@@ -341,7 +341,8 @@ class AdminService:
                 detail=f"Project '{project_id}' not found",
             )
 
-        if project.owner_username == admin_username:
+        admin_user_id = self._user_id_for_username(admin_username)
+        if admin_user_id and project.owner_user_id == admin_user_id:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Cannot delete your own project",
@@ -405,10 +406,7 @@ class AdminService:
             )
 
         existing = ProjectMembershipDocument.find_one(
-            {
-                "project_id": project_id,
-                "$or": [{"user_id": user.user_id}, {"username": username}],
-            }
+            {"project_id": project_id, "user_id": user.user_id}
         ).run()
 
         if existing:
@@ -463,14 +461,21 @@ class AdminService:
                 detail=f"Project '{project_id}' not found",
             )
 
-        if project.owner_username == username:
+        user = UserDocument.find_one({"username": username}).run()
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"User '{username}' not found",
+            )
+
+        if user.user_id == project.owner_user_id:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Cannot remove the project owner",
             )
 
         membership = ProjectMembershipDocument.find_one(
-            {"project_id": project_id, "username": username, "status": "active"}
+            {"project_id": project_id, "user_id": user.user_id, "status": "active"}
         ).run()
 
         if not membership:
@@ -496,7 +501,7 @@ class AdminService:
                 detail=f"User '{username}' not found",
             )
 
-        existing_project = ProjectDocument.find_one({"owner_username": username}).run()
+        existing_project = ProjectDocument.find_one({"owner_user_id": user.user_id}).run()
         if existing_project:
             user.default_project_id = existing_project.project_id
             if user.system_info:

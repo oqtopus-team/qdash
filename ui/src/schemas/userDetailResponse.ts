@@ -5,7 +5,6 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { UserDetailResponseUserId } from "./userDetailResponseUserId";
 import type { UserDetailResponseFullName } from "./userDetailResponseFullName";
 import type { SystemRole } from "./systemRole";
 import type { UserDetailResponseDefaultProjectId } from "./userDetailResponseDefaultProjectId";
@@ -16,7 +15,7 @@ import type { UserDetailResponseUpdatedAt } from "./userDetailResponseUpdatedAt"
  * Detailed user response for admin view.
  */
 export interface UserDetailResponse {
-  user_id?: UserDetailResponseUserId;
+  user_id: string;
   username: string;
   full_name?: UserDetailResponseFullName;
   disabled?: boolean;

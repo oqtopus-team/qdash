@@ -5,7 +5,6 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { ProjectResponseOwnerUserId } from "./projectResponseOwnerUserId";
 import type { ProjectResponseDescription } from "./projectResponseDescription";
 import type { ProjectRole } from "./projectRole";
 
@@ -14,7 +13,7 @@ import type { ProjectRole } from "./projectRole";
  */
 export interface ProjectResponse {
   project_id: string;
-  owner_user_id?: ProjectResponseOwnerUserId;
+  owner_user_id: string;
   owner_username: string;
   name: string;
   description: ProjectResponseDescription;

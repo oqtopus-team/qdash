@@ -21,18 +21,23 @@ def project_with_members(init_db: PyMongoDatabase[Any]) -> ProjectDocument:
         ("viewer", "viewer-token"),
         ("candidate", "candidate-token"),
     ]
+    user_ids: dict[str, str] = {}
     for username, token in users:
-        UserDocument(
+        user = UserDocument(
             username=username,
             hashed_password="hashed",
             access_token=token,
             default_project_id="project-1",
             system_info=SystemInfoModel(),
-        ).insert()
+        )
+        user.insert()
+        assert user.user_id is not None
+        user_ids[username] = user.user_id
 
     project = ProjectDocument(
         project_id="project-1",
         name="Project 1",
+        owner_user_id=user_ids["owner"],
         owner_username="owner",
     )
     project.insert()
@@ -44,9 +49,11 @@ def project_with_members(init_db: PyMongoDatabase[Any]) -> ProjectDocument:
     ]:
         ProjectMembershipDocument(
             project_id="project-1",
+            user_id=user_ids[username],
             username=username,
             role=role,
             status="active",
+            invited_by_user_id=user_ids["owner"],
             invited_by="owner",
         ).insert()
 

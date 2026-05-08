@@ -5,7 +5,6 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { MemberItemUserId } from "./memberItemUserId";
 import type { MemberItemFullName } from "./memberItemFullName";
 import type { ProjectRole } from "./projectRole";
 
@@ -13,7 +12,7 @@ import type { ProjectRole } from "./projectRole";
  * Member info for admin view.
  */
 export interface MemberItem {
-  user_id?: MemberItemUserId;
+  user_id: string;
   username: string;
   full_name?: MemberItemFullName;
   role: ProjectRole;

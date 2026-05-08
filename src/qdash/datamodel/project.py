@@ -50,7 +50,7 @@ class ProjectModel(BaseModel):
     """Represents a collaborative project/workspace."""
 
     project_id: str = Field(..., description="Globally unique project identifier")
-    owner_user_id: str | None = Field(default=None, description="Internal user ID of the owner")
+    owner_user_id: str = Field(..., description="Internal user ID of the owner")
     owner_username: str = Field(..., description="Username snapshot of the project owner")
     name: str = Field(..., description="Display name of the project")
     description: str | None = Field(default=None, description="Project description")
@@ -62,7 +62,7 @@ class ProjectMembershipModel(BaseModel):
     """Represents membership information of a project."""
 
     project_id: str = Field(..., description="Project identifier")
-    user_id: str | None = Field(default=None, description="Internal user ID of the member")
+    user_id: str = Field(..., description="Internal user ID of the member")
     username: str = Field(..., description="Member username snapshot")
     role: ProjectRole = Field(
         default=ProjectRole.VIEWER, description="Member role within the project"

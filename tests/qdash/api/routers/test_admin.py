@@ -275,6 +275,7 @@ class TestAdminProjectsEndpoints:
         project = ProjectDocument(
             project_id="proj-owner",
             name="Owner's Project",
+            owner_user_id=project_owner.user_id,
             owner_username="projectowner",
             description="Test project",
             system_info=SystemInfoModel(),
@@ -327,6 +328,7 @@ class TestAdminProjectsEndpoints:
         admin_project = ProjectDocument(
             project_id="proj-admin",
             name="Admin's Project",
+            owner_user_id=admin_user.user_id,
             owner_username="admin",
             description="Admin project",
             system_info=SystemInfoModel(),
@@ -394,6 +396,7 @@ class TestAdminMembersEndpoints:
         project = ProjectDocument(
             project_id="proj-owner",
             name="Owner's Project",
+            owner_user_id=project_owner.user_id,
             owner_username="projectowner",
             description="Test project",
             system_info=SystemInfoModel(),
@@ -406,9 +409,11 @@ class TestAdminMembersEndpoints:
         """Create test membership."""
         membership = ProjectMembershipDocument(
             project_id="proj-owner",
+            user_id=member_user.user_id,
             username="memberuser",
             role=ProjectRole.VIEWER,
             status="active",
+            invited_by_user_id=test_project.owner_user_id,
             invited_by="projectowner",
             system_info=SystemInfoModel(),
         )
@@ -474,6 +479,7 @@ class TestAdminMembersEndpoints:
         # Create owner membership
         owner_membership = ProjectMembershipDocument(
             project_id="proj-owner",
+            user_id=project_owner.user_id,
             username="projectowner",
             role=ProjectRole.OWNER,
             status="active",

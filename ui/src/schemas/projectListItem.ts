@@ -5,7 +5,6 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { ProjectListItemOwnerUserId } from "./projectListItemOwnerUserId";
 import type { ProjectListItemDescription } from "./projectListItemDescription";
 import type { ProjectListItemCreatedAt } from "./projectListItemCreatedAt";
 
@@ -15,7 +14,7 @@ import type { ProjectListItemCreatedAt } from "./projectListItemCreatedAt";
 export interface ProjectListItem {
   project_id: string;
   name: string;
-  owner_user_id?: ProjectListItemOwnerUserId;
+  owner_user_id: string;
   owner_username: string;
   description?: ProjectListItemDescription;
   member_count?: number;

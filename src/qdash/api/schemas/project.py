@@ -27,7 +27,7 @@ class ProjectResponse(BaseModel):
     """Response schema for project information."""
 
     project_id: str
-    owner_user_id: str | None = None
+    owner_user_id: str
     owner_username: str
     name: str
     description: str | None
@@ -61,7 +61,7 @@ class MemberResponse(BaseModel):
     """Response schema for project membership."""
 
     project_id: str
-    user_id: str | None = None
+    user_id: str
     username: str
     role: ProjectRole
     status: str

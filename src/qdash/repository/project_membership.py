@@ -46,31 +46,13 @@ class MongoProjectMembershipRepository:
         """
         return list(ProjectMembershipDocument.find(query).run())
 
-    def find_by_username(
-        self, username: str, status: str = "active"
-    ) -> list[ProjectMembershipDocument]:
-        """Find all memberships for a user.
-
-        Args:
-            username: Member username
-            status: Membership status filter
-
-        Returns:
-            List of ProjectMembershipDocument objects
-        """
-        return list(ProjectMembershipDocument.find({"username": username, "status": status}).run())
-
     def find_by_user(
-        self, username: str, user_id: str | None, status: str = "active"
+        self, user_id: str | None, status: str = "active"
     ) -> list[ProjectMembershipDocument]:
-        """Find all memberships for a user_id with username fallback."""
-        if user_id:
-            query: dict[str, Any] = {
-                "status": status,
-                "$or": [{"user_id": user_id}, {"username": username}],
-            }
-        else:
-            query = {"username": username, "status": status}
+        """Find all memberships for a user."""
+        if not user_id:
+            return []
+        query: dict[str, Any] = {"user_id": user_id, "status": status}
         return list(ProjectMembershipDocument.find(query).run())
 
     def find_by_project(self, project_id: str) -> list[ProjectMembershipDocument]:
@@ -111,7 +93,7 @@ class MongoProjectMembershipRepository:
     def create_membership(
         self,
         project_id: str,
-        user_id: str | None,
+        user_id: str,
         username: str,
         role: ProjectRole,
         status: str = "active",
