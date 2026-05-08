@@ -138,7 +138,7 @@ async def get_flow_helper_file(
 @router.get(
     "/flows/schedules",
     response_model=ListFlowSchedulesResponse,
-    summary="List all flow schedules for current user",
+    summary="List all flow schedules for current project",
     operation_id="listAllFlowSchedules",
 )
 async def list_all_flow_schedules(

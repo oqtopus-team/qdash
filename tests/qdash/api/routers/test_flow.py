@@ -55,6 +55,33 @@ def auth_headers():
 
 
 @pytest.fixture
+def editor_auth_headers(test_project):
+    """Create an editor user and return authentication headers."""
+    user = UserDocument(
+        username="editor_user",
+        hashed_password="hashed",
+        access_token="editor_token",
+        default_project_id="test_project",
+        system_info=SystemInfoModel(),
+    )
+    user.insert()
+
+    membership = ProjectMembershipDocument(
+        project_id="test_project",
+        username="editor_user",
+        role=ProjectRole.EDITOR,
+        status="active",
+        invited_by="test_user",
+    )
+    membership.insert()
+
+    return {
+        "Authorization": "Bearer editor_token",
+        "X-Project-Id": "test_project",
+    }
+
+
+@pytest.fixture
 def sample_flow(test_project):
     """Create a sample flow in the database."""
     flow = FlowDocument(
@@ -125,6 +152,17 @@ class TestFlowRouter:
         data = response.json()
         assert len(data["flows"]) == 1
         assert data["flows"][0]["name"] == "flow_project1"
+
+    def test_list_flows_includes_other_project_members_flows(
+        self, test_client, test_project, editor_auth_headers, sample_flow
+    ):
+        """Test that project members can see flows created by other members."""
+        response = test_client.get("/flows", headers=editor_auth_headers)
+
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["flows"]) == 1
+        assert data["flows"][0]["name"] == "test_flow"
 
     def test_list_flows_requires_authentication(self, test_client, test_project):
         """Test that listing flows without auth returns 401."""
@@ -267,3 +305,31 @@ class TestFlowExecution:
 
         # Assert: Should not find the flow (project isolation)
         assert response.status_code == 404
+
+    def test_execute_flow_created_by_other_member_uses_requesting_user(
+        self, test_client, test_project, editor_auth_headers, sample_flow
+    ):
+        """Test that project members can execute shared flows as themselves."""
+        mock_flow_run = MagicMock()
+        mock_flow_run.id = "test-flow-run-id"
+
+        mock_client = MagicMock()
+        mock_client.create_flow_run_from_deployment = AsyncMock(return_value=mock_flow_run)
+
+        async_cm = MagicMock()
+        async_cm.__aenter__ = AsyncMock(return_value=mock_client)
+        async_cm.__aexit__ = AsyncMock(return_value=None)
+
+        with patch("qdash.api.services.flow_service.get_client", return_value=async_cm):
+            response = test_client.post(
+                "/flows/test_flow/execute",
+                headers=editor_auth_headers,
+                json={"parameters": {}},
+            )
+
+        assert response.status_code == 200
+
+        call_args = mock_client.create_flow_run_from_deployment.call_args
+        parameters = call_args.kwargs.get("parameters", {})
+        assert parameters["username"] == "editor_user"
+        assert parameters["project_id"] == "test_project"

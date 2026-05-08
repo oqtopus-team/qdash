@@ -1,20 +1,20 @@
-"""Database model for user-defined flows."""
+"""Database model for project-defined flows."""
 
 from datetime import datetime
 from typing import Any
 
 from bunnet import Document, SortDirection
 from pydantic import ConfigDict, Field
-from pymongo import ASCENDING, DESCENDING
+from pymongo import ASCENDING, DESCENDING, IndexModel
 
 
 class FlowDocument(Document):
-    """User-defined Flow metadata.
+    """Project-defined Flow metadata.
 
     Attributes
     ----------
         name (str): Flow name (filename without .py extension).
-        username (str): Owner username.
+        username (str): Creator username.
         chip_id (str): Target chip ID.
         description (str): Flow description.
         flow_function_name (str): Entry point function name in the Python file.
@@ -28,7 +28,7 @@ class FlowDocument(Document):
 
     project_id: str = Field(..., description="Owning project identifier")
     name: str = Field(..., description="Flow name (filename without .py)")
-    username: str = Field(..., description="Owner username")
+    username: str = Field(..., description="Creator username")
     chip_id: str = Field(..., description="Target chip ID")
     description: str = Field(default="", description="Flow description")
     flow_function_name: str = Field(..., description="Entry point function name")
@@ -62,14 +62,81 @@ class FlowDocument(Document):
                 ("project_id", ASCENDING),
                 ("username", ASCENDING),
                 ("name", ASCENDING),
-            ],  # Unique per project+user
+            ],  # Legacy lookup by project+user+name
+            IndexModel(
+                [
+                    ("project_id", ASCENDING),
+                    ("name", ASCENDING),
+                ],
+                unique=True,
+            ),  # Unique project-scoped flow name
             [
                 ("project_id", ASCENDING),
                 ("username", ASCENDING),
                 ("created_at", DESCENDING),
             ],  # List by project+user, sorted by creation date
+            [
+                ("project_id", ASCENDING),
+                ("updated_at", DESCENDING),
+            ],  # List by project, sorted by update date
             [("project_id", ASCENDING), ("chip_id", ASCENDING)],  # Lookup by project+chip
         ]
+
+    @classmethod
+    def find_by_project_and_name(cls, project_id: str, name: str) -> "FlowDocument | None":
+        """Find flow by project and name.
+
+        Args:
+        ----
+            project_id: Project identifier
+            name: Flow name
+
+        Returns:
+        -------
+            FlowDocument if found, None otherwise
+
+        """
+        return cls.find_one({"project_id": project_id, "name": name}).run()
+
+    @classmethod
+    def list_by_project(cls, project_id: str) -> list["FlowDocument"]:
+        """List all flows for a project, sorted by update time (newest first).
+
+        Args:
+        ----
+            project_id: Project identifier
+
+        Returns:
+        -------
+            List of FlowDocument objects
+
+        """
+        return list(
+            cls.find(
+                {"project_id": project_id},
+                sort=[("updated_at", SortDirection.DESCENDING)],
+            ).run()
+        )
+
+    @classmethod
+    def delete_by_project_and_name(cls, project_id: str, name: str) -> bool:
+        """Delete flow by project and name.
+
+        Args:
+        ----
+            project_id: Project identifier
+            name: Flow name
+
+        Returns:
+        -------
+            True if deleted, False if not found
+
+        """
+        doc = cls.find_one({"project_id": project_id, "name": name}).run()
+        if doc:
+            doc.delete()
+            return True
+        return False
 
     @classmethod
     def find_by_user_and_name(
