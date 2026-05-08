@@ -197,6 +197,7 @@ class FlowService:
             flow_summaries = [
                 FlowSummary(
                     name=flow.name,
+                    created_by=flow.username,
                     description=flow.description,
                     chip_id=flow.chip_id,
                     flow_function_name=flow.flow_function_name,
@@ -249,6 +250,7 @@ class FlowService:
         logger.info(f"[TRACE] get_flow default_run_parameters={flow.default_run_parameters}")
         return GetFlowResponse(
             name=flow.name,
+            created_by=flow.username,
             description=flow.description,
             code=code,
             flow_function_name=flow.flow_function_name,

@@ -15152,6 +15152,11 @@
             "title": "Name",
             "description": "Flow name"
           },
+          "created_by": {
+            "type": "string",
+            "title": "Created By",
+            "description": "Username of the flow creator"
+          },
           "description": {
             "type": "string",
             "title": "Description",
@@ -15191,6 +15196,7 @@
         "type": "object",
         "required": [
           "name",
+          "created_by",
           "description",
           "chip_id",
           "flow_function_name",
@@ -15698,6 +15704,11 @@
             "title": "Name",
             "description": "Flow name"
           },
+          "created_by": {
+            "type": "string",
+            "title": "Created By",
+            "description": "Username of the flow creator"
+          },
           "description": {
             "type": "string",
             "title": "Description",
@@ -15759,6 +15770,7 @@
         "type": "object",
         "required": [
           "name",
+          "created_by",
           "description",
           "code",
           "flow_function_name",

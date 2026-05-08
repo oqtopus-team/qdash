@@ -262,8 +262,8 @@ function ProjectMembersPanel() {
             </div>
           )}
 
-          <div className="mt-4 overflow-x-auto rounded-lg border border-base-300 bg-base-100">
-            <table className="table">
+          <div className="mt-4 overflow-x-auto">
+            <table className="table table-zebra">
               <thead>
                 <tr>
                   <th>Username</th>

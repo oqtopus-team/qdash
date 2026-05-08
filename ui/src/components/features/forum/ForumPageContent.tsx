@@ -308,136 +308,138 @@ export function ForumPageContent() {
       </div>
 
       {showCategoryManager && isOwner && (
-        <div className="mb-4 rounded-lg border border-base-300 bg-base-100 p-4">
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <h2 className="text-sm font-semibold">Forum Categories</h2>
-            <span className="text-xs text-base-content/50">
-              Deleting archives the category and keeps existing threads
-              readable.
-            </span>
-          </div>
-          <div className="mb-4 grid gap-2 sm:grid-cols-[150px_180px_1fr_130px_160px_auto]">
-            <input
-              className="input input-bordered input-sm"
-              value={categoryKey}
-              onChange={(event) => setCategoryKey(event.target.value)}
-              placeholder="key"
-            />
-            <input
-              className="input input-bordered input-sm"
-              value={categoryName}
-              onChange={(event) => setCategoryName(event.target.value)}
-              placeholder="Name"
-            />
-            <input
-              className="input input-bordered input-sm"
-              value={categoryDescription}
-              onChange={(event) => setCategoryDescription(event.target.value)}
-              placeholder="Description"
-            />
-            <select
-              className="select select-bordered select-sm"
-              value={categoryColor}
-              onChange={(event) => setCategoryColor(event.target.value)}
-            >
-              {[
-                "neutral",
-                "primary",
-                "secondary",
-                "accent",
-                "info",
-                "success",
-                "warning",
-                "error",
-                "ghost",
-              ].map((color) => (
-                <option key={color} value={color}>
-                  {color}
-                </option>
-              ))}
-            </select>
-            <select
-              className="select select-bordered select-sm"
-              value={categoryIcon}
-              onChange={(event) => setCategoryIcon(event.target.value)}
-            >
-              {[
-                "message-square",
-                "activity",
-                "network",
-                "circuit-board",
-                "settings",
-                "calendar-check",
-              ].map((icon) => (
-                <option key={icon} value={icon}>
-                  {icon}
-                </option>
-              ))}
-            </select>
-            <button
-              className="btn btn-primary btn-sm"
-              onClick={submitCategory}
-              disabled={
-                !categoryKey.trim() ||
-                !categoryName.trim() ||
-                createCategoryMutation.isPending
-              }
-            >
-              Add
-            </button>
-          </div>
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            {categories.map((item) => {
-              const Icon = item.icon;
-              return (
-                <div
-                  key={item.id}
-                  className="flex items-center justify-between gap-2 rounded-lg border border-base-300 px-3 py-2"
-                >
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <Icon className="h-4 w-4 text-base-content/60" />
-                      <span className="truncate text-sm font-medium">
-                        {item.label}
-                      </span>
-                      <span className={`badge badge-xs ${item.badgeClass}`}>
-                        {item.id}
-                      </span>
-                    </div>
-                    <p className="truncate text-xs text-base-content/50">
-                      {item.description}
-                    </p>
-                  </div>
-                  <button
-                    className="btn btn-ghost btn-xs text-error"
-                    onClick={() =>
-                      deleteCategoryMutation.mutate(
-                        { categoryKey: item.id },
-                        {
-                          onSuccess: () => {
-                            if (category === item.id) {
-                              setCategoryFilter("all");
-                            }
-                            if (newCategory === item.id) {
-                              setNewCategory(
-                                categories.find(
-                                  (candidate) => candidate.id !== item.id,
-                                )?.id ?? "other",
-                              );
-                            }
-                            invalidateCategories();
-                          },
-                        },
-                      )
-                    }
-                    disabled={deleteCategoryMutation.isPending}
-                    title="Archive category"
+        <div className="card bg-base-200 shadow-lg mb-4">
+          <div className="card-body">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="card-title text-sm">Forum Categories</h2>
+              <span className="text-xs text-base-content/50">
+                Deleting archives the category and keeps existing threads
+                readable.
+              </span>
+            </div>
+            <div className="mb-4 grid gap-2 sm:grid-cols-[150px_180px_1fr_130px_160px_auto]">
+              <input
+                className="input input-bordered input-sm"
+                value={categoryKey}
+                onChange={(event) => setCategoryKey(event.target.value)}
+                placeholder="key"
+              />
+              <input
+                className="input input-bordered input-sm"
+                value={categoryName}
+                onChange={(event) => setCategoryName(event.target.value)}
+                placeholder="Name"
+              />
+              <input
+                className="input input-bordered input-sm"
+                value={categoryDescription}
+                onChange={(event) => setCategoryDescription(event.target.value)}
+                placeholder="Description"
+              />
+              <select
+                className="select select-bordered select-sm"
+                value={categoryColor}
+                onChange={(event) => setCategoryColor(event.target.value)}
+              >
+                {[
+                  "neutral",
+                  "primary",
+                  "secondary",
+                  "accent",
+                  "info",
+                  "success",
+                  "warning",
+                  "error",
+                  "ghost",
+                ].map((color) => (
+                  <option key={color} value={color}>
+                    {color}
+                  </option>
+                ))}
+              </select>
+              <select
+                className="select select-bordered select-sm"
+                value={categoryIcon}
+                onChange={(event) => setCategoryIcon(event.target.value)}
+              >
+                {[
+                  "message-square",
+                  "activity",
+                  "network",
+                  "circuit-board",
+                  "settings",
+                  "calendar-check",
+                ].map((icon) => (
+                  <option key={icon} value={icon}>
+                    {icon}
+                  </option>
+                ))}
+              </select>
+              <button
+                className="btn btn-primary btn-sm"
+                onClick={submitCategory}
+                disabled={
+                  !categoryKey.trim() ||
+                  !categoryName.trim() ||
+                  createCategoryMutation.isPending
+                }
+              >
+                Add
+              </button>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              {categories.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <div
+                    key={item.id}
+                    className="flex items-center justify-between gap-2 rounded-lg border border-base-300 px-3 py-2"
                   >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              );
-            })}
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <Icon className="h-4 w-4 text-base-content/60" />
+                        <span className="truncate text-sm font-medium">
+                          {item.label}
+                        </span>
+                        <span className={`badge badge-xs ${item.badgeClass}`}>
+                          {item.id}
+                        </span>
+                      </div>
+                      <p className="truncate text-xs text-base-content/50">
+                        {item.description}
+                      </p>
+                    </div>
+                    <button
+                      className="btn btn-ghost btn-xs text-error"
+                      onClick={() =>
+                        deleteCategoryMutation.mutate(
+                          { categoryKey: item.id },
+                          {
+                            onSuccess: () => {
+                              if (category === item.id) {
+                                setCategoryFilter("all");
+                              }
+                              if (newCategory === item.id) {
+                                setNewCategory(
+                                  categories.find(
+                                    (candidate) => candidate.id !== item.id,
+                                  )?.id ?? "other",
+                                );
+                              }
+                              invalidateCategories();
+                            },
+                          },
+                        )
+                      }
+                      disabled={deleteCategoryMutation.isPending}
+                      title="Archive category"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
       )}
@@ -466,36 +468,39 @@ export function ForumPageContent() {
       </div>
 
       {showComposer && (
-        <div className="mb-4 rounded-lg border border-base-300 bg-base-100 p-4">
-          <div className="mb-3 grid gap-3 sm:grid-cols-[220px_1fr]">
-            <select
-              className="select select-bordered select-sm w-full"
-              value={newCategory}
-              onChange={(event) => setNewCategory(event.target.value)}
-            >
-              {categories.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.label}
-                </option>
-              ))}
-            </select>
-            <input
-              className="input input-bordered input-sm w-full"
-              value={title}
-              onChange={(event) => setTitle(event.target.value)}
-              placeholder="Thread title"
+        <div className="card bg-base-200 shadow-lg mb-4">
+          <div className="card-body">
+            <h2 className="card-title text-sm">New Thread</h2>
+            <div className="grid gap-3 sm:grid-cols-[220px_1fr]">
+              <select
+                className="select select-bordered select-sm w-full"
+                value={newCategory}
+                onChange={(event) => setNewCategory(event.target.value)}
+              >
+                {categories.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.label}
+                  </option>
+                ))}
+              </select>
+              <input
+                className="input input-bordered input-sm w-full"
+                value={title}
+                onChange={(event) => setTitle(event.target.value)}
+                placeholder="Thread title"
+              />
+            </div>
+            <MarkdownEditor
+              value={content}
+              onChange={setContent}
+              onSubmit={submitThread}
+              placeholder="Start a discussion. Use @username to mention project members."
+              rows={5}
+              submitLabel="Post"
+              isSubmitting={createMutation.isPending}
+              mentionCandidates={mentionCandidates}
             />
           </div>
-          <MarkdownEditor
-            value={content}
-            onChange={setContent}
-            onSubmit={submitThread}
-            placeholder="Start a discussion. Use @username to mention project members."
-            rows={5}
-            submitLabel="Post"
-            isSubmitting={createMutation.isPending}
-            mentionCandidates={mentionCandidates}
-          />
         </div>
       )}
 
