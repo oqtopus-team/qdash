@@ -7,7 +7,6 @@ import { useCallback, useRef } from "react";
 
 import {
   BarChart3,
-  Bell,
   BookMarked,
   BookOpen,
   ChevronLeft,
@@ -18,6 +17,7 @@ import {
   FileJson2,
   Files,
   GitBranch,
+  Inbox,
   LayoutDashboard,
   LayoutGrid,
   Snowflake,
@@ -169,19 +169,17 @@ export function Sidebar() {
         <SectionHeader visible={sectionHeaderVisible} label="Data" />
         <li>
           <Link
-            href="/notifications"
+            href="/inbox"
             className={
               isMobileOpen
-                ? linkClass(isActive("/notifications"))
-                : desktopLinkClass(isActive("/notifications"))
+                ? linkClass(isActive("/inbox"))
+                : desktopLinkClass(isActive("/inbox"))
             }
-            title="Notifications"
+            title="Inbox"
             onClick={handleLinkClick}
           >
-            <Bell size={18} />
-            {(isOpen || isMobileOpen) && (
-              <span className="ml-2">Notifications</span>
-            )}
+            <Inbox size={18} />
+            {(isOpen || isMobileOpen) && <span className="ml-2">Inbox</span>}
             {unreadNotifications > 0 && (
               <span className="badge badge-primary badge-xs ml-auto">
                 {unreadNotifications > 99 ? "99+" : unreadNotifications}
