@@ -2,12 +2,18 @@
 
 from __future__ import annotations
 
+import csv
 import logging
+import secrets
 from datetime import datetime, timezone
+from io import StringIO
 from typing import TYPE_CHECKING
 
 from fastapi import HTTPException, status
+from qdash.api.lib.auth import get_password_hash
 from qdash.api.schemas.admin import (
+    BulkUserImportResponse,
+    BulkUserImportResult,
     MemberItem,
     MemberListResponse,
     ProjectListItem,
@@ -16,6 +22,7 @@ from qdash.api.schemas.admin import (
     UserListItem,
     UserListResponse,
 )
+from qdash.api.services.auth_service import generate_temporary_password
 from qdash.datamodel.system_info import SystemInfoModel
 from qdash.datamodel.user import SystemRole
 from qdash.dbmodel.project import ProjectDocument
@@ -25,7 +32,18 @@ from qdash.dbmodel.user import UserDocument
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
+
     from qdash.datamodel.project import ProjectRole
+
+
+MAX_BULK_IMPORT_ROWS = 500
+REQUIRED_BULK_IMPORT_COLUMNS = {"username"}
+SUPPORTED_BULK_IMPORT_COLUMNS = {
+    "username",
+    "full_name",
+    "system_role",
+}
 
 
 class AdminService:
@@ -46,6 +64,130 @@ class AdminService:
         )
 
     # --- User Management ---
+
+    @staticmethod
+    def _parse_system_role(value: str | None) -> SystemRole:
+        """Parse system role from CSV."""
+        if value is None or value.strip() == "":
+            return SystemRole.USER
+        try:
+            return SystemRole(value.strip().lower())
+        except ValueError as exc:
+            raise ValueError(f"Invalid system_role '{value}'") from exc
+
+    @staticmethod
+    def _bulk_result(
+        row_number: int,
+        row: Mapping[str, str],
+        status_value: str,
+        message: str | None = None,
+        initial_password: str | None = None,
+        system_role: SystemRole = SystemRole.USER,
+    ) -> BulkUserImportResult:
+        """Build a result row for bulk import."""
+        return BulkUserImportResult(
+            row_number=row_number,
+            username=(row.get("username") or "").strip(),
+            full_name=(row.get("full_name") or "").strip() or None,
+            system_role=system_role,
+            initial_password=initial_password,
+            status=status_value,
+            message=message,
+        )
+
+    def bulk_import_users(self, csv_content: str) -> BulkUserImportResponse:
+        """Create users from CSV and return generated temporary passwords."""
+        stream = StringIO(csv_content)
+        reader = csv.DictReader(stream)
+        if reader.fieldnames is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="CSV header is required",
+            )
+
+        fieldnames = {field.strip() for field in reader.fieldnames if field}
+        missing = REQUIRED_BULK_IMPORT_COLUMNS - fieldnames
+        if missing:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Missing required columns: {', '.join(sorted(missing))}",
+            )
+
+        unsupported = fieldnames - SUPPORTED_BULK_IMPORT_COLUMNS
+        if unsupported:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Unsupported columns: {', '.join(sorted(unsupported))}",
+            )
+
+        results: list[BulkUserImportResult] = []
+
+        for index, raw_row in enumerate(reader, start=2):
+            if len(results) >= MAX_BULK_IMPORT_ROWS:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"CSV row limit exceeded: maximum {MAX_BULK_IMPORT_ROWS}",
+                )
+
+            row = {key.strip(): (value or "").strip() for key, value in raw_row.items() if key}
+            username = row.get("username", "")
+            if not username:
+                results.append(self._bulk_result(index, row, "failed", "username is required"))
+                continue
+
+            try:
+                system_role = self._parse_system_role(row.get("system_role"))
+
+                existing_user = UserDocument.find_one({"username": username}).run()
+                if existing_user:
+                    results.append(
+                        self._bulk_result(
+                            index,
+                            row,
+                            "skipped",
+                            "user already exists",
+                            system_role=existing_user.system_role,
+                        )
+                    )
+                    continue
+
+                initial_password = generate_temporary_password()
+                user = UserDocument(
+                    username=username,
+                    full_name=row.get("full_name") or None,
+                    hashed_password=get_password_hash(initial_password),
+                    access_token=secrets.token_urlsafe(32),
+                    disabled=False,
+                    system_role=system_role,
+                    must_change_password=True,
+                    system_info=SystemInfoModel(),
+                )
+                user.insert()
+
+                results.append(
+                    self._bulk_result(
+                        index,
+                        row,
+                        "created",
+                        initial_password=initial_password,
+                        system_role=system_role,
+                    )
+                )
+            except Exception as exc:
+                logger.warning("Failed to import user from row %s: %s", index, exc)
+                results.append(self._bulk_result(index, row, "failed", str(exc)))
+
+        created = sum(1 for result in results if result.status == "created")
+        skipped = sum(1 for result in results if result.status == "skipped")
+        failed = sum(1 for result in results if result.status == "failed")
+
+        return BulkUserImportResponse(
+            results=results,
+            created=created,
+            skipped=skipped,
+            failed=failed,
+            total=len(results),
+        )
 
     def list_users(self, skip: int = 0, limit: int = 100) -> UserListResponse:
         """List all users with project mapping."""

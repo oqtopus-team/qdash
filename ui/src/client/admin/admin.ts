@@ -24,6 +24,8 @@ import type {
 import type {
   AddMemberRequest,
   AdminDeleteProject200,
+  BodyBulkImportUsers,
+  BulkUserImportResponse,
   ConfigReloadResponse,
   DeleteUser200,
   HTTPValidationError,
@@ -575,6 +577,101 @@ export const useDeleteUser = <
   TContext
 > => {
   const mutationOptions = getDeleteUserMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+/**
+ * Create users from a CSV file and return generated temporary passwords.
+ * @summary Bulk import users from CSV
+ */
+export const bulkImportUsers = (
+  bodyBulkImportUsers: BodyBulkImportUsers,
+  options?: SecondParameter<typeof customInstance>,
+  signal?: AbortSignal,
+) => {
+  const formData = new FormData();
+  formData.append(`file`, bodyBulkImportUsers.file);
+
+  return customInstance<BulkUserImportResponse>(
+    {
+      url: `/admin/users/bulk-import`,
+      method: "POST",
+      headers: { "Content-Type": "multipart/form-data" },
+      data: formData,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getBulkImportUsersMutationOptions = <
+  TError = void | HTTPValidationError,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof bulkImportUsers>>,
+    TError,
+    { data: BodyBulkImportUsers },
+    TContext
+  >;
+  request?: SecondParameter<typeof customInstance>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof bulkImportUsers>>,
+  TError,
+  { data: BodyBulkImportUsers },
+  TContext
+> => {
+  const mutationKey = ["bulkImportUsers"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof bulkImportUsers>>,
+    { data: BodyBulkImportUsers }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return bulkImportUsers(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type BulkImportUsersMutationResult = NonNullable<
+  Awaited<ReturnType<typeof bulkImportUsers>>
+>;
+export type BulkImportUsersMutationBody = BodyBulkImportUsers;
+export type BulkImportUsersMutationError = void | HTTPValidationError;
+
+/**
+ * @summary Bulk import users from CSV
+ */
+export const useBulkImportUsers = <
+  TError = void | HTTPValidationError,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof bulkImportUsers>>,
+      TError,
+      { data: BodyBulkImportUsers },
+      TContext
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof bulkImportUsers>>,
+  TError,
+  { data: BodyBulkImportUsers },
+  TContext
+> => {
+  const mutationOptions = getBulkImportUsersMutationOptions(options);
 
   return useMutation(mutationOptions, queryClient);
 };
