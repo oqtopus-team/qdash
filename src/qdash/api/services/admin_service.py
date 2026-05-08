@@ -2,11 +2,18 @@
 
 from __future__ import annotations
 
+import csv
 import logging
+import secrets
 from datetime import datetime, timezone
+from io import StringIO
+from typing import TYPE_CHECKING
 
 from fastapi import HTTPException, status
+from qdash.api.lib.auth import get_password_hash
 from qdash.api.schemas.admin import (
+    BulkUserImportResponse,
+    BulkUserImportResult,
     MemberItem,
     MemberListResponse,
     ProjectListItem,
@@ -15,33 +22,192 @@ from qdash.api.schemas.admin import (
     UserListItem,
     UserListResponse,
 )
-from qdash.datamodel.project import ProjectRole
+from qdash.api.services.auth_service import generate_temporary_password
 from qdash.datamodel.system_info import SystemInfoModel
-from qdash.datamodel.user import SystemRole
+from qdash.datamodel.user import (
+    USERNAME_PATTERN_DESCRIPTION,
+    SystemRole,
+    generate_user_id,
+    is_valid_username,
+)
 from qdash.dbmodel.project import ProjectDocument
 from qdash.dbmodel.project_membership import ProjectMembershipDocument
 from qdash.dbmodel.user import UserDocument
 
 logger = logging.getLogger(__name__)
 
+if TYPE_CHECKING:
+    from collections.abc import Mapping
+
+    from qdash.datamodel.project import ProjectRole
+
+
+MAX_BULK_IMPORT_ROWS = 500
+REQUIRED_BULK_IMPORT_COLUMNS = {"username"}
+SUPPORTED_BULK_IMPORT_COLUMNS = {
+    "username",
+    "full_name",
+    "system_role",
+}
+
 
 class AdminService:
     """Service for admin user and project management operations."""
 
     @staticmethod
+    def _user_id_for_username(username: str | None) -> str | None:
+        """Resolve a username to a user_id for new relationship writes."""
+        if not username:
+            return None
+        user = UserDocument.find_one({"username": username}).run()
+        return user.user_id if user else None
+
+    @staticmethod
     def _user_to_detail(user: UserDocument) -> UserDetailResponse:
         """Convert a UserDocument to UserDetailResponse."""
         return UserDetailResponse(
+            user_id=user.user_id,
             username=user.username,
             full_name=user.full_name,
             disabled=user.disabled,
             system_role=user.system_role,
             default_project_id=user.default_project_id,
+            must_change_password=user.must_change_password,
             created_at=user.system_info.created_at if user.system_info else None,
             updated_at=user.system_info.updated_at if user.system_info else None,
         )
 
     # --- User Management ---
+
+    @staticmethod
+    def _parse_system_role(value: str | None) -> SystemRole:
+        """Parse system role from CSV."""
+        if value is None or value.strip() == "":
+            return SystemRole.USER
+        try:
+            return SystemRole(value.strip().lower())
+        except ValueError as exc:
+            raise ValueError(f"Invalid system_role '{value}'") from exc
+
+    @staticmethod
+    def _bulk_result(
+        row_number: int,
+        row: Mapping[str, str],
+        status_value: str,
+        message: str | None = None,
+        initial_password: str | None = None,
+        system_role: SystemRole = SystemRole.USER,
+    ) -> BulkUserImportResult:
+        """Build a result row for bulk import."""
+        return BulkUserImportResult(
+            row_number=row_number,
+            username=(row.get("username") or "").strip(),
+            full_name=(row.get("full_name") or "").strip() or None,
+            system_role=system_role,
+            initial_password=initial_password,
+            status=status_value,
+            message=message,
+        )
+
+    def bulk_import_users(self, csv_content: str) -> BulkUserImportResponse:
+        """Create users from CSV and return generated temporary passwords."""
+        stream = StringIO(csv_content)
+        reader = csv.DictReader(stream)
+        if reader.fieldnames is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="CSV header is required",
+            )
+
+        fieldnames = {field.strip() for field in reader.fieldnames if field}
+        missing = REQUIRED_BULK_IMPORT_COLUMNS - fieldnames
+        if missing:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Missing required columns: {', '.join(sorted(missing))}",
+            )
+
+        unsupported = fieldnames - SUPPORTED_BULK_IMPORT_COLUMNS
+        if unsupported:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Unsupported columns: {', '.join(sorted(unsupported))}",
+            )
+
+        results: list[BulkUserImportResult] = []
+
+        for index, raw_row in enumerate(reader, start=2):
+            if len(results) >= MAX_BULK_IMPORT_ROWS:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"CSV row limit exceeded: maximum {MAX_BULK_IMPORT_ROWS}",
+                )
+
+            row = {key.strip(): (value or "").strip() for key, value in raw_row.items() if key}
+            username = row.get("username", "")
+            if not username:
+                results.append(self._bulk_result(index, row, "failed", "username is required"))
+                continue
+            if not is_valid_username(username):
+                results.append(
+                    self._bulk_result(index, row, "failed", USERNAME_PATTERN_DESCRIPTION)
+                )
+                continue
+
+            try:
+                system_role = self._parse_system_role(row.get("system_role"))
+
+                existing_user = UserDocument.find_one({"username": username}).run()
+                if existing_user:
+                    results.append(
+                        self._bulk_result(
+                            index,
+                            row,
+                            "skipped",
+                            "user already exists",
+                            system_role=existing_user.system_role,
+                        )
+                    )
+                    continue
+
+                initial_password = generate_temporary_password()
+                user = UserDocument(
+                    user_id=generate_user_id(),
+                    username=username,
+                    full_name=row.get("full_name") or None,
+                    hashed_password=get_password_hash(initial_password),
+                    access_token=secrets.token_urlsafe(32),
+                    disabled=False,
+                    system_role=system_role,
+                    must_change_password=True,
+                    system_info=SystemInfoModel(),
+                )
+                user.insert()
+
+                results.append(
+                    self._bulk_result(
+                        index,
+                        row,
+                        "created",
+                        initial_password=initial_password,
+                        system_role=system_role,
+                    )
+                )
+            except Exception as exc:
+                logger.warning("Failed to import user from row %s: %s", index, exc)
+                results.append(self._bulk_result(index, row, "failed", str(exc)))
+
+        created = sum(1 for result in results if result.status == "created")
+        skipped = sum(1 for result in results if result.status == "skipped")
+        failed = sum(1 for result in results if result.status == "failed")
+
+        return BulkUserImportResponse(
+            results=results,
+            created=created,
+            skipped=skipped,
+            failed=failed,
+            total=len(results),
+        )
 
     def list_users(self, skip: int = 0, limit: int = 100) -> UserListResponse:
         """List all users with project mapping."""
@@ -57,11 +223,13 @@ class AdminService:
             project_id = u.default_project_id or owner_project_map.get(u.username)
             user_list.append(
                 UserListItem(
+                    user_id=u.user_id,
                     username=u.username,
                     full_name=u.full_name,
                     disabled=u.disabled,
                     system_role=u.system_role,
                     default_project_id=project_id,
+                    must_change_password=u.must_change_password,
                 )
             )
 
@@ -164,6 +332,7 @@ class AdminService:
                 ProjectListItem(
                     project_id=p.project_id,
                     name=p.name,
+                    owner_user_id=p.owner_user_id,
                     owner_username=p.owner_username,
                     description=p.description,
                     member_count=member_count,
@@ -182,7 +351,8 @@ class AdminService:
                 detail=f"Project '{project_id}' not found",
             )
 
-        if project.owner_username == admin_username:
+        admin_user_id = self._user_id_for_username(admin_username)
+        if admin_user_id and project.owner_user_id == admin_user_id:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Cannot delete your own project",
@@ -217,6 +387,7 @@ class AdminService:
             user = UserDocument.find_one({"username": m.username}).run()
             members.append(
                 MemberItem(
+                    user_id=m.user_id,
                     username=m.username,
                     full_name=user.full_name if user else None,
                     role=m.role,
@@ -226,8 +397,10 @@ class AdminService:
 
         return MemberListResponse(members=members, total=len(members))
 
-    def add_project_member(self, project_id: str, username: str, admin_username: str) -> MemberItem:
-        """Add a member to a project as viewer."""
+    def add_project_member(
+        self, project_id: str, username: str, role: ProjectRole, admin_username: str
+    ) -> MemberItem:
+        """Add a member to a project."""
         project = ProjectDocument.find_one({"project_id": project_id}).run()
         if not project:
             raise HTTPException(
@@ -243,7 +416,7 @@ class AdminService:
             )
 
         existing = ProjectMembershipDocument.find_one(
-            {"project_id": project_id, "username": username}
+            {"project_id": project_id, "user_id": user.user_id}
         ).run()
 
         if existing:
@@ -252,13 +425,16 @@ class AdminService:
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail=f"User '{username}' is already a member",
                 )
-            existing.role = ProjectRole.VIEWER
+            existing.role = role
             existing.status = "active"
+            existing.user_id = user.user_id
             existing.invited_by = admin_username
+            existing.invited_by_user_id = self._user_id_for_username(admin_username)
             existing.system_info.update_time()
             existing.save()
-            logger.info(f"Reactivated {username} in project {project_id} as viewer")
+            logger.info("Reactivated %s in project %s as %s", username, project_id, role.value)
             return MemberItem(
+                user_id=existing.user_id,
                 username=existing.username,
                 full_name=user.full_name,
                 role=existing.role,
@@ -267,16 +443,19 @@ class AdminService:
 
         membership = ProjectMembershipDocument(
             project_id=project_id,
+            user_id=user.user_id,
             username=username,
-            role=ProjectRole.VIEWER,
+            role=role,
             status="active",
+            invited_by_user_id=self._user_id_for_username(admin_username),
             invited_by=admin_username,
             system_info=SystemInfoModel(),
         )
         membership.insert()
 
-        logger.info(f"Added {username} to project {project_id} as viewer")
+        logger.info("Added %s to project %s as %s", username, project_id, role.value)
         return MemberItem(
+            user_id=membership.user_id,
             username=membership.username,
             full_name=user.full_name,
             role=membership.role,
@@ -292,14 +471,21 @@ class AdminService:
                 detail=f"Project '{project_id}' not found",
             )
 
-        if project.owner_username == username:
+        user = UserDocument.find_one({"username": username}).run()
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"User '{username}' not found",
+            )
+
+        if user.user_id == project.owner_user_id:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Cannot remove the project owner",
             )
 
         membership = ProjectMembershipDocument.find_one(
-            {"project_id": project_id, "username": username, "status": "active"}
+            {"project_id": project_id, "user_id": user.user_id, "status": "active"}
         ).run()
 
         if not membership:
@@ -325,7 +511,7 @@ class AdminService:
                 detail=f"User '{username}' not found",
             )
 
-        existing_project = ProjectDocument.find_one({"owner_username": username}).run()
+        existing_project = ProjectDocument.find_one({"owner_user_id": user.user_id}).run()
         if existing_project:
             user.default_project_id = existing_project.project_id
             if user.system_info:

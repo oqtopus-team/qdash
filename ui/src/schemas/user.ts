@@ -14,9 +14,11 @@ import type { SystemRole } from "./systemRole";
  * User model for authentication and user management.
  */
 export interface User {
+  user_id: string;
   username: string;
   full_name?: UserFullName;
   disabled?: UserDisabled;
   default_project_id?: UserDefaultProjectId;
+  must_change_password?: boolean;
   system_role?: SystemRole;
 }

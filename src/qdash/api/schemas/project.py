@@ -4,6 +4,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 from qdash.datamodel.project import ProjectRole
+from qdash.datamodel.user import USERNAME_PATTERN_DESCRIPTION, Username
 
 
 class ProjectCreate(BaseModel):
@@ -27,6 +28,7 @@ class ProjectResponse(BaseModel):
     """Response schema for project information."""
 
     project_id: str
+    owner_user_id: str
     owner_username: str
     name: str
     description: str | None
@@ -46,7 +48,7 @@ class ProjectListResponse(BaseModel):
 class MemberInvite(BaseModel):
     """Request schema for inviting a member."""
 
-    username: str = Field(..., description="Username to invite")
+    username: Username = Field(..., description=USERNAME_PATTERN_DESCRIPTION)
     role: ProjectRole = Field(default=ProjectRole.VIEWER, description="Role to assign")
 
 
@@ -60,9 +62,11 @@ class MemberResponse(BaseModel):
     """Response schema for project membership."""
 
     project_id: str
+    user_id: str
     username: str
     role: ProjectRole
     status: str
+    invited_by_user_id: str | None = None
     invited_by: str | None
     last_accessed_at: datetime | None
 

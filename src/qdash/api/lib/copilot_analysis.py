@@ -9,6 +9,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from pydantic import BaseModel, Field, field_validator
+from qdash.api.lib.copilot_config import ModelConfig  # noqa: TCH002
 
 
 @dataclass
@@ -141,6 +142,14 @@ class AnalyzeRequest(BaseModel):
     conversation_history: list[dict[str, str]] = Field(
         default_factory=list,
         description="Previous conversation messages [{role, content}, ...]",
+    )
+    analysis_model_override: ModelConfig | None = Field(
+        default=None,
+        alias="model_override",
+        description=(
+            "Optional per-request model override for task result analysis. "
+            "When unset, the configured analysis_model/model selection is used."
+        ),
     )
 
 

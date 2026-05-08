@@ -161,6 +161,96 @@ class TestAdminUsersEndpoints:
         response = test_client.delete("/admin/users/admin", headers=admin_headers)
         assert response.status_code == 400
 
+    def test_bulk_import_users_returns_generated_passwords(
+        self, test_client, admin_user, admin_headers
+    ):
+        """Admin can bulk import users and download generated passwords from response."""
+        csv_content = (
+            "username,full_name,system_role\n"
+            "bulkviewer,Bulk Viewer,user\n"
+            "bulkadmin,Bulk Admin,admin\n"
+        )
+        response = test_client.post(
+            "/admin/users/bulk-import",
+            headers=admin_headers,
+            files={"file": ("users.csv", csv_content, "text/csv")},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["created"] == 2
+        assert data["skipped"] == 0
+        assert data["failed"] == 0
+        assert data["total"] == 2
+
+        first = data["results"][0]
+        assert first["username"] == "bulkviewer"
+        assert first["status"] == "created"
+        assert first["initial_password"]
+        assert "project_id" not in first
+
+        login_response = test_client.post(
+            "/auth/login",
+            data={"username": "bulkviewer", "password": first["initial_password"]},
+        )
+        assert login_response.status_code == 200
+        assert login_response.json()["must_change_password"] is True
+
+        created_admin = UserDocument.find_one({"username": "bulkadmin"}).run()
+        assert created_admin is not None
+        assert created_admin.system_role == SystemRole.ADMIN
+
+    def test_bulk_import_users_skips_existing_user_without_password(
+        self, test_client, admin_user, regular_user, admin_headers
+    ):
+        """Existing users are skipped and do not return password information."""
+        csv_content = "username,full_name\nregularuser,Regular Duplicate\n"
+        response = test_client.post(
+            "/admin/users/bulk-import",
+            headers=admin_headers,
+            files={"file": ("users.csv", csv_content, "text/csv")},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["created"] == 0
+        assert data["skipped"] == 1
+        assert data["results"][0]["status"] == "skipped"
+        assert data["results"][0]["initial_password"] is None
+
+    def test_bulk_import_users_rejects_invalid_username(
+        self, test_client, admin_user, admin_headers
+    ):
+        """Bulk import rejects usernames outside the canonical format."""
+        csv_content = "username,full_name\ntaka fumi,Invalid Username\n"
+        response = test_client.post(
+            "/admin/users/bulk-import",
+            headers=admin_headers,
+            files={"file": ("users.csv", csv_content, "text/csv")},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["created"] == 0
+        assert data["failed"] == 1
+        assert data["results"][0]["status"] == "failed"
+        assert "lowercase letters" in data["results"][0]["message"]
+
+    def test_bulk_import_users_rejects_project_columns(
+        self, test_client, admin_user, admin_headers
+    ):
+        """Bulk import only creates accounts; project membership is managed separately."""
+        csv_content = "username,full_name,project_id\nprojectuser,Project User,proj-001\n"
+        response = test_client.post(
+            "/admin/users/bulk-import",
+            headers=admin_headers,
+            files={"file": ("users.csv", csv_content, "text/csv")},
+        )
+
+        assert response.status_code == 400
+        data = response.json()
+        assert "Unsupported columns" in data["detail"]
+
 
 class TestAdminProjectsEndpoints:
     """Tests for admin project management endpoints."""
@@ -203,6 +293,7 @@ class TestAdminProjectsEndpoints:
         project = ProjectDocument(
             project_id="proj-owner",
             name="Owner's Project",
+            owner_user_id=project_owner.user_id,
             owner_username="projectowner",
             description="Test project",
             system_info=SystemInfoModel(),
@@ -255,6 +346,7 @@ class TestAdminProjectsEndpoints:
         admin_project = ProjectDocument(
             project_id="proj-admin",
             name="Admin's Project",
+            owner_user_id=admin_user.user_id,
             owner_username="admin",
             description="Admin project",
             system_info=SystemInfoModel(),
@@ -322,6 +414,7 @@ class TestAdminMembersEndpoints:
         project = ProjectDocument(
             project_id="proj-owner",
             name="Owner's Project",
+            owner_user_id=project_owner.user_id,
             owner_username="projectowner",
             description="Test project",
             system_info=SystemInfoModel(),
@@ -334,9 +427,11 @@ class TestAdminMembersEndpoints:
         """Create test membership."""
         membership = ProjectMembershipDocument(
             project_id="proj-owner",
+            user_id=member_user.user_id,
             username="memberuser",
             role=ProjectRole.VIEWER,
             status="active",
+            invited_by_user_id=test_project.owner_user_id,
             invited_by="projectowner",
             system_info=SystemInfoModel(),
         )
@@ -402,6 +497,7 @@ class TestAdminMembersEndpoints:
         # Create owner membership
         owner_membership = ProjectMembershipDocument(
             project_id="proj-owner",
+            user_id=project_owner.user_id,
             username="projectowner",
             role=ProjectRole.OWNER,
             status="active",
@@ -470,3 +566,103 @@ class TestAdminCreateProjectForUser:
         """Returns 404 for non-existent user."""
         response = test_client.post("/admin/users/nonexistent/project", headers=admin_headers)
         assert response.status_code == 404
+
+
+class TestAdminRegisterUser:
+    """Tests for admin-managed user registration."""
+
+    @pytest.fixture
+    def admin_user(self, init_db):
+        """Create admin user."""
+        user = UserDocument(
+            username="admin",
+            full_name="Admin User",
+            hashed_password="hashed",
+            access_token="admin-token",
+            disabled=False,
+            system_role=SystemRole.ADMIN,
+            default_project_id="proj-admin",
+            system_info=SystemInfoModel(),
+        )
+        user.insert()
+        yield user
+
+    @pytest.fixture
+    def admin_headers(self):
+        """Admin authentication headers."""
+        return {"Authorization": "Bearer admin-token"}
+
+    def test_register_user_generates_temporary_password(
+        self, test_client, admin_user, admin_headers
+    ):
+        """Admin can create a user without choosing a password."""
+        response = test_client.post(
+            "/auth/register",
+            headers=admin_headers,
+            json={
+                "username": "generateduser",
+                "full_name": "Generated User",
+                "create_default_project": True,
+            },
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["username"] == "generateduser"
+        assert data["must_change_password"] is True
+        assert data["initial_password"]
+        assert data["access_token"]
+        assert data["default_project_id"]
+
+        login_response = test_client.post(
+            "/auth/login",
+            data={"username": "generateduser", "password": data["initial_password"]},
+        )
+        assert login_response.status_code == 200
+        assert login_response.json()["must_change_password"] is True
+
+    def test_register_user_without_default_project(self, test_client, admin_user, admin_headers):
+        """Admin can create an account without provisioning a default project."""
+        response = test_client.post(
+            "/auth/register",
+            headers=admin_headers,
+            json={"username": "accountonly"},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["username"] == "accountonly"
+        assert data["default_project_id"] is None
+        assert data["initial_password"]
+
+    def test_register_user_rejects_invalid_username(self, test_client, admin_user, admin_headers):
+        """Admin user registration rejects usernames with spaces."""
+        response = test_client.post(
+            "/auth/register",
+            headers=admin_headers,
+            json={"username": "taka fumi"},
+        )
+
+        assert response.status_code == 422
+
+    def test_change_password_clears_must_change_password(
+        self, test_client, admin_user, admin_headers
+    ):
+        """Changing password clears the first-login password-change flag."""
+        register_response = test_client.post(
+            "/auth/register",
+            headers=admin_headers,
+            json={"username": "changeme"},
+        )
+        assert register_response.status_code == 200
+        initial_password = register_response.json()["initial_password"]
+        token = register_response.json()["access_token"]
+
+        change_response = test_client.post(
+            "/auth/change-password",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"current_password": initial_password, "new_password": "changed-password"},
+        )
+        assert change_response.status_code == 200
+
+        user = UserDocument.find_one({"username": "changeme"}).run()
+        assert user is not None
+        assert user.must_change_password is False

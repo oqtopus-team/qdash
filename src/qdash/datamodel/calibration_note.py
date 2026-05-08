@@ -20,7 +20,8 @@ class CalibrationNoteModel(BaseModel):
     Attributes
     ----------
         project_id: The project ID for multi-tenancy.
-        username: The username of the user who created the note.
+        user_id: The internal user ID of the user who created the note.
+        username: The username snapshot of the user who created the note.
         chip_id: The chip ID associated with this note.
         execution_id: The execution ID associated with this note.
         task_id: The task ID associated with this note.
@@ -42,7 +43,8 @@ class CalibrationNoteModel(BaseModel):
     """
 
     project_id: str = Field(..., description="Owning project identifier")
-    username: str = Field(..., description="The username of the user who created the note")
+    user_id: str | None = Field(default=None, description="Creator user ID")
+    username: str = Field(..., description="Creator username snapshot")
     chip_id: str = Field(..., description="The chip ID associated with this note")
     execution_id: str = Field(..., description="The execution ID associated with this note")
     task_id: str = Field(..., description="The task ID associated with this note")

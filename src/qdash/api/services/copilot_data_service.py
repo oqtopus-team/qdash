@@ -126,6 +126,7 @@ class CopilotDataService:
     def collect_expected_images(
         self,
         knowledge: Any,
+        max_images: int | None = None,
     ) -> list[tuple[str, str]]:
         """Collect expected reference images from TaskKnowledge.
 
@@ -139,6 +140,8 @@ class CopilotDataService:
             for img in case.images:
                 if img.base64_data:
                     result.append((img.base64_data, f"[Case: {case.title}] {img.alt_text}"))
+        if max_images is not None and max_images >= 0:
+            return result[:max_images]
         return result
 
     def load_task_history(
@@ -1158,7 +1161,10 @@ class CopilotDataService:
         if config.analysis.multimodal:
             if not image_base64 and task_result:
                 image_base64 = self.load_figure_as_base64(figure_paths)
-            expected_images = self.collect_expected_images(knowledge)
+            expected_images = self.collect_expected_images(
+                knowledge,
+                max_images=config.analysis.max_expected_images,
+            )
 
         context = TaskAnalysisContext(
             task_knowledge_prompt=knowledge_prompt,

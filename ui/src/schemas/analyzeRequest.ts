@@ -7,6 +7,7 @@
  */
 import type { AnalyzeRequestImageBase64 } from "./analyzeRequestImageBase64";
 import type { AnalyzeRequestConversationHistoryItem } from "./analyzeRequestConversationHistoryItem";
+import type { AnalyzeRequestModelOverride } from "./analyzeRequestModelOverride";
 
 /**
  * Request body for POST /copilot/analyze.
@@ -24,4 +25,6 @@ export interface AnalyzeRequest {
   image_base64?: AnalyzeRequestImageBase64;
   /** Previous conversation messages [{role, content}, ...] */
   conversation_history?: AnalyzeRequestConversationHistoryItem[];
+  /** Optional per-request model override for task result analysis. When unset, the configured analysis_model/model selection is used. */
+  model_override?: AnalyzeRequestModelOverride;
 }

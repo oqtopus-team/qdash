@@ -32,7 +32,8 @@ class IssueKnowledgeDocument(Document):
         root_cause (str): Identified root cause.
         resolution (str): How the issue was resolved.
         lesson_learned (list[str]): Key takeaways.
-        reviewed_by (str | None): Username of the reviewer.
+        reviewed_by_user_id (str | None): Internal user ID of the reviewer.
+        reviewed_by (str | None): Username snapshot of the reviewer.
         system_info (SystemInfoModel): Created/updated timestamps.
 
     """
@@ -52,10 +53,23 @@ class IssueKnowledgeDocument(Document):
     resolution_status: str = Field(
         default="resolved", description="Case outcome: resolved, open, workaround"
     )
+    human_label: str = Field(default="", description="Human review label")
+    failure_mode_labels: list[str] = Field(
+        default_factory=list, description="Structured failure-mode labels"
+    )
+    case_type: list[str] = Field(default_factory=list, description="Knowledge case type labels")
+    model_error_type: str = Field(default="", description="Verifier error/outcome type")
+    resolution_label: str = Field(default="", description="Structured resolution label")
     symptom: str = Field(default="", description="Observed symptom")
+    model_prediction: str = Field(default="", description="Verifier/model prediction summary")
+    human_review_decision: str = Field(default="", description="Human review decision summary")
     root_cause: str = Field(default="", description="Identified root cause")
     resolution: str = Field(default="", description="How the issue was resolved")
+    boundary_criteria: str = Field(default="", description="Boundary criteria for this case")
     lesson_learned: list[str] = Field(default_factory=list, description="Key takeaways")
+    applicability: str = Field(default="", description="When this case should be retrieved")
+    counterexample: str = Field(default="", description="What rule this case counters")
+    prompt_guidance: str = Field(default="", description="Prompt/checklist guidance")
 
     # Images
     figure_paths: list[str] = Field(
@@ -65,7 +79,8 @@ class IssueKnowledgeDocument(Document):
         default_factory=list, description="Image URLs from the issue thread discussion"
     )
 
-    reviewed_by: str | None = Field(default=None, description="Username of the reviewer")
+    reviewed_by_user_id: str | None = Field(default=None, description="Reviewer user ID")
+    reviewed_by: str | None = Field(default=None, description="Reviewer username snapshot")
     pr_url: str | None = Field(default=None, description="GitHub PR URL created on approve")
     system_info: SystemInfoModel = Field(
         default_factory=SystemInfoModel, description="System timestamps"
@@ -102,4 +117,5 @@ class IssueKnowledgeDocument(Document):
 
     model_config = ConfigDict(
         from_attributes=True,
+        protected_namespaces=(),
     )

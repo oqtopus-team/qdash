@@ -1,15 +1,19 @@
 import copy
 import logging
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar
 
+from qdash.analysis.spectroscopy import (
+    NUM_RESONATORS,
+    PEAK_POSITIONS,
+    EstimateResonatorFrequencyConfig,
+    create_bare_shift_boundary_estimator,
+    create_marked_figure,
+    estimate_resonator_frequency_from_figure,
+)
 from qdash.datamodel.task import ParameterModel, RunParameterModel
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
     RunResult,
-)
-from qdash.workflow.calibtasks.qubex.analysis import (
-    EstimateResonatorFrequencyConfig,
-    estimate_and_mark_figure,
 )
 from qdash.workflow.calibtasks.qubex.base import QubexTask
 from qdash.workflow.engine.backend.qubex import QubexBackend
@@ -18,18 +22,6 @@ if TYPE_CHECKING:
     import plotly.graph_objs as go
 
 logger = logging.getLogger(__name__)
-
-# Number of resonators expected per mux
-NUM_RESONATORS = 4
-
-# Mapping from qubit position in mux (qid % 4) to resonance index
-# This mapping reflects the physical arrangement of resonators
-PEAK_POSITIONS = {
-    0: 1,
-    1: 3,
-    2: 2,
-    3: 0,
-}
 
 
 class CheckResonatorSpectroscopy(QubexTask):
@@ -52,7 +44,19 @@ class CheckResonatorSpectroscopy(QubexTask):
             unit="GHz",
             value_type="np.arange",
             value=(9.75, 10.75, 0.002),
-            description="Frequency range for resonator spectroscopy",
+            description=(
+                "Frequency range for resonator spectroscopy on the high band "
+                "(64Q chips). Used when chip_id does not contain '144'."
+            ),
+        ),
+        "frequency_range_low_band": RunParameterModel(
+            unit="GHz",
+            value_type="np.arange",
+            value=(5.75, 6.75, 0.002),
+            description=(
+                "Frequency range for resonator spectroscopy on the low band "
+                "(144Q chips). Used when chip_id contains '144'."
+            ),
         ),
         "power_range": RunParameterModel(
             unit="dB",
@@ -90,6 +94,26 @@ class CheckResonatorSpectroscopy(QubexTask):
             value=-30.0,
             description="Power level for low-power peak detection",
         ),
+        "bare_shift_estimator_type": RunParameterModel(
+            unit="",
+            value_type="str",
+            value="config",
+            description=(
+                "How to pick the bare-shift boundary. "
+                "'config' uses high_power_min/max/low_power; "
+                "'high_frequency_strength' detects it from the FFT of each row."
+            ),
+        ),
+        "bare_shift_strength_limit": RunParameterModel(
+            unit="a.u.",
+            value_type="float",
+            value=4.0,
+            description=(
+                "Maximum high-frequency FFT strength accepted as the bare-shift "
+                "boundary. Only used when bare_shift_estimator_type="
+                "'high_frequency_strength'."
+            ),
+        ),
     }
     output_parameters: ClassVar[dict[str, ParameterModel]] = {
         "readout_frequency": ParameterModel(
@@ -122,7 +146,32 @@ class CheckResonatorSpectroscopy(QubexTask):
                 high_power_max=self.run_parameters["high_power_max"].get_value(),
                 low_power=self.run_parameters["low_power"].get_value(),
             )
-            marked_fig, _, frequencies = estimate_and_mark_figure(raw_fig, config)
+
+            estimator_type = self.run_parameters["bare_shift_estimator_type"].get_value()
+            if estimator_type and estimator_type != "config":
+                trace = raw_fig.data[0]
+                estimator = create_bare_shift_boundary_estimator(
+                    type=estimator_type,
+                    args={
+                        "strength_limit": self.run_parameters[
+                            "bare_shift_strength_limit"
+                        ].get_value(),
+                    },
+                )
+                boundary = estimator.estimate_bare_shift_boundary(
+                    list(trace.x), list(trace.y), list(trace.z)
+                )
+                config = config.with_boundary(boundary)
+                print(
+                    f"[BareShift] qid={qid} estimator={estimator_type} "
+                    f"low={boundary.low_power} high=[{boundary.high_power_min}, "
+                    f"{boundary.high_power_max}]"
+                )
+
+            resonances, rejected, frequencies = estimate_resonator_frequency_from_figure(
+                raw_fig, config
+            )
+            marked_fig = create_marked_figure(raw_fig, resonances, rejected_resonances=rejected)
 
             if len(frequencies) == NUM_RESONATORS:
                 # Get frequency for current qid based on its position in the MUX
@@ -164,18 +213,23 @@ class CheckResonatorSpectroscopy(QubexTask):
             figures=figures,
         )
 
+    def _select_frequency_range(self, backend: QubexBackend) -> Any:
+        """Pick the resonator-spectroscopy frequency range for the current chip.
+
+        144Q chips (low band, ~5.75-6.75 GHz) use ``frequency_range_low_band``;
+        any other chip (64Q etc., high band ~9.75-10.75 GHz) uses
+        ``frequency_range``. Selection follows the same convention used by the
+        scheduler plugins (``"144" in chip_id``).
+        """
+        chip_id = backend.config.get("chip_id") or ""
+        param_name = "frequency_range_low_band" if "144" in chip_id else "frequency_range"
+        return self.run_parameters[param_name].get_value()
+
     def run(self, backend: QubexBackend, qid: str) -> RunResult:
         """Run the task."""
         exp = self.get_experiment(backend)
         label = self.get_qubit_label(backend, qid)
-        read_box = exp.experiment_system.get_readout_box_for_qubit(label)
-        import numpy as np
-        from qubex.system import BoxType
-
-        if read_box.type == BoxType.QUEL1SE_R8:
-            frequency_range = np.arange(5.75, 6.75, 0.002)
-        else:
-            frequency_range = self.run_parameters["frequency_range"].get_value()
+        frequency_range = self._select_frequency_range(backend)
         result = exp.resonator_spectroscopy(
             target=label,
             frequency_range=frequency_range,
@@ -189,14 +243,7 @@ class CheckResonatorSpectroscopy(QubexTask):
         """Run the task for a batch of qubits."""
         exp = self.get_experiment(backend)
         labels = [self.get_qubit_label(backend, qid) for qid in qids]
-        read_box = exp.experiment_system.get_readout_box_for_qubit(labels[0])
-        import numpy as np
-        from qubex.system import BoxType
-
-        if read_box.type == BoxType.QUEL1SE_R8:
-            frequency_range = np.arange(5.75, 6.75, 0.002)
-        else:
-            frequency_range = self.run_parameters["frequency_range"].get_value()
+        frequency_range = self._select_frequency_range(backend)
         result = exp.resonator_spectroscopy(
             labels[0],
             frequency_range=frequency_range,

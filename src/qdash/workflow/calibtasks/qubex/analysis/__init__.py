@@ -1,54 +1,11 @@
-"""Analysis modules for qubex calibration tasks."""
+"""Compatibility shim — analysis modules now live in :mod:`qdash.analysis.spectroscopy`.
 
-from qdash.workflow.calibtasks.qubex.analysis.estimate_qubit_frequency import (
-    EstimateQubitFrequencyConfig,
-    F01Result,
-    F12Result,
-    Peak,
-    QubitFrequencyResult,
-    QubitResponse,
-    estimate_qubit_frequency,
-    estimate_qubit_frequency_from_figure,
-)
-from qdash.workflow.calibtasks.qubex.analysis.estimate_qubit_frequency import (
-    create_marked_figure as create_qubit_marked_figure,
-)
-from qdash.workflow.calibtasks.qubex.analysis.estimate_qubit_frequency import (
-    estimate_and_mark_figure as estimate_and_mark_qubit_figure,
-)
-from qdash.workflow.calibtasks.qubex.analysis.estimate_resonator_frequency import (
-    EstimateResonatorFrequencyConfig,
-    Resonance,
-    create_marked_figure,
-    estimate_and_mark_figure,
-    estimate_resonator_frequency,
-    estimate_resonator_frequency_from_figure,
-)
-from qdash.workflow.calibtasks.qubex.analysis.remove_false_spike import (
-    RemoveFalseSpikeRange,
-    remove_false_spike,
-)
+The actual implementation was moved out of the workflow package so the API
+container (which does not ship :mod:`qdash.workflow.engine`) can use the same
+analysis code. New code should import from :mod:`qdash.analysis.spectroscopy`
+directly; this re-export only exists to keep existing workflow imports
+working.
+"""
 
-__all__ = [
-    # Resonator frequency estimation
-    "EstimateResonatorFrequencyConfig",
-    "Resonance",
-    "create_marked_figure",
-    "estimate_and_mark_figure",
-    "estimate_resonator_frequency",
-    "estimate_resonator_frequency_from_figure",
-    # Qubit frequency estimation
-    "EstimateQubitFrequencyConfig",
-    "F01Result",
-    "F12Result",
-    "Peak",
-    "QubitFrequencyResult",
-    "QubitResponse",
-    "create_qubit_marked_figure",
-    "estimate_and_mark_qubit_figure",
-    "estimate_qubit_frequency",
-    "estimate_qubit_frequency_from_figure",
-    # Remove false spike
-    "RemoveFalseSpikeRange",
-    "remove_false_spike",
-]
+from qdash.analysis.spectroscopy import *  # noqa: F403
+from qdash.analysis.spectroscopy import __all__  # noqa: F401

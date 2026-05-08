@@ -1,4 +1,4 @@
-"""Service for flow CRUD and execution operations."""
+"""Service for project flow CRUD and execution operations."""
 
 from __future__ import annotations
 
@@ -7,7 +7,8 @@ import logging
 import os
 import re
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
+from uuid import UUID
 
 import httpx
 from fastapi import HTTPException
@@ -45,7 +46,7 @@ class FlowService:
     ) -> None:
         """Initialize the service with a flow repository."""
         self._flow_repo = flow_repository
-        self._user_flows_base_dir = USER_FLOWS_DIR
+        self._project_flows_base_dir = USER_FLOWS_DIR
 
     async def save_flow(
         self,
@@ -67,7 +68,7 @@ class FlowService:
         request : SaveFlowRequest
             The save flow request.
         username : str
-            The username.
+            The username of the user saving the flow.
         project_id : str
             The project ID.
 
@@ -84,10 +85,10 @@ class FlowService:
 
         self._validate_flow_code(request.code, request.flow_function_name)
 
-        user_dir = self._get_user_flows_dir(username)
-        file_path = user_dir / f"{request.name}.py"
+        project_dir = self._get_project_flows_dir(project_id)
+        file_path = project_dir / f"{request.name}.py"
 
-        existing_flow = self._flow_repo.find_by_user_and_name(username, request.name, project_id)
+        existing_flow = self._flow_repo.find_by_project_and_name(project_id, request.name)
         old_deployment_id = existing_flow.deployment_id if existing_flow else None
 
         # Write code to file
@@ -103,7 +104,7 @@ class FlowService:
 
         # Register Prefect deployment
         try:
-            deployment_name = f"{username}-{request.name}"
+            deployment_name = f"{project_id}-{request.name}"
             deployment_id = await self._register_flow_deployment(
                 file_path=str(file_path),
                 flow_function_name=request.flow_function_name,
@@ -136,7 +137,9 @@ class FlowService:
                     deployment_id=deployment_id,
                     tags=request.tags,
                 )
-                logger.info(f"Updated flow '{request.name}' for user '{username}'")
+                logger.info(
+                    f"Updated flow '{request.name}' in project '{project_id}' by user '{username}'"
+                )
                 message = f"Flow '{request.name}' updated successfully"
             else:
                 self._flow_repo.create_flow(
@@ -152,7 +155,9 @@ class FlowService:
                     tags=request.tags,
                     default_run_parameters=request.default_run_parameters,
                 )
-                logger.info(f"Created new flow '{request.name}' for user '{username}'")
+                logger.info(
+                    f"Created new flow '{request.name}' in project '{project_id}' by user '{username}'"
+                )
                 message = f"Flow '{request.name}' created successfully"
 
         except Exception as e:
@@ -173,7 +178,7 @@ class FlowService:
         Parameters
         ----------
         username : str
-            The username.
+            The username of the requesting user.
         project_id : str
             The project ID.
 
@@ -184,12 +189,15 @@ class FlowService:
 
         """
         try:
-            flows = self._flow_repo.list_by_user(username, project_id)
-            logger.info(f"Listed {len(flows)} flows for user '{username}'")
+            flows = self._flow_repo.list_by_project(project_id)
+            logger.info(
+                f"Listed {len(flows)} flows in project '{project_id}' for user '{username}'"
+            )
 
             flow_summaries = [
                 FlowSummary(
                     name=flow.name,
+                    created_by=flow.username,
                     description=flow.description,
                     chip_id=flow.chip_id,
                     flow_function_name=flow.flow_function_name,
@@ -214,7 +222,7 @@ class FlowService:
         name : str
             Flow name.
         username : str
-            The username.
+            The username of the requesting user.
         project_id : str
             The project ID.
 
@@ -224,7 +232,7 @@ class FlowService:
             Flow details with code.
 
         """
-        flow = self._flow_repo.find_by_user_and_name(username, name, project_id)
+        flow = self._flow_repo.find_by_project_and_name(project_id, name)
         if not flow:
             raise HTTPException(status_code=404, detail=f"Flow '{name}' not found")
 
@@ -242,6 +250,7 @@ class FlowService:
         logger.info(f"[TRACE] get_flow default_run_parameters={flow.default_run_parameters}")
         return GetFlowResponse(
             name=flow.name,
+            created_by=flow.username,
             description=flow.description,
             code=code,
             flow_function_name=flow.flow_function_name,
@@ -262,7 +271,7 @@ class FlowService:
         name : str
             Flow name.
         username : str
-            The username.
+            The username of the requesting user.
         project_id : str
             The project ID.
 
@@ -272,15 +281,16 @@ class FlowService:
             Success message.
 
         """
-        flow = self._flow_repo.find_by_user_and_name(username, name, project_id)
+        flow = self._flow_repo.find_by_project_and_name(project_id, name)
         if not flow:
             raise HTTPException(status_code=404, detail=f"Flow '{name}' not found")
 
         # Delete Prefect deployment
         if flow.deployment_id:
             try:
+                deployment_id = cast(UUID, flow.deployment_id)
                 async with get_client() as client:
-                    await client.delete_deployment(flow.deployment_id)
+                    await client.delete_deployment(deployment_id)
                     logger.info(f"Deleted Prefect deployment: {flow.deployment_id}")
             except Exception as e:
                 logger.warning(f"Failed to delete Prefect deployment (may not exist): {e}")
@@ -297,8 +307,8 @@ class FlowService:
 
         # Delete from database
         try:
-            self._flow_repo.delete_by_user_and_name(username, name, project_id)
-            logger.info(f"Deleted flow '{name}' from database")
+            self._flow_repo.delete_by_project_and_name(project_id, name)
+            logger.info(f"Deleted flow '{name}' from project '{project_id}' by user '{username}'")
         except Exception as e:
             logger.error(f"Failed to delete flow from database: {e}")
             raise HTTPException(status_code=500, detail=f"Failed to delete flow metadata: {e}")
@@ -321,7 +331,7 @@ class FlowService:
         request : ExecuteFlowRequest
             Execution request with parameters.
         username : str
-            The username.
+            The username of the user starting the execution.
         project_id : str
             The project ID.
 
@@ -333,7 +343,7 @@ class FlowService:
         """
         settings = get_settings()
 
-        flow = self._flow_repo.find_by_user_and_name(username, name, project_id)
+        flow = self._flow_repo.find_by_project_and_name(project_id, name)
         if not flow:
             raise HTTPException(status_code=404, detail=f"Flow '{name}' not found")
 
@@ -349,6 +359,7 @@ class FlowService:
         parameters: dict[str, Any] = {
             **flow.default_parameters,
             **request.parameters,
+            "username": username,
             "flow_name": name,
             "project_id": project_id,
         }
@@ -363,8 +374,9 @@ class FlowService:
 
         try:
             async with get_client() as client:
+                deployment_id = cast(UUID, flow.deployment_id)
                 flow_run = await client.create_flow_run_from_deployment(
-                    deployment_id=flow.deployment_id,
+                    deployment_id=deployment_id,
                     parameters=parameters,
                 )
 
@@ -418,19 +430,11 @@ class FlowService:
         """
         settings = get_settings()
 
-        # Try username-specific lookup first, then fallback to project-wide lookup.
-        # The executor username may differ from the flow owner (e.g. shared flows).
-        flow = self._flow_repo.find_by_user_and_name(username, flow_name, project_id)
-        if not flow:
-            logger.info(
-                f"Flow '{flow_name}' not found for user '{username}', "
-                f"trying project-wide lookup (project_id={project_id})"
-            )
-            flow = self._flow_repo.find_one({"project_id": project_id, "name": flow_name})
+        flow = self._flow_repo.find_by_project_and_name(project_id, flow_name)
         if not flow:
             raise HTTPException(
                 status_code=404,
-                detail=f"Flow '{flow_name}' not found (user={username}, project={project_id})",
+                detail=f"Flow '{flow_name}' not found in project '{project_id}'",
             )
 
         if not flow.deployment_id:
@@ -445,6 +449,7 @@ class FlowService:
         parameters: dict[str, Any] = {
             **flow.default_parameters,
             **parameter_overrides,
+            "username": username,
             "flow_name": flow_name,
             "project_id": project_id,
             "source_execution_id": source_execution_id,
@@ -459,8 +464,9 @@ class FlowService:
 
         try:
             async with get_client() as client:
+                deployment_id = cast(UUID, flow.deployment_id)
                 flow_run = await client.create_flow_run_from_deployment(
-                    deployment_id=flow.deployment_id,
+                    deployment_id=deployment_id,
                     parameters=parameters,
                 )
 
@@ -722,11 +728,12 @@ class FlowService:
 
     # --- Private helpers ---
 
-    def _get_user_flows_dir(self, username: str) -> Path:
-        """Get user's flows directory, create if not exists."""
-        user_dir = self._user_flows_base_dir / username
-        user_dir.mkdir(parents=True, exist_ok=True)
-        return user_dir
+    def _get_project_flows_dir(self, project_id: str) -> Path:
+        """Get a project's flows directory, create if not exists."""
+        safe_project_id = re.sub(r"[^a-zA-Z0-9_-]", "_", project_id)
+        project_dir = self._project_flows_base_dir / safe_project_id
+        project_dir.mkdir(parents=True, exist_ok=True)
+        return project_dir
 
     @staticmethod
     def _validate_flow_name(name: str) -> None:

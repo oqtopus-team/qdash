@@ -14,6 +14,11 @@
     },
     "version": "0.0.1"
   },
+  "servers": [
+    {
+      "url": "/api"
+    }
+  ],
   "paths": {
     "/auth/login": {
       "post": {
@@ -532,6 +537,56 @@
         }
       }
     },
+    "/admin/users/bulk-import": {
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Bulk import users from CSV",
+        "description": "Create users from a CSV file and return generated temporary passwords.",
+        "operationId": "bulkImportUsers",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_bulkImportUsers"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkUserImportResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/admin/projects": {
       "get": {
         "tags": [
@@ -704,7 +759,7 @@
           "admin"
         ],
         "summary": "Add member to project",
-        "description": "Add a member to a project as viewer (admin only).",
+        "description": "Add a member to a project (admin only).",
         "operationId": "addProjectMemberAdmin",
         "security": [
           {
@@ -1174,7 +1229,7 @@
           "projects"
         ],
         "summary": "Invite a member",
-        "description": "Invite a user to the project. Admin only.",
+        "description": "Invite a user to the project. Owner only.",
         "operationId": "inviteProjectMember",
         "security": [
           {
@@ -1188,8 +1243,10 @@
             "required": true,
             "schema": {
               "type": "string",
+              "description": "Project identifier",
               "title": "Project Id"
-            }
+            },
+            "description": "Project identifier"
           }
         ],
         "requestBody": {
@@ -1236,7 +1293,7 @@
           "projects"
         ],
         "summary": "Update member role",
-        "description": "Update a member's role. Admin only.",
+        "description": "Update a member's role. Owner only.",
         "operationId": "updateProjectMember",
         "security": [
           {
@@ -1245,15 +1302,6 @@
         ],
         "parameters": [
           {
-            "name": "project_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Project Id"
-            }
-          },
-          {
             "name": "username",
             "in": "path",
             "required": true,
@@ -1261,6 +1309,17 @@
               "type": "string",
               "title": "Username"
             }
+          },
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Project identifier",
+              "title": "Project Id"
+            },
+            "description": "Project identifier"
           }
         ],
         "requestBody": {
@@ -1305,7 +1364,7 @@
           "projects"
         ],
         "summary": "Remove member",
-        "description": "Remove a member from the project. Admin only.",
+        "description": "Remove a member from the project. Owner only.",
         "operationId": "removeProjectMember",
         "security": [
           {
@@ -1314,15 +1373,6 @@
         ],
         "parameters": [
           {
-            "name": "project_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Project Id"
-            }
-          },
-          {
             "name": "username",
             "in": "path",
             "required": true,
@@ -1330,6 +1380,17 @@
               "type": "string",
               "title": "Username"
             }
+          },
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Project identifier",
+              "title": "Project Id"
+            },
+            "description": "Project identifier"
           }
         ],
         "responses": {
@@ -2709,7 +2770,7 @@
           "chip"
         ],
         "summary": "Create a new chip",
-        "description": "Create a new chip in the current project.\n\nParameters\n----------\nrequest : CreateChipRequest\n    Chip creation request containing chip_id and size\nctx : ProjectContext\n    Project context with owner permission\n\nReturns\n-------\nChipResponse\n    Created chip information\n\nRaises\n------\nHTTPException\n    If chip_id already exists or size is invalid",
+        "description": "Create a new chip in the current project.\n\nParameters\n----------\nrequest : CreateChipRequest\n    Chip creation request containing chip_id and size\nctx : ProjectContext\n    Project context with editor permission\n\nReturns\n-------\nChipResponse\n    Created chip information\n\nRaises\n------\nHTTPException\n    If chip_id already exists or size is invalid",
         "operationId": "createChip",
         "security": [
           {
@@ -3402,6 +3463,172 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/QubitResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chips/{chip_id}/qubits/{qid}/reanalyze/resonator-spectroscopy": {
+      "post": {
+        "tags": [
+          "chip"
+        ],
+        "summary": "Re-run resonator spectroscopy analysis on a stored task result (preview)",
+        "description": "Re-run the resonator-spectroscopy analysis on a previously stored figure.\n\nReturns the marked figure and the re-estimated `readout_frequency` for\nthe requested qubit. The DB is **not** mutated; this is a preview only.",
+        "operationId": "reanalyzeResonatorSpectroscopy",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chip_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Chip Id"
+            }
+          },
+          {
+            "name": "qid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Qid"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReanalyzeResonatorSpectroscopyRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReanalyzeResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chips/{chip_id}/qubits/{qid}/reanalyze/qubit-spectroscopy": {
+      "post": {
+        "tags": [
+          "chip"
+        ],
+        "summary": "Re-run qubit spectroscopy analysis on a stored task result (preview)",
+        "description": "Re-run the qubit-spectroscopy analysis on a previously stored figure.\n\nReturns the marked figure and the re-estimated `qubit_frequency`,\n`f01_repr_db`, `f01_quality_level`, and `anharmonicity` for the requested\nqubit. The DB is **not** mutated; this is a preview only.",
+        "operationId": "reanalyzeQubitSpectroscopy",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chip_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Chip Id"
+            }
+          },
+          {
+            "name": "qid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Qid"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReanalyzeQubitSpectroscopyRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReanalyzeResponse"
                 }
               }
             }
@@ -4924,6 +5151,71 @@
         }
       }
     },
+    "/task-results/ai-triage/bulk": {
+      "post": {
+        "tags": [
+          "task-result"
+        ],
+        "summary": "Request bulk AI triage review for latest task results",
+        "description": "Enqueue AI triage review for the current latest task result per entity.",
+        "operationId": "requestBulkAiTriageReview",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkAiTriageRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkAiTriageResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/task-results/{task_id}/re-execute": {
       "post": {
         "tags": [
@@ -4997,23 +5289,120 @@
         }
       }
     },
+    "/task-results/{task_id}/exclude": {
+      "post": {
+        "tags": [
+          "task-result"
+        ],
+        "summary": "Toggle exclusion of a task result from metrics aggregations",
+        "description": "Toggle the excluded flag on a task result.\n\nExcluded measurements are skipped when aggregating metrics for the\ndashboard / metrics screens. Raw data is preserved.",
+        "operationId": "setTaskResultExcluded",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Task Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskResultExcludeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskResultExcludeResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/task-results/figures/download": {
       "post": {
         "tags": [
           "task-result"
         ],
         "summary": "Download multiple figures as a ZIP file",
-        "description": "Download multiple calibration figures as a ZIP file.\n\nCreates a ZIP archive containing all requested figure files and returns it\nas a streaming response.\n\nParameters\n----------\npaths : list[str]\n    List of absolute file paths to the calibration figures\nfilename : str\n    Filename for the ZIP archive (default: \"figures.zip\")\n\nReturns\n-------\nStreamingResponse\n    ZIP archive containing all requested files\n\nRaises\n------\nHTTPException\n    400 if no paths are provided or if any path does not exist",
+        "description": "Download multiple calibration figures as a ZIP file.\n\nCreates a ZIP archive containing all requested figure files and returns it\nas a streaming response.\n\nParameters\n----------\nbody.paths : list[str]\n    List of absolute file paths to the calibration figures\nbody.filename : str\n    Filename for the ZIP archive (default: \"figures.zip\")\n\nReturns\n-------\nStreamingResponse\n    ZIP archive containing all requested files\n\nRaises\n------\nHTTPException\n    400 if no paths are provided or if any path does not exist",
         "operationId": "downloadFiguresAsZip",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/Body_downloadFiguresAsZip"
+                "$ref": "#/components/schemas/DownloadFiguresAsZipRequest"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "200": {
@@ -5034,12 +5423,879 @@
               }
             }
           }
-        },
+        }
+      }
+    },
+    "/forum/categories": {
+      "get": {
+        "tags": [
+          "forum"
+        ],
+        "summary": "List forum categories",
+        "description": "List forum categories for the active project.",
+        "operationId": "listForumCategories",
         "security": [
           {
             "HTTPBearer": []
           }
-        ]
+        ],
+        "parameters": [
+          {
+            "name": "include_archived",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Include archived categories",
+              "default": false,
+              "title": "Include Archived"
+            },
+            "description": "Include archived categories"
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListForumCategoriesResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "forum"
+        ],
+        "summary": "Create a forum category",
+        "description": "Create a forum category. Only project owners can manage categories.",
+        "operationId": "createForumCategory",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ForumCategoryCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForumCategoryResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/forum/categories/{category_key}": {
+      "patch": {
+        "tags": [
+          "forum"
+        ],
+        "summary": "Update a forum category",
+        "description": "Update a forum category. Only project owners can manage categories.",
+        "operationId": "updateForumCategory",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "category_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Category Key"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ForumCategoryUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForumCategoryResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "forum"
+        ],
+        "summary": "Archive a forum category",
+        "description": "Archive a forum category. Existing threads keep their category key.",
+        "operationId": "deleteForumCategory",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "category_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Category Key"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/forum/posts": {
+      "get": {
+        "tags": [
+          "forum"
+        ],
+        "summary": "List forum threads",
+        "description": "List root forum threads for the active project.",
+        "operationId": "listForumPosts",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "skip",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Number of items to skip",
+              "default": 0,
+              "title": "Skip"
+            },
+            "description": "Number of items to skip"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "description": "Max items to return",
+              "default": 50,
+              "title": "Limit"
+            },
+            "description": "Max items to return"
+          },
+          {
+            "name": "category",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64,
+                  "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by category key",
+              "title": "Category"
+            },
+            "description": "Filter by category key"
+          },
+          {
+            "name": "is_closed",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by closed status. Default false (open only). Set to true for closed, or omit/null for all.",
+              "default": false,
+              "title": "Is Closed"
+            },
+            "description": "Filter by closed status. Default false (open only). Set to true for closed, or omit/null for all."
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListForumPostsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "forum"
+        ],
+        "summary": "Create a forum thread or reply",
+        "description": "Create a new project forum thread or reply.",
+        "operationId": "createForumPost",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ForumPostCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForumPostResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/forum/posts/{post_id}": {
+      "get": {
+        "tags": [
+          "forum"
+        ],
+        "summary": "Get a forum post",
+        "description": "Get a forum post by ID.",
+        "operationId": "getForumPost",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "post_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Post Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForumPostResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "forum"
+        ],
+        "summary": "Update a forum post",
+        "description": "Update a forum post. Only the author can edit.",
+        "operationId": "updateForumPost",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "post_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Post Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ForumPostUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForumPostResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "forum"
+        ],
+        "summary": "Delete a forum post",
+        "description": "Delete a forum post. Only the author can delete.",
+        "operationId": "deleteForumPost",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "post_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Post Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/forum/posts/{post_id}/replies": {
+      "get": {
+        "tags": [
+          "forum"
+        ],
+        "summary": "List forum replies",
+        "description": "List replies for a forum thread.",
+        "operationId": "getForumPostReplies",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "post_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Post Id"
+            }
+          },
+          {
+            "name": "skip",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Number of replies to skip",
+              "default": 0,
+              "title": "Skip"
+            },
+            "description": "Number of replies to skip"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "description": "Max replies to return",
+              "default": 100,
+              "title": "Limit"
+            },
+            "description": "Max replies to return"
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ForumPostResponse"
+                  },
+                  "title": "Response Getforumpostreplies"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/forum/posts/{post_id}/close": {
+      "patch": {
+        "tags": [
+          "forum"
+        ],
+        "summary": "Close a forum thread",
+        "description": "Close a forum thread. Only the author or project owner can close.",
+        "operationId": "closeForumPost",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "post_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Post Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/forum/posts/{post_id}/reopen": {
+      "patch": {
+        "tags": [
+          "forum"
+        ],
+        "summary": "Reopen a forum thread",
+        "description": "Reopen a forum thread. Only the author or project owner can reopen.",
+        "operationId": "reopenForumPost",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "post_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Post Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/issues": {
@@ -6714,7 +7970,7 @@
         "tags": [
           "flow"
         ],
-        "summary": "List all flow schedules for current user",
+        "summary": "List all flow schedules for current project",
         "description": "List all Flow schedules (cron and one-time) for the current project.",
         "operationId": "listAllFlowSchedules",
         "security": [
@@ -9003,6 +10259,258 @@
         }
       }
     },
+    "/notifications": {
+      "get": {
+        "tags": [
+          "notification"
+        ],
+        "summary": "List current user's notifications",
+        "description": "List notifications addressed to the current user.",
+        "operationId": "listNotifications",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "unread_only",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Only return unread notifications",
+              "default": false,
+              "title": "Unread Only"
+            },
+            "description": "Only return unread notifications"
+          },
+          {
+            "name": "skip",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Skip"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListNotificationsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/notifications/unread-count": {
+      "get": {
+        "tags": [
+          "notification"
+        ],
+        "summary": "Get unread notification count",
+        "description": "Return unread notification count for the current user.",
+        "operationId": "getUnreadNotificationCount",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnreadNotificationCountResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/notifications/{notification_id}/read": {
+      "patch": {
+        "tags": [
+          "notification"
+        ],
+        "summary": "Mark a notification as read",
+        "description": "Mark one notification as read.",
+        "operationId": "markNotificationRead",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "notification_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Notification Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/notifications/read-all": {
+      "patch": {
+        "tags": [
+          "notification"
+        ],
+        "summary": "Mark all notifications as read",
+        "description": "Mark all matching notifications as read.",
+        "operationId": "markAllNotificationsRead",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "integer"
+                  },
+                  "title": "Response Markallnotificationsread"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/cryostats": {
       "get": {
         "tags": [
@@ -9803,6 +11311,165 @@
         }
       }
     },
+    "/cooldowns/{cooldown_id}/wiring-checkpoint": {
+      "post": {
+        "tags": [
+          "cooldown-wiring"
+        ],
+        "summary": "Record a wiring change checkpoint within a cool-down",
+        "operationId": "createCooldownWiringCheckpoint",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "cooldown_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Cooldown Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CooldownWiringCheckpointRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CooldownWiringEventResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/cooldowns/{cooldown_id}/wiring-events": {
+      "get": {
+        "tags": [
+          "cooldown-wiring"
+        ],
+        "summary": "List wiring change history for a cool-down",
+        "operationId": "listCooldownWiringEvents",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "cooldown_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Cooldown Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 100,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "skip",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Skip"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListCooldownWiringEventsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/topology/list": {
       "get": {
         "tags": [
@@ -9936,6 +11603,154 @@
             "HTTPBearer": []
           }
         ]
+      }
+    },
+    "/dashboard/chips/{chip_id}/ai-insights": {
+      "get": {
+        "tags": [
+          "dashboard"
+        ],
+        "summary": "Generate dashboard-level AI insight candidates",
+        "description": "Return compact operational insights for the dashboard.\n\nThe first implementation is deterministic: it extracts high-signal patterns\nfrom persisted AI triage notes and task-result metadata. A later LLM\nsynthesis layer can consume the same structured candidate contract.",
+        "operationId": "getDashboardAiInsights",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chip_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Chip Id"
+            }
+          },
+          {
+            "name": "task_name",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional task-name filter",
+              "title": "Task Name"
+            },
+            "description": "Optional task-name filter"
+          },
+          {
+            "name": "latest_only",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "If true, use only the latest result per task and target",
+              "default": true,
+              "title": "Latest Only"
+            },
+            "description": "If true, use only the latest result per task and target"
+          },
+          {
+            "name": "selection_mode",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Dashboard selection mode; accepted for filter-state traceability",
+              "title": "Selection Mode"
+            },
+            "description": "Dashboard selection mode; accepted for filter-state traceability"
+          },
+          {
+            "name": "start_at",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Dashboard lower time bound; accepted for filter-state traceability",
+              "title": "Start At"
+            },
+            "description": "Dashboard lower time bound; accepted for filter-state traceability"
+          },
+          {
+            "name": "end_at",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Dashboard upper time bound; accepted for filter-state traceability",
+              "title": "End At"
+            },
+            "description": "Dashboard upper time bound; accepted for filter-state traceability"
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DashboardAiInsightsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/provenance/entities/{entity_id}": {
@@ -11049,7 +12864,12 @@
         "properties": {
           "username": {
             "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9._-]{1,62}[a-z0-9]$",
             "title": "Username"
+          },
+          "role": {
+            "$ref": "#/components/schemas/ProjectRole",
+            "default": "viewer"
           }
         },
         "type": "object",
@@ -11057,7 +12877,70 @@
           "username"
         ],
         "title": "AddMemberRequest",
-        "description": "Request to add a member to a project (always as viewer)."
+        "description": "Request to add a member to a project."
+      },
+      "AiTriageReviewModel": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "description": "AI triage status: requested, running, completed, or failed",
+            "default": ""
+          },
+          "requested_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested At",
+            "description": "Timestamp when AI triage was requested"
+          },
+          "requested_by": {
+            "type": "string",
+            "title": "Requested By",
+            "description": "Username that requested AI triage",
+            "default": ""
+          },
+          "model_provider": {
+            "type": "string",
+            "title": "Model Provider",
+            "description": "Provider for the selected AI triage model",
+            "default": ""
+          },
+          "model_name": {
+            "type": "string",
+            "title": "Model Name",
+            "description": "Name of the selected AI triage model",
+            "default": ""
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At",
+            "description": "Timestamp when AI triage completed or failed"
+          },
+          "error": {
+            "type": "string",
+            "title": "Error",
+            "description": "Failure detail if AI triage failed",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "title": "AiTriageReviewModel",
+        "description": "Persistent state for an AI triage review request on a task result."
       },
       "AllConfigResponse": {
         "properties": {
@@ -11172,6 +13055,17 @@
             "type": "array",
             "title": "Conversation History",
             "description": "Previous conversation messages [{role, content}, ...]"
+          },
+          "model_override": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelConfig"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional per-request model override for task result analysis. When unset, the configured analysis_model/model selection is used."
           }
         },
         "type": "object",
@@ -11256,28 +13150,19 @@
         "title": "BackendResponseModel",
         "description": "Response model for backend operations.\n\nInherits from BackendModel and is used to format the response\nfor backend-related API endpoints."
       },
-      "Body_downloadFiguresAsZip": {
+      "Body_bulkImportUsers": {
         "properties": {
-          "paths": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Paths",
-            "description": "List of file paths to include in the ZIP"
-          },
-          "filename": {
+          "file": {
             "type": "string",
-            "title": "Filename",
-            "description": "Filename for the ZIP archive",
-            "default": "figures.zip"
+            "format": "binary",
+            "title": "File"
           }
         },
         "type": "object",
         "required": [
-          "paths"
+          "file"
         ],
-        "title": "Body_downloadFiguresAsZip"
+        "title": "Body_bulkImportUsers"
       },
       "Body_login": {
         "properties": {
@@ -11330,6 +13215,222 @@
         },
         "type": "object",
         "title": "Body_reExecuteTaskResult"
+      },
+      "BulkAiTriageRequest": {
+        "properties": {
+          "chip_id": {
+            "type": "string",
+            "title": "Chip Id"
+          },
+          "task": {
+            "type": "string",
+            "title": "Task"
+          },
+          "entity_type": {
+            "type": "string",
+            "title": "Entity Type",
+            "default": "qubit"
+          },
+          "date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date"
+          },
+          "task_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Ids"
+          },
+          "model_override": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelConfig"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "chip_id",
+          "task"
+        ],
+        "title": "BulkAiTriageRequest",
+        "description": "Request body for bulk AI triage review."
+      },
+      "BulkAiTriageResponse": {
+        "properties": {
+          "chip_id": {
+            "type": "string",
+            "title": "Chip Id"
+          },
+          "task": {
+            "type": "string",
+            "title": "Task"
+          },
+          "entity_type": {
+            "type": "string",
+            "title": "Entity Type"
+          },
+          "date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date"
+          },
+          "requested_count": {
+            "type": "integer",
+            "title": "Requested Count"
+          },
+          "task_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Task Ids"
+          },
+          "skipped_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Skipped Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "chip_id",
+          "task",
+          "entity_type",
+          "requested_count",
+          "task_ids"
+        ],
+        "title": "BulkAiTriageResponse",
+        "description": "Response after enqueueing bulk AI triage review."
+      },
+      "BulkUserImportResponse": {
+        "properties": {
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/BulkUserImportResult"
+            },
+            "type": "array",
+            "title": "Results"
+          },
+          "created": {
+            "type": "integer",
+            "title": "Created"
+          },
+          "skipped": {
+            "type": "integer",
+            "title": "Skipped"
+          },
+          "failed": {
+            "type": "integer",
+            "title": "Failed"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "results",
+          "created",
+          "skipped",
+          "failed",
+          "total"
+        ],
+        "title": "BulkUserImportResponse",
+        "description": "Response for bulk user import."
+      },
+      "BulkUserImportResult": {
+        "properties": {
+          "row_number": {
+            "type": "integer",
+            "title": "Row Number"
+          },
+          "username": {
+            "type": "string",
+            "title": "Username"
+          },
+          "full_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Full Name"
+          },
+          "system_role": {
+            "$ref": "#/components/schemas/SystemRole",
+            "default": "user"
+          },
+          "initial_password": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Initial Password"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "row_number",
+          "username",
+          "status"
+        ],
+        "title": "BulkUserImportResult",
+        "description": "Result for a single row in a bulk user import."
       },
       "CalibrationNoteResponse": {
         "properties": {
@@ -11788,6 +13889,19 @@
           },
           "note": {
             "$ref": "#/components/schemas/NoteModel"
+          },
+          "wiring_info": {
+            "type": "string",
+            "title": "Wiring Info",
+            "default": ""
+          },
+          "wiring_blocks": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Wiring Blocks"
           }
         },
         "type": "object",
@@ -11838,11 +13952,122 @@
               }
             ],
             "title": "Ended At"
+          },
+          "wiring_info": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wiring Info",
+            "description": "Markdown export of the wiring document (derived from wiring_blocks)"
+          },
+          "wiring_blocks": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wiring Blocks",
+            "description": "BlockNote document JSON. Source of truth when present."
           }
         },
         "type": "object",
         "title": "CooldownUpdateRequest",
         "description": "Body for updating a cool-down. All fields optional."
+      },
+      "CooldownWiringCheckpointRequest": {
+        "properties": {
+          "comment": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Comment",
+            "description": "Why the wiring changed at this point in time"
+          }
+        },
+        "type": "object",
+        "required": [
+          "comment"
+        ],
+        "title": "CooldownWiringCheckpointRequest",
+        "description": "Body for recording a wiring change checkpoint within a cool-down."
+      },
+      "CooldownWiringEventResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "cooldown_id": {
+            "type": "string",
+            "title": "Cooldown Id"
+          },
+          "actor_user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor User Id"
+          },
+          "actor": {
+            "type": "string",
+            "title": "Actor"
+          },
+          "action": {
+            "type": "string",
+            "title": "Action"
+          },
+          "comment": {
+            "type": "string",
+            "title": "Comment"
+          },
+          "wiring_info_snapshot": {
+            "type": "string",
+            "title": "Wiring Info Snapshot"
+          },
+          "block_count": {
+            "type": "integer",
+            "title": "Block Count"
+          },
+          "image_count": {
+            "type": "integer",
+            "title": "Image Count"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "cooldown_id",
+          "actor",
+          "action",
+          "comment",
+          "wiring_info_snapshot",
+          "block_count",
+          "image_count",
+          "created_at"
+        ],
+        "title": "CooldownWiringEventResponse",
+        "description": "One wiring-history entry for a cool-down."
       },
       "Coupling": {
         "properties": {
@@ -12168,6 +14393,120 @@
         "title": "CryostatUpdateRequest",
         "description": "Body for updating a cryostat. All fields optional."
       },
+      "DashboardAiInsightsResponse": {
+        "properties": {
+          "chip_id": {
+            "type": "string",
+            "title": "Chip Id"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary"
+          },
+          "insights": {
+            "items": {
+              "$ref": "#/components/schemas/DashboardInsight"
+            },
+            "type": "array",
+            "title": "Insights"
+          },
+          "suppressed": {
+            "$ref": "#/components/schemas/DashboardInsightSuppressed"
+          }
+        },
+        "type": "object",
+        "required": [
+          "chip_id",
+          "summary"
+        ],
+        "title": "DashboardAiInsightsResponse",
+        "description": "Dashboard-level AI insight response."
+      },
+      "DashboardInsight": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "info",
+              "warning",
+              "critical"
+            ],
+            "title": "Severity"
+          },
+          "affected_targets": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Affected Targets"
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "triage_cluster",
+              "model_failure",
+              "data_consistency",
+              "metric_outlier",
+              "coverage_gap",
+              "provenance_impact",
+              "note_cluster",
+              "other"
+            ],
+            "title": "Category",
+            "default": "other"
+          },
+          "evidence": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Evidence"
+          },
+          "recommended_action": {
+            "type": "string",
+            "title": "Recommended Action"
+          },
+          "confidence": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ],
+            "title": "Confidence",
+            "default": "medium"
+          }
+        },
+        "type": "object",
+        "required": [
+          "title",
+          "severity",
+          "recommended_action"
+        ],
+        "title": "DashboardInsight",
+        "description": "One operator-facing dashboard insight."
+      },
+      "DashboardInsightSuppressed": {
+        "properties": {
+          "routine_pass_count": {
+            "type": "integer",
+            "title": "Routine Pass Count",
+            "default": 0
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "title": "DashboardInsightSuppressed",
+        "description": "Summary of routine items intentionally omitted from the insight card."
+      },
       "DegradationTrendResponse": {
         "properties": {
           "parameter_name": {
@@ -12413,6 +14752,34 @@
         "type": "object",
         "title": "DeviceTopologyRequest",
         "description": "Request model for device topology."
+      },
+      "DownloadFiguresAsZipRequest": {
+        "properties": {
+          "paths": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Paths",
+            "default": []
+          },
+          "filename": {
+            "type": "string",
+            "title": "Filename",
+            "default": "figures.zip"
+          },
+          "ai_triage_task_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Ai Triage Task Ids",
+            "default": []
+          }
+        },
+        "type": "object",
+        "title": "DownloadFiguresAsZipRequest",
+        "description": "Request body for downloading task-result artifacts as a ZIP archive."
       },
       "ExecuteFlowRequest": {
         "properties": {
@@ -12819,6 +15186,17 @@
             "type": "boolean",
             "title": "Is Within 24H",
             "default": true
+          },
+          "metric": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metric"
           }
         },
         "type": "object",
@@ -12948,6 +15326,11 @@
             "title": "Name",
             "description": "Flow name"
           },
+          "created_by": {
+            "type": "string",
+            "title": "Created By",
+            "description": "Username of the flow creator"
+          },
           "description": {
             "type": "string",
             "title": "Description",
@@ -12987,6 +15370,7 @@
         "type": "object",
         "required": [
           "name",
+          "created_by",
           "description",
           "chip_id",
           "flow_function_name",
@@ -13093,12 +15477,423 @@
         "title": "FlowTemplateWithCode",
         "description": "Flow template with code content."
       },
+      "ForumCategoryCreate": {
+        "properties": {
+          "key": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64,
+                "minLength": 1,
+                "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Key",
+            "description": "Stable category key. Generated from name when omitted."
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Name",
+            "description": "Display name"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Description",
+            "description": "Short description",
+            "default": ""
+          },
+          "color": {
+            "type": "string",
+            "pattern": "^(neutral|primary|secondary|accent|info|success|warning|error|ghost)$",
+            "title": "Color",
+            "description": "Display color token",
+            "default": "neutral"
+          },
+          "icon": {
+            "type": "string",
+            "maxLength": 64,
+            "pattern": "^[a-z0-9][a-z0-9-]{0,63}$",
+            "title": "Icon",
+            "description": "Display icon token",
+            "default": "message-square"
+          },
+          "sort_order": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 10000,
+                "minimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sort Order",
+            "description": "Display order"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "ForumCategoryCreate",
+        "description": "Request schema for creating a forum category."
+      },
+      "ForumCategoryResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Forum category document ID"
+          },
+          "project_id": {
+            "type": "string",
+            "title": "Project Id",
+            "description": "Owning project identifier"
+          },
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "Stable category key"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Display name"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description",
+            "description": "Short category description",
+            "default": ""
+          },
+          "color": {
+            "type": "string",
+            "title": "Color",
+            "description": "Display color token",
+            "default": "neutral"
+          },
+          "icon": {
+            "type": "string",
+            "title": "Icon",
+            "description": "Display icon token",
+            "default": "message-square"
+          },
+          "sort_order": {
+            "type": "integer",
+            "title": "Sort Order",
+            "description": "Display order",
+            "default": 100
+          },
+          "is_archived": {
+            "type": "boolean",
+            "title": "Is Archived",
+            "description": "Whether this category is hidden",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "project_id",
+          "key",
+          "name"
+        ],
+        "title": "ForumCategoryResponse",
+        "description": "Response schema for a forum category."
+      },
+      "ForumCategoryUpdate": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 80,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name",
+            "description": "Display name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Short description"
+          },
+          "color": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(neutral|primary|secondary|accent|info|success|warning|error|ghost)$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Color",
+            "description": "Display color token"
+          },
+          "icon": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64,
+                "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Icon",
+            "description": "Display icon token"
+          },
+          "sort_order": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 10000,
+                "minimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sort Order",
+            "description": "Display order"
+          },
+          "is_archived": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Archived",
+            "description": "Whether this category is hidden"
+          }
+        },
+        "type": "object",
+        "title": "ForumCategoryUpdate",
+        "description": "Request schema for updating a forum category."
+      },
+      "ForumPostCreate": {
+        "properties": {
+          "category": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$",
+            "title": "Category",
+            "description": "Forum category key"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title",
+            "description": "Thread title. Required for root threads, None for replies."
+          },
+          "content": {
+            "type": "string",
+            "maxLength": 8000,
+            "minLength": 1,
+            "title": "Content",
+            "description": "Markdown content"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id",
+            "description": "Parent forum post ID for replies. None for root threads."
+          }
+        },
+        "type": "object",
+        "required": [
+          "category",
+          "content"
+        ],
+        "title": "ForumPostCreate",
+        "description": "Request schema for creating a forum thread or reply."
+      },
+      "ForumPostResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Forum post document ID"
+          },
+          "project_id": {
+            "type": "string",
+            "title": "Project Id",
+            "description": "Owning project identifier"
+          },
+          "category": {
+            "type": "string",
+            "title": "Category",
+            "description": "Forum category key"
+          },
+          "user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Id",
+            "description": "Post author user ID"
+          },
+          "username": {
+            "type": "string",
+            "title": "Username",
+            "description": "Post author username"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title",
+            "description": "Thread title"
+          },
+          "content": {
+            "type": "string",
+            "title": "Content",
+            "description": "Markdown content"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id",
+            "description": "Parent forum post ID"
+          },
+          "reply_count": {
+            "type": "integer",
+            "title": "Reply Count",
+            "description": "Number of replies to this thread",
+            "default": 0
+          },
+          "is_closed": {
+            "type": "boolean",
+            "title": "Is Closed",
+            "description": "Whether this thread is closed",
+            "default": false
+          },
+          "is_deleted": {
+            "type": "boolean",
+            "title": "Is Deleted",
+            "description": "Whether this post is archived/deleted",
+            "default": false
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At",
+            "description": "When the post was created"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At",
+            "description": "When the post was last updated"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "project_id",
+          "category",
+          "username",
+          "content",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "ForumPostResponse",
+        "description": "Response schema for a forum post."
+      },
+      "ForumPostUpdate": {
+        "properties": {
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title",
+            "description": "Updated title for root threads"
+          },
+          "content": {
+            "type": "string",
+            "maxLength": 8000,
+            "minLength": 1,
+            "title": "Content",
+            "description": "Updated content"
+          }
+        },
+        "type": "object",
+        "required": [
+          "content"
+        ],
+        "title": "ForumPostUpdate",
+        "description": "Request schema for updating a forum post."
+      },
       "GetFlowResponse": {
         "properties": {
           "name": {
             "type": "string",
             "title": "Name",
             "description": "Flow name"
+          },
+          "created_by": {
+            "type": "string",
+            "title": "Created By",
+            "description": "Username of the flow creator"
           },
           "description": {
             "type": "string",
@@ -13161,6 +15956,7 @@
         "type": "object",
         "required": [
           "name",
+          "created_by",
           "description",
           "code",
           "flow_function_name",
@@ -13386,10 +16182,56 @@
             "description": "Case outcome",
             "default": "resolved"
           },
+          "human_label": {
+            "type": "string",
+            "title": "Human Label",
+            "description": "Human review label",
+            "default": ""
+          },
+          "failure_mode_labels": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Failure Mode Labels",
+            "description": "Failure labels"
+          },
+          "case_type": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Case Type",
+            "description": "Knowledge case type labels"
+          },
+          "model_error_type": {
+            "type": "string",
+            "title": "Model Error Type",
+            "description": "Verifier error/outcome type",
+            "default": ""
+          },
+          "resolution_label": {
+            "type": "string",
+            "title": "Resolution Label",
+            "description": "Structured resolution label",
+            "default": ""
+          },
           "symptom": {
             "type": "string",
             "title": "Symptom",
             "description": "Observed symptom",
+            "default": ""
+          },
+          "model_prediction": {
+            "type": "string",
+            "title": "Model Prediction",
+            "description": "Verifier/model prediction summary",
+            "default": ""
+          },
+          "human_review_decision": {
+            "type": "string",
+            "title": "Human Review Decision",
+            "description": "Human review decision summary",
             "default": ""
           },
           "root_cause": {
@@ -13404,6 +16246,12 @@
             "description": "How the issue was resolved",
             "default": ""
           },
+          "boundary_criteria": {
+            "type": "string",
+            "title": "Boundary Criteria",
+            "description": "Boundary criteria",
+            "default": ""
+          },
           "lesson_learned": {
             "items": {
               "type": "string"
@@ -13411,6 +16259,24 @@
             "type": "array",
             "title": "Lesson Learned",
             "description": "Key takeaways"
+          },
+          "applicability": {
+            "type": "string",
+            "title": "Applicability",
+            "description": "When this case should be retrieved",
+            "default": ""
+          },
+          "counterexample": {
+            "type": "string",
+            "title": "Counterexample",
+            "description": "What rule this case counters",
+            "default": ""
+          },
+          "prompt_guidance": {
+            "type": "string",
+            "title": "Prompt Guidance",
+            "description": "Prompt/checklist guidance",
+            "default": ""
           },
           "figure_paths": {
             "items": {
@@ -13428,6 +16294,18 @@
             "title": "Thread Image Urls",
             "description": "Image URLs from issue thread"
           },
+          "reviewed_by_user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewed By User Id",
+            "description": "Reviewer user ID"
+          },
           "reviewed_by": {
             "anyOf": [
               {
@@ -13438,7 +16316,7 @@
               }
             ],
             "title": "Reviewed By",
-            "description": "Reviewer username"
+            "description": "Reviewer username snapshot"
           },
           "pr_url": {
             "anyOf": [
@@ -13511,6 +16389,73 @@
             "title": "Severity",
             "description": "Updated severity"
           },
+          "human_label": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Human Label",
+            "description": "Human label"
+          },
+          "failure_mode_labels": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "maxItems": 50
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Failure Mode Labels"
+          },
+          "case_type": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "maxItems": 50
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Case Type"
+          },
+          "model_error_type": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Error Type"
+          },
+          "resolution_label": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolution Label"
+          },
           "symptom": {
             "anyOf": [
               {
@@ -13523,6 +16468,30 @@
             ],
             "title": "Symptom",
             "description": "Updated symptom"
+          },
+          "model_prediction": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 5000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Prediction"
+          },
+          "human_review_decision": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 5000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Human Review Decision"
           },
           "root_cause": {
             "anyOf": [
@@ -13550,6 +16519,18 @@
             "title": "Resolution",
             "description": "Updated resolution"
           },
+          "boundary_criteria": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 5000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Boundary Criteria"
+          },
           "lesson_learned": {
             "anyOf": [
               {
@@ -13565,6 +16546,42 @@
             ],
             "title": "Lesson Learned",
             "description": "Updated lessons"
+          },
+          "applicability": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 5000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Applicability"
+          },
+          "counterexample": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 5000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Counterexample"
+          },
+          "prompt_guidance": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 5000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prompt Guidance"
           }
         },
         "type": "object",
@@ -13582,6 +16599,18 @@
             "type": "string",
             "title": "Task Id",
             "description": "Associated task ID"
+          },
+          "user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Id",
+            "description": "Issue author user ID"
           },
           "username": {
             "type": "string",
@@ -13721,9 +16750,50 @@
             "title": "Status",
             "default": "resolved"
           },
+          "human_label": {
+            "type": "string",
+            "title": "Human Label",
+            "default": ""
+          },
+          "failure_mode_labels": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Failure Mode Labels",
+            "default": []
+          },
+          "case_type": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Case Type",
+            "default": []
+          },
+          "model_error_type": {
+            "type": "string",
+            "title": "Model Error Type",
+            "default": ""
+          },
+          "resolution_label": {
+            "type": "string",
+            "title": "Resolution Label",
+            "default": ""
+          },
           "symptom": {
             "type": "string",
             "title": "Symptom",
+            "default": ""
+          },
+          "model_prediction": {
+            "type": "string",
+            "title": "Model Prediction",
+            "default": ""
+          },
+          "human_review_decision": {
+            "type": "string",
+            "title": "Human Review Decision",
             "default": ""
           },
           "root_cause": {
@@ -13736,6 +16806,11 @@
             "title": "Resolution",
             "default": ""
           },
+          "boundary_criteria": {
+            "type": "string",
+            "title": "Boundary Criteria",
+            "default": ""
+          },
           "lesson_learned": {
             "items": {
               "type": "string"
@@ -13743,6 +16818,21 @@
             "type": "array",
             "title": "Lesson Learned",
             "default": []
+          },
+          "applicability": {
+            "type": "string",
+            "title": "Applicability",
+            "default": ""
+          },
+          "counterexample": {
+            "type": "string",
+            "title": "Counterexample",
+            "default": ""
+          },
+          "prompt_guidance": {
+            "type": "string",
+            "title": "Prompt Guidance",
+            "default": ""
           }
         },
         "type": "object",
@@ -13955,6 +17045,22 @@
         "title": "ListChipsResponse",
         "description": "Response model for listing chips."
       },
+      "ListCooldownWiringEventsResponse": {
+        "properties": {
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/CooldownWiringEventResponse"
+            },
+            "type": "array",
+            "title": "Events"
+          }
+        },
+        "type": "object",
+        "required": [
+          "events"
+        ],
+        "title": "ListCooldownWiringEventsResponse"
+      },
       "ListCooldownsResponse": {
         "properties": {
           "cooldowns": {
@@ -14105,6 +17211,55 @@
         "title": "ListFlowsResponse",
         "description": "Response for listing flows."
       },
+      "ListForumCategoriesResponse": {
+        "properties": {
+          "categories": {
+            "items": {
+              "$ref": "#/components/schemas/ForumCategoryResponse"
+            },
+            "type": "array",
+            "title": "Categories"
+          }
+        },
+        "type": "object",
+        "required": [
+          "categories"
+        ],
+        "title": "ListForumCategoriesResponse",
+        "description": "List of forum categories."
+      },
+      "ListForumPostsResponse": {
+        "properties": {
+          "posts": {
+            "items": {
+              "$ref": "#/components/schemas/ForumPostResponse"
+            },
+            "type": "array",
+            "title": "Posts"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "skip": {
+            "type": "integer",
+            "title": "Skip"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          }
+        },
+        "type": "object",
+        "required": [
+          "posts",
+          "total",
+          "skip",
+          "limit"
+        ],
+        "title": "ListForumPostsResponse",
+        "description": "Paginated list of forum posts."
+      },
       "ListIssueKnowledgeResponse": {
         "properties": {
           "items": {
@@ -14208,6 +17363,43 @@
         ],
         "title": "ListNoteEventsResponse",
         "description": "Paginated note-event feed."
+      },
+      "ListNotificationsResponse": {
+        "properties": {
+          "notifications": {
+            "items": {
+              "$ref": "#/components/schemas/NotificationResponse"
+            },
+            "type": "array",
+            "title": "Notifications"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "unread_count": {
+            "type": "integer",
+            "title": "Unread Count"
+          },
+          "skip": {
+            "type": "integer",
+            "title": "Skip"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          }
+        },
+        "type": "object",
+        "required": [
+          "notifications",
+          "total",
+          "unread_count",
+          "skip",
+          "limit"
+        ],
+        "title": "ListNotificationsResponse",
+        "description": "Paginated notifications for the current user."
       },
       "ListQubitsResponse": {
         "properties": {
@@ -14485,8 +17677,9 @@
         "properties": {
           "username": {
             "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9._-]{1,62}[a-z0-9]$",
             "title": "Username",
-            "description": "Username to invite"
+            "description": "Username must be 3-64 characters, lowercase letters, numbers, dots, underscores, or hyphens, and start and end with a letter or number."
           },
           "role": {
             "$ref": "#/components/schemas/ProjectRole",
@@ -14503,6 +17696,10 @@
       },
       "MemberItem": {
         "properties": {
+          "user_id": {
+            "type": "string",
+            "title": "User Id"
+          },
           "username": {
             "type": "string",
             "title": "Username"
@@ -14529,6 +17726,7 @@
         },
         "type": "object",
         "required": [
+          "user_id",
           "username",
           "role"
         ],
@@ -14541,6 +17739,10 @@
             "type": "string",
             "title": "Project Id"
           },
+          "user_id": {
+            "type": "string",
+            "title": "User Id"
+          },
           "username": {
             "type": "string",
             "title": "Username"
@@ -14551,6 +17753,17 @@
           "status": {
             "type": "string",
             "title": "Status"
+          },
+          "invited_by_user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Invited By User Id"
           },
           "invited_by": {
             "anyOf": [
@@ -14579,6 +17792,7 @@
         "type": "object",
         "required": [
           "project_id",
+          "user_id",
           "username",
           "role",
           "status",
@@ -14726,6 +17940,50 @@
               }
             ],
             "title": "Output Parameters"
+          },
+          "excluded": {
+            "type": "boolean",
+            "title": "Excluded",
+            "default": false
+          },
+          "excluded_reason": {
+            "type": "string",
+            "title": "Excluded Reason",
+            "default": ""
+          },
+          "excluded_by_user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Excluded By User Id"
+          },
+          "excluded_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Excluded By"
+          },
+          "excluded_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Excluded At"
           }
         },
         "type": "object",
@@ -14821,6 +18079,122 @@
         ],
         "title": "MetricsSummaryResponse",
         "description": "Response model for aggregated metrics summary.\n\nReturns statistical summary computed by the database.\nMinimal data transfer (~0.1KB).\nMetrics are loaded dynamically from metrics.yaml config."
+      },
+      "ModelConfig": {
+        "properties": {
+          "provider": {
+            "type": "string",
+            "title": "Provider",
+            "default": "openai"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "default": "gpt-4.1"
+          },
+          "temperature": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Temperature",
+            "default": 0.7
+          },
+          "max_output_tokens": {
+            "type": "integer",
+            "title": "Max Output Tokens",
+            "default": 16384
+          },
+          "base_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Url"
+          },
+          "api_key_env": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Api Key Env"
+          },
+          "keep_alive": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Keep Alive"
+          },
+          "num_ctx": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Num Ctx"
+          },
+          "top_p": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Top P"
+          },
+          "top_k": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Top K"
+          },
+          "reasoning_effort": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning Effort"
+          },
+          "disable_thinking_instruction": {
+            "type": "boolean",
+            "title": "Disable Thinking Instruction",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "ModelConfig",
+        "description": "Model configuration for CopilotKit."
       },
       "MuxDetailResponse": {
         "properties": {
@@ -15076,6 +18450,17 @@
             "title": "Action",
             "description": "upsert | delete"
           },
+          "actor_user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor User Id"
+          },
           "actor": {
             "type": "string",
             "title": "Actor"
@@ -15158,6 +18543,105 @@
         ],
         "title": "NoteUpsertRequest",
         "description": "Body for upserting a note."
+      },
+      "NotificationResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "project_id": {
+            "type": "string",
+            "title": "Project Id"
+          },
+          "recipient_user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recipient User Id"
+          },
+          "recipient_username": {
+            "type": "string",
+            "title": "Recipient Username"
+          },
+          "actor_user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor User Id"
+          },
+          "actor_username": {
+            "type": "string",
+            "title": "Actor Username"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "source_type": {
+            "type": "string",
+            "title": "Source Type"
+          },
+          "source_id": {
+            "type": "string",
+            "title": "Source Id"
+          },
+          "target_url": {
+            "type": "string",
+            "title": "Target Url"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "excerpt": {
+            "type": "string",
+            "title": "Excerpt",
+            "default": ""
+          },
+          "read_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Read At"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "project_id",
+          "recipient_username",
+          "actor_username",
+          "kind",
+          "source_type",
+          "source_id",
+          "target_url",
+          "title",
+          "created_at"
+        ],
+        "title": "NotificationResponse",
+        "description": "Single notification row."
       },
       "OutputParameterInfoResponse": {
         "properties": {
@@ -15607,6 +19091,7 @@
         "properties": {
           "username": {
             "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9._-]{1,62}[a-z0-9]$",
             "title": "Username"
           },
           "new_password": {
@@ -15809,6 +19294,10 @@
             "type": "string",
             "title": "Name"
           },
+          "owner_user_id": {
+            "type": "string",
+            "title": "Owner User Id"
+          },
           "owner_username": {
             "type": "string",
             "title": "Owner Username"
@@ -15846,6 +19335,7 @@
         "required": [
           "project_id",
           "name",
+          "owner_user_id",
           "owner_username"
         ],
         "title": "ProjectListItem",
@@ -15856,6 +19346,10 @@
           "project_id": {
             "type": "string",
             "title": "Project Id"
+          },
+          "owner_user_id": {
+            "type": "string",
+            "title": "Owner User Id"
           },
           "owner_username": {
             "type": "string",
@@ -15900,6 +19394,7 @@
         "type": "object",
         "required": [
           "project_id",
+          "owner_user_id",
           "owner_username",
           "name",
           "description",
@@ -15915,10 +19410,11 @@
         "type": "string",
         "enum": [
           "owner",
+          "editor",
           "viewer"
         ],
         "title": "ProjectRole",
-        "description": "Role of a member inside a project.\n\nSimplified model:\n- OWNER: Full access to project (read, write, admin)\n- VIEWER: Read-only access (for invited members)"
+        "description": "Role of a member inside a project.\n\nRoles intentionally stay coarse-grained:\n- OWNER: Project administration plus write access\n- EDITOR: Operational write access\n- VIEWER: Read-only access"
       },
       "ProjectUpdate": {
         "properties": {
@@ -16243,6 +19739,299 @@
         ],
         "title": "ReExecutionEntry",
         "description": "A child task result created by re-execution."
+      },
+      "ReanalyzeOutputParameter": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "value": {
+            "type": "number",
+            "title": "Value"
+          },
+          "unit": {
+            "type": "string",
+            "title": "Unit",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "value"
+        ],
+        "title": "ReanalyzeOutputParameter",
+        "description": "A single re-analyzed output value."
+      },
+      "ReanalyzeQubitSpectroscopyParams": {
+        "properties": {
+          "binarize_threshold_sigma_plus": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Binarize Threshold Sigma Plus"
+          },
+          "binarize_threshold_sigma_minus": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Binarize Threshold Sigma Minus"
+          },
+          "top_power": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Top Power"
+          },
+          "f01_height_min": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "F01 Height Min"
+          },
+          "f12_distance_min": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "F12 Distance Min"
+          },
+          "f12_distance_max": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "F12 Distance Max"
+          },
+          "f12_height_min": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "F12 Height Min"
+          },
+          "retry_with_trim": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retry With Trim",
+            "description": "If true, retry after trimming the highest-power row when no f01 is found."
+          }
+        },
+        "type": "object",
+        "title": "ReanalyzeQubitSpectroscopyParams",
+        "description": "Optional analysis-parameter overrides for qubit spectroscopy."
+      },
+      "ReanalyzeQubitSpectroscopyRequest": {
+        "properties": {
+          "source_task_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Task Id",
+            "description": "Task result to re-analyze. If omitted, the latest matching task result for the (chip_id, qid) is used."
+          },
+          "parameters": {
+            "$ref": "#/components/schemas/ReanalyzeQubitSpectroscopyParams"
+          }
+        },
+        "type": "object",
+        "title": "ReanalyzeQubitSpectroscopyRequest",
+        "description": "Request body for re-running CheckQubitSpectroscopy analysis."
+      },
+      "ReanalyzeResonatorSpectroscopyParams": {
+        "properties": {
+          "num_resonators": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Num Resonators",
+            "description": "Number of resonators to detect in the MUX (typically 4)."
+          },
+          "high_power_min": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "High Power Min",
+            "description": "Minimum power (dB) for the high-power region."
+          },
+          "high_power_max": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "High Power Max",
+            "description": "Maximum power (dB) for the high-power region."
+          },
+          "low_power": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Low Power",
+            "description": "Power level (dB) sampled for low-power peaks."
+          },
+          "bare_shift_estimator_type": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "config",
+                  "high_frequency_strength"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bare Shift Estimator Type",
+            "description": "If 'high_frequency_strength', the high/low-power boundary is auto-detected from the FFT energy of each row, overriding high_power_min/max/low_power."
+          },
+          "bare_shift_strength_limit": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bare Shift Strength Limit",
+            "description": "Strength cutoff for the high_frequency_strength estimator."
+          }
+        },
+        "type": "object",
+        "title": "ReanalyzeResonatorSpectroscopyParams",
+        "description": "Optional analysis-parameter overrides for resonator spectroscopy.\n\nAny field left ``None`` falls back to the default in\n:class:`EstimateResonatorFrequencyConfig`."
+      },
+      "ReanalyzeResonatorSpectroscopyRequest": {
+        "properties": {
+          "source_task_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Task Id",
+            "description": "Task result to re-analyze. If omitted, the latest matching task result for the (chip_id, qid) is used."
+          },
+          "parameters": {
+            "$ref": "#/components/schemas/ReanalyzeResonatorSpectroscopyParams"
+          }
+        },
+        "type": "object",
+        "title": "ReanalyzeResonatorSpectroscopyRequest",
+        "description": "Request body for re-running CheckResonatorSpectroscopy analysis."
+      },
+      "ReanalyzeResponse": {
+        "properties": {
+          "source_task_id": {
+            "type": "string",
+            "title": "Source Task Id",
+            "description": "Task result whose data was re-analyzed."
+          },
+          "source_task_name": {
+            "type": "string",
+            "title": "Source Task Name"
+          },
+          "qid": {
+            "type": "string",
+            "title": "Qid"
+          },
+          "figure": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Figure",
+            "description": "Plotly figure JSON of the re-analyzed result with markers."
+          },
+          "output_parameters": {
+            "items": {
+              "$ref": "#/components/schemas/ReanalyzeOutputParameter"
+            },
+            "type": "array",
+            "title": "Output Parameters"
+          },
+          "committed": {
+            "type": "boolean",
+            "title": "Committed",
+            "description": "Always false in this version; persisting changes will land later.",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "source_task_id",
+          "source_task_name",
+          "qid",
+          "figure",
+          "output_parameters"
+        ],
+        "title": "ReanalyzeResponse",
+        "description": "Preview response from a reanalyze endpoint.\n\n``figure`` carries a Plotly figure as a plain JSON dict so the UI can\nrender it directly. The DB is *not* mutated by this endpoint; commit\nwill be added in a follow-up."
       },
       "RecalibrationRecommendationResponse": {
         "properties": {
@@ -17851,11 +21640,100 @@
             "type": "boolean",
             "title": "Default View",
             "default": true
+          },
+          "ai_triage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AiTriageReviewModel"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
         "title": "TaskResult",
         "description": "TaskResult is a Pydantic model that represents a task result."
+      },
+      "TaskResultExcludeRequest": {
+        "properties": {
+          "excluded": {
+            "type": "boolean",
+            "title": "Excluded"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "excluded"
+        ],
+        "title": "TaskResultExcludeRequest",
+        "description": "Request body for toggling exclusion on a task result."
+      },
+      "TaskResultExcludeResponse": {
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "title": "Task Id"
+          },
+          "excluded": {
+            "type": "boolean",
+            "title": "Excluded"
+          },
+          "excluded_reason": {
+            "type": "string",
+            "title": "Excluded Reason"
+          },
+          "excluded_by_user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Excluded By User Id"
+          },
+          "excluded_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Excluded By"
+          },
+          "excluded_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Excluded At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "task_id",
+          "excluded",
+          "excluded_reason",
+          "excluded_by",
+          "excluded_at"
+        ],
+        "title": "TaskResultExcludeResponse",
+        "description": "Response after toggling exclusion on a task result."
       },
       "TaskResultResponse": {
         "properties": {
@@ -17870,6 +21748,11 @@
           "qid": {
             "type": "string",
             "title": "Qid"
+          },
+          "chip_id": {
+            "type": "string",
+            "title": "Chip Id",
+            "default": ""
           },
           "status": {
             "type": "string",
@@ -18032,6 +21915,10 @@
             "title": "Token Type",
             "default": "bearer"
           },
+          "user_id": {
+            "type": "string",
+            "title": "User Id"
+          },
           "username": {
             "type": "string",
             "title": "Username"
@@ -18046,11 +21933,17 @@
               }
             ],
             "title": "Default Project Id"
+          },
+          "must_change_password": {
+            "type": "boolean",
+            "title": "Must Change Password",
+            "default": false
           }
         },
         "type": "object",
         "required": [
           "access_token",
+          "user_id",
           "username"
         ],
         "title": "TokenResponse",
@@ -18105,6 +21998,21 @@
         "type": "object",
         "title": "UITaskFilesSettings",
         "description": "Task files editor settings."
+      },
+      "UnreadNotificationCountResponse": {
+        "properties": {
+          "unread_count": {
+            "type": "integer",
+            "minimum": 0,
+            "title": "Unread Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "unread_count"
+        ],
+        "title": "UnreadNotificationCountResponse",
+        "description": "Unread notification count."
       },
       "UpdateChipRequest": {
         "properties": {
@@ -18245,6 +22153,10 @@
       },
       "User": {
         "properties": {
+          "user_id": {
+            "type": "string",
+            "title": "User Id"
+          },
           "username": {
             "type": "string",
             "title": "Username"
@@ -18282,6 +22194,11 @@
             ],
             "title": "Default Project Id"
           },
+          "must_change_password": {
+            "type": "boolean",
+            "title": "Must Change Password",
+            "default": false
+          },
           "system_role": {
             "$ref": "#/components/schemas/SystemRole",
             "default": "user"
@@ -18289,6 +22206,7 @@
         },
         "type": "object",
         "required": [
+          "user_id",
           "username"
         ],
         "title": "User",
@@ -18298,10 +22216,18 @@
         "properties": {
           "username": {
             "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9._-]{1,62}[a-z0-9]$",
             "title": "Username"
           },
           "password": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Password"
           },
           "full_name": {
@@ -18314,18 +22240,26 @@
               }
             ],
             "title": "Full Name"
+          },
+          "create_default_project": {
+            "type": "boolean",
+            "title": "Create Default Project",
+            "default": false
           }
         },
         "type": "object",
         "required": [
-          "username",
-          "password"
+          "username"
         ],
         "title": "UserCreate",
         "description": "User creation model for registration (admin only)."
       },
       "UserDetailResponse": {
         "properties": {
+          "user_id": {
+            "type": "string",
+            "title": "User Id"
+          },
           "username": {
             "type": "string",
             "title": "Username"
@@ -18360,6 +22294,11 @@
               }
             ],
             "title": "Default Project Id"
+          },
+          "must_change_password": {
+            "type": "boolean",
+            "title": "Must Change Password",
+            "default": false
           },
           "created_at": {
             "anyOf": [
@@ -18388,6 +22327,7 @@
         },
         "type": "object",
         "required": [
+          "user_id",
           "username"
         ],
         "title": "UserDetailResponse",
@@ -18395,6 +22335,10 @@
       },
       "UserListItem": {
         "properties": {
+          "user_id": {
+            "type": "string",
+            "title": "User Id"
+          },
           "username": {
             "type": "string",
             "title": "Username"
@@ -18429,10 +22373,16 @@
               }
             ],
             "title": "Default Project Id"
+          },
+          "must_change_password": {
+            "type": "boolean",
+            "title": "Must Change Password",
+            "default": false
           }
         },
         "type": "object",
         "required": [
+          "user_id",
           "username"
         ],
         "title": "UserListItem",
@@ -18462,6 +22412,10 @@
       },
       "UserWithToken": {
         "properties": {
+          "user_id": {
+            "type": "string",
+            "title": "User Id"
+          },
           "username": {
             "type": "string",
             "title": "Username"
@@ -18499,6 +22453,11 @@
             ],
             "title": "Default Project Id"
           },
+          "must_change_password": {
+            "type": "boolean",
+            "title": "Must Change Password",
+            "default": false
+          },
           "system_role": {
             "$ref": "#/components/schemas/SystemRole",
             "default": "user"
@@ -18506,10 +22465,22 @@
           "access_token": {
             "type": "string",
             "title": "Access Token"
+          },
+          "initial_password": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Initial Password"
           }
         },
         "type": "object",
         "required": [
+          "user_id",
           "username",
           "access_token"
         ],
@@ -18558,13 +22529,6 @@
           "type": {
             "type": "string",
             "title": "Error Type"
-          },
-          "input": {
-            "title": "Input"
-          },
-          "ctx": {
-            "type": "object",
-            "title": "Context"
           }
         },
         "type": "object",
@@ -18670,10 +22634,5 @@
         "scheme": "bearer"
       }
     }
-  },
-  "servers": [
-    {
-      "url": "/api"
-    }
-  ]
+  }
 }

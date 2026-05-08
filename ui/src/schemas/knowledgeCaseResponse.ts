@@ -16,8 +16,19 @@ export interface KnowledgeCaseResponse {
   chip_id?: string;
   qid?: string;
   status?: string;
+  human_label?: string;
+  failure_mode_labels?: string[];
+  case_type?: string[];
+  model_error_type?: string;
+  resolution_label?: string;
   symptom?: string;
+  model_prediction?: string;
+  human_review_decision?: string;
   root_cause?: string;
   resolution?: string;
+  boundary_criteria?: string;
   lesson_learned?: string[];
+  applicability?: string;
+  counterexample?: string;
+  prompt_guidance?: string;
 }

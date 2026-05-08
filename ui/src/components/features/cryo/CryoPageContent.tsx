@@ -51,13 +51,8 @@ export function CryoPageContent() {
   const [newCryostatOpen, setNewCryostatOpen] = useState(false);
   const [newCooldownFor, setNewCooldownFor] = useState<string | null>(null);
 
-  if (cryostatsLoading || cooldownsLoading) {
-    return (
-      <PageContainer>
-        <div className="text-base-content/60">Loading…</div>
-      </PageContainer>
-    );
-  }
+  const isLoading = cryostatsLoading || cooldownsLoading;
+  const showNewCryostatHeaderBtn = cryostats.length > 0;
 
   return (
     <PageContainer>
@@ -68,24 +63,37 @@ export function CryoPageContent() {
             description="Manage cryostats and their cool-down cycles. Assign chips to a cool-down so calibration data gets tagged at write time."
             className="mb-0"
           />
-          <button
-            className="btn btn-primary btn-sm gap-1"
-            onClick={() => setNewCryostatOpen(true)}
-          >
-            <Plus className="h-4 w-4" />
-            New cryostat
-          </button>
+          {showNewCryostatHeaderBtn && (
+            <button
+              className="btn btn-primary btn-sm gap-1"
+              onClick={() => setNewCryostatOpen(true)}
+            >
+              <Plus className="h-4 w-4" />
+              New cryostat
+            </button>
+          )}
         </div>
 
-        {cryostats.length === 0 ? (
+        {isLoading ? (
+          <CryoLoadingSkeleton />
+        ) : cryostats.length === 0 ? (
           <EmptyState
             title="No cryostats yet"
-            description="Create one above to start tracking cool-downs."
+            description="Register your fridge to start tracking cool-down cycles. Each cool-down tags calibration writes with its cooldown_id."
             emoji="snowflake"
             size="lg"
+            action={
+              <button
+                className="btn btn-primary btn-sm gap-1 mt-3"
+                onClick={() => setNewCryostatOpen(true)}
+              >
+                <Plus className="h-4 w-4" />
+                New cryostat
+              </button>
+            }
           />
         ) : (
-          <div className="grid grid-cols-1 gap-4">
+          <div className="divide-y divide-base-300">
             {cryostats.map((cryo) => (
               <CryostatCard
                 key={cryo.cryo_id}
@@ -114,6 +122,35 @@ export function CryoPageContent() {
         />
       )}
     </PageContainer>
+  );
+}
+
+function CryoLoadingSkeleton() {
+  return (
+    <div className="space-y-4 animate-pulse">
+      {/* Header skeleton */}
+      <div className="space-y-2">
+        <div className="flex items-center gap-2">
+          <div className="h-5 w-5 rounded bg-base-300" />
+          <div className="h-6 w-24 rounded bg-base-300" />
+          <div className="h-5 w-16 rounded-full bg-base-300" />
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          <div className="h-5 w-24 rounded-full bg-base-300" />
+          <div className="h-5 w-32 rounded-full bg-base-300" />
+          <div className="h-5 w-28 rounded-full bg-base-300" />
+        </div>
+      </div>
+      {/* Active banner skeleton */}
+      <div className="h-16 rounded-xl bg-base-200/60" />
+      {/* Timeline skeleton */}
+      <div>
+        <div className="h-3 w-20 rounded bg-base-300 mb-2" />
+        <div className="h-20 rounded-md bg-base-200/60" />
+      </div>
+      {/* Detail panel skeleton */}
+      <div className="h-64 rounded-xl bg-base-200/40" />
+    </div>
   );
 }
 

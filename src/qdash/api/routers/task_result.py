@@ -11,12 +11,17 @@ from qdash.api.dependencies import get_flow_service, get_task_result_service  # 
 from qdash.api.lib.project import (  # noqa: TCH002
     ProjectContext,
     get_project_context,
-    get_project_context_owner,
+    get_project_context_editor,
 )
 from qdash.api.schemas.flow import ExecuteFlowResponse
 from qdash.api.schemas.task_result import (
+    BulkAiTriageRequest,
+    BulkAiTriageResponse,
+    DownloadFiguresAsZipRequest,
     LatestTaskResultResponse,
     TaskHistoryResponse,
+    TaskResultExcludeRequest,
+    TaskResultExcludeResponse,
     TimeSeriesData,
 )
 from qdash.api.services.flow_service import FlowService  # noqa: TCH002
@@ -397,6 +402,35 @@ def get_timeseries_task_results(
 
 
 # =============================================================================
+# AI Triage
+# =============================================================================
+
+
+@router.post(
+    "/task-results/ai-triage/bulk",
+    response_model=BulkAiTriageResponse,
+    summary="Request bulk AI triage review for latest task results",
+    operation_id="requestBulkAiTriageReview",
+)
+def request_bulk_ai_triage_review(
+    body: BulkAiTriageRequest,
+    ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
+    service: Annotated[TaskResultService, Depends(get_task_result_service)],
+) -> BulkAiTriageResponse:
+    """Enqueue AI triage review for the current latest task result per entity."""
+    return service.request_bulk_ai_triage(
+        project_id=ctx.project_id,
+        chip_id=body.chip_id,
+        task=body.task,
+        entity_type=body.entity_type,
+        date=body.date,
+        task_ids=body.task_ids,
+        model_override=body.model_override,
+        requested_by=ctx.user.username,
+    )
+
+
+# =============================================================================
 # Single-Task Re-execution
 # =============================================================================
 
@@ -409,7 +443,7 @@ def get_timeseries_task_results(
 )
 async def re_execute_task_result(
     task_id: str,
-    ctx: Annotated[ProjectContext, Depends(get_project_context_owner)],
+    ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
     service: Annotated[TaskResultService, Depends(get_task_result_service)],
     flow_service: Annotated[FlowService, Depends(get_flow_service)],
     parameter_overrides: Annotated[
@@ -493,6 +527,58 @@ async def re_execute_task_result(
 
 
 # =============================================================================
+# Exclusion
+# =============================================================================
+
+
+@router.post(
+    "/task-results/{task_id}/exclude",
+    response_model=TaskResultExcludeResponse,
+    summary="Toggle exclusion of a task result from metrics aggregations",
+    operation_id="setTaskResultExcluded",
+)
+def set_task_result_excluded(
+    task_id: str,
+    body: TaskResultExcludeRequest,
+    ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
+) -> TaskResultExcludeResponse:
+    """Toggle the excluded flag on a task result.
+
+    Excluded measurements are skipped when aggregating metrics for the
+    dashboard / metrics screens. Raw data is preserved.
+    """
+    from qdash.common.datetime_utils import now
+    from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
+    from starlette.exceptions import HTTPException
+
+    doc = TaskResultHistoryDocument.find_one(
+        {"project_id": ctx.project_id, "task_id": task_id}
+    ).run()
+
+    if doc is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Task result '{task_id}' not found",
+        )
+
+    doc.excluded = body.excluded
+    doc.excluded_reason = body.reason if body.excluded else ""
+    doc.excluded_by_user_id = ctx.user.user_id
+    doc.excluded_by = ctx.user.username
+    doc.excluded_at = now()
+    doc.save()
+
+    return TaskResultExcludeResponse(
+        task_id=doc.task_id,
+        excluded=doc.excluded,
+        excluded_reason=doc.excluded_reason,
+        excluded_by_user_id=doc.excluded_by_user_id,
+        excluded_by=doc.excluded_by,
+        excluded_at=doc.excluded_at,
+    )
+
+
+# =============================================================================
 # Figure Download
 # =============================================================================
 
@@ -503,8 +589,8 @@ async def re_execute_task_result(
     operation_id="downloadFiguresAsZip",
 )
 def download_figures_as_zip(
-    paths: Annotated[list[str], Body(description="List of file paths to include in the ZIP")],
-    filename: Annotated[str, Body(description="Filename for the ZIP archive")] = "figures.zip",
+    body: DownloadFiguresAsZipRequest,
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
 ) -> StreamingResponse:
     """Download multiple calibration figures as a ZIP file.
 
@@ -513,9 +599,9 @@ def download_figures_as_zip(
 
     Parameters
     ----------
-    paths : list[str]
+    body.paths : list[str]
         List of absolute file paths to the calibration figures
-    filename : str
+    body.filename : str
         Filename for the ZIP archive (default: "figures.zip")
 
     Returns
@@ -529,7 +615,12 @@ def download_figures_as_zip(
         400 if no paths are provided or if any path does not exist
 
     """
-    zip_buffer, safe_filename = TaskResultService.create_figures_zip(paths, filename)
+    zip_buffer, safe_filename = TaskResultService.create_figures_zip(
+        body.paths,
+        body.filename,
+        project_id=ctx.project_id,
+        ai_triage_task_ids=body.ai_triage_task_ids,
+    )
 
     return StreamingResponse(
         zip_buffer,

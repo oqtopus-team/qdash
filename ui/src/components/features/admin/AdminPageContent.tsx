@@ -3,12 +3,15 @@
 import { useState } from "react";
 
 import { useQueryClient } from "@tanstack/react-query";
+import { Download, Upload } from "lucide-react";
 
 import type {
   UserListItem,
   SystemRole,
+  ProjectRole,
   ProjectListItem,
   MemberItem,
+  BulkUserImportResponse,
 } from "@/schemas";
 
 import {
@@ -23,6 +26,7 @@ import {
   useAddProjectMemberAdmin,
   useRemoveProjectMemberAdmin,
   useCreateProjectForUser,
+  useBulkImportUsers,
 } from "@/client/admin/admin";
 import { useRegisterUser, useResetPassword } from "@/client/auth/auth";
 import { SettingsCard } from "@/components/features/settings/SettingsCard";
@@ -43,6 +47,7 @@ export function AdminPageContent() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isBulkImportModalOpen, setIsBulkImportModalOpen] = useState(false);
   const [isDeleteProjectModalOpen, setIsDeleteProjectModalOpen] =
     useState(false);
   const [isMembersModalOpen, setIsMembersModalOpen] = useState(false);
@@ -56,6 +61,7 @@ export function AdminPageContent() {
   const updateUserMutation = useUpdateUserSettings();
   const deleteUserMutation = useDeleteUser();
   const registerUserMutation = useRegisterUser();
+  const bulkImportMutation = useBulkImportUsers();
   const deleteProjectMutation = useAdminDeleteProject();
   const addMemberMutation = useAddProjectMemberAdmin();
   const removeMemberMutation = useRemoveProjectMemberAdmin();
@@ -129,18 +135,31 @@ export function AdminPageContent() {
 
   const handleCreateUser = async (userData: {
     username: string;
-    password: string;
     full_name?: string;
-  }) => {
+    create_default_project?: boolean;
+  }): Promise<string | null> => {
     try {
-      await registerUserMutation.mutateAsync({ data: userData });
+      const response = await registerUserMutation.mutateAsync({
+        data: userData,
+      });
       queryClient.invalidateQueries({ queryKey: getListAllUsersQueryKey() });
       queryClient.invalidateQueries({ queryKey: getListAllProjectsQueryKey() });
-      setIsCreateModalOpen(false);
+      return response.data.initial_password ?? null;
     } catch (err) {
       console.error("Failed to create user:", err);
       throw err;
     }
+  };
+
+  const handleBulkImportUsers = async (
+    file: File,
+  ): Promise<BulkUserImportResponse> => {
+    const response = await bulkImportMutation.mutateAsync({
+      data: { file },
+    });
+    queryClient.invalidateQueries({ queryKey: getListAllUsersQueryKey() });
+    queryClient.invalidateQueries({ queryKey: getListAllProjectsQueryKey() });
+    return response.data;
   };
 
   const handleDeleteProject = (project: ProjectListItem) => {
@@ -178,12 +197,12 @@ export function AdminPageContent() {
     }
   };
 
-  const handleAddMember = async (username: string) => {
+  const handleAddMember = async (username: string, role: ProjectRole) => {
     if (!selectedProject) return;
 
     await addMemberMutation.mutateAsync({
       projectId: selectedProject.project_id,
-      data: { username },
+      data: { username, role },
     });
     queryClient.invalidateQueries({ queryKey: getListAllProjectsQueryKey() });
   };
@@ -250,28 +269,37 @@ export function AdminPageContent() {
       {activeTab === "users" && (
         <div className="card bg-base-200 shadow-lg">
           <div className="card-body">
-            <div className="flex justify-between items-center mb-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
               <h2 className="card-title">User Management</h2>
-              <button
-                className="btn btn-primary btn-sm"
-                onClick={() => setIsCreateModalOpen(true)}
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-4 w-4"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
+              <div className="flex flex-wrap gap-2">
+                <button
+                  className="btn btn-outline btn-sm"
+                  onClick={() => setIsBulkImportModalOpen(true)}
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 4v16m8-8H4"
-                  />
-                </svg>
-                Create User
-              </button>
+                  <Upload className="h-4 w-4" />
+                  Bulk Import
+                </button>
+                <button
+                  className="btn btn-primary btn-sm"
+                  onClick={() => setIsCreateModalOpen(true)}
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-4 w-4"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 4v16m8-8H4"
+                    />
+                  </svg>
+                  Create User
+                </button>
+              </div>
             </div>
 
             {/* Mobile card view */}
@@ -314,7 +342,7 @@ export function AdminPageContent() {
                       <div>
                         {userItem.default_project_id ? (
                           <span className="badge badge-success badge-sm">
-                            Has Project
+                            Default Project
                           </span>
                         ) : (
                           <button
@@ -327,7 +355,7 @@ export function AdminPageContent() {
                             {createProjectMutation.isPending ? (
                               <span className="loading loading-spinner loading-xs"></span>
                             ) : (
-                              "Add Project"
+                              "Create Default"
                             )}
                           </button>
                         )}
@@ -361,7 +389,7 @@ export function AdminPageContent() {
                     <th>Username</th>
                     <th>Full Name</th>
                     <th>System Role</th>
-                    <th>Project</th>
+                    <th>Default Project</th>
                     <th>Status</th>
                     <th>Actions</th>
                   </tr>
@@ -385,7 +413,7 @@ export function AdminPageContent() {
                       <td>
                         {userItem.default_project_id ? (
                           <span className="badge badge-success badge-sm">
-                            Has Project
+                            Default Project
                           </span>
                         ) : (
                           <button
@@ -398,7 +426,7 @@ export function AdminPageContent() {
                             {createProjectMutation.isPending ? (
                               <span className="loading loading-spinner loading-xs"></span>
                             ) : (
-                              "Add Project"
+                              "Create Default"
                             )}
                           </button>
                         )}
@@ -647,6 +675,15 @@ export function AdminPageContent() {
           onSave={handleCreateUser}
           isLoading={registerUserMutation.isPending}
           error={registerUserMutation.error}
+        />
+      )}
+
+      {isBulkImportModalOpen && (
+        <BulkImportUsersModal
+          onClose={() => setIsBulkImportModalOpen(false)}
+          onImport={handleBulkImportUsers}
+          isLoading={bulkImportMutation.isPending}
+          error={bulkImportMutation.error}
         />
       )}
 
@@ -943,16 +980,20 @@ function CreateUserModal({
   onClose: () => void;
   onSave: (userData: {
     username: string;
-    password: string;
     full_name?: string;
-  }) => Promise<void>;
+    create_default_project?: boolean;
+  }) => Promise<string | null>;
   isLoading: boolean;
   error: Error | unknown | null;
 }) {
   const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
+  const [createDefaultProject, setCreateDefaultProject] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
+  const [temporaryPassword, setTemporaryPassword] = useState<string | null>(
+    null,
+  );
+  const [copied, setCopied] = useState(false);
 
   const handleSave = async () => {
     setLocalError(null);
@@ -961,24 +1002,24 @@ function CreateUserModal({
       setLocalError("Username is required");
       return;
     }
-    if (!password.trim()) {
-      setLocalError("Password is required");
-      return;
-    }
-    if (password.length < 4) {
-      setLocalError("Password must be at least 4 characters");
-      return;
-    }
 
     try {
-      await onSave({
+      const generatedPassword = await onSave({
         username: username.trim(),
-        password,
         full_name: fullName.trim() || undefined,
+        create_default_project: createDefaultProject,
       });
+      setTemporaryPassword(generatedPassword);
     } catch {
       // Error is handled by the mutation
     }
+  };
+
+  const handleCopyPassword = async () => {
+    if (!temporaryPassword) return;
+    await navigator.clipboard.writeText(temporaryPassword);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   const displayError =
@@ -996,67 +1037,335 @@ function CreateUserModal({
           </div>
         )}
 
-        <div className="space-y-4">
-          <div className="form-control">
-            <label className="label">
-              <span className="label-text font-medium">Username *</span>
-            </label>
-            <input
-              type="text"
-              className="input input-bordered w-full"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder="Enter username"
-            />
-          </div>
-
-          <div className="form-control">
-            <label className="label">
-              <span className="label-text font-medium">Password *</span>
-            </label>
-            <input
-              type="password"
-              className="input input-bordered w-full"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter password"
-            />
-          </div>
-
-          <div className="form-control">
-            <label className="label">
-              <span className="label-text font-medium">Full Name</span>
-            </label>
-            <input
-              type="text"
-              className="input input-bordered w-full"
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              placeholder="Enter full name (optional)"
-            />
-            <label className="label">
-              <span className="label-text-alt text-base-content/60">
-                A default project will be created for this user
+        {temporaryPassword ? (
+          <div className="space-y-4">
+            <div className="alert alert-success">
+              <span>
+                User <span className="font-mono font-semibold">{username}</span>{" "}
+                was created. Share this temporary password securely.
               </span>
+            </div>
+            <div className="form-control">
+              <label className="label">
+                <span className="label-text font-medium">
+                  Temporary Password
+                </span>
+              </label>
+              <div className="join w-full">
+                <input
+                  className="input input-bordered join-item w-full font-mono"
+                  value={temporaryPassword}
+                  readOnly
+                />
+                <button
+                  type="button"
+                  className={`btn join-item ${copied ? "btn-success" : "btn-primary"}`}
+                  onClick={handleCopyPassword}
+                >
+                  {copied ? "Copied" : "Copy"}
+                </button>
+              </div>
+              <label className="label">
+                <span className="label-text-alt text-base-content/60">
+                  This password is shown only once. The user must change it
+                  after signing in.
+                </span>
+              </label>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="form-control">
+              <label className="label">
+                <span className="label-text font-medium">Username *</span>
+              </label>
+              <input
+                type="text"
+                className="input input-bordered w-full"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="Enter username"
+              />
+            </div>
+
+            <div className="form-control">
+              <label className="label">
+                <span className="label-text font-medium">Full Name</span>
+              </label>
+              <input
+                type="text"
+                className="input input-bordered w-full"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                placeholder="Enter full name (optional)"
+              />
+              <label className="label">
+                <span className="label-text-alt text-base-content/60">
+                  A temporary password will be generated for this user
+                </span>
+              </label>
+            </div>
+            <label className="form-control cursor-pointer rounded-lg border border-base-300 bg-base-100 p-3">
+              <div className="flex items-start gap-3">
+                <input
+                  type="checkbox"
+                  className="checkbox checkbox-primary mt-1"
+                  checked={createDefaultProject}
+                  onChange={(event) =>
+                    setCreateDefaultProject(event.target.checked)
+                  }
+                />
+                <div>
+                  <div className="font-medium">Create default project</div>
+                  <div className="text-sm text-base-content/60">
+                    Provision a personal project for this user and set it as
+                    their default project.
+                  </div>
+                </div>
+              </div>
             </label>
           </div>
-        </div>
+        )}
 
         <div className="modal-action">
           <button className="btn" onClick={onClose}>
-            Cancel
+            {temporaryPassword ? "Close" : "Cancel"}
           </button>
-          <button
-            className="btn btn-primary"
-            onClick={handleSave}
-            disabled={isLoading}
-          >
-            {isLoading ? (
-              <span className="loading loading-spinner loading-sm"></span>
-            ) : (
-              "Create User"
-            )}
+          {!temporaryPassword && (
+            <button
+              className="btn btn-primary"
+              onClick={handleSave}
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <span className="loading loading-spinner loading-sm"></span>
+              ) : (
+                "Create User"
+              )}
+            </button>
+          )}
+        </div>
+      </div>
+      <form method="dialog" className="modal-backdrop">
+        <button onClick={onClose}>close</button>
+      </form>
+    </dialog>
+  );
+}
+
+function csvEscape(value: unknown): string {
+  const text = value == null ? "" : String(value);
+  if (/[",\n\r]/.test(text)) {
+    return `"${text.split('"').join('""')}"`;
+  }
+  return text;
+}
+
+function buildBulkImportResultCsv(result: BulkUserImportResponse): string {
+  const headers = [
+    "row_number",
+    "username",
+    "full_name",
+    "system_role",
+    "initial_password",
+    "status",
+    "message",
+  ];
+  const rows = result.results.map((row) =>
+    [
+      row.row_number,
+      row.username,
+      row.full_name,
+      row.system_role,
+      row.initial_password,
+      row.status,
+      row.message,
+    ]
+      .map(csvEscape)
+      .join(","),
+  );
+  return [headers.join(","), ...rows].join("\n");
+}
+
+function downloadBulkImportResult(result: BulkUserImportResponse) {
+  const csv = buildBulkImportResultCsv(result);
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `qdash-user-import-${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+function BulkImportUsersModal({
+  onClose,
+  onImport,
+  isLoading,
+  error,
+}: {
+  onClose: () => void;
+  onImport: (file: File) => Promise<BulkUserImportResponse>;
+  isLoading: boolean;
+  error: Error | unknown | null;
+}) {
+  const [file, setFile] = useState<File | null>(null);
+  const [result, setResult] = useState<BulkUserImportResponse | null>(null);
+  const [localError, setLocalError] = useState<string | null>(null);
+
+  const handleImport = async () => {
+    setLocalError(null);
+    if (!file) {
+      setLocalError("CSV file is required");
+      return;
+    }
+
+    try {
+      const importResult = await onImport(file);
+      setResult(importResult);
+    } catch {
+      // Error is shown from mutation state.
+    }
+  };
+
+  const displayError =
+    localError || (error ? "Failed to import users from CSV." : null);
+
+  return (
+    <dialog className="modal modal-open">
+      <div className="modal-box max-w-4xl">
+        <h3 className="font-bold text-lg mb-4">Bulk Import Users</h3>
+
+        {displayError && (
+          <div className="alert alert-error mb-4">
+            <span>{displayError}</span>
+          </div>
+        )}
+
+        {result ? (
+          <div className="space-y-4">
+            <div className="stats stats-vertical sm:stats-horizontal w-full bg-base-200">
+              <div className="stat">
+                <div className="stat-title">Created</div>
+                <div className="stat-value text-success">{result.created}</div>
+              </div>
+              <div className="stat">
+                <div className="stat-title">Skipped</div>
+                <div className="stat-value">{result.skipped}</div>
+              </div>
+              <div className="stat">
+                <div className="stat-title">Failed</div>
+                <div className="stat-value text-error">{result.failed}</div>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto rounded-lg border border-base-300">
+              <table className="table table-sm">
+                <thead>
+                  <tr>
+                    <th>Row</th>
+                    <th>Username</th>
+                    <th>Role</th>
+                    <th>Status</th>
+                    <th>Message</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {result.results.map((row) => (
+                    <tr key={`${row.row_number}-${row.username}`}>
+                      <td>{row.row_number}</td>
+                      <td className="font-mono">{row.username || "-"}</td>
+                      <td>{row.system_role || "-"}</td>
+                      <td>
+                        <span
+                          className={`badge badge-sm ${
+                            row.status === "created"
+                              ? "badge-success"
+                              : row.status === "failed"
+                                ? "badge-error"
+                                : "badge-ghost"
+                          }`}
+                        >
+                          {row.status}
+                        </span>
+                      </td>
+                      <td className="max-w-xs truncate">
+                        {row.message || "-"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="alert alert-info">
+              <span>
+                Download the result CSV now. Generated passwords are not stored
+                in plain text and cannot be shown again later.
+              </span>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="form-control">
+              <label className="label">
+                <span className="label-text font-medium">CSV File</span>
+              </label>
+              <input
+                type="file"
+                accept=".csv,text/csv"
+                className="file-input file-input-bordered w-full"
+                onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+              />
+            </div>
+
+            <div className="rounded-lg border border-base-300 bg-base-100 p-3">
+              <div className="text-sm font-medium">Expected columns</div>
+              <pre className="mt-2 overflow-x-auto rounded bg-base-200 p-3 text-xs">
+                username,full_name,system_role
+                {"\n"}
+                alice,Alice Sato,user
+                {"\n"}
+                bob,Bob Tanaka,admin
+              </pre>
+              <p className="mt-2 text-xs text-base-content/60">
+                Add users to projects from the Projects tab after importing
+                accounts.
+              </p>
+            </div>
+          </div>
+        )}
+
+        <div className="modal-action">
+          <button className="btn" onClick={onClose}>
+            {result ? "Close" : "Cancel"}
           </button>
+          {result ? (
+            <button
+              className="btn btn-primary"
+              onClick={() => downloadBulkImportResult(result)}
+            >
+              <Download className="h-4 w-4" />
+              Download CSV
+            </button>
+          ) : (
+            <button
+              className="btn btn-primary"
+              onClick={handleImport}
+              disabled={isLoading || !file}
+            >
+              {isLoading ? (
+                <span className="loading loading-spinner loading-sm"></span>
+              ) : (
+                <>
+                  <Upload className="h-4 w-4" />
+                  Import Users
+                </>
+              )}
+            </button>
+          )}
         </div>
       </div>
       <form method="dialog" className="modal-backdrop">
@@ -1080,7 +1389,7 @@ function MembersModal({
   project: ProjectListItem;
   users: UserListItem[];
   onClose: () => void;
-  onAddMember: (username: string) => Promise<void>;
+  onAddMember: (username: string, role: ProjectRole) => Promise<void>;
   onRemoveMember: (username: string) => Promise<void>;
   isAddingMember: boolean;
   isRemovingMember: boolean;
@@ -1088,6 +1397,7 @@ function MembersModal({
 }) {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [selectedUsername, setSelectedUsername] = useState("");
+  const [selectedRole, setSelectedRole] = useState<ProjectRole>("viewer");
   const [removingUsername, setRemovingUsername] = useState<string | null>(null);
   const [localError, setLocalError] = useState<string | null>(null);
 
@@ -1114,8 +1424,9 @@ function MembersModal({
     }
 
     try {
-      await onAddMember(selectedUsername);
+      await onAddMember(selectedUsername, selectedRole);
       setSelectedUsername("");
+      setSelectedRole("viewer");
       setIsAddModalOpen(false);
       refetch();
     } catch {
@@ -1134,6 +1445,8 @@ function MembersModal({
     switch (role) {
       case "owner":
         return "badge-secondary";
+      case "editor":
+        return "badge-primary";
       case "viewer":
         return "badge-ghost";
       default:
@@ -1237,7 +1550,7 @@ function MembersModal({
         {isAddModalOpen && (
           <dialog className="modal modal-open" style={{ zIndex: 100 }}>
             <div className="modal-box">
-              <h3 className="font-bold text-lg mb-4">Add Member as Viewer</h3>
+              <h3 className="font-bold text-lg mb-4">Add Member</h3>
 
               {(localError || !!addMemberError) && (
                 <div className="alert alert-error mb-4">
@@ -1269,6 +1582,22 @@ function MembersModal({
                   </select>
                 </div>
 
+                <div className="form-control">
+                  <label className="label">
+                    <span className="label-text font-medium">Role</span>
+                  </label>
+                  <select
+                    className="select select-bordered ml-2"
+                    value={selectedRole}
+                    onChange={(e) =>
+                      setSelectedRole(e.target.value as ProjectRole)
+                    }
+                  >
+                    <option value="viewer">Viewer</option>
+                    <option value="editor">Editor</option>
+                  </select>
+                </div>
+
                 <div className="alert alert-info">
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -1284,7 +1613,8 @@ function MembersModal({
                     ></path>
                   </svg>
                   <span className="text-sm">
-                    Members are added as viewers with read-only access.
+                    Viewers can read project data. Editors can also operate
+                    workflows, notes, chips, and calibration data.
                   </span>
                 </div>
               </div>
@@ -1304,7 +1634,7 @@ function MembersModal({
                   {isAddingMember ? (
                     <span className="loading loading-spinner loading-sm"></span>
                   ) : (
-                    "Add as Viewer"
+                    "Add Member"
                   )}
                 </button>
               </div>

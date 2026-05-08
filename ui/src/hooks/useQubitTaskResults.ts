@@ -26,6 +26,7 @@ export function useQubitTaskResults({
   keepPrevious = false,
 }: UseQubitTaskResultsOptions) {
   const isLatest = selectedDate === "latest";
+  const canFetch = Boolean(chipId && task);
   const dateForHistorical = isLatest
     ? new Date().toISOString().split("T")[0]
     : selectedDate;
@@ -36,7 +37,7 @@ export function useQubitTaskResults({
     {
       query: {
         staleTime,
-        enabled: isLatest,
+        enabled: canFetch && isLatest,
         ...(keepPrevious && { placeholderData: keepPreviousData }),
       },
     },
@@ -51,7 +52,7 @@ export function useQubitTaskResults({
     {
       query: {
         staleTime,
-        enabled: !isLatest,
+        enabled: canFetch && !isLatest,
         ...(keepPrevious && { placeholderData: keepPreviousData }),
       },
     },

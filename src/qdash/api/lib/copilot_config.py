@@ -38,6 +38,14 @@ class ModelConfig(BaseModel):
     name: str = "gpt-4.1"
     temperature: float | None = 0.7
     max_output_tokens: int = 16384
+    base_url: str | None = None
+    api_key_env: str | None = None
+    keep_alive: str | None = None
+    num_ctx: int | None = None
+    top_p: float | None = None
+    top_k: int | None = None
+    reasoning_effort: str | None = None
+    disable_thinking_instruction: bool = False
 
 
 class Suggestion(BaseModel):
@@ -53,6 +61,13 @@ class AnalysisConfig(BaseModel):
     enabled: bool = True
     multimodal: bool = True
     max_conversation_turns: int = 10
+    max_expected_images: int | None = None
+    ai_triage_max_expected_images: int | None = None
+    ai_triage_max_output_tokens: int | None = None
+    ai_triage_tasks: list[str] = []
+    ai_triage_message: str = (
+        "Review this completed calibration result and attach a concise operational triage note."
+    )
 
 
 class CopilotConfig(BaseModel):
@@ -65,6 +80,10 @@ class CopilotConfig(BaseModel):
     # Optional override used only for task result analysis (image/chevron etc.).
     # When unset, `model` is used for both chat and analysis.
     analysis_model: ModelConfig | None = None
+    # Optional list of selectable task result analysis models. The first entry
+    # is used as the default when `analysis_model` is unset. `analysis_model`
+    # remains for backward compatibility with existing copilot.yaml files.
+    analysis_models: list[ModelConfig] = []
     evaluation_metrics: EvaluationMetrics = EvaluationMetrics()
     scoring: dict[str, ScoringThreshold] = {}
     system_prompt: str = ""
@@ -100,7 +119,9 @@ def load_copilot_config() -> CopilotConfig:
         if "scoring" in data:
             scoring = {}
             for key, value in data["scoring"].items():
-                scoring[key] = ScoringThreshold(**value)
+                scoring[key] = (
+                    value if isinstance(value, ScoringThreshold) else ScoringThreshold(**value)
+                )
             data["scoring"] = scoring
 
         return CopilotConfig(**data)

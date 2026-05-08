@@ -11,6 +11,9 @@ import type { MetricHistoryItemCalibratedAt } from "./metricHistoryItemCalibrate
 import type { MetricHistoryItemName } from "./metricHistoryItemName";
 import type { MetricHistoryItemInputParameters } from "./metricHistoryItemInputParameters";
 import type { MetricHistoryItemOutputParameters } from "./metricHistoryItemOutputParameters";
+import type { MetricHistoryItemExcludedByUserId } from "./metricHistoryItemExcludedByUserId";
+import type { MetricHistoryItemExcludedBy } from "./metricHistoryItemExcludedBy";
+import type { MetricHistoryItemExcludedAt } from "./metricHistoryItemExcludedAt";
 
 /**
  * Single historical metric data point.
@@ -24,4 +27,9 @@ export interface MetricHistoryItem {
   name?: MetricHistoryItemName;
   input_parameters?: MetricHistoryItemInputParameters;
   output_parameters?: MetricHistoryItemOutputParameters;
+  excluded?: boolean;
+  excluded_reason?: string;
+  excluded_by_user_id?: MetricHistoryItemExcludedByUserId;
+  excluded_by?: MetricHistoryItemExcludedBy;
+  excluded_at?: MetricHistoryItemExcludedAt;
 }

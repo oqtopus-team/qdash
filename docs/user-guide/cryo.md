@@ -50,6 +50,44 @@ Click **End** on an active cool-down. This:
 
 Subsequent calibration writes will have an empty `cooldown_id`.
 
+## Wiring info
+
+Each cool-down has a **Wiring info** section in its detail panel for recording
+how the fridge was wired up for that cycle (MUX assignments, attenuation,
+filters, diagrams, etc.). The editor is a Notion-style block editor that is
+**always editable** — there is no separate edit/view toggle, and changes save
+automatically (~1 s after you stop typing). A subtle *Saving… / Saved · Xs
+ago* indicator at the top-right of the section shows the autosave status.
+
+- Type <kbd>/</kbd> to insert a block: **table**, image, heading, bullet /
+  numbered / check list, toggle, quote, code, divider.
+- **Tables**: hover a row or column edge to add or delete; drag edges to
+  resize. Right-click a cell for the cell menu.
+- **Images**: paste a screenshot with <kbd>⌘/Ctrl+V</kbd>, drag a file in, or
+  insert via the slash menu. Images are embedded inline as base64; max 5 MB
+  per image to keep cool-down documents within Mongo's 16 MiB limit.
+- Drag the <kbd>⠿</kbd> handle in the left margin to reorder blocks.
+- Existing Markdown notes are imported automatically the first time the
+  section is opened.
+- Each save persists both the rich block representation (authoritative) and a
+  Markdown export (for fallback rendering and search).
+
+### Wiring history (checkpoints)
+
+Autosave keeps the *current* wiring up to date but does not preserve a
+history. When the wiring actually changes during a cool-down (e.g. a MUX line
+is swapped, attenuators are added), record a **checkpoint**:
+
+1. Below the editor, click **Save checkpoint**.
+2. Briefly describe what changed (required, e.g. *"Swapped MUX line on Q3
+   readout after warm-up"*) and confirm.
+
+Each checkpoint captures the actor, the comment, and a Markdown snapshot of
+the wiring at that moment. Checkpoints appear in the **Wiring history** list
+underneath the editor — click an entry to expand it and view the snapshot.
+Snapshots are append-only, so you can always trace which configuration
+produced which calibration data within the same cool-down.
+
 ## Filtering by cool-down
 
 The dashboard's filter bar shows a **Cool-down…** dropdown next to the chip

@@ -5,6 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
+import type { NoteEventResponseActorUserId } from "./noteEventResponseActorUserId";
 import type { NoteEventResponseExtra } from "./noteEventResponseExtra";
 
 /**
@@ -19,6 +20,7 @@ export interface NoteEventResponse {
   metric_key?: string;
   /** upsert | delete */
   action: string;
+  actor_user_id?: NoteEventResponseActorUserId;
   actor: string;
   content?: string;
   extra?: NoteEventResponseExtra;

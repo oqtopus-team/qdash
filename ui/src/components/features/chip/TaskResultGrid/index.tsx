@@ -3,13 +3,16 @@
 import {
   Check,
   Download,
+  Bot,
+  LoaderCircle,
   X,
   ZoomIn,
   ZoomOut,
   Maximize2,
   Move,
 } from "lucide-react";
-import { useMemo, useState, useRef, useCallback, memo } from "react";
+import { useMemo, useState, useRef, useCallback, memo, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   TransformWrapper,
   TransformComponent,
@@ -18,13 +21,31 @@ import {
 
 import type { Task } from "@/schemas";
 
-import { downloadFiguresAsZip } from "@/client/task-result/task-result";
+import { getGetChipNotesSummaryQueryKey } from "@/client/note/note";
+import { useGetCopilotConfig } from "@/client/copilot/copilot";
+import {
+  downloadFiguresAsZip,
+  requestBulkAiTriageReview,
+} from "@/client/task-result/task-result";
+import { AiTriageConfirmModal } from "@/components/features/chip/AiTriageConfirmModal";
+import type { AiTriageBadgeState } from "@/components/features/chip/aiTriageBadge";
+import {
+  DownloadConfirmModal,
+  type DownloadItemCounts,
+  type DownloadOptions,
+} from "@/components/features/chip/DownloadConfirmModal";
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { TaskHistoryModal } from "@/components/features/chip/modals/TaskHistoryModal";
 import { RegionZoomToggle } from "@/components/ui/RegionZoomToggle";
 import { useGridLayout } from "@/hooks/useGridLayout";
 import { useQubitTaskResults } from "@/hooks/useQubitTaskResults";
 import { useTopologyConfig } from "@/hooks/useTopologyConfig";
+import {
+  buildAnalysisModelOptions,
+  getStoredAnalysisModelKey,
+  resolveAnalysisModelOption,
+  setStoredAnalysisModelKey,
+} from "@/lib/copilotModels";
 import {
   getQubitGridPosition,
   type TopologyLayoutParams,
@@ -38,12 +59,26 @@ interface TaskResultGridProps {
   selectedDate: string;
   gridSize: number;
   onDateChange?: (date: string) => void;
+  aiTriageBadgesByTaskId?: Map<string, AiTriageBadgeState>;
 }
 
 interface SelectedTaskInfo {
   qid: string;
   taskName: string;
 }
+
+type TaskWithAiTriage = Task & {
+  ai_triage?: {
+    status?: string;
+  } | null;
+};
+
+const DEFAULT_DOWNLOAD_OPTIONS: DownloadOptions = {
+  figureImages: false,
+  jsonFigures: true,
+  rawData: false,
+  aiTriageNotes: false,
+};
 
 // Zoom control buttons component
 function ZoomControls() {
@@ -98,6 +133,30 @@ function getStatusColor(status: string | undefined): string {
   }
 }
 
+function isAiTriageReviewPending(
+  task: TaskWithAiTriage | null | undefined,
+): boolean {
+  const status = task?.ai_triage?.status;
+  return status === "requested" || status === "running";
+}
+
+function getPendingAiTriageTaskIds(
+  tasks: Record<string, TaskWithAiTriage> | undefined,
+): Set<string> {
+  const taskIds = new Set<string>();
+  for (const task of Object.values(tasks ?? {})) {
+    if (task.task_id && isAiTriageReviewPending(task)) {
+      taskIds.add(task.task_id);
+    }
+  }
+  return taskIds;
+}
+
+function toPathList(paths: string[] | string | null | undefined): string[] {
+  if (!paths) return [];
+  return Array.isArray(paths) ? paths : [paths];
+}
+
 // Memoized grid cell component for performance
 interface GridCellProps {
   qid: string;
@@ -110,6 +169,11 @@ interface GridCellProps {
   isDownloadMode: boolean;
   isSelectedForDownload: boolean;
   canBeDownloaded: boolean;
+  isAiTriageMode: boolean;
+  isSelectedForAiTriage: boolean;
+  canBeAiTriaged: boolean;
+  aiTriageBadge: AiTriageBadgeState | null;
+  isAiTriagePending: boolean;
   onClick: () => void;
 }
 
@@ -124,8 +188,19 @@ const GridCell = memo(function GridCell({
   isDownloadMode,
   isSelectedForDownload,
   canBeDownloaded,
+  isAiTriageMode,
+  isSelectedForAiTriage,
+  canBeAiTriaged,
+  aiTriageBadge,
+  isAiTriagePending,
   onClick,
 }: GridCellProps) {
+  const isSelectionMode = isDownloadMode || isAiTriageMode;
+  const isSelected = isDownloadMode
+    ? isSelectedForDownload
+    : isSelectedForAiTriage;
+  const canBeSelected = isDownloadMode ? canBeDownloaded : canBeAiTriaged;
+
   if (!task) {
     return (
       <div
@@ -144,11 +219,11 @@ const GridCell = memo(function GridCell({
       <button
         onClick={onClick}
         className={`aspect-square rounded-lg shadow-sm relative group cursor-pointer ${getStatusColor(task.status)} ${muxBgClass} ${
-          isDownloadMode && isSelectedForDownload
+          isSelectionMode && isSelected
             ? "ring-2 ring-primary ring-offset-1"
             : ""
         } ${
-          isDownloadMode && !canBeDownloaded
+          isSelectionMode && !canBeSelected
             ? "opacity-40 cursor-not-allowed"
             : ""
         }`}
@@ -158,14 +233,31 @@ const GridCell = memo(function GridCell({
             {qid}
           </div>
         )}
+        {isAiTriagePending ? (
+          <div
+            className="absolute top-0.5 right-0.5 rounded bg-info text-info-content p-0.5 shadow-sm"
+            title="AI triage review requested"
+          >
+            <LoaderCircle size={10} className="animate-spin" />
+          </div>
+        ) : aiTriageBadge ? (
+          <div
+            className={`absolute top-0.5 right-0.5 rounded ${aiTriageBadge.iconClass} p-0.5 shadow-sm`}
+            title={aiTriageBadge.title}
+          >
+            <Bot size={10} />
+          </div>
+        ) : null}
         {/* Hover tooltip */}
         <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-base-100 text-base-content text-xs rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
           {qid}: {task.status}
+          {isAiTriagePending ? " · AI triage review requested" : ""}
+          {aiTriageBadge ? ` · ${aiTriageBadge.tooltip}` : ""}
         </div>
-        {isDownloadMode && canBeDownloaded && isSelectedForDownload && (
+        {isSelectionMode && canBeSelected && isSelected && (
           <div className="absolute inset-0 flex items-center justify-center bg-primary/20">
             <div className="bg-primary text-primary-content rounded-full p-0.5">
-              <Check size={10} />
+              {isAiTriageMode ? <Bot size={10} /> : <Check size={10} />}
             </div>
           </div>
         )}
@@ -178,13 +270,9 @@ const GridCell = memo(function GridCell({
     <button
       onClick={onClick}
       className={`aspect-square rounded-xl bg-white shadow-md border border-base-300/60 overflow-hidden transition-all duration-200 hover:shadow-xl hover:scale-105 hover:border-primary/40 relative w-full ${muxBgClass} ${
-        isDownloadMode && isSelectedForDownload
-          ? "ring-2 ring-primary ring-offset-2"
-          : ""
+        isSelectionMode && isSelected ? "ring-2 ring-primary ring-offset-2" : ""
       } ${
-        isDownloadMode && !canBeDownloaded
-          ? "opacity-40 cursor-not-allowed"
-          : ""
+        isSelectionMode && !canBeSelected ? "opacity-40 cursor-not-allowed" : ""
       }`}
     >
       {task.figure_path && figurePath && (
@@ -205,21 +293,36 @@ const GridCell = memo(function GridCell({
           {qid}
         </div>
       )}
+      {isAiTriagePending ? (
+        <div
+          className="absolute top-1 right-1 rounded bg-info text-info-content p-1 shadow-sm"
+          title="AI triage review requested"
+        >
+          <LoaderCircle size={14} className="animate-spin" />
+        </div>
+      ) : aiTriageBadge ? (
+        <div
+          className={`absolute top-1 right-1 rounded ${aiTriageBadge.iconClass} p-1 shadow-sm`}
+          title={aiTriageBadge.title}
+        >
+          <Bot size={14} />
+        </div>
+      ) : null}
       <div
         className={`absolute bottom-1 right-1 w-2 h-2 rounded-full ${getStatusColor(task.status)}`}
       />
       {/* Download selection overlay */}
-      {isDownloadMode && canBeDownloaded && (
+      {isSelectionMode && canBeSelected && (
         <div
           className={`absolute inset-0 flex items-center justify-center transition-colors ${
-            isSelectedForDownload
+            isSelected
               ? "bg-primary/20"
               : "bg-transparent hover:bg-base-content/10"
           }`}
         >
-          {isSelectedForDownload && (
+          {isSelected && (
             <div className="bg-primary text-primary-content rounded-full p-1">
-              <Check size={16} />
+              {isAiTriageMode ? <Bot size={16} /> : <Check size={16} />}
             </div>
           )}
         </div>
@@ -234,7 +337,9 @@ export function TaskResultGrid({
   selectedTask,
   selectedDate,
   gridSize: defaultGridSize,
+  aiTriageBadgesByTaskId,
 }: TaskResultGridProps) {
+  const queryClient = useQueryClient();
   // Get topology configuration
   const {
     muxSize = 2,
@@ -286,18 +391,97 @@ export function TaskResultGrid({
     new Set(),
   );
   const [isDownloading, setIsDownloading] = useState(false);
+  const [isDownloadConfirmOpen, setIsDownloadConfirmOpen] = useState(false);
+  const [downloadOptions, setDownloadOptions] = useState<DownloadOptions>(
+    DEFAULT_DOWNLOAD_OPTIONS,
+  );
+  const [aiTriageSelectionEnabled, setAiTriageSelectionEnabled] =
+    useState(false);
+  const [selectedForAiTriage, setSelectedForAiTriage] = useState<Set<string>>(
+    new Set(),
+  );
+  const [pendingAiTriageTaskIds, setPendingAiTriageTaskIds] = useState<
+    Set<string>
+  >(new Set());
+  const [isRequestingAiTriage, setIsRequestingAiTriage] = useState(false);
+  const [isAiTriageConfirmOpen, setIsAiTriageConfirmOpen] = useState(false);
+  const [aiTriageStatus, setAiTriageStatus] = useState<string | null>(null);
+  const [selectedModelKey, setSelectedModelKey] = useState(
+    getStoredAnalysisModelKey,
+  );
+  const { data: copilotConfigResponse } = useGetCopilotConfig();
+  const modelOptions = useMemo(
+    () => buildAnalysisModelOptions(copilotConfigResponse?.data ?? null),
+    [copilotConfigResponse?.data],
+  );
+  const selectedModel = resolveAnalysisModelOption(
+    modelOptions,
+    selectedModelKey,
+  );
 
   // Fetch task results
   const {
     data: taskResponse,
     isLoading: isLoadingTask,
     isError: isTaskError,
+    refetch: refetchTaskResults,
   } = useQubitTaskResults({
     chipId,
     task: selectedTask,
     selectedDate,
     keepPrevious: true,
   });
+  const persistedPendingAiTriageTaskIds = useMemo(
+    () => getPendingAiTriageTaskIds(taskResponse?.data?.result),
+    [taskResponse?.data?.result],
+  );
+  const visiblePendingAiTriageCount = useMemo(() => {
+    const taskIds = new Set(pendingAiTriageTaskIds);
+    for (const taskId of persistedPendingAiTriageTaskIds) {
+      taskIds.add(taskId);
+    }
+    return taskIds.size;
+  }, [pendingAiTriageTaskIds, persistedPendingAiTriageTaskIds]);
+  const downloadCounts = useMemo(() => {
+    const counts: DownloadItemCounts = {
+      figureImages: 0,
+      jsonFigures: 0,
+      rawData: 0,
+      aiTriageNotes: 0,
+    };
+    selectedForDownload.forEach((qid) => {
+      const task = taskResponse?.data?.result?.[qid];
+      counts.figureImages += toPathList(task?.figure_path).length;
+      counts.jsonFigures += toPathList(task?.json_figure_path).length;
+      counts.rawData += toPathList(task?.raw_data_path).length;
+      if (task?.task_id && aiTriageBadgesByTaskId?.has(task.task_id)) {
+        counts.aiTriageNotes += 1;
+      }
+    });
+    return counts;
+  }, [aiTriageBadgesByTaskId, selectedForDownload, taskResponse?.data?.result]);
+
+  useEffect(() => {
+    if (!aiTriageBadgesByTaskId || pendingAiTriageTaskIds.size === 0) return;
+    setPendingAiTriageTaskIds((prev) => {
+      const next = new Set(prev);
+      for (const taskId of aiTriageBadgesByTaskId.keys()) {
+        next.delete(taskId);
+      }
+      return next.size === prev.size ? prev : next;
+    });
+  }, [aiTriageBadgesByTaskId, pendingAiTriageTaskIds.size]);
+
+  useEffect(() => {
+    if (visiblePendingAiTriageCount === 0) return;
+    const intervalId = window.setInterval(() => {
+      void refetchTaskResults();
+      void queryClient.invalidateQueries({
+        queryKey: getGetChipNotesSummaryQueryKey(chipId),
+      });
+    }, 5_000);
+    return () => window.clearInterval(intervalId);
+  }, [chipId, queryClient, refetchTaskResults, visiblePendingAiTriageCount]);
 
   // View mode state: 'pan-zoom' for DOM with pan/zoom, 'region' for region zoom
   const [viewMode, setViewMode] = useState<"pan-zoom" | "region">("pan-zoom");
@@ -394,7 +578,7 @@ export function TaskResultGrid({
 
   const selectAllForDownload = () => {
     const allQids = Object.entries(taskResponse?.data?.result || {})
-      .filter(([, task]) => task.json_figure_path)
+      .filter(([, task]) => hasDownloadableArtifacts(task))
       .map(([qid]) => qid);
     setSelectedForDownload(new Set(allQids));
   };
@@ -407,23 +591,31 @@ export function TaskResultGrid({
     if (selectedForDownload.size === 0) return;
 
     const paths: string[] = [];
+    const aiTriageTaskIds: string[] = [];
     selectedForDownload.forEach((qid) => {
       const task = taskResponse?.data?.result?.[qid];
-      if (task?.json_figure_path) {
-        const jsonPaths = Array.isArray(task.json_figure_path)
-          ? task.json_figure_path
-          : [task.json_figure_path];
-        paths.push(...jsonPaths);
+      if (!task) return;
+      if (downloadOptions.figureImages) {
+        paths.push(...toPathList(task.figure_path));
+      }
+      if (downloadOptions.jsonFigures) {
+        paths.push(...toPathList(task.json_figure_path));
+      }
+      if (downloadOptions.rawData) {
+        paths.push(...toPathList(task.raw_data_path));
+      }
+      if (downloadOptions.aiTriageNotes && task.task_id) {
+        aiTriageTaskIds.push(task.task_id);
       }
     });
 
-    if (paths.length === 0) return;
+    if (paths.length === 0 && aiTriageTaskIds.length === 0) return;
 
     setIsDownloading(true);
     try {
-      const filename = `${chipId}_${selectedTask}_${selectedDate}_json_figures.zip`;
+      const filename = `${chipId}_${selectedTask}_${selectedDate}_artifacts.zip`;
       const response = await downloadFiguresAsZip(
-        { paths, filename },
+        { paths, filename, ai_triage_task_ids: aiTriageTaskIds },
         { responseType: "blob" },
       );
 
@@ -439,6 +631,7 @@ export function TaskResultGrid({
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
 
+      setIsDownloadConfirmOpen(false);
       setDownloadSelectionEnabled(false);
       setSelectedForDownload(new Set());
     } catch (error) {
@@ -449,14 +642,107 @@ export function TaskResultGrid({
     }
   };
 
+  const hasDownloadableArtifacts = (task: Task | null | undefined): boolean =>
+    Boolean(
+      toPathList(task?.figure_path).length ||
+      toPathList(task?.json_figure_path).length ||
+      toPathList(task?.raw_data_path).length ||
+      task?.task_id,
+    );
+
   const hasJsonFigures = (qid: string): boolean => {
     const task = taskResponse?.data?.result?.[qid];
-    return !!task?.json_figure_path;
+    return hasDownloadableArtifacts(task);
   };
 
   const availableForDownloadCount = Object.entries(
     taskResponse?.data?.result || {},
-  ).filter(([, task]) => task.json_figure_path).length;
+  ).filter(([, task]) => hasDownloadableArtifacts(task)).length;
+  const availableForAiTriageCount = Object.values(
+    taskResponse?.data?.result || {},
+  ).filter((task) => task.task_id).length;
+  const copilotConfig = copilotConfigResponse?.data as
+    | {
+        enabled?: boolean;
+        analysis?: { enabled?: boolean; ai_triage_tasks?: string[] };
+      }
+    | undefined;
+  const isAiTriageTaskConfigured = Boolean(
+    copilotConfig?.enabled &&
+    copilotConfig.analysis?.enabled &&
+    copilotConfig.analysis.ai_triage_tasks?.includes(selectedTask),
+  );
+  const handleModelChange = (key: string) => {
+    setSelectedModelKey(key);
+    setStoredAnalysisModelKey(key);
+  };
+
+  const canAiTriageQid = (qid: string): boolean =>
+    Boolean(
+      isAiTriageTaskConfigured && taskResponse?.data?.result?.[qid]?.task_id,
+    );
+
+  const toggleAiTriageSelection = (qid: string) => {
+    setSelectedForAiTriage((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(qid)) {
+        newSet.delete(qid);
+      } else {
+        newSet.add(qid);
+      }
+      return newSet;
+    });
+  };
+
+  const selectAllForAiTriage = () => {
+    const allQids = Object.keys(taskResponse?.data?.result || {}).filter(
+      canAiTriageQid,
+    );
+    setSelectedForAiTriage(new Set(allQids));
+  };
+
+  const clearAiTriageSelection = () => {
+    setSelectedForAiTriage(new Set());
+  };
+
+  const handleBulkAiTriage = async () => {
+    if (selectedForAiTriage.size === 0 || !isAiTriageTaskConfigured) return;
+
+    const taskIds = Array.from(selectedForAiTriage)
+      .map((qid) => taskResponse?.data?.result?.[qid]?.task_id)
+      .filter((taskId): taskId is string => Boolean(taskId));
+    if (taskIds.length === 0) return;
+
+    setIsRequestingAiTriage(true);
+    try {
+      const response = await requestBulkAiTriageReview({
+        chip_id: chipId,
+        task: selectedTask,
+        entity_type: "qubit",
+        date: selectedDate === "latest" ? null : selectedDate,
+        task_ids: taskIds,
+        model_override: selectedModel.model,
+      });
+      setAiTriageStatus(
+        `AI triage review requested for ${response.data.requested_count} task results.`,
+      );
+      setPendingAiTriageTaskIds((prev) => {
+        const next = new Set(prev);
+        for (const taskId of response.data.task_ids) {
+          next.add(taskId);
+        }
+        return next;
+      });
+      setIsAiTriageConfirmOpen(false);
+      setAiTriageSelectionEnabled(false);
+      setSelectedForAiTriage(new Set());
+    } catch (error) {
+      console.error("AI triage request error:", error);
+      setAiTriageStatus("AI triage request failed. Please try again.");
+    } finally {
+      setIsRequestingAiTriage(false);
+    }
+  };
 
   // Calculate displayed grid size based on zoom mode
   const displayGridStart = selectedRegion
@@ -539,6 +825,14 @@ export function TaskResultGrid({
           : null;
         const isSelectedForDownload = selectedForDownload.has(qid);
         const canBeDownloaded = hasJsonFigures(qid);
+        const aiTriageBadge = task?.task_id
+          ? (aiTriageBadgesByTaskId?.get(task.task_id) ?? null)
+          : null;
+        const isAiTriagePending = Boolean(
+          task?.task_id &&
+          (pendingAiTriageTaskIds.has(task.task_id) ||
+            isAiTriageReviewPending(task)),
+        );
 
         return (
           <GridCell
@@ -553,10 +847,19 @@ export function TaskResultGrid({
             isDownloadMode={downloadSelectionEnabled}
             isSelectedForDownload={isSelectedForDownload}
             canBeDownloaded={canBeDownloaded}
+            isAiTriageMode={aiTriageSelectionEnabled}
+            isSelectedForAiTriage={selectedForAiTriage.has(qid)}
+            canBeAiTriaged={canAiTriageQid(qid)}
+            aiTriageBadge={aiTriageBadge}
+            isAiTriagePending={isAiTriagePending}
             onClick={() => {
               if (downloadSelectionEnabled) {
                 if (canBeDownloaded) {
                   toggleDownloadSelection(qid);
+                }
+              } else if (aiTriageSelectionEnabled) {
+                if (canAiTriageQid(qid)) {
+                  toggleAiTriageSelection(qid);
                 }
               } else {
                 setSelectedTaskInfo({ qid, taskName: selectedTask });
@@ -754,7 +1057,7 @@ export function TaskResultGrid({
                 </button>
                 <button
                   className="btn btn-sm btn-primary gap-1"
-                  onClick={handleDownload}
+                  onClick={() => setIsDownloadConfirmOpen(true)}
                   disabled={selectedForDownload.size === 0 || isDownloading}
                 >
                   {isDownloading ? (
@@ -775,24 +1078,121 @@ export function TaskResultGrid({
                   <X size={16} />
                 </button>
               </div>
+            ) : aiTriageSelectionEnabled ? (
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-base-content/70">
+                  {selectedForAiTriage.size} / {availableForAiTriageCount}{" "}
+                  selected
+                </span>
+                <button
+                  className="btn btn-xs btn-ghost"
+                  onClick={selectAllForAiTriage}
+                  title="Select all"
+                >
+                  All
+                </button>
+                <button
+                  className="btn btn-xs btn-ghost"
+                  onClick={clearAiTriageSelection}
+                  title="Clear selection"
+                >
+                  Clear
+                </button>
+                <button
+                  className="btn btn-sm btn-primary gap-1"
+                  onClick={() => setIsAiTriageConfirmOpen(true)}
+                  disabled={
+                    selectedForAiTriage.size === 0 || isRequestingAiTriage
+                  }
+                >
+                  {isRequestingAiTriage ? (
+                    <span className="loading loading-spinner loading-xs" />
+                  ) : (
+                    <Bot size={16} />
+                  )}
+                  AI Triage
+                </button>
+                <button
+                  className="btn btn-sm btn-ghost btn-circle"
+                  onClick={() => {
+                    setAiTriageSelectionEnabled(false);
+                    setSelectedForAiTriage(new Set());
+                  }}
+                  title="Cancel"
+                >
+                  <X size={16} />
+                </button>
+              </div>
             ) : (
-              <button
-                className="btn btn-sm btn-outline gap-2"
-                onClick={() => {
-                  setDownloadSelectionEnabled(true);
-                  setRegionSelectionEnabled(false);
-                  selectAllForDownload();
-                }}
-                title="Select figures to download"
-                disabled={availableForDownloadCount === 0}
-              >
-                <Download size={16} />
-                Download
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  className="btn btn-sm btn-outline gap-2"
+                  onClick={() => {
+                    setAiTriageSelectionEnabled(true);
+                    setDownloadSelectionEnabled(false);
+                    setRegionSelectionEnabled(false);
+                    selectAllForAiTriage();
+                  }}
+                  title="Request AI triage review for the displayed task results"
+                  disabled={
+                    availableForAiTriageCount === 0 || !isAiTriageTaskConfigured
+                  }
+                >
+                  <Bot size={16} />
+                  AI Triage
+                </button>
+                <button
+                  className="btn btn-sm btn-outline gap-2"
+                  onClick={() => {
+                    setDownloadSelectionEnabled(true);
+                    setRegionSelectionEnabled(false);
+                    selectAllForDownload();
+                  }}
+                  title="Select figures to download"
+                  disabled={availableForDownloadCount === 0}
+                >
+                  <Download size={16} />
+                  Download
+                </button>
+              </div>
             )}
           </>
         )}
       </div>
+      {(aiTriageStatus || visiblePendingAiTriageCount > 0) && (
+        <div className="text-xs text-base-content/70 text-right flex justify-end items-center gap-2">
+          {visiblePendingAiTriageCount > 0 && (
+            <LoaderCircle className="h-3 w-3 animate-spin text-info" />
+          )}
+          <span>
+            {visiblePendingAiTriageCount > 0
+              ? `${aiTriageStatus ?? "AI triage review is in progress."} Waiting for ${visiblePendingAiTriageCount} note update(s).`
+              : aiTriageStatus}
+          </span>
+        </div>
+      )}
+
+      <AiTriageConfirmModal
+        isOpen={isAiTriageConfirmOpen}
+        selectedCount={selectedForAiTriage.size}
+        taskName={selectedTask}
+        modelOptions={modelOptions}
+        selectedModelKey={selectedModel.key}
+        isSubmitting={isRequestingAiTriage}
+        onModelChange={handleModelChange}
+        onConfirm={handleBulkAiTriage}
+        onClose={() => setIsAiTriageConfirmOpen(false)}
+      />
+      <DownloadConfirmModal
+        isOpen={isDownloadConfirmOpen}
+        selectedCount={selectedForDownload.size}
+        options={downloadOptions}
+        counts={downloadCounts}
+        isSubmitting={isDownloading}
+        onOptionsChange={setDownloadOptions}
+        onConfirm={handleDownload}
+        onClose={() => setIsDownloadConfirmOpen(false)}
+      />
 
       {/* Back button */}
       {zoomMode === "region" && selectedRegion && (

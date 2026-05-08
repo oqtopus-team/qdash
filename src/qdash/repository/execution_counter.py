@@ -7,6 +7,7 @@ counter operations.
 import logging
 
 from qdash.dbmodel.execution_counter import ExecutionCounterDocument
+from qdash.dbmodel.user import UserDocument
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +30,11 @@ class MongoExecutionCounterRepository:
         >>> print(index)  # 0, 1, 2, ...
 
     """
+
+    @staticmethod
+    def _user_id_for_username(username: str) -> str | None:
+        user = UserDocument.find_one({"username": username}).run()
+        return user.user_id if user else None
 
     def get_next_index(
         self,
@@ -59,6 +65,7 @@ class MongoExecutionCounterRepository:
         result: int = ExecutionCounterDocument.get_next_index(
             date=date,
             username=username,
+            user_id=self._user_id_for_username(username),
             chip_id=chip_id,
             project_id=project_id,
         )

@@ -8,6 +8,8 @@
 import type { CooldownUpdateRequestDescription } from "./cooldownUpdateRequestDescription";
 import type { CooldownUpdateRequestStartedAt } from "./cooldownUpdateRequestStartedAt";
 import type { CooldownUpdateRequestEndedAt } from "./cooldownUpdateRequestEndedAt";
+import type { CooldownUpdateRequestWiringInfo } from "./cooldownUpdateRequestWiringInfo";
+import type { CooldownUpdateRequestWiringBlocks } from "./cooldownUpdateRequestWiringBlocks";
 
 /**
  * Body for updating a cool-down. All fields optional.
@@ -16,4 +18,8 @@ export interface CooldownUpdateRequest {
   description?: CooldownUpdateRequestDescription;
   started_at?: CooldownUpdateRequestStartedAt;
   ended_at?: CooldownUpdateRequestEndedAt;
+  /** Markdown export of the wiring document (derived from wiring_blocks) */
+  wiring_info?: CooldownUpdateRequestWiringInfo;
+  /** BlockNote document JSON. Source of truth when present. */
+  wiring_blocks?: CooldownUpdateRequestWiringBlocks;
 }

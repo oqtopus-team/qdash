@@ -15,11 +15,13 @@ import type { UserDetailResponseUpdatedAt } from "./userDetailResponseUpdatedAt"
  * Detailed user response for admin view.
  */
 export interface UserDetailResponse {
+  user_id: string;
   username: string;
   full_name?: UserDetailResponseFullName;
   disabled?: boolean;
   system_role?: SystemRole;
   default_project_id?: UserDetailResponseDefaultProjectId;
+  must_change_password?: boolean;
   created_at?: UserDetailResponseCreatedAt;
   updated_at?: UserDetailResponseUpdatedAt;
 }

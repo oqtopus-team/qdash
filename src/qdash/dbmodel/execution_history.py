@@ -8,6 +8,7 @@ from pymongo import ASCENDING, DESCENDING, IndexModel
 from qdash.common.datetime_utils import ensure_timezone, parse_elapsed_time
 from qdash.datamodel.execution import ExecutionModel
 from qdash.datamodel.system_info import SystemInfoModel
+from qdash.dbmodel.user import UserDocument
 
 
 class ExecutionHistoryDocument(Document):
@@ -34,7 +35,8 @@ class ExecutionHistoryDocument(Document):
     """
 
     project_id: str | None = Field(None, description="Owning project identifier")
-    username: str = Field(..., description="The username of the user who created the execution")
+    user_id: str | None = Field(default=None, description="Creator user ID")
+    username: str = Field(..., description="Creator username snapshot")
     name: str = Field(..., description="The name of the execution")
     execution_id: str = Field(..., description="The execution ID")
     calib_data_path: str = Field(..., description="The path to the calibration data")
@@ -85,12 +87,21 @@ class ExecutionHistoryDocument(Document):
             IndexModel(
                 [("project_id", ASCENDING), ("username", ASCENDING), ("start_at", DESCENDING)]
             ),
+            IndexModel(
+                [("project_id", ASCENDING), ("user_id", ASCENDING), ("start_at", DESCENDING)]
+            ),
         ]
+
+    @classmethod
+    def _user_id_for_username(cls, username: str) -> str | None:
+        user = UserDocument.find_one({"username": username}).run()
+        return user.user_id if user else None
 
     @classmethod
     def from_execution_model(cls, execution_model: ExecutionModel) -> "ExecutionHistoryDocument":
         return cls(
             project_id=execution_model.project_id,
+            user_id=cls._user_id_for_username(execution_model.username),
             username=execution_model.username,
             name=execution_model.name,
             execution_id=execution_model.execution_id,
@@ -117,6 +128,7 @@ class ExecutionHistoryDocument(Document):
             return doc
 
         doc.project_id = execution_model.project_id
+        doc.user_id = cls._user_id_for_username(execution_model.username)
         doc.username = execution_model.username
         doc.name = execution_model.name
         doc.calib_data_path = execution_model.calib_data_path

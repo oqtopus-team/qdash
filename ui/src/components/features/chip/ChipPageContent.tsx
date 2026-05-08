@@ -1,20 +1,26 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 
 import { keepPreviousData } from "@tanstack/react-query";
+import { Bot } from "lucide-react";
 
 import { formatDateTime } from "@/lib/utils/datetime";
 
 import { CouplingGrid } from "./CouplingGrid";
 import { TaskResultGrid } from "./TaskResultGrid";
 import { ChipManageModal } from "./ChipManageModal";
+import {
+  getAiTriageBadgeState,
+  type AiTriageBadgeState,
+} from "./aiTriageBadge";
 import { CreateChipModal } from "./modals/CreateChipModal";
 
 import type { Task, MuxDetailResponseDetail, TaskInfo } from "@/schemas";
 
 import { useListChipMuxes, useGetChip, useListChips } from "@/client/chip/chip";
+import { useGetChipNotesSummary } from "@/client/note/note";
 import {
   useListTaskInfo,
   useGetTaskFileSettings,
@@ -116,6 +122,22 @@ export function ChipPageContent() {
 
   // Get task list from task-files API
   const { data: taskInfoData } = useListTaskInfo({ backend: defaultBackend });
+
+  const { data: notesSummaryData } = useGetChipNotesSummary(selectedChip, {
+    query: { enabled: !!selectedChip, staleTime: 30_000 },
+  });
+
+  const aiTriageBadgesByTaskId = useMemo(() => {
+    const badges = new Map<string, AiTriageBadgeState>();
+    for (const entry of notesSummaryData?.data?.task_notes ?? []) {
+      const content = entry.note?.content ?? "";
+      const badge = getAiTriageBadgeState(content);
+      if (badge) {
+        badges.set(entry.task_id, badge);
+      }
+    }
+    return badges;
+  }, [notesSummaryData]);
 
   // Use custom hook for date navigation
   const {
@@ -510,6 +532,7 @@ export function ChipPageContent() {
               selectedDate={selectedDate}
               gridSize={gridSize}
               onDateChange={setSelectedDate}
+              aiTriageBadgesByTaskId={aiTriageBadgesByTaskId}
             />
           ) : viewMode === "2q" ? (
             <CouplingGrid
@@ -522,6 +545,7 @@ export function ChipPageContent() {
               selectedDate={selectedDate}
               gridSize={gridSize}
               onDateChange={setSelectedDate}
+              aiTriageBadgesByTaskId={aiTriageBadgesByTaskId}
             />
           ) : (
             <div className="space-y-4">
@@ -611,6 +635,9 @@ export function ChipPageContent() {
                                     }
 
                                     const figurePath = getFigurePath(task);
+                                    const aiTriageBadge = task.task_id
+                                      ? aiTriageBadgesByTaskId.get(task.task_id)
+                                      : null;
 
                                     return (
                                       <div key={qid} className="relative group">
@@ -629,15 +656,30 @@ export function ChipPageContent() {
                                             <div className="text-sm font-medium mb-2">
                                               <div className="flex justify-between items-center mb-1">
                                                 <span>QID: {qid}</span>
-                                                <div
-                                                  className={`w-2 h-2 rounded-full ${
-                                                    task.status === "completed"
-                                                      ? "bg-success"
-                                                      : task.status === "failed"
-                                                        ? "bg-error"
-                                                        : "bg-warning"
-                                                  }`}
-                                                />
+                                                <div className="flex items-center gap-1">
+                                                  {aiTriageBadge && (
+                                                    <span
+                                                      className={`badge ${aiTriageBadge.badgeClass} badge-xs gap-1`}
+                                                      title={
+                                                        aiTriageBadge.title
+                                                      }
+                                                    >
+                                                      <Bot className="h-3 w-3" />
+                                                      {aiTriageBadge.label}
+                                                    </span>
+                                                  )}
+                                                  <div
+                                                    className={`w-2 h-2 rounded-full ${
+                                                      task.status ===
+                                                      "completed"
+                                                        ? "bg-success"
+                                                        : task.status ===
+                                                            "failed"
+                                                          ? "bg-error"
+                                                          : "bg-warning"
+                                                    }`}
+                                                  />
+                                                </div>
                                               </div>
                                               {task.end_at && (
                                                 <div className="text-xs text-base-content/60">
@@ -662,11 +704,12 @@ export function ChipPageContent() {
 
                                         {/* Detail Analysis Button */}
                                         <button
-                                          onClick={() =>
+                                          onClick={(event) => {
+                                            event.stopPropagation();
                                             router.push(
                                               `/chip/${selectedChip}/qubit/${qid}`,
-                                            )
-                                          }
+                                            );
+                                          }}
                                           className="absolute top-2 right-2 btn btn-xs btn-primary opacity-0 group-hover:opacity-100 transition-opacity duration-200"
                                           title="Detailed Analysis"
                                         >

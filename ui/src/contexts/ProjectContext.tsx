@@ -11,6 +11,7 @@ import {
 } from "react";
 
 import { useQueryClient } from "@tanstack/react-query";
+import { usePathname } from "next/navigation";
 
 import { useAuth } from "./AuthContext";
 
@@ -27,12 +28,22 @@ interface ProjectContextType {
   projectId: string | null;
   role: ProjectRole | null;
   isOwner: boolean;
+  isEditor: boolean;
   isViewer: boolean;
-  canEdit: boolean; // Only owner can edit (simplified permission model)
+  canEdit: boolean;
+  can: (permission: ProjectPermission) => boolean;
   loading: boolean;
   switchProject: (projectId: string) => void;
   refreshProjects: () => void;
 }
+
+type ProjectPermission = "read" | "write" | "admin";
+
+const ROLE_PERMISSIONS: Record<ProjectRole, ProjectPermission[]> = {
+  owner: ["read", "write", "admin"],
+  editor: ["read", "write"],
+  viewer: ["read"],
+};
 
 const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
 
@@ -41,6 +52,9 @@ const PROJECT_STORAGE_KEY = "qdash_current_project_id";
 export function ProjectProvider({ children }: { children: ReactNode }) {
   const { user, accessToken } = useAuth();
   const queryClient = useQueryClient();
+  const pathname = usePathname();
+  const [urlProjectId, setUrlProjectId] = useState<string | null>(null);
+  const [urlProjectInitialized, setUrlProjectInitialized] = useState(false);
   const [currentProject, setCurrentProject] = useState<ProjectResponse | null>(
     null,
   );
@@ -82,40 +96,88 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     [projectsData?.data?.projects],
   );
 
+  const writeProjectToUrl = useCallback(
+    (nextProjectId: string, mode: "push" | "replace" = "replace") => {
+      try {
+        const url = new URL(window.location.href);
+        url.searchParams.set("project", nextProjectId);
+        const nextUrl = `${url.pathname}?${url.searchParams.toString()}${url.hash}`;
+        if (mode === "push") {
+          window.history.pushState(null, "", nextUrl);
+        } else {
+          window.history.replaceState(null, "", nextUrl);
+        }
+        setUrlProjectId(nextProjectId);
+      } catch (error) {
+        console.warn("Failed to update project URL state:", error);
+      }
+    },
+    [],
+  );
+
+  const readProjectFromUrl = useCallback(() => {
+    const nextUrlProjectId = new URLSearchParams(window.location.search).get(
+      "project",
+    );
+    setUrlProjectId(nextUrlProjectId);
+    setUrlProjectInitialized(true);
+    return nextUrlProjectId;
+  }, []);
+
   useEffect(() => {
-    if (!projects.length) return;
+    readProjectFromUrl();
+    window.addEventListener("popstate", readProjectFromUrl);
+    return () => window.removeEventListener("popstate", readProjectFromUrl);
+  }, [readProjectFromUrl]);
+
+  useEffect(() => {
+    const currentUrlProjectId = readProjectFromUrl();
+    if (!projectId) return;
+    if (currentUrlProjectId !== projectId) {
+      writeProjectToUrl(projectId);
+    }
+  }, [pathname, projectId, readProjectFromUrl, writeProjectToUrl]);
+
+  useEffect(() => {
+    if (!urlProjectInitialized || !projects.length) return;
 
     const storedProjectId = localStorage.getItem(PROJECT_STORAGE_KEY);
-    if (storedProjectId) {
-      const storedProject = projects.find(
-        (p) => p.project_id === storedProjectId,
-      );
-      if (storedProject) {
-        setCurrentProject(storedProject);
-        setProjectId(storedProject.project_id);
-        return;
+    const urlProject = urlProjectId
+      ? projects.find((p) => p.project_id === urlProjectId)
+      : null;
+    const storedProject = storedProjectId
+      ? projects.find((p) => p.project_id === storedProjectId)
+      : null;
+    const defaultProject = user?.default_project_id
+      ? projects.find((p) => p.project_id === user.default_project_id)
+      : null;
+    const nextProject =
+      urlProject ?? storedProject ?? defaultProject ?? projects[0] ?? null;
+
+    if (!nextProject) return;
+
+    if (nextProject.project_id !== projectId) {
+      setCurrentProject(nextProject);
+      setProjectId(nextProject.project_id);
+      localStorage.setItem(PROJECT_STORAGE_KEY, nextProject.project_id);
+
+      if (projectId !== null) {
+        queryClient.invalidateQueries();
       }
     }
 
-    if (user?.default_project_id) {
-      const defaultProject = projects.find(
-        (p) => p.project_id === user.default_project_id,
-      );
-      if (defaultProject) {
-        setCurrentProject(defaultProject);
-        setProjectId(defaultProject.project_id);
-        localStorage.setItem(PROJECT_STORAGE_KEY, defaultProject.project_id);
-        return;
-      }
+    if (urlProjectId !== nextProject.project_id) {
+      writeProjectToUrl(nextProject.project_id);
     }
-
-    if (projects.length > 0) {
-      const firstProject = projects[0];
-      setCurrentProject(firstProject);
-      setProjectId(firstProject.project_id);
-      localStorage.setItem(PROJECT_STORAGE_KEY, firstProject.project_id);
-    }
-  }, [projects, user?.default_project_id]);
+  }, [
+    projectId,
+    projects,
+    queryClient,
+    urlProjectId,
+    urlProjectInitialized,
+    user?.default_project_id,
+    writeProjectToUrl,
+  ]);
 
   const switchProject = useCallback(
     (newProjectId: string) => {
@@ -124,11 +186,12 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
         setCurrentProject(project);
         setProjectId(project.project_id);
         localStorage.setItem(PROJECT_STORAGE_KEY, project.project_id);
+        writeProjectToUrl(project.project_id, "push");
         // Invalidate all queries to refresh data for new project
         queryClient.invalidateQueries();
       }
     },
-    [projects, projectId, queryClient],
+    [projects, projectId, queryClient, writeProjectToUrl],
   );
 
   const refreshProjects = useCallback(() => {
@@ -136,8 +199,14 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
   }, [refetch]);
 
   const isOwner = role === "owner";
+  const isEditor = role === "editor";
   const isViewer = role === "viewer";
-  const canEdit = isOwner; // Only owner can edit (simplified permission model)
+  const can = useCallback(
+    (permission: ProjectPermission) =>
+      role ? ROLE_PERMISSIONS[role].includes(permission) : false,
+    [role],
+  );
+  const canEdit = can("write");
 
   return (
     <ProjectContext.Provider
@@ -147,8 +216,10 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
         projectId,
         role,
         isOwner,
+        isEditor,
         isViewer,
         canEdit,
+        can,
         loading: isLoading,
         switchProject,
         refreshProjects,

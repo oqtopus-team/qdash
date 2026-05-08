@@ -9,6 +9,7 @@ from pymongo import ASCENDING, IndexModel
 from pymongo.errors import DuplicateKeyError
 from qdash.common.datetime_utils import now
 from qdash.datamodel.system_info import SystemInfoModel
+from qdash.dbmodel.user import UserDocument
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +31,8 @@ class CalibrationNoteDocument(Document):
     """
 
     project_id: str = Field(..., description="Owning project identifier")
-    username: str = Field(..., description="The username of the user who created the note")
+    user_id: str | None = Field(default=None, description="Creator user ID")
+    username: str = Field(..., description="Creator username snapshot")
     chip_id: str = Field(..., description="The chip ID associated with this note")
     execution_id: str = Field(..., description="The execution ID associated with this note")
     task_id: str = Field(..., description="The task ID associated with this note")
@@ -43,6 +45,11 @@ class CalibrationNoteDocument(Document):
     system_info: SystemInfoModel = Field(
         default_factory=SystemInfoModel, description="The system information"
     )
+
+    @staticmethod
+    def _user_id_for_username(username: str) -> str | None:
+        user = UserDocument.find_one({"username": username}).run()
+        return user.user_id if user else None
 
     class Settings:
         """Settings for the document."""
@@ -100,6 +107,7 @@ class CalibrationNoteDocument(Document):
         """
         from pymongo import ReturnDocument
 
+        user_id = cls._user_id_for_username(username)
         query = {
             "project_id": project_id,
             "execution_id": execution_id,
@@ -113,6 +121,7 @@ class CalibrationNoteDocument(Document):
         # Atomic upsert using find_one_and_update
         update = {
             "$set": {
+                "user_id": user_id,
                 "note": note,
                 "timestamp": timestamp,
             },
@@ -121,6 +130,7 @@ class CalibrationNoteDocument(Document):
                 "project_id": project_id,
                 "execution_id": execution_id,
                 "task_id": task_id,
+                "user_id": user_id,
                 "username": username,
                 "chip_id": chip_id,
             },

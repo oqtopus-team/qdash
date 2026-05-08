@@ -18,7 +18,7 @@ import json
 import logging
 from typing import TYPE_CHECKING
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -98,17 +98,46 @@ class KnowledgeCase(BaseModel):
     chip_id: str = Field(default="", description="Chip identifier")
     qid: str = Field(default="", description="Qubit identifier")
     status: str = Field(default="resolved", description="Case status: resolved, open, workaround")
+    human_label: str = Field(default="", description="Human review label for the case")
+    failure_mode_labels: list[str] = Field(
+        default_factory=list,
+        description="Structured failure-mode labels for retrieval and filtering",
+    )
+    case_type: list[str] = Field(
+        default_factory=list,
+        description="Knowledge case type: positive_example, boundary_case, counterexample, etc.",
+    )
+    model_error_type: str = Field(
+        default="",
+        description="Verifier outcome type: true_positive, false_positive, false_negative, etc.",
+    )
+    resolution_label: str = Field(
+        default="",
+        description="Structured resolution label such as accept_heuristic or rerun_task",
+    )
     symptom: str = Field(default="", description="Observed symptom")
+    model_prediction: str = Field(default="", description="Verifier/model prediction summary")
+    human_review_decision: str = Field(default="", description="Human review decision summary")
     root_cause: str = Field(default="", description="Identified root cause")
     resolution: str = Field(default="", description="How the issue was resolved")
+    boundary_criteria: str = Field(
+        default="",
+        description="Criteria that make this a boundary or counterexample case",
+    )
     lesson_learned: list[str] = Field(
         default_factory=list,
         description="Key takeaways from the case",
+    )
+    applicability: str = Field(default="", description="When this case should be retrieved")
+    counterexample: str = Field(default="", description="What rule this case counters")
+    prompt_guidance: str = Field(
+        default="", description="Prompt/checklist guidance derived from case"
     )
     images: list[TaskKnowledgeImage] = Field(
         default_factory=list,
         description="Image references from the case file (with base64 data)",
     )
+    model_config = ConfigDict(protected_namespaces=())
 
 
 class TaskKnowledge(BaseModel):
@@ -267,14 +296,39 @@ class TaskKnowledge(BaseModel):
                         header += f", {case.qid}"
                     header += ")"
                 lines.append(header)
+                labels = []
+                if case.human_label:
+                    labels.append(f"human_label={case.human_label}")
+                if case.failure_mode_labels:
+                    labels.append(f"failure_modes={', '.join(case.failure_mode_labels)}")
+                if case.case_type:
+                    labels.append(f"case_type={', '.join(case.case_type)}")
+                if case.model_error_type:
+                    labels.append(f"model_error_type={case.model_error_type}")
+                if case.resolution_label:
+                    labels.append(f"resolution_label={case.resolution_label}")
+                if labels:
+                    lines.append(f"   - Labels: {'; '.join(labels)}")
                 if case.symptom:
                     lines.append(f"   - Symptom: {case.symptom}")
+                if case.model_prediction:
+                    lines.append(f"   - Model prediction: {case.model_prediction}")
+                if case.human_review_decision:
+                    lines.append(f"   - Human review decision: {case.human_review_decision}")
                 if case.root_cause:
                     lines.append(f"   - Root cause: {case.root_cause}")
                 if case.resolution:
                     lines.append(f"   - Resolution: {case.resolution}")
+                if case.boundary_criteria:
+                    lines.append(f"   - Boundary criteria: {case.boundary_criteria}")
                 if case.lesson_learned:
                     lines.append(f"   - Lessons: {'; '.join(case.lesson_learned)}")
+                if case.applicability:
+                    lines.append(f"   - Applicability: {case.applicability}")
+                if case.counterexample:
+                    lines.append(f"   - Counterexample: {case.counterexample}")
+                if case.prompt_guidance:
+                    lines.append(f"   - Prompt guidance: {case.prompt_guidance}")
                 if case.images:
                     for img in case.images:
                         lines.append(f"   - Image: {img.alt_text} ({img.relative_path})")
@@ -398,7 +452,7 @@ _CATEGORIES: list[tuple[str, str, list[str]]] = [
             "CheckDispersiveShift",
             "CheckOptimalReadoutAmplitude",
             "ReadoutClassification",
-            "ChevronPattern",
+            "CheckFineChevron",
         ],
     ),
     (

@@ -1,24 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
-import {
-  Activity,
-  ChevronDown,
-  ChevronRight,
-  Plus,
-  Trash2,
-  X,
-} from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 
-import {
-  useAssignChipToCooldown,
-  useDeleteCooldown,
-  useUnassignChipFromCooldown,
-  useUpdateCooldown,
-} from "@/client/cooldown/cooldown";
 import { useDeleteCryostat } from "@/client/cryostat/cryostat";
-import { Card } from "@/components/ui/Card";
+
+import { CooldownItem } from "./CooldownItem";
+import { CooldownTimeline } from "./CooldownTimeline";
 
 interface Cooldown {
   cooldown_id: string;
@@ -27,6 +16,8 @@ interface Cooldown {
   started_at: string;
   ended_at?: string | null;
   chip_ids: string[];
+  wiring_info?: string;
+  wiring_blocks?: Record<string, unknown>[];
 }
 
 interface Cryo {
@@ -56,6 +47,20 @@ function formatRelativeDays(days: number): string {
   return `${days} days ago`;
 }
 
+function StatChip({ label, emphasis }: { label: string; emphasis?: boolean }) {
+  return (
+    <span
+      className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] tabular-nums ${
+        emphasis
+          ? "border-primary/30 bg-primary/10 text-primary"
+          : "border-base-300 bg-base-200/50 text-base-content/70"
+      }`}
+    >
+      {label}
+    </span>
+  );
+}
+
 export function CryostatCard({
   cryo,
   cooldowns,
@@ -63,11 +68,8 @@ export function CryostatCard({
   onChange,
   onCreateCooldown,
 }: CryostatCardProps) {
-  const [expanded, setExpanded] = useState(true);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
   const deleteCryostat = useDeleteCryostat();
 
-  // Sort newest first for timeline rendering and details lookup
   const sortedCooldowns = useMemo(
     () =>
       [...cooldowns].sort(
@@ -77,10 +79,8 @@ export function CryostatCard({
     [cooldowns],
   );
 
-  // Active cool-down (the most recent one with no ended_at)
   const activeCooldown = sortedCooldowns.find((c) => !c.ended_at);
 
-  // Aggregate stats
   const stats = useMemo(() => {
     const now = new Date();
     let totalDaysCooled = 0;
@@ -97,10 +97,32 @@ export function CryostatCard({
     };
   }, [sortedCooldowns, activeCooldown]);
 
-  const selectedCooldown =
-    sortedCooldowns.find((c) => c.cooldown_id === selectedId) ??
-    activeCooldown ??
-    sortedCooldowns[0];
+  // Accordion: only one cool-down expanded at a time. Defaults to active,
+  // or the most recent one if no active cool-down exists.
+  const [expandedId, setExpandedId] = useState<string | null>(() => {
+    return (
+      activeCooldown?.cooldown_id ?? sortedCooldowns[0]?.cooldown_id ?? null
+    );
+  });
+
+  const itemRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+
+  const handleSelectFromTimeline = (id: string) => {
+    setExpandedId(id);
+    // Wait a tick for the panel to expand before scrolling
+    requestAnimationFrame(() => {
+      const el = itemRefs.current.get(id);
+      el?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    });
+  };
+
+  // Keep expansion in sync if the active cool-down changes externally and
+  // nothing was previously expanded.
+  useEffect(() => {
+    if (expandedId === null && activeCooldown) {
+      setExpandedId(activeCooldown.cooldown_id);
+    }
+  }, [activeCooldown, expandedId]);
 
   const handleDelete = async () => {
     if (
@@ -115,52 +137,45 @@ export function CryostatCard({
   };
 
   return (
-    <Card variant="default" padding="md">
+    <section className="py-3">
       {/* Header */}
       <div className="flex items-start justify-between gap-3">
-        <button
-          className="flex items-center gap-3 text-left flex-1 min-w-0"
-          onClick={() => setExpanded((v) => !v)}
-        >
-          {expanded ? (
-            <ChevronDown className="h-4 w-4 flex-shrink-0" />
-          ) : (
-            <ChevronRight className="h-4 w-4 flex-shrink-0" />
-          )}
-          <div className="min-w-0 flex-1">
-            <div className="flex items-baseline gap-2 flex-wrap">
-              <span className="font-bold text-lg">{cryo.cryo_id}</span>
-              {cryo.name && (
-                <span className="text-base-content/70 text-sm truncate">
-                  {cryo.name}
-                </span>
-              )}
-              <span
-                className={`badge badge-sm ${
-                  cryo.status === "active"
-                    ? "badge-success"
-                    : cryo.status === "maintenance"
-                      ? "badge-warning"
-                      : "badge-ghost"
-                }`}
-              >
-                {cryo.status ?? "active"}
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-bold text-xl tracking-tight">
+              {cryo.cryo_id}
+            </span>
+            {cryo.name && (
+              <span className="text-base-content/70 text-sm truncate">
+                {cryo.name}
               </span>
-            </div>
-            <div className="text-xs text-base-content/60 mt-0.5 flex flex-wrap gap-x-3">
-              {cryo.location && <span>{cryo.location}</span>}
-              <span>
-                {stats.totalCooldowns} cool-down
-                {stats.totalCooldowns !== 1 ? "s" : ""}
-              </span>
-              <span>{stats.totalDaysCooled} days cooled</span>
-              <span>
-                {stats.chipsLoaded.length} chip
-                {stats.chipsLoaded.length !== 1 ? "s" : ""} loaded now
-              </span>
-            </div>
+            )}
+            <span
+              className={`badge badge-sm ${
+                cryo.status === "active"
+                  ? "badge-success"
+                  : cryo.status === "maintenance"
+                    ? "badge-warning"
+                    : "badge-ghost"
+              }`}
+            >
+              {cryo.status ?? "active"}
+            </span>
           </div>
-        </button>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {cryo.location && <StatChip label={cryo.location} />}
+            <StatChip
+              label={`${stats.totalCooldowns} cool-down${stats.totalCooldowns !== 1 ? "s" : ""}`}
+            />
+            <StatChip
+              label={`${stats.totalDaysCooled} ${stats.totalDaysCooled === 1 ? "day" : "days"} cooled`}
+            />
+            <StatChip
+              label={`${stats.chipsLoaded.length} chip${stats.chipsLoaded.length !== 1 ? "s" : ""} now`}
+              emphasis={stats.chipsLoaded.length > 0}
+            />
+          </div>
+        </div>
         <button
           className="btn btn-ghost btn-xs text-error flex-shrink-0"
           onClick={handleDelete}
@@ -171,59 +186,76 @@ export function CryostatCard({
         </button>
       </div>
 
-      {expanded && (
-        <div className="mt-4 space-y-4">
-          {/* Active cool-down banner */}
-          {activeCooldown && (
-            <ActiveCooldownBanner
-              cooldown={activeCooldown}
-              onSelect={() => setSelectedId(activeCooldown.cooldown_id)}
-            />
-          )}
+      <div className="mt-5 space-y-4">
+        {/* Active cool-down banner */}
+        {activeCooldown && (
+          <ActiveCooldownBanner
+            cooldown={activeCooldown}
+            isSelected={expandedId === activeCooldown.cooldown_id}
+            onSelect={() =>
+              handleSelectFromTimeline(activeCooldown.cooldown_id)
+            }
+          />
+        )}
 
-          {/* Timeline */}
-          {sortedCooldowns.length > 0 ? (
+        {/* Timeline + new-cooldown button */}
+        {sortedCooldowns.length > 0 ? (
+          <div className="space-y-2">
             <CooldownTimeline
               cooldowns={sortedCooldowns}
-              selectedId={selectedCooldown?.cooldown_id ?? null}
-              onSelect={(id) => setSelectedId(id)}
+              selectedId={expandedId}
+              onSelect={handleSelectFromTimeline}
             />
-          ) : (
-            <div className="text-xs text-base-content/50 italic text-center py-4">
-              No cool-downs yet.
+            <div className="flex justify-end">
+              <button
+                className="btn btn-sm btn-ghost gap-1"
+                onClick={onCreateCooldown}
+                title="Start a new cool-down cycle"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                New cool-down
+              </button>
             </div>
-          )}
-
-          {/* New cool-down trigger */}
-          <div className="flex justify-end">
-            <button
-              className="btn btn-sm btn-primary gap-1"
-              onClick={onCreateCooldown}
-            >
-              <Plus className="h-3.5 w-3.5" />
-              New cool-down
-            </button>
           </div>
+        ) : (
+          <EmptyCooldowns onCreate={onCreateCooldown} />
+        )}
 
-          {/* Detail panel */}
-          {selectedCooldown && (
-            <CooldownDetail
-              cooldown={selectedCooldown}
-              allChips={allChips}
-              onChange={onChange}
-            />
-          )}
-        </div>
-      )}
-    </Card>
+        {/* Cool-down list (accordion) */}
+        {sortedCooldowns.length > 0 && (
+          <div className="space-y-2">
+            {sortedCooldowns.map((cd) => (
+              <CooldownItem
+                key={cd.cooldown_id}
+                ref={(el) => {
+                  if (el) itemRefs.current.set(cd.cooldown_id, el);
+                  else itemRefs.current.delete(cd.cooldown_id);
+                }}
+                cooldown={cd}
+                allChips={allChips}
+                expanded={expandedId === cd.cooldown_id}
+                onToggle={() =>
+                  setExpandedId((cur) =>
+                    cur === cd.cooldown_id ? null : cd.cooldown_id,
+                  )
+                }
+                onChange={onChange}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    </section>
   );
 }
 
 function ActiveCooldownBanner({
   cooldown,
+  isSelected,
   onSelect,
 }: {
   cooldown: Cooldown;
+  isSelected: boolean;
   onSelect: () => void;
 }) {
   const start = new Date(cooldown.started_at);
@@ -231,418 +263,58 @@ function ActiveCooldownBanner({
   return (
     <button
       onClick={onSelect}
-      className="w-full text-left rounded-lg border border-success/40 bg-success/10 px-3 py-2 hover:bg-success/15 transition-colors"
+      className={`group w-full text-left rounded-xl border bg-success/8 px-4 py-3 transition-all hover:bg-success/12 ${
+        isSelected
+          ? "border-success/60 ring-2 ring-success/30"
+          : "border-success/30"
+      }`}
     >
-      <div className="flex items-center gap-2 text-sm font-semibold">
-        <Activity className="h-4 w-4 text-success" />
-        Currently cooling — {cooldown.cooldown_id}
-      </div>
-      <div className="text-xs text-base-content/70 mt-0.5">
-        Started {formatRelativeDays(days)} ({start.toLocaleDateString()}) ·{" "}
-        {cooldown.chip_ids.length} chip
-        {cooldown.chip_ids.length !== 1 ? "s" : ""} loaded
-        {cooldown.chip_ids.length > 0 && `: ${cooldown.chip_ids.join(", ")}`}
+      <div className="flex items-center gap-3">
+        <span className="relative inline-flex h-3 w-3 flex-shrink-0">
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success/60" />
+          <span className="relative inline-flex h-3 w-3 rounded-full bg-success" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-semibold text-sm">Currently cooling</span>
+            <span className="font-mono font-bold text-sm">
+              {cooldown.cooldown_id}
+            </span>
+            <span className="text-xs text-base-content/60 tabular-nums">
+              · {formatRelativeDays(days)} ({start.toLocaleDateString()})
+            </span>
+          </div>
+          {cooldown.chip_ids.length > 0 && (
+            <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-base-content/70">
+              <span className="text-base-content/50">Chips:</span>
+              {cooldown.chip_ids.map((id) => (
+                <span
+                  key={id}
+                  className="rounded border border-base-300 bg-base-100 px-1.5 py-0.5 font-mono text-base-content/80"
+                >
+                  {id}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </button>
   );
 }
 
-function CooldownTimeline({
-  cooldowns,
-  selectedId,
-  onSelect,
-}: {
-  cooldowns: Cooldown[];
-  selectedId: string | null;
-  onSelect: (id: string) => void;
-}) {
-  // Bounds: t_min = earliest started_at, t_max = latest ended_at (or now)
-  const now = Date.now();
-  const tMin = Math.min(
-    ...cooldowns.map((c) => new Date(c.started_at).getTime()),
-  );
-  const tMax = Math.max(
-    ...cooldowns.map((c) =>
-      c.ended_at ? new Date(c.ended_at).getTime() : now,
-    ),
-  );
-  // Add 5% padding on each side so bars don't touch the edges
-  const range = Math.max(1, tMax - tMin);
-  const padding = range * 0.05;
-  const lo = tMin - padding;
-  const hi = tMax + padding;
-  const span = hi - lo;
-
-  // Generate ~5 evenly spaced tick labels
-  const ticks = [0, 0.25, 0.5, 0.75, 1].map((f) => {
-    const t = lo + span * f;
-    const date = new Date(t);
-    return {
-      pct: f * 100,
-      label: date.toLocaleDateString(undefined, {
-        year: "numeric",
-        month: "short",
-      }),
-    };
-  });
-
+function EmptyCooldowns({ onCreate }: { onCreate: () => void }) {
   return (
-    <div>
-      <div className="text-xs text-base-content/60 mb-1">Timeline</div>
-      <div className="relative h-20 bg-base-200/50 rounded-md border border-base-300">
-        {cooldowns.map((cd, i) => {
-          const start = new Date(cd.started_at).getTime();
-          const end = cd.ended_at ? new Date(cd.ended_at).getTime() : now;
-          const left = ((start - lo) / span) * 100;
-          const width = Math.max(0.5, ((end - start) / span) * 100);
-          const isActive = !cd.ended_at;
-          const isSelected = cd.cooldown_id === selectedId;
-          // Stack rows: cycle through 3 rows so adjacent bars don't overlap visually
-          const row = i % 3;
-          const top = 4 + row * 18;
-          return (
-            <button
-              key={cd.cooldown_id}
-              onClick={() => onSelect(cd.cooldown_id)}
-              className={`absolute rounded transition-all hover:brightness-110 ${
-                isActive
-                  ? "bg-success/80 hover:bg-success"
-                  : "bg-info/60 hover:bg-info/80"
-              } ${isSelected ? "ring-2 ring-primary ring-offset-1" : ""}`}
-              style={{
-                left: `${left}%`,
-                width: `${width}%`,
-                top: `${top}px`,
-                height: "14px",
-              }}
-              title={`${cd.cooldown_id} (${new Date(cd.started_at).toLocaleDateString()} → ${cd.ended_at ? new Date(cd.ended_at).toLocaleDateString() : "now"})`}
-            >
-              <span className="text-[9px] font-bold text-white px-1 truncate block leading-[14px]">
-                {cd.cooldown_id}
-              </span>
-            </button>
-          );
-        })}
+    <div className="rounded-xl border border-dashed border-base-300 bg-base-200/30 px-4 py-8 text-center">
+      <div className="text-sm text-base-content/70">No cool-downs yet</div>
+      <div className="text-xs text-base-content/50 mt-0.5 mb-3">
+        Cool-down cycles tag every calibration write with their{" "}
+        <code className="font-mono">cooldown_id</code>.
       </div>
-      {/* Time axis */}
-      <div className="relative h-4 mt-1">
-        {ticks.map((t, i) => (
-          <span
-            key={i}
-            className="absolute text-[10px] text-base-content/50 -translate-x-1/2"
-            style={{ left: `${t.pct}%` }}
-          >
-            {t.label}
-          </span>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function isoToDateInput(iso: string | null | undefined): string {
-  if (!iso) return "";
-  return new Date(iso).toISOString().slice(0, 10);
-}
-
-function dateInputToIso(value: string, endOfDay = false): string | null {
-  if (!value) return null;
-  const time = endOfDay ? "T23:59:59" : "T12:00:00";
-  return new Date(`${value}${time}`).toISOString();
-}
-
-function CooldownDetail({
-  cooldown,
-  allChips,
-  onChange,
-}: {
-  cooldown: Cooldown;
-  allChips: string[];
-  onChange: () => void;
-}) {
-  const updateMutation = useUpdateCooldown();
-  const deleteMutation = useDeleteCooldown();
-  const assignMutation = useAssignChipToCooldown();
-  const unassignMutation = useUnassignChipFromCooldown();
-  const [chipToAdd, setChipToAdd] = useState("");
-  const [editingDescription, setEditingDescription] = useState(false);
-  const [draftDescription, setDraftDescription] = useState(
-    cooldown.description,
-  );
-  const [editingDates, setEditingDates] = useState(false);
-  const [draftStartedAt, setDraftStartedAt] = useState(
-    isoToDateInput(cooldown.started_at),
-  );
-  const [draftEndedAt, setDraftEndedAt] = useState(
-    isoToDateInput(cooldown.ended_at),
-  );
-
-  const isActive = !cooldown.ended_at;
-
-  const handleEnd = async () => {
-    if (!confirm(`End cool-down ${cooldown.cooldown_id} now?`)) return;
-    await updateMutation.mutateAsync({
-      cooldownId: cooldown.cooldown_id,
-      data: { ended_at: new Date().toISOString() },
-    });
-    onChange();
-  };
-
-  const handleDelete = async () => {
-    if (!confirm(`Delete cool-down ${cooldown.cooldown_id}?`)) return;
-    await deleteMutation.mutateAsync({ cooldownId: cooldown.cooldown_id });
-    onChange();
-  };
-
-  const handleSaveDescription = async () => {
-    await updateMutation.mutateAsync({
-      cooldownId: cooldown.cooldown_id,
-      data: { description: draftDescription },
-    });
-    setEditingDescription(false);
-    onChange();
-  };
-
-  const handleSaveDates = async () => {
-    if (!draftStartedAt) return;
-    if (draftEndedAt && draftEndedAt < draftStartedAt) return;
-    await updateMutation.mutateAsync({
-      cooldownId: cooldown.cooldown_id,
-      data: {
-        started_at: dateInputToIso(draftStartedAt),
-        ended_at: draftEndedAt ? dateInputToIso(draftEndedAt, true) : null,
-      },
-    });
-    setEditingDates(false);
-    onChange();
-  };
-
-  const handleAssign = async () => {
-    if (!chipToAdd) return;
-    await assignMutation.mutateAsync({
-      cooldownId: cooldown.cooldown_id,
-      chipId: chipToAdd,
-    });
-    setChipToAdd("");
-    onChange();
-  };
-
-  const handleUnassign = async (chipId: string) => {
-    await unassignMutation.mutateAsync({
-      cooldownId: cooldown.cooldown_id,
-      chipId,
-    });
-    onChange();
-  };
-
-  const availableChips = allChips.filter((c) => !cooldown.chip_ids.includes(c));
-
-  return (
-    <div className="rounded-lg border border-base-300 bg-base-200/40 p-3 space-y-3">
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-mono font-bold text-base">
-              {cooldown.cooldown_id}
-            </span>
-            <span
-              className={`badge badge-sm ${
-                isActive ? "badge-success" : "badge-ghost"
-              }`}
-            >
-              {isActive ? "active" : "ended"}
-            </span>
-          </div>
-          {!editingDates && (
-            <div className="text-xs text-base-content/60 mt-0.5">
-              Started {new Date(cooldown.started_at).toLocaleString()}
-              {cooldown.ended_at && (
-                <> · Ended {new Date(cooldown.ended_at).toLocaleString()}</>
-              )}
-              {!cooldown.ended_at && " · still active"}
-              <button
-                className="ml-2 link link-primary text-[11px]"
-                onClick={() => {
-                  setDraftStartedAt(isoToDateInput(cooldown.started_at));
-                  setDraftEndedAt(isoToDateInput(cooldown.ended_at));
-                  setEditingDates(true);
-                }}
-              >
-                edit dates
-              </button>
-            </div>
-          )}
-          {editingDates && (
-            <div className="mt-1 flex flex-wrap items-end gap-2 text-xs">
-              <label className="flex flex-col">
-                <span className="text-[10px] text-base-content/60 uppercase">
-                  Started
-                </span>
-                <input
-                  type="date"
-                  className="input input-xs input-bordered tabular-nums"
-                  value={draftStartedAt}
-                  onChange={(e) => setDraftStartedAt(e.target.value)}
-                />
-              </label>
-              <label className="flex flex-col">
-                <span className="text-[10px] text-base-content/60 uppercase">
-                  Ended (empty = active)
-                </span>
-                <input
-                  type="date"
-                  className="input input-xs input-bordered tabular-nums"
-                  value={draftEndedAt}
-                  onChange={(e) => setDraftEndedAt(e.target.value)}
-                  min={draftStartedAt}
-                />
-              </label>
-              <button
-                className="btn btn-xs btn-primary"
-                onClick={handleSaveDates}
-                disabled={
-                  !draftStartedAt ||
-                  (!!draftEndedAt && draftEndedAt < draftStartedAt) ||
-                  updateMutation.isPending
-                }
-              >
-                Save
-              </button>
-              <button
-                className="btn btn-xs btn-ghost"
-                onClick={() => setEditingDates(false)}
-              >
-                Cancel
-              </button>
-            </div>
-          )}
-        </div>
-        <div className="flex gap-1 flex-shrink-0">
-          {isActive && (
-            <button
-              className="btn btn-xs btn-warning gap-1"
-              onClick={handleEnd}
-              disabled={updateMutation.isPending}
-              title="End this cool-down (warm-up)"
-            >
-              End now
-            </button>
-          )}
-          <button
-            className="btn btn-xs btn-ghost text-error"
-            onClick={handleDelete}
-            disabled={deleteMutation.isPending}
-            title="Delete this cool-down"
-          >
-            <Trash2 className="h-3 w-3" />
-          </button>
-        </div>
-      </div>
-
-      {/* Description (inline edit) */}
-      <div className="text-xs">
-        <div className="flex items-center justify-between mb-1">
-          <span className="text-base-content/60 font-semibold uppercase tracking-wide">
-            Description
-          </span>
-          {!editingDescription && (
-            <button
-              className="btn btn-xs btn-ghost"
-              onClick={() => {
-                setDraftDescription(cooldown.description);
-                setEditingDescription(true);
-              }}
-            >
-              Edit
-            </button>
-          )}
-        </div>
-        {editingDescription ? (
-          <div className="space-y-1">
-            <textarea
-              className="textarea textarea-bordered w-full text-xs h-16"
-              value={draftDescription}
-              onChange={(e) => setDraftDescription(e.target.value)}
-            />
-            <div className="flex gap-2 justify-end">
-              <button
-                className="btn btn-xs btn-ghost"
-                onClick={() => setEditingDescription(false)}
-              >
-                Cancel
-              </button>
-              <button
-                className="btn btn-xs btn-primary"
-                onClick={handleSaveDescription}
-                disabled={updateMutation.isPending}
-              >
-                Save
-              </button>
-            </div>
-          </div>
-        ) : (
-          <p className="text-base-content/80 whitespace-pre-wrap">
-            {cooldown.description || (
-              <span className="italic text-base-content/40">
-                No description.
-              </span>
-            )}
-          </p>
-        )}
-      </div>
-
-      {/* Chip management */}
-      <div className="text-xs">
-        <div className="text-base-content/60 font-semibold uppercase tracking-wide mb-1">
-          Chips loaded
-        </div>
-        <div className="flex flex-wrap gap-1.5 items-center">
-          {cooldown.chip_ids.length === 0 && (
-            <span className="text-base-content/40 italic">
-              No chips loaded.
-            </span>
-          )}
-          {cooldown.chip_ids.map((chipId) => (
-            <span
-              key={chipId}
-              className="badge badge-outline badge-md gap-1 pr-1"
-            >
-              {chipId}
-              <button
-                className="hover:text-error"
-                onClick={() => handleUnassign(chipId)}
-                disabled={unassignMutation.isPending}
-                title="Unload"
-              >
-                <X className="h-3 w-3" />
-              </button>
-            </span>
-          ))}
-          {availableChips.length > 0 && (
-            <div className="flex items-center gap-1">
-              <select
-                className="select select-xs select-bordered max-w-[10rem]"
-                value={chipToAdd}
-                onChange={(e) => setChipToAdd(e.target.value)}
-              >
-                <option value="">Load chip…</option>
-                {availableChips.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
-              <button
-                className="btn btn-xs btn-primary"
-                onClick={handleAssign}
-                disabled={!chipToAdd || assignMutation.isPending}
-              >
-                <Plus className="h-3 w-3" />
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
+      <button className="btn btn-sm btn-primary gap-1" onClick={onCreate}>
+        <Plus className="h-3.5 w-3.5" />
+        Start a cool-down
+      </button>
     </div>
   );
 }

@@ -13,9 +13,11 @@ import type { UserListItemDefaultProjectId } from "./userListItemDefaultProjectI
  * User summary for admin list view.
  */
 export interface UserListItem {
+  user_id: string;
   username: string;
   full_name?: UserListItemFullName;
   disabled?: boolean;
   system_role?: SystemRole;
   default_project_id?: UserListItemDefaultProjectId;
+  must_change_password?: boolean;
 }

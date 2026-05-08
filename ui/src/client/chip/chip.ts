@@ -39,6 +39,9 @@ import type {
   MetricsSummaryResponse,
   MuxDetailResponse,
   QubitResponse,
+  ReanalyzeQubitSpectroscopyRequest,
+  ReanalyzeResonatorSpectroscopyRequest,
+  ReanalyzeResponse,
   SuccessResponse,
   UpdateChipRequest,
 } from "../../schemas";
@@ -187,7 +190,7 @@ Parameters
 request : CreateChipRequest
     Chip creation request containing chip_id and size
 ctx : ProjectContext
-    Project context with owner permission
+    Project context with editor permission
 
 Returns
 -------
@@ -1592,6 +1595,212 @@ export function useGetChipQubit<
   return query;
 }
 
+/**
+ * Re-run the resonator-spectroscopy analysis on a previously stored figure.
+
+Returns the marked figure and the re-estimated `readout_frequency` for
+the requested qubit. The DB is **not** mutated; this is a preview only.
+ * @summary Re-run resonator spectroscopy analysis on a stored task result (preview)
+ */
+export const reanalyzeResonatorSpectroscopy = (
+  chipId: string,
+  qid: string,
+  reanalyzeResonatorSpectroscopyRequest: ReanalyzeResonatorSpectroscopyRequest,
+  options?: SecondParameter<typeof customInstance>,
+  signal?: AbortSignal,
+) => {
+  return customInstance<ReanalyzeResponse>(
+    {
+      url: `/chips/${chipId}/qubits/${qid}/reanalyze/resonator-spectroscopy`,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      data: reanalyzeResonatorSpectroscopyRequest,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getReanalyzeResonatorSpectroscopyMutationOptions = <
+  TError = HTTPValidationError,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof reanalyzeResonatorSpectroscopy>>,
+    TError,
+    {
+      chipId: string;
+      qid: string;
+      data: ReanalyzeResonatorSpectroscopyRequest;
+    },
+    TContext
+  >;
+  request?: SecondParameter<typeof customInstance>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof reanalyzeResonatorSpectroscopy>>,
+  TError,
+  { chipId: string; qid: string; data: ReanalyzeResonatorSpectroscopyRequest },
+  TContext
+> => {
+  const mutationKey = ["reanalyzeResonatorSpectroscopy"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof reanalyzeResonatorSpectroscopy>>,
+    { chipId: string; qid: string; data: ReanalyzeResonatorSpectroscopyRequest }
+  > = (props) => {
+    const { chipId, qid, data } = props ?? {};
+
+    return reanalyzeResonatorSpectroscopy(chipId, qid, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ReanalyzeResonatorSpectroscopyMutationResult = NonNullable<
+  Awaited<ReturnType<typeof reanalyzeResonatorSpectroscopy>>
+>;
+export type ReanalyzeResonatorSpectroscopyMutationBody =
+  ReanalyzeResonatorSpectroscopyRequest;
+export type ReanalyzeResonatorSpectroscopyMutationError = HTTPValidationError;
+
+/**
+ * @summary Re-run resonator spectroscopy analysis on a stored task result (preview)
+ */
+export const useReanalyzeResonatorSpectroscopy = <
+  TError = HTTPValidationError,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof reanalyzeResonatorSpectroscopy>>,
+      TError,
+      {
+        chipId: string;
+        qid: string;
+        data: ReanalyzeResonatorSpectroscopyRequest;
+      },
+      TContext
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof reanalyzeResonatorSpectroscopy>>,
+  TError,
+  { chipId: string; qid: string; data: ReanalyzeResonatorSpectroscopyRequest },
+  TContext
+> => {
+  const mutationOptions =
+    getReanalyzeResonatorSpectroscopyMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+/**
+ * Re-run the qubit-spectroscopy analysis on a previously stored figure.
+
+Returns the marked figure and the re-estimated `qubit_frequency`,
+`f01_repr_db`, `f01_quality_level`, and `anharmonicity` for the requested
+qubit. The DB is **not** mutated; this is a preview only.
+ * @summary Re-run qubit spectroscopy analysis on a stored task result (preview)
+ */
+export const reanalyzeQubitSpectroscopy = (
+  chipId: string,
+  qid: string,
+  reanalyzeQubitSpectroscopyRequest: ReanalyzeQubitSpectroscopyRequest,
+  options?: SecondParameter<typeof customInstance>,
+  signal?: AbortSignal,
+) => {
+  return customInstance<ReanalyzeResponse>(
+    {
+      url: `/chips/${chipId}/qubits/${qid}/reanalyze/qubit-spectroscopy`,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      data: reanalyzeQubitSpectroscopyRequest,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getReanalyzeQubitSpectroscopyMutationOptions = <
+  TError = HTTPValidationError,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof reanalyzeQubitSpectroscopy>>,
+    TError,
+    { chipId: string; qid: string; data: ReanalyzeQubitSpectroscopyRequest },
+    TContext
+  >;
+  request?: SecondParameter<typeof customInstance>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof reanalyzeQubitSpectroscopy>>,
+  TError,
+  { chipId: string; qid: string; data: ReanalyzeQubitSpectroscopyRequest },
+  TContext
+> => {
+  const mutationKey = ["reanalyzeQubitSpectroscopy"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof reanalyzeQubitSpectroscopy>>,
+    { chipId: string; qid: string; data: ReanalyzeQubitSpectroscopyRequest }
+  > = (props) => {
+    const { chipId, qid, data } = props ?? {};
+
+    return reanalyzeQubitSpectroscopy(chipId, qid, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ReanalyzeQubitSpectroscopyMutationResult = NonNullable<
+  Awaited<ReturnType<typeof reanalyzeQubitSpectroscopy>>
+>;
+export type ReanalyzeQubitSpectroscopyMutationBody =
+  ReanalyzeQubitSpectroscopyRequest;
+export type ReanalyzeQubitSpectroscopyMutationError = HTTPValidationError;
+
+/**
+ * @summary Re-run qubit spectroscopy analysis on a stored task result (preview)
+ */
+export const useReanalyzeQubitSpectroscopy = <
+  TError = HTTPValidationError,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof reanalyzeQubitSpectroscopy>>,
+      TError,
+      { chipId: string; qid: string; data: ReanalyzeQubitSpectroscopyRequest },
+      TContext
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof reanalyzeQubitSpectroscopy>>,
+  TError,
+  { chipId: string; qid: string; data: ReanalyzeQubitSpectroscopyRequest },
+  TContext
+> => {
+  const mutationOptions = getReanalyzeQubitSpectroscopyMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
 /**
  * List couplings for a chip with pagination.
 

@@ -11,7 +11,10 @@ import type { ProjectRole } from "./projectRole";
  * Request schema for inviting a member.
  */
 export interface MemberInvite {
-  /** Username to invite */
+  /**
+   * Username must be 3-64 characters, lowercase letters, numbers, dots, underscores, or hyphens, and start and end with a letter or number.
+   * @pattern ^[a-z0-9][a-z0-9._-]{1,62}[a-z0-9]$
+   */
   username: string;
   /** Role to assign */
   role?: ProjectRole;

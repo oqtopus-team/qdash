@@ -54,6 +54,7 @@ class FlowSummary(BaseModel):
     """Summary of a Flow for listing."""
 
     name: str = Field(..., description="Flow name")
+    created_by: str = Field(..., description="Username of the flow creator")
     description: str = Field(..., description="Flow description")
     chip_id: str = Field(..., description="Target chip ID")
     flow_function_name: str = Field(..., description="Entry point function name")
@@ -72,6 +73,7 @@ class GetFlowResponse(BaseModel):
     """Response for getting flow details."""
 
     name: str = Field(..., description="Flow name")
+    created_by: str = Field(..., description="Username of the flow creator")
     description: str = Field(..., description="Flow description")
     code: str = Field(..., description="Python code content")
     flow_function_name: str = Field(..., description="Entry point function name")

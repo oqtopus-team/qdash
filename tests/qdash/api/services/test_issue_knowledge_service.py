@@ -47,10 +47,21 @@ def _make_doc(
     chip_id: str = "chip-A",
     qid: str = "Q0",
     resolution_status: str = "resolved",
+    human_label: str = "",
+    failure_mode_labels: list[str] | object = _SENTINEL,
+    case_type: list[str] | object = _SENTINEL,
+    model_error_type: str = "",
+    resolution_label: str = "",
     symptom: str = "T1 dropped below threshold",
+    model_prediction: str = "",
+    human_review_decision: str = "",
     root_cause: str = "Cosmic ray event",
     resolution: str = "Recalibrated qubit",
+    boundary_criteria: str = "",
     lesson_learned: list[str] | object = _SENTINEL,
+    applicability: str = "",
+    counterexample: str = "",
+    prompt_guidance: str = "",
     figure_paths: list[str] | object = _SENTINEL,
     thread_image_urls: list[str] | object = _SENTINEL,
     reviewed_by: str | None = None,
@@ -71,12 +82,23 @@ def _make_doc(
     doc.chip_id = chip_id
     doc.qid = qid
     doc.resolution_status = resolution_status
+    doc.human_label = human_label
+    doc.failure_mode_labels = [] if failure_mode_labels is _SENTINEL else failure_mode_labels
+    doc.case_type = [] if case_type is _SENTINEL else case_type
+    doc.model_error_type = model_error_type
+    doc.resolution_label = resolution_label
     doc.symptom = symptom
+    doc.model_prediction = model_prediction
+    doc.human_review_decision = human_review_decision
     doc.root_cause = root_cause
     doc.resolution = resolution
+    doc.boundary_criteria = boundary_criteria
     doc.lesson_learned = (
         ["Always check T1 after cooldown"] if lesson_learned is _SENTINEL else lesson_learned
     )
+    doc.applicability = applicability
+    doc.counterexample = counterexample
+    doc.prompt_guidance = prompt_guidance
     doc.figure_paths = [] if figure_paths is _SENTINEL else figure_paths
     doc.thread_image_urls = [] if thread_image_urls is _SENTINEL else thread_image_urls
     doc.reviewed_by = reviewed_by

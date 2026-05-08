@@ -9,7 +9,7 @@ from qdash.api.dependencies import (
     get_manual_update_service,
     get_seed_import_service,
 )
-from qdash.api.lib.project import ProjectContext, get_project_context
+from qdash.api.lib.project import ProjectContext, get_project_context, get_project_context_editor
 from qdash.api.schemas.calibration import (
     CalibrationNoteResponse,
     ManualEditsResponse,
@@ -75,7 +75,7 @@ def get_calibration_note(
     operation_id="importSeedParameters",
 )
 def import_seed_parameters(
-    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
     service: Annotated[SeedImportService, Depends(get_seed_import_service)],
     request: SeedImportRequest,
 ) -> SeedImportResponse:
@@ -228,7 +228,7 @@ def compare_seed_values(
     operation_id="updateCalibrationParameters",
 )
 def update_calibration_parameters(
-    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
     service: Annotated[ManualUpdateService, Depends(get_manual_update_service)],
     request: ManualParameterUpdateRequest,
 ) -> ManualParameterUpdateResponse:

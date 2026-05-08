@@ -23,6 +23,7 @@ import { useMetricsUrlState, useRangeModeUrlState } from "@/hooks/useUrlState";
 import { dateToDateTimeLocal } from "@/lib/utils/datetime";
 
 import { DashboardCdfChart } from "./DashboardCdfChart";
+import { DashboardAiInsights } from "./DashboardAiInsights";
 import { DashboardCouplingGrid } from "./DashboardCouplingGrid";
 import { DashboardNotesSummary } from "./DashboardNotesSummary";
 import { DashboardQubitGrid } from "./DashboardQubitGrid";
@@ -175,13 +176,15 @@ export function DashboardPageContent() {
 
   const taskNotes = useMemo(
     () =>
-      (summary?.task_notes ?? []).map((t) => ({
-        taskId: t.task_id,
-        qid: t.qid,
-        content: t.note?.content ?? "",
-        username: t.note?.updated_by ?? "",
-        updatedAt: t.note?.updated_at ?? "",
-      })),
+      (summary?.task_notes ?? [])
+        .map((t) => ({
+          taskId: t.task_id,
+          qid: t.qid,
+          content: stripAiTriageSection(t.note?.content ?? ""),
+          username: t.note?.updated_by ?? "",
+          updatedAt: t.note?.updated_at ?? "",
+        }))
+        .filter((t) => t.content.trim().length > 0),
     [summary],
   );
 
@@ -378,6 +381,21 @@ export function DashboardPageContent() {
           />
         ) : (
           <>
+            {/* Chip-level operational insights */}
+            <Card
+              variant="default"
+              padding="md"
+              title="AI Insights"
+              description="High-signal operational patterns extracted from task triage and dashboard context."
+            >
+              <DashboardAiInsights
+                chipId={selectedChip}
+                selectionMode={selectionMode}
+                startAt={queryParams.start_at}
+                endAt={queryParams.end_at}
+              />
+            </Card>
+
             {/* All notes overview */}
             <Card
               variant="default"
@@ -606,4 +624,8 @@ export function DashboardPageContent() {
       )}
     </PageContainer>
   );
+}
+
+function stripAiTriageSection(content: string): string {
+  return content.replace(/^## AI triage\n\n.*?(?:\n\n---\n\n|$)/s, "").trim();
 }

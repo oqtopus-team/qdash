@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { Pencil, Save, StickyNote, Trash2, X } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -13,18 +13,25 @@ import {
   useGetTaskNote,
   useUpsertTaskNote,
 } from "@/client/note/note";
+import { MarkdownContent } from "@/components/ui/MarkdownContent";
 
 interface TaskResultMemoProps {
   taskId: string;
   /** Optional chip_id to invalidate the chip-wide list query after edits. */
   chipId?: string;
+  /** Hide the component when the task has no note yet. */
+  hideWhenEmpty?: boolean;
 }
 
 /**
  * Free-form note attached to a task result. Renders right above the issues
  * thread inside QubitMetricHistoryModal.
  */
-export function TaskResultMemo({ taskId, chipId }: TaskResultMemoProps) {
+export function TaskResultMemo({
+  taskId,
+  chipId,
+  hideWhenEmpty = false,
+}: TaskResultMemoProps) {
   const queryClient = useQueryClient();
   const { data, isLoading } = useGetTaskNote(taskId, {
     query: {
@@ -41,10 +48,19 @@ export function TaskResultMemo({ taskId, chipId }: TaskResultMemoProps) {
 
   const [isEditing, setIsEditing] = useState(false);
   const [draft, setDraft] = useState(noteContent);
+  const aiTriageSummary = useMemo(
+    () => getAiTriageSummary(noteContent),
+    [noteContent],
+  );
+  const [isExpanded, setIsExpanded] = useState(!aiTriageSummary);
 
   useEffect(() => {
     setDraft(noteContent);
   }, [noteContent]);
+
+  useEffect(() => {
+    setIsExpanded(!aiTriageSummary);
+  }, [aiTriageSummary]);
 
   const invalidate = async () => {
     await queryClient.invalidateQueries({
@@ -80,12 +96,24 @@ export function TaskResultMemo({ taskId, chipId }: TaskResultMemoProps) {
     // useGetTaskNote returns no data on 404 — treat that as the "create" state.
     true;
 
+  if (hideWhenEmpty && showNotFound) {
+    return null;
+  }
+
   return (
     <div className="mt-6 mb-3 rounded-lg border border-base-300 bg-base-200/40">
       <div className="flex items-center justify-between px-3 py-2 border-b border-base-300">
         <h3 className="text-sm font-semibold flex items-center gap-2">
           <StickyNote className="h-4 w-4" />
           Note
+          {aiTriageSummary?.decision && (
+            <span
+              className={`badge badge-xs ${getAiTriageDecisionBadgeClass(aiTriageSummary.decision)}`}
+              title="AI triage decision"
+            >
+              {aiTriageSummary.decision}
+            </span>
+          )}
           {note?.updated_by && (
             <span className="text-xs font-normal text-base-content/60">
               · last edit by {note.updated_by}
@@ -159,7 +187,25 @@ export function TaskResultMemo({ taskId, chipId }: TaskResultMemoProps) {
         ) : isLoading ? (
           <div className="text-xs text-base-content/50 italic">Loading…</div>
         ) : note ? (
-          <p className="whitespace-pre-wrap break-words">{note.content}</p>
+          <>
+            <MarkdownContent
+              content={
+                aiTriageSummary && !isExpanded
+                  ? aiTriageSummary.summary
+                  : noteContent
+              }
+              className="break-words [&>:first-child]:mt-0 [&>:last-child]:mb-0 [&_ul]:my-1.5 [&_ol]:my-1.5 [&_li]:my-0.5 [&_li>p]:my-0"
+            />
+            {aiTriageSummary && (
+              <button
+                type="button"
+                className="btn btn-xs btn-ghost mt-2"
+                onClick={() => setIsExpanded((value) => !value)}
+              >
+                {isExpanded ? "Show summary" : "Show full note"}
+              </button>
+            )}
+          </>
         ) : showNotFound ? (
           <p className="text-xs text-base-content/50 italic">
             No note yet. Click &ldquo;Add note&rdquo; to write one.
@@ -168,6 +214,69 @@ export function TaskResultMemo({ taskId, chipId }: TaskResultMemoProps) {
       </div>
     </div>
   );
+}
+
+function getAiTriageSummary(
+  content: string,
+): { summary: string; decision: string | null } | null {
+  const header = "## AI triage";
+  const headerIndex = content.indexOf(header);
+  if (headerIndex === -1) return null;
+
+  const separatorIndex = content.indexOf("\n\n---\n\n", headerIndex);
+  const section =
+    separatorIndex === -1
+      ? content.slice(headerIndex)
+      : content.slice(headerIndex, separatorIndex);
+  const body = section.slice(header.length).trim();
+  if (!body) return null;
+
+  const lines = body.split(/\r?\n/);
+  const summaryLines: string[] = [header];
+  let decision: string | null = null;
+  const importantLinePattern =
+    /^(?:[-*]\s*)?(?:\*\*)?(Review triage|Decision|判定|Human label suggestion|Accepted parameter\(s\)|受理されたパラメータ|Needs review|要レビュー|Primary reason|主な理由|Closest knowledge case|最も近い知識事例|Suggested labels|推奨ラベル|Recommended action|推奨アクション|Optional note)(?:\*\*)?\s*:?/i;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) {
+      if (summaryLines[summaryLines.length - 1] !== "") {
+        summaryLines.push("");
+      }
+      continue;
+    }
+    if (importantLinePattern.test(trimmed)) {
+      summaryLines.push(line);
+      decision ??= extractAiTriageDecision(trimmed);
+      continue;
+    }
+    if (summaryLines.length <= 2) {
+      summaryLines.push(line);
+    }
+  }
+
+  const summary = summaryLines.join("\n").trim();
+  if (!summary || (summary === section.trim() && !decision)) return null;
+  return { summary, decision };
+}
+
+function extractAiTriageDecision(line: string): string | null {
+  const match = line.match(/(?:Decision|判定)\s*:\s*`?([A-Z_]+)`?/i);
+  return match?.[1]?.toUpperCase() ?? null;
+}
+
+function getAiTriageDecisionBadgeClass(decision: string): string {
+  switch (decision) {
+    case "PASS":
+      return "badge-success";
+    case "PASS_WITH_NOTE":
+    case "REVIEW":
+      return "badge-warning";
+    case "FAIL":
+      return "badge-error";
+    default:
+      return "badge-ghost";
+  }
 }
 
 function extractErrorMessage(err: unknown): string {

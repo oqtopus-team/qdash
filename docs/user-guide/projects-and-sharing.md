@@ -41,27 +41,29 @@ You automatically become the owner of any project you create.
 
 ## Team Roles and Permissions
 
-QDash uses a simplified two-role permission model:
+QDash uses a simplified three-role permission model:
 
 | Role       | Capabilities                                                                                       |
 | ---------- | -------------------------------------------------------------------------------------------------- |
 | **Viewer** | View all project data (chips, calibrations, results). Cannot modify anything.                      |
-| **Owner**  | Full access: create/modify chips, run calibrations, invite/remove members, and delete the project. |
+| **Editor** | Operational write access: create/modify chips, run workflows, edit notes, and update calibration data. |
+| **Owner**  | Project administration plus editor access: manage members, project settings, categories, and deletion. |
 
 ### Permission Summary
 
-| Action                          | Viewer | Owner |
-| ------------------------------- | :----: | :---: |
-| View chips and calibration data |   ✅   |  ✅   |
-| View execution history          |   ✅   |  ✅   |
-| Download results                |   ✅   |  ✅   |
-| Create/modify chips             |   ❌   |  ✅   |
-| Run calibrations                |   ❌   |  ✅   |
-| Update parameters               |   ❌   |  ✅   |
-| Invite members                  |   ❌   |  ✅   |
-| Remove members                  |   ❌   |  ✅   |
-| Delete project                  |   ❌   |  ✅   |
-| Transfer ownership              |   ❌   |  ✅   |
+| Action                          | Viewer | Editor | Owner |
+| ------------------------------- | :----: | :----: | :---: |
+| View chips and calibration data |   ✅   |   ✅   |  ✅   |
+| View execution history          |   ✅   |   ✅   |  ✅   |
+| Download results                |   ✅   |   ✅   |  ✅   |
+| Create/modify chips             |   ❌   |   ✅   |  ✅   |
+| Run calibrations                |   ❌   |   ✅   |  ✅   |
+| Update parameters               |   ❌   |   ✅   |  ✅   |
+| Edit notes                      |   ❌   |   ✅   |  ✅   |
+| Manage forum categories         |   ❌   |   ❌   |  ✅   |
+| Invite or remove members        |   ❌   |   ❌   |  ✅   |
+| Delete project                  |   ❌   |   ❌   |  ✅   |
+| Transfer ownership              |   ❌   |   ❌   |  ✅   |
 
 ## Inviting Team Members
 
@@ -73,14 +75,15 @@ As a project owner, you can invite other QDash users to collaborate:
 4. Enter the username of the person you want to invite
 5. Click **"Send Invitation"**
 
-The invited user will be added as a **Viewer** and see the project in their project list immediately.
+Choose **Viewer** for read-only access or **Editor** for operational work. The invited user sees the project in their project list immediately.
 
 ### Managing Members
 
 From the Members tab, owners can:
 
+- **Assign roles**: Choose Viewer or Editor access for each member
 - **Remove members**: Revoke a user's access to the project
-- **Transfer ownership**: Make another member the owner (you become a Viewer)
+- **Transfer ownership**: Make another member the owner. The previous owner remains an Editor.
 
 ## Sharing Calibration Results
 
@@ -89,12 +92,13 @@ Once you have team members in your project, sharing is automatic:
 1. **Run a calibration** in your project
 2. **All members can view** the results
 3. **Viewers** can see and download data
-4. **Only the Owner** can modify and re-run calibrations
+4. **Editors and Owners** can modify and re-run calibrations
 
 ### Best Practices for Sharing
 
-- Invite team members as **Viewers** so they can access results
-- Keep **ownership** for active calibration work
+- Invite team members as **Viewers** when they only need to inspect results
+- Use **Editor** for users who need to run workflows or update calibration data
+- Keep **Owner** limited to users who should manage project membership and settings
 - Create **separate projects** for different experiments or teams
 - Use **descriptive project names** to keep things organized
 
@@ -177,7 +181,7 @@ Before leaving, the owner must transfer ownership to another member. A project c
 
 ### Can I have multiple owners?
 
-No, each project has exactly one owner. If you need another user to have write access, transfer ownership to them.
+No, each project has exactly one owner. If another user needs write access without project administration, assign them the Editor role.
 
 ### How do I find my project ID?
 
@@ -186,4 +190,3 @@ Your project ID is shown in:
 - Project Settings page
 - URL when viewing project details
 - API responses
-

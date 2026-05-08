@@ -7,7 +7,8 @@ from typing import Annotated, cast
 from fastapi import Depends, Header, HTTPException, Path, status
 from qdash.api.lib.auth import get_current_active_user
 from qdash.api.schemas.auth import User
-from qdash.datamodel.project import ProjectRole
+from qdash.datamodel.project import ProjectPermission, ProjectRole, role_has_permission
+from qdash.datamodel.user import SystemRole
 from qdash.dbmodel.project import ProjectDocument
 from qdash.dbmodel.project_membership import ProjectMembershipDocument
 
@@ -58,12 +59,13 @@ def _resolve_project_id(
     if user.default_project_id:
         return str(user.default_project_id)
 
-    # Fallback: check if user owns a project
+    # Fallback: check if user owns a project.
     from qdash.dbmodel.project import ProjectDocument
 
-    owned_project = ProjectDocument.find_one({"owner_username": user.username}).run()
-    if owned_project:
-        return str(owned_project.project_id)
+    if user.user_id:
+        owned_project = ProjectDocument.find_one({"owner_user_id": user.user_id}).run()
+        if owned_project:
+            return str(owned_project.project_id)
 
     raise HTTPException(
         status_code=status.HTTP_400_BAD_REQUEST,
@@ -71,23 +73,25 @@ def _resolve_project_id(
     )
 
 
-def _get_membership(project_id: str, username: str) -> ProjectMembershipDocument | None:
+def _get_membership(
+    project_id: str, username: str, user_id: str | None
+) -> ProjectMembershipDocument | None:
     """Get active membership for user in project."""
-    result = ProjectMembershipDocument.get_active_membership(project_id, username)
+    result = ProjectMembershipDocument.get_active_membership(project_id, username, user_id)
     return cast("ProjectMembershipDocument | None", result)
 
 
 def _check_permission(
     project_id: str,
     user: User,
-    required_roles: list[ProjectRole] | None = None,
+    required_permission: ProjectPermission = ProjectPermission.READ,
 ) -> tuple[ProjectDocument, ProjectRole]:
     """Check if user has permission to access project.
 
     Args:
         project_id: The project identifier
         user: The authenticated user
-        required_roles: List of roles that are allowed. If None, any role is accepted.
+        required_permission: Coarse project permission required for this endpoint.
 
     Returns:
         Tuple of (ProjectDocument, user's role)
@@ -103,23 +107,29 @@ def _check_permission(
             detail=f"Project '{project_id}' not found",
         )
 
+    if user.system_role == SystemRole.ADMIN:
+        return project, ProjectRole.OWNER
+
     # Check membership
-    membership = _get_membership(project_id, user.username)
+    membership = _get_membership(project_id, user.username, user.user_id)
     if not membership:
-        # Check if user is the owner (fallback for legacy data)
-        if project.owner_username == user.username:
+        if user.user_id and project.owner_user_id == user.user_id:
             logger.debug(f"User {user.username} is owner of project {project_id}")
+            if not role_has_permission(ProjectRole.OWNER, required_permission):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=f"Insufficient permissions. Required: {required_permission.value}",
+                )
             return project, ProjectRole.OWNER
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"You do not have access to project '{project_id}'",
         )
 
-    # Check role if required
-    if required_roles and membership.role not in required_roles:
+    if not role_has_permission(membership.role, required_permission):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Insufficient permissions. Required: {[r.value for r in required_roles]}",
+            detail=f"Insufficient permissions. Required: {required_permission.value}",
         )
 
     return project, membership.role
@@ -147,7 +157,20 @@ def get_project_context_owner(
     Use this dependency for admin endpoints (e.g., project settings, member management).
     """
     project_id = _resolve_project_id(user, project_id_header)
-    project, role = _check_permission(project_id, user, required_roles=[ProjectRole.OWNER])
+    project, role = _check_permission(project_id, user, required_permission=ProjectPermission.ADMIN)
+    return ProjectContext(project_id=project_id, project=project, user=user, role=role)
+
+
+def get_project_context_editor(
+    user: Annotated[User, Depends(get_current_active_user)],
+    project_id_header: Annotated[str | None, Depends(get_project_id_from_header)] = None,
+) -> ProjectContext:
+    """Get project context with editor or owner permission.
+
+    Use this dependency for operational write endpoints.
+    """
+    project_id = _resolve_project_id(user, project_id_header)
+    project, role = _check_permission(project_id, user, required_permission=ProjectPermission.WRITE)
     return ProjectContext(project_id=project_id, project=project, user=user, role=role)
 
 
@@ -174,5 +197,14 @@ def get_project_context_owner_from_path(
 
     Use this dependency for project router admin endpoints with /{project_id}.
     """
-    project, role = _check_permission(project_id, user, required_roles=[ProjectRole.OWNER])
+    project, role = _check_permission(project_id, user, required_permission=ProjectPermission.ADMIN)
+    return ProjectContext(project_id=project_id, project=project, user=user, role=role)
+
+
+def get_project_context_editor_from_path(
+    project_id: Annotated[str, Path(description="Project identifier")],
+    user: Annotated[User, Depends(get_current_active_user)],
+) -> ProjectContext:
+    """Get project context from path parameter with editor or owner permission."""
+    project, role = _check_permission(project_id, user, required_permission=ProjectPermission.WRITE)
     return ProjectContext(project_id=project_id, project=project, user=user, role=role)

@@ -14,6 +14,7 @@ import type { ProjectListItemCreatedAt } from "./projectListItemCreatedAt";
 export interface ProjectListItem {
   project_id: string;
   name: string;
+  owner_user_id: string;
   owner_username: string;
   description?: ProjectListItemDescription;
   member_count?: number;

@@ -71,6 +71,7 @@ Represents a collaborative workspace. Every tenant-visible entity references a p
 ```python
 class ProjectModel(BaseModel):
     project_id: str        # Globally unique slug/UUID
+    owner_user_id: str     # Immutable internal owner ID
     owner_username: str    # Creator/owner of the project
     name: str              # Display name
     description: str | None = None
@@ -86,14 +87,17 @@ Represents user access to a project.
 
 ```python
 class ProjectRole(str, Enum):
-    """Simplified two-role permission model."""
+    """Simplified project permission model."""
     OWNER = "owner"   # Full access (read, write, admin)
+    EDITOR = "editor" # Operational write access
     VIEWER = "viewer" # Read-only access
 
 class ProjectMembershipModel(BaseModel):
     project_id: str
+    user_id: str
     username: str
     role: ProjectRole
+    invited_by_user_id: str | None = None
     invited_by: str | None = None
     status: Literal["pending", "active", "revoked"] = "pending"
     system_info: SystemInfoModel
@@ -313,11 +317,13 @@ class BackendModel(BaseModel):
 **Indexes:**
 
 - `project_id` - Unique identifier per project
+- `(owner_user_id, name)` - Efficient owner lookup by immutable user ID
 - `(owner_username, name)` - Prevent duplicate names per owner
 
 ```python
 class ProjectDocument(Document):
     project_id: str            # UUID/slug
+    owner_user_id: str         # Immutable internal owner ID
     owner_username: str
     name: str
     description: str | None = None
@@ -334,14 +340,18 @@ class ProjectDocument(Document):
 **Indexes:**
 
 - `(project_id, username)` - Unique membership per user/project
+- `(project_id, user_id)` - Membership lookup by immutable user ID
+- `(user_id, status)` - Efficient active membership lookup
 - `(username, status)` - Efficient lookup of invitations
 
 ```python
 class ProjectMembershipDocument(Document):
     project_id: str
+    user_id: str
     username: str
     role: ProjectRole
     status: Literal["pending", "active", "revoked"] = "pending"
+    invited_by_user_id: str | None = None
     invited_by: str | None = None
     last_accessed_at: str | None = None
     system_info: SystemInfoModel
@@ -658,10 +668,12 @@ class BackendDocument(Document):
 **Indexes:**
 
 - `username` - Unique index
+- `user_id` - Unique immutable internal identifier
 - `access_token` - Unique index
 
 ```python
 class UserDocument(Document):
+    user_id: str
     username: str
     hashed_password: str
     access_token: str
@@ -919,7 +931,7 @@ Other project-scoped collections (tasks, tags, backends, flows, counters, locks,
 
 ### During Calibration Execution
 
-0. Resolve `(project_id, username)` via **ProjectMembershipDocument** and ensure role is `owner`
+0. Resolve `(project_id, user_id)` via **ProjectMembershipDocument** and ensure the role includes write permission
 1. Acquire per-project lock via **ExecutionLockDocument(project_id)**
 2. Generate execution ID from **ExecutionCounterDocument** (YYYYMMDD-NNN scoped by project/chip)
 3. Execute each task:

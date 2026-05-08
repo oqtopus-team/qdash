@@ -31,14 +31,18 @@ def test_project(init_db: PyMongoDatabase[Any]) -> ProjectDocument:
     project = ProjectDocument(
         project_id="test_project",
         name="Test Project",
+        owner_user_id=user.user_id,
         owner_username="test_user",
     )
     project.insert()
 
     membership = ProjectMembershipDocument(
         project_id="test_project",
+        user_id=user.user_id,
         username="test_user",
         role=ProjectRole.OWNER,
+        status="active",
+        invited_by_user_id=user.user_id,
         invited_by="test_user",
     )
     membership.insert()
@@ -60,8 +64,35 @@ def viewer_user(init_db: PyMongoDatabase[Any]) -> UserDocument:
 
     membership = ProjectMembershipDocument(
         project_id="test_project",
+        user_id=user.user_id,
         username="viewer_user",
         role=ProjectRole.VIEWER,
+        status="active",
+        invited_by="test_user",
+    )
+    membership.insert()
+
+    return user
+
+
+@pytest.fixture
+def editor_user(init_db: PyMongoDatabase[Any]) -> UserDocument:
+    """Create an editor user."""
+    user = UserDocument(
+        username="editor_user",
+        hashed_password="hashed",
+        access_token="editor_token",
+        default_project_id="test_project",
+        system_info=SystemInfoModel(),
+    )
+    user.insert()
+
+    membership = ProjectMembershipDocument(
+        project_id="test_project",
+        user_id=user.user_id,
+        username="editor_user",
+        role=ProjectRole.EDITOR,
+        status="active",
         invited_by="test_user",
     )
     membership.insert()
@@ -83,6 +114,15 @@ def viewer_headers() -> dict[str, str]:
     """Viewer authentication headers."""
     return {
         "Authorization": "Bearer viewer_token",
+        "X-Project-Id": "test_project",
+    }
+
+
+@pytest.fixture
+def editor_headers() -> dict[str, str]:
+    """Editor authentication headers."""
+    return {
+        "Authorization": "Bearer editor_token",
         "X-Project-Id": "test_project",
     }
 
@@ -379,7 +419,7 @@ class TestReExecuteFromSnapshot:
         )
         assert response.status_code == 401
 
-    def test_re_execute_requires_owner_role(
+    def test_re_execute_rejects_viewer_role(
         self,
         test_client: TestClient,
         test_project: ProjectDocument,
@@ -397,6 +437,51 @@ class TestReExecuteFromSnapshot:
             },
         )
         assert response.status_code == 403
+
+    @patch("qdash.api.services.flow_service.FlowService.re_execute_from_snapshot")
+    def test_re_execute_allows_editor_for_own_execution(
+        self,
+        mock_re_execute: AsyncMock,
+        test_client: TestClient,
+        test_project: ProjectDocument,
+        editor_user: UserDocument,
+        editor_headers: dict[str, str],
+    ) -> None:
+        """Test editors can re-execute their own executions."""
+        execution = ExecutionHistoryDocument(
+            project_id="test_project",
+            execution_id="exec-editor",
+            name="test_flow",
+            status="completed",
+            chip_id="chip-1",
+            username="editor_user",
+            tags=["test"],
+            note={},
+            calib_data_path="/tmp/calib",
+            message="completed",
+            system_info=SystemInfoModel(),
+            start_at=datetime.now(tz=timezone.utc),
+            end_at=datetime.now(tz=timezone.utc),
+            elapsed_time=10.0,
+        )
+        execution.insert()
+        mock_re_execute.return_value = {
+            "execution_id": "exec-new",
+            "flow_run_url": "http://prefect.local/runs/run-123",
+            "qdash_ui_url": "http://qdash.local/executions/exec-new",
+            "message": "Flow re-execution started",
+        }
+
+        response = test_client.post(
+            "/executions/exec-editor/re-execute",
+            headers=editor_headers,
+            json={
+                "flow_name": "test_flow",
+                "parameter_overrides": {},
+            },
+        )
+
+        assert response.status_code == 200
 
 
 class TestListExecutions:

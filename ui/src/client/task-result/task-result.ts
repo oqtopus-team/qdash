@@ -22,8 +22,10 @@ import type {
 } from "@tanstack/react-query";
 
 import type {
-  BodyDownloadFiguresAsZip,
   BodyReExecuteTaskResult,
+  BulkAiTriageRequest,
+  BulkAiTriageResponse,
+  DownloadFiguresAsZipRequest,
   ExecuteFlowResponse,
   GetCouplingTaskHistoryParams,
   GetHistoricalCouplingTaskResultsParams,
@@ -35,6 +37,8 @@ import type {
   HTTPValidationError,
   LatestTaskResultResponse,
   TaskHistoryResponse,
+  TaskResultExcludeRequest,
+  TaskResultExcludeResponse,
   TimeSeriesData,
 } from "../../schemas";
 
@@ -1416,6 +1420,98 @@ export function useGetTimeseriesTaskResults<
 }
 
 /**
+ * Enqueue AI triage review for the current latest task result per entity.
+ * @summary Request bulk AI triage review for latest task results
+ */
+export const requestBulkAiTriageReview = (
+  bulkAiTriageRequest: BulkAiTriageRequest,
+  options?: SecondParameter<typeof customInstance>,
+  signal?: AbortSignal,
+) => {
+  return customInstance<BulkAiTriageResponse>(
+    {
+      url: `/task-results/ai-triage/bulk`,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      data: bulkAiTriageRequest,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getRequestBulkAiTriageReviewMutationOptions = <
+  TError = HTTPValidationError,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof requestBulkAiTriageReview>>,
+    TError,
+    { data: BulkAiTriageRequest },
+    TContext
+  >;
+  request?: SecondParameter<typeof customInstance>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof requestBulkAiTriageReview>>,
+  TError,
+  { data: BulkAiTriageRequest },
+  TContext
+> => {
+  const mutationKey = ["requestBulkAiTriageReview"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof requestBulkAiTriageReview>>,
+    { data: BulkAiTriageRequest }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return requestBulkAiTriageReview(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type RequestBulkAiTriageReviewMutationResult = NonNullable<
+  Awaited<ReturnType<typeof requestBulkAiTriageReview>>
+>;
+export type RequestBulkAiTriageReviewMutationBody = BulkAiTriageRequest;
+export type RequestBulkAiTriageReviewMutationError = HTTPValidationError;
+
+/**
+ * @summary Request bulk AI triage review for latest task results
+ */
+export const useRequestBulkAiTriageReview = <
+  TError = HTTPValidationError,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof requestBulkAiTriageReview>>,
+      TError,
+      { data: BulkAiTriageRequest },
+      TContext
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof requestBulkAiTriageReview>>,
+  TError,
+  { data: BulkAiTriageRequest },
+  TContext
+> => {
+  const mutationOptions = getRequestBulkAiTriageReviewMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+/**
  * Re-execute a single task using the system single-task-executor deployment.
 
 Looks up the TaskResultHistoryDocument to extract task_name, qid, chip_id,
@@ -1529,6 +1625,102 @@ export const useReExecuteTaskResult = <
   return useMutation(mutationOptions, queryClient);
 };
 /**
+ * Toggle the excluded flag on a task result.
+
+Excluded measurements are skipped when aggregating metrics for the
+dashboard / metrics screens. Raw data is preserved.
+ * @summary Toggle exclusion of a task result from metrics aggregations
+ */
+export const setTaskResultExcluded = (
+  taskId: string,
+  taskResultExcludeRequest: TaskResultExcludeRequest,
+  options?: SecondParameter<typeof customInstance>,
+  signal?: AbortSignal,
+) => {
+  return customInstance<TaskResultExcludeResponse>(
+    {
+      url: `/task-results/${taskId}/exclude`,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      data: taskResultExcludeRequest,
+      signal,
+    },
+    options,
+  );
+};
+
+export const getSetTaskResultExcludedMutationOptions = <
+  TError = HTTPValidationError,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof setTaskResultExcluded>>,
+    TError,
+    { taskId: string; data: TaskResultExcludeRequest },
+    TContext
+  >;
+  request?: SecondParameter<typeof customInstance>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof setTaskResultExcluded>>,
+  TError,
+  { taskId: string; data: TaskResultExcludeRequest },
+  TContext
+> => {
+  const mutationKey = ["setTaskResultExcluded"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof setTaskResultExcluded>>,
+    { taskId: string; data: TaskResultExcludeRequest }
+  > = (props) => {
+    const { taskId, data } = props ?? {};
+
+    return setTaskResultExcluded(taskId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SetTaskResultExcludedMutationResult = NonNullable<
+  Awaited<ReturnType<typeof setTaskResultExcluded>>
+>;
+export type SetTaskResultExcludedMutationBody = TaskResultExcludeRequest;
+export type SetTaskResultExcludedMutationError = HTTPValidationError;
+
+/**
+ * @summary Toggle exclusion of a task result from metrics aggregations
+ */
+export const useSetTaskResultExcluded = <
+  TError = HTTPValidationError,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof setTaskResultExcluded>>,
+      TError,
+      { taskId: string; data: TaskResultExcludeRequest },
+      TContext
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof setTaskResultExcluded>>,
+  TError,
+  { taskId: string; data: TaskResultExcludeRequest },
+  TContext
+> => {
+  const mutationOptions = getSetTaskResultExcludedMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
+/**
  * Download multiple calibration figures as a ZIP file.
 
 Creates a ZIP archive containing all requested figure files and returns it
@@ -1536,9 +1728,9 @@ as a streaming response.
 
 Parameters
 ----------
-paths : list[str]
+body.paths : list[str]
     List of absolute file paths to the calibration figures
-filename : str
+body.filename : str
     Filename for the ZIP archive (default: "figures.zip")
 
 Returns
@@ -1553,7 +1745,7 @@ HTTPException
  * @summary Download multiple figures as a ZIP file
  */
 export const downloadFiguresAsZip = (
-  bodyDownloadFiguresAsZip: BodyDownloadFiguresAsZip,
+  downloadFiguresAsZipRequest: DownloadFiguresAsZipRequest,
   options?: SecondParameter<typeof customInstance>,
   signal?: AbortSignal,
 ) => {
@@ -1562,7 +1754,7 @@ export const downloadFiguresAsZip = (
       url: `/task-results/figures/download`,
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      data: bodyDownloadFiguresAsZip,
+      data: downloadFiguresAsZipRequest,
       signal,
     },
     options,
@@ -1576,14 +1768,14 @@ export const getDownloadFiguresAsZipMutationOptions = <
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof downloadFiguresAsZip>>,
     TError,
-    { data: BodyDownloadFiguresAsZip },
+    { data: DownloadFiguresAsZipRequest },
     TContext
   >;
   request?: SecondParameter<typeof customInstance>;
 }): UseMutationOptions<
   Awaited<ReturnType<typeof downloadFiguresAsZip>>,
   TError,
-  { data: BodyDownloadFiguresAsZip },
+  { data: DownloadFiguresAsZipRequest },
   TContext
 > => {
   const mutationKey = ["downloadFiguresAsZip"];
@@ -1597,7 +1789,7 @@ export const getDownloadFiguresAsZipMutationOptions = <
 
   const mutationFn: MutationFunction<
     Awaited<ReturnType<typeof downloadFiguresAsZip>>,
-    { data: BodyDownloadFiguresAsZip }
+    { data: DownloadFiguresAsZipRequest }
   > = (props) => {
     const { data } = props ?? {};
 
@@ -1610,7 +1802,7 @@ export const getDownloadFiguresAsZipMutationOptions = <
 export type DownloadFiguresAsZipMutationResult = NonNullable<
   Awaited<ReturnType<typeof downloadFiguresAsZip>>
 >;
-export type DownloadFiguresAsZipMutationBody = BodyDownloadFiguresAsZip;
+export type DownloadFiguresAsZipMutationBody = DownloadFiguresAsZipRequest;
 export type DownloadFiguresAsZipMutationError = HTTPValidationError;
 
 /**
@@ -1624,7 +1816,7 @@ export const useDownloadFiguresAsZip = <
     mutation?: UseMutationOptions<
       Awaited<ReturnType<typeof downloadFiguresAsZip>>,
       TError,
-      { data: BodyDownloadFiguresAsZip },
+      { data: DownloadFiguresAsZipRequest },
       TContext
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -1633,7 +1825,7 @@ export const useDownloadFiguresAsZip = <
 ): UseMutationResult<
   Awaited<ReturnType<typeof downloadFiguresAsZip>>,
   TError,
-  { data: BodyDownloadFiguresAsZip },
+  { data: DownloadFiguresAsZipRequest },
   TContext
 > => {
   const mutationOptions = getDownloadFiguresAsZipMutationOptions(options);

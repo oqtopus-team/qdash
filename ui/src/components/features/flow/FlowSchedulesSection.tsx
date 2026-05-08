@@ -3,162 +3,171 @@
 import Link from "next/link";
 
 import { useQuery } from "@tanstack/react-query";
+import { CalendarClock, Clock, ExternalLink } from "lucide-react";
 
-import { formatDateTime } from "@/lib/utils/datetime";
+import type { FlowScheduleSummary } from "@/schemas";
 
 import { listAllFlowSchedules } from "@/client/flow/flow";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { formatDateTime } from "@/lib/utils/datetime";
+
+function formatScheduleType(schedule: FlowScheduleSummary) {
+  return schedule.schedule_type === "cron" ? "Recurring" : "One-time";
+}
+
+function getNextRunLabel(schedule: FlowScheduleSummary) {
+  if (schedule.schedule_type === "cron") {
+    return schedule.cron || "Cron schedule";
+  }
+  return schedule.next_run ? formatDateTime(schedule.next_run) : "Scheduled";
+}
+
+function ScheduleRow({ schedule }: { schedule: FlowScheduleSummary }) {
+  const isCron = schedule.schedule_type === "cron";
+
+  return (
+    <Link
+      href={`/workflow/${schedule.flow_name}`}
+      className="group block rounded-lg border border-base-300 bg-base-100 p-3 transition-colors hover:border-primary/50"
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div className="truncate font-semibold">{schedule.flow_name}</div>
+          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-base-content/60">
+            <span>{formatScheduleType(schedule)}</span>
+            <span
+              className={`badge badge-xs ${
+                schedule.active ? "badge-success" : "badge-ghost"
+              }`}
+            >
+              {schedule.active ? "Active" : "Inactive"}
+            </span>
+          </div>
+        </div>
+        <ExternalLink className="h-3.5 w-3.5 shrink-0 text-base-content/35 transition-colors group-hover:text-primary" />
+      </div>
+      <div className="mt-3 grid gap-1.5 text-xs text-base-content/70">
+        <div className="flex min-w-0 items-center gap-2">
+          <Clock className="h-3.5 w-3.5 shrink-0 text-base-content/40" />
+          <span className={isCron ? "font-mono" : ""}>
+            {getNextRunLabel(schedule)}
+          </span>
+        </div>
+        <div className="flex min-w-0 items-center gap-2">
+          <CalendarClock className="h-3.5 w-3.5 shrink-0 text-base-content/40" />
+          <span>Created {formatDateTime(schedule.created_at)}</span>
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+function SectionShell({
+  children,
+  headerActions,
+}: {
+  children: React.ReactNode;
+  headerActions?: React.ReactNode;
+}) {
+  return (
+    <div className="card bg-base-200 shadow-lg">
+      <div className="card-body">
+        <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
+          <h2 className="card-title">Schedule Status</h2>
+          {headerActions}
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
 
 export function FlowSchedulesSection() {
   const { data, isLoading, error } = useQuery({
     queryKey: ["flow-schedules"],
     queryFn: () => listAllFlowSchedules(),
-    refetchInterval: 10000, // Refresh every 10 seconds
+    refetchInterval: 10000,
   });
-
-  const schedules = data?.data?.schedules || [];
 
   if (isLoading) {
     return (
-      <div className="card bg-base-100 shadow-xl">
-        <div className="card-body">
-          <h2 className="card-title">Scheduled Flows</h2>
-          <div className="flex justify-center py-4">
-            <span className="loading loading-spinner loading-md"></span>
-          </div>
+      <SectionShell>
+        <div className="flex justify-center py-8">
+          <span className="loading loading-spinner loading-md"></span>
         </div>
-      </div>
+      </SectionShell>
     );
   }
 
   if (error) {
     return (
-      <div className="card bg-base-100 shadow-xl">
-        <div className="card-body">
-          <h2 className="card-title">Scheduled Flows</h2>
-          <div className="alert alert-error">
-            <span>Failed to load schedules: {(error as Error)?.message}</span>
-          </div>
+      <SectionShell>
+        <div className="alert alert-error mt-2">
+          <span>Failed to load schedules: {(error as Error)?.message}</span>
         </div>
-      </div>
+      </SectionShell>
     );
   }
+
+  const schedules = data?.data?.schedules || [];
 
   if (schedules.length === 0) {
     return (
-      <div className="card bg-base-100 shadow-xl">
-        <div className="card-body">
-          <h2 className="card-title">Scheduled Flows</h2>
-          <p className="text-sm opacity-70">
-            No scheduled flows. Create a schedule from the Flow editor to
-            automate executions.
-          </p>
-        </div>
-      </div>
+      <SectionShell>
+        <EmptyState
+          title="No schedules configured"
+          description="Schedule a flow run to see it here."
+          emoji="hourglass"
+          size="sm"
+        />
+      </SectionShell>
     );
   }
 
-  // Group schedules by type
-  const cronSchedules = schedules.filter((s) => s.schedule_type === "cron");
-  const oneTimeSchedules = schedules
-    .filter((s) => s.schedule_type === "one-time")
-    .sort((a, b) => {
-      // Sort by next_run time (earliest first)
-      if (!a.next_run) return 1;
-      if (!b.next_run) return -1;
-      return new Date(a.next_run).getTime() - new Date(b.next_run).getTime();
-    })
-    .slice(0, 10); // Show only the next 10 upcoming one-time schedules
+  const activeCount = schedules.filter((schedule) => schedule.active).length;
+  const recurringCount = schedules.filter(
+    (schedule) => schedule.schedule_type === "cron",
+  ).length;
+
+  const sortedSchedules = [...schedules].sort((a, b) => {
+    const aTime = a.next_run
+      ? new Date(a.next_run).getTime()
+      : Number.MAX_SAFE_INTEGER;
+    const bTime = b.next_run
+      ? new Date(b.next_run).getTime()
+      : Number.MAX_SAFE_INTEGER;
+    if (aTime !== bTime) return aTime - bTime;
+    return a.flow_name.localeCompare(b.flow_name);
+  });
 
   return (
-    <div className="card bg-base-100 shadow-xl">
-      <div className="card-body">
-        <h2 className="card-title">Scheduled Flows</h2>
+    <SectionShell
+      headerActions={
+        <div className="flex flex-wrap gap-1.5">
+          <span className="badge badge-outline badge-sm">
+            {recurringCount} cron
+          </span>
+          <span className="badge badge-outline badge-sm">
+            {schedules.length - recurringCount} one-time
+          </span>
+        </div>
+      }
+    >
+      <p className="text-xs text-base-content/60">
+        {activeCount} active of {schedules.length} schedules
+      </p>
 
-        {/* Cron Schedules */}
-        {cronSchedules.length > 0 && (
-          <div className="mb-4">
-            <h3 className="text-sm font-semibold opacity-70 mb-2">
-              Recurring (Cron)
-            </h3>
-            <div className="space-y-2">
-              {cronSchedules.map((schedule) => (
-                <Link
-                  key={schedule.schedule_id}
-                  href={`/workflow/${schedule.flow_name}`}
-                  className={`block p-3 rounded hover:bg-base-300 transition-colors ${
-                    schedule.active ? "bg-base-200" : "bg-base-300 opacity-60"
-                  }`}
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-semibold">
-                          {schedule.flow_name}
-                        </span>
-                        <span
-                          className={`badge badge-sm ${
-                            schedule.active ? "badge-success" : "badge-ghost"
-                          }`}
-                        >
-                          {schedule.active ? "Active" : "Inactive"}
-                        </span>
-                      </div>
-                      {schedule.cron && (
-                        <p className="text-xs font-mono opacity-70 mt-1">
-                          {schedule.cron}
-                        </p>
-                      )}
-                      <p className="text-xs opacity-60 mt-1">
-                        Created: {formatDateTime(schedule.created_at)}
-                      </p>
-                    </div>
-                    <div className="text-xs opacity-60">→</div>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* One-time Schedules */}
-        {oneTimeSchedules.length > 0 && (
-          <div>
-            <h3 className="text-sm font-semibold opacity-70 mb-2">
-              One-time Executions
-            </h3>
-            <div className="space-y-2">
-              {oneTimeSchedules.map((schedule) => (
-                <Link
-                  key={schedule.schedule_id}
-                  href={`/workflow/${schedule.flow_name}`}
-                  className={`block p-3 rounded hover:bg-base-300 transition-colors ${
-                    schedule.active ? "bg-base-200" : "bg-base-300 opacity-60"
-                  }`}
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-semibold">
-                          {schedule.flow_name}
-                        </span>
-                        <span className="badge badge-sm badge-secondary">
-                          One-time
-                        </span>
-                      </div>
-                      {schedule.next_run && (
-                        <p className="text-xs opacity-70 mt-1">
-                          Scheduled: {formatDateTime(schedule.next_run)}
-                        </p>
-                      )}
-                    </div>
-                    <div className="text-xs opacity-60">→</div>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          </div>
-        )}
+      <div className="mt-2 space-y-2">
+        {sortedSchedules.slice(0, 12).map((schedule) => (
+          <ScheduleRow key={schedule.schedule_id} schedule={schedule} />
+        ))}
       </div>
-    </div>
+
+      {sortedSchedules.length > 12 && (
+        <div className="mt-3 text-xs text-base-content/60">
+          Showing 12 of {sortedSchedules.length} schedules
+        </div>
+      )}
+    </SectionShell>
   );
 }

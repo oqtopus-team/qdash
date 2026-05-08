@@ -12,6 +12,7 @@ import type { ProjectRole } from "./projectRole";
  * Member info for admin view.
  */
 export interface MemberItem {
+  user_id: string;
   username: string;
   full_name?: MemberItemFullName;
   role: ProjectRole;

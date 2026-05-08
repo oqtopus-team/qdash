@@ -144,6 +144,7 @@ class TaskService:
             task_id=task_result.task_id,
             task_name=task_result.name,
             qid=task_result.qid,
+            chip_id=task_result.chip_id,
             status=task_result.status,
             execution_id=task_result.execution_id,
             flow_name=flow_name,

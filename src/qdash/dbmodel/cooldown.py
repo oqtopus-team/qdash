@@ -5,7 +5,7 @@ Multiple chips may be loaded into the same cooldown.
 """
 
 from datetime import datetime
-from typing import ClassVar
+from typing import Any, ClassVar
 
 from bunnet import Document
 from pydantic import ConfigDict, Field
@@ -31,6 +31,21 @@ class CooldownDocument(Document):
         description="Chips loaded into this cool-down (in the cryostat at the same time)",
     )
     note: NoteModel = Field(default_factory=NoteModel, description="Free-form note")
+    wiring_info: str = Field(
+        default="",
+        description=(
+            "Markdown export of the wiring document — kept in sync with "
+            "wiring_blocks for fallback rendering, search, and export."
+        ),
+    )
+    wiring_blocks: list[dict[str, Any]] = Field(
+        default_factory=list,
+        description=(
+            "BlockNote document (list of Block JSON objects). Authoritative "
+            "source for the rich editor; wiring_info is derived from this. "
+            "Images are embedded inline as data URLs in image blocks."
+        ),
+    )
     system_info: SystemInfoModel = Field(
         default_factory=SystemInfoModel, description="Created/updated timestamps"
     )

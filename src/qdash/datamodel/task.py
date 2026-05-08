@@ -41,7 +41,7 @@ class RunParameterModel(BaseModel):
 
     unit: str = ""
     value_type: str = "float"
-    value: tuple[int | float, ...] | list[int | float] | int | float | None = None
+    value: tuple[int | float, ...] | list[int | float] | int | float | str | None = None
     description: str = ""
 
     def get_value(self) -> Any:

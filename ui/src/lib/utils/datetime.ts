@@ -15,11 +15,26 @@ export function toDateTimeLocal(isoString: string): string {
 }
 
 export function toIsoSeconds(dt: string): string {
-  if (dt.length === 16) return `${dt}:00`;
+  if (dt.length === 16) return `${dt}:00${getTimezoneOffsetString()}`;
   return dt;
 }
 
 const DEFAULT_TIMEZONE = process.env.NEXT_PUBLIC_TIMEZONE || "Asia/Tokyo";
+
+export function getTimezoneOffsetString(
+  timezone: string = DEFAULT_TIMEZONE,
+): string {
+  const fmt = new Intl.DateTimeFormat("en-US", {
+    timeZone: timezone,
+    timeZoneName: "longOffset",
+  });
+  const part = fmt
+    .formatToParts(new Date())
+    .find((p) => p.type === "timeZoneName");
+  const raw = part?.value ?? "GMT";
+  if (raw === "GMT") return "+00:00";
+  return raw.replace("GMT", "");
+}
 
 /**
  * Format a UTC datetime string to local timezone.

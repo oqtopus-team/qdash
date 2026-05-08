@@ -13,6 +13,8 @@ import type { TokenResponseDefaultProjectId } from "./tokenResponseDefaultProjec
 export interface TokenResponse {
   access_token: string;
   token_type?: string;
+  user_id: string;
   username: string;
   default_project_id?: TokenResponseDefaultProjectId;
+  must_change_password?: boolean;
 }

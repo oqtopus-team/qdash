@@ -7,4 +7,8 @@ export interface MetricHistoryItem {
   name: string | null;
   input_parameters: Record<string, unknown> | null;
   output_parameters: Record<string, unknown> | null;
+  excluded?: boolean;
+  excluded_reason?: string;
+  excluded_by?: string | null;
+  excluded_at?: string | null;
 }

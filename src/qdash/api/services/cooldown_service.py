@@ -31,8 +31,8 @@ class CooldownService:
         self._repo = cooldown_repository
         self._cryostats = cryostat_repository
 
-    @staticmethod
-    def _to_response(doc: CooldownDocument) -> CooldownResponse:
+    @classmethod
+    def _to_response(cls, doc: CooldownDocument) -> CooldownResponse:
         return CooldownResponse(
             cooldown_id=doc.cooldown_id,
             cryo_id=doc.cryo_id,
@@ -41,6 +41,8 @@ class CooldownService:
             ended_at=doc.ended_at,
             chip_ids=list(doc.chip_ids),
             note=doc.note,
+            wiring_info=doc.wiring_info,
+            wiring_blocks=list(doc.wiring_blocks),
         )
 
     def list_all(
@@ -104,6 +106,10 @@ class CooldownService:
             doc.started_at = body.started_at
         if body.ended_at is not None:
             doc.ended_at = body.ended_at
+        if body.wiring_info is not None:
+            doc.wiring_info = body.wiring_info
+        if body.wiring_blocks is not None:
+            doc.wiring_blocks = body.wiring_blocks
         self._repo.save(doc)
         # If the cool-down ended, clear chip.current_cooldown_id for any chip
         # that pointed to this one.

@@ -1,8 +1,10 @@
-import logging
+from __future__ import annotations
+
 import os
 import shutil
 import tempfile
 from pathlib import Path
+from typing import TYPE_CHECKING
 from urllib.parse import urlparse, urlunparse
 
 from git import Repo
@@ -11,8 +13,13 @@ from prefect import get_run_logger, task
 from qdash.common.datetime_utils import now_iso
 from qdash.common.paths import QUBEX_CONFIG_BASE
 
+if TYPE_CHECKING:
+    import logging
 
-def _sync_local_repo(branch: str, logger: logging.Logger) -> None:
+
+def _sync_local_repo(
+    branch: str, logger: logging.Logger | logging.LoggerAdapter[logging.Logger]
+) -> None:
     """Sync the local qubex-config git repository to match the remote after push.
 
     This resets the local .git state so that ``git status`` shows clean
