@@ -24,6 +24,7 @@ export function useCouplingTaskResults({
   staleTime = 30000,
 }: UseCouplingTaskResultsOptions) {
   const isLatest = selectedDate === "latest";
+  const canFetch = Boolean(chipId && task);
 
   // Always call both hooks, but only enable one based on condition
   const latestResult = useGetLatestCouplingTaskResults(
@@ -32,7 +33,7 @@ export function useCouplingTaskResults({
       query: {
         placeholderData: keepPreviousData,
         staleTime,
-        enabled: isLatest,
+        enabled: canFetch && isLatest,
       },
     },
   );
@@ -47,7 +48,7 @@ export function useCouplingTaskResults({
       query: {
         placeholderData: keepPreviousData,
         staleTime,
-        enabled: !isLatest,
+        enabled: canFetch && !isLatest,
       },
     },
   );

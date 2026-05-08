@@ -5,6 +5,7 @@ from fastapi import HTTPException
 from qdash.api.lib.project import _check_permission
 from qdash.api.schemas.auth import User
 from qdash.datamodel.project import ProjectPermission, ProjectRole, role_has_permission
+from qdash.datamodel.user import SystemRole
 from qdash.dbmodel.project import ProjectDocument
 from qdash.dbmodel.project_membership import ProjectMembershipDocument
 
@@ -83,3 +84,14 @@ def test_owner_can_admin_but_editor_cannot(project_members) -> None:
         )
 
     assert exc_info.value.status_code == 403
+
+
+def test_system_admin_can_access_project_without_membership(project_members) -> None:
+    """System admins can administer projects without explicit membership."""
+    _, role = _check_permission(
+        "permission-project",
+        User(username="admin", user_id="usr_admin", system_role=SystemRole.ADMIN),
+        required_permission=ProjectPermission.ADMIN,
+    )
+
+    assert role == ProjectRole.OWNER
