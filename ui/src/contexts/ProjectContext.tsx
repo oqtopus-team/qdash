@@ -54,6 +54,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
   const pathname = usePathname();
   const [urlProjectId, setUrlProjectId] = useState<string | null>(null);
+  const [urlProjectInitialized, setUrlProjectInitialized] = useState(false);
   const [currentProject, setCurrentProject] = useState<ProjectResponse | null>(
     null,
   );
@@ -97,42 +98,48 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
 
   const writeProjectToUrl = useCallback(
     (nextProjectId: string, mode: "push" | "replace" = "replace") => {
-      const url = new URL(window.location.href);
-      url.searchParams.set("project", nextProjectId);
-      const nextUrl = `${url.pathname}?${url.searchParams.toString()}${url.hash}`;
-      if (mode === "push") {
-        window.history.pushState(null, "", nextUrl);
-      } else {
-        window.history.replaceState(null, "", nextUrl);
+      try {
+        const url = new URL(window.location.href);
+        url.searchParams.set("project", nextProjectId);
+        const nextUrl = `${url.pathname}?${url.searchParams.toString()}${url.hash}`;
+        if (mode === "push") {
+          window.history.pushState(null, "", nextUrl);
+        } else {
+          window.history.replaceState(null, "", nextUrl);
+        }
+        setUrlProjectId(nextProjectId);
+      } catch (error) {
+        console.warn("Failed to update project URL state:", error);
       }
-      setUrlProjectId(nextProjectId);
     },
     [],
   );
 
-  useEffect(() => {
-    const readProjectFromUrl = () => {
-      setUrlProjectId(
-        new URLSearchParams(window.location.search).get("project"),
-      );
-    };
-    readProjectFromUrl();
-    window.addEventListener("popstate", readProjectFromUrl);
-    return () => window.removeEventListener("popstate", readProjectFromUrl);
+  const readProjectFromUrl = useCallback(() => {
+    const nextUrlProjectId = new URLSearchParams(window.location.search).get(
+      "project",
+    );
+    setUrlProjectId(nextUrlProjectId);
+    setUrlProjectInitialized(true);
+    return nextUrlProjectId;
   }, []);
 
   useEffect(() => {
+    readProjectFromUrl();
+    window.addEventListener("popstate", readProjectFromUrl);
+    return () => window.removeEventListener("popstate", readProjectFromUrl);
+  }, [readProjectFromUrl]);
+
+  useEffect(() => {
+    const currentUrlProjectId = readProjectFromUrl();
     if (!projectId) return;
-    const currentUrlProjectId = new URLSearchParams(window.location.search).get(
-      "project",
-    );
     if (currentUrlProjectId !== projectId) {
       writeProjectToUrl(projectId);
     }
-  }, [pathname, projectId, writeProjectToUrl]);
+  }, [pathname, projectId, readProjectFromUrl, writeProjectToUrl]);
 
   useEffect(() => {
-    if (!projects.length) return;
+    if (!urlProjectInitialized || !projects.length) return;
 
     const storedProjectId = localStorage.getItem(PROJECT_STORAGE_KEY);
     const urlProject = urlProjectId
@@ -167,6 +174,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     projects,
     queryClient,
     urlProjectId,
+    urlProjectInitialized,
     user?.default_project_id,
     writeProjectToUrl,
   ]);
