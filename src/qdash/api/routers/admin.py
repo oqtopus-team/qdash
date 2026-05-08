@@ -3,7 +3,7 @@
 import logging
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, File, UploadFile, status
 from qdash.api.dependencies import get_admin_service
 from qdash.api.lib.auth import get_admin_user
 from qdash.api.lib.config_loader import ConfigLoader
@@ -12,6 +12,7 @@ from qdash.api.lib.metrics_config import clear_metrics_config_cache
 from qdash.api.lib.policy_config import clear_policy_config_cache
 from qdash.api.schemas.admin import (
     AddMemberRequest,
+    BulkUserImportResponse,
     ConfigReloadResponse,
     MemberItem,
     MemberListResponse,
@@ -128,6 +129,23 @@ def delete_user(
     return service.delete_user(username=username, admin_username=admin.username)
 
 
+@router.post(
+    "/users/bulk-import",
+    response_model=BulkUserImportResponse,
+    summary="Bulk import users from CSV",
+    operation_id="bulkImportUsers",
+)
+async def bulk_import_users(
+    admin: Annotated[User, Depends(get_admin_user)],
+    service: Annotated[AdminService, Depends(get_admin_service)],
+    file: UploadFile = File(...),
+) -> BulkUserImportResponse:
+    """Create users from a CSV file and return generated temporary passwords."""
+    logger.debug(f"Admin {admin.username} bulk importing users from {file.filename}")
+    content = await file.read()
+    return service.bulk_import_users(content.decode("utf-8-sig"))
+
+
 # --- Project Management ---
 
 
@@ -195,11 +213,12 @@ def add_project_member_admin(
     admin: Annotated[User, Depends(get_admin_user)],
     service: Annotated[AdminService, Depends(get_admin_service)],
 ) -> MemberItem:
-    """Add a member to a project as viewer (admin only)."""
+    """Add a member to a project (admin only)."""
     logger.debug(f"Admin {admin.username} adding {request.username} to project {project_id}")
     return service.add_project_member(
         project_id=project_id,
         username=request.username,
+        role=request.role,
         admin_username=admin.username,
     )
 

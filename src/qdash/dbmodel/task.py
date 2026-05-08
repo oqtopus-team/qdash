@@ -5,6 +5,7 @@ from bunnet import Document
 from pydantic import ConfigDict, Field
 from pymongo import ASCENDING, IndexModel
 from qdash.datamodel.task import TaskModel
+from qdash.dbmodel.user import UserDocument
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +23,8 @@ class TaskDocument(Document):
     """
 
     project_id: str | None = Field(None, description="Owning project identifier")
-    username: str = Field(..., description="The username of the user who created the task")
+    user_id: str | None = Field(default=None, description="Creator user ID")
+    username: str = Field(..., description="Creator username snapshot")
     name: str = Field(..., description="The name of the task")
     backend: str | None = Field(None, description="The backend of the task")
     description: str = Field(..., description="Detailed description of the task")
@@ -43,8 +45,14 @@ class TaskDocument(Document):
                 [("project_id", ASCENDING), ("name", ASCENDING), ("username", ASCENDING)],
                 unique=True,
             ),
+            IndexModel([("project_id", ASCENDING), ("user_id", ASCENDING)]),
             IndexModel([("project_id", ASCENDING), ("username", ASCENDING)]),
         ]
+
+    @staticmethod
+    def _user_id_for_username(username: str) -> str | None:
+        user = UserDocument.find_one({"username": username}).run()
+        return user.user_id if user else None
 
     @classmethod
     def from_task_model(cls, model: TaskModel) -> "TaskDocument":
@@ -63,6 +71,7 @@ class TaskDocument(Document):
         """
         return cls(
             project_id=model.project_id,
+            user_id=cls._user_id_for_username(model.username),
             username=model.username,
             name=model.name,
             backend=model.backend,
@@ -88,6 +97,7 @@ class TaskDocument(Document):
             else:
                 logger.debug(f"Task {task.name} found. Updating task.")
                 doc.project_id = task.project_id
+                doc.user_id = cls._user_id_for_username(task.username)
                 doc.username = task.username
                 doc.backend = task.backend
                 doc.task_type = task.task_type

@@ -49,7 +49,8 @@ class NoteEventDocument(Document):
     )
     metric_key: str = Field(default="", description="Metric key for *_metric scopes; '' otherwise")
     action: str = Field(..., description="upsert | delete")
-    actor: str = Field(..., description="Username who performed the action")
+    actor_user_id: str | None = Field(default=None, description="User ID who performed the action")
+    actor: str = Field(..., description="Username snapshot who performed the action")
     content: str = Field(default="", description="Note content at the time of the action")
     # Free-form context, e.g. {"qid": "5", "task_name": "T1"} — populated where useful
     extra: dict[str, str] = Field(default_factory=dict, description="Arbitrary context tags")
@@ -80,6 +81,14 @@ class NoteEventDocument(Document):
                     ("created_at", DESCENDING),
                 ],
                 name="target_chrono_idx",
+            ),
+            IndexModel(
+                [
+                    ("project_id", ASCENDING),
+                    ("actor_user_id", ASCENDING),
+                    ("created_at", DESCENDING),
+                ],
+                name="actor_user_id_chrono_idx",
             ),
             # text index on content for cross-chip knowledge search
             IndexModel(

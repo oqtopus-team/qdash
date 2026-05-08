@@ -10,6 +10,7 @@ from qdash.api.dependencies import get_note_service  # noqa: TCH002
 from qdash.api.lib.project import (  # noqa: TCH002
     ProjectContext,
     get_project_context,
+    get_project_context_editor,
 )
 from qdash.api.schemas.note import (
     ChipNotesSummaryResponse,
@@ -39,7 +40,7 @@ def upsert_qubit_note(
     chip_id: str,
     qid: str,
     body: NoteUpsertRequest,
-    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
     service: Annotated[NoteService, Depends(get_note_service)],
 ) -> NoteModel:
     return service.upsert_qubit_note(
@@ -60,7 +61,7 @@ def upsert_qubit_note(
 def delete_qubit_note(
     chip_id: str,
     qid: str,
-    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
     service: Annotated[NoteService, Depends(get_note_service)],
 ) -> SuccessResponse:
     return service.delete_qubit_note(
@@ -82,7 +83,7 @@ def upsert_qubit_metric_note(
     qid: str,
     metric_key: str,
     body: NoteUpsertRequest,
-    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
     service: Annotated[NoteService, Depends(get_note_service)],
 ) -> NoteModel:
     return service.upsert_qubit_metric_note(
@@ -105,7 +106,7 @@ def delete_qubit_metric_note(
     chip_id: str,
     qid: str,
     metric_key: str,
-    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
     service: Annotated[NoteService, Depends(get_note_service)],
 ) -> SuccessResponse:
     return service.delete_qubit_metric_note(
@@ -132,7 +133,7 @@ def upsert_coupling_note(
     chip_id: str,
     coupling_id: str,
     body: NoteUpsertRequest,
-    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
     service: Annotated[NoteService, Depends(get_note_service)],
 ) -> NoteModel:
     return service.upsert_coupling_note(
@@ -153,7 +154,7 @@ def upsert_coupling_note(
 def delete_coupling_note(
     chip_id: str,
     coupling_id: str,
-    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
     service: Annotated[NoteService, Depends(get_note_service)],
 ) -> SuccessResponse:
     return service.delete_coupling_note(
@@ -175,7 +176,7 @@ def upsert_coupling_metric_note(
     coupling_id: str,
     metric_key: str,
     body: NoteUpsertRequest,
-    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
     service: Annotated[NoteService, Depends(get_note_service)],
 ) -> NoteModel:
     return service.upsert_coupling_metric_note(
@@ -198,7 +199,7 @@ def delete_coupling_metric_note(
     chip_id: str,
     coupling_id: str,
     metric_key: str,
-    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
     service: Annotated[NoteService, Depends(get_note_service)],
 ) -> SuccessResponse:
     return service.delete_coupling_metric_note(
@@ -241,7 +242,7 @@ def get_task_note(
 def upsert_task_note(
     task_id: str,
     body: NoteUpsertRequest,
-    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
     service: Annotated[NoteService, Depends(get_note_service)],
 ) -> NoteModel:
     return service.upsert_task_note(
@@ -260,7 +261,7 @@ def upsert_task_note(
 )
 def delete_task_note(
     task_id: str,
-    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
     service: Annotated[NoteService, Depends(get_note_service)],
 ) -> SuccessResponse:
     return service.delete_task_note(

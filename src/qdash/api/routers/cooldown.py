@@ -10,6 +10,7 @@ from qdash.api.dependencies import get_cooldown_service  # noqa: TCH002
 from qdash.api.lib.project import (  # noqa: TCH002
     ProjectContext,
     get_project_context,
+    get_project_context_editor,
 )
 from qdash.api.schemas.cooldown import (
     CooldownCreateRequest,
@@ -62,7 +63,7 @@ def get_cooldown(
 )
 def create_cooldown(
     body: CooldownCreateRequest,
-    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
     service: Annotated[CooldownService, Depends(get_cooldown_service)],
 ) -> CooldownResponse:
     return service.create(project_id=ctx.project_id, body=body)
@@ -77,7 +78,7 @@ def create_cooldown(
 def update_cooldown(
     cooldown_id: str,
     body: CooldownUpdateRequest,
-    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
     service: Annotated[CooldownService, Depends(get_cooldown_service)],
 ) -> CooldownResponse:
     return service.update(project_id=ctx.project_id, cooldown_id=cooldown_id, body=body)
@@ -91,7 +92,7 @@ def update_cooldown(
 )
 def delete_cooldown(
     cooldown_id: str,
-    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
     service: Annotated[CooldownService, Depends(get_cooldown_service)],
 ) -> SuccessResponse:
     return service.delete(project_id=ctx.project_id, cooldown_id=cooldown_id)
@@ -106,7 +107,7 @@ def delete_cooldown(
 def assign_chip(
     cooldown_id: str,
     chip_id: str,
-    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
     service: Annotated[CooldownService, Depends(get_cooldown_service)],
 ) -> CooldownResponse:
     return service.assign_chip(project_id=ctx.project_id, cooldown_id=cooldown_id, chip_id=chip_id)
@@ -121,7 +122,7 @@ def assign_chip(
 def unassign_chip(
     cooldown_id: str,
     chip_id: str,
-    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
     service: Annotated[CooldownService, Depends(get_cooldown_service)],
 ) -> CooldownResponse:
     return service.unassign_chip(

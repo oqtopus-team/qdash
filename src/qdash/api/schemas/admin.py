@@ -10,11 +10,13 @@ from qdash.datamodel.user import SystemRole
 class UserListItem(BaseModel):
     """User summary for admin list view."""
 
+    user_id: str | None = None
     username: str
     full_name: str | None = None
     disabled: bool = False
     system_role: SystemRole = SystemRole.USER
     default_project_id: str | None = None
+    must_change_password: bool = False
 
 
 class ProjectListItem(BaseModel):
@@ -22,6 +24,7 @@ class ProjectListItem(BaseModel):
 
     project_id: str
     name: str
+    owner_user_id: str | None = None
     owner_username: str
     description: str | None = None
     member_count: int = 0
@@ -53,11 +56,13 @@ class UpdateUserRequest(BaseModel):
 class UserDetailResponse(BaseModel):
     """Detailed user response for admin view."""
 
+    user_id: str | None = None
     username: str
     full_name: str | None = None
     disabled: bool = False
     system_role: SystemRole = SystemRole.USER
     default_project_id: str | None = None
+    must_change_password: bool = False
     created_at: datetime | None = None
     updated_at: datetime | None = None
 
@@ -74,6 +79,7 @@ class ConfigReloadResponse(BaseModel):
 class MemberItem(BaseModel):
     """Member info for admin view."""
 
+    user_id: str | None = None
     username: str
     full_name: str | None = None
     role: ProjectRole
@@ -88,6 +94,32 @@ class MemberListResponse(BaseModel):
 
 
 class AddMemberRequest(BaseModel):
-    """Request to add a member to a project (always as viewer)."""
+    """Request to add a member to a project."""
 
     username: str
+    role: ProjectRole = ProjectRole.VIEWER
+
+
+# --- Bulk User Import ---
+
+
+class BulkUserImportResult(BaseModel):
+    """Result for a single row in a bulk user import."""
+
+    row_number: int
+    username: str
+    full_name: str | None = None
+    system_role: SystemRole = SystemRole.USER
+    initial_password: str | None = None
+    status: str
+    message: str | None = None
+
+
+class BulkUserImportResponse(BaseModel):
+    """Response for bulk user import."""
+
+    results: list[BulkUserImportResult]
+    created: int
+    skipped: int
+    failed: int
+    total: int

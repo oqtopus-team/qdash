@@ -4,6 +4,7 @@ from bunnet import Document
 from pydantic import ConfigDict, Field
 from pymongo import ASCENDING, IndexModel
 from qdash.datamodel.system_info import SystemInfoModel
+from qdash.dbmodel.user import UserDocument
 
 
 class ExecutionCounterDocument(Document):
@@ -11,6 +12,7 @@ class ExecutionCounterDocument(Document):
 
     project_id: str = Field(..., description="Owning project identifier")
     date: str
+    user_id: str | None = None
     username: str
     chip_id: str
     index: int
@@ -38,8 +40,20 @@ class ExecutionCounterDocument(Document):
         from_attributes=True,
     )
 
+    @staticmethod
+    def _user_id_for_username(username: str) -> str | None:
+        user = UserDocument.find_one({"username": username}).run()
+        return user.user_id if user else None
+
     @classmethod
-    def get_next_index(cls, date: str, username: str, chip_id: str, project_id: str) -> int:
+    def get_next_index(
+        cls,
+        date: str,
+        username: str,
+        chip_id: str,
+        project_id: str,
+        user_id: str | None = None,
+    ) -> int:
         """Get the next index for the given date, username and chip_id combination.
 
         Uses atomic findAndModify to prevent race conditions in concurrent executions.
@@ -63,6 +77,7 @@ class ExecutionCounterDocument(Document):
         from pymongo.errors import DuplicateKeyError
 
         max_retries = 5
+        resolved_user_id = user_id or cls._user_id_for_username(username)
         for attempt in range(max_retries):
             # First, try to find existing document
             doc = cls.find_one(
@@ -75,6 +90,7 @@ class ExecutionCounterDocument(Document):
                     doc = cls(
                         project_id=project_id,
                         date=date,
+                        user_id=resolved_user_id,
                         username=username,
                         chip_id=chip_id,
                         index=0,
@@ -90,7 +106,7 @@ class ExecutionCounterDocument(Document):
             # Document exists - use atomic increment
             result = cls.get_motor_collection().find_one_and_update(
                 {"project_id": project_id, "date": date, "username": username, "chip_id": chip_id},
-                {"$inc": {"index": 1}},
+                {"$inc": {"index": 1}, "$set": {"user_id": resolved_user_id}},
                 return_document=ReturnDocument.AFTER,
             )
 

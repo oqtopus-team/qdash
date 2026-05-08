@@ -90,6 +90,7 @@ class TaskResultExcludeResponse(BaseModel):
     task_id: str
     excluded: bool
     excluded_reason: str
+    excluded_by_user_id: str | None = None
     excluded_by: str | None
     excluded_at: datetime | None
 

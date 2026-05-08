@@ -18,6 +18,9 @@ Run migrations with:
 
     python -m qdash.dbmodel.migration remove-coupling-from-qubit          # dry-run
     python -m qdash.dbmodel.migration remove-coupling-from-qubit --execute  # execute
+
+    python -m qdash.dbmodel.migration backfill-user-id          # dry-run
+    python -m qdash.dbmodel.migration backfill-user-id --execute  # execute
 """
 
 import logging
@@ -31,9 +34,137 @@ logger = logging.getLogger(__name__)
 # Constants for migration safety
 BATCH_SIZE = 1000  # Process documents in batches for memory efficiency
 
+USER_ID_FIELD_MIGRATIONS = {
+    "project": [("owner_username", "owner_user_id")],
+    "project_membership": [
+        ("username", "user_id"),
+        ("invited_by", "invited_by_user_id"),
+    ],
+    "notification": [
+        ("recipient_username", "recipient_user_id"),
+        ("actor_username", "actor_user_id"),
+    ],
+    "note_event": [("actor", "actor_user_id")],
+    "cooldown_wiring_event": [("actor", "actor_user_id")],
+    "forum_post": [("username", "user_id")],
+    "issue": [("username", "user_id")],
+    "issue_knowledge": [("reviewed_by", "reviewed_by_user_id")],
+    "backend": [("username", "user_id")],
+    "task": [("username", "user_id")],
+    "tag": [("username", "user_id")],
+    "flows": [("username", "user_id")],
+    "execution_history": [("username", "user_id")],
+    "execution_counter": [("username", "user_id")],
+    "chip": [("username", "user_id")],
+    "chip_history": [("username", "user_id")],
+    "qubit": [("username", "user_id")],
+    "qubit_history": [("username", "user_id")],
+    "coupling": [("username", "user_id")],
+    "coupling_history": [("username", "user_id")],
+    "calibration_note": [("username", "user_id")],
+    "task_result_history": [
+        ("username", "user_id"),
+        ("excluded_by", "excluded_by_user_id"),
+    ],
+}
+
 
 class MigrationError(Exception):
     """Raised when migration encounters an unrecoverable error."""
+
+
+def migrate_backfill_user_id(dry_run: bool = True) -> dict[str, Any]:
+    """Backfill opaque user IDs and relationship user_id fields.
+
+    Existing username fields are retained as login/display snapshots. This migration
+    adds user_id values to users and denormalized relationship fields so application
+    code can use user_id for identity while preserving backwards-compatible display.
+    """
+    from qdash.datamodel.user import generate_user_id
+    from qdash.dbmodel.user import UserDocument
+
+    user_collection = UserDocument.get_motor_collection()
+    stats: dict[str, Any] = {
+        "users_without_user_id": 0,
+        "users_updated": 0,
+        "collections": {},
+        "unresolved": {},
+    }
+
+    missing_user_filter: dict[str, Any] = {
+        "$or": [{"user_id": {"$exists": False}}, {"user_id": None}, {"user_id": ""}]
+    }
+    users_without_user_id = list(user_collection.find(missing_user_filter, {"username": 1}))
+    stats["users_without_user_id"] = len(users_without_user_id)
+
+    if users_without_user_id:
+        logger.info("Found %s users without user_id", len(users_without_user_id))
+    generated_user_ids = {
+        user["username"]: generate_user_id()
+        for user in users_without_user_id
+        if isinstance(user.get("username"), str) and user.get("username")
+    }
+    if not dry_run:
+        for user in users_without_user_id:
+            user_id = generated_user_ids.get(user.get("username"))
+            if user_id is None:
+                continue
+            result = user_collection.update_one(
+                {"_id": user["_id"]},
+                {"$set": {"user_id": user_id}},
+            )
+            stats["users_updated"] += result.modified_count
+
+    username_to_user_id = {
+        user["username"]: user["user_id"]
+        for user in user_collection.find(
+            {
+                "username": {"$type": "string"},
+                "user_id": {"$type": "string"},
+            },
+            {"username": 1, "user_id": 1},
+        )
+    }
+    username_to_user_id.update(generated_user_ids)
+
+    database = user_collection.database
+    for collection_name, field_pairs in USER_ID_FIELD_MIGRATIONS.items():
+        collection = database[collection_name]
+        collection_stats = {"matched": 0, "updated": 0}
+        unresolved: dict[str, int] = {}
+
+        for username_field, user_id_field in field_pairs:
+            query = {
+                username_field: {"$type": "string", "$ne": ""},
+                "$or": [
+                    {user_id_field: {"$exists": False}},
+                    {user_id_field: None},
+                    {user_id_field: ""},
+                ],
+            }
+            docs = list(collection.find(query, {username_field: 1}))
+            collection_stats["matched"] += len(docs)
+            for doc in docs:
+                username = doc.get(username_field)
+                user_id = username_to_user_id.get(username)
+                if not user_id:
+                    unresolved[username] = unresolved.get(username, 0) + 1
+                    continue
+                if not dry_run:
+                    result = collection.update_one(
+                        {"_id": doc["_id"]},
+                        {"$set": {user_id_field: user_id}},
+                    )
+                    collection_stats["updated"] += result.modified_count
+
+        stats["collections"][collection_name] = collection_stats
+        if unresolved:
+            stats["unresolved"][collection_name] = unresolved
+            logger.warning("Unresolved user references in %s: %s", collection_name, unresolved)
+
+    prefix = "[DRY RUN] Would backfill" if dry_run else "Backfilled"
+    logger.info("%s user_id fields: %s", prefix, stats)
+    return stats
 
 
 def migrate_fix_invalid_fidelity(dry_run: bool = True) -> dict[str, Any]:
@@ -712,6 +843,17 @@ if __name__ == "__main__":
         help="Actually execute the migration (default is dry-run)",
     )
 
+    # backfill-user-id migration
+    backfill_user_id_parser = subparsers.add_parser(
+        "backfill-user-id",
+        help="Backfill user.user_id and denormalized relationship user_id fields",
+    )
+    backfill_user_id_parser.add_argument(
+        "--execute",
+        action="store_true",
+        help="Actually execute the migration (default is dry-run)",
+    )
+
     args = parser.parse_args()
 
     if args.command == "fix-invalid-fidelity":
@@ -750,6 +892,12 @@ if __name__ == "__main__":
 
         initialize()
         stats = migrate_remove_coupling_from_qubit(dry_run=not args.execute)
+        logger.info(f"Migration complete: {stats}")
+    elif args.command == "backfill-user-id":
+        from qdash.dbmodel.initialize import initialize
+
+        initialize()
+        stats = migrate_backfill_user_id(dry_run=not args.execute)
         logger.info(f"Migration complete: {stats}")
     else:
         parser.print_help()

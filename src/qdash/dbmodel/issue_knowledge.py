@@ -32,7 +32,8 @@ class IssueKnowledgeDocument(Document):
         root_cause (str): Identified root cause.
         resolution (str): How the issue was resolved.
         lesson_learned (list[str]): Key takeaways.
-        reviewed_by (str | None): Username of the reviewer.
+        reviewed_by_user_id (str | None): Internal user ID of the reviewer.
+        reviewed_by (str | None): Username snapshot of the reviewer.
         system_info (SystemInfoModel): Created/updated timestamps.
 
     """
@@ -78,7 +79,8 @@ class IssueKnowledgeDocument(Document):
         default_factory=list, description="Image URLs from the issue thread discussion"
     )
 
-    reviewed_by: str | None = Field(default=None, description="Username of the reviewer")
+    reviewed_by_user_id: str | None = Field(default=None, description="Reviewer user ID")
+    reviewed_by: str | None = Field(default=None, description="Reviewer username snapshot")
     pr_url: str | None = Field(default=None, description="GitHub PR URL created on approve")
     system_info: SystemInfoModel = Field(
         default_factory=SystemInfoModel, description="System timestamps"

@@ -9,6 +9,7 @@ from qdash.datamodel.execution import ExecutionModel
 from qdash.datamodel.note import AiTriageReviewModel, NoteModel
 from qdash.datamodel.system_info import SystemInfoModel
 from qdash.datamodel.task import BaseTaskResultModel
+from qdash.dbmodel.user import UserDocument
 
 
 class TaskResultHistoryDocument(Document):
@@ -33,7 +34,8 @@ class TaskResultHistoryDocument(Document):
     """
 
     project_id: str | None = Field(None, description="Owning project identifier")
-    username: str = Field(..., description="The username of the user who created the task")
+    user_id: str | None = Field(default=None, description="Creator user ID")
+    username: str = Field(..., description="Creator username snapshot")
     task_id: str = Field(..., description="The task ID")
     name: str = Field(..., description="The task name")
     upstream_id: str = Field(..., description="The upstream task ID")
@@ -95,6 +97,10 @@ class TaskResultHistoryDocument(Document):
     excluded_by: str | None = Field(
         default=None,
         description="Username of the user who toggled exclusion most recently.",
+    )
+    excluded_by_user_id: str | None = Field(
+        default=None,
+        description="User ID of the user who toggled exclusion most recently.",
     )
     excluded_at: datetime | None = Field(
         default=None,
@@ -211,6 +217,11 @@ class TaskResultHistoryDocument(Document):
         ]
 
     @classmethod
+    def _user_id_for_username(cls, username: str) -> str | None:
+        user = UserDocument.find_one({"username": username}).run()
+        return user.user_id if user else None
+
+    @classmethod
     def _resolve_cooldown_id(cls, *, project_id: str | None, chip_id: str) -> str:
         """Look up the chip's current_cooldown_id at write time.
 
@@ -232,6 +243,7 @@ class TaskResultHistoryDocument(Document):
     ) -> "TaskResultHistoryDocument":
         return cls(
             project_id=execution_model.project_id,
+            user_id=cls._user_id_for_username(execution_model.username),
             username=execution_model.username,
             task_id=task.task_id,
             name=task.name,
@@ -274,6 +286,7 @@ class TaskResultHistoryDocument(Document):
             doc.save()
             return doc
         doc.project_id = execution_model.project_id
+        doc.user_id = cls._user_id_for_username(execution_model.username)
         doc.username = execution_model.username
         doc.name = task.name
         doc.upstream_id = task.upstream_id

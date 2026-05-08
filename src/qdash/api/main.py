@@ -20,10 +20,12 @@ from qdash.api.routers import (
     execution,
     file,
     flow,
+    forum,
     issue,
     issue_knowledge,
     metrics,
     note,
+    notification,
     project,
     provenance,
     settings,
@@ -110,6 +112,7 @@ app.include_router(chip.router, tags=["chip"], dependencies=auth_dependency)
 app.include_router(task.router, tags=["task"], dependencies=auth_dependency)
 app.include_router(task_file.router, tags=["task-file"], dependencies=auth_dependency)
 app.include_router(task_result.router, tags=["task-result"], dependencies=auth_dependency)
+app.include_router(forum.router, tags=["forum"], dependencies=auth_dependency)
 app.include_router(issue.router, tags=["issue"], dependencies=auth_dependency)
 app.include_router(issue_knowledge.router, tags=["issue-knowledge"], dependencies=auth_dependency)
 app.include_router(tag.router, tags=["tag"], dependencies=auth_dependency)
@@ -120,6 +123,7 @@ app.include_router(
     metrics.router, prefix="/metrics", tags=["metrics"], dependencies=auth_dependency
 )
 app.include_router(note.router, tags=["note"], dependencies=auth_dependency)
+app.include_router(notification.router, tags=["notification"], dependencies=auth_dependency)
 app.include_router(cryostat.router, tags=["cryostat"], dependencies=auth_dependency)
 app.include_router(cooldown.router, tags=["cooldown"], dependencies=auth_dependency)
 app.include_router(

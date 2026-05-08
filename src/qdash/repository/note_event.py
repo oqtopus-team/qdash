@@ -4,10 +4,16 @@ from __future__ import annotations
 
 from bunnet import SortDirection
 from qdash.dbmodel.note_event import NoteEventDocument
+from qdash.dbmodel.user import UserDocument
 
 
 class MongoNoteEventRepository:
     """Append + query helpers for NoteEventDocument."""
+
+    @staticmethod
+    def _user_id_for_username(username: str) -> str | None:
+        user = UserDocument.find_one({"username": username}).run()
+        return user.user_id if user else None
 
     def append(
         self,
@@ -29,6 +35,7 @@ class MongoNoteEventRepository:
             target_id=target_id,
             metric_key=metric_key,
             action=action,
+            actor_user_id=self._user_id_for_username(actor),
             actor=actor,
             content=content,
             extra=extra or {},

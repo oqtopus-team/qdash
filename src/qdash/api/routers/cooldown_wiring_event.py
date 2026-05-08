@@ -15,6 +15,7 @@ from qdash.api.dependencies import get_cooldown_wiring_event_service  # noqa: TC
 from qdash.api.lib.project import (  # noqa: TCH002
     ProjectContext,
     get_project_context,
+    get_project_context_editor,
 )
 from qdash.api.schemas.cooldown_wiring_event import (
     CooldownWiringCheckpointRequest,
@@ -38,7 +39,7 @@ router = APIRouter()
 def create_wiring_checkpoint(
     cooldown_id: str,
     body: CooldownWiringCheckpointRequest,
-    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
     service: Annotated[CooldownWiringEventService, Depends(get_cooldown_wiring_event_service)],
 ) -> CooldownWiringEventResponse:
     return service.create_checkpoint(

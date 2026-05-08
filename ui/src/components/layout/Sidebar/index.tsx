@@ -7,6 +7,7 @@ import { useCallback, useRef } from "react";
 
 import {
   BarChart3,
+  Bell,
   BookMarked,
   BookOpen,
   ChevronLeft,
@@ -17,7 +18,6 @@ import {
   FileJson2,
   Files,
   GitBranch,
-  Inbox,
   LayoutDashboard,
   LayoutGrid,
   Snowflake,
@@ -25,6 +25,7 @@ import {
   LogOut,
   Brain,
   CircleDot,
+  MessagesSquare,
   Moon,
   Settings,
   ShieldCheck,
@@ -41,6 +42,7 @@ import { FluentEmoji, getAvatarEmoji } from "@/components/ui/FluentEmoji";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProject } from "@/contexts/ProjectContext";
 import { useSidebar } from "@/contexts/SidebarContext";
+import { useUnreadNotificationCount } from "@/hooks/useNotifications";
 import { DARK_THEMES } from "@/constants/themes";
 
 const PREFECT_URL =
@@ -70,6 +72,9 @@ export function Sidebar() {
   const { canEdit } = useProject();
   const { user, logout: authLogout } = useAuth();
   const { theme, setTheme } = useTheme();
+  const { data: unreadNotificationsResponse } = useUnreadNotificationCount();
+  const unreadNotifications =
+    unreadNotificationsResponse?.data.unread_count ?? 0;
   const isAdmin = user?.system_role === "admin";
   const isDarkTheme = DARK_THEMES.includes(
     theme as (typeof DARK_THEMES)[number],
@@ -164,17 +169,24 @@ export function Sidebar() {
         <SectionHeader visible={sectionHeaderVisible} label="Data" />
         <li>
           <Link
-            href="/inbox"
+            href="/notifications"
             className={
               isMobileOpen
-                ? linkClass(isActive("/inbox"))
-                : desktopLinkClass(isActive("/inbox"))
+                ? linkClass(isActive("/notifications"))
+                : desktopLinkClass(isActive("/notifications"))
             }
-            title="Inbox"
+            title="Notifications"
             onClick={handleLinkClick}
           >
-            <Inbox size={18} />
-            {(isOpen || isMobileOpen) && <span className="ml-2">Inbox</span>}
+            <Bell size={18} />
+            {(isOpen || isMobileOpen) && (
+              <span className="ml-2">Notifications</span>
+            )}
+            {unreadNotifications > 0 && (
+              <span className="badge badge-primary badge-xs ml-auto">
+                {unreadNotifications > 99 ? "99+" : unreadNotifications}
+              </span>
+            )}
           </Link>
         </li>
         <li>
@@ -371,6 +383,21 @@ export function Sidebar() {
           >
             <CircleDot size={18} />
             {(isOpen || isMobileOpen) && <span className="ml-2">Issues</span>}
+          </Link>
+        </li>
+        <li>
+          <Link
+            href="/forum"
+            className={
+              isMobileOpen
+                ? linkClass(pathname.startsWith("/forum"))
+                : desktopLinkClass(pathname.startsWith("/forum"))
+            }
+            title="Forum"
+            onClick={handleLinkClick}
+          >
+            <MessagesSquare size={18} />
+            {(isOpen || isMobileOpen) && <span className="ml-2">Forum</span>}
           </Link>
         </li>
         <li>

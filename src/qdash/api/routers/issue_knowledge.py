@@ -9,6 +9,7 @@ from qdash.api.dependencies import get_issue_knowledge_service, get_issue_servic
 from qdash.api.lib.project import (  # noqa: TCH002
     ProjectContext,
     get_project_context,
+    get_project_context_editor,
 )
 from qdash.api.schemas.issue_knowledge import (
     IssueKnowledgeResponse,
@@ -29,7 +30,7 @@ router = APIRouter()
     response_model=ListIssueKnowledgeResponse,
 )
 def list_issue_knowledge(
-    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
     service: Annotated[IssueKnowledgeService, Depends(get_issue_knowledge_service)],
     skip: Annotated[int, Query(ge=0)] = 0,
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
@@ -56,7 +57,7 @@ def list_issue_knowledge(
 )
 def get_issue_knowledge(
     knowledge_id: str,
-    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
     service: Annotated[IssueKnowledgeService, Depends(get_issue_knowledge_service)],
 ) -> IssueKnowledgeResponse:
     """Get a single knowledge case by ID."""
@@ -72,7 +73,7 @@ def get_issue_knowledge(
 )
 async def extract_issue_knowledge(
     issue_id: str,
-    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
     service: Annotated[IssueKnowledgeService, Depends(get_issue_knowledge_service)],
     issue_service: Annotated[IssueService, Depends(get_issue_service)],
 ) -> IssueKnowledgeResponse:
@@ -93,7 +94,7 @@ async def extract_issue_knowledge(
 def update_issue_knowledge(
     knowledge_id: str,
     body: IssueKnowledgeUpdate,
-    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
     service: Annotated[IssueKnowledgeService, Depends(get_issue_knowledge_service)],
 ) -> IssueKnowledgeResponse:
     """Update a knowledge draft's content. Only drafts can be edited."""
@@ -128,7 +129,7 @@ def update_issue_knowledge(
 )
 def approve_issue_knowledge(
     knowledge_id: str,
-    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
     service: Annotated[IssueKnowledgeService, Depends(get_issue_knowledge_service)],
 ) -> IssueKnowledgeResponse:
     """Approve a knowledge draft for inclusion in task knowledge."""

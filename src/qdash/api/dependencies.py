@@ -23,11 +23,13 @@ from qdash.api.services.cryostat_service import CryostatService
 from qdash.api.services.device_topology_service import DeviceTopologyService
 from qdash.api.services.execution_service import ExecutionService
 from qdash.api.services.file_service import FileService
+from qdash.api.services.forum_service import ForumService
 from qdash.api.services.issue_knowledge_service import IssueKnowledgeService
 from qdash.api.services.issue_service import IssueService
 from qdash.api.services.manual_update_service import ManualUpdateService
 from qdash.api.services.metrics_service import MetricsService
 from qdash.api.services.note_service import NoteService
+from qdash.api.services.notification_service import NotificationService
 from qdash.api.services.project_service import ProjectService
 from qdash.api.services.provenance_service import ProvenanceService
 from qdash.api.services.reanalysis_service import ReanalysisService
@@ -277,7 +279,13 @@ def get_provenance_service() -> ProvenanceService:
 @lru_cache(maxsize=1)
 def get_issue_service() -> IssueService:
     """Get the issue service instance."""
-    return IssueService()
+    return IssueService(notification_service=get_notification_service())
+
+
+@lru_cache(maxsize=1)
+def get_forum_service() -> ForumService:
+    """Get the forum service instance."""
+    return ForumService(notification_service=get_notification_service())
 
 
 @lru_cache(maxsize=1)
@@ -315,7 +323,13 @@ def get_task_service() -> TaskService:
 @lru_cache(maxsize=1)
 def get_note_service() -> NoteService:
     """Get the unified note service instance."""
-    return NoteService()
+    return NoteService(notification_service=get_notification_service())
+
+
+@lru_cache(maxsize=1)
+def get_notification_service() -> NotificationService:
+    """Get the notification service instance."""
+    return NotificationService()
 
 
 @lru_cache(maxsize=1)

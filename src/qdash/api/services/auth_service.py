@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 from fastapi import HTTPException, status
 from qdash.api.lib.auth import get_password_hash, get_user, verify_password
 from qdash.datamodel.system_info import SystemInfoModel
-from qdash.datamodel.user import SystemRole
+from qdash.datamodel.user import SystemRole, generate_user_id
 from qdash.dbmodel.user import UserDocument
 
 if TYPE_CHECKING:
@@ -19,6 +19,7 @@ if TYPE_CHECKING:
     from qdash.repository import MongoUserRepository
 
 logger = logging.getLogger(__name__)
+TEMPORARY_PASSWORD_LENGTH = 18
 
 
 def _get_system_role_for_user(username: str) -> SystemRole:
@@ -46,6 +47,12 @@ def _get_system_role_for_user(username: str) -> SystemRole:
     return SystemRole.USER
 
 
+def generate_temporary_password() -> str:
+    """Generate a URL-safe temporary password for new users."""
+    # token_urlsafe may return a little more than requested; trim to keep UI compact.
+    return secrets.token_urlsafe(24)[:TEMPORARY_PASSWORD_LENGTH]
+
+
 class AuthService:
     """Service for user registration and password management.
 
@@ -67,7 +74,7 @@ class AuthService:
         self,
         user_data: UserCreate,
         admin_username: str,
-    ) -> tuple[UserDocument, str]:
+    ) -> tuple[UserDocument, str, str | None]:
         """Register a new user account.
 
         Parameters
@@ -79,8 +86,8 @@ class AuthService:
 
         Returns
         -------
-        tuple[UserDocument, str]
-            The created user document and access token.
+        tuple[UserDocument, str, str | None]
+            The created user document, access token, and generated password if any.
 
         Raises
         ------
@@ -97,22 +104,30 @@ class AuthService:
                 detail="Username already registered",
             )
 
-        hashed_password = get_password_hash(user_data.password)
+        initial_password: str | None = None
+        password = user_data.password
+        if password is None:
+            initial_password = generate_temporary_password()
+            password = initial_password
+
+        hashed_password = get_password_hash(password)
         access_token = secrets.token_urlsafe(32)
         system_role = _get_system_role_for_user(user_data.username)
 
         user = UserDocument(
+            user_id=generate_user_id(),
             username=user_data.username,
             hashed_password=hashed_password,
             access_token=access_token,
             full_name=user_data.full_name,
             system_role=system_role,
+            must_change_password=True,
             system_info=SystemInfoModel(),
         )
         self._user_repo.insert(user)
         logger.info(f"Admin {admin_username} created new user: {user_data.username}")
 
-        return user, access_token
+        return user, access_token, initial_password
 
     def onboard_user(self, user: UserDocument) -> None:
         """Create a default project for a newly registered user.
@@ -189,6 +204,7 @@ class AuthService:
         user_doc = self._user_repo.find_by_username(username)
         if user_doc:
             user_doc.hashed_password = new_hashed_password
+            user_doc.must_change_password = False
             self._user_repo.save(user_doc)
             logger.info(f"Password changed successfully for user: {username}")
             return {"message": "Password changed successfully"}
@@ -243,6 +259,7 @@ class AuthService:
 
         new_hashed_password = get_password_hash(password_data.new_password)
         user_doc.hashed_password = new_hashed_password
+        user_doc.must_change_password = True
         self._user_repo.save(user_doc)
         logger.info(f"Admin {admin_username} reset password for user: {password_data.username}")
         return {"message": f"Password reset successfully for user '{password_data.username}'"}

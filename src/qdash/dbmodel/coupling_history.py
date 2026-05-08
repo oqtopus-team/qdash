@@ -6,6 +6,7 @@ from pymongo import ASCENDING, DESCENDING, IndexModel
 from qdash.common.datetime_utils import now
 from qdash.datamodel.coupling import CouplingModel
 from qdash.datamodel.system_info import SystemInfoModel
+from qdash.dbmodel.user import UserDocument
 
 
 class CouplingHistoryDocument(Document):
@@ -24,7 +25,8 @@ class CouplingHistoryDocument(Document):
     """
 
     project_id: str = Field(..., description="Owning project identifier")
-    username: str = Field(..., description="The username of the user who created the coupling")
+    user_id: str | None = Field(default=None, description="Creator user ID")
+    username: str = Field(..., description="Creator username snapshot")
     qid: str = Field(..., description="The coupling ID")
     status: str = Field(..., description="The status of the coupling")
     chip_id: str = Field(..., description="The chip ID")
@@ -63,6 +65,9 @@ class CouplingHistoryDocument(Document):
             IndexModel(
                 [("project_id", ASCENDING), ("chip_id", ASCENDING), ("recorded_date", DESCENDING)]
             ),
+            IndexModel(
+                [("project_id", ASCENDING), ("user_id", ASCENDING), ("recorded_date", DESCENDING)]
+            ),
         ]
 
     @classmethod
@@ -78,30 +83,42 @@ class CouplingHistoryDocument(Document):
         return getattr(chip, "current_cooldown_id", None) or ""
 
     @classmethod
+    def _user_id_for_username(cls, username: str) -> str | None:
+        user = UserDocument.find_one({"username": username}).run()
+        return user.user_id if user else None
+
+    @classmethod
     def create_history(cls, coupling: CouplingModel) -> "CouplingHistoryDocument":
         """Create a history record from a CouplingDocument."""
         today = now().strftime("%Y%m%d")
         cooldown_id = cls._resolve_cooldown_id(
             project_id=coupling.project_id, chip_id=coupling.chip_id
         )
+        username = coupling.username
+        if username is None:
+            msg = "CouplingDocument.username is required to create history"
+            raise ValueError(msg)
+        user_id = coupling.user_id or cls._user_id_for_username(username)
         existing_history = cls.find_one(
             {
                 "project_id": coupling.project_id,
                 "chip_id": coupling.chip_id,
                 "qid": coupling.qid,
-                "username": coupling.username,
+                "username": username,
                 "recorded_date": today,
             }
         ).run()
         if existing_history:
             history = existing_history
+            history.user_id = user_id
             history.data = coupling.data
             history.status = coupling.status
             history.cooldown_id = cooldown_id
         else:
             history = cls(
                 project_id=coupling.project_id,
-                username=coupling.username,
+                user_id=user_id,
+                username=username,
                 qid=coupling.qid,
                 status=coupling.status,
                 chip_id=coupling.chip_id,

@@ -11,7 +11,7 @@ from qdash.api.dependencies import get_flow_service, get_task_result_service  # 
 from qdash.api.lib.project import (  # noqa: TCH002
     ProjectContext,
     get_project_context,
-    get_project_context_owner,
+    get_project_context_editor,
 )
 from qdash.api.schemas.flow import ExecuteFlowResponse
 from qdash.api.schemas.task_result import (
@@ -414,7 +414,7 @@ def get_timeseries_task_results(
 )
 def request_bulk_ai_triage_review(
     body: BulkAiTriageRequest,
-    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
     service: Annotated[TaskResultService, Depends(get_task_result_service)],
 ) -> BulkAiTriageResponse:
     """Enqueue AI triage review for the current latest task result per entity."""
@@ -443,7 +443,7 @@ def request_bulk_ai_triage_review(
 )
 async def re_execute_task_result(
     task_id: str,
-    ctx: Annotated[ProjectContext, Depends(get_project_context_owner)],
+    ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
     service: Annotated[TaskResultService, Depends(get_task_result_service)],
     flow_service: Annotated[FlowService, Depends(get_flow_service)],
     parameter_overrides: Annotated[
@@ -540,13 +540,12 @@ async def re_execute_task_result(
 def set_task_result_excluded(
     task_id: str,
     body: TaskResultExcludeRequest,
-    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
 ) -> TaskResultExcludeResponse:
     """Toggle the excluded flag on a task result.
 
     Excluded measurements are skipped when aggregating metrics for the
-    dashboard / metrics screens. Raw data is preserved. Any project member
-    can toggle exclusion; the most recent toggler is recorded.
+    dashboard / metrics screens. Raw data is preserved.
     """
     from qdash.common.datetime_utils import now
     from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
@@ -564,6 +563,7 @@ def set_task_result_excluded(
 
     doc.excluded = body.excluded
     doc.excluded_reason = body.reason if body.excluded else ""
+    doc.excluded_by_user_id = ctx.user.user_id
     doc.excluded_by = ctx.user.username
     doc.excluded_at = now()
     doc.save()
@@ -572,6 +572,7 @@ def set_task_result_excluded(
         task_id=doc.task_id,
         excluded=doc.excluded,
         excluded_reason=doc.excluded_reason,
+        excluded_by_user_id=doc.excluded_by_user_id,
         excluded_by=doc.excluded_by,
         excluded_at=doc.excluded_at,
     )

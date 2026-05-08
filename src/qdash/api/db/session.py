@@ -123,7 +123,7 @@ def create_initial_admin() -> None:
     from passlib.context import CryptContext
     from qdash.api.lib.project_service import ProjectService
     from qdash.datamodel.system_info import SystemInfoModel
-    from qdash.datamodel.user import SystemRole
+    from qdash.datamodel.user import SystemRole, generate_user_id
     from qdash.dbmodel.user import UserDocument
 
     logger = logging.getLogger(__name__)
@@ -147,6 +147,7 @@ def create_initial_admin() -> None:
 
     # Create admin user
     user = UserDocument(
+        user_id=generate_user_id(),
         username=admin_username,
         hashed_password=hashed_password,
         access_token=access_token,

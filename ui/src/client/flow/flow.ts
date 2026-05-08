@@ -890,7 +890,7 @@ export function useGetFlowHelperFile<
 
 /**
  * List all Flow schedules (cron and one-time) for the current project.
- * @summary List all flow schedules for current user
+ * @summary List all flow schedules for current project
  */
 export const listAllFlowSchedules = (
   params?: ListAllFlowSchedulesParams,
@@ -1016,7 +1016,7 @@ export function useListAllFlowSchedules<
   queryClient?: QueryClient,
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 /**
- * @summary List all flow schedules for current user
+ * @summary List all flow schedules for current project
  */
 
 export function useListAllFlowSchedules<

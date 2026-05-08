@@ -5,6 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
+import type { TokenResponseUserId } from "./tokenResponseUserId";
 import type { TokenResponseDefaultProjectId } from "./tokenResponseDefaultProjectId";
 
 /**
@@ -13,6 +14,8 @@ import type { TokenResponseDefaultProjectId } from "./tokenResponseDefaultProjec
 export interface TokenResponse {
   access_token: string;
   token_type?: string;
+  user_id?: TokenResponseUserId;
   username: string;
   default_project_id?: TokenResponseDefaultProjectId;
+  must_change_password?: boolean;
 }

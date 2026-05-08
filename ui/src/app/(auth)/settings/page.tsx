@@ -1,23 +1,46 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Cpu } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 
 import { useTheme } from "@/contexts/ThemeContext";
 import { PasswordChangeCard } from "@/components/features/settings/PasswordChangeCard";
 import { PageContainer } from "@/components/ui/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { useAuth } from "@/contexts/AuthContext";
+import { useProject } from "@/contexts/ProjectContext";
 import { AVAILABLE_THEMES, DEV_THEMES } from "@/constants/themes";
 import { useGetCopilotConfig } from "@/client/copilot/copilot";
+import {
+  getListProjectMembersQueryKey,
+  useInviteProjectMember,
+  useListProjectMembers,
+  useRemoveProjectMember,
+  useUpdateProjectMember,
+} from "@/client/projects/projects";
 import {
   buildAnalysisModelOptions,
   getStoredAnalysisModelKey,
   resolveAnalysisModelOption,
   setStoredAnalysisModelKey,
 } from "@/lib/copilotModels";
+import type { MemberResponse, ProjectRole } from "@/schemas";
 
-type Tab = "appearance" | "copilot" | "account" | "api";
+type Tab = "appearance" | "project" | "copilot" | "account" | "api";
+
+const editableProjectRoles: ProjectRole[] = ["viewer", "editor"];
+
+function roleBadgeClass(role: ProjectRole) {
+  if (role === "owner") return "badge-secondary";
+  if (role === "editor") return "badge-primary";
+  return "badge-ghost";
+}
+
+function mutationErrorMessage(error: unknown) {
+  if (error instanceof Error) return error.message;
+  return "Failed to update project members";
+}
 
 function CopilotSettingsPanel() {
   const [selectedModelKey, setSelectedModelKey] = useState(
@@ -88,10 +111,275 @@ function CopilotSettingsPanel() {
   );
 }
 
+function ProjectMembersPanel() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const { currentProject, projectId, isOwner } = useProject();
+  const [inviteUsername, setInviteUsername] = useState("");
+  const [inviteRole, setInviteRole] = useState<ProjectRole>("viewer");
+  const [localError, setLocalError] = useState<string | null>(null);
+
+  const membersQuery = useListProjectMembers(projectId ?? "", {
+    query: {
+      enabled: !!projectId,
+      retry: false,
+    },
+  });
+  const inviteMutation = useInviteProjectMember();
+  const updateMutation = useUpdateProjectMember();
+  const removeMutation = useRemoveProjectMember();
+  const members = membersQuery.data?.data.members ?? [];
+  const isMutating =
+    inviteMutation.isPending ||
+    updateMutation.isPending ||
+    removeMutation.isPending;
+  const memberError =
+    localError ||
+    (inviteMutation.error || updateMutation.error || removeMutation.error
+      ? mutationErrorMessage(
+          inviteMutation.error || updateMutation.error || removeMutation.error,
+        )
+      : null);
+
+  const refreshMembers = () => {
+    if (!projectId) return;
+    queryClient.invalidateQueries({
+      queryKey: getListProjectMembersQueryKey(projectId),
+    });
+  };
+
+  const handleInvite = async () => {
+    if (!projectId) return;
+    const username = inviteUsername.trim();
+    if (!username) {
+      setLocalError("Enter a username.");
+      return;
+    }
+    setLocalError(null);
+    try {
+      await inviteMutation.mutateAsync({
+        projectId,
+        data: { username, role: inviteRole },
+      });
+      setInviteUsername("");
+      setInviteRole("viewer");
+      refreshMembers();
+    } catch {
+      // The mutation error is rendered from TanStack Query state.
+    }
+  };
+
+  const handleRoleChange = async (
+    member: MemberResponse,
+    role: ProjectRole,
+  ) => {
+    if (!projectId || member.role === role) return;
+    setLocalError(null);
+    try {
+      await updateMutation.mutateAsync({
+        projectId,
+        username: member.username,
+        data: { role },
+      });
+      refreshMembers();
+    } catch {
+      // The mutation error is rendered from TanStack Query state.
+    }
+  };
+
+  const handleRemove = async (member: MemberResponse) => {
+    if (!projectId) return;
+    setLocalError(null);
+    try {
+      await removeMutation.mutateAsync({
+        projectId,
+        username: member.username,
+      });
+      refreshMembers();
+    } catch {
+      // The mutation error is rendered from TanStack Query state.
+    }
+  };
+
+  return (
+    <div className="space-y-4" key="project">
+      <div className="card bg-base-200 shadow-lg">
+        <div className="card-body">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h2 className="card-title text-xl">Project Members</h2>
+              <p className="text-sm text-base-content/60">
+                {currentProject?.name ?? "Current project"}
+              </p>
+            </div>
+            <div
+              className={`badge ${isOwner ? "badge-secondary" : "badge-ghost"} w-fit`}
+            >
+              {isOwner ? "Owner controls" : "Read only"}
+            </div>
+          </div>
+
+          {!isOwner && (
+            <div className="alert alert-info mt-4">
+              <span>
+                Only the project owner can invite members, remove members, or
+                change Viewer and Editor roles.
+              </span>
+            </div>
+          )}
+
+          {isOwner && (
+            <div className="mt-4 grid gap-3 rounded-lg bg-base-100 p-4 md:grid-cols-[1fr_160px_auto]">
+              <input
+                className="input input-bordered w-full"
+                value={inviteUsername}
+                onChange={(event) => setInviteUsername(event.target.value)}
+                placeholder="Username"
+              />
+              <select
+                className="select select-bordered w-full"
+                value={inviteRole}
+                onChange={(event) =>
+                  setInviteRole(event.target.value as ProjectRole)
+                }
+              >
+                <option value="viewer">Viewer</option>
+                <option value="editor">Editor</option>
+              </select>
+              <button
+                className="btn btn-primary"
+                onClick={handleInvite}
+                disabled={isMutating || !inviteUsername.trim()}
+              >
+                Add Member
+              </button>
+            </div>
+          )}
+
+          {memberError && (
+            <div className="alert alert-error mt-4">
+              <span>{memberError}</span>
+            </div>
+          )}
+
+          <div className="mt-4 overflow-x-auto">
+            <table className="table table-zebra">
+              <thead>
+                <tr>
+                  <th>Username</th>
+                  <th>Role</th>
+                  <th>Status</th>
+                  <th className="text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {membersQuery.isLoading ? (
+                  <tr>
+                    <td colSpan={4} className="py-8 text-center">
+                      <span className="loading loading-spinner" />
+                    </td>
+                  </tr>
+                ) : members.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={4}
+                      className="py-8 text-center text-base-content/60"
+                    >
+                      No members found
+                    </td>
+                  </tr>
+                ) : (
+                  members.map((member) => {
+                    const isProjectOwner = member.role === "owner";
+                    const isCurrentUser = member.username === user?.username;
+                    return (
+                      <tr key={member.username}>
+                        <td className="font-mono">{member.username}</td>
+                        <td>
+                          {isOwner && !isProjectOwner ? (
+                            <select
+                              className="select select-bordered select-sm w-32"
+                              value={member.role}
+                              disabled={isMutating}
+                              onChange={(event) =>
+                                handleRoleChange(
+                                  member,
+                                  event.target.value as ProjectRole,
+                                )
+                              }
+                            >
+                              {editableProjectRoles.map((role) => (
+                                <option key={role} value={role}>
+                                  {role.charAt(0).toUpperCase() + role.slice(1)}
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            <span
+                              className={`badge ${roleBadgeClass(member.role)}`}
+                            >
+                              {member.role}
+                            </span>
+                          )}
+                        </td>
+                        <td>
+                          <span className="badge badge-ghost">
+                            {member.status}
+                          </span>
+                        </td>
+                        <td className="text-right">
+                          {isOwner && !isProjectOwner ? (
+                            <button
+                              className="btn btn-error btn-ghost btn-sm"
+                              disabled={isMutating || isCurrentUser}
+                              onClick={() => handleRemove(member)}
+                            >
+                              Remove
+                            </button>
+                          ) : (
+                            <span className="text-xs text-base-content/50">
+                              {isProjectOwner ? "Owner" : "-"}
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="mt-3 grid gap-2 text-sm text-base-content/60 md:grid-cols-3">
+            <p>
+              <span className="font-medium text-base-content">Viewer</span> can
+              read project data.
+            </p>
+            <p>
+              <span className="font-medium text-base-content">Editor</span> can
+              run workflows and update operational data.
+            </p>
+            <p>
+              <span className="font-medium text-base-content">Owner</span>{" "}
+              manages project settings and membership.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function SettingsPage() {
   const { theme, setTheme, isDevEnv } = useTheme();
-  const { accessToken } = useAuth();
+  const { accessToken, user } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>("appearance");
+
+  useEffect(() => {
+    if (user?.must_change_password) {
+      setActiveTab("account");
+    }
+  }, [user?.must_change_password]);
 
   // Limit theme options in dev environment
   const themes = isDevEnv ? DEV_THEMES : AVAILABLE_THEMES;
@@ -129,6 +417,12 @@ export default function SettingsPage() {
             onClick={() => setActiveTab("appearance")}
           >
             Appearance
+          </a>
+          <a
+            className={`tab ${activeTab === "project" ? "tab-active" : ""}`}
+            onClick={() => setActiveTab("project")}
+          >
+            Project
           </a>
           <a
             className={`tab ${activeTab === "copilot" ? "tab-active" : ""}`}
@@ -276,10 +570,22 @@ export default function SettingsPage() {
                 </div>
               </div>
             </div>
+          ) : activeTab === "project" ? (
+            <ProjectMembersPanel />
           ) : activeTab === "copilot" ? (
             <CopilotSettingsPanel />
           ) : activeTab === "account" ? (
-            <PasswordChangeCard key="account" />
+            <div className="space-y-4" key="account">
+              {user?.must_change_password && (
+                <div className="alert alert-warning">
+                  <span>
+                    You are using a temporary password. Change it before
+                    continuing regular work.
+                  </span>
+                </div>
+              )}
+              <PasswordChangeCard />
+            </div>
           ) : (
             <div className="card bg-base-200 shadow-lg" key="api">
               <div className="card-body">

@@ -5,6 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
+import type { CooldownWiringEventResponseActorUserId } from "./cooldownWiringEventResponseActorUserId";
 
 /**
  * One wiring-history entry for a cool-down.
@@ -12,6 +13,7 @@
 export interface CooldownWiringEventResponse {
   id: string;
   cooldown_id: string;
+  actor_user_id?: CooldownWiringEventResponseActorUserId;
   actor: string;
   action: string;
   comment: string;

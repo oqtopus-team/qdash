@@ -6,4 +6,7 @@
  * OpenAPI spec version: 0.0.1
  */
 
-export type ValidationErrorCtx = { [key: string]: unknown };
+/**
+ * Issue author user ID
+ */
+export type IssueResponseUserId = string | null;

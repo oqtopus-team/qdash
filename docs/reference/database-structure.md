@@ -86,8 +86,9 @@ Represents user access to a project.
 
 ```python
 class ProjectRole(str, Enum):
-    """Simplified two-role permission model."""
+    """Simplified project permission model."""
     OWNER = "owner"   # Full access (read, write, admin)
+    EDITOR = "editor" # Operational write access
     VIEWER = "viewer" # Read-only access
 
 class ProjectMembershipModel(BaseModel):
@@ -919,7 +920,7 @@ Other project-scoped collections (tasks, tags, backends, flows, counters, locks,
 
 ### During Calibration Execution
 
-0. Resolve `(project_id, username)` via **ProjectMembershipDocument** and ensure role is `owner`
+0. Resolve `(project_id, username)` via **ProjectMembershipDocument** and ensure the role includes write permission
 1. Acquire per-project lock via **ExecutionLockDocument(project_id)**
 2. Generate execution ID from **ExecutionCounterDocument** (YYYYMMDD-NNN scoped by project/chip)
 3. Execute each task:

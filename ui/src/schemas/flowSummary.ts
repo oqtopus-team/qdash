@@ -12,6 +12,8 @@
 export interface FlowSummary {
   /** Flow name */
   name: string;
+  /** Username of the flow creator */
+  created_by: string;
   /** Flow description */
   description: string;
   /** Target chip ID */

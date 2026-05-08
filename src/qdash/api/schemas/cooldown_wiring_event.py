@@ -25,6 +25,7 @@ class CooldownWiringEventResponse(BaseModel):
 
     id: str
     cooldown_id: str
+    actor_user_id: str | None = None
     actor: str
     action: str
     comment: str

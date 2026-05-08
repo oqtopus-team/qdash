@@ -11,7 +11,7 @@ class MongoProjectMembershipRepository:
     """MongoDB implementation of Project Membership repository."""
 
     def get_active_membership(
-        self, project_id: str, username: str
+        self, project_id: str, username: str, user_id: str | None = None
     ) -> ProjectMembershipDocument | None:
         """Fetch active membership for the user/project pair.
 
@@ -22,7 +22,7 @@ class MongoProjectMembershipRepository:
         Returns:
             ProjectMembershipDocument if found, None otherwise
         """
-        return ProjectMembershipDocument.get_active_membership(project_id, username)  # type: ignore[no-any-return]
+        return ProjectMembershipDocument.get_active_membership(project_id, username, user_id)  # type: ignore[no-any-return]
 
     def find_one(self, query: dict[str, Any]) -> ProjectMembershipDocument | None:
         """Find a single membership document by query.
@@ -59,6 +59,19 @@ class MongoProjectMembershipRepository:
             List of ProjectMembershipDocument objects
         """
         return list(ProjectMembershipDocument.find({"username": username, "status": status}).run())
+
+    def find_by_user(
+        self, username: str, user_id: str | None, status: str = "active"
+    ) -> list[ProjectMembershipDocument]:
+        """Find all memberships for a user_id with username fallback."""
+        if user_id:
+            query: dict[str, Any] = {
+                "status": status,
+                "$or": [{"user_id": user_id}, {"username": username}],
+            }
+        else:
+            query = {"username": username, "status": status}
+        return list(ProjectMembershipDocument.find(query).run())
 
     def find_by_project(self, project_id: str) -> list[ProjectMembershipDocument]:
         """Find all memberships for a project.
@@ -98,9 +111,11 @@ class MongoProjectMembershipRepository:
     def create_membership(
         self,
         project_id: str,
+        user_id: str | None,
         username: str,
         role: ProjectRole,
         status: str = "active",
+        invited_by_user_id: str | None = None,
         invited_by: str | None = None,
     ) -> ProjectMembershipDocument:
         """Create a new project membership.
@@ -117,9 +132,11 @@ class MongoProjectMembershipRepository:
         """
         membership = ProjectMembershipDocument(
             project_id=project_id,
+            user_id=user_id,
             username=username,
             role=role,
             status=status,
+            invited_by_user_id=invited_by_user_id,
             invited_by=invited_by,
             system_info=SystemInfoModel(),
         )
