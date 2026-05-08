@@ -4,7 +4,12 @@ from bunnet import Document
 from pydantic import ConfigDict, Field
 from pymongo import ASCENDING, IndexModel
 from qdash.datamodel.system_info import SystemInfoModel
-from qdash.datamodel.user import SystemRole, generate_user_id
+from qdash.datamodel.user import (
+    USERNAME_PATTERN_DESCRIPTION,
+    SystemRole,
+    Username,
+    generate_user_id,
+)
 
 
 class UserDocument(Document):
@@ -25,7 +30,7 @@ class UserDocument(Document):
     """
 
     user_id: str = Field(default_factory=generate_user_id, description="Internal user ID")
-    username: str = Field(description="The login username")
+    username: Username = Field(description=USERNAME_PATTERN_DESCRIPTION)
     hashed_password: str = Field(description="The hashed password")
     access_token: str = Field(description="The API access token for authentication")
     full_name: str | None = Field(default=None, description="The full name of the user")

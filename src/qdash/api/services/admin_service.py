@@ -24,7 +24,12 @@ from qdash.api.schemas.admin import (
 )
 from qdash.api.services.auth_service import generate_temporary_password
 from qdash.datamodel.system_info import SystemInfoModel
-from qdash.datamodel.user import SystemRole, generate_user_id
+from qdash.datamodel.user import (
+    USERNAME_PATTERN_DESCRIPTION,
+    SystemRole,
+    generate_user_id,
+    is_valid_username,
+)
 from qdash.dbmodel.project import ProjectDocument
 from qdash.dbmodel.project_membership import ProjectMembershipDocument
 from qdash.dbmodel.user import UserDocument
@@ -142,6 +147,11 @@ class AdminService:
             username = row.get("username", "")
             if not username:
                 results.append(self._bulk_result(index, row, "failed", "username is required"))
+                continue
+            if not is_valid_username(username):
+                results.append(
+                    self._bulk_result(index, row, "failed", USERNAME_PATTERN_DESCRIPTION)
+                )
                 continue
 
             try:
