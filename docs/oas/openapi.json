@@ -12864,6 +12864,7 @@
         "properties": {
           "username": {
             "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9._-]{1,62}[a-z0-9]$",
             "title": "Username"
           },
           "role": {
@@ -17676,8 +17677,9 @@
         "properties": {
           "username": {
             "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9._-]{1,62}[a-z0-9]$",
             "title": "Username",
-            "description": "Username to invite"
+            "description": "Username must be 3-64 characters, lowercase letters, numbers, dots, underscores, or hyphens, and start and end with a letter or number."
           },
           "role": {
             "$ref": "#/components/schemas/ProjectRole",
@@ -19089,6 +19091,7 @@
         "properties": {
           "username": {
             "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9._-]{1,62}[a-z0-9]$",
             "title": "Username"
           },
           "new_password": {
@@ -22213,6 +22216,7 @@
         "properties": {
           "username": {
             "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9._-]{1,62}[a-z0-9]$",
             "title": "Username"
           },
           "password": {

@@ -4,7 +4,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 from qdash.datamodel.project import ProjectRole
-from qdash.datamodel.user import SystemRole
+from qdash.datamodel.user import SystemRole, Username
 
 
 class UserListItem(BaseModel):
@@ -96,7 +96,7 @@ class MemberListResponse(BaseModel):
 class AddMemberRequest(BaseModel):
     """Request to add a member to a project."""
 
-    username: str
+    username: Username
     role: ProjectRole = ProjectRole.VIEWER
 
 

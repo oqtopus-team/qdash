@@ -10,6 +10,7 @@
  * Password reset request model (admin only).
  */
 export interface PasswordReset {
+  /** @pattern ^[a-z0-9][a-z0-9._-]{1,62}[a-z0-9]$ */
   username: string;
   new_password: string;
 }

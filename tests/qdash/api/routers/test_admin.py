@@ -218,6 +218,24 @@ class TestAdminUsersEndpoints:
         assert data["results"][0]["status"] == "skipped"
         assert data["results"][0]["initial_password"] is None
 
+    def test_bulk_import_users_rejects_invalid_username(
+        self, test_client, admin_user, admin_headers
+    ):
+        """Bulk import rejects usernames outside the canonical format."""
+        csv_content = "username,full_name\ntaka fumi,Invalid Username\n"
+        response = test_client.post(
+            "/admin/users/bulk-import",
+            headers=admin_headers,
+            files={"file": ("users.csv", csv_content, "text/csv")},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["created"] == 0
+        assert data["failed"] == 1
+        assert data["results"][0]["status"] == "failed"
+        assert "lowercase letters" in data["results"][0]["message"]
+
     def test_bulk_import_users_rejects_project_columns(
         self, test_client, admin_user, admin_headers
     ):
@@ -614,6 +632,16 @@ class TestAdminRegisterUser:
         assert data["username"] == "accountonly"
         assert data["default_project_id"] is None
         assert data["initial_password"]
+
+    def test_register_user_rejects_invalid_username(self, test_client, admin_user, admin_headers):
+        """Admin user registration rejects usernames with spaces."""
+        response = test_client.post(
+            "/auth/register",
+            headers=admin_headers,
+            json={"username": "taka fumi"},
+        )
+
+        assert response.status_code == 422
 
     def test_change_password_clears_must_change_password(
         self, test_client, admin_user, admin_headers

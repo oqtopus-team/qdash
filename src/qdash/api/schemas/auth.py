@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from qdash.datamodel.user import SystemRole
+from qdash.datamodel.user import SystemRole, Username
 
 
 class User(BaseModel):
@@ -38,7 +38,7 @@ class UserInDB(User):
 class UserCreate(BaseModel):
     """User creation model for registration (admin only)."""
 
-    username: str
+    username: Username
     password: str | None = None
     full_name: str | None = None
     create_default_project: bool = False
@@ -65,5 +65,5 @@ class PasswordChange(BaseModel):
 class PasswordReset(BaseModel):
     """Password reset request model (admin only)."""
 
-    username: str
+    username: Username
     new_password: str
