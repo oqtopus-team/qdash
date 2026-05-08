@@ -27,6 +27,7 @@ def test_project(init_db):
     project = ProjectDocument(
         project_id="test_project",
         name="Test Project",
+        owner_user_id=user.user_id,
         owner_username="test_user",
     )
     project.insert()
@@ -34,8 +35,11 @@ def test_project(init_db):
     # Create membership
     membership = ProjectMembershipDocument(
         project_id="test_project",
+        user_id=user.user_id,
         username="test_user",
         role=ProjectRole.OWNER,
+        status="active",
+        invited_by_user_id=user.user_id,
         invited_by="test_user",
     )
     membership.insert()

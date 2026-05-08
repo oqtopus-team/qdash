@@ -83,8 +83,8 @@ class ForumService:
         return user.user_id if user else None
 
     @staticmethod
-    def _is_author(doc: ForumPostDocument, *, username: str, user_id: str | None) -> bool:
-        return bool((user_id and doc.user_id == user_id) or doc.username == username)
+    def _is_author(doc: ForumPostDocument, *, user_id: str | None) -> bool:
+        return bool(user_id and doc.user_id == user_id)
 
     @staticmethod
     def _category_to_response(doc: ForumCategoryDocument) -> ForumCategoryResponse:
@@ -441,7 +441,7 @@ class ForumService:
         if doc is None:
             raise HTTPException(status_code=404, detail="Forum post not found")
         user_id = self._user_id_for_username(username)
-        if not self._is_author(doc, username=username, user_id=user_id):
+        if not self._is_author(doc, user_id=user_id):
             raise HTTPException(status_code=403, detail="You can only edit your own posts")
 
         if doc.parent_id is None and title is not None:
@@ -489,10 +489,7 @@ class ForumService:
         if doc is None:
             raise HTTPException(status_code=404, detail="Forum post not found")
         user_id = self._user_id_for_username(username)
-        if (
-            not self._is_author(doc, username=username, user_id=user_id)
-            and role != ProjectRole.OWNER
-        ):
+        if not self._is_author(doc, user_id=user_id) and role != ProjectRole.OWNER:
             raise HTTPException(
                 status_code=403, detail="Only the author or project owner can delete this post"
             )
@@ -530,10 +527,7 @@ class ForumService:
         if doc is None:
             raise HTTPException(status_code=404, detail="Forum thread not found")
         user_id = self._user_id_for_username(username)
-        if (
-            not self._is_author(doc, username=username, user_id=user_id)
-            and role != ProjectRole.OWNER
-        ):
+        if not self._is_author(doc, user_id=user_id) and role != ProjectRole.OWNER:
             raise HTTPException(
                 status_code=403, detail="Only the author or project owner can close this thread"
             )
@@ -562,10 +556,7 @@ class ForumService:
         if doc is None:
             raise HTTPException(status_code=404, detail="Forum thread not found")
         user_id = self._user_id_for_username(username)
-        if (
-            not self._is_author(doc, username=username, user_id=user_id)
-            and role != ProjectRole.OWNER
-        ):
+        if not self._is_author(doc, user_id=user_id) and role != ProjectRole.OWNER:
             raise HTTPException(
                 status_code=403, detail="Only the author or project owner can reopen this thread"
             )

@@ -52,8 +52,8 @@ class IssueService:
         return user.user_id if user else None
 
     @staticmethod
-    def _is_author(doc: IssueDocument, *, username: str, user_id: str | None) -> bool:
-        return bool((user_id and doc.user_id == user_id) or doc.username == username)
+    def _is_author(doc: IssueDocument, *, user_id: str | None) -> bool:
+        return bool(user_id and doc.user_id == user_id)
 
     @staticmethod
     def _to_response(doc: IssueDocument, reply_count: int = 0) -> IssueResponse:
@@ -281,7 +281,7 @@ class IssueService:
             raise HTTPException(status_code=404, detail="Issue not found")
 
         user_id = self._user_id_for_username(username)
-        if not self._is_author(doc, username=username, user_id=user_id):
+        if not self._is_author(doc, user_id=user_id):
             raise HTTPException(status_code=403, detail="You can only edit your own issues")
 
         # Only update title for root issues
@@ -329,7 +329,7 @@ class IssueService:
             raise HTTPException(status_code=404, detail="Issue not found")
 
         user_id = self._user_id_for_username(username)
-        if not self._is_author(doc, username=username, user_id=user_id):
+        if not self._is_author(doc, user_id=user_id):
             raise HTTPException(status_code=403, detail="You can only delete your own issues")
 
         doc.delete()
@@ -358,10 +358,7 @@ class IssueService:
             raise HTTPException(status_code=404, detail="Issue not found")
 
         user_id = self._user_id_for_username(username)
-        if (
-            not self._is_author(doc, username=username, user_id=user_id)
-            and role != ProjectRole.OWNER
-        ):
+        if not self._is_author(doc, user_id=user_id) and role != ProjectRole.OWNER:
             raise HTTPException(
                 status_code=403, detail="Only the author or project owner can close this issue"
             )
@@ -393,10 +390,7 @@ class IssueService:
             raise HTTPException(status_code=404, detail="Issue not found")
 
         user_id = self._user_id_for_username(username)
-        if (
-            not self._is_author(doc, username=username, user_id=user_id)
-            and role != ProjectRole.OWNER
-        ):
+        if not self._is_author(doc, user_id=user_id) and role != ProjectRole.OWNER:
             raise HTTPException(
                 status_code=403, detail="Only the author or project owner can reopen this issue"
             )

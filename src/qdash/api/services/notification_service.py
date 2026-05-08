@@ -269,14 +269,9 @@ class NotificationService:
         limit: int,
     ) -> ListNotificationsResponse:
         """List notifications for a user."""
-        user_id = self._user_id_for_username(username)
-        identity_query: dict[str, object]
-        if user_id:
-            identity_query = {
-                "$or": [{"recipient_user_id": user_id}, {"recipient_username": username}]
-            }
-        else:
-            identity_query = {"recipient_username": username}
+        identity_query: dict[str, object] = {
+            "recipient_user_id": self._user_id_for_username(username) or ""
+        }
         query: dict[str, object] = dict(identity_query)
         if project_id:
             query["project_id"] = project_id
@@ -305,14 +300,10 @@ class NotificationService:
         self, *, username: str, project_id: str | None
     ) -> UnreadNotificationCountResponse:
         """Return unread notification count for a user."""
-        user_id = self._user_id_for_username(username)
-        if user_id:
-            query: dict[str, object] = {
-                "$or": [{"recipient_user_id": user_id}, {"recipient_username": username}],
-                "read_at": None,
-            }
-        else:
-            query = {"recipient_username": username, "read_at": None}
+        query: dict[str, object] = {
+            "recipient_user_id": self._user_id_for_username(username) or "",
+            "read_at": None,
+        }
         if project_id:
             query["project_id"] = project_id
         return UnreadNotificationCountResponse(
@@ -321,15 +312,10 @@ class NotificationService:
 
     def mark_read(self, *, notification_id: str, username: str) -> NotificationResponse:
         """Mark one notification as read."""
-        user_id = self._user_id_for_username(username)
-        identity_query: dict[str, object]
-        if user_id:
-            identity_query = {
-                "_id": ObjectId(notification_id),
-                "$or": [{"recipient_user_id": user_id}, {"recipient_username": username}],
-            }
-        else:
-            identity_query = {"_id": ObjectId(notification_id), "recipient_username": username}
+        identity_query: dict[str, object] = {
+            "_id": ObjectId(notification_id),
+            "recipient_user_id": self._user_id_for_username(username) or "",
+        }
         doc = NotificationDocument.find_one(identity_query).run()
         if doc is None:
             raise HTTPException(
@@ -342,14 +328,10 @@ class NotificationService:
 
     def mark_all_read(self, *, username: str, project_id: str | None) -> dict[str, int]:
         """Mark all matching notifications as read."""
-        user_id = self._user_id_for_username(username)
-        if user_id:
-            query: dict[str, object] = {
-                "$or": [{"recipient_user_id": user_id}, {"recipient_username": username}],
-                "read_at": None,
-            }
-        else:
-            query = {"recipient_username": username, "read_at": None}
+        query: dict[str, object] = {
+            "recipient_user_id": self._user_id_for_username(username) or "",
+            "read_at": None,
+        }
         if project_id:
             query["project_id"] = project_id
         read_at = now()

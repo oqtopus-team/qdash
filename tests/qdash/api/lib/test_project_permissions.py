@@ -15,20 +15,23 @@ def project_members(init_db) -> None:
     project = ProjectDocument(
         project_id="permission-project",
         name="Permission Project",
+        owner_user_id="usr_owner",
         owner_username="owner",
     )
     project.insert()
 
-    for username, role in [
-        ("owner", ProjectRole.OWNER),
-        ("editor", ProjectRole.EDITOR),
-        ("viewer", ProjectRole.VIEWER),
+    for username, user_id, role in [
+        ("owner", "usr_owner", ProjectRole.OWNER),
+        ("editor", "usr_editor", ProjectRole.EDITOR),
+        ("viewer", "usr_viewer", ProjectRole.VIEWER),
     ]:
         ProjectMembershipDocument(
             project_id="permission-project",
+            user_id=user_id,
             username=username,
             role=role,
             status="active",
+            invited_by_user_id="usr_owner",
             invited_by="owner",
         ).insert()
 
@@ -46,7 +49,7 @@ def test_editor_can_write_but_viewer_cannot(project_members) -> None:
     """Operational write permission starts at editor."""
     _, editor_role = _check_permission(
         "permission-project",
-        User(username="editor", default_project_id="permission-project"),
+        User(username="editor", user_id="usr_editor", default_project_id="permission-project"),
         required_permission=ProjectPermission.WRITE,
     )
 
@@ -55,7 +58,7 @@ def test_editor_can_write_but_viewer_cannot(project_members) -> None:
     with pytest.raises(HTTPException) as exc_info:
         _check_permission(
             "permission-project",
-            User(username="viewer", default_project_id="permission-project"),
+            User(username="viewer", user_id="usr_viewer", default_project_id="permission-project"),
             required_permission=ProjectPermission.WRITE,
         )
 
@@ -66,7 +69,7 @@ def test_owner_can_admin_but_editor_cannot(project_members) -> None:
     """Administrative permission is owner-only."""
     _, owner_role = _check_permission(
         "permission-project",
-        User(username="owner", default_project_id="permission-project"),
+        User(username="owner", user_id="usr_owner", default_project_id="permission-project"),
         required_permission=ProjectPermission.ADMIN,
     )
 
@@ -75,7 +78,7 @@ def test_owner_can_admin_but_editor_cannot(project_members) -> None:
     with pytest.raises(HTTPException) as exc_info:
         _check_permission(
             "permission-project",
-            User(username="editor", default_project_id="permission-project"),
+            User(username="editor", user_id="usr_editor", default_project_id="permission-project"),
             required_permission=ProjectPermission.ADMIN,
         )
 

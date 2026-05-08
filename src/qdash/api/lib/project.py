@@ -58,15 +58,13 @@ def _resolve_project_id(
     if user.default_project_id:
         return str(user.default_project_id)
 
-    # Fallback: check if user owns a project
+    # Fallback: check if user owns a project.
     from qdash.dbmodel.project import ProjectDocument
 
-    owner_clauses: list[dict[str, str]] = [{"owner_username": user.username}]
     if user.user_id:
-        owner_clauses.insert(0, {"owner_user_id": user.user_id})
-    owned_project = ProjectDocument.find_one({"$or": owner_clauses}).run()
-    if owned_project:
-        return str(owned_project.project_id)
+        owned_project = ProjectDocument.find_one({"owner_user_id": user.user_id}).run()
+        if owned_project:
+            return str(owned_project.project_id)
 
     raise HTTPException(
         status_code=status.HTTP_400_BAD_REQUEST,
@@ -111,8 +109,7 @@ def _check_permission(
     # Check membership
     membership = _get_membership(project_id, user.username, user.user_id)
     if not membership:
-        # Check if user is the owner (fallback for legacy data)
-        if project.owner_user_id == user.user_id or project.owner_username == user.username:
+        if user.user_id and project.owner_user_id == user.user_id:
             logger.debug(f"User {user.username} is owner of project {project_id}")
             if not role_has_permission(ProjectRole.OWNER, required_permission):
                 raise HTTPException(
