@@ -93,7 +93,7 @@ class MongoProjectMembershipRepository:
     def create_membership(
         self,
         project_id: str,
-        user_id: str | None,
+        user_id: str,
         username: str,
         role: ProjectRole,
         status: str = "active",

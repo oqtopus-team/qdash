@@ -17695,14 +17695,7 @@
       "MemberItem": {
         "properties": {
           "user_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "type": "string",
             "title": "User Id"
           },
           "username": {
@@ -17731,6 +17724,7 @@
         },
         "type": "object",
         "required": [
+          "user_id",
           "username",
           "role"
         ],
@@ -17744,14 +17738,7 @@
             "title": "Project Id"
           },
           "user_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "type": "string",
             "title": "User Id"
           },
           "username": {
@@ -17803,6 +17790,7 @@
         "type": "object",
         "required": [
           "project_id",
+          "user_id",
           "username",
           "role",
           "status",
@@ -19304,14 +19292,7 @@
             "title": "Name"
           },
           "owner_user_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "type": "string",
             "title": "Owner User Id"
           },
           "owner_username": {
@@ -19351,6 +19332,7 @@
         "required": [
           "project_id",
           "name",
+          "owner_user_id",
           "owner_username"
         ],
         "title": "ProjectListItem",
@@ -19363,14 +19345,7 @@
             "title": "Project Id"
           },
           "owner_user_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "type": "string",
             "title": "Owner User Id"
           },
           "owner_username": {
@@ -19416,6 +19391,7 @@
         "type": "object",
         "required": [
           "project_id",
+          "owner_user_id",
           "owner_username",
           "name",
           "description",
@@ -21937,14 +21913,7 @@
             "default": "bearer"
           },
           "user_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "type": "string",
             "title": "User Id"
           },
           "username": {
@@ -21971,6 +21940,7 @@
         "type": "object",
         "required": [
           "access_token",
+          "user_id",
           "username"
         ],
         "title": "TokenResponse",
@@ -22181,14 +22151,7 @@
       "User": {
         "properties": {
           "user_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "type": "string",
             "title": "User Id"
           },
           "username": {
@@ -22240,6 +22203,7 @@
         },
         "type": "object",
         "required": [
+          "user_id",
           "username"
         ],
         "title": "User",
@@ -22289,14 +22253,7 @@
       "UserDetailResponse": {
         "properties": {
           "user_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "type": "string",
             "title": "User Id"
           },
           "username": {
@@ -22366,6 +22323,7 @@
         },
         "type": "object",
         "required": [
+          "user_id",
           "username"
         ],
         "title": "UserDetailResponse",
@@ -22374,14 +22332,7 @@
       "UserListItem": {
         "properties": {
           "user_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "type": "string",
             "title": "User Id"
           },
           "username": {
@@ -22427,6 +22378,7 @@
         },
         "type": "object",
         "required": [
+          "user_id",
           "username"
         ],
         "title": "UserListItem",
@@ -22457,14 +22409,7 @@
       "UserWithToken": {
         "properties": {
           "user_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "type": "string",
             "title": "User Id"
           },
           "username": {
@@ -22531,6 +22476,7 @@
         },
         "type": "object",
         "required": [
+          "user_id",
           "username",
           "access_token"
         ],

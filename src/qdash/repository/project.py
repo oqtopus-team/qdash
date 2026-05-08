@@ -71,7 +71,7 @@ class MongoProjectRepository:
         self,
         owner_username: str,
         name: str,
-        owner_user_id: str | None = None,
+        owner_user_id: str,
         description: str | None = None,
         tags: list[str] | None = None,
         default_role: ProjectRole = ProjectRole.VIEWER,

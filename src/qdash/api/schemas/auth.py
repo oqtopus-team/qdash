@@ -5,7 +5,7 @@ from qdash.datamodel.user import SystemRole
 class User(BaseModel):
     """User model for authentication and user management."""
 
-    user_id: str | None = None
+    user_id: str
     username: str
     full_name: str | None = None
     disabled: bool | None = None
@@ -17,7 +17,7 @@ class User(BaseModel):
 class UserWithToken(BaseModel):
     """User model with access token for login/register responses."""
 
-    user_id: str | None = None
+    user_id: str
     username: str
     full_name: str | None = None
     disabled: bool | None = None
@@ -49,7 +49,7 @@ class TokenResponse(BaseModel):
 
     access_token: str
     token_type: str = "bearer"
-    user_id: str | None = None
+    user_id: str
     username: str
     default_project_id: str | None = None
     must_change_password: bool = False

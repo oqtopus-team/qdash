@@ -14,7 +14,7 @@ class ProjectMembershipDocument(Document):
     """Represents a user's membership state in a project."""
 
     project_id: str = Field(..., description="Project identifier")
-    user_id: str | None = Field(default=None, description="Member user ID")
+    user_id: str = Field(..., description="Member user ID")
     username: str = Field(..., description="Member username snapshot")
     role: ProjectRole = Field(default=ProjectRole.VIEWER, description="Assigned project role")
     status: str = Field(default="pending", description="Invitation status")

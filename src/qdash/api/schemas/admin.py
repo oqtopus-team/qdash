@@ -10,7 +10,7 @@ from qdash.datamodel.user import SystemRole
 class UserListItem(BaseModel):
     """User summary for admin list view."""
 
-    user_id: str | None = None
+    user_id: str
     username: str
     full_name: str | None = None
     disabled: bool = False
@@ -24,7 +24,7 @@ class ProjectListItem(BaseModel):
 
     project_id: str
     name: str
-    owner_user_id: str | None = None
+    owner_user_id: str
     owner_username: str
     description: str | None = None
     member_count: int = 0
@@ -56,7 +56,7 @@ class UpdateUserRequest(BaseModel):
 class UserDetailResponse(BaseModel):
     """Detailed user response for admin view."""
 
-    user_id: str | None = None
+    user_id: str
     username: str
     full_name: str | None = None
     disabled: bool = False
@@ -79,7 +79,7 @@ class ConfigReloadResponse(BaseModel):
 class MemberItem(BaseModel):
     """Member info for admin view."""
 
-    user_id: str | None = None
+    user_id: str
     username: str
     full_name: str | None = None
     role: ProjectRole

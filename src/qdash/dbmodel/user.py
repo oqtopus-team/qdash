@@ -24,7 +24,7 @@ class UserDocument(Document):
 
     """
 
-    user_id: str | None = Field(default_factory=generate_user_id, description="Internal user ID")
+    user_id: str = Field(default_factory=generate_user_id, description="Internal user ID")
     username: str = Field(description="The login username")
     hashed_password: str = Field(description="The hashed password")
     access_token: str = Field(description="The API access token for authentication")
