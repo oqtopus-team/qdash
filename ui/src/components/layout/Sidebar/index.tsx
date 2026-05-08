@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useCallback, useRef } from "react";
+import { Fragment, useCallback, useRef } from "react";
 
 import {
   BarChart3,
@@ -35,6 +35,7 @@ import {
   X,
   Zap,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 
 import { useTheme } from "@/contexts/ThemeContext";
 import { useLogout } from "@/client/auth/auth";
@@ -48,6 +49,29 @@ import { DARK_THEMES } from "@/constants/themes";
 const PREFECT_URL =
   process.env.NEXT_PUBLIC_PREFECT_URL || "http://127.0.0.1:4200";
 
+type NavItem = {
+  href: string;
+  label: string;
+  title?: string;
+  icon: LucideIcon;
+  match?: "exact" | "prefix";
+  badge?: number;
+  visible?: boolean;
+};
+
+type ExternalNavItem = {
+  href: string;
+  label: string;
+  title?: string;
+  icon: LucideIcon;
+  visible?: boolean;
+};
+
+type NavSection = {
+  label: string;
+  items: NavItem[];
+};
+
 function SectionHeader({
   label,
   visible,
@@ -59,6 +83,85 @@ function SectionHeader({
   return (
     <li className="menu-title text-xs font-semibold text-base-content/50 uppercase tracking-wider px-3 pt-3 pb-1">
       {label}
+    </li>
+  );
+}
+
+function SidebarNavItem({
+  item,
+  isMobileOpen,
+  isOpen,
+  pathname,
+  linkClass,
+  desktopLinkClass,
+  onClick,
+}: {
+  item: NavItem;
+  isMobileOpen: boolean;
+  isOpen: boolean;
+  pathname: string;
+  linkClass: (active: boolean) => string;
+  desktopLinkClass: (active: boolean) => string;
+  onClick: () => void;
+}) {
+  const Icon = item.icon;
+  const active =
+    item.match === "prefix"
+      ? pathname.startsWith(item.href)
+      : pathname === item.href;
+  const showLabel = isOpen || isMobileOpen;
+  const badge = item.badge ?? 0;
+
+  return (
+    <li>
+      <Link
+        href={item.href}
+        className={isMobileOpen ? linkClass(active) : desktopLinkClass(active)}
+        title={item.title ?? item.label}
+        onClick={onClick}
+      >
+        <Icon size={18} />
+        {showLabel && <span className="ml-2">{item.label}</span>}
+        {badge > 0 && (
+          <span className="badge badge-primary badge-xs ml-auto">
+            {badge > 99 ? "99+" : badge}
+          </span>
+        )}
+      </Link>
+    </li>
+  );
+}
+
+function SidebarExternalNavItem({
+  item,
+  isMobileOpen,
+  isOpen,
+  linkClass,
+  desktopLinkClass,
+  onClick,
+}: {
+  item: ExternalNavItem;
+  isMobileOpen: boolean;
+  isOpen: boolean;
+  linkClass: (active: boolean) => string;
+  desktopLinkClass: (active: boolean) => string;
+  onClick: () => void;
+}) {
+  const Icon = item.icon;
+
+  return (
+    <li>
+      <a
+        href={item.href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={isMobileOpen ? linkClass(false) : desktopLinkClass(false)}
+        title={item.title ?? item.label}
+        onClick={onClick}
+      >
+        <Icon size={18} />
+        {(isOpen || isMobileOpen) && <span className="ml-2">{item.label}</span>}
+      </a>
     </li>
   );
 }
@@ -114,10 +217,6 @@ export function Sidebar() {
     await handleLogout();
   }, [handleLogout]);
 
-  const isActive = (path: string) => {
-    return pathname === path;
-  };
-
   // Close mobile sidebar when clicking a link
   const handleLinkClick = () => {
     if (isMobileOpen) {
@@ -142,6 +241,113 @@ export function Sidebar() {
     }`;
 
   const sectionHeaderVisible = isOpen || isMobileOpen;
+  const navSections: NavSection[] = [
+    {
+      label: "Overview",
+      items: [
+        {
+          href: "/inbox",
+          label: "Inbox",
+          icon: Inbox,
+          badge: unreadNotifications,
+        },
+        { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+        { href: "/metrics", label: "Metrics", icon: LayoutGrid },
+        { href: "/chip", label: "Chip", icon: Cpu },
+        { href: "/analysis", label: "Analysis", icon: BarChart3 },
+        { href: "/chat", label: "AI Chat", icon: Bot },
+        {
+          href: "/provenance",
+          label: "Provenance",
+          icon: GitBranch,
+        },
+      ],
+    },
+    {
+      label: "Operate",
+      items: [
+        {
+          href: "/workflow",
+          label: "Workflow",
+          icon: Code,
+          match: "prefix",
+          visible: canEdit,
+        },
+        { href: "/execution", label: "Execution", icon: Zap },
+        {
+          href: "/tasks",
+          label: "Tasks",
+          icon: ListTodo,
+          visible: canEdit,
+        },
+        { href: "/cryo", label: "Cryo", icon: Snowflake },
+        { href: "/import", label: "Import", icon: Download },
+      ],
+    },
+    {
+      label: "Collaborate",
+      items: [
+        { href: "/issues", label: "Issues", icon: CircleDot, match: "prefix" },
+        {
+          href: "/forum",
+          label: "Forum",
+          icon: MessagesSquare,
+          match: "prefix",
+        },
+        {
+          href: "/issue-knowledge",
+          label: "Knowledge",
+          icon: Brain,
+          match: "prefix",
+        },
+        {
+          href: "/task-knowledge",
+          label: "Task Knowledge",
+          icon: BookMarked,
+          match: "prefix",
+        },
+      ],
+    },
+    {
+      label: "Manage",
+      items: [
+        {
+          href: "/files",
+          label: "Files",
+          icon: Files,
+          match: "prefix",
+          visible: canEdit,
+        },
+        { href: "/settings", label: "Settings", icon: Settings },
+        {
+          href: "/admin",
+          label: "Admin",
+          icon: ShieldCheck,
+          visible: isAdmin,
+        },
+      ],
+    },
+  ];
+  const externalItems: ExternalNavItem[] = [
+    {
+      href: "https://oqtopus-team.github.io/qdash/",
+      label: "Docs",
+      icon: BookOpen,
+    },
+    {
+      href: `${PREFECT_URL}/dashboard`,
+      label: "Prefect",
+      title: "Prefect",
+      icon: Workflow,
+      visible: canEdit,
+    },
+    {
+      href: "/api/docs",
+      label: "API Docs",
+      icon: FileJson2,
+      visible: canEdit,
+    },
+  ];
 
   const sidebarContent = (
     <>
@@ -165,381 +371,48 @@ export function Sidebar() {
           </div>
         )}
 
-        {/* Data & Monitoring Section */}
-        <SectionHeader visible={sectionHeaderVisible} label="Data" />
-        <li>
-          <Link
-            href="/inbox"
-            className={
-              isMobileOpen
-                ? linkClass(isActive("/inbox"))
-                : desktopLinkClass(isActive("/inbox"))
-            }
-            title="Inbox"
-            onClick={handleLinkClick}
-          >
-            <Inbox size={18} />
-            {(isOpen || isMobileOpen) && <span className="ml-2">Inbox</span>}
-            {unreadNotifications > 0 && (
-              <span className="badge badge-primary badge-xs ml-auto">
-                {unreadNotifications > 99 ? "99+" : unreadNotifications}
-              </span>
-            )}
-          </Link>
-        </li>
-        <li>
-          <Link
-            href="/dashboard"
-            className={
-              isMobileOpen
-                ? linkClass(isActive("/dashboard"))
-                : desktopLinkClass(isActive("/dashboard"))
-            }
-            title="Dashboard"
-            onClick={handleLinkClick}
-          >
-            <LayoutDashboard size={18} />
-            {(isOpen || isMobileOpen) && (
-              <span className="ml-2">Dashboard</span>
-            )}
-          </Link>
-        </li>
-        <li>
-          <Link
-            href="/metrics"
-            className={
-              isMobileOpen
-                ? linkClass(isActive("/metrics"))
-                : desktopLinkClass(isActive("/metrics"))
-            }
-            title="Metrics"
-            onClick={handleLinkClick}
-          >
-            <LayoutGrid size={18} />
-            {(isOpen || isMobileOpen) && <span className="ml-2">Metrics</span>}
-          </Link>
-        </li>
-        <li>
-          <Link
-            href="/chip"
-            className={
-              isMobileOpen
-                ? linkClass(isActive("/chip"))
-                : desktopLinkClass(isActive("/chip"))
-            }
-            title="Chip"
-            onClick={handleLinkClick}
-          >
-            <Cpu size={18} />
-            {(isOpen || isMobileOpen) && <span className="ml-2">Chip</span>}
-          </Link>
-        </li>
-        <li>
-          <Link
-            href="/cryo"
-            className={
-              isMobileOpen
-                ? linkClass(isActive("/cryo"))
-                : desktopLinkClass(isActive("/cryo"))
-            }
-            title="Cryo"
-            onClick={handleLinkClick}
-          >
-            <Snowflake size={18} />
-            {(isOpen || isMobileOpen) && <span className="ml-2">Cryo</span>}
-          </Link>
-        </li>
-        <li>
-          <Link
-            href="/import"
-            className={
-              isMobileOpen
-                ? linkClass(isActive("/import"))
-                : desktopLinkClass(isActive("/import"))
-            }
-            title="Import"
-            onClick={handleLinkClick}
-          >
-            <Download size={18} />
-            {(isOpen || isMobileOpen) && <span className="ml-2">Import</span>}
-          </Link>
-        </li>
-        <li>
-          <Link
-            href="/analysis"
-            className={
-              isMobileOpen
-                ? linkClass(isActive("/analysis"))
-                : desktopLinkClass(isActive("/analysis"))
-            }
-            title="Analysis"
-            onClick={handleLinkClick}
-          >
-            <BarChart3 size={18} />
-            {(isOpen || isMobileOpen) && <span className="ml-2">Analysis</span>}
-          </Link>
-        </li>
-        <li>
-          <Link
-            href="/chat"
-            className={
-              isMobileOpen
-                ? linkClass(isActive("/chat"))
-                : desktopLinkClass(isActive("/chat"))
-            }
-            title="AI Chat"
-            onClick={handleLinkClick}
-          >
-            <Bot size={18} />
-            {(isOpen || isMobileOpen) && <span className="ml-2">AI Chat</span>}
-          </Link>
-        </li>
-        <li>
-          <Link
-            href="/provenance"
-            className={
-              isMobileOpen
-                ? linkClass(isActive("/provenance"))
-                : desktopLinkClass(isActive("/provenance"))
-            }
-            title="Provenance"
-            onClick={handleLinkClick}
-          >
-            <GitBranch size={18} />
-            {(isOpen || isMobileOpen) && (
-              <span className="ml-2">Provenance</span>
-            )}
-          </Link>
-        </li>
+        {navSections.map((section) => {
+          const visibleItems = section.items.filter(
+            (item) => item.visible !== false,
+          );
+          if (visibleItems.length === 0) return null;
 
-        <li>
-          <Link
-            href="/task-knowledge"
-            className={
-              isMobileOpen
-                ? linkClass(pathname.startsWith("/task-knowledge"))
-                : desktopLinkClass(pathname.startsWith("/task-knowledge"))
-            }
-            title="Task Knowledge"
-            onClick={handleLinkClick}
-          >
-            <BookMarked size={18} />
-            {(isOpen || isMobileOpen) && (
-              <span className="ml-2">Task Knowledge</span>
-            )}
-          </Link>
-        </li>
+          return (
+            <Fragment key={section.label}>
+              <SectionHeader
+                visible={sectionHeaderVisible}
+                label={section.label}
+              />
+              {visibleItems.map((item) => (
+                <SidebarNavItem
+                  key={item.href}
+                  item={item}
+                  isMobileOpen={isMobileOpen}
+                  isOpen={isOpen}
+                  pathname={pathname}
+                  linkClass={linkClass}
+                  desktopLinkClass={desktopLinkClass}
+                  onClick={handleLinkClick}
+                />
+              ))}
+            </Fragment>
+          );
+        })}
 
-        {/* Operations Section */}
-        <SectionHeader visible={sectionHeaderVisible} label="Operations" />
-        {canEdit && (
-          <li>
-            <Link
-              href="/workflow"
-              className={
-                isMobileOpen
-                  ? linkClass(pathname.startsWith("/workflow"))
-                  : desktopLinkClass(pathname.startsWith("/workflow"))
-              }
-              title="Workflow"
+        <div className={`divider ${isMobileOpen ? "my-1" : "my-0"}`} />
+        {externalItems
+          .filter((item) => item.visible !== false)
+          .map((item) => (
+            <SidebarExternalNavItem
+              key={item.href}
+              item={item}
+              isMobileOpen={isMobileOpen}
+              isOpen={isOpen}
+              linkClass={linkClass}
+              desktopLinkClass={desktopLinkClass}
               onClick={handleLinkClick}
-            >
-              <Code size={18} />
-              {(isOpen || isMobileOpen) && (
-                <span className="ml-2">Workflow</span>
-              )}
-            </Link>
-          </li>
-        )}
-        <li>
-          <Link
-            href="/execution"
-            className={
-              isMobileOpen
-                ? linkClass(isActive("/execution"))
-                : desktopLinkClass(isActive("/execution"))
-            }
-            title="Execution"
-            onClick={handleLinkClick}
-          >
-            <Zap size={18} />
-            {(isOpen || isMobileOpen) && (
-              <span className="ml-2">Execution</span>
-            )}
-          </Link>
-        </li>
-        <li>
-          <Link
-            href="/issues"
-            className={
-              isMobileOpen
-                ? linkClass(pathname.startsWith("/issues"))
-                : desktopLinkClass(pathname.startsWith("/issues"))
-            }
-            title="Issues"
-            onClick={handleLinkClick}
-          >
-            <CircleDot size={18} />
-            {(isOpen || isMobileOpen) && <span className="ml-2">Issues</span>}
-          </Link>
-        </li>
-        <li>
-          <Link
-            href="/forum"
-            className={
-              isMobileOpen
-                ? linkClass(pathname.startsWith("/forum"))
-                : desktopLinkClass(pathname.startsWith("/forum"))
-            }
-            title="Forum"
-            onClick={handleLinkClick}
-          >
-            <MessagesSquare size={18} />
-            {(isOpen || isMobileOpen) && <span className="ml-2">Forum</span>}
-          </Link>
-        </li>
-        <li>
-          <Link
-            href="/issue-knowledge"
-            className={
-              isMobileOpen
-                ? linkClass(pathname.startsWith("/issue-knowledge"))
-                : desktopLinkClass(pathname.startsWith("/issue-knowledge"))
-            }
-            title="Knowledge"
-            onClick={handleLinkClick}
-          >
-            <Brain size={18} />
-            {(isOpen || isMobileOpen) && (
-              <span className="ml-2">Knowledge</span>
-            )}
-          </Link>
-        </li>
-        {canEdit && (
-          <li>
-            <Link
-              href="/tasks"
-              className={
-                isMobileOpen
-                  ? linkClass(isActive("/tasks"))
-                  : desktopLinkClass(isActive("/tasks"))
-              }
-              title="Tasks"
-              onClick={handleLinkClick}
-            >
-              <ListTodo size={18} />
-              {(isOpen || isMobileOpen) && <span className="ml-2">Tasks</span>}
-            </Link>
-          </li>
-        )}
-
-        {/* Management Section */}
-        <SectionHeader visible={sectionHeaderVisible} label="Manage" />
-        {canEdit && (
-          <li>
-            <Link
-              href="/files"
-              className={
-                isMobileOpen
-                  ? linkClass(pathname.startsWith("/files"))
-                  : desktopLinkClass(pathname.startsWith("/files"))
-              }
-              title="Files"
-              onClick={handleLinkClick}
-            >
-              <Files size={18} />
-              {(isOpen || isMobileOpen) && <span className="ml-2">Files</span>}
-            </Link>
-          </li>
-        )}
-        <li>
-          <Link
-            href="/settings"
-            className={
-              isMobileOpen
-                ? linkClass(isActive("/settings"))
-                : desktopLinkClass(isActive("/settings"))
-            }
-            title="Settings"
-            onClick={handleLinkClick}
-          >
-            <Settings size={18} />
-            {(isOpen || isMobileOpen) && <span className="ml-2">Settings</span>}
-          </Link>
-        </li>
-        {isAdmin && (
-          <li>
-            <Link
-              href="/admin"
-              className={
-                isMobileOpen
-                  ? linkClass(isActive("/admin"))
-                  : desktopLinkClass(isActive("/admin"))
-              }
-              title="Admin"
-              onClick={handleLinkClick}
-            >
-              <ShieldCheck size={18} />
-              {(isOpen || isMobileOpen) && <span className="ml-2">Admin</span>}
-            </Link>
-          </li>
-        )}
-
-        {/* External Links Section */}
-        <div className={`divider ${isMobileOpen ? "my-1" : "my-0"}`}></div>
-        <li>
-          <a
-            href="https://oqtopus-team.github.io/qdash/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className={
-              isMobileOpen ? linkClass(false) : desktopLinkClass(false)
-            }
-            title="Docs"
-            onClick={handleLinkClick}
-          >
-            <BookOpen size={18} />
-            {(isOpen || isMobileOpen) && <span className="ml-2">Docs</span>}
-          </a>
-        </li>
-        {canEdit && (
-          <>
-            <li>
-              <a
-                href={`${PREFECT_URL}/dashboard`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={
-                  isMobileOpen ? linkClass(false) : desktopLinkClass(false)
-                }
-                title="Workflow"
-                onClick={handleLinkClick}
-              >
-                <Workflow size={18} />
-                {(isOpen || isMobileOpen) && (
-                  <span className="ml-2">Workflow</span>
-                )}
-              </a>
-            </li>
-            <li>
-              <a
-                href="/api/docs"
-                target="_blank"
-                rel="noopener noreferrer"
-                className={
-                  isMobileOpen ? linkClass(false) : desktopLinkClass(false)
-                }
-                title="API Docs"
-                onClick={handleLinkClick}
-              >
-                <FileJson2 size={18} />
-                {(isOpen || isMobileOpen) && (
-                  <span className="ml-2">API Docs</span>
-                )}
-              </a>
-            </li>
-          </>
-        )}
+            />
+          ))}
       </ul>
     </>
   );
