@@ -78,7 +78,7 @@ Below is the correspondence between prefixes and labels:
 
 ## Secret Scanning
 
-Gitleaks automatically scans staged files on every commit via a pre-commit hook. If a secret is detected, the commit is blocked.
+Gitleaks automatically scans staged files on every commit via a Lefthook-managed pre-commit hook. If a secret is detected, the commit is blocked.
 
 | Command                  | Description                                              |
 | ------------------------ | -------------------------------------------------------- |
