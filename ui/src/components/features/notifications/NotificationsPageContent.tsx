@@ -9,6 +9,7 @@ import {
   StickyNote,
 } from "lucide-react";
 
+import { EmptyState } from "@/components/ui/EmptyState";
 import { PageContainer } from "@/components/ui/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
 import {
@@ -121,24 +122,22 @@ export function NotificationsPageContent() {
         </button>
       </div>
 
-      <div className="overflow-hidden rounded-lg border border-base-300 bg-base-100">
+      <div className="card bg-base-200 shadow-lg overflow-hidden">
         {isLoading ? (
           <div className="flex justify-center py-16">
             <span className="loading loading-spinner loading-lg" />
           </div>
         ) : error ? (
-          <div className="p-6 text-sm text-error">
-            Failed to load notifications.
+          <div className="alert alert-error m-4">
+            <span>Failed to load notifications.</span>
           </div>
         ) : notifications.length === 0 ? (
-          <div className="flex flex-col items-center justify-center gap-2 py-16 text-center">
-            <Bell className="h-8 w-8 text-base-content/30" />
-            <p className="font-medium">No notifications</p>
-            <p className="max-w-md text-sm text-base-content/55">
-              Mentions in issues and notes, issue replies, and future app
-              notifications will appear here.
-            </p>
-          </div>
+          <EmptyState
+            title="No notifications"
+            description="Mentions in issues and notes, issue replies, and future app notifications will appear here."
+            emoji="empty"
+            size="md"
+          />
         ) : (
           notifications.map((notification) => (
             <NotificationRow

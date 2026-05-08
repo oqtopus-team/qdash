@@ -120,6 +120,7 @@ class TestFlowRouter:
         data = response.json()
         assert len(data["flows"]) == 1
         assert data["flows"][0]["name"] == "test_flow"
+        assert data["flows"][0]["created_by"] == "test_user"
 
     def test_list_flows_filters_by_project(self, test_client, test_project, auth_headers):
         """Test that listing flows only returns flows for the current project."""

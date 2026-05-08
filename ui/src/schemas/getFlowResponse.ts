@@ -14,6 +14,8 @@ import type { GetFlowResponseDefaultRunParameters } from "./getFlowResponseDefau
 export interface GetFlowResponse {
   /** Flow name */
   name: string;
+  /** Username of the flow creator */
+  created_by: string;
   /** Flow description */
   description: string;
   /** Python code content */
