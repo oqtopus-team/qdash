@@ -12,6 +12,21 @@ QDash runs three tools to keep secrets out of the repository: Lefthook orchestra
 
 CI definitions live in `.github/workflows/secret-scan.yml`. Installation instructions are in [Setup](./setup.md#secret-scanning-tools).
 
+### Why two scanners
+
+The two tools support different allowlist granularities, which is why they own different stages:
+
+|            | Path allowlist                          | Literal-string allowlist        |
+| ---------- | --------------------------------------- | ------------------------------- |
+| Gitleaks   | yes                                     | yes (regex, in `.gitleaks.toml`) |
+| Trufflehog | yes (`.trufflehog-exclude-paths.txt`)   | no                              |
+
+Because Gitleaks can allowlist *specific values*, it can be configured strictly: only the literals in `.gitleaks.toml` are exempt — anything else credential-shaped is rejected. That precision makes it the right gate at **pre-commit**, where it blocks credentials before they enter git history.
+
+Trufflehog has no string-level allowlist, so the only way to suppress a known false positive is to drop the entire file. Compensating for that, it **verifies findings by probing the upstream provider** to check whether a credential is live, and walks **full git history** in CI on push and PR. Its role is ongoing detection of live secrets — running on remote CI infrastructure and reaching out to remote providers to confirm validity.
+
+The result is a clear division of labor: Gitleaks is the strict, fast, syntactic gate at commit time; Trufflehog is the slower, semantic, live-credential check that runs continuously in CI.
+
 ### Lefthook
 
 `lefthook.yml` defines a single pre-commit command that calls `gitleaks protect --staged`. Running `lefthook install` once writes the git hook into `.git/hooks/`. If the Gitleaks binary is missing, Lefthook skips the step rather than failing the commit, so contributors on platforms without the binary are not blocked.
