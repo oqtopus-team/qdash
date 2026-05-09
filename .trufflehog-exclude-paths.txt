@@ -1,4 +1,6 @@
-scripts/migrate_user_tokens\.py
-docs/design/api-testing-guidelines\.md
-tests/conftest\.py
 \.gitleaks\.toml
+docs/design/api-testing-guidelines\.md
+docs/development/credential-scan\.md
+poetry\.lock
+scripts/migrate_user_tokens\.py
+tests/conftest\.py
