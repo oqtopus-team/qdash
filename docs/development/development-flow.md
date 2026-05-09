@@ -78,7 +78,7 @@ Below is the correspondence between prefixes and labels:
 
 ## Secret Scanning
 
-Gitleaks automatically scans staged files on every commit via a Lefthook-managed pre-commit hook. If a secret is detected, the commit is blocked.
+Gitleaks runs on every commit via a Lefthook-managed pre-commit hook and blocks the commit on any finding. Trufflehog scans git history in CI for verified leaks. See [Credential Scanning](./credential-scan.md) for tool roles, output reading, and false-positive handling.
 
 | Command                  | Description                                              |
 | ------------------------ | -------------------------------------------------------- |
@@ -87,9 +87,7 @@ Gitleaks automatically scans staged files on every commit via a Lefthook-managed
 | `task scan-secrets`      | Scan git history with Trufflehog (verified secrets only) |
 | `task scan-secrets-all`  | Scan git history with Trufflehog (all findings)          |
 
-The `task check` command includes `scan-leaks`, so running it before push covers secret scanning.
-
-If a finding is a false positive, add the path or pattern to `.gitleaks.toml` under `[allowlist]`.
+`task check` includes `scan-leaks`.
 
 ## Claude Code Custom Commands
 

@@ -113,6 +113,7 @@ export default withMermaid(
             { text: "Setup", link: "/development/setup" },
             { text: "Datetime Handling", link: "/development/datetime" },
             { text: "Logging", link: "/development/logging" },
+            { text: "Credential Scanning", link: "/development/credential-scan" },
             {
               text: "API",
               collapsed: true,
