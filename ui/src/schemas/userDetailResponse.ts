@@ -7,6 +7,7 @@
  */
 import type { UserDetailResponseDisplayName } from "./userDetailResponseDisplayName";
 import type { UserDetailResponseOrganization } from "./userDetailResponseOrganization";
+import type { UserDetailResponseAvatarKey } from "./userDetailResponseAvatarKey";
 import type { SystemRole } from "./systemRole";
 import type { UserDetailResponseDefaultProjectId } from "./userDetailResponseDefaultProjectId";
 import type { UserDetailResponseCreatedAt } from "./userDetailResponseCreatedAt";
@@ -20,6 +21,7 @@ export interface UserDetailResponse {
   username: string;
   display_name?: UserDetailResponseDisplayName;
   organization?: UserDetailResponseOrganization;
+  avatar_key?: UserDetailResponseAvatarKey;
   disabled?: boolean;
   system_role?: SystemRole;
   default_project_id?: UserDetailResponseDefaultProjectId;

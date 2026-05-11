@@ -14,6 +14,7 @@ class UserListItem(BaseModel):
     username: str
     display_name: str | None = None
     organization: str | None = None
+    avatar_key: str | None = None
     disabled: bool = False
     system_role: SystemRole = SystemRole.USER
     default_project_id: str | None = None
@@ -51,6 +52,7 @@ class UpdateUserRequest(BaseModel):
 
     display_name: str | None = None
     organization: str | None = None
+    avatar_key: str | None = None
     disabled: bool | None = None
     system_role: SystemRole | None = None
 
@@ -62,6 +64,7 @@ class UserDetailResponse(BaseModel):
     username: str
     display_name: str | None = None
     organization: str | None = None
+    avatar_key: str | None = None
     disabled: bool = False
     system_role: SystemRole = SystemRole.USER
     default_project_id: str | None = None
@@ -86,6 +89,7 @@ class MemberItem(BaseModel):
     username: str
     display_name: str | None = None
     organization: str | None = None
+    avatar_key: str | None = None
     role: ProjectRole
     status: str = "active"
 

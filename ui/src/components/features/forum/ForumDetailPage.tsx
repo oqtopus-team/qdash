@@ -29,8 +29,10 @@ import {
 import { useListProjectMembers } from "@/client/projects/projects";
 import { MarkdownContent } from "@/components/ui/MarkdownContent";
 import { MarkdownEditor } from "@/components/ui/MarkdownEditor";
+import { QdashBotAvatar, UserAvatar } from "@/components/ui/UserAvatar";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProject } from "@/contexts/ProjectContext";
+import { useForumAiReply } from "@/hooks/useForumAiReply";
 import { formatRelativeTime } from "@/lib/utils/datetime";
 import type { ForumPostResponse } from "@/schemas";
 
@@ -73,12 +75,30 @@ function PostBody({
   saving: boolean;
 }) {
   const canEdit = currentUsername === post.username;
+  const isAi = post.is_ai_reply || post.username === "qdash";
 
   return (
-    <div className="rounded-lg border border-base-300 bg-base-100 p-4">
+    <div
+      className={`rounded-lg border p-4 ${
+        isAi ? "border-primary/30 bg-primary/5" : "border-base-300 bg-base-100"
+      }`}
+    >
       <div className="mb-2 flex items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="badge badge-sm badge-neutral">{post.username}</span>
+          {isAi ? (
+            <QdashBotAvatar size={24} />
+          ) : (
+            <UserAvatar
+              username={post.username}
+              avatarKey={post.avatar_key}
+              size={24}
+            />
+          )}
+          <span
+            className={`badge badge-sm ${isAi ? "badge-primary" : "badge-neutral"}`}
+          >
+            {post.username}
+          </span>
           <span className="text-xs text-base-content/40">
             {formatRelativeTime(post.created_at)}
           </span>
@@ -88,7 +108,7 @@ function PostBody({
             </span>
           )}
         </div>
-        {canEdit && !editing && (
+        {canEdit && !editing && !isAi && (
           <div className="flex items-center gap-1">
             <button
               className="btn btn-ghost btn-xs p-0 h-auto min-h-0 text-base-content/40 hover:text-primary"
@@ -190,14 +210,17 @@ export function ForumDetailPage({ postId }: { postId: string }) {
     query: { enabled: !!projectId },
   });
   const mentionCandidates = useMemo(
-    () =>
-      membersResponse?.data.members
+    () => [
+      { id: "qdash", label: "QDash" },
+      ...(membersResponse?.data.members
         ?.filter((member) => member.username !== currentUsername)
         .map((member) => ({
           id: member.username,
           label: member.display_name || member.username,
           secondaryLabel: member.organization ?? undefined,
-        })) ?? [],
+          avatarKey: member.avatar_key,
+        })) ?? []),
+    ],
     [currentUsername, membersResponse?.data.members],
   );
 
@@ -206,6 +229,12 @@ export function ForumDetailPage({ postId }: { postId: string }) {
   const deleteMutation = useDeleteForumPost();
   const closeMutation = useCloseForumPost();
   const reopenMutation = useReopenForumPost();
+  const {
+    isGenerating,
+    statusMessage: aiStatus,
+    error: aiError,
+    triggerAiReply,
+  } = useForumAiReply();
 
   const invalidateThread = () => {
     queryClient.invalidateQueries({
@@ -239,16 +268,20 @@ export function ForumDetailPage({ postId }: { postId: string }) {
 
   const handleAddReply = async () => {
     if (!post || !replyText.trim()) return;
+    const trimmed = replyText.trim();
     await createMutation.mutateAsync({
       data: {
         category: post.category,
         title: null,
-        content: replyText.trim(),
+        content: trimmed,
         parent_id: post.id,
       },
     });
     setReplyText("");
     invalidateThread();
+    if (/@qdash\b/i.test(trimmed)) {
+      triggerAiReply(post.id, trimmed, invalidateThread);
+    }
   };
 
   const handleStartEditReply = (reply: ForumPostResponse) => {
@@ -417,6 +450,19 @@ export function ForumDetailPage({ postId }: { postId: string }) {
           </>
         ) : (
           <p className="py-2 text-xs text-base-content/40">No replies yet</p>
+        )}
+        {isGenerating && (
+          <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 text-sm animate-pulse">
+            <div className="flex items-center gap-2">
+              <QdashBotAvatar size={24} />
+              <span className="badge badge-sm badge-primary">qdash</span>
+              <span className="loading loading-dots loading-xs" />
+              <span className="text-xs text-base-content/60">{aiStatus}</span>
+            </div>
+          </div>
+        )}
+        {aiError && (
+          <div className="px-2 py-1 text-xs text-error">{aiError}</div>
         )}
       </div>
 

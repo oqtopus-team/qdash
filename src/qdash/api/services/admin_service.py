@@ -71,6 +71,7 @@ class AdminService:
             username=user.username,
             display_name=user.display_name,
             organization=user.organization,
+            avatar_key=user.avatar_key,
             disabled=user.disabled,
             system_role=user.system_role,
             default_project_id=user.default_project_id,
@@ -231,6 +232,7 @@ class AdminService:
                     username=u.username,
                     display_name=u.display_name,
                     organization=u.organization,
+                    avatar_key=u.avatar_key,
                     disabled=u.disabled,
                     system_role=u.system_role,
                     default_project_id=project_id,
@@ -256,6 +258,7 @@ class AdminService:
         admin_username: str,
         display_name: str | None = None,
         organization: str | None = None,
+        avatar_key: str | None = None,
         disabled: bool | None = None,
         system_role: SystemRole | None = None,
     ) -> UserDetailResponse:
@@ -289,6 +292,8 @@ class AdminService:
             user.display_name = display_name
         if organization is not None:
             user.organization = organization
+        if avatar_key is not None:
+            user.avatar_key = avatar_key.strip() or None
         if disabled is not None:
             user.disabled = disabled
         if system_role is not None:
@@ -399,6 +404,7 @@ class AdminService:
                     username=m.username,
                     display_name=user.display_name if user else None,
                     organization=user.organization if user else None,
+                    avatar_key=user.avatar_key if user else None,
                     role=m.role,
                     status=m.status,
                 )
@@ -447,6 +453,7 @@ class AdminService:
                 username=existing.username,
                 display_name=user.display_name,
                 organization=user.organization,
+                avatar_key=user.avatar_key,
                 role=existing.role,
                 status=existing.status,
             )
@@ -469,6 +476,7 @@ class AdminService:
             username=membership.username,
             display_name=user.display_name,
             organization=user.organization,
+            avatar_key=user.avatar_key,
             role=membership.role,
             status=membership.status,
         )

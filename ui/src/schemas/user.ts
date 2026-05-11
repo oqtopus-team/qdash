@@ -7,6 +7,7 @@
  */
 import type { UserDisplayName } from "./userDisplayName";
 import type { UserOrganization } from "./userOrganization";
+import type { UserAvatarKey } from "./userAvatarKey";
 import type { UserDisabled } from "./userDisabled";
 import type { UserDefaultProjectId } from "./userDefaultProjectId";
 import type { SystemRole } from "./systemRole";
@@ -19,6 +20,7 @@ export interface User {
   username: string;
   display_name?: UserDisplayName;
   organization?: UserOrganization;
+  avatar_key?: UserAvatarKey;
   disabled?: UserDisabled;
   default_project_id?: UserDefaultProjectId;
   must_change_password?: boolean;

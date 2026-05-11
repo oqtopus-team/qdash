@@ -7,6 +7,7 @@
  */
 import type { MemberResponseDisplayName } from "./memberResponseDisplayName";
 import type { MemberResponseOrganization } from "./memberResponseOrganization";
+import type { MemberResponseAvatarKey } from "./memberResponseAvatarKey";
 import type { ProjectRole } from "./projectRole";
 import type { MemberResponseInvitedByUserId } from "./memberResponseInvitedByUserId";
 import type { MemberResponseInvitedBy } from "./memberResponseInvitedBy";
@@ -21,6 +22,7 @@ export interface MemberResponse {
   username: string;
   display_name?: MemberResponseDisplayName;
   organization?: MemberResponseOrganization;
+  avatar_key?: MemberResponseAvatarKey;
   role: ProjectRole;
   status: string;
   invited_by_user_id?: MemberResponseInvitedByUserId;

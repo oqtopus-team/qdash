@@ -35,6 +35,7 @@ class TestAdminUsersEndpoints:
             username="regularuser",
             display_name="Regular User",
             organization="Example Lab",
+            avatar_key="planet",
             hashed_password="hashed",
             access_token="regular-token",
             disabled=False,
@@ -65,6 +66,7 @@ class TestAdminUsersEndpoints:
         assert data["total"] >= 2
         regular = next(user for user in data["users"] if user["username"] == "regularuser")
         assert regular["organization"] == "Example Lab"
+        assert regular["avatar_key"] == "planet"
 
     def test_list_all_users_requires_admin(
         self, test_client, admin_user, regular_user, user_headers
@@ -106,7 +108,26 @@ class TestAdminUsersEndpoints:
         assert data["username"] == "regularuser"
         assert data["display_name"] == "Regular User"
         assert data["organization"] == "Example Lab"
+        assert data["avatar_key"] == "planet"
         assert data["system_role"] == "user"
+
+    def test_update_current_user_profile(self, test_client, admin_user, regular_user, user_headers):
+        """Users can update their own display profile."""
+        response = test_client.patch(
+            "/auth/me",
+            headers=user_headers,
+            json={"display_name": "Visible Name", "avatar_key": "crystal"},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["username"] == "regularuser"
+        assert data["display_name"] == "Visible Name"
+        assert data["avatar_key"] == "crystal"
+
+        updated = UserDocument.find_one({"username": "regularuser"}).run()
+        assert updated is not None
+        assert updated.display_name == "Visible Name"
+        assert updated.avatar_key == "crystal"
 
     def test_get_user_details_not_found(self, test_client, admin_user, admin_headers):
         """Returns 404 for non-existent user."""

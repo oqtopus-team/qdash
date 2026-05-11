@@ -11,14 +11,15 @@ import {
   List,
   ListOrdered,
   ImageIcon,
-  Bot,
 } from "lucide-react";
 import { MarkdownContent } from "./MarkdownContent";
+import { QdashBotAvatar, UserAvatar } from "./UserAvatar";
 
 interface MentionCandidate {
   id: string;
   label: string;
   secondaryLabel?: string;
+  avatarKey?: string | null;
   icon?: React.ReactNode;
 }
 
@@ -471,9 +472,16 @@ export function MarkdownEditor({
                       selectMention(candidate);
                     }}
                   >
-                    {candidate.icon ?? (
-                      <Bot className="h-3.5 w-3.5 text-primary" />
-                    )}
+                    {candidate.icon ??
+                      (candidate.id === "qdash" ? (
+                        <QdashBotAvatar size={20} />
+                      ) : (
+                        <UserAvatar
+                          username={candidate.id}
+                          avatarKey={candidate.avatarKey}
+                          size={20}
+                        />
+                      ))}
                     <span className="flex min-w-0 flex-col">
                       <span className="font-medium truncate">
                         {candidate.label || `@${candidate.id}`}

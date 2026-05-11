@@ -7,6 +7,7 @@
  */
 import type { UserWithTokenDisplayName } from "./userWithTokenDisplayName";
 import type { UserWithTokenOrganization } from "./userWithTokenOrganization";
+import type { UserWithTokenAvatarKey } from "./userWithTokenAvatarKey";
 import type { UserWithTokenDisabled } from "./userWithTokenDisabled";
 import type { UserWithTokenDefaultProjectId } from "./userWithTokenDefaultProjectId";
 import type { SystemRole } from "./systemRole";
@@ -20,6 +21,7 @@ export interface UserWithToken {
   username: string;
   display_name?: UserWithTokenDisplayName;
   organization?: UserWithTokenOrganization;
+  avatar_key?: UserWithTokenAvatarKey;
   disabled?: UserWithTokenDisabled;
   default_project_id?: UserWithTokenDefaultProjectId;
   must_change_password?: boolean;
