@@ -92,6 +92,24 @@ class TestInMemoryCalibrationNoteRepository:
 
         assert result.note == {"qubit_0": {"frequency": 6.0}}
 
+    def test_upsert_on_insert_preserves_existing_note(
+        self, repo: InMemoryCalibrationNoteRepository, sample_note: CalibrationNoteModel
+    ) -> None:
+        """Test insert-only upsert does not replace existing note."""
+        repo.upsert(sample_note)
+        stale_note = CalibrationNoteModel(
+            project_id=sample_note.project_id,
+            username=sample_note.username,
+            chip_id=sample_note.chip_id,
+            execution_id=sample_note.execution_id,
+            task_id=sample_note.task_id,
+            note={},
+        )
+
+        result = repo.upsert_on_insert(stale_note)
+
+        assert result.note == sample_note.note
+
     def test_find_one_returns_matching_note(
         self, repo: InMemoryCalibrationNoteRepository, sample_note: CalibrationNoteModel
     ) -> None:
@@ -288,6 +306,40 @@ class TestMongoCalibrationNoteRepository:
         assert collection.update is not None
         assert collection.update["$set"]["user_id"] == "usr_alice"
         assert "user_id" not in collection.update["$setOnInsert"]
+
+    def test_upsert_on_insert_does_not_replace_existing_note(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Parallel worker initialization must not overwrite merged note fields."""
+        collection = RecordingCollection()
+        monkeypatch.setattr(
+            CalibrationNoteDocument,
+            "get_motor_collection",
+            classmethod(lambda cls: collection),
+        )
+        monkeypatch.setattr(
+            MongoCalibrationNoteRepository,
+            "_user_id_for_username",
+            staticmethod(lambda username: "usr_alice"),
+        )
+
+        repo = MongoCalibrationNoteRepository()
+        repo.upsert_on_insert(
+            CalibrationNoteModel(
+                project_id="project-1",
+                username="alice",
+                chip_id="64Qv3",
+                execution_id="20240101-001",
+                task_id="master",
+                note={"rabi_params": {"Q00": {"amplitude": 0.1}}},
+            )
+        )
+
+        assert collection.update is not None
+        assert "note" not in collection.update["$set"]
+        assert collection.update["$setOnInsert"]["note"] == {
+            "rabi_params": {"Q00": {"amplitude": 0.1}}
+        }
 
     def test_document_upsert_note_does_not_set_user_id_in_conflicting_operators(
         self, monkeypatch: pytest.MonkeyPatch

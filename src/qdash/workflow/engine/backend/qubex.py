@@ -138,7 +138,7 @@ class QubexBackend(BaseBackend):
         existing_master = repo.find_latest_master(chip_id=chip_id, project_id=project_id)
         initial_note = existing_master.note if existing_master is not None else {}
 
-        master_note = repo.upsert(
+        master_note = repo.upsert_on_insert(
             CalibrationNoteModel(
                 project_id=project_id,
                 username=username,
@@ -150,6 +150,36 @@ class QubexBackend(BaseBackend):
         )
 
         note_path.write_text(json.dumps(master_note.note, indent=2))
+        self._sync_qubit_params_from_db(project_id=project_id, chip_id=chip_id)
+
+    def _sync_qubit_params_from_db(self, *, project_id: str, chip_id: str) -> None:
+        """Write latest QDash qubit calibration values to Qubex params files.
+
+        Qubex loads params YAML during Experiment construction. Keep those files
+        in sync before connect(), especially for two-qubit sessions that depend
+        on one-qubit calibration results from previous workflow steps.
+        """
+        qids = self._config.get("qids", [])
+        if not qids:
+            return
+
+        from qdash.repository.qubit import MongoQubitCalibrationRepository
+        from qdash.workflow.engine.params_updater import get_params_updater
+
+        updater = get_params_updater(self, chip_id)
+        if updater is None:
+            return
+
+        qubit_repo = MongoQubitCalibrationRepository()
+        qubit_ids = sorted({qubit for qid in qids for qubit in str(qid).split("-")})
+        for qid in qubit_ids:
+            calib_data = qubit_repo.get_calibration_data(
+                project_id=project_id,
+                chip_id=chip_id,
+                qid=qid,
+            )
+            if calib_data:
+                updater.update(qid, calib_data)
 
     def update_note(
         self,

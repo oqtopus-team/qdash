@@ -193,6 +193,31 @@ class InMemoryCalibrationNoteRepository:
         self._notes[key] = updated_note
         return updated_note
 
+    def upsert_on_insert(self, note: CalibrationNoteModel) -> CalibrationNoteModel:
+        """Create a calibration note if absent without replacing existing note content."""
+        key = self._make_key(
+            note.project_id,
+            note.username,
+            note.chip_id,
+            note.execution_id,
+            note.task_id,
+        )
+        if key in self._notes:
+            existing = self._notes[key]
+            updated_note = CalibrationNoteModel(
+                project_id=existing.project_id,
+                username=existing.username,
+                chip_id=existing.chip_id,
+                execution_id=existing.execution_id,
+                task_id=existing.task_id,
+                note=existing.note,
+                timestamp=now(),
+                system_info=existing.system_info,
+            )
+            self._notes[key] = updated_note
+            return updated_note
+        return self.upsert(note)
+
     def merge_note_fields(
         self,
         query_filter: dict[str, str],
