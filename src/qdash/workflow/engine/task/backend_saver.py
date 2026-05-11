@@ -165,6 +165,7 @@ class BackendSaver:
 
         # Always update calibration note regardless of success/failure
         if backend.name == "qubex":
+            note_qid = qid if task.is_qubit_task() or task.is_coupling_task() else None
             backend.update_note(
                 username=self._username,
                 chip_id=execution_service.chip_id,
@@ -172,7 +173,7 @@ class BackendSaver:
                 execution_id=execution_service.execution_id,
                 task_manager_id=self._task_manager_id,
                 project_id=execution_service.project_id,
-                qid=qid,
+                qid=note_qid,
             )
 
         # Always save to database (even on R² failure)

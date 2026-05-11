@@ -19,6 +19,7 @@ from qdash.workflow.calibtasks.qubex.benchmark.zx90_interleaved_randoized_benchm
 from qdash.workflow.calibtasks.qubex.box_setup.check_noise import CheckNoise
 from qdash.workflow.calibtasks.qubex.box_setup.check_status import CheckStatus
 from qdash.workflow.calibtasks.qubex.box_setup.configure import Configure
+from qdash.workflow.calibtasks.qubex.box_setup.configure_all import ConfigureAll
 from qdash.workflow.calibtasks.qubex.box_setup.dump_box import DumpBox
 from qdash.workflow.calibtasks.qubex.box_setup.link_up import LinkUp
 from qdash.workflow.calibtasks.qubex.box_setup.readout_configure import ReadoutConfigure
@@ -84,6 +85,7 @@ __all__ = [
     "CheckNoise",
     "CheckStatus",
     "Configure",
+    "ConfigureAll",
     "ReadoutConfigure",
     "DumpBox",
     "LinkUp",

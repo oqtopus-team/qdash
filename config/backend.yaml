@@ -29,6 +29,7 @@ backends:
     tasks:
       # Box Setup
       - Configure
+      - ConfigureAll
       - LinkUp
       - CheckStatus
       - CheckNoise
@@ -111,6 +112,7 @@ backends:
 categories:
   "Box Setup":
     - Configure
+    - ConfigureAll
     - LinkUp
     - CheckStatus
     - CheckNoise

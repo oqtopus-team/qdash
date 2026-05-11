@@ -1,9 +1,17 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from prefect import get_run_logger, task
 from qdash.dbmodel.initialize import initialize
+
+CACHE_POLICY_NO_CACHE: Any = None
+try:
+    from prefect.cache_policies import NO_CACHE
+except ModuleNotFoundError:
+    pass
+else:
+    CACHE_POLICY_NO_CACHE = NO_CACHE
 
 if TYPE_CHECKING:
     from qdash.workflow.calibtasks.base import BaseTask
@@ -52,7 +60,7 @@ def validate_task_name(
 initialize()
 
 
-@task(name="execute-dynamic-task-service")
+@task(name="execute-dynamic-task-service", cache_policy=CACHE_POLICY_NO_CACHE)
 def execute_dynamic_task_by_qid_service(
     backend: BaseBackend,
     execution_service: ExecutionService,
@@ -90,7 +98,7 @@ def execute_dynamic_task_by_qid_service(
     return execution_service, task_context
 
 
-@task(name="execute-dynamic-task-batch-service")
+@task(name="execute-dynamic-task-batch-service", cache_policy=CACHE_POLICY_NO_CACHE)
 def execute_dynamic_task_batch_service(
     backend: BaseBackend,
     execution_service: ExecutionService,

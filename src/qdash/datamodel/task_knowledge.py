@@ -415,6 +415,7 @@ _CATEGORIES: list[tuple[str, str, list[str]]] = [
             "DumpBox",
             "CheckNoise",
             "Configure",
+            "ConfigureAll",
             "ReadoutConfigure",
         ],
     ),

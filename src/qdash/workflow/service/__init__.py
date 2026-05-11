@@ -67,6 +67,7 @@ from qdash.workflow.service.session_context import (
 from qdash.workflow.service.steps import (
     CalibrationStep,
     CheckSkew,
+    ConfigureAll,
     CustomOneQubit,
     CustomTwoQubit,
     FilterByMetric,
@@ -112,6 +113,7 @@ __all__ = [
     "Pipeline",
     "OneQubitCheck",
     "OneQubitFineTune",
+    "ConfigureAll",
     "CustomOneQubit",
     "CustomTwoQubit",
     "FilterByMetric",
