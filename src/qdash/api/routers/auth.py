@@ -85,7 +85,7 @@ def register_user(
     Parameters
     ----------
     user_data : UserCreate
-        User registration data including username, password, and optional full_name
+        User registration data including username, password, and optional display_name
     current_user : User
         Current authenticated admin user
     auth_service : AuthService
@@ -118,7 +118,7 @@ def register_user(
     return UserWithToken(
         user_id=user.user_id,
         username=user.username,
-        full_name=user.full_name,
+        display_name=user.display_name,
         organization=user.organization,
         disabled=user.disabled,
         default_project_id=user.default_project_id,

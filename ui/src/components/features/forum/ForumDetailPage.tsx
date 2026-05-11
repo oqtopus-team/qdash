@@ -193,8 +193,11 @@ export function ForumDetailPage({ postId }: { postId: string }) {
     () =>
       membersResponse?.data.members
         ?.filter((member) => member.username !== currentUsername)
-        .map((member) => ({ id: member.username, label: member.username })) ??
-      [],
+        .map((member) => ({
+          id: member.username,
+          label: member.display_name || member.username,
+          secondaryLabel: member.organization ?? undefined,
+        })) ?? [],
     [currentUsername, membersResponse?.data.members],
   );
 

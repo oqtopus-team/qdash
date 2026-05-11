@@ -71,7 +71,7 @@
           "auth"
         ],
         "summary": "Register a new user (admin only)",
-        "description": "Register a new user account (admin only).\n\nParameters\n----------\nuser_data : UserCreate\n    User registration data including username, password, and optional full_name\ncurrent_user : User\n    Current authenticated admin user\nauth_service : AuthService\n    The auth service instance\n\nReturns\n-------\nUserWithToken\n    Newly created user information including access_token\n\nRaises\n------\nHTTPException\n    403 if the current user is not an admin\n    400 if the username is already registered",
+        "description": "Register a new user account (admin only).\n\nParameters\n----------\nuser_data : UserCreate\n    User registration data including username, password, and optional display_name\ncurrent_user : User\n    Current authenticated admin user\nauth_service : AuthService\n    The auth service instance\n\nReturns\n-------\nUserWithToken\n    Newly created user information including access_token\n\nRaises\n------\nHTTPException\n    403 if the current user is not an admin\n    400 if the username is already registered",
         "operationId": "registerUser",
         "requestBody": {
           "content": {
@@ -13381,7 +13381,7 @@
             "type": "string",
             "title": "Username"
           },
-          "full_name": {
+          "display_name": {
             "anyOf": [
               {
                 "type": "string"
@@ -13390,7 +13390,7 @@
                 "type": "null"
               }
             ],
-            "title": "Full Name"
+            "title": "Display Name"
           },
           "organization": {
             "anyOf": [
@@ -17715,7 +17715,7 @@
             "type": "string",
             "title": "Username"
           },
-          "full_name": {
+          "display_name": {
             "anyOf": [
               {
                 "type": "string"
@@ -17724,7 +17724,7 @@
                 "type": "null"
               }
             ],
-            "title": "Full Name"
+            "title": "Display Name"
           },
           "organization": {
             "anyOf": [
@@ -17768,6 +17768,28 @@
           "username": {
             "type": "string",
             "title": "Username"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "organization": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Organization"
           },
           "role": {
             "$ref": "#/components/schemas/ProjectRole"
@@ -22136,7 +22158,7 @@
       },
       "UpdateUserRequest": {
         "properties": {
-          "full_name": {
+          "display_name": {
             "anyOf": [
               {
                 "type": "string"
@@ -22145,7 +22167,7 @@
                 "type": "null"
               }
             ],
-            "title": "Full Name"
+            "title": "Display Name"
           },
           "organization": {
             "anyOf": [
@@ -22194,7 +22216,7 @@
             "type": "string",
             "title": "Username"
           },
-          "full_name": {
+          "display_name": {
             "anyOf": [
               {
                 "type": "string"
@@ -22203,7 +22225,7 @@
                 "type": "null"
               }
             ],
-            "title": "Full Name"
+            "title": "Display Name"
           },
           "organization": {
             "anyOf": [
@@ -22274,7 +22296,7 @@
             ],
             "title": "Password"
           },
-          "full_name": {
+          "display_name": {
             "anyOf": [
               {
                 "type": "string"
@@ -22283,7 +22305,7 @@
                 "type": "null"
               }
             ],
-            "title": "Full Name"
+            "title": "Display Name"
           },
           "organization": {
             "anyOf": [
@@ -22319,7 +22341,7 @@
             "type": "string",
             "title": "Username"
           },
-          "full_name": {
+          "display_name": {
             "anyOf": [
               {
                 "type": "string"
@@ -22328,7 +22350,7 @@
                 "type": "null"
               }
             ],
-            "title": "Full Name"
+            "title": "Display Name"
           },
           "organization": {
             "anyOf": [
@@ -22409,7 +22431,7 @@
             "type": "string",
             "title": "Username"
           },
-          "full_name": {
+          "display_name": {
             "anyOf": [
               {
                 "type": "string"
@@ -22418,7 +22440,7 @@
                 "type": "null"
               }
             ],
-            "title": "Full Name"
+            "title": "Display Name"
           },
           "organization": {
             "anyOf": [
@@ -22497,7 +22519,7 @@
             "type": "string",
             "title": "Username"
           },
-          "full_name": {
+          "display_name": {
             "anyOf": [
               {
                 "type": "string"
@@ -22506,7 +22528,7 @@
                 "type": "null"
               }
             ],
-            "title": "Full Name"
+            "title": "Display Name"
           },
           "organization": {
             "anyOf": [

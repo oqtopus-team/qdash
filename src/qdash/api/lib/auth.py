@@ -74,7 +74,7 @@ def get_user(username: str) -> UserInDB | None:
         return UserInDB(
             user_id=user.user_id,
             username=user.username,
-            full_name=user.full_name,
+            display_name=user.display_name,
             organization=user.organization,
             disabled=user.disabled,
             default_project_id=user.default_project_id,
@@ -97,7 +97,7 @@ def get_user_by_token(access_token: str) -> UserInDB | None:
         return UserInDB(
             user_id=user.user_id,
             username=user.username,
-            full_name=user.full_name,
+            display_name=user.display_name,
             organization=user.organization,
             disabled=user.disabled,
             default_project_id=user.default_project_id,
@@ -170,7 +170,7 @@ def get_current_user(
     return User(
         user_id=user.user_id,
         username=user.username,
-        full_name=user.full_name,
+        display_name=user.display_name,
         organization=user.organization,
         disabled=user.disabled,
         default_project_id=user.default_project_id,
@@ -226,7 +226,7 @@ def get_current_active_user(
     return User(
         user_id=user.user_id,
         username=user.username,
-        full_name=user.full_name,
+        display_name=user.display_name,
         organization=user.organization,
         disabled=user.disabled,
         default_project_id=user.default_project_id,

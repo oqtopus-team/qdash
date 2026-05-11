@@ -158,7 +158,7 @@ export const useLogin = <
 Parameters
 ----------
 user_data : UserCreate
-    User registration data including username, password, and optional full_name
+    User registration data including username, password, and optional display_name
 current_user : User
     Current authenticated admin user
 auth_service : AuthService

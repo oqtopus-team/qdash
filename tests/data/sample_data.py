@@ -8,19 +8,19 @@ SAMPLE_USERS = {
     "valid_user": {
         "username": "test_user",
         "password": "secure_password123",
-        "full_name": "Test User",
+        "display_name": "Test User",
         "email": "test@example.com",
     },
     "admin_user": {
         "username": "admin",
         "password": "admin_password123",
-        "full_name": "Admin User",
+        "display_name": "Admin User",
         "email": "admin@example.com",
     },
     "invalid_user": {
         "username": "",
         "password": "short",
-        "full_name": "",
+        "display_name": "",
         "email": "invalid-email",
     },
 }

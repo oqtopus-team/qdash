@@ -119,7 +119,7 @@ class AuthService:
             username=user_data.username,
             hashed_password=hashed_password,
             access_token=access_token,
-            full_name=user_data.full_name,
+            display_name=user_data.display_name,
             organization=user_data.organization,
             system_role=system_role,
             must_change_password=True,

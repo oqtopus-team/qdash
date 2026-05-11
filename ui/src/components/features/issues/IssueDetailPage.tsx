@@ -122,8 +122,11 @@ export function IssueDetailPage({ issueId }: { issueId: string }) {
     const members =
       membersResponse?.data.members
         ?.filter((member) => member.username !== currentUser)
-        .map((member) => ({ id: member.username, label: member.username })) ??
-      [];
+        .map((member) => ({
+          id: member.username,
+          label: member.display_name || member.username,
+          secondaryLabel: member.organization ?? undefined,
+        })) ?? [];
     return [{ id: "qdash", label: "AI Assistant" }, ...members];
   }, [currentUser, membersResponse?.data.members]);
 

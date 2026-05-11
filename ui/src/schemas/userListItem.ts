@@ -5,7 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { UserListItemFullName } from "./userListItemFullName";
+import type { UserListItemDisplayName } from "./userListItemDisplayName";
 import type { UserListItemOrganization } from "./userListItemOrganization";
 import type { SystemRole } from "./systemRole";
 import type { UserListItemDefaultProjectId } from "./userListItemDefaultProjectId";
@@ -16,7 +16,7 @@ import type { UserListItemDefaultProjectId } from "./userListItemDefaultProjectI
 export interface UserListItem {
   user_id: string;
   username: string;
-  full_name?: UserListItemFullName;
+  display_name?: UserListItemDisplayName;
   organization?: UserListItemOrganization;
   disabled?: boolean;
   system_role?: SystemRole;

@@ -10,6 +10,7 @@ from qdash.api.schemas.project import MemberResponse, ProjectResponse
 from qdash.datamodel.project import ProjectRole
 from qdash.dbmodel.project import ProjectDocument
 from qdash.dbmodel.project_membership import ProjectMembershipDocument
+from qdash.dbmodel.user import UserDocument
 from qdash.repository import (
     MongoProjectMembershipRepository,
     MongoProjectRepository,
@@ -18,8 +19,6 @@ from qdash.repository import (
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
-
-    from qdash.dbmodel.user import UserDocument
 
 logger = logging.getLogger(__name__)
 
@@ -62,10 +61,13 @@ class ProjectService:
         membership: ProjectMembershipDocument,
     ) -> MemberResponse:
         """Convert ProjectMembershipDocument to MemberResponse."""
+        user = UserDocument.find_one({"user_id": membership.user_id}).run()
         return MemberResponse(
             project_id=membership.project_id,
             user_id=membership.user_id,
             username=membership.username,
+            display_name=user.display_name if user else None,
+            organization=user.organization if user else None,
             role=membership.role,
             status=membership.status,
             invited_by_user_id=membership.invited_by_user_id,
