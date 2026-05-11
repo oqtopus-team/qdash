@@ -30,8 +30,11 @@ import { MarkdownContent } from "@/components/ui/MarkdownContent";
 import { MarkdownEditor } from "@/components/ui/MarkdownEditor";
 import { PageContainer } from "@/components/ui/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { UserAvatar } from "@/components/ui/UserAvatar";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProject } from "@/contexts/ProjectContext";
+import { useForumAiReply } from "@/hooks/useForumAiReply";
+import { useImageUpload } from "@/hooks/useImageUpload";
 import { formatRelativeTime } from "@/lib/utils/datetime";
 import type { ForumPostResponse, ListForumPostsParams } from "@/schemas";
 
@@ -72,11 +75,16 @@ function ForumThreadCard({
       <Link href={`/forum/${post.id}`} className="block p-4">
         <div className="flex items-start gap-3">
           <div className="hidden sm:flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-base-200">
-            <Icon className="h-4 w-4 text-base-content/70" />
+            <UserAvatar
+              username={post.username}
+              avatarKey={post.avatar_key}
+              size={28}
+            />
           </div>
           <div className="min-w-0 flex-1">
             <div className="mb-2 flex flex-wrap items-center gap-2">
               <span className={`badge badge-sm ${category.badgeClass}`}>
+                <Icon className="h-3 w-3" />
                 {category.shortLabel}
               </span>
               <span className="badge badge-sm badge-neutral">
@@ -147,6 +155,7 @@ export function ForumPageContent() {
   const [categoryDescription, setCategoryDescription] = useState("");
   const [categoryColor, setCategoryColor] = useState("neutral");
   const [categoryIcon, setCategoryIcon] = useState("message-square");
+  const { uploadImage } = useImageUpload("forum");
 
   const params: ListForumPostsParams = {
     skip,
@@ -175,11 +184,17 @@ export function ForumPageContent() {
     query: { enabled: !!projectId },
   });
   const mentionCandidates = useMemo(
-    () =>
-      membersResponse?.data.members
+    () => [
+      { id: "qdash", label: "QDash" },
+      ...(membersResponse?.data.members
         ?.filter((member) => member.username !== user?.username)
-        .map((member) => ({ id: member.username, label: member.username })) ??
-      [],
+        .map((member) => ({
+          id: member.username,
+          label: member.display_name || member.username,
+          secondaryLabel: member.organization ?? undefined,
+          avatarKey: member.avatar_key,
+        })) ?? []),
+    ],
     [membersResponse?.data.members, user?.username],
   );
 
@@ -188,6 +203,7 @@ export function ForumPageContent() {
   const deleteCategoryMutation = useDeleteForumCategory();
   const closeMutation = useCloseForumPost();
   const reopenMutation = useReopenForumPost();
+  const { triggerAiReply } = useForumAiReply();
 
   const invalidateList = () => {
     queryClient.invalidateQueries({ queryKey: getListForumPostsQueryKey() });
@@ -204,7 +220,7 @@ export function ForumPageContent() {
     const trimmedContent = content.trim();
     if (!trimmedTitle || !trimmedContent) return;
 
-    await createMutation.mutateAsync({
+    const response = await createMutation.mutateAsync({
       data: {
         category: newCategory,
         title: trimmedTitle,
@@ -216,6 +232,9 @@ export function ForumPageContent() {
     setContent("");
     setShowComposer(false);
     invalidateList();
+    if (/@qdash\b/i.test(trimmedContent)) {
+      triggerAiReply(response.data.id, trimmedContent, invalidateList);
+    }
   };
 
   const setCategoryFilter = (nextCategory: CategoryFilter) => {
@@ -499,6 +518,7 @@ export function ForumPageContent() {
               submitLabel="Post"
               isSubmitting={createMutation.isPending}
               mentionCandidates={mentionCandidates}
+              onImageUpload={uploadImage}
             />
           </div>
         </div>

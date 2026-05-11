@@ -22,6 +22,7 @@ import { useIssueAiReply } from "@/hooks/useIssueAiReply";
 import type { IssueResponse } from "@/schemas";
 import { MarkdownContent } from "@/components/ui/MarkdownContent";
 import { MarkdownEditor } from "@/components/ui/MarkdownEditor";
+import { QdashBotAvatar, UserAvatar } from "@/components/ui/UserAvatar";
 import { useImageUpload } from "@/hooks/useImageUpload";
 import {
   useGetIssue,
@@ -122,9 +123,13 @@ export function IssueDetailPage({ issueId }: { issueId: string }) {
     const members =
       membersResponse?.data.members
         ?.filter((member) => member.username !== currentUser)
-        .map((member) => ({ id: member.username, label: member.username })) ??
-      [];
-    return [{ id: "qdash", label: "AI Assistant" }, ...members];
+        .map((member) => ({
+          id: member.username,
+          label: member.display_name || member.username,
+          secondaryLabel: member.organization ?? undefined,
+          avatarKey: member.avatar_key,
+        })) ?? [];
+    return [{ id: "qdash", label: "QDash" }, ...members];
   }, [currentUser, membersResponse?.data.members]);
 
   const handleClose = () => {
@@ -441,6 +446,11 @@ export function IssueDetailPage({ issueId }: { issueId: string }) {
       {/* Root issue */}
       <div className="bg-base-100 rounded-lg border border-base-300 p-4 mb-4">
         <div className="flex items-center gap-2 mb-2">
+          <UserAvatar
+            username={issue.username}
+            avatarKey={issue.avatar_key}
+            size={24}
+          />
           <span className="badge badge-sm badge-neutral">{issue.username}</span>
           <span className="text-xs text-base-content/40">
             {formatRelativeTime(issue.created_at)}
@@ -476,7 +486,7 @@ export function IssueDetailPage({ issueId }: { issueId: string }) {
           </div>
         ) : replies.length > 0 ? (
           replies.map((reply: IssueResponse) => {
-            const isAi = reply.username === "qdash-ai";
+            const isAi = reply.is_ai_reply || reply.username === "qdash";
             return (
               <div
                 key={reply.id}
@@ -489,14 +499,23 @@ export function IssueDetailPage({ issueId }: { issueId: string }) {
                 <div className="flex items-center justify-between mb-1">
                   <div className="flex items-center gap-2">
                     {isAi ? (
-                      <span className="badge badge-xs badge-primary gap-1">
-                        <Bot className="h-2.5 w-2.5" />
-                        {reply.username}
-                      </span>
+                      <>
+                        <QdashBotAvatar size={20} />
+                        <span className="badge badge-xs badge-primary">
+                          {reply.username}
+                        </span>
+                      </>
                     ) : (
-                      <span className="badge badge-xs badge-neutral">
-                        {reply.username}
-                      </span>
+                      <>
+                        <UserAvatar
+                          username={reply.username}
+                          avatarKey={reply.avatar_key}
+                          size={20}
+                        />
+                        <span className="badge badge-xs badge-neutral">
+                          {reply.username}
+                        </span>
+                      </>
                     )}
                     <span className="text-xs text-base-content/40">
                       {formatRelativeTime(reply.created_at)}
@@ -571,7 +590,7 @@ export function IssueDetailPage({ issueId }: { issueId: string }) {
             <div className="flex items-center gap-2">
               <span className="badge badge-xs badge-primary gap-1">
                 <Bot className="h-2.5 w-2.5" />
-                qdash-ai
+                qdash
               </span>
               <span className="loading loading-dots loading-xs" />
               <span className="text-xs text-base-content/60">{aiStatus}</span>

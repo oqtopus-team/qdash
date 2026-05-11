@@ -14,7 +14,7 @@ class ProjectMembershipDocument(Document):
     """Represents a user's membership state in a project."""
 
     project_id: str = Field(..., description="Project identifier")
-    user_id: str | None = Field(default=None, description="Member user ID")
+    user_id: str = Field(..., description="Member user ID")
     username: str = Field(..., description="Member username snapshot")
     role: ProjectRole = Field(default=ProjectRole.VIEWER, description="Assigned project role")
     status: str = Field(default="pending", description="Invitation status")
@@ -46,14 +46,12 @@ class ProjectMembershipDocument(Document):
         cls, project_id: str, username: str, user_id: str | None = None
     ) -> ProjectMembershipDocument | None:
         """Fetch active membership for the user/project pair."""
-        query: dict[str, object]
-        if user_id:
-            query = {
-                "project_id": project_id,
-                "status": "active",
-                "$or": [{"user_id": user_id}, {"username": username}],
-            }
-        else:
-            query = {"project_id": project_id, "username": username, "status": "active"}
+        if not user_id:
+            return None
+        query: dict[str, object] = {
+            "project_id": project_id,
+            "user_id": user_id,
+            "status": "active",
+        }
         result = cls.find_one(query).run()
         return cast("ProjectMembershipDocument | None", result)

@@ -5,8 +5,9 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { UserUserId } from "./userUserId";
-import type { UserFullName } from "./userFullName";
+import type { UserDisplayName } from "./userDisplayName";
+import type { UserOrganization } from "./userOrganization";
+import type { UserAvatarKey } from "./userAvatarKey";
 import type { UserDisabled } from "./userDisabled";
 import type { UserDefaultProjectId } from "./userDefaultProjectId";
 import type { SystemRole } from "./systemRole";
@@ -15,9 +16,11 @@ import type { SystemRole } from "./systemRole";
  * User model for authentication and user management.
  */
 export interface User {
-  user_id?: UserUserId;
+  user_id: string;
   username: string;
-  full_name?: UserFullName;
+  display_name?: UserDisplayName;
+  organization?: UserOrganization;
+  avatar_key?: UserAvatarKey;
   disabled?: UserDisabled;
   default_project_id?: UserDefaultProjectId;
   must_change_password?: boolean;

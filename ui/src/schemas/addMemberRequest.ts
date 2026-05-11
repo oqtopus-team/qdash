@@ -11,6 +11,7 @@ import type { ProjectRole } from "./projectRole";
  * Request to add a member to a project.
  */
 export interface AddMemberRequest {
+  /** @pattern ^[a-z0-9][a-z0-9._-]{1,62}[a-z0-9]$ */
   username: string;
   role?: ProjectRole;
 }

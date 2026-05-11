@@ -14,7 +14,7 @@ from qdash.datamodel.user import SystemRole, generate_user_id
 from qdash.dbmodel.user import UserDocument
 
 if TYPE_CHECKING:
-    from qdash.api.schemas.auth import PasswordChange, PasswordReset, UserCreate
+    from qdash.api.schemas.auth import PasswordChange, PasswordReset, UserCreate, UserProfileUpdate
     from qdash.api.services.project_service import ProjectService
     from qdash.repository import MongoUserRepository
 
@@ -119,7 +119,9 @@ class AuthService:
             username=user_data.username,
             hashed_password=hashed_password,
             access_token=access_token,
-            full_name=user_data.full_name,
+            display_name=user_data.display_name,
+            organization=user_data.organization,
+            avatar_key=user_data.avatar_key,
             system_role=system_role,
             must_change_password=True,
             system_info=SystemInfoModel(),
@@ -213,6 +215,26 @@ class AuthService:
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to update password",
         )
+
+    def update_profile(
+        self,
+        username: str,
+        profile_data: UserProfileUpdate,
+    ) -> UserDocument:
+        """Update profile fields owned by the current user."""
+        user_doc = self._user_repo.find_by_username(username)
+        if not user_doc:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found",
+            )
+
+        if "display_name" in profile_data.model_fields_set:
+            user_doc.display_name = (profile_data.display_name or "").strip() or None
+        if "avatar_key" in profile_data.model_fields_set:
+            user_doc.avatar_key = (profile_data.avatar_key or "").strip() or None
+        self._user_repo.save(user_doc)
+        return user_doc
 
     def reset_password(
         self,

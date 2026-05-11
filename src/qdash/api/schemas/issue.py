@@ -37,6 +37,7 @@ class IssueResponse(BaseModel):
     task_id: str = Field(..., description="Associated task ID")
     user_id: str | None = Field(default=None, description="Issue author user ID")
     username: str = Field(..., description="Issue author username")
+    avatar_key: str | None = Field(default=None, description="Issue author avatar preset key")
     title: str | None = Field(default=None, description="Issue title")
     content: str = Field(..., description="Issue text content")
     created_at: datetime = Field(..., description="When the issue was created")

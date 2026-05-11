@@ -31,14 +31,18 @@ def test_project(init_db: PyMongoDatabase[Any]) -> ProjectDocument:
     project = ProjectDocument(
         project_id="test_project",
         name="Test Project",
+        owner_user_id=user.user_id,
         owner_username="test_user",
     )
     project.insert()
 
     membership = ProjectMembershipDocument(
         project_id="test_project",
+        user_id=user.user_id,
         username="test_user",
         role=ProjectRole.OWNER,
+        status="active",
+        invited_by_user_id=user.user_id,
         invited_by="test_user",
     )
     membership.insert()
@@ -60,8 +64,10 @@ def viewer_user(init_db: PyMongoDatabase[Any]) -> UserDocument:
 
     membership = ProjectMembershipDocument(
         project_id="test_project",
+        user_id=user.user_id,
         username="viewer_user",
         role=ProjectRole.VIEWER,
+        status="active",
         invited_by="test_user",
     )
     membership.insert()
@@ -83,6 +89,7 @@ def editor_user(init_db: PyMongoDatabase[Any]) -> UserDocument:
 
     membership = ProjectMembershipDocument(
         project_id="test_project",
+        user_id=user.user_id,
         username="editor_user",
         role=ProjectRole.EDITOR,
         status="active",

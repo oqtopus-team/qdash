@@ -1,5 +1,6 @@
 """Tests for forum router endpoints."""
 
+from qdash.api.services import forum_service
 from qdash.datamodel.project import ProjectRole
 from qdash.datamodel.system_info import SystemInfoModel
 from qdash.dbmodel.notification import NotificationDocument
@@ -17,14 +18,28 @@ def _create_user(username: str, token: str, role: ProjectRole) -> UserDocument:
         system_info=SystemInfoModel(),
     )
     user.insert()
+    inviter = UserDocument.find_one({"username": "owner"}).run()
     ProjectMembershipDocument(
         project_id="test_project",
+        user_id=user.user_id,
         username=username,
         role=role,
         status="active",
+        invited_by_user_id=inviter.user_id if inviter else user.user_id,
         invited_by="owner",
     ).insert()
     return user
+
+
+def _create_project() -> None:
+    owner = UserDocument.find_one({"username": "owner"}).run()
+    assert owner is not None
+    ProjectDocument(
+        project_id="test_project",
+        name="Test Project",
+        owner_user_id=owner.user_id,
+        owner_username="owner",
+    ).insert()
 
 
 def _headers(token: str) -> dict[str, str]:
@@ -52,11 +67,7 @@ def _create_post(
 def test_create_and_list_forum_threads(test_client, init_db):
     """Forum threads are project-scoped and return reply counts."""
     _create_user("owner", "owner_token", ProjectRole.OWNER)
-    ProjectDocument(
-        project_id="test_project",
-        name="Test Project",
-        owner_username="owner",
-    ).insert()
+    _create_project()
     headers = _headers("owner_token")
 
     root = _create_post(test_client, headers)
@@ -82,11 +93,7 @@ def test_create_and_list_forum_threads(test_client, init_db):
 def test_owner_can_create_and_archive_forum_category(test_client, init_db):
     """Project owners can add and archive forum categories."""
     _create_user("owner", "owner_token", ProjectRole.OWNER)
-    ProjectDocument(
-        project_id="test_project",
-        name="Test Project",
-        owner_username="owner",
-    ).insert()
+    _create_project()
     headers = _headers("owner_token")
 
     created = test_client.post(
@@ -117,11 +124,7 @@ def test_owner_can_create_and_archive_forum_category(test_client, init_db):
 def test_cannot_archive_last_active_forum_category(test_client, init_db):
     """At least one active forum category must remain."""
     _create_user("owner", "owner_token", ProjectRole.OWNER)
-    ProjectDocument(
-        project_id="test_project",
-        name="Test Project",
-        owner_username="owner",
-    ).insert()
+    _create_project()
     headers = _headers("owner_token")
 
     listed = test_client.get("/forum/categories", headers=headers)
@@ -141,11 +144,7 @@ def test_viewer_cannot_create_forum_category(test_client, init_db):
     """Only owners can manage forum categories."""
     _create_user("owner", "owner_token", ProjectRole.OWNER)
     _create_user("member", "member_token", ProjectRole.VIEWER)
-    ProjectDocument(
-        project_id="test_project",
-        name="Test Project",
-        owner_username="owner",
-    ).insert()
+    _create_project()
 
     response = test_client.post(
         "/forum/categories",
@@ -159,11 +158,7 @@ def test_viewer_cannot_create_forum_category(test_client, init_db):
 def test_delete_root_thread_archives_replies_from_normal_listing(test_client, init_db):
     """Deleting a root thread hides the thread and its replies from normal reads."""
     _create_user("owner", "owner_token", ProjectRole.OWNER)
-    ProjectDocument(
-        project_id="test_project",
-        name="Test Project",
-        owner_username="owner",
-    ).insert()
+    _create_project()
     headers = _headers("owner_token")
 
     root = _create_post(test_client, headers)
@@ -189,11 +184,7 @@ def test_owner_can_delete_member_forum_thread(test_client, init_db):
     """Project owners can moderate another member's forum thread."""
     _create_user("owner", "owner_token", ProjectRole.OWNER)
     _create_user("member", "member_token", ProjectRole.VIEWER)
-    ProjectDocument(
-        project_id="test_project",
-        name="Test Project",
-        owner_username="owner",
-    ).insert()
+    _create_project()
 
     root = _create_post(test_client, _headers("member_token"))
     root_id = root.json()["id"]
@@ -210,11 +201,7 @@ def test_owner_can_delete_member_forum_thread(test_client, init_db):
 def test_get_forum_replies_is_paginated(test_client, init_db):
     """Reply listing accepts skip and limit parameters."""
     _create_user("owner", "owner_token", ProjectRole.OWNER)
-    ProjectDocument(
-        project_id="test_project",
-        name="Test Project",
-        owner_username="owner",
-    ).insert()
+    _create_project()
     headers = _headers("owner_token")
     root = _create_post(test_client, headers)
     root_id = root.json()["id"]
@@ -233,11 +220,7 @@ def test_reply_creates_forum_reply_notification(test_client, init_db):
     """Replying to another user's thread creates an in-app notification."""
     _create_user("owner", "owner_token", ProjectRole.OWNER)
     _create_user("member", "member_token", ProjectRole.VIEWER)
-    ProjectDocument(
-        project_id="test_project",
-        name="Test Project",
-        owner_username="owner",
-    ).insert()
+    _create_project()
 
     root = _create_post(test_client, _headers("owner_token"))
     root_id = root.json()["id"]
@@ -266,11 +249,7 @@ def test_close_forum_thread_requires_author_or_owner(test_client, init_db):
     """A viewer cannot close another user's forum thread."""
     _create_user("owner", "owner_token", ProjectRole.OWNER)
     _create_user("member", "member_token", ProjectRole.VIEWER)
-    ProjectDocument(
-        project_id="test_project",
-        name="Test Project",
-        owner_username="owner",
-    ).insert()
+    _create_project()
 
     root = _create_post(test_client, _headers("owner_token"))
     root_id = root.json()["id"]
@@ -278,3 +257,24 @@ def test_close_forum_thread_requires_author_or_owner(test_client, init_db):
     response = test_client.patch(f"/forum/posts/{root_id}/close", headers=_headers("member_token"))
 
     assert response.status_code == 403
+
+
+def test_upload_and_serve_forum_image(test_client, init_db, tmp_path, monkeypatch):
+    """Forum images can be uploaded by members and served for markdown rendering."""
+    monkeypatch.setattr(forum_service, "FORUM_IMAGE_DIR", tmp_path / "forum")
+    _create_user("owner", "owner_token", ProjectRole.OWNER)
+    _create_project()
+
+    upload = test_client.post(
+        "/forum/upload-image",
+        headers=_headers("owner_token"),
+        files={"file": ("image.png", b"\x89PNG\r\n\x1a\n", "image/png")},
+    )
+
+    assert upload.status_code == 200
+    url = upload.json()["url"]
+    assert url.startswith("/api/forum/images/")
+
+    image = test_client.get(url.removeprefix("/api"))
+    assert image.status_code == 200
+    assert image.headers["content-type"] == "image/png"

@@ -6,4 +6,4 @@
  * OpenAPI spec version: 0.0.1
  */
 
-export type MemberItemUserId = string | null;
+export type MemberItemDisplayName = string | null;

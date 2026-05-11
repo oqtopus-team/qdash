@@ -3,6 +3,7 @@
 import pytest
 from qdash.datamodel.project import ProjectRole
 from qdash.datamodel.system_info import SystemInfoModel
+from qdash.datamodel.user import SystemRole
 from qdash.dbmodel.chip import ChipDocument
 from qdash.dbmodel.project import ProjectDocument
 from qdash.dbmodel.project_membership import ProjectMembershipDocument
@@ -27,6 +28,7 @@ def test_project(init_db):
     project = ProjectDocument(
         project_id="test_project",
         name="Test Project",
+        owner_user_id=user.user_id,
         owner_username="test_user",
     )
     project.insert()
@@ -34,8 +36,11 @@ def test_project(init_db):
     # Create membership
     membership = ProjectMembershipDocument(
         project_id="test_project",
+        user_id=user.user_id,
         username="test_user",
         role=ProjectRole.OWNER,
+        status="active",
+        invited_by_user_id=user.user_id,
         invited_by="test_user",
     )
     membership.insert()
@@ -239,3 +244,61 @@ class TestChipRouter:
 
         # Assert
         assert response.status_code == 401
+
+    def test_admin_cannot_list_chips_for_project_without_membership(self, test_client, init_db):
+        """System admins do not bypass project membership for project data APIs."""
+        admin = UserDocument(
+            username="admin",
+            hashed_password="hashed",
+            access_token="admin_token",
+            default_project_id=None,
+            system_role=SystemRole.ADMIN,
+            system_info=SystemInfoModel(),
+        )
+        admin.insert()
+
+        owner = UserDocument(
+            username="owner",
+            hashed_password="hashed",
+            access_token="owner_token",
+            default_project_id="owner_project",
+            system_info=SystemInfoModel(),
+        )
+        owner.insert()
+
+        project = ProjectDocument(
+            project_id="owner_project",
+            name="Owner Project",
+            owner_user_id=owner.user_id,
+            owner_username="owner",
+            system_info=SystemInfoModel(),
+        )
+        project.insert()
+
+        ProjectMembershipDocument(
+            project_id="owner_project",
+            user_id=owner.user_id,
+            username="owner",
+            role=ProjectRole.OWNER,
+            status="active",
+            invited_by_user_id=owner.user_id,
+            invited_by="owner",
+        ).insert()
+
+        ChipDocument(
+            chip_id="private_chip",
+            username="owner",
+            project_id="owner_project",
+            size=64,
+            system_info=SystemInfoModel(),
+        ).insert()
+
+        response = test_client.get(
+            "/chips",
+            headers={
+                "Authorization": "Bearer admin_token",
+                "X-Project-Id": "owner_project",
+            },
+        )
+
+        assert response.status_code == 403

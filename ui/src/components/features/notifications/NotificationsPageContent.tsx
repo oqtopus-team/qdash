@@ -3,8 +3,8 @@
 import Link from "next/link";
 import {
   AtSign,
-  Bell,
   CheckCheck,
+  Inbox,
   MessageSquare,
   StickyNote,
 } from "lucide-react";
@@ -99,17 +99,17 @@ export function NotificationsPageContent() {
   return (
     <PageContainer>
       <PageHeader
-        title="Notifications"
-        description="Mentions, replies, and app notifications that need your attention"
+        title="Inbox"
+        description="Mentions, replies, and system messages that need your attention"
       />
 
       <div className="mb-4 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2 text-sm text-base-content/60">
-          <Bell className="h-4 w-4" />
+          <Inbox className="h-4 w-4" />
           <span>
             {unreadCount > 0
-              ? `${unreadCount} unread notification${unreadCount === 1 ? "" : "s"}`
-              : "No unread notifications"}
+              ? `${unreadCount} unread item${unreadCount === 1 ? "" : "s"}`
+              : "No unread items"}
           </span>
         </div>
         <button
@@ -129,12 +129,12 @@ export function NotificationsPageContent() {
           </div>
         ) : error ? (
           <div className="alert alert-error m-4">
-            <span>Failed to load notifications.</span>
+            <span>Failed to load inbox.</span>
           </div>
         ) : notifications.length === 0 ? (
           <EmptyState
-            title="No notifications"
-            description="Mentions in issues and notes, issue replies, and future app notifications will appear here."
+            title="Inbox is empty"
+            description="Mentions in issues and notes, replies, and system messages will appear here."
             emoji="empty"
             size="md"
           />

@@ -10,6 +10,7 @@ from qdash.api.schemas.project import MemberResponse, ProjectResponse
 from qdash.datamodel.project import ProjectRole
 from qdash.dbmodel.project import ProjectDocument
 from qdash.dbmodel.project_membership import ProjectMembershipDocument
+from qdash.dbmodel.user import UserDocument
 from qdash.repository import (
     MongoProjectMembershipRepository,
     MongoProjectRepository,
@@ -18,8 +19,6 @@ from qdash.repository import (
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
-
-    from qdash.dbmodel.user import UserDocument
 
 logger = logging.getLogger(__name__)
 
@@ -62,10 +61,14 @@ class ProjectService:
         membership: ProjectMembershipDocument,
     ) -> MemberResponse:
         """Convert ProjectMembershipDocument to MemberResponse."""
+        user = UserDocument.find_one({"user_id": membership.user_id}).run()
         return MemberResponse(
             project_id=membership.project_id,
             user_id=membership.user_id,
             username=membership.username,
+            display_name=user.display_name if user else None,
+            organization=user.organization if user else None,
+            avatar_key=user.avatar_key if user else None,
             role=membership.role,
             status=membership.status,
             invited_by_user_id=membership.invited_by_user_id,
@@ -110,6 +113,11 @@ class ProjectService:
 
         """
         owner_user_id = self._user_id_for_username(owner_username)
+        if not owner_user_id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"User '{owner_username}' not found",
+            )
         project = ProjectDocument(
             owner_user_id=owner_user_id,
             owner_username=owner_username,
@@ -145,9 +153,6 @@ class ProjectService:
         if user.default_project_id:
             existing = ProjectDocument.find_by_id(user.default_project_id)
             if existing:
-                if not existing.owner_user_id and existing.owner_username == user.username:
-                    existing.owner_user_id = user.user_id
-                    existing.save()
                 self._ensure_membership(
                     project_id=existing.project_id,
                     username=user.username,
@@ -197,7 +202,7 @@ class ProjectService:
 
         """
         user_id = self._user_id_for_username(username)
-        memberships = self._membership_repo.find_by_user(username, user_id, status="active")
+        memberships = self._membership_repo.find_by_user(user_id, status="active")
         project_ids = [m.project_id for m in memberships]
         return self._project_repo.find({"project_id": {"$in": project_ids}})
 
@@ -313,10 +318,7 @@ class ProjectService:
             )
 
         existing = self._membership_repo.find_one(
-            {
-                "project_id": project_id,
-                "$or": [{"user_id": target_user.user_id}, {"username": username}],
-            }
+            {"project_id": project_id, "user_id": target_user.user_id}
         )
 
         if existing:
@@ -384,11 +386,14 @@ class ProjectService:
             )
 
         target_user = self._user_repo.find_one({"username": username})
-        target_user_id = target_user.user_id if target_user else None
+        if not target_user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"User '{username}' not found",
+            )
+        target_user_id = target_user.user_id
 
-        if username == project.owner_username or (
-            target_user_id and target_user_id == project.owner_user_id
-        ):
+        if target_user_id and target_user_id == project.owner_user_id:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Cannot change the owner's role",
@@ -401,10 +406,7 @@ class ProjectService:
             )
 
         membership = self._membership_repo.find_one(
-            {
-                "project_id": project_id,
-                "$or": [{"user_id": target_user_id}, {"username": username}],
-            }
+            {"project_id": project_id, "user_id": target_user_id}
         )
         if not membership:
             raise HTTPException(
@@ -449,21 +451,21 @@ class ProjectService:
             )
 
         target_user = self._user_repo.find_one({"username": username})
-        target_user_id = target_user.user_id if target_user else None
+        if not target_user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"User '{username}' not found",
+            )
+        target_user_id = target_user.user_id
 
-        if username == project.owner_username or (
-            target_user_id and target_user_id == project.owner_user_id
-        ):
+        if target_user_id and target_user_id == project.owner_user_id:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Cannot remove the project owner",
             )
 
         membership = self._membership_repo.find_one(
-            {
-                "project_id": project_id,
-                "$or": [{"user_id": target_user_id}, {"username": username}],
-            }
+            {"project_id": project_id, "user_id": target_user_id}
         )
         if not membership:
             raise HTTPException(
@@ -520,10 +522,7 @@ class ProjectService:
                 detail=f"User '{new_owner_username}' not found",
             )
 
-        if (
-            new_owner_username == project.owner_username
-            or target_user.user_id == project.owner_user_id
-        ):
+        if target_user.user_id == project.owner_user_id:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="User is already the owner",
@@ -531,10 +530,7 @@ class ProjectService:
 
         # Keep the previous owner as an editor after transferring administration.
         old_owner_membership = self._membership_repo.find_one(
-            {
-                "project_id": project_id,
-                "$or": [{"user_id": project.owner_user_id}, {"username": project.owner_username}],
-            }
+            {"project_id": project_id, "user_id": project.owner_user_id}
         )
         if old_owner_membership:
             old_owner_membership.role = ProjectRole.EDITOR
@@ -543,10 +539,7 @@ class ProjectService:
 
         # Update or create new owner membership
         new_owner_membership = self._membership_repo.find_one(
-            {
-                "project_id": project_id,
-                "$or": [{"user_id": target_user.user_id}, {"username": new_owner_username}],
-            }
+            {"project_id": project_id, "user_id": target_user.user_id}
         )
 
         if new_owner_membership:
@@ -600,13 +593,15 @@ class ProjectService:
         invited_by: str | None = None,
     ) -> ProjectMembershipDocument:
         """Insert or update a membership entry."""
-        membership = ProjectMembershipDocument.find_one(
-            {
-                "project_id": project_id,
-                "$or": [{"user_id": self._user_id_for_username(username)}, {"username": username}],
-            }
-        ).run()
         user_id = self._user_id_for_username(username)
+        if not user_id:
+            raise HTTPException(
+                status_code=404,
+                detail=f"User '{username}' not found",
+            )
+        membership = ProjectMembershipDocument.find_one(
+            {"project_id": project_id, "user_id": user_id}
+        ).run()
         invited_by_user_id = self._user_id_for_username(invited_by)
         if membership:
             membership.user_id = user_id

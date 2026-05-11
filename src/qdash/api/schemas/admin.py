@@ -4,15 +4,17 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 from qdash.datamodel.project import ProjectRole
-from qdash.datamodel.user import SystemRole
+from qdash.datamodel.user import SystemRole, Username
 
 
 class UserListItem(BaseModel):
     """User summary for admin list view."""
 
-    user_id: str | None = None
+    user_id: str
     username: str
-    full_name: str | None = None
+    display_name: str | None = None
+    organization: str | None = None
+    avatar_key: str | None = None
     disabled: bool = False
     system_role: SystemRole = SystemRole.USER
     default_project_id: str | None = None
@@ -24,7 +26,7 @@ class ProjectListItem(BaseModel):
 
     project_id: str
     name: str
-    owner_user_id: str | None = None
+    owner_user_id: str
     owner_username: str
     description: str | None = None
     member_count: int = 0
@@ -48,7 +50,9 @@ class UserListResponse(BaseModel):
 class UpdateUserRequest(BaseModel):
     """Request to update user settings (admin only)."""
 
-    full_name: str | None = None
+    display_name: str | None = None
+    organization: str | None = None
+    avatar_key: str | None = None
     disabled: bool | None = None
     system_role: SystemRole | None = None
 
@@ -56,9 +60,11 @@ class UpdateUserRequest(BaseModel):
 class UserDetailResponse(BaseModel):
     """Detailed user response for admin view."""
 
-    user_id: str | None = None
+    user_id: str
     username: str
-    full_name: str | None = None
+    display_name: str | None = None
+    organization: str | None = None
+    avatar_key: str | None = None
     disabled: bool = False
     system_role: SystemRole = SystemRole.USER
     default_project_id: str | None = None
@@ -79,9 +85,11 @@ class ConfigReloadResponse(BaseModel):
 class MemberItem(BaseModel):
     """Member info for admin view."""
 
-    user_id: str | None = None
+    user_id: str
     username: str
-    full_name: str | None = None
+    display_name: str | None = None
+    organization: str | None = None
+    avatar_key: str | None = None
     role: ProjectRole
     status: str = "active"
 
@@ -96,7 +104,7 @@ class MemberListResponse(BaseModel):
 class AddMemberRequest(BaseModel):
     """Request to add a member to a project."""
 
-    username: str
+    username: Username
     role: ProjectRole = ProjectRole.VIEWER
 
 
@@ -108,7 +116,8 @@ class BulkUserImportResult(BaseModel):
 
     row_number: int
     username: str
-    full_name: str | None = None
+    display_name: str | None = None
+    organization: str | None = None
     system_role: SystemRole = SystemRole.USER
     initial_password: str | None = None
     status: str

@@ -8,13 +8,16 @@ All collections use `project_id` as the leading key to support multi-tenant data
 
 ```python
 db.project.create_index([("project_id", 1)], unique=True)
+db.project.create_index([("owner_user_id", 1), ("name", 1)])
 db.project.create_index([("owner_username", 1), ("name", 1)], unique=True)
 ```
 
 ### ProjectMembershipDocument
 
 ```python
+db.project_membership.create_index([("project_id", 1), ("user_id", 1)])
 db.project_membership.create_index([("project_id", 1), ("username", 1)], unique=True)
+db.project_membership.create_index([("user_id", 1), ("status", 1)])
 db.project_membership.create_index([("username", 1), ("status", 1)])
 ```
 
@@ -46,6 +49,7 @@ db.execution_history.create_index([("project_id", 1), ("execution_id", 1)], uniq
 db.execution_history.create_index([("project_id", 1), ("chip_id", 1), ("start_at", -1)])
 db.execution_history.create_index([("project_id", 1), ("chip_id", 1)])
 db.execution_history.create_index([("project_id", 1), ("username", 1), ("start_at", -1)])
+db.execution_history.create_index([("project_id", 1), ("user_id", 1), ("start_at", -1)])
 ```
 
 **Usage**: Used by `_extract_best_metrics()` for querying execution history within a project
@@ -241,10 +245,13 @@ use qdash;
 
 // Project indexes
 db.project.createIndex({ project_id: 1 }, { unique: true, name: "project_id_unique" });
+db.project.createIndex({ owner_user_id: 1, name: 1 }, { name: "owner_user_id_name_idx" });
 db.project.createIndex({ owner_username: 1, name: 1 }, { unique: true, name: "owner_name_unique" });
 
 // Membership indexes
+db.project_membership.createIndex({ project_id: 1, user_id: 1 }, { name: "membership_project_user_id_idx" });
 db.project_membership.createIndex({ project_id: 1, username: 1 }, { unique: true, name: "membership_unique" });
+db.project_membership.createIndex({ user_id: 1, status: 1 }, { name: "user_id_status_idx" });
 db.project_membership.createIndex({ username: 1, status: 1 }, { name: "user_status_idx" });
 
 // Execution history indexes
@@ -256,6 +263,11 @@ db.execution_history.createIndex(
 db.execution_history.createIndex(
   { project_id: 1, chip_id: 1 },
   { name: "metrics_chip_idx" }
+);
+
+db.execution_history.createIndex(
+  { project_id: 1, user_id: 1, start_at: -1 },
+  { name: "metrics_project_user_id_idx" }
 );
 
 db.execution_history.createIndex(

@@ -6,4 +6,4 @@
  * OpenAPI spec version: 0.0.1
  */
 
-export type UserFullName = string | null;
+export type UserCreateDisplayName = string | null;

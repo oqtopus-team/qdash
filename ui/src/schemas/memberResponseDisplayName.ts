@@ -6,4 +6,4 @@
  * OpenAPI spec version: 0.0.1
  */
 
-export type UserUserId = string | null;
+export type MemberResponseDisplayName = string | null;

@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import TYPE_CHECKING
+from pathlib import Path
+from typing import TYPE_CHECKING, Any
+from uuid import uuid4
 
 from bson import ObjectId
 from bunnet import SortDirection
@@ -16,6 +18,7 @@ from qdash.api.schemas.forum import (
     ListForumPostsResponse,
 )
 from qdash.api.schemas.success import SuccessResponse
+from qdash.common.paths import CALIB_DATA_BASE
 from qdash.datamodel.project import ProjectRole
 from qdash.dbmodel.forum import ForumCategoryDocument, ForumPostDocument
 from qdash.dbmodel.user import UserDocument
@@ -68,6 +71,21 @@ DEFAULT_FORUM_CATEGORIES = [
 ]
 
 CATEGORY_KEY_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
+FORUM_IMAGE_DIR = CALIB_DATA_BASE / "forum"
+ALLOWED_CONTENT_TYPES = {
+    "image/png",
+    "image/jpeg",
+    "image/gif",
+    "image/webp",
+}
+CONTENT_TYPE_TO_EXT: dict[str, str] = {
+    "image/png": ".png",
+    "image/jpeg": ".jpg",
+    "image/gif": ".gif",
+    "image/webp": ".webp",
+}
+MAX_IMAGE_SIZE = 5 * 1024 * 1024
+FILENAME_PATTERN = re.compile(r"^[0-9a-f\-]{36}\.(png|jpg|gif|webp)$")
 logger = logging.getLogger(__name__)
 
 
@@ -83,8 +101,8 @@ class ForumService:
         return user.user_id if user else None
 
     @staticmethod
-    def _is_author(doc: ForumPostDocument, *, username: str, user_id: str | None) -> bool:
-        return bool((user_id and doc.user_id == user_id) or doc.username == username)
+    def _is_author(doc: ForumPostDocument, *, user_id: str | None) -> bool:
+        return bool(user_id and doc.user_id == user_id)
 
     @staticmethod
     def _category_to_response(doc: ForumCategoryDocument) -> ForumCategoryResponse:
@@ -104,21 +122,46 @@ class ForumService:
     @staticmethod
     def _to_response(doc: ForumPostDocument, reply_count: int = 0) -> ForumPostResponse:
         """Convert a document to an API response."""
+        user = UserDocument.find_one({"user_id": doc.user_id}).run() if doc.user_id else None
         return ForumPostResponse(
             id=str(doc.id),
             project_id=doc.project_id,
             category=doc.category,
             user_id=doc.user_id,
             username=doc.username,
+            avatar_key=user.avatar_key if user else None,
             title=doc.title,
             content=doc.content,
             parent_id=doc.parent_id,
             reply_count=reply_count,
             is_closed=doc.is_closed,
             is_deleted=doc.is_deleted,
+            is_ai_reply=doc.is_ai_reply,
             created_at=doc.system_info.created_at,
             updated_at=doc.system_info.updated_at,
         )
+
+    @staticmethod
+    def strip_mention(text: str) -> str:
+        """Remove ``@qdash`` mention from text."""
+        return re.sub(r"@qdash\b\s*", "", text).strip()
+
+    @staticmethod
+    def deduplicate_last_message(
+        history: list[dict[str, str]],
+        user_message: str,
+    ) -> list[dict[str, str]]:
+        """Remove the last history entry if it duplicates *user_message*."""
+        if history and history[-1]["role"] == "user" and history[-1]["content"] == user_message:
+            return history[:-1]
+        return history
+
+    @staticmethod
+    def format_ai_response_as_markdown(result: dict[str, Any]) -> str | None:
+        """Convert an AI response dict to Markdown."""
+        from qdash.api.services.issue_service import IssueService
+
+        return IssueService.format_ai_response_as_markdown(result)
 
     @staticmethod
     def _make_category_key(name: str) -> str:
@@ -425,6 +468,137 @@ class ForumService:
 
         return self._to_response(doc)
 
+    def build_ai_reply_context(self, *, project_id: str, post_id: str) -> dict[str, Any]:
+        """Build conversation context for a forum AI reply."""
+        root_doc = ForumPostDocument.find_one(
+            {"_id": ObjectId(post_id), "project_id": project_id, "is_deleted": False}
+        ).run()
+
+        if root_doc is None:
+            return {"root_doc": None}
+
+        actual_root_id = post_id if root_doc.parent_id is None else root_doc.parent_id
+        if root_doc.parent_id is not None:
+            root_doc = ForumPostDocument.find_one(
+                {
+                    "_id": ObjectId(actual_root_id),
+                    "project_id": project_id,
+                    "is_deleted": False,
+                }
+            ).run()
+            if root_doc is None:
+                return {"root_doc": None}
+
+        reply_docs = (
+            ForumPostDocument.find(
+                {"project_id": project_id, "parent_id": actual_root_id, "is_deleted": False}
+            )
+            .sort("system_info.created_at")
+            .to_list()
+        )
+
+        category = ForumCategoryDocument.find_one(
+            {"project_id": project_id, "key": root_doc.category}
+        ).run()
+        category_name = category.name if category else root_doc.category
+        title = root_doc.title or "Forum thread"
+
+        conversation_history: list[dict[str, str]] = [
+            {
+                "role": "user",
+                "content": (
+                    f"Forum category: {category_name}\n"
+                    f"Thread title: {title}\n\n"
+                    f"{self.strip_mention(root_doc.content)}"
+                ),
+            }
+        ]
+
+        for reply_doc in reply_docs:
+            role = "assistant" if reply_doc.is_ai_reply else "user"
+            content = reply_doc.content
+            if role == "user":
+                content = self.strip_mention(content)
+            conversation_history.append({"role": role, "content": content})
+
+        return {
+            "root_doc": root_doc,
+            "actual_root_id": actual_root_id,
+            "conversation_history": conversation_history,
+            "title": title,
+            "category_name": category_name,
+        }
+
+    def save_ai_reply(
+        self,
+        *,
+        project_id: str,
+        parent_id: str,
+        content: str,
+    ) -> ForumPostResponse:
+        """Save an AI-generated forum reply."""
+        root_doc = ForumPostDocument.find_one(
+            {"_id": ObjectId(parent_id), "project_id": project_id, "is_deleted": False}
+        ).run()
+        if root_doc is None:
+            raise HTTPException(status_code=404, detail="Forum post not found")
+
+        ai_doc = ForumPostDocument(
+            project_id=project_id,
+            category=root_doc.category,
+            username="qdash",
+            title=None,
+            content=content,
+            parent_id=parent_id,
+            is_ai_reply=True,
+        )
+        ai_doc.insert()
+        return self._to_response(ai_doc)
+
+    @staticmethod
+    def upload_image(data: bytes, content_type: str) -> str:
+        """Validate and save an uploaded forum image."""
+        if content_type not in ALLOWED_CONTENT_TYPES:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Unsupported image type: {content_type}. " "Allowed: png, jpeg, gif, webp"
+                ),
+            )
+
+        if len(data) > MAX_IMAGE_SIZE:
+            raise HTTPException(status_code=400, detail="Image exceeds 5MB size limit")
+
+        ext = CONTENT_TYPE_TO_EXT[content_type]
+        filename = f"{uuid4()}{ext}"
+        dest = FORUM_IMAGE_DIR / filename
+
+        FORUM_IMAGE_DIR.mkdir(parents=True, exist_ok=True)
+        dest.write_bytes(data)
+
+        return f"/api/forum/images/{filename}"
+
+    @staticmethod
+    def get_image_path(filename: str) -> tuple[Path, str]:
+        """Resolve and validate a forum image filename."""
+        if not FILENAME_PATTERN.match(filename):
+            raise HTTPException(status_code=400, detail="Invalid filename")
+
+        filepath = FORUM_IMAGE_DIR / filename
+        if not filepath.is_file():
+            raise HTTPException(status_code=404, detail="Image not found")
+
+        ext = Path(filename).suffix.lstrip(".")
+        media_types = {
+            "png": "image/png",
+            "jpg": "image/jpeg",
+            "gif": "image/gif",
+            "webp": "image/webp",
+        }
+        media_type = media_types.get(ext, "application/octet-stream")
+
+        return filepath, media_type
+
     def update_post(
         self,
         *,
@@ -441,7 +615,7 @@ class ForumService:
         if doc is None:
             raise HTTPException(status_code=404, detail="Forum post not found")
         user_id = self._user_id_for_username(username)
-        if not self._is_author(doc, username=username, user_id=user_id):
+        if not self._is_author(doc, user_id=user_id):
             raise HTTPException(status_code=403, detail="You can only edit your own posts")
 
         if doc.parent_id is None and title is not None:
@@ -489,10 +663,7 @@ class ForumService:
         if doc is None:
             raise HTTPException(status_code=404, detail="Forum post not found")
         user_id = self._user_id_for_username(username)
-        if (
-            not self._is_author(doc, username=username, user_id=user_id)
-            and role != ProjectRole.OWNER
-        ):
+        if not self._is_author(doc, user_id=user_id) and role != ProjectRole.OWNER:
             raise HTTPException(
                 status_code=403, detail="Only the author or project owner can delete this post"
             )
@@ -530,10 +701,7 @@ class ForumService:
         if doc is None:
             raise HTTPException(status_code=404, detail="Forum thread not found")
         user_id = self._user_id_for_username(username)
-        if (
-            not self._is_author(doc, username=username, user_id=user_id)
-            and role != ProjectRole.OWNER
-        ):
+        if not self._is_author(doc, user_id=user_id) and role != ProjectRole.OWNER:
             raise HTTPException(
                 status_code=403, detail="Only the author or project owner can close this thread"
             )
@@ -562,10 +730,7 @@ class ForumService:
         if doc is None:
             raise HTTPException(status_code=404, detail="Forum thread not found")
         user_id = self._user_id_for_username(username)
-        if (
-            not self._is_author(doc, username=username, user_id=user_id)
-            and role != ProjectRole.OWNER
-        ):
+        if not self._is_author(doc, user_id=user_id) and role != ProjectRole.OWNER:
             raise HTTPException(
                 status_code=403, detail="Only the author or project owner can reopen this thread"
             )

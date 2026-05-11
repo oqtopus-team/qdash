@@ -11,13 +11,15 @@ import {
   List,
   ListOrdered,
   ImageIcon,
-  Bot,
 } from "lucide-react";
 import { MarkdownContent } from "./MarkdownContent";
+import { QdashBotAvatar, UserAvatar } from "./UserAvatar";
 
 interface MentionCandidate {
   id: string;
   label: string;
+  secondaryLabel?: string;
+  avatarKey?: string | null;
   icon?: React.ReactNode;
 }
 
@@ -193,9 +195,14 @@ export function MarkdownEditor({
   const [mentionIndex, setMentionIndex] = useState(0);
   const mentionRef = useRef<HTMLDivElement>(null);
 
-  const filteredMentions = (mentionCandidates ?? []).filter((c) =>
-    c.id.toLowerCase().startsWith(mentionQuery.toLowerCase()),
-  );
+  const filteredMentions = (mentionCandidates ?? []).filter((candidate) => {
+    const query = mentionQuery.toLowerCase();
+    return (
+      candidate.id.toLowerCase().includes(query) ||
+      candidate.label.toLowerCase().includes(query) ||
+      candidate.secondaryLabel?.toLowerCase().includes(query)
+    );
+  });
 
   const closeMention = useCallback(() => {
     setMentionOpen(false);
@@ -465,15 +472,27 @@ export function MarkdownEditor({
                       selectMention(candidate);
                     }}
                   >
-                    {candidate.icon ?? (
-                      <Bot className="h-3.5 w-3.5 text-primary" />
-                    )}
-                    <span className="font-medium">@{candidate.id}</span>
-                    {candidate.label && (
-                      <span className="text-base-content/50 text-xs">
-                        {candidate.label}
+                    {candidate.icon ??
+                      (candidate.id === "qdash" ? (
+                        <QdashBotAvatar size={20} />
+                      ) : (
+                        <UserAvatar
+                          username={candidate.id}
+                          avatarKey={candidate.avatarKey}
+                          size={20}
+                        />
+                      ))}
+                    <span className="flex min-w-0 flex-col">
+                      <span className="font-medium truncate">
+                        {candidate.label || `@${candidate.id}`}
                       </span>
-                    )}
+                      <span className="text-base-content/50 text-xs truncate">
+                        @{candidate.id}
+                        {candidate.secondaryLabel
+                          ? ` · ${candidate.secondaryLabel}`
+                          : ""}
+                      </span>
+                    </span>
                   </button>
                 ))}
               </div>

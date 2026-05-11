@@ -6,4 +6,4 @@
  * OpenAPI spec version: 0.0.1
  */
 
-export type UserWithTokenUserId = string | null;
+export type UserWithTokenAvatarKey = string | null;

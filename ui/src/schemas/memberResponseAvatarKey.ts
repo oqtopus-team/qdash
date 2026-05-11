@@ -6,4 +6,4 @@
  * OpenAPI spec version: 0.0.1
  */
 
-export type BulkUserImportResultFullName = string | null;
+export type MemberResponseAvatarKey = string | null;

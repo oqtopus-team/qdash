@@ -74,7 +74,9 @@ def get_user(username: str) -> UserInDB | None:
         return UserInDB(
             user_id=user.user_id,
             username=user.username,
-            full_name=user.full_name,
+            display_name=user.display_name,
+            organization=user.organization,
+            avatar_key=user.avatar_key,
             disabled=user.disabled,
             default_project_id=user.default_project_id,
             must_change_password=user.must_change_password,
@@ -96,7 +98,9 @@ def get_user_by_token(access_token: str) -> UserInDB | None:
         return UserInDB(
             user_id=user.user_id,
             username=user.username,
-            full_name=user.full_name,
+            display_name=user.display_name,
+            organization=user.organization,
+            avatar_key=user.avatar_key,
             disabled=user.disabled,
             default_project_id=user.default_project_id,
             must_change_password=user.must_change_password,
@@ -168,7 +172,9 @@ def get_current_user(
     return User(
         user_id=user.user_id,
         username=user.username,
-        full_name=user.full_name,
+        display_name=user.display_name,
+        organization=user.organization,
+        avatar_key=user.avatar_key,
         disabled=user.disabled,
         default_project_id=user.default_project_id,
         must_change_password=user.must_change_password,
@@ -223,7 +229,9 @@ def get_current_active_user(
     return User(
         user_id=user.user_id,
         username=user.username,
-        full_name=user.full_name,
+        display_name=user.display_name,
+        organization=user.organization,
+        avatar_key=user.avatar_key,
         disabled=user.disabled,
         default_project_id=user.default_project_id,
         must_change_password=user.must_change_password,

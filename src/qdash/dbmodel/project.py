@@ -16,7 +16,7 @@ class ProjectDocument(Document):
     project_id: str = Field(
         default_factory=lambda: str(uuid.uuid4()), description="Project identifier"
     )
-    owner_user_id: str | None = Field(default=None, description="Project owner user ID")
+    owner_user_id: str = Field(..., description="Project owner user ID")
     owner_username: str = Field(..., description="Project owner username snapshot")
     name: str = Field(..., description="Project display name")
     description: str | None = Field(default=None, description="Project description")

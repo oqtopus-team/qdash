@@ -6,4 +6,4 @@
  * OpenAPI spec version: 0.0.1
  */
 
-export type ProjectResponseOwnerUserId = string | null;
+export type UpdateUserRequestOrganization = string | null;

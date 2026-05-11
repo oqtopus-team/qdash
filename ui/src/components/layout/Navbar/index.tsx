@@ -1,5 +1,7 @@
 "use client";
 
+import { Folder, FolderLock } from "lucide-react";
+
 import { EnvironmentBadge } from "@/components/ui/EnvironmentBadge";
 import { useProject } from "@/contexts/ProjectContext";
 import { useSidebar } from "@/contexts/SidebarContext";
@@ -48,22 +50,13 @@ function ProjectSelector() {
     <>
       <div className="dropdown dropdown-bottom">
         <div tabIndex={0} role="button" className="btn btn-ghost btn-sm gap-2">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-            strokeWidth={1.5}
-            stroke="currentColor"
-            className="w-4 h-4"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M2.25 12.75V12A2.25 2.25 0 0 1 4.5 9.75h15A2.25 2.25 0 0 1 21.75 12v.75m-8.69-6.44-2.12-2.12a1.5 1.5 0 0 0-1.061-.44H4.5A2.25 2.25 0 0 0 2.25 6v12a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9a2.25 2.25 0 0 0-2.25-2.25h-5.379a1.5 1.5 0 0 1-1.06-.44Z"
-            />
-          </svg>
+          {currentProject ? (
+            <Folder size={16} aria-hidden="true" />
+          ) : (
+            <FolderLock size={16} aria-hidden="true" />
+          )}
           <span className="max-w-32 truncate">
-            {currentProject?.name ?? "Select Project"}
+            {currentProject?.name ?? "No projects"}
           </span>
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -84,6 +77,16 @@ function ProjectSelector() {
           tabIndex={0}
           className="dropdown-content z-[1] menu p-2 shadow bg-base-100 rounded-box w-64 max-h-80 overflow-y-auto"
         >
+          {projects.length === 0 && (
+            <li>
+              <span className="menu-disabled flex flex-col items-start">
+                <span className="font-medium">No projects available</span>
+                <span className="text-xs opacity-60">
+                  Ask an owner or admin for an invitation.
+                </span>
+              </span>
+            </li>
+          )}
           {projects.map((project) => (
             <li key={project.project_id}>
               <button
