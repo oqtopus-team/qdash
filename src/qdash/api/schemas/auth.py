@@ -8,6 +8,7 @@ class User(BaseModel):
     user_id: str
     username: str
     full_name: str | None = None
+    organization: str | None = None
     disabled: bool | None = None
     default_project_id: str | None = None
     must_change_password: bool = False
@@ -20,6 +21,7 @@ class UserWithToken(BaseModel):
     user_id: str
     username: str
     full_name: str | None = None
+    organization: str | None = None
     disabled: bool | None = None
     default_project_id: str | None = None
     must_change_password: bool = False
@@ -41,6 +43,7 @@ class UserCreate(BaseModel):
     username: Username
     password: str | None = None
     full_name: str | None = None
+    organization: str | None = None
     create_default_project: bool = False
 
 

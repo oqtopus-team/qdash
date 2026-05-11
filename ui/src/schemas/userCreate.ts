@@ -7,6 +7,7 @@
  */
 import type { UserCreatePassword } from "./userCreatePassword";
 import type { UserCreateFullName } from "./userCreateFullName";
+import type { UserCreateOrganization } from "./userCreateOrganization";
 
 /**
  * User creation model for registration (admin only).
@@ -16,5 +17,6 @@ export interface UserCreate {
   username: string;
   password?: UserCreatePassword;
   full_name?: UserCreateFullName;
+  organization?: UserCreateOrganization;
   create_default_project?: boolean;
 }

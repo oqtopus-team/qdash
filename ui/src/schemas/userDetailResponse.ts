@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.0.1
  */
 import type { UserDetailResponseFullName } from "./userDetailResponseFullName";
+import type { UserDetailResponseOrganization } from "./userDetailResponseOrganization";
 import type { SystemRole } from "./systemRole";
 import type { UserDetailResponseDefaultProjectId } from "./userDetailResponseDefaultProjectId";
 import type { UserDetailResponseCreatedAt } from "./userDetailResponseCreatedAt";
@@ -18,6 +19,7 @@ export interface UserDetailResponse {
   user_id: string;
   username: string;
   full_name?: UserDetailResponseFullName;
+  organization?: UserDetailResponseOrganization;
   disabled?: boolean;
   system_role?: SystemRole;
   default_project_id?: UserDetailResponseDefaultProjectId;

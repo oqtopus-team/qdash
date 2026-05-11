@@ -102,6 +102,7 @@ export function AdminPageContent() {
   };
 
   const handleUpdateUser = async (updates: {
+    organization?: string;
     disabled?: boolean;
     system_role?: SystemRole;
   }) => {
@@ -136,6 +137,7 @@ export function AdminPageContent() {
   const handleCreateUser = async (userData: {
     username: string;
     full_name?: string;
+    organization?: string;
     create_default_project?: boolean;
   }): Promise<string | null> => {
     try {
@@ -318,6 +320,9 @@ export function AdminPageContent() {
                         <p className="text-sm text-base-content/60">
                           {userItem.full_name || "-"}
                         </p>
+                        <p className="text-xs text-base-content/50">
+                          {userItem.organization || "No organization"}
+                        </p>
                       </div>
                       <div className="flex flex-col gap-1 items-end">
                         <span
@@ -388,6 +393,7 @@ export function AdminPageContent() {
                   <tr>
                     <th>Username</th>
                     <th>Full Name</th>
+                    <th>Organization</th>
                     <th>System Role</th>
                     <th>Default Project</th>
                     <th>Status</th>
@@ -399,6 +405,7 @@ export function AdminPageContent() {
                     <tr key={userItem.username}>
                       <td className="font-mono">{userItem.username}</td>
                       <td>{userItem.full_name || "-"}</td>
+                      <td>{userItem.organization || "-"}</td>
                       <td>
                         <span
                           className={`badge ${
@@ -767,9 +774,14 @@ function EditUserModal({
   user: UserListItem;
   currentUsername?: string;
   onClose: () => void;
-  onSave: (updates: { disabled?: boolean; system_role?: SystemRole }) => void;
+  onSave: (updates: {
+    organization?: string;
+    disabled?: boolean;
+    system_role?: SystemRole;
+  }) => void;
   isLoading: boolean;
 }) {
+  const [organization, setOrganization] = useState(user.organization ?? "");
   const [disabled, setDisabled] = useState(user.disabled ?? false);
   const [systemRole, setSystemRole] = useState<SystemRole>(
     user.system_role ?? "user",
@@ -784,6 +796,7 @@ function EditUserModal({
 
   const handleSave = () => {
     onSave({
+      organization: organization.trim(),
       disabled,
       system_role: systemRole,
     });
@@ -826,6 +839,19 @@ function EditUserModal({
         <h3 className="font-bold text-lg mb-4">Edit User: {user.username}</h3>
 
         <div className="space-y-4">
+          <div className="form-control">
+            <label className="label">
+              <span className="label-text font-medium">Organization</span>
+            </label>
+            <input
+              type="text"
+              className="input input-bordered w-full"
+              value={organization}
+              onChange={(e) => setOrganization(e.target.value)}
+              placeholder="Enter organization or affiliation"
+            />
+          </div>
+
           {/* Status */}
           <div className="form-control">
             <label className="label cursor-pointer justify-start gap-4">
@@ -981,6 +1007,7 @@ function CreateUserModal({
   onSave: (userData: {
     username: string;
     full_name?: string;
+    organization?: string;
     create_default_project?: boolean;
   }) => Promise<string | null>;
   isLoading: boolean;
@@ -988,6 +1015,7 @@ function CreateUserModal({
 }) {
   const [username, setUsername] = useState("");
   const [fullName, setFullName] = useState("");
+  const [organization, setOrganization] = useState("");
   const [createDefaultProject, setCreateDefaultProject] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
   const [temporaryPassword, setTemporaryPassword] = useState<string | null>(
@@ -1007,6 +1035,7 @@ function CreateUserModal({
       const generatedPassword = await onSave({
         username: username.trim(),
         full_name: fullName.trim() || undefined,
+        organization: organization.trim() || undefined,
         create_default_project: createDefaultProject,
       });
       setTemporaryPassword(generatedPassword);
@@ -1105,6 +1134,19 @@ function CreateUserModal({
                 </span>
               </label>
             </div>
+
+            <div className="form-control">
+              <label className="label">
+                <span className="label-text font-medium">Organization</span>
+              </label>
+              <input
+                type="text"
+                className="input input-bordered w-full"
+                value={organization}
+                onChange={(e) => setOrganization(e.target.value)}
+                placeholder="Enter organization or affiliation (optional)"
+              />
+            </div>
             <label className="form-control cursor-pointer rounded-lg border border-base-300 bg-base-100 p-3">
               <div className="flex items-start gap-3">
                 <input
@@ -1166,6 +1208,7 @@ function buildBulkImportResultCsv(result: BulkUserImportResponse): string {
     "row_number",
     "username",
     "full_name",
+    "organization",
     "system_role",
     "initial_password",
     "status",
@@ -1176,6 +1219,7 @@ function buildBulkImportResultCsv(result: BulkUserImportResponse): string {
       row.row_number,
       row.username,
       row.full_name,
+      row.organization,
       row.system_role,
       row.initial_password,
       row.status,
@@ -1267,6 +1311,7 @@ function BulkImportUsersModal({
                   <tr>
                     <th>Row</th>
                     <th>Username</th>
+                    <th>Organization</th>
                     <th>Role</th>
                     <th>Status</th>
                     <th>Message</th>
@@ -1277,6 +1322,7 @@ function BulkImportUsersModal({
                     <tr key={`${row.row_number}-${row.username}`}>
                       <td>{row.row_number}</td>
                       <td className="font-mono">{row.username || "-"}</td>
+                      <td>{row.organization || "-"}</td>
                       <td>{row.system_role || "-"}</td>
                       <td>
                         <span
@@ -1324,11 +1370,11 @@ function BulkImportUsersModal({
             <div className="rounded-lg border border-base-300 bg-base-100 p-3">
               <div className="text-sm font-medium">Expected columns</div>
               <pre className="mt-2 overflow-x-auto rounded bg-base-200 p-3 text-xs">
-                username,full_name,system_role
+                username,full_name,organization,system_role
                 {"\n"}
-                alice,Alice Sato,user
+                alice,Alice Sato,Example Lab,user
                 {"\n"}
-                bob,Bob Tanaka,admin
+                bob,Bob Tanaka,Operations,admin
               </pre>
               <p className="mt-2 text-xs text-base-content/60">
                 Add users to projects from the Projects tab after importing
@@ -1483,6 +1529,7 @@ function MembersModal({
                   <tr>
                     <th>Username</th>
                     <th>Full Name</th>
+                    <th>Organization</th>
                     <th>Role</th>
                     <th>Actions</th>
                   </tr>
@@ -1492,6 +1539,7 @@ function MembersModal({
                     <tr key={member.username}>
                       <td className="font-mono">{member.username}</td>
                       <td>{member.full_name || "-"}</td>
+                      <td>{member.organization || "-"}</td>
                       <td>
                         <span
                           className={`badge ${getRoleBadgeClass(member.role)}`}
@@ -1527,7 +1575,7 @@ function MembersModal({
                   {members.length === 0 && (
                     <tr>
                       <td
-                        colSpan={4}
+                        colSpan={5}
                         className="text-center text-base-content/60"
                       >
                         No members found
@@ -1577,6 +1625,7 @@ function MembersModal({
                       <option key={u.username} value={u.username}>
                         {u.username}
                         {u.full_name ? ` (${u.full_name})` : ""}
+                        {u.organization ? ` - ${u.organization}` : ""}
                       </option>
                     ))}
                   </select>

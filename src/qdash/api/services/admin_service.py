@@ -47,6 +47,7 @@ REQUIRED_BULK_IMPORT_COLUMNS = {"username"}
 SUPPORTED_BULK_IMPORT_COLUMNS = {
     "username",
     "full_name",
+    "organization",
     "system_role",
 }
 
@@ -69,6 +70,7 @@ class AdminService:
             user_id=user.user_id,
             username=user.username,
             full_name=user.full_name,
+            organization=user.organization,
             disabled=user.disabled,
             system_role=user.system_role,
             default_project_id=user.default_project_id,
@@ -103,6 +105,7 @@ class AdminService:
             row_number=row_number,
             username=(row.get("username") or "").strip(),
             full_name=(row.get("full_name") or "").strip() or None,
+            organization=(row.get("organization") or "").strip() or None,
             system_role=system_role,
             initial_password=initial_password,
             status=status_value,
@@ -175,6 +178,7 @@ class AdminService:
                     user_id=generate_user_id(),
                     username=username,
                     full_name=row.get("full_name") or None,
+                    organization=row.get("organization") or None,
                     hashed_password=get_password_hash(initial_password),
                     access_token=secrets.token_urlsafe(32),
                     disabled=False,
@@ -226,6 +230,7 @@ class AdminService:
                     user_id=u.user_id,
                     username=u.username,
                     full_name=u.full_name,
+                    organization=u.organization,
                     disabled=u.disabled,
                     system_role=u.system_role,
                     default_project_id=project_id,
@@ -250,6 +255,7 @@ class AdminService:
         username: str,
         admin_username: str,
         full_name: str | None = None,
+        organization: str | None = None,
         disabled: bool | None = None,
         system_role: SystemRole | None = None,
     ) -> UserDetailResponse:
@@ -281,6 +287,8 @@ class AdminService:
 
         if full_name is not None:
             user.full_name = full_name
+        if organization is not None:
+            user.organization = organization
         if disabled is not None:
             user.disabled = disabled
         if system_role is not None:
@@ -390,6 +398,7 @@ class AdminService:
                     user_id=m.user_id,
                     username=m.username,
                     full_name=user.full_name if user else None,
+                    organization=user.organization if user else None,
                     role=m.role,
                     status=m.status,
                 )
@@ -437,6 +446,7 @@ class AdminService:
                 user_id=existing.user_id,
                 username=existing.username,
                 full_name=user.full_name,
+                organization=user.organization,
                 role=existing.role,
                 status=existing.status,
             )
@@ -458,6 +468,7 @@ class AdminService:
             user_id=membership.user_id,
             username=membership.username,
             full_name=user.full_name,
+            organization=user.organization,
             role=membership.role,
             status=membership.status,
         )

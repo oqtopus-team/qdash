@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.0.1
  */
 import type { UserListItemFullName } from "./userListItemFullName";
+import type { UserListItemOrganization } from "./userListItemOrganization";
 import type { SystemRole } from "./systemRole";
 import type { UserListItemDefaultProjectId } from "./userListItemDefaultProjectId";
 
@@ -16,6 +17,7 @@ export interface UserListItem {
   user_id: string;
   username: string;
   full_name?: UserListItemFullName;
+  organization?: UserListItemOrganization;
   disabled?: boolean;
   system_role?: SystemRole;
   default_project_id?: UserListItemDefaultProjectId;

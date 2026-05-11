@@ -119,6 +119,7 @@ def register_user(
         user_id=user.user_id,
         username=user.username,
         full_name=user.full_name,
+        organization=user.organization,
         disabled=user.disabled,
         default_project_id=user.default_project_id,
         must_change_password=user.must_change_password,
