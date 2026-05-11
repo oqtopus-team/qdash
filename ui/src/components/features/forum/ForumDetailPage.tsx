@@ -33,6 +33,7 @@ import { QdashBotAvatar, UserAvatar } from "@/components/ui/UserAvatar";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProject } from "@/contexts/ProjectContext";
 import { useForumAiReply } from "@/hooks/useForumAiReply";
+import { useImageUpload } from "@/hooks/useImageUpload";
 import { formatRelativeTime } from "@/lib/utils/datetime";
 import type { ForumPostResponse } from "@/schemas";
 
@@ -60,6 +61,7 @@ function PostBody({
   onCancel,
   onSave,
   saving,
+  onImageUpload,
 }: {
   post: ForumPostResponse;
   currentUsername?: string;
@@ -73,6 +75,7 @@ function PostBody({
   onCancel: () => void;
   onSave: () => void;
   saving: boolean;
+  onImageUpload?: (file: File) => Promise<string>;
 }) {
   const canEdit = currentUsername === post.username;
   const isAi = post.is_ai_reply || post.username === "qdash";
@@ -143,6 +146,7 @@ function PostBody({
             onSubmit={onSave}
             rows={4}
             placeholder="Edit post..."
+            onImageUpload={onImageUpload}
           />
           <div className="flex justify-end gap-2">
             <button className="btn btn-ghost btn-sm" onClick={onCancel}>
@@ -176,6 +180,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const { isOwner, projectId } = useProject();
+  const { uploadImage } = useImageUpload("forum");
   const currentUsername = user?.username;
   const [replyText, setReplyText] = useState("");
   const [editingRoot, setEditingRoot] = useState(false);
@@ -406,6 +411,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
         onCancel={() => setEditingRoot(false)}
         onSave={handleSaveRoot}
         saving={updateMutation.isPending}
+        onImageUpload={uploadImage}
       />
 
       <div className="divider text-xs text-base-content/40">
@@ -433,6 +439,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
                 onCancel={() => setEditingReplyId(null)}
                 onSave={handleSaveReply}
                 saving={updateMutation.isPending}
+                onImageUpload={uploadImage}
               />
             ))}
             {replies.length >= replyLimit && (
@@ -481,6 +488,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
             submitLabel="Reply"
             isSubmitting={createMutation.isPending}
             mentionCandidates={mentionCandidates}
+            onImageUpload={uploadImage}
           />
         )}
       </div>
