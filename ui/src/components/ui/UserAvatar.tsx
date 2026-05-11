@@ -4,7 +4,7 @@ import Image from "next/image";
 
 import { FluentEmoji, getAvatarEmoji } from "@/components/ui/FluentEmoji";
 
-export type AvatarPreset = {
+type AvatarPreset = {
   key: string;
   label: string;
 };
@@ -40,7 +40,7 @@ export const AVATAR_PRESETS: AvatarPreset[] = [
   { key: "planet", label: "Planet" },
 ];
 
-export function resolveAvatarKey(username: string, avatarKey?: string | null) {
+function resolveAvatarKey(username: string, avatarKey?: string | null) {
   return avatarKey || getAvatarEmoji(username);
 }
 
