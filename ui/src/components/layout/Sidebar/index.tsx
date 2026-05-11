@@ -439,7 +439,7 @@ export function Sidebar() {
               {user?.username || "User"}
             </div>
             <div className="text-xs opacity-60 truncate">
-              {user?.full_name || ""}
+              {user?.display_name || ""}
             </div>
             {user?.system_role && (
               <div className="mt-0.5">
@@ -465,8 +465,8 @@ export function Sidebar() {
             <FluentEmoji name={avatarEmoji} size={64} />
           </div>
           <h2 className="text-lg font-bold">{user?.username}</h2>
-          {user?.full_name && (
-            <p className="text-sm text-base-content/60">{user?.full_name}</p>
+          {user?.display_name && (
+            <p className="text-sm text-base-content/60">{user?.display_name}</p>
           )}
           {user?.system_role && (
             <span

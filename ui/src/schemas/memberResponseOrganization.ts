@@ -6,4 +6,4 @@
  * OpenAPI spec version: 0.0.1
  */
 
-export type UpdateUserRequestFullName = string | null;
+export type MemberResponseOrganization = string | null;

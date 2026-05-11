@@ -151,7 +151,7 @@ def create_initial_admin() -> None:
         username=admin_username,
         hashed_password=hashed_password,
         access_token=access_token,
-        full_name="Administrator",
+        display_name="Administrator",
         system_role=SystemRole.ADMIN,
         system_info=SystemInfoModel(),
     )

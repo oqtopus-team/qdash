@@ -46,7 +46,7 @@ MAX_BULK_IMPORT_ROWS = 500
 REQUIRED_BULK_IMPORT_COLUMNS = {"username"}
 SUPPORTED_BULK_IMPORT_COLUMNS = {
     "username",
-    "full_name",
+    "display_name",
     "organization",
     "system_role",
 }
@@ -69,7 +69,7 @@ class AdminService:
         return UserDetailResponse(
             user_id=user.user_id,
             username=user.username,
-            full_name=user.full_name,
+            display_name=user.display_name,
             organization=user.organization,
             disabled=user.disabled,
             system_role=user.system_role,
@@ -104,7 +104,7 @@ class AdminService:
         return BulkUserImportResult(
             row_number=row_number,
             username=(row.get("username") or "").strip(),
-            full_name=(row.get("full_name") or "").strip() or None,
+            display_name=(row.get("display_name") or "").strip() or None,
             organization=(row.get("organization") or "").strip() or None,
             system_role=system_role,
             initial_password=initial_password,
@@ -177,7 +177,7 @@ class AdminService:
                 user = UserDocument(
                     user_id=generate_user_id(),
                     username=username,
-                    full_name=row.get("full_name") or None,
+                    display_name=row.get("display_name") or None,
                     organization=row.get("organization") or None,
                     hashed_password=get_password_hash(initial_password),
                     access_token=secrets.token_urlsafe(32),
@@ -229,7 +229,7 @@ class AdminService:
                 UserListItem(
                     user_id=u.user_id,
                     username=u.username,
-                    full_name=u.full_name,
+                    display_name=u.display_name,
                     organization=u.organization,
                     disabled=u.disabled,
                     system_role=u.system_role,
@@ -254,7 +254,7 @@ class AdminService:
         self,
         username: str,
         admin_username: str,
-        full_name: str | None = None,
+        display_name: str | None = None,
         organization: str | None = None,
         disabled: bool | None = None,
         system_role: SystemRole | None = None,
@@ -285,8 +285,8 @@ class AdminService:
                     detail="Cannot change your own system role",
                 )
 
-        if full_name is not None:
-            user.full_name = full_name
+        if display_name is not None:
+            user.display_name = display_name
         if organization is not None:
             user.organization = organization
         if disabled is not None:
@@ -397,7 +397,7 @@ class AdminService:
                 MemberItem(
                     user_id=m.user_id,
                     username=m.username,
-                    full_name=user.full_name if user else None,
+                    display_name=user.display_name if user else None,
                     organization=user.organization if user else None,
                     role=m.role,
                     status=m.status,
@@ -445,7 +445,7 @@ class AdminService:
             return MemberItem(
                 user_id=existing.user_id,
                 username=existing.username,
-                full_name=user.full_name,
+                display_name=user.display_name,
                 organization=user.organization,
                 role=existing.role,
                 status=existing.status,
@@ -467,7 +467,7 @@ class AdminService:
         return MemberItem(
             user_id=membership.user_id,
             username=membership.username,
-            full_name=user.full_name,
+            display_name=user.display_name,
             organization=user.organization,
             role=membership.role,
             status=membership.status,

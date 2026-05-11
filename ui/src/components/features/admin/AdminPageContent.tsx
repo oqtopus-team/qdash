@@ -136,7 +136,7 @@ export function AdminPageContent() {
 
   const handleCreateUser = async (userData: {
     username: string;
-    full_name?: string;
+    display_name?: string;
     organization?: string;
     create_default_project?: boolean;
   }): Promise<string | null> => {
@@ -318,7 +318,7 @@ export function AdminPageContent() {
                           {userItem.username}
                         </h3>
                         <p className="text-sm text-base-content/60">
-                          {userItem.full_name || "-"}
+                          {userItem.display_name || "-"}
                         </p>
                         <p className="text-xs text-base-content/50">
                           {userItem.organization || "No organization"}
@@ -392,7 +392,7 @@ export function AdminPageContent() {
                 <thead>
                   <tr>
                     <th>Username</th>
-                    <th>Full Name</th>
+                    <th>Display Name</th>
                     <th>Organization</th>
                     <th>System Role</th>
                     <th>Default Project</th>
@@ -404,7 +404,7 @@ export function AdminPageContent() {
                   {usersData?.data?.users.map((userItem: UserListItem) => (
                     <tr key={userItem.username}>
                       <td className="font-mono">{userItem.username}</td>
-                      <td>{userItem.full_name || "-"}</td>
+                      <td>{userItem.display_name || "-"}</td>
                       <td>{userItem.organization || "-"}</td>
                       <td>
                         <span
@@ -1006,7 +1006,7 @@ function CreateUserModal({
   onClose: () => void;
   onSave: (userData: {
     username: string;
-    full_name?: string;
+    display_name?: string;
     organization?: string;
     create_default_project?: boolean;
   }) => Promise<string | null>;
@@ -1014,7 +1014,7 @@ function CreateUserModal({
   error: Error | unknown | null;
 }) {
   const [username, setUsername] = useState("");
-  const [fullName, setFullName] = useState("");
+  const [displayName, setDisplayName] = useState("");
   const [organization, setOrganization] = useState("");
   const [createDefaultProject, setCreateDefaultProject] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
@@ -1034,7 +1034,7 @@ function CreateUserModal({
     try {
       const generatedPassword = await onSave({
         username: username.trim(),
-        full_name: fullName.trim() || undefined,
+        display_name: displayName.trim() || undefined,
         organization: organization.trim() || undefined,
         create_default_project: createDefaultProject,
       });
@@ -1119,14 +1119,14 @@ function CreateUserModal({
 
             <div className="form-control">
               <label className="label">
-                <span className="label-text font-medium">Full Name</span>
+                <span className="label-text font-medium">Display Name</span>
               </label>
               <input
                 type="text"
                 className="input input-bordered w-full"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                placeholder="Enter full name (optional)"
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                placeholder="Enter display name (optional)"
               />
               <label className="label">
                 <span className="label-text-alt text-base-content/60">
@@ -1207,7 +1207,7 @@ function buildBulkImportResultCsv(result: BulkUserImportResponse): string {
   const headers = [
     "row_number",
     "username",
-    "full_name",
+    "display_name",
     "organization",
     "system_role",
     "initial_password",
@@ -1218,7 +1218,7 @@ function buildBulkImportResultCsv(result: BulkUserImportResponse): string {
     [
       row.row_number,
       row.username,
-      row.full_name,
+      row.display_name,
       row.organization,
       row.system_role,
       row.initial_password,
@@ -1370,7 +1370,7 @@ function BulkImportUsersModal({
             <div className="rounded-lg border border-base-300 bg-base-100 p-3">
               <div className="text-sm font-medium">Expected columns</div>
               <pre className="mt-2 overflow-x-auto rounded bg-base-200 p-3 text-xs">
-                username,full_name,organization,system_role
+                username,display_name,organization,system_role
                 {"\n"}
                 alice,Alice Sato,Example Lab,user
                 {"\n"}
@@ -1528,7 +1528,7 @@ function MembersModal({
                 <thead>
                   <tr>
                     <th>Username</th>
-                    <th>Full Name</th>
+                    <th>Display Name</th>
                     <th>Organization</th>
                     <th>Role</th>
                     <th>Actions</th>
@@ -1538,7 +1538,7 @@ function MembersModal({
                   {members.map((member: MemberItem) => (
                     <tr key={member.username}>
                       <td className="font-mono">{member.username}</td>
-                      <td>{member.full_name || "-"}</td>
+                      <td>{member.display_name || "-"}</td>
                       <td>{member.organization || "-"}</td>
                       <td>
                         <span
@@ -1624,7 +1624,7 @@ function MembersModal({
                     {availableUsers.map((u: UserListItem) => (
                       <option key={u.username} value={u.username}>
                         {u.username}
-                        {u.full_name ? ` (${u.full_name})` : ""}
+                        {u.display_name ? ` (${u.display_name})` : ""}
                         {u.organization ? ` - ${u.organization}` : ""}
                       </option>
                     ))}

@@ -21,7 +21,7 @@ class UserDocument(Document):
         username (str): The login username.
         hashed_password (str): The hashed password.
         access_token (str): The API access token for authentication.
-        full_name (Optional[str]): The full name of the user.
+        display_name (Optional[str]): The display name of the user.
         organization (Optional[str]): The user's organization or affiliation.
         disabled (bool): Whether the user is disabled.
         system_role (SystemRole): The system-level role (admin/user).
@@ -34,7 +34,7 @@ class UserDocument(Document):
     username: Username = Field(description=USERNAME_PATTERN_DESCRIPTION)
     hashed_password: str = Field(description="The hashed password")
     access_token: str = Field(description="The API access token for authentication")
-    full_name: str | None = Field(default=None, description="The full name of the user")
+    display_name: str | None = Field(default=None, description="The display name of the user")
     organization: str | None = Field(
         default=None,
         description="The user's organization or affiliation",

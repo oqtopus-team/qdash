@@ -5,7 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { UserWithTokenFullName } from "./userWithTokenFullName";
+import type { UserWithTokenDisplayName } from "./userWithTokenDisplayName";
 import type { UserWithTokenOrganization } from "./userWithTokenOrganization";
 import type { UserWithTokenDisabled } from "./userWithTokenDisabled";
 import type { UserWithTokenDefaultProjectId } from "./userWithTokenDefaultProjectId";
@@ -18,7 +18,7 @@ import type { UserWithTokenInitialPassword } from "./userWithTokenInitialPasswor
 export interface UserWithToken {
   user_id: string;
   username: string;
-  full_name?: UserWithTokenFullName;
+  display_name?: UserWithTokenDisplayName;
   organization?: UserWithTokenOrganization;
   disabled?: UserWithTokenDisabled;
   default_project_id?: UserWithTokenDefaultProjectId;

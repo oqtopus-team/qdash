@@ -6,7 +6,7 @@
  * OpenAPI spec version: 0.0.1
  */
 import type { UserCreatePassword } from "./userCreatePassword";
-import type { UserCreateFullName } from "./userCreateFullName";
+import type { UserCreateDisplayName } from "./userCreateDisplayName";
 import type { UserCreateOrganization } from "./userCreateOrganization";
 
 /**
@@ -16,7 +16,7 @@ export interface UserCreate {
   /** @pattern ^[a-z0-9][a-z0-9._-]{1,62}[a-z0-9]$ */
   username: string;
   password?: UserCreatePassword;
-  full_name?: UserCreateFullName;
+  display_name?: UserCreateDisplayName;
   organization?: UserCreateOrganization;
   create_default_project?: boolean;
 }

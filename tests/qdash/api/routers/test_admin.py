@@ -17,7 +17,7 @@ class TestAdminUsersEndpoints:
         """Create admin user."""
         user = UserDocument(
             username="admin",
-            full_name="Admin User",
+            display_name="Admin User",
             hashed_password="hashed",
             access_token="admin-token",
             disabled=False,
@@ -33,7 +33,7 @@ class TestAdminUsersEndpoints:
         """Create regular user."""
         user = UserDocument(
             username="regularuser",
-            full_name="Regular User",
+            display_name="Regular User",
             organization="Example Lab",
             hashed_password="hashed",
             access_token="regular-token",
@@ -104,7 +104,7 @@ class TestAdminUsersEndpoints:
         assert response.status_code == 200
         data = response.json()
         assert data["username"] == "regularuser"
-        assert data["full_name"] == "Regular User"
+        assert data["display_name"] == "Regular User"
         assert data["organization"] == "Example Lab"
         assert data["system_role"] == "user"
 
@@ -118,11 +118,11 @@ class TestAdminUsersEndpoints:
         response = test_client.put(
             "/admin/users/regularuser",
             headers=admin_headers,
-            json={"full_name": "Updated Name", "organization": "Updated Org"},
+            json={"display_name": "Updated Name", "organization": "Updated Org"},
         )
         assert response.status_code == 200
         data = response.json()
-        assert data["full_name"] == "Updated Name"
+        assert data["display_name"] == "Updated Name"
         assert data["organization"] == "Updated Org"
 
     def test_update_user_disable(self, test_client, admin_user, regular_user, admin_headers):
@@ -171,7 +171,7 @@ class TestAdminUsersEndpoints:
     ):
         """Admin can bulk import users and download generated passwords from response."""
         csv_content = (
-            "username,full_name,organization,system_role\n"
+            "username,display_name,organization,system_role\n"
             "bulkviewer,Bulk Viewer,Viewer Lab,user\n"
             "bulkadmin,Bulk Admin,Admin Lab,admin\n"
         )
@@ -211,7 +211,7 @@ class TestAdminUsersEndpoints:
         self, test_client, admin_user, regular_user, admin_headers
     ):
         """Existing users are skipped and do not return password information."""
-        csv_content = "username,full_name\nregularuser,Regular Duplicate\n"
+        csv_content = "username,display_name\nregularuser,Regular Duplicate\n"
         response = test_client.post(
             "/admin/users/bulk-import",
             headers=admin_headers,
@@ -229,7 +229,7 @@ class TestAdminUsersEndpoints:
         self, test_client, admin_user, admin_headers
     ):
         """Bulk import rejects usernames outside the canonical format."""
-        csv_content = "username,full_name\ntaka fumi,Invalid Username\n"
+        csv_content = "username,display_name\ntaka fumi,Invalid Username\n"
         response = test_client.post(
             "/admin/users/bulk-import",
             headers=admin_headers,
@@ -247,7 +247,7 @@ class TestAdminUsersEndpoints:
         self, test_client, admin_user, admin_headers
     ):
         """Bulk import only creates accounts; project membership is managed separately."""
-        csv_content = "username,full_name,project_id\nprojectuser,Project User,proj-001\n"
+        csv_content = "username,display_name,project_id\nprojectuser,Project User,proj-001\n"
         response = test_client.post(
             "/admin/users/bulk-import",
             headers=admin_headers,
@@ -267,7 +267,7 @@ class TestAdminProjectsEndpoints:
         """Create admin user."""
         user = UserDocument(
             username="admin",
-            full_name="Admin User",
+            display_name="Admin User",
             hashed_password="hashed",
             access_token="admin-token",
             disabled=False,
@@ -283,7 +283,7 @@ class TestAdminProjectsEndpoints:
         """Create project owner user."""
         user = UserDocument(
             username="projectowner",
-            full_name="Project Owner",
+            display_name="Project Owner",
             hashed_password="hashed",
             access_token="owner-token",
             disabled=False,
@@ -373,7 +373,7 @@ class TestAdminMembersEndpoints:
         """Create admin user."""
         user = UserDocument(
             username="admin",
-            full_name="Admin User",
+            display_name="Admin User",
             hashed_password="hashed",
             access_token="admin-token",
             disabled=False,
@@ -389,7 +389,7 @@ class TestAdminMembersEndpoints:
         """Create project owner user."""
         user = UserDocument(
             username="projectowner",
-            full_name="Project Owner",
+            display_name="Project Owner",
             hashed_password="hashed",
             access_token="owner-token",
             disabled=False,
@@ -405,7 +405,7 @@ class TestAdminMembersEndpoints:
         """Create member user."""
         user = UserDocument(
             username="memberuser",
-            full_name="Member User",
+            display_name="Member User",
             organization="Member Org",
             hashed_password="hashed",
             access_token="member-token",
@@ -531,7 +531,7 @@ class TestAdminCreateProjectForUser:
         """Create admin user."""
         user = UserDocument(
             username="admin",
-            full_name="Admin User",
+            display_name="Admin User",
             hashed_password="hashed",
             access_token="admin-token",
             disabled=False,
@@ -547,7 +547,7 @@ class TestAdminCreateProjectForUser:
         """Create user without project."""
         user = UserDocument(
             username="noprojectuser",
-            full_name="No Project User",
+            display_name="No Project User",
             hashed_password="hashed",
             access_token="noproject-token",
             disabled=False,
@@ -586,7 +586,7 @@ class TestAdminRegisterUser:
         """Create admin user."""
         user = UserDocument(
             username="admin",
-            full_name="Admin User",
+            display_name="Admin User",
             hashed_password="hashed",
             access_token="admin-token",
             disabled=False,
@@ -611,7 +611,7 @@ class TestAdminRegisterUser:
             headers=admin_headers,
             json={
                 "username": "generateduser",
-                "full_name": "Generated User",
+                "display_name": "Generated User",
                 "organization": "Generated Org",
                 "create_default_project": True,
             },

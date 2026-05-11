@@ -178,8 +178,11 @@ export function ForumPageContent() {
     () =>
       membersResponse?.data.members
         ?.filter((member) => member.username !== user?.username)
-        .map((member) => ({ id: member.username, label: member.username })) ??
-      [],
+        .map((member) => ({
+          id: member.username,
+          label: member.display_name || member.username,
+          secondaryLabel: member.organization ?? undefined,
+        })) ?? [],
     [membersResponse?.data.members, user?.username],
   );
 

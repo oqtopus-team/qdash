@@ -108,7 +108,7 @@ def update_user_settings(
     return service.update_user(
         username=username,
         admin_username=admin.username,
-        full_name=request.full_name,
+        display_name=request.display_name,
         organization=request.organization,
         disabled=request.disabled,
         system_role=request.system_role,
