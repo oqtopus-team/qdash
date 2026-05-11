@@ -37,6 +37,11 @@ from qdash.workflow.service.steps.base import (
     TransformStep,
 )
 
+# Box setup steps
+from qdash.workflow.service.steps.box_setup import (
+    ConfigureAll,
+)
+
 # MUX-level bring-up steps
 from qdash.workflow.service.steps.bringup import (
     BringUp,
@@ -75,6 +80,8 @@ __all__ = [
     "Step",
     "CalibrationStep",
     "TransformStep",
+    # Box setup steps
+    "ConfigureAll",
     # Context and Pipeline
     "StepContext",
     "Pipeline",
