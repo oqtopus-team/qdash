@@ -8,7 +8,6 @@ from fastapi import Depends, Header, HTTPException, Path, status
 from qdash.api.lib.auth import get_current_active_user
 from qdash.api.schemas.auth import User
 from qdash.datamodel.project import ProjectPermission, ProjectRole, role_has_permission
-from qdash.datamodel.user import SystemRole
 from qdash.dbmodel.project import ProjectDocument
 from qdash.dbmodel.project_membership import ProjectMembershipDocument
 
@@ -106,9 +105,6 @@ def _check_permission(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Project '{project_id}' not found",
         )
-
-    if user.system_role == SystemRole.ADMIN:
-        return project, ProjectRole.OWNER
 
     # Check membership
     membership = _get_membership(project_id, user.username, user.user_id)

@@ -115,6 +115,19 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     [],
   );
 
+  const clearProjectFromUrl = useCallback(() => {
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("project");
+      const query = url.searchParams.toString();
+      const nextUrl = `${url.pathname}${query ? `?${query}` : ""}${url.hash}`;
+      window.history.replaceState(null, "", nextUrl);
+      setUrlProjectId(null);
+    } catch (error) {
+      console.warn("Failed to clear project URL state:", error);
+    }
+  }, []);
+
   const readProjectFromUrl = useCallback(() => {
     const nextUrlProjectId = new URLSearchParams(window.location.search).get(
       "project",
@@ -177,6 +190,30 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     urlProjectInitialized,
     user?.default_project_id,
     writeProjectToUrl,
+  ]);
+
+  useEffect(() => {
+    if (!accessToken) {
+      setCurrentProject(null);
+      setProjectId(null);
+      setRole(null);
+      localStorage.removeItem(PROJECT_STORAGE_KEY);
+      return;
+    }
+
+    if (!urlProjectInitialized || isLoading || projects.length > 0) return;
+
+    setCurrentProject(null);
+    setProjectId(null);
+    setRole(null);
+    localStorage.removeItem(PROJECT_STORAGE_KEY);
+    clearProjectFromUrl();
+  }, [
+    accessToken,
+    clearProjectFromUrl,
+    isLoading,
+    projects.length,
+    urlProjectInitialized,
   ]);
 
   const switchProject = useCallback(

@@ -86,12 +86,13 @@ def test_owner_can_admin_but_editor_cannot(project_members) -> None:
     assert exc_info.value.status_code == 403
 
 
-def test_system_admin_can_access_project_without_membership(project_members) -> None:
-    """System admins can administer projects without explicit membership."""
-    _, role = _check_permission(
-        "permission-project",
-        User(username="admin", user_id="usr_admin", system_role=SystemRole.ADMIN),
-        required_permission=ProjectPermission.ADMIN,
-    )
+def test_system_admin_cannot_access_project_without_membership(project_members) -> None:
+    """System admins need membership for normal project-scoped APIs."""
+    with pytest.raises(HTTPException) as exc_info:
+        _check_permission(
+            "permission-project",
+            User(username="admin", user_id="usr_admin", system_role=SystemRole.ADMIN),
+            required_permission=ProjectPermission.ADMIN,
+        )
 
-    assert role == ProjectRole.OWNER
+    assert exc_info.value.status_code == 403
