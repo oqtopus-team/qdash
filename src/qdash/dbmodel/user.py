@@ -23,6 +23,7 @@ class UserDocument(Document):
         access_token (str): The API access token for authentication.
         display_name (Optional[str]): The display name of the user.
         organization (Optional[str]): The user's organization or affiliation.
+        avatar_key (Optional[str]): The selected avatar preset key.
         disabled (bool): Whether the user is disabled.
         system_role (SystemRole): The system-level role (admin/user).
         default_project_id (str): The user's default project ID.
@@ -39,6 +40,7 @@ class UserDocument(Document):
         default=None,
         description="The user's organization or affiliation",
     )
+    avatar_key: str | None = Field(default=None, description="The selected avatar preset key")
     default_project_id: str | None = Field(
         default=None,
         description="Project ID automatically provisioned for the user",

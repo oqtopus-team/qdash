@@ -27,6 +27,7 @@ def project_with_members(init_db: PyMongoDatabase[Any]) -> ProjectDocument:
             username=username,
             display_name=username.title(),
             organization="Project Org",
+            avatar_key="planet",
             hashed_password="hashed",
             access_token=token,
             default_project_id="project-1",
@@ -98,6 +99,7 @@ def test_list_project_members_includes_display_metadata(
     owner = next(member for member in data["members"] if member["username"] == "owner")
     assert owner["display_name"] == "Owner"
     assert owner["organization"] == "Project Org"
+    assert owner["avatar_key"] == "planet"
 
 
 def test_owner_cannot_invite_member_as_owner(

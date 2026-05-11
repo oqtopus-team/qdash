@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from bson import ObjectId
 from bunnet import SortDirection
@@ -104,21 +104,46 @@ class ForumService:
     @staticmethod
     def _to_response(doc: ForumPostDocument, reply_count: int = 0) -> ForumPostResponse:
         """Convert a document to an API response."""
+        user = UserDocument.find_one({"user_id": doc.user_id}).run() if doc.user_id else None
         return ForumPostResponse(
             id=str(doc.id),
             project_id=doc.project_id,
             category=doc.category,
             user_id=doc.user_id,
             username=doc.username,
+            avatar_key=user.avatar_key if user else None,
             title=doc.title,
             content=doc.content,
             parent_id=doc.parent_id,
             reply_count=reply_count,
             is_closed=doc.is_closed,
             is_deleted=doc.is_deleted,
+            is_ai_reply=doc.is_ai_reply,
             created_at=doc.system_info.created_at,
             updated_at=doc.system_info.updated_at,
         )
+
+    @staticmethod
+    def strip_mention(text: str) -> str:
+        """Remove ``@qdash`` mention from text."""
+        return re.sub(r"@qdash\b\s*", "", text).strip()
+
+    @staticmethod
+    def deduplicate_last_message(
+        history: list[dict[str, str]],
+        user_message: str,
+    ) -> list[dict[str, str]]:
+        """Remove the last history entry if it duplicates *user_message*."""
+        if history and history[-1]["role"] == "user" and history[-1]["content"] == user_message:
+            return history[:-1]
+        return history
+
+    @staticmethod
+    def format_ai_response_as_markdown(result: dict[str, Any]) -> str | None:
+        """Convert an AI response dict to Markdown."""
+        from qdash.api.services.issue_service import IssueService
+
+        return IssueService.format_ai_response_as_markdown(result)
 
     @staticmethod
     def _make_category_key(name: str) -> str:
@@ -424,6 +449,93 @@ class ForumService:
                 logger.exception("Failed to create forum notifications for post %s", doc.id)
 
         return self._to_response(doc)
+
+    def build_ai_reply_context(self, *, project_id: str, post_id: str) -> dict[str, Any]:
+        """Build conversation context for a forum AI reply."""
+        root_doc = ForumPostDocument.find_one(
+            {"_id": ObjectId(post_id), "project_id": project_id, "is_deleted": False}
+        ).run()
+
+        if root_doc is None:
+            return {"root_doc": None}
+
+        actual_root_id = post_id if root_doc.parent_id is None else root_doc.parent_id
+        if root_doc.parent_id is not None:
+            root_doc = ForumPostDocument.find_one(
+                {
+                    "_id": ObjectId(actual_root_id),
+                    "project_id": project_id,
+                    "is_deleted": False,
+                }
+            ).run()
+            if root_doc is None:
+                return {"root_doc": None}
+
+        reply_docs = (
+            ForumPostDocument.find(
+                {"project_id": project_id, "parent_id": actual_root_id, "is_deleted": False}
+            )
+            .sort("system_info.created_at")
+            .to_list()
+        )
+
+        category = ForumCategoryDocument.find_one(
+            {"project_id": project_id, "key": root_doc.category}
+        ).run()
+        category_name = category.name if category else root_doc.category
+        title = root_doc.title or "Forum thread"
+
+        conversation_history: list[dict[str, str]] = [
+            {
+                "role": "user",
+                "content": (
+                    f"Forum category: {category_name}\n"
+                    f"Thread title: {title}\n\n"
+                    f"{self.strip_mention(root_doc.content)}"
+                ),
+            }
+        ]
+
+        for reply_doc in reply_docs:
+            role = "assistant" if reply_doc.is_ai_reply else "user"
+            content = reply_doc.content
+            if role == "user":
+                content = self.strip_mention(content)
+            conversation_history.append({"role": role, "content": content})
+
+        return {
+            "root_doc": root_doc,
+            "actual_root_id": actual_root_id,
+            "conversation_history": conversation_history,
+            "title": title,
+            "category_name": category_name,
+        }
+
+    def save_ai_reply(
+        self,
+        *,
+        project_id: str,
+        parent_id: str,
+        content: str,
+    ) -> ForumPostResponse:
+        """Save an AI-generated forum reply."""
+        root_doc = ForumPostDocument.find_one(
+            {"_id": ObjectId(parent_id), "project_id": project_id, "is_deleted": False}
+        ).run()
+        if root_doc is None:
+            raise HTTPException(status_code=404, detail="Forum post not found")
+
+        ai_doc = ForumPostDocument(
+            project_id=project_id,
+            category=root_doc.category,
+            username="qdash",
+            title=None,
+            content=content,
+            parent_id=parent_id,
+            is_ai_reply=True,
+        )
+        ai_doc.insert()
+        return self._to_response(ai_doc)
 
     def update_post(
         self,

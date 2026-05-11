@@ -110,6 +110,7 @@ def update_user_settings(
         admin_username=admin.username,
         display_name=request.display_name,
         organization=request.organization,
+        avatar_key=request.avatar_key,
         disabled=request.disabled,
         system_role=request.system_role,
     )

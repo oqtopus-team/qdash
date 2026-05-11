@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from qdash.datamodel.user import SystemRole, Username
 
 
@@ -9,6 +9,7 @@ class User(BaseModel):
     username: str
     display_name: str | None = None
     organization: str | None = None
+    avatar_key: str | None = None
     disabled: bool | None = None
     default_project_id: str | None = None
     must_change_password: bool = False
@@ -22,6 +23,7 @@ class UserWithToken(BaseModel):
     username: str
     display_name: str | None = None
     organization: str | None = None
+    avatar_key: str | None = None
     disabled: bool | None = None
     default_project_id: str | None = None
     must_change_password: bool = False
@@ -44,7 +46,15 @@ class UserCreate(BaseModel):
     password: str | None = None
     display_name: str | None = None
     organization: str | None = None
+    avatar_key: str | None = None
     create_default_project: bool = False
+
+
+class UserProfileUpdate(BaseModel):
+    """Current user profile update model."""
+
+    display_name: str | None = Field(default=None, max_length=100)
+    avatar_key: str | None = Field(default=None, max_length=64, pattern=r"^[a-z0-9_-]+$")
 
 
 class TokenResponse(BaseModel):

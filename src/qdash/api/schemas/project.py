@@ -66,6 +66,7 @@ class MemberResponse(BaseModel):
     username: str
     display_name: str | None = None
     organization: str | None = None
+    avatar_key: str | None = None
     role: ProjectRole
     status: str
     invited_by_user_id: str | None = None

@@ -7,6 +7,7 @@
  */
 import type { MemberItemDisplayName } from "./memberItemDisplayName";
 import type { MemberItemOrganization } from "./memberItemOrganization";
+import type { MemberItemAvatarKey } from "./memberItemAvatarKey";
 import type { ProjectRole } from "./projectRole";
 
 /**
@@ -17,6 +18,7 @@ export interface MemberItem {
   username: string;
   display_name?: MemberItemDisplayName;
   organization?: MemberItemOrganization;
+  avatar_key?: MemberItemAvatarKey;
   role: ProjectRole;
   status?: string;
 }

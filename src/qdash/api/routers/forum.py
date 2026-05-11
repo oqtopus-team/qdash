@@ -2,16 +2,24 @@
 
 from __future__ import annotations
 
-from typing import Annotated
+import asyncio
+import logging
+from functools import partial
+from typing import TYPE_CHECKING, Annotated, Any
 
 from fastapi import APIRouter, Depends, Query
+from fastapi.responses import StreamingResponse
 from qdash.api.dependencies import get_forum_service  # noqa: TCH002
+from qdash.api.lib.ai_labels import STATUS_LABELS as _AI_STATUS_LABELS
+from qdash.api.lib.ai_labels import TOOL_LABELS as _AI_TOOL_LABELS
 from qdash.api.lib.project import (  # noqa: TCH002
     ProjectContext,
     get_project_context,
     get_project_context_owner,
 )
+from qdash.api.lib.sse import SSETaskBridge, sse_event
 from qdash.api.schemas.forum import (
+    ForumAiReplyRequest,
     ForumCategoryCreate,
     ForumCategoryResponse,
     ForumCategoryUpdate,
@@ -22,9 +30,13 @@ from qdash.api.schemas.forum import (
     ListForumPostsResponse,
 )
 from qdash.api.schemas.success import SuccessResponse
-from qdash.api.services.forum_service import ForumService  # noqa: TCH002
+from qdash.api.services.forum_service import ForumService
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 @router.get(
@@ -202,6 +214,121 @@ def get_forum_post_replies(
 ) -> list[ForumPostResponse]:
     """List replies for a forum thread."""
     return service.get_replies(project_id=ctx.project_id, post_id=post_id, skip=skip, limit=limit)
+
+
+@router.post("/forum/posts/{post_id}/ai-reply/stream", include_in_schema=False)
+async def forum_ai_reply_stream(
+    post_id: str,
+    body: ForumAiReplyRequest,
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    service: Annotated[ForumService, Depends(get_forum_service)],
+) -> StreamingResponse:
+    """SSE endpoint that generates an AI reply in a forum thread."""
+
+    async def event_generator() -> AsyncGenerator[str, None]:
+        from qdash.api.lib.copilot_config import load_copilot_config
+
+        config = load_copilot_config()
+        if not config.enabled:
+            yield sse_event("error", {"step": "init", "detail": "Copilot is not enabled"})
+            return
+
+        yield sse_event("status", {"step": "load_forum", "message": "Forumを読み込み中..."})
+        await asyncio.sleep(0)
+
+        ai_context = service.build_ai_reply_context(project_id=ctx.project_id, post_id=post_id)
+        if ai_context["root_doc"] is None:
+            yield sse_event("error", {"step": "load_forum", "detail": "Forum post not found"})
+            return
+
+        yield sse_event("status", {"step": "build_history", "message": "スレッド履歴を構築中..."})
+        await asyncio.sleep(0)
+
+        conversation_history: list[dict[str, str]] = ai_context["conversation_history"]
+        actual_root_id: str = ai_context["actual_root_id"]
+        conversation_history = ForumService.deduplicate_last_message(
+            conversation_history,
+            body.user_message,
+        )
+
+        from qdash.api.services.copilot_data_service import CopilotDataService
+
+        copilot_data_svc = CopilotDataService()
+        tool_executors = copilot_data_svc.build_tool_executors()
+
+        clean_message = ForumService.strip_mention(body.user_message)
+        if not clean_message:
+            clean_message = "この Forum スレッドについてコメントしてください"
+        logger.info("Forum AI reply: original=%r, clean=%r", body.user_message, clean_message)
+
+        yield sse_event("status", {"step": "run_chat", "message": "AIが応答中..."})
+        bridge = SSETaskBridge(
+            tool_labels=_AI_TOOL_LABELS,
+            status_labels=_AI_STATUS_LABELS,
+        )
+
+        try:
+            from qdash.api.lib.copilot_agent import run_chat
+
+            coro = partial(
+                run_chat,
+                user_message=clean_message,
+                config=config,
+                chip_id=None,
+                qid=None,
+                qubit_params=None,
+                conversation_history=conversation_history,
+                tool_executors=tool_executors,
+            )
+
+            result: dict[str, Any] = {}
+            async for event in bridge.drain(coro):
+                if isinstance(event, str):
+                    yield event
+                else:
+                    result = event
+        except ImportError:
+            yield sse_event(
+                "error",
+                {
+                    "step": "run_chat",
+                    "detail": "openai is not installed. Install with: pip install openai",
+                },
+            )
+            return
+        except Exception as e:
+            logger.exception("Forum AI reply failed")
+            yield sse_event(
+                "error",
+                {"step": "run_chat", "detail": f"AI reply failed: {e}"},
+            )
+            return
+
+        yield sse_event("status", {"step": "save_reply", "message": "返信を保存中..."})
+        await asyncio.sleep(0)
+
+        markdown_content = ForumService.format_ai_response_as_markdown(result)
+        if not markdown_content:
+            yield sse_event(
+                "error",
+                {"step": "save_reply", "detail": "AIが空の応答を返しました"},
+            )
+            return
+
+        saved_response = service.save_ai_reply(
+            project_id=ctx.project_id,
+            parent_id=actual_root_id,
+            content=markdown_content,
+        )
+
+        yield sse_event("status", {"step": "complete", "message": "完了"})
+        yield sse_event("result", saved_response.model_dump(mode="json"))
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 @router.patch(

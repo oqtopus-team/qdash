@@ -7,6 +7,7 @@
  */
 import type { UserListItemDisplayName } from "./userListItemDisplayName";
 import type { UserListItemOrganization } from "./userListItemOrganization";
+import type { UserListItemAvatarKey } from "./userListItemAvatarKey";
 import type { SystemRole } from "./systemRole";
 import type { UserListItemDefaultProjectId } from "./userListItemDefaultProjectId";
 
@@ -18,6 +19,7 @@ export interface UserListItem {
   username: string;
   display_name?: UserListItemDisplayName;
   organization?: UserListItemOrganization;
+  avatar_key?: UserListItemAvatarKey;
   disabled?: boolean;
   system_role?: SystemRole;
   default_project_id?: UserListItemDefaultProjectId;

@@ -68,6 +68,7 @@ class ProjectService:
             username=membership.username,
             display_name=user.display_name if user else None,
             organization=user.organization if user else None,
+            avatar_key=user.avatar_key if user else None,
             role=membership.role,
             status=membership.status,
             invited_by_user_id=membership.invited_by_user_id,

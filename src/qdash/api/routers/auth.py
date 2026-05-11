@@ -12,6 +12,7 @@ from qdash.api.schemas.auth import (
     TokenResponse,
     User,
     UserCreate,
+    UserProfileUpdate,
     UserWithToken,
 )
 from qdash.api.services.auth_service import AuthService
@@ -120,6 +121,7 @@ def register_user(
         username=user.username,
         display_name=user.display_name,
         organization=user.organization,
+        avatar_key=user.avatar_key,
         disabled=user.disabled,
         default_project_id=user.default_project_id,
         must_change_password=user.must_change_password,
@@ -145,6 +147,32 @@ def get_current_user(current_user: Annotated[User, Depends(get_current_active_us
     """
     logger.debug(f"Reading user info for: {current_user.username}")
     return current_user
+
+
+@router.patch(
+    "/me",
+    response_model=User,
+    summary="Update current user profile",
+    operation_id="updateCurrentUserProfile",
+)
+def update_current_user_profile(
+    profile_data: UserProfileUpdate,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    auth_service: Annotated[AuthService, Depends(get_auth_service)],
+) -> User:
+    """Update the current user's editable profile fields."""
+    user = auth_service.update_profile(current_user.username, profile_data)
+    return User(
+        user_id=user.user_id,
+        username=user.username,
+        display_name=user.display_name,
+        organization=user.organization,
+        avatar_key=user.avatar_key,
+        disabled=user.disabled,
+        default_project_id=user.default_project_id,
+        must_change_password=user.must_change_password,
+        system_role=user.system_role,
+    )
 
 
 @router.post("/logout", summary="Logout user", operation_id="logout")

@@ -32,6 +32,7 @@ import type {
   TokenResponse,
   User,
   UserCreate,
+  UserProfileUpdate,
   UserWithToken,
 } from "../../schemas";
 
@@ -403,6 +404,96 @@ export function useGetCurrentUser<
   return query;
 }
 
+/**
+ * Update the current user's editable profile fields.
+ * @summary Update current user profile
+ */
+export const updateCurrentUserProfile = (
+  userProfileUpdate: UserProfileUpdate,
+  options?: SecondParameter<typeof customInstance>,
+) => {
+  return customInstance<User>(
+    {
+      url: `/auth/me`,
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      data: userProfileUpdate,
+    },
+    options,
+  );
+};
+
+export const getUpdateCurrentUserProfileMutationOptions = <
+  TError = void | HTTPValidationError,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateCurrentUserProfile>>,
+    TError,
+    { data: UserProfileUpdate },
+    TContext
+  >;
+  request?: SecondParameter<typeof customInstance>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateCurrentUserProfile>>,
+  TError,
+  { data: UserProfileUpdate },
+  TContext
+> => {
+  const mutationKey = ["updateCurrentUserProfile"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateCurrentUserProfile>>,
+    { data: UserProfileUpdate }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return updateCurrentUserProfile(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateCurrentUserProfileMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateCurrentUserProfile>>
+>;
+export type UpdateCurrentUserProfileMutationBody = UserProfileUpdate;
+export type UpdateCurrentUserProfileMutationError = void | HTTPValidationError;
+
+/**
+ * @summary Update current user profile
+ */
+export const useUpdateCurrentUserProfile = <
+  TError = void | HTTPValidationError,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof updateCurrentUserProfile>>,
+      TError,
+      { data: UserProfileUpdate },
+      TContext
+    >;
+    request?: SecondParameter<typeof customInstance>;
+  },
+  queryClient?: QueryClient,
+): UseMutationResult<
+  Awaited<ReturnType<typeof updateCurrentUserProfile>>,
+  TError,
+  { data: UserProfileUpdate },
+  TContext
+> => {
+  const mutationOptions = getUpdateCurrentUserProfileMutationOptions(options);
+
+  return useMutation(mutationOptions, queryClient);
+};
 /**
  * Logout the current user.
 
