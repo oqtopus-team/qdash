@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import contextlib
+import logging
 import os
 import tempfile
 from pathlib import Path
@@ -15,6 +16,8 @@ from ruamel.yaml.comments import CommentedMap
 
 if TYPE_CHECKING:
     from qdash.workflow.engine.backend.base import BaseBackend
+
+logger = logging.getLogger(__name__)
 
 
 class ParamsUpdater(Protocol):
@@ -146,6 +149,21 @@ class _QubexParamsUpdater:
         except ValueError:
             return qid
 
+        config = getattr(self._backend, "config", {})
+        project_id = config.get("project_id")
+        chip_id = config.get("chip_id") or self._chip_id
+        if project_id and chip_id:
+            try:
+                from qdash.common.qubit_utils import qid_to_label_from_chip
+
+                return qid_to_label_from_chip(qid, project_id=project_id, chip_id=chip_id)
+            except Exception:
+                logger.debug(
+                    "Failed to resolve qid label from chip metadata for qid=%s",
+                    qid,
+                    exc_info=True,
+                )
+
         try:
             experiment = self._backend.get_instance()
         except Exception:
@@ -160,6 +178,9 @@ class _QubexParamsUpdater:
     def _extract_value(param: Any) -> float | int | str | None:
         if isinstance(param, ParameterModel):
             return _QubexParamsUpdater._coerce_value(param.value)
+
+        if isinstance(param, dict) and "value" in param:
+            return _QubexParamsUpdater._coerce_value(param.get("value"))
 
         value = getattr(param, "value", param)
         return _QubexParamsUpdater._coerce_value(value)
