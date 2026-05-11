@@ -7,8 +7,8 @@ import logging
 from functools import partial
 from typing import TYPE_CHECKING, Annotated, Any
 
-from fastapi import APIRouter, Depends, Query
-from fastapi.responses import StreamingResponse
+from fastapi import APIRouter, Depends, Query, UploadFile
+from fastapi.responses import FileResponse, StreamingResponse
 from qdash.api.dependencies import get_forum_service  # noqa: TCH002
 from qdash.api.lib.ai_labels import STATUS_LABELS as _AI_STATUS_LABELS
 from qdash.api.lib.ai_labels import TOOL_LABELS as _AI_TOOL_LABELS
@@ -36,6 +36,7 @@ if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
 router = APIRouter()
+public_router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
@@ -214,6 +215,33 @@ def get_forum_post_replies(
 ) -> list[ForumPostResponse]:
     """List replies for a forum thread."""
     return service.get_replies(project_id=ctx.project_id, post_id=post_id, skip=skip, limit=limit)
+
+
+@router.post(
+    "/forum/upload-image",
+    summary="Upload an image for a forum post",
+    operation_id="uploadForumImage",
+    include_in_schema=False,
+)
+async def upload_forum_image(
+    file: UploadFile,
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+) -> dict[str, str]:
+    """Upload an image to attach to a forum post. Returns the image URL."""
+    data = await file.read()
+    url = ForumService.upload_image(data, file.content_type or "")
+    return {"url": url}
+
+
+@public_router.get(
+    "/forum/images/{filename}",
+    summary="Serve a forum image",
+    include_in_schema=False,
+)
+def get_forum_image(filename: str) -> FileResponse:
+    """Serve an uploaded forum image."""
+    filepath, media_type = ForumService.get_image_path(filename)
+    return FileResponse(filepath, media_type=media_type)
 
 
 @router.post("/forum/posts/{post_id}/ai-reply/stream", include_in_schema=False)

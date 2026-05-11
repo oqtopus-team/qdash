@@ -1,5 +1,6 @@
 """Tests for forum router endpoints."""
 
+from qdash.api.services import forum_service
 from qdash.datamodel.project import ProjectRole
 from qdash.datamodel.system_info import SystemInfoModel
 from qdash.dbmodel.notification import NotificationDocument
@@ -256,3 +257,24 @@ def test_close_forum_thread_requires_author_or_owner(test_client, init_db):
     response = test_client.patch(f"/forum/posts/{root_id}/close", headers=_headers("member_token"))
 
     assert response.status_code == 403
+
+
+def test_upload_and_serve_forum_image(test_client, init_db, tmp_path, monkeypatch):
+    """Forum images can be uploaded by members and served for markdown rendering."""
+    monkeypatch.setattr(forum_service, "FORUM_IMAGE_DIR", tmp_path / "forum")
+    _create_user("owner", "owner_token", ProjectRole.OWNER)
+    _create_project()
+
+    upload = test_client.post(
+        "/forum/upload-image",
+        headers=_headers("owner_token"),
+        files={"file": ("image.png", b"\x89PNG\r\n\x1a\n", "image/png")},
+    )
+
+    assert upload.status_code == 200
+    url = upload.json()["url"]
+    assert url.startswith("/api/forum/images/")
+
+    image = test_client.get(url.removeprefix("/api"))
+    assert image.status_code == 200
+    assert image.headers["content-type"] == "image/png"

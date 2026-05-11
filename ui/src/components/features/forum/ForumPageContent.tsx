@@ -34,6 +34,7 @@ import { UserAvatar } from "@/components/ui/UserAvatar";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProject } from "@/contexts/ProjectContext";
 import { useForumAiReply } from "@/hooks/useForumAiReply";
+import { useImageUpload } from "@/hooks/useImageUpload";
 import { formatRelativeTime } from "@/lib/utils/datetime";
 import type { ForumPostResponse, ListForumPostsParams } from "@/schemas";
 
@@ -154,6 +155,7 @@ export function ForumPageContent() {
   const [categoryDescription, setCategoryDescription] = useState("");
   const [categoryColor, setCategoryColor] = useState("neutral");
   const [categoryIcon, setCategoryIcon] = useState("message-square");
+  const { uploadImage } = useImageUpload("forum");
 
   const params: ListForumPostsParams = {
     skip,
@@ -516,6 +518,7 @@ export function ForumPageContent() {
               submitLabel="Post"
               isSubmitting={createMutation.isPending}
               mentionCandidates={mentionCandidates}
+              onImageUpload={uploadImage}
             />
           </div>
         </div>
