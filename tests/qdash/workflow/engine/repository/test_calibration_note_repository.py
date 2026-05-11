@@ -4,6 +4,8 @@ This module tests both the in-memory implementation (for unit tests)
 and verifies the protocol interface.
 """
 
+from typing import Any
+
 import pytest
 from qdash.datamodel.calibration_note import CalibrationNoteModel
 from qdash.dbmodel.calibration_note import CalibrationNoteDocument
@@ -16,9 +18,11 @@ class RecordingCollection:
     """Capture MongoDB updates and fail on conflicting update operators."""
 
     def __init__(self) -> None:
-        self.update: dict | None = None
+        self.update: dict[str, Any] | None = None
 
-    def find_one_and_update(self, query: dict, update: dict, **kwargs: object) -> dict:
+    def find_one_and_update(
+        self, query: dict[str, Any], update: dict[str, Any], **kwargs: object
+    ) -> dict[str, Any]:
         self.update = update
         set_fields = set(update.get("$set", {}))
         set_on_insert_fields = set(update.get("$setOnInsert", {}))
