@@ -6,8 +6,30 @@ and verifies the protocol interface.
 
 import pytest
 from qdash.datamodel.calibration_note import CalibrationNoteModel
+from qdash.dbmodel.calibration_note import CalibrationNoteDocument
+from qdash.repository.calibration_note import MongoCalibrationNoteRepository
 from qdash.repository.inmemory import InMemoryCalibrationNoteRepository
 from qdash.repository.protocols import CalibrationNoteRepository
+
+
+class RecordingCollection:
+    """Capture MongoDB updates and fail on conflicting update operators."""
+
+    def __init__(self) -> None:
+        self.update: dict | None = None
+
+    def find_one_and_update(self, query: dict, update: dict, **kwargs: object) -> dict:
+        self.update = update
+        set_fields = set(update.get("$set", {}))
+        set_on_insert_fields = set(update.get("$setOnInsert", {}))
+        assert set_fields.isdisjoint(set_on_insert_fields)
+
+        return {
+            **query,
+            **update.get("$setOnInsert", {}),
+            **update.get("$set", {}),
+            "version": update.get("$inc", {}).get("version", 0),
+        }
 
 
 class TestInMemoryCalibrationNoteRepository:
@@ -225,3 +247,70 @@ class TestInMemoryCalibrationNoteRepository:
         repo.clear()
 
         assert repo.find_one(chip_id="64Qv3") is None
+
+
+class TestMongoCalibrationNoteRepository:
+    """Test MongoDB-specific update document construction."""
+
+    def test_upsert_does_not_set_user_id_in_conflicting_operators(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """MongoDB rejects the same path in $set and $setOnInsert."""
+        collection = RecordingCollection()
+        monkeypatch.setattr(
+            CalibrationNoteDocument,
+            "get_motor_collection",
+            classmethod(lambda cls: collection),
+        )
+        monkeypatch.setattr(
+            MongoCalibrationNoteRepository,
+            "_user_id_for_username",
+            staticmethod(lambda username: "usr_alice"),
+        )
+
+        repo = MongoCalibrationNoteRepository()
+        result = repo.upsert(
+            CalibrationNoteModel(
+                project_id="project-1",
+                username="alice",
+                chip_id="64Qv3",
+                execution_id="20240101-001",
+                task_id="master",
+                note={"qubit_0": {"frequency": 5.0}},
+            )
+        )
+
+        assert result.user_id == "usr_alice"
+        assert collection.update is not None
+        assert collection.update["$set"]["user_id"] == "usr_alice"
+        assert "user_id" not in collection.update["$setOnInsert"]
+
+    def test_document_upsert_note_does_not_set_user_id_in_conflicting_operators(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Keep legacy document helper compatible with MongoDB upsert rules."""
+        collection = RecordingCollection()
+        monkeypatch.setattr(
+            CalibrationNoteDocument,
+            "get_motor_collection",
+            classmethod(lambda cls: collection),
+        )
+        monkeypatch.setattr(
+            CalibrationNoteDocument,
+            "_user_id_for_username",
+            staticmethod(lambda username: "usr_alice"),
+        )
+
+        result = CalibrationNoteDocument.upsert_note(
+            username="alice",
+            chip_id="64Qv3",
+            execution_id="20240101-001",
+            task_id="master",
+            note={"qubit_0": {"frequency": 5.0}},
+            project_id="project-1",
+        )
+
+        assert result.user_id == "usr_alice"
+        assert collection.update is not None
+        assert collection.update["$set"]["user_id"] == "usr_alice"
+        assert "user_id" not in collection.update["$setOnInsert"]

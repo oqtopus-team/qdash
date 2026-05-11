@@ -130,7 +130,6 @@ class CalibrationNoteDocument(Document):
                 "project_id": project_id,
                 "execution_id": execution_id,
                 "task_id": task_id,
-                "user_id": user_id,
                 "username": username,
                 "chip_id": chip_id,
             },
