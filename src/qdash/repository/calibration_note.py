@@ -202,7 +202,6 @@ class MongoCalibrationNoteRepository:
                 "project_id": note.project_id,
                 "execution_id": note.execution_id,
                 "task_id": note.task_id,
-                "user_id": user_id,
                 "username": note.username,
                 "chip_id": note.chip_id,
             },
