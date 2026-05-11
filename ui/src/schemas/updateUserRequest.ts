@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.0.1
  */
 import type { UpdateUserRequestFullName } from "./updateUserRequestFullName";
+import type { UpdateUserRequestOrganization } from "./updateUserRequestOrganization";
 import type { UpdateUserRequestDisabled } from "./updateUserRequestDisabled";
 import type { UpdateUserRequestSystemRole } from "./updateUserRequestSystemRole";
 
@@ -14,6 +15,7 @@ import type { UpdateUserRequestSystemRole } from "./updateUserRequestSystemRole"
  */
 export interface UpdateUserRequest {
   full_name?: UpdateUserRequestFullName;
+  organization?: UpdateUserRequestOrganization;
   disabled?: UpdateUserRequestDisabled;
   system_role?: UpdateUserRequestSystemRole;
 }

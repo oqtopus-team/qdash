@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.0.1
  */
 import type { MemberItemFullName } from "./memberItemFullName";
+import type { MemberItemOrganization } from "./memberItemOrganization";
 import type { ProjectRole } from "./projectRole";
 
 /**
@@ -15,6 +16,7 @@ export interface MemberItem {
   user_id: string;
   username: string;
   full_name?: MemberItemFullName;
+  organization?: MemberItemOrganization;
   role: ProjectRole;
   status?: string;
 }

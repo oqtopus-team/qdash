@@ -22,6 +22,7 @@ class UserDocument(Document):
         hashed_password (str): The hashed password.
         access_token (str): The API access token for authentication.
         full_name (Optional[str]): The full name of the user.
+        organization (Optional[str]): The user's organization or affiliation.
         disabled (bool): Whether the user is disabled.
         system_role (SystemRole): The system-level role (admin/user).
         default_project_id (str): The user's default project ID.
@@ -34,6 +35,10 @@ class UserDocument(Document):
     hashed_password: str = Field(description="The hashed password")
     access_token: str = Field(description="The API access token for authentication")
     full_name: str | None = Field(default=None, description="The full name of the user")
+    organization: str | None = Field(
+        default=None,
+        description="The user's organization or affiliation",
+    )
     default_project_id: str | None = Field(
         default=None,
         description="Project ID automatically provisioned for the user",

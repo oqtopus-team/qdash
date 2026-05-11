@@ -34,6 +34,7 @@ class TestAdminUsersEndpoints:
         user = UserDocument(
             username="regularuser",
             full_name="Regular User",
+            organization="Example Lab",
             hashed_password="hashed",
             access_token="regular-token",
             disabled=False,
@@ -62,6 +63,8 @@ class TestAdminUsersEndpoints:
         assert "users" in data
         assert "total" in data
         assert data["total"] >= 2
+        regular = next(user for user in data["users"] if user["username"] == "regularuser")
+        assert regular["organization"] == "Example Lab"
 
     def test_list_all_users_requires_admin(
         self, test_client, admin_user, regular_user, user_headers
@@ -102,6 +105,7 @@ class TestAdminUsersEndpoints:
         data = response.json()
         assert data["username"] == "regularuser"
         assert data["full_name"] == "Regular User"
+        assert data["organization"] == "Example Lab"
         assert data["system_role"] == "user"
 
     def test_get_user_details_not_found(self, test_client, admin_user, admin_headers):
@@ -114,11 +118,12 @@ class TestAdminUsersEndpoints:
         response = test_client.put(
             "/admin/users/regularuser",
             headers=admin_headers,
-            json={"full_name": "Updated Name"},
+            json={"full_name": "Updated Name", "organization": "Updated Org"},
         )
         assert response.status_code == 200
         data = response.json()
         assert data["full_name"] == "Updated Name"
+        assert data["organization"] == "Updated Org"
 
     def test_update_user_disable(self, test_client, admin_user, regular_user, admin_headers):
         """Admin can disable a user."""
@@ -166,9 +171,9 @@ class TestAdminUsersEndpoints:
     ):
         """Admin can bulk import users and download generated passwords from response."""
         csv_content = (
-            "username,full_name,system_role\n"
-            "bulkviewer,Bulk Viewer,user\n"
-            "bulkadmin,Bulk Admin,admin\n"
+            "username,full_name,organization,system_role\n"
+            "bulkviewer,Bulk Viewer,Viewer Lab,user\n"
+            "bulkadmin,Bulk Admin,Admin Lab,admin\n"
         )
         response = test_client.post(
             "/admin/users/bulk-import",
@@ -185,6 +190,7 @@ class TestAdminUsersEndpoints:
 
         first = data["results"][0]
         assert first["username"] == "bulkviewer"
+        assert first["organization"] == "Viewer Lab"
         assert first["status"] == "created"
         assert first["initial_password"]
         assert "project_id" not in first
@@ -199,6 +205,7 @@ class TestAdminUsersEndpoints:
         created_admin = UserDocument.find_one({"username": "bulkadmin"}).run()
         assert created_admin is not None
         assert created_admin.system_role == SystemRole.ADMIN
+        assert created_admin.organization == "Admin Lab"
 
     def test_bulk_import_users_skips_existing_user_without_password(
         self, test_client, admin_user, regular_user, admin_headers
@@ -399,6 +406,7 @@ class TestAdminMembersEndpoints:
         user = UserDocument(
             username="memberuser",
             full_name="Member User",
+            organization="Member Org",
             hashed_password="hashed",
             access_token="member-token",
             disabled=False,
@@ -454,6 +462,7 @@ class TestAdminMembersEndpoints:
         data = response.json()
         assert "members" in data
         assert len(data["members"]) >= 1
+        assert data["members"][0]["organization"] == "Member Org"
 
     def test_add_project_member(
         self, test_client, admin_user, project_owner, test_project, member_user, admin_headers
@@ -467,6 +476,7 @@ class TestAdminMembersEndpoints:
         assert response.status_code == 201
         data = response.json()
         assert data["username"] == "memberuser"
+        assert data["organization"] == "Member Org"
         assert data["role"] == "viewer"
 
         # Cleanup
@@ -602,12 +612,14 @@ class TestAdminRegisterUser:
             json={
                 "username": "generateduser",
                 "full_name": "Generated User",
+                "organization": "Generated Org",
                 "create_default_project": True,
             },
         )
         assert response.status_code == 200
         data = response.json()
         assert data["username"] == "generateduser"
+        assert data["organization"] == "Generated Org"
         assert data["must_change_password"] is True
         assert data["initial_password"]
         assert data["access_token"]

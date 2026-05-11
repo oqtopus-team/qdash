@@ -109,6 +109,7 @@ def update_user_settings(
         username=username,
         admin_username=admin.username,
         full_name=request.full_name,
+        organization=request.organization,
         disabled=request.disabled,
         system_role=request.system_role,
     )

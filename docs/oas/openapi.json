@@ -13392,6 +13392,17 @@
             ],
             "title": "Full Name"
           },
+          "organization": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Organization"
+          },
           "system_role": {
             "$ref": "#/components/schemas/SystemRole",
             "default": "user"
@@ -17714,6 +17725,17 @@
               }
             ],
             "title": "Full Name"
+          },
+          "organization": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Organization"
           },
           "role": {
             "$ref": "#/components/schemas/ProjectRole"
@@ -22125,6 +22147,17 @@
             ],
             "title": "Full Name"
           },
+          "organization": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Organization"
+          },
           "disabled": {
             "anyOf": [
               {
@@ -22171,6 +22204,17 @@
               }
             ],
             "title": "Full Name"
+          },
+          "organization": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Organization"
           },
           "disabled": {
             "anyOf": [
@@ -22241,6 +22285,17 @@
             ],
             "title": "Full Name"
           },
+          "organization": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Organization"
+          },
           "create_default_project": {
             "type": "boolean",
             "title": "Create Default Project",
@@ -22274,6 +22329,17 @@
               }
             ],
             "title": "Full Name"
+          },
+          "organization": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Organization"
           },
           "disabled": {
             "type": "boolean",
@@ -22354,6 +22420,17 @@
             ],
             "title": "Full Name"
           },
+          "organization": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Organization"
+          },
           "disabled": {
             "type": "boolean",
             "title": "Disabled",
@@ -22430,6 +22507,17 @@
               }
             ],
             "title": "Full Name"
+          },
+          "organization": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Organization"
           },
           "disabled": {
             "anyOf": [
