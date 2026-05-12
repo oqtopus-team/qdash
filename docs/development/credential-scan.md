@@ -1,13 +1,13 @@
 # Credential Scanning
 
-QDash runs three tools to keep secrets out of the repository: Lefthook orchestrates a pre-commit hook, Gitleaks blocks staged secrets locally and in CI, and Trufflehog scans git history in CI for verified leaks.
+QDash runs three tools to keep secrets out of the repository: Lefthook orchestrates a pre-commit hook, Gitleaks blocks staged secrets locally before they enter git history, and Trufflehog scans git history in CI for verified leaks.
 
 ## Tools
 
 | Tool       | Where it runs                          | What it scans                                   | Configuration                    |
 | ---------- | -------------------------------------- | ----------------------------------------------- | -------------------------------- |
 | Lefthook   | Local pre-commit                       | Triggers Gitleaks against staged files          | `lefthook.yml`                   |
-| Gitleaks   | Local pre-commit + CI (push, PR)       | Pattern match for secrets in working tree       | `.gitleaks.toml`                 |
+| Gitleaks   | Local pre-commit                       | Pattern match for secrets in working tree       | `.gitleaks.toml`                 |
 | Trufflehog | CI only (push, PR to `main`/`develop`) | Git history; only verified secrets are reported | `.trufflehog-exclude-paths.txt`  |
 
 CI definitions live in `.github/workflows/secret-scan.yml`. Installation instructions are in [Setup](./setup.md#secret-scanning-tools).
@@ -25,7 +25,7 @@ Because Gitleaks can allowlist *specific values*, it can be configured strictly:
 
 Trufflehog has no string-level allowlist, so the only way to suppress a known false positive is to drop the entire file. Compensating for that, it **verifies findings by probing the upstream provider** to check whether a credential is live, and walks **full git history** in CI on push and PR. Its role is ongoing detection of live secrets — running on remote CI infrastructure and reaching out to remote providers to confirm validity.
 
-The result is a clear division of labor: Gitleaks is the strict, fast, syntactic gate at commit time; Trufflehog is the slower, semantic, live-credential check that runs continuously in CI.
+The result is a clear division of labor: Gitleaks is the strict, fast, syntactic gate at commit time; Trufflehog is the slower, semantic, live-credential check that runs in CI. Gitleaks is not run in CI because the `gitleaks-action` requires a paid license for organization repositories; the local pre-commit hook covers the same purpose, and any commit that slips past it is caught by Trufflehog's history scan.
 
 ### Lefthook
 
