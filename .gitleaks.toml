@@ -3,8 +3,8 @@ title = "QDash Gitleaks Configuration"
 [extend]
   useDefault = true
 
-[allowlist]
-  description = "Global allowlist"
+[[allowlists]]
+  description = "Generated artifacts and intentional sample credentials"
   paths = [
     '''\.devcontainer/requirements\.txt''',
     '''ui/bun\.lock''',
@@ -15,4 +15,15 @@ title = "QDash Gitleaks Configuration"
   regexTarget = "match"
   regexes = [
     '''mongodb://root:example@mongo:27017''',
+  ]
+
+[[allowlists]]
+  description = "Documentation placeholder tokens and quantum gate fidelity metric names"
+  regexTarget = "secret"
+  regexes = [
+    '''^ADMIN_TOKEN$''',
+    '''^YOUR_TOKEN$''',
+    '''^x90_gate_fidelity$''',
+    '''^x180_gate_fidelity$''',
+    '''^zx90_gate_fidelity$''',
   ]
