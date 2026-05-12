@@ -173,8 +173,9 @@ analysis:
   # optional overrides only when a lower-latency triage mode is required.
   ai_triage_max_expected_images: null
   ai_triage_max_output_tokens: null
-  # Task results whose notes should receive automatic AI triage. Both completed
-  # and failed results are eligible; the hook runs asynchronously after history
+  # Terminal task results whose notes should receive automatic AI triage. Both
+  # completed and failed results are eligible; running, pending, scheduled, and
+  # skipped results are ignored. The hook runs asynchronously after history
   # persistence and does not block calibration progress.
   ai_triage_tasks:
     - CheckQubitSpectroscopy

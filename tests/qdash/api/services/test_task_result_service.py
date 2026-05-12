@@ -120,6 +120,7 @@ def test_request_bulk_ai_triage_enqueues_latest_result_per_qid_with_upsert() -> 
         "chip_id": "chip-1",
         "name": "CheckRabi",
         "qid": {"$in": ["0", "1", "2"]},
+        "status": {"$in": ["completed", "failed"]},
     }
     assert enqueue.call_count == 2
     assert enqueue.call_args_list[0].args[0].task_id == "new-q0"
@@ -129,6 +130,26 @@ def test_request_bulk_ai_triage_enqueues_latest_result_per_qid_with_upsert() -> 
     assert repo.docs[0].ai_triage.model_provider == "openai"
     assert repo.docs[0].ai_triage.model_name == "gpt-5.1"
     assert repo.docs[0].saved is True
+
+
+def test_request_bulk_ai_triage_filters_to_terminal_results() -> None:
+    now = datetime(2026, 5, 5, tzinfo=timezone.utc)
+    repo = _TaskResultRepo([_doc("new-q0", "0", now)])
+    service = _service(repo)
+
+    with (
+        patch.object(service, "_load_ai_triage_config", return_value=_ai_triage_config()),
+        patch.object(service, "_enqueue_ai_triage_for_document"),
+    ):
+        service.request_bulk_ai_triage(
+            project_id="proj-1",
+            chip_id="chip-1",
+            task="CheckRabi",
+            entity_type="qubit",
+        )
+
+    assert repo.last_query is not None
+    assert repo.last_query["status"] == {"$in": ["completed", "failed"]}
 
 
 def test_request_bulk_ai_triage_limits_to_selected_task_ids() -> None:

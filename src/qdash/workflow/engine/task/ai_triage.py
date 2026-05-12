@@ -39,6 +39,7 @@ markdown block. Do not put prose before it.
 - Recommended action: ...
 - Optional note: ...
 """
+AI_TRIAGE_ELIGIBLE_STATUSES = frozenset({"completed", "failed"})
 
 _EXECUTOR = ThreadPoolExecutor(max_workers=AI_TRIAGE_WORKERS, thread_name_prefix="ai-triage")
 _IN_FLIGHT_TASK_IDS: set[str] = set()
@@ -72,6 +73,14 @@ def enqueue_ai_triage_note(
                 task.name,
                 task.task_id,
                 config.analysis.ai_triage_tasks,
+            )
+            return
+        if not _is_terminal_ai_triage_result(task):
+            _log_info(
+                "AI triage enqueue skipped: task=%s task_id=%s status=%s non_terminal=true",
+                task.name,
+                task.task_id,
+                _task_status_value(task),
             )
             return
         if _is_non_representative_mux_result(task):
@@ -164,6 +173,14 @@ def maybe_attach_ai_triage_note(
                 task.name,
                 task.task_id,
                 config.analysis.ai_triage_tasks,
+            )
+            return
+        if not _is_terminal_ai_triage_result(task):
+            _log_info(
+                "AI triage skipped: task=%s task_id=%s status=%s non_terminal=true",
+                task.name,
+                task.task_id,
+                _task_status_value(task),
             )
             return
         if _is_non_representative_mux_result(task):
@@ -314,6 +331,17 @@ def _is_non_representative_mux_result(task: BaseTaskResultModel) -> bool:
         return False
 
 
+def _task_status_value(task: BaseTaskResultModel) -> str:
+    """Return the task status as its persisted string value."""
+    status = getattr(task, "status", "")
+    return str(getattr(status, "value", status))
+
+
+def _is_terminal_ai_triage_result(task: BaseTaskResultModel) -> bool:
+    """Return whether this task result is ready for AI triage."""
+    return _task_status_value(task) in AI_TRIAGE_ELIGIBLE_STATUSES
+
+
 def _run_ai_triage(
     task: BaseTaskResultModel,
     execution_model: ExecutionModel,
@@ -333,6 +361,7 @@ def _run_ai_triage(
         image_base64=None,
         config=config,
     )
+    ctx.context = ctx.context.model_copy(update={"recent_values": [], "history_results": []})
     if forced := _forced_ai_triage_markdown(task.name, ctx.context.output_parameters):
         return forced
     selected_model = _select_analysis_model(config)

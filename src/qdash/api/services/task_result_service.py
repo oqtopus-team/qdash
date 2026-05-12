@@ -394,6 +394,7 @@ class TaskResultService:
                 "chip_id": chip_id,
                 "name": task,
                 "qid": {"$in": qids},
+                "status": {"$in": ["completed", "failed"]},
             }
         else:
             historical_date = date or ""
@@ -406,6 +407,7 @@ class TaskResultService:
                 "chip_id": chip_id,
                 "name": task,
                 "qid": {"$in": qids},
+                "status": {"$in": ["completed", "failed"]},
                 "start_at": {"$gte": start_of_day(parsed_date), "$lt": end_of_day(parsed_date)},
             }
         if task_ids:
@@ -566,6 +568,9 @@ class TaskResultService:
                 task_id=task_id,
                 image_base64=None,
                 config=config,
+            )
+            ctx.context = ctx.context.model_copy(
+                update={"recent_values": [], "history_results": []}
             )
             if forced := TaskResultService._forced_ai_triage_markdown(
                 task_name,

@@ -78,17 +78,19 @@ class Resonance:
         return -1
 
     @functools.cached_property
-    def score(self) -> tuple[bool, bool, float, float]:
+    def score(self) -> tuple[bool, float, bool, float, float]:
         """Score tuple used to rank resonances.
 
         Order of preference (descending):
           1. has a high-power peak group
-          2. has a low-power peak
-          3. high_power_grad (more strongly downward-sloped is better)
-          4. max_prominence across all peaks
+          2. high_power_x_span
+          3. has a low-power peak
+          4. high_power_grad (more strongly downward-sloped is better)
+          5. max_prominence across all peaks
         """
         return (
             self.has_high_power_peaks,
+            self.high_power_x_span,
             self.has_low_power_peak,
             self.high_power_grad,
             self.max_prominence,
@@ -108,6 +110,14 @@ class Resonance:
         if len(self.peaks) <= 1:
             return float("-inf")
         return max(self._compute_grad(p0, p1) for p0, p1 in itertools.combinations(self.peaks, 2))
+
+    @functools.cached_property
+    def high_power_x_span(self) -> float:
+        """X span of high-power peaks; larger spans are preferred by script logic."""
+        if not self.high_power_peaks:
+            return float("-inf")
+        xs = [peak.x for peak in self.high_power_peaks.peaks]
+        return float(max(xs) - min(xs))
 
     @functools.cached_property
     def peaks(self) -> list[Peak]:
