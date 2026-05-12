@@ -45,18 +45,26 @@ def remove_false_spike(
     for spike_range in ranges:
         idx_min = None
         idx_max = None
+        x_min = f"{spike_range.x_min:.3f}"
+        x_max = f"{spike_range.x_max:.3f}"
 
         for i, x in enumerate(xs):
-            if idx_min is None and x >= spike_range.x_min:
+            x_str = f"{x:.3f}"
+            if x_str == x_min:
                 idx_min = i
-            if x <= spike_range.x_max:
+            if x_str == x_max:
                 idx_max = i
+            if idx_min and idx_max:
+                break
 
         if idx_min is None or idx_max is None:
-            continue
+            raise ValueError(f"Spike range [{x_min}, {x_max}] not found in x-axis")
 
-        if idx_min == 0 or idx_max == len(xs) - 1:
-            continue
+        if idx_min == 0:
+            raise ValueError(f"Spike range [{x_min}, {x_max}] starts at x-axis boundary")
+
+        if idx_max == len(xs) - 1:
+            raise ValueError(f"Spike range [{x_min}, {x_max}] ends at x-axis boundary")
 
         for z_row in zs:
             mean = (z_row[idx_min - 1] + z_row[idx_max + 1]) / 2.0
