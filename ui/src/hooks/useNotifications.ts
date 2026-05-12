@@ -15,6 +15,7 @@ export function useNotifications(unreadOnly = false) {
     {
       query: {
         staleTime: 15_000,
+        refetchInterval: 60_000,
       },
     },
   );

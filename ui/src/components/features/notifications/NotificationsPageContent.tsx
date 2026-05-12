@@ -20,12 +20,17 @@ import { formatRelativeTime } from "@/lib/utils/datetime";
 import type { NotificationResponse } from "@/schemas";
 
 function kindIcon(kind: string) {
+  if (kind === "forum_reply" || kind === "forum_mention") {
+    return <MessageSquare className="h-4 w-4" />;
+  }
   if (kind === "issue_reply") return <MessageSquare className="h-4 w-4" />;
   if (kind === "note_mention") return <StickyNote className="h-4 w-4" />;
   return <AtSign className="h-4 w-4" />;
 }
 
 function kindLabel(kind: string) {
+  if (kind === "forum_reply") return "Forum reply";
+  if (kind === "forum_mention") return "Forum mention";
   if (kind === "issue_reply") return "Reply";
   if (kind === "note_mention") return "Note mention";
   if (kind === "mention") return "Mention";
