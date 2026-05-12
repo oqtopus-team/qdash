@@ -12,7 +12,9 @@ class UserListItem(BaseModel):
 
     user_id: str
     username: str
-    full_name: str | None = None
+    display_name: str | None = None
+    organization: str | None = None
+    avatar_key: str | None = None
     disabled: bool = False
     system_role: SystemRole = SystemRole.USER
     default_project_id: str | None = None
@@ -48,7 +50,9 @@ class UserListResponse(BaseModel):
 class UpdateUserRequest(BaseModel):
     """Request to update user settings (admin only)."""
 
-    full_name: str | None = None
+    display_name: str | None = None
+    organization: str | None = None
+    avatar_key: str | None = None
     disabled: bool | None = None
     system_role: SystemRole | None = None
 
@@ -58,7 +62,9 @@ class UserDetailResponse(BaseModel):
 
     user_id: str
     username: str
-    full_name: str | None = None
+    display_name: str | None = None
+    organization: str | None = None
+    avatar_key: str | None = None
     disabled: bool = False
     system_role: SystemRole = SystemRole.USER
     default_project_id: str | None = None
@@ -81,7 +87,9 @@ class MemberItem(BaseModel):
 
     user_id: str
     username: str
-    full_name: str | None = None
+    display_name: str | None = None
+    organization: str | None = None
+    avatar_key: str | None = None
     role: ProjectRole
     status: str = "active"
 
@@ -108,7 +116,8 @@ class BulkUserImportResult(BaseModel):
 
     row_number: int
     username: str
-    full_name: str | None = None
+    display_name: str | None = None
+    organization: str | None = None
     system_role: SystemRole = SystemRole.USER
     initial_password: str | None = None
     status: str

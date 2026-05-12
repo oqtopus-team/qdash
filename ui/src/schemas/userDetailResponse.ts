@@ -5,7 +5,9 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { UserDetailResponseFullName } from "./userDetailResponseFullName";
+import type { UserDetailResponseDisplayName } from "./userDetailResponseDisplayName";
+import type { UserDetailResponseOrganization } from "./userDetailResponseOrganization";
+import type { UserDetailResponseAvatarKey } from "./userDetailResponseAvatarKey";
 import type { SystemRole } from "./systemRole";
 import type { UserDetailResponseDefaultProjectId } from "./userDetailResponseDefaultProjectId";
 import type { UserDetailResponseCreatedAt } from "./userDetailResponseCreatedAt";
@@ -17,7 +19,9 @@ import type { UserDetailResponseUpdatedAt } from "./userDetailResponseUpdatedAt"
 export interface UserDetailResponse {
   user_id: string;
   username: string;
-  full_name?: UserDetailResponseFullName;
+  display_name?: UserDetailResponseDisplayName;
+  organization?: UserDetailResponseOrganization;
+  avatar_key?: UserDetailResponseAvatarKey;
   disabled?: boolean;
   system_role?: SystemRole;
   default_project_id?: UserDetailResponseDefaultProjectId;

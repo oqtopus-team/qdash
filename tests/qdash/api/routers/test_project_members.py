@@ -25,6 +25,9 @@ def project_with_members(init_db: PyMongoDatabase[Any]) -> ProjectDocument:
     for username, token in users:
         user = UserDocument(
             username=username,
+            display_name=username.title(),
+            organization="Project Org",
+            avatar_key="planet",
             hashed_password="hashed",
             access_token=token,
             default_project_id="project-1",
@@ -79,6 +82,24 @@ def test_owner_can_invite_project_member_as_editor(
     data = response.json()
     assert data["username"] == "candidate"
     assert data["role"] == "editor"
+
+
+def test_list_project_members_includes_display_metadata(
+    test_client: TestClient,
+    project_with_members: ProjectDocument,
+) -> None:
+    """Project member listings include display metadata for mentions."""
+    response = test_client.get(
+        "/projects/project-1/members",
+        headers=_headers("owner-token"),
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    owner = next(member for member in data["members"] if member["username"] == "owner")
+    assert owner["display_name"] == "Owner"
+    assert owner["organization"] == "Project Org"
+    assert owner["avatar_key"] == "planet"
 
 
 def test_owner_cannot_invite_member_as_owner(

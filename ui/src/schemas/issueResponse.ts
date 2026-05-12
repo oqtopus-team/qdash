@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.0.1
  */
 import type { IssueResponseUserId } from "./issueResponseUserId";
+import type { IssueResponseAvatarKey } from "./issueResponseAvatarKey";
 import type { IssueResponseTitle } from "./issueResponseTitle";
 import type { IssueResponseParentId } from "./issueResponseParentId";
 
@@ -21,6 +22,8 @@ export interface IssueResponse {
   user_id?: IssueResponseUserId;
   /** Issue author username */
   username: string;
+  /** Issue author avatar preset key */
+  avatar_key?: IssueResponseAvatarKey;
   /** Issue title */
   title?: IssueResponseTitle;
   /** Issue text content */

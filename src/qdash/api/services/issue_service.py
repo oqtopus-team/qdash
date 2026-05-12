@@ -58,11 +58,13 @@ class IssueService:
     @staticmethod
     def _to_response(doc: IssueDocument, reply_count: int = 0) -> IssueResponse:
         """Convert an IssueDocument to an IssueResponse schema."""
+        user = UserDocument.find_one({"user_id": doc.user_id}).run() if doc.user_id else None
         return IssueResponse(
             id=str(doc.id),
             task_id=doc.task_id,
             user_id=doc.user_id,
             username=doc.username,
+            avatar_key=user.avatar_key if user else None,
             title=doc.title,
             content=doc.content,
             created_at=doc.system_info.created_at,
@@ -513,7 +515,7 @@ class IssueService:
         ai_doc = IssueDocument(
             project_id=project_id,
             task_id=task_id,
-            username="qdash-ai",
+            username="qdash",
             title=None,
             content=content,
             parent_id=parent_id,

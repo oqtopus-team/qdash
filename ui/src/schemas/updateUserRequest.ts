@@ -5,7 +5,9 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { UpdateUserRequestFullName } from "./updateUserRequestFullName";
+import type { UpdateUserRequestDisplayName } from "./updateUserRequestDisplayName";
+import type { UpdateUserRequestOrganization } from "./updateUserRequestOrganization";
+import type { UpdateUserRequestAvatarKey } from "./updateUserRequestAvatarKey";
 import type { UpdateUserRequestDisabled } from "./updateUserRequestDisabled";
 import type { UpdateUserRequestSystemRole } from "./updateUserRequestSystemRole";
 
@@ -13,7 +15,9 @@ import type { UpdateUserRequestSystemRole } from "./updateUserRequestSystemRole"
  * Request to update user settings (admin only).
  */
 export interface UpdateUserRequest {
-  full_name?: UpdateUserRequestFullName;
+  display_name?: UpdateUserRequestDisplayName;
+  organization?: UpdateUserRequestOrganization;
+  avatar_key?: UpdateUserRequestAvatarKey;
   disabled?: UpdateUserRequestDisabled;
   system_role?: UpdateUserRequestSystemRole;
 }

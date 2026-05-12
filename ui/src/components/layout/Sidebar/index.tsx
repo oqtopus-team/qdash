@@ -39,7 +39,7 @@ import type { LucideIcon } from "lucide-react";
 
 import { useTheme } from "@/contexts/ThemeContext";
 import { useLogout } from "@/client/auth/auth";
-import { FluentEmoji, getAvatarEmoji } from "@/components/ui/FluentEmoji";
+import { UserAvatar } from "@/components/ui/UserAvatar";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProject } from "@/contexts/ProjectContext";
 import { useSidebar } from "@/contexts/SidebarContext";
@@ -417,8 +417,6 @@ export function Sidebar() {
     </>
   );
 
-  const avatarEmoji = getAvatarEmoji(user?.username || "");
-
   const userSection = (
     <div
       className={`border-t border-base-300 ${isMobileOpen ? "p-2" : isOpen ? "p-2 mx-2" : "p-1"}`}
@@ -428,8 +426,9 @@ export function Sidebar() {
         className={`btn btn-ghost w-full ${isOpen || isMobileOpen ? "justify-start gap-3" : "justify-center p-0"} h-auto py-2`}
       >
         <div className="flex items-center justify-center">
-          <FluentEmoji
-            name={avatarEmoji}
+          <UserAvatar
+            username={user?.username || ""}
+            avatarKey={user?.avatar_key}
             size={isOpen || isMobileOpen ? 28 : 40}
           />
         </div>
@@ -439,7 +438,7 @@ export function Sidebar() {
               {user?.username || "User"}
             </div>
             <div className="text-xs opacity-60 truncate">
-              {user?.full_name || ""}
+              {user?.display_name || ""}
             </div>
             {user?.system_role && (
               <div className="mt-0.5">
@@ -462,11 +461,15 @@ export function Sidebar() {
         {/* Profile Section */}
         <div className="flex flex-col items-center py-4 border-b border-base-300">
           <div className="mb-3">
-            <FluentEmoji name={avatarEmoji} size={64} />
+            <UserAvatar
+              username={user?.username || ""}
+              avatarKey={user?.avatar_key}
+              size={64}
+            />
           </div>
           <h2 className="text-lg font-bold">{user?.username}</h2>
-          {user?.full_name && (
-            <p className="text-sm text-base-content/60">{user?.full_name}</p>
+          {user?.display_name && (
+            <p className="text-sm text-base-content/60">{user?.display_name}</p>
           )}
           {user?.system_role && (
             <span

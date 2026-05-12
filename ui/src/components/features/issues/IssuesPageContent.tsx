@@ -8,6 +8,7 @@ import { PageContainer } from "@/components/ui/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { MarkdownContent } from "@/components/ui/MarkdownContent";
+import { UserAvatar } from "@/components/ui/UserAvatar";
 import { useIssues } from "@/hooks/useIssues";
 import { useProject } from "@/contexts/ProjectContext";
 import { formatRelativeTime } from "@/lib/utils/datetime";
@@ -45,6 +46,11 @@ function IssueThread({
     >
       <div className="p-4">
         <div className="flex items-center gap-3 mb-2 flex-wrap">
+          <UserAvatar
+            username={issue.username}
+            avatarKey={issue.avatar_key}
+            size={28}
+          />
           <Link
             href={`/task-results/${issue.task_id}`}
             onClick={(e) => e.stopPropagation()}

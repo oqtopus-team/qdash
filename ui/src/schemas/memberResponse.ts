@@ -5,6 +5,9 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
+import type { MemberResponseDisplayName } from "./memberResponseDisplayName";
+import type { MemberResponseOrganization } from "./memberResponseOrganization";
+import type { MemberResponseAvatarKey } from "./memberResponseAvatarKey";
 import type { ProjectRole } from "./projectRole";
 import type { MemberResponseInvitedByUserId } from "./memberResponseInvitedByUserId";
 import type { MemberResponseInvitedBy } from "./memberResponseInvitedBy";
@@ -17,6 +20,9 @@ export interface MemberResponse {
   project_id: string;
   user_id: string;
   username: string;
+  display_name?: MemberResponseDisplayName;
+  organization?: MemberResponseOrganization;
+  avatar_key?: MemberResponseAvatarKey;
   role: ProjectRole;
   status: string;
   invited_by_user_id?: MemberResponseInvitedByUserId;

@@ -46,7 +46,8 @@ MAX_BULK_IMPORT_ROWS = 500
 REQUIRED_BULK_IMPORT_COLUMNS = {"username"}
 SUPPORTED_BULK_IMPORT_COLUMNS = {
     "username",
-    "full_name",
+    "display_name",
+    "organization",
     "system_role",
 }
 
@@ -68,7 +69,9 @@ class AdminService:
         return UserDetailResponse(
             user_id=user.user_id,
             username=user.username,
-            full_name=user.full_name,
+            display_name=user.display_name,
+            organization=user.organization,
+            avatar_key=user.avatar_key,
             disabled=user.disabled,
             system_role=user.system_role,
             default_project_id=user.default_project_id,
@@ -102,7 +105,8 @@ class AdminService:
         return BulkUserImportResult(
             row_number=row_number,
             username=(row.get("username") or "").strip(),
-            full_name=(row.get("full_name") or "").strip() or None,
+            display_name=(row.get("display_name") or "").strip() or None,
+            organization=(row.get("organization") or "").strip() or None,
             system_role=system_role,
             initial_password=initial_password,
             status=status_value,
@@ -174,7 +178,8 @@ class AdminService:
                 user = UserDocument(
                     user_id=generate_user_id(),
                     username=username,
-                    full_name=row.get("full_name") or None,
+                    display_name=row.get("display_name") or None,
+                    organization=row.get("organization") or None,
                     hashed_password=get_password_hash(initial_password),
                     access_token=secrets.token_urlsafe(32),
                     disabled=False,
@@ -225,7 +230,9 @@ class AdminService:
                 UserListItem(
                     user_id=u.user_id,
                     username=u.username,
-                    full_name=u.full_name,
+                    display_name=u.display_name,
+                    organization=u.organization,
+                    avatar_key=u.avatar_key,
                     disabled=u.disabled,
                     system_role=u.system_role,
                     default_project_id=project_id,
@@ -249,7 +256,9 @@ class AdminService:
         self,
         username: str,
         admin_username: str,
-        full_name: str | None = None,
+        display_name: str | None = None,
+        organization: str | None = None,
+        avatar_key: str | None = None,
         disabled: bool | None = None,
         system_role: SystemRole | None = None,
     ) -> UserDetailResponse:
@@ -279,8 +288,12 @@ class AdminService:
                     detail="Cannot change your own system role",
                 )
 
-        if full_name is not None:
-            user.full_name = full_name
+        if display_name is not None:
+            user.display_name = display_name
+        if organization is not None:
+            user.organization = organization
+        if avatar_key is not None:
+            user.avatar_key = avatar_key.strip() or None
         if disabled is not None:
             user.disabled = disabled
         if system_role is not None:
@@ -389,7 +402,9 @@ class AdminService:
                 MemberItem(
                     user_id=m.user_id,
                     username=m.username,
-                    full_name=user.full_name if user else None,
+                    display_name=user.display_name if user else None,
+                    organization=user.organization if user else None,
+                    avatar_key=user.avatar_key if user else None,
                     role=m.role,
                     status=m.status,
                 )
@@ -436,7 +451,9 @@ class AdminService:
             return MemberItem(
                 user_id=existing.user_id,
                 username=existing.username,
-                full_name=user.full_name,
+                display_name=user.display_name,
+                organization=user.organization,
+                avatar_key=user.avatar_key,
                 role=existing.role,
                 status=existing.status,
             )
@@ -457,7 +474,9 @@ class AdminService:
         return MemberItem(
             user_id=membership.user_id,
             username=membership.username,
-            full_name=user.full_name,
+            display_name=user.display_name,
+            organization=user.organization,
+            avatar_key=user.avatar_key,
             role=membership.role,
             status=membership.status,
         )

@@ -6,4 +6,4 @@
  * OpenAPI spec version: 0.0.1
  */
 
-export type UserCreateFullName = string | null;
+export type UserProfileUpdateAvatarKey = string | null;

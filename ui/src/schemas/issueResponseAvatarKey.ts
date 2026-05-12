@@ -6,4 +6,7 @@
  * OpenAPI spec version: 0.0.1
  */
 
-export type BulkUserImportResultFullName = string | null;
+/**
+ * Issue author avatar preset key
+ */
+export type IssueResponseAvatarKey = string | null;
