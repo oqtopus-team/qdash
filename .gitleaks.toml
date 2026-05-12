@@ -1,5 +1,8 @@
 title = "QDash Gitleaks Configuration"
 
+[extend]
+  useDefault = true
+
 [allowlist]
   description = "Global allowlist"
   paths = [

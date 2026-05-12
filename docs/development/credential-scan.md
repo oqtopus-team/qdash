@@ -33,7 +33,7 @@ The result is a clear division of labor: Gitleaks is the strict, fast, syntactic
 
 ### Gitleaks
 
-Gitleaks scans content for known secret patterns (API keys, tokens, private keys). The repo overrides the default config via `.gitleaks.toml` with two kinds of allowlist:
+Gitleaks scans content for known secret patterns (API keys, tokens, private keys). The repo config `.gitleaks.toml` sets `[extend] useDefault = true` to inherit all built-in detection rules (AWS, GitHub, GCP, Azure, Slack, Stripe, etc.) and layers two kinds of allowlist on top:
 
 - **`paths`** — files whose entire contents are excluded from scanning.
 - **`regexes`** — literal strings that are ignored wherever they appear.
@@ -58,10 +58,12 @@ Trufflehog walks the git history and reports only **verified** findings — mean
 Paths in `.trufflehog-exclude-paths.txt` are excluded from history scanning. Each line is a regex matched against the file path:
 
 ```
-scripts/migrate_user_tokens\.py
-docs/design/api-testing-guidelines\.md
-tests/conftest\.py
 \.gitleaks\.toml
+docs/design/api-testing-guidelines\.md
+docs/development/credential-scan\.md
+poetry\.lock
+scripts/migrate_user_tokens\.py
+tests/conftest\.py
 ```
 
 ## Running Locally
