@@ -59,6 +59,7 @@ CHECK_1Q_TASKS: list[str] = [
     "CheckRabi",
     "CreateHPIPulse",
     "CheckHPIPulse",
+    "CheckOptimalReadoutFrequency",
     "CheckOptimalReadoutAmplitude",
     "CheckRabi",
     "CreateHPIPulse",

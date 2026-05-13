@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useId } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import dynamic from "next/dynamic";
+import { ImageIcon, BarChart3, Code2 } from "lucide-react";
 import { CodeBlock } from "@/components/features/chat/CodeBlock";
 
 const ChatPlotlyChart = dynamic(
@@ -117,6 +118,67 @@ function tryParsePlotlyJson(
   return null;
 }
 
+function PreviewBadge({
+  icon: Icon,
+  label,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+}) {
+  return (
+    <span className="inline-flex items-center gap-1 align-middle rounded bg-base-200 text-base-content/60 px-1.5 py-0.5 text-xs not-prose">
+      <Icon className="h-3 w-3" />
+      {label}
+    </span>
+  );
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const previewComponents: Record<string, React.ComponentType<any>> = {
+  img() {
+    return <PreviewBadge icon={ImageIcon} label="image" />;
+  },
+  code({
+    className,
+    children,
+    ...props
+  }: React.ComponentPropsWithoutRef<"code"> & { className?: string }) {
+    const match = /language-(\w+)/.exec(className || "");
+    if (match) {
+      if (match[1] === "mermaid") {
+        return <PreviewBadge icon={BarChart3} label="diagram" />;
+      }
+      if (match[1] === "json") {
+        const plotly = tryParsePlotlyJson(String(children));
+        if (plotly) {
+          return <PreviewBadge icon={BarChart3} label="chart" />;
+        }
+      }
+      return <PreviewBadge icon={Code2} label={match[1]} />;
+    }
+    return (
+      <code className="bg-base-200 px-1 py-0.5 rounded text-sm" {...props}>
+        {children}
+      </code>
+    );
+  },
+  pre({ children }: React.ComponentPropsWithoutRef<"pre">) {
+    return <>{children}</>;
+  },
+  p({ children, ...props }: React.ComponentPropsWithoutRef<"p">) {
+    return (
+      <p {...props}>
+        {React.Children.map(children, (child) => {
+          if (typeof child === "string" && HAS_MENTION_RE.test(child)) {
+            return highlightMentions(child);
+          }
+          return child;
+        })}
+      </p>
+    );
+  },
+};
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const markdownComponents: Record<string, React.ComponentType<any>> = {
   code({
@@ -216,16 +278,29 @@ function urlTransform(url: string): string {
 export function MarkdownContent({
   content,
   className,
+  preview = false,
 }: {
   content: string;
   className?: string;
+  /**
+   * Compact preview mode for list views: replaces block-level attachments
+   * (images, code blocks, charts, diagrams) with small inline badges so the
+   * parent `line-clamp` can truncate the content cleanly.
+   */
+  preview?: boolean;
 }) {
   return (
-    <div className={`prose prose-sm max-w-none ${className ?? ""}`}>
+    <div
+      className={`prose prose-sm max-w-none ${
+        preview
+          ? "prose-p:my-0 prose-headings:my-0 prose-headings:text-sm prose-headings:font-semibold prose-ul:my-0 prose-ol:my-0 prose-li:my-0 prose-pre:my-0 prose-img:my-0"
+          : ""
+      } ${className ?? ""}`}
+    >
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         urlTransform={urlTransform}
-        components={markdownComponents}
+        components={preview ? previewComponents : markdownComponents}
       >
         {content}
       </ReactMarkdown>

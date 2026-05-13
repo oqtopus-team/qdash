@@ -93,6 +93,7 @@ function IssueRow({
         <MarkdownContent
           content={issue.content}
           className="text-base-content/80 text-xs"
+          preview
         />
       </div>
     </div>
