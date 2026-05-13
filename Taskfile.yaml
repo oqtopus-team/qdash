@@ -199,7 +199,7 @@ tasks:
   # =============================================================================
 
   check:
-    desc: Run all checks locally (lint, typecheck, test, UI)
+    desc: Run all checks locally (lint, typecheck, test, UI, audit)
     cmds:
       - task: ci-lint
       - task: ci-typecheck
@@ -208,10 +208,9 @@ tasks:
       - task: scan-leaks
 
   check-all:
-    desc: Run all checks including UI production build
+    desc: Run the full local check suite
     cmds:
       - task: check
-      - task: ci-ui-build
 
   # =============================================================================
   # CI Checks (check-only, no auto-fix)
@@ -257,9 +256,11 @@ tasks:
     dir: ui
     cmds:
       - bun run test:run
+      - bunx tsc --noEmit
       - bunx eslint . -c eslint.config.mjs
       - bunx prettier . --check
       - bun run knip
+      - bun audit
 
   ci-ui-build:
     desc: Build UI for production

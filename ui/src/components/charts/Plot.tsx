@@ -5,9 +5,7 @@ import type { CSSProperties } from "react";
 
 import type {
   Config,
-  Figure,
   Layout,
-  PlotData,
   PlotHoverEvent,
   PlotMouseEvent,
   PlotRelayoutEvent,
@@ -15,16 +13,22 @@ import type {
 } from "plotly.js";
 import Plotly from "plotly.js-dist-min";
 
+interface PlotFigure {
+  data: Plotly.Data[];
+  layout: Partial<Layout>;
+  frames: unknown[];
+}
+
 interface PlotProps {
-  data: Array<Partial<PlotData>>;
+  data: Plotly.Data[];
   layout?: Partial<Layout>;
   config?: Partial<Config>;
   style?: CSSProperties;
   className?: string;
   useResizeHandler?: boolean;
-  onInitialized?: (figure: Figure, graphDiv: HTMLElement) => void;
-  onUpdate?: (figure: Figure, graphDiv: HTMLElement) => void;
-  onPurge?: (figure: Figure, graphDiv: HTMLElement) => void;
+  onInitialized?: (figure: PlotFigure, graphDiv: HTMLElement) => void;
+  onUpdate?: (figure: PlotFigure, graphDiv: HTMLElement) => void;
+  onPurge?: (figure: PlotFigure, graphDiv: HTMLElement) => void;
   onSelected?: (event: PlotSelectionEvent) => void;
   onClick?: (event: PlotMouseEvent) => void;
   onHover?: (event: PlotHoverEvent) => void;
@@ -71,9 +75,9 @@ export default function Plot({
     void typedPlotly.react(container, data, layout, config).then((graphDiv) => {
       if (cancelled) return;
 
-      const figure: Figure = {
-        data: data as Figure["data"],
-        layout: (layout ?? {}) as Figure["layout"],
+      const figure: PlotFigure = {
+        data,
+        layout: layout ?? {},
         frames: [],
       };
 
@@ -93,11 +97,25 @@ export default function Plot({
       emitter.removeAllListeners?.("plotly_hover");
       emitter.removeAllListeners?.("plotly_unhover");
       emitter.removeAllListeners?.("plotly_relayout");
-      if (onSelected) emitter.on?.("plotly_selected", onSelected as (...args: unknown[]) => void);
-      if (onClick) emitter.on?.("plotly_click", onClick as (...args: unknown[]) => void);
-      if (onHover) emitter.on?.("plotly_hover", onHover as (...args: unknown[]) => void);
-      if (onUnhover) emitter.on?.("plotly_unhover", onUnhover as (...args: unknown[]) => void);
-      if (onRelayout) emitter.on?.("plotly_relayout", onRelayout as (...args: unknown[]) => void);
+      if (onSelected)
+        emitter.on?.(
+          "plotly_selected",
+          onSelected as (...args: unknown[]) => void,
+        );
+      if (onClick)
+        emitter.on?.("plotly_click", onClick as (...args: unknown[]) => void);
+      if (onHover)
+        emitter.on?.("plotly_hover", onHover as (...args: unknown[]) => void);
+      if (onUnhover)
+        emitter.on?.(
+          "plotly_unhover",
+          onUnhover as (...args: unknown[]) => void,
+        );
+      if (onRelayout)
+        emitter.on?.(
+          "plotly_relayout",
+          onRelayout as (...args: unknown[]) => void,
+        );
     });
 
     return () => {
@@ -123,7 +141,8 @@ export default function Plot({
     if (!container) return;
 
     const resize = () => typedPlotly.Plots.resize(container);
-    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(resize);
+    const observer =
+      typeof ResizeObserver === "undefined" ? null : new ResizeObserver(resize);
     observer?.observe(container);
     window.addEventListener("resize", resize);
 
@@ -138,9 +157,9 @@ export default function Plot({
 
     return () => {
       if (!container) return;
-      const figure: Figure = {
-        data: data as Figure["data"],
-        layout: (layout ?? {}) as Figure["layout"],
+      const figure: PlotFigure = {
+        data,
+        layout: layout ?? {},
         frames: [],
       };
       onPurge?.(figure, container);
