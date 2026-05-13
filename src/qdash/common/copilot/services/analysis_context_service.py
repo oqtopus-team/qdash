@@ -7,8 +7,8 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from qdash.common.copilot.analysis_models import AnalysisContextResult
-    from qdash.common.copilot.settings import CopilotConfig
+    from qdash.common.copilot.config import CopilotConfig
+    from qdash.common.copilot.contracts import AnalysisContextResult
 
 
 class AnalysisContextBuilder:
@@ -46,7 +46,7 @@ class AnalysisContextBuilder:
         config: CopilotConfig,
     ) -> AnalysisContextResult:
         """Build the full analysis context consumed by Copilot review flows."""
-        from qdash.common.copilot.analysis_models import (
+        from qdash.common.copilot.contracts import (
             AnalysisContextResult,
             TaskAnalysisContext,
         )

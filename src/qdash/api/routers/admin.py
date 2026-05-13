@@ -23,7 +23,7 @@ from qdash.api.schemas.admin import (
 )
 from qdash.api.schemas.auth import User
 from qdash.api.services.admin_service import AdminService
-from qdash.common.copilot.settings import clear_copilot_config_cache
+from qdash.common.copilot.config import clear_copilot_config_cache
 
 logger = logging.getLogger(__name__)
 

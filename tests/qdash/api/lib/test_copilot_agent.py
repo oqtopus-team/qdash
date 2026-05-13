@@ -7,7 +7,7 @@ import pytest
 
 from qdash.common.copilot.agent import _run_chat_completions
 from qdash.common.copilot.agent_runtime.parsing import parse_response
-from qdash.common.copilot.settings import CopilotConfig, ModelConfig
+from qdash.common.copilot.config import CopilotConfig, ModelConfig
 
 
 def test_parse_response_accepts_review_triage_markdown_without_json() -> None:

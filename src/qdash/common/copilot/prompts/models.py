@@ -7,8 +7,8 @@ from typing import TYPE_CHECKING, Any
 from pydantic import BaseModel, Field
 
 if TYPE_CHECKING:
-    from qdash.common.copilot.analysis_models import TaskAnalysisContext
-    from qdash.common.copilot.settings import ScoringThreshold
+    from qdash.common.copilot.config import ScoringThreshold
+    from qdash.common.copilot.contracts import TaskAnalysisContext
 
 
 class AnalysisPromptOptions(BaseModel):
@@ -33,8 +33,8 @@ class ChatPromptContext(BaseModel):
 
 
 def _rebuild_models() -> None:
-    from qdash.common.copilot.analysis_models import TaskAnalysisContext as _TaskAnalysisContext
-    from qdash.common.copilot.settings import ScoringThreshold as _ScoringThreshold
+    from qdash.common.copilot.config import ScoringThreshold as _ScoringThreshold
+    from qdash.common.copilot.contracts import TaskAnalysisContext as _TaskAnalysisContext
 
     namespace = {
         "TaskAnalysisContext": _TaskAnalysisContext,

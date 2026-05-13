@@ -845,7 +845,7 @@ class TestCallLlmExtract:
         config = MagicMock()
         config.enabled = False
 
-        with patch("qdash.common.copilot.settings.load_copilot_config", return_value=config):
+        with patch("qdash.common.copilot.config.load_copilot_config", return_value=config):
             result = await IssueKnowledgeService._call_llm_extract(
                 "CheckT1", "chip-A", "Q0", "Title", "Thread text"
             )
@@ -870,7 +870,7 @@ class TestCallLlmExtract:
         mock_client.chat.completions.create = AsyncMock(return_value=mock_response)
 
         with (
-            patch("qdash.common.copilot.settings.load_copilot_config", return_value=mock_config),
+            patch("qdash.common.copilot.config.load_copilot_config", return_value=mock_config),
             patch("qdash.common.copilot.agent._build_client", return_value=mock_client),
         ):
             result = await IssueKnowledgeService._call_llm_extract(
@@ -891,7 +891,7 @@ class TestCallLlmExtract:
         mock_client.chat.completions.create = AsyncMock(return_value=mock_response)
 
         with (
-            patch("qdash.common.copilot.settings.load_copilot_config", return_value=mock_config),
+            patch("qdash.common.copilot.config.load_copilot_config", return_value=mock_config),
             patch("qdash.common.copilot.agent._build_client", return_value=mock_client),
         ):
             result = await IssueKnowledgeService._call_llm_extract(
@@ -910,7 +910,7 @@ class TestCallLlmExtract:
         mock_client.chat.completions.create = AsyncMock(return_value=mock_response)
 
         with (
-            patch("qdash.common.copilot.settings.load_copilot_config", return_value=mock_config),
+            patch("qdash.common.copilot.config.load_copilot_config", return_value=mock_config),
             patch("qdash.common.copilot.agent._build_client", return_value=mock_client),
         ):
             result = await IssueKnowledgeService._call_llm_extract(
@@ -926,7 +926,7 @@ class TestCallLlmExtract:
         mock_client.chat.completions.create = AsyncMock(side_effect=RuntimeError("API unreachable"))
 
         with (
-            patch("qdash.common.copilot.settings.load_copilot_config", return_value=mock_config),
+            patch("qdash.common.copilot.config.load_copilot_config", return_value=mock_config),
             patch("qdash.common.copilot.agent._build_client", return_value=mock_client),
         ):
             result = await IssueKnowledgeService._call_llm_extract(
@@ -944,7 +944,7 @@ class TestCallLlmExtract:
         mock_client.chat.completions.create = AsyncMock(return_value=mock_response)
 
         with (
-            patch("qdash.common.copilot.settings.load_copilot_config", return_value=mock_config),
+            patch("qdash.common.copilot.config.load_copilot_config", return_value=mock_config),
             patch("qdash.common.copilot.agent._build_client", return_value=mock_client),
         ):
             result = await IssueKnowledgeService._call_llm_extract(
@@ -965,7 +965,7 @@ class TestCallLlmExtract:
         mock_client.chat.completions.create = AsyncMock(return_value=mock_response)
 
         with (
-            patch("qdash.common.copilot.settings.load_copilot_config", return_value=mock_config),
+            patch("qdash.common.copilot.config.load_copilot_config", return_value=mock_config),
             patch("qdash.common.copilot.agent._build_client", return_value=mock_client),
         ):
             result = await IssueKnowledgeService._call_llm_extract(
@@ -983,7 +983,7 @@ class TestCallLlmExtract:
         mock_client.chat.completions.create = AsyncMock(return_value=mock_response)
 
         with (
-            patch("qdash.common.copilot.settings.load_copilot_config", return_value=mock_config),
+            patch("qdash.common.copilot.config.load_copilot_config", return_value=mock_config),
             patch("qdash.common.copilot.agent._build_client", return_value=mock_client),
         ):
             result = await IssueKnowledgeService._call_llm_extract(

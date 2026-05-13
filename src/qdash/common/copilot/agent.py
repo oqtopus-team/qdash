@@ -1,7 +1,14 @@
-"""OpenAI-based agent for calibration task analysis.
+"""Public Copilot agent entrypoint.
 
-Uses the openai SDK directly to avoid pydantic-ai dependency conflicts.
-Supports OpenAI Responses API (default) with Chat Completions API fallback for Ollama.
+This module exposes the callable surface used by API routes and workflows.
+Implementation details live under ``agent_runtime/``:
+
+- ``client``: OpenAI-compatible client construction
+- ``execution``: Responses / Chat Completions loops and tool orchestration
+- ``parsing``: response parsing and fallback handling
+- ``rendering``: blocks rendering and compact summaries
+- ``translation``: language fallback helpers
+- ``schemas`` / ``types``: runtime contracts
 """
 
 from __future__ import annotations
@@ -44,11 +51,13 @@ if TYPE_CHECKING:
         OnToolCallHook,
         ToolExecutors,
     )
-    from qdash.common.copilot.analysis_models import AnalysisResponse, TaskAnalysisContext
-    from qdash.common.copilot.python_sandbox import SandboxChartSpec
-    from qdash.common.copilot.settings import CopilotConfig, ModelConfig
+    from qdash.common.copilot.config import CopilotConfig, ModelConfig
+    from qdash.common.copilot.contracts import AnalysisResponse, TaskAnalysisContext
+    from qdash.common.copilot.tooling.sandbox import SandboxChartSpec
 
 logger = logging.getLogger(__name__)
+
+
 def _build_client(config: CopilotConfig) -> AsyncOpenAI:
     """Build an AsyncOpenAI client based on provider configuration."""
     return _agent_client.build_client(config)
@@ -251,6 +260,7 @@ def _wrap_tool_executors(
 ) -> tuple[ToolExecutors, list[SandboxChartSpec | dict[str, Any]]]:
     """Wrap tool executors to handle data store and chart collection."""
     return _agent_execution.wrap_tool_executors(tool_executors, data_store)
+
 
 def _wrap_rate_limited_executors(tool_executors: ToolExecutors) -> ToolExecutors:
     """Wrap per-qubit tools with a call-count limiter."""

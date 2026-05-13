@@ -592,7 +592,7 @@ class TaskResultService:
     @staticmethod
     def _load_ai_triage_config() -> Any:
         """Load Copilot config lazily so tests can patch it."""
-        from qdash.common.copilot.settings import load_copilot_config
+        from qdash.common.copilot.config import load_copilot_config
 
         return load_copilot_config()
 
@@ -654,7 +654,7 @@ class TaskResultService:
     @staticmethod
     def _load_ai_triage_runtime_config(model_override: Any | None) -> Any:
         """Load Copilot config and apply AI-triage-specific defaults."""
-        from qdash.common.copilot.settings import load_copilot_config
+        from qdash.common.copilot.config import load_copilot_config
 
         config = load_copilot_config()
         if model_override is not None:

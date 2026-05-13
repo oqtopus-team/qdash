@@ -29,6 +29,7 @@ from qdash.dbmodel.user import UserDocument
 
 logger = logging.getLogger(__name__)
 
+
 class IssueKnowledgeService:
     """Service for issue knowledge CRUD and AI draft generation."""
 
@@ -301,7 +302,7 @@ class IssueKnowledgeService:
         thread_text: str,
     ) -> dict[str, Any]:
         """Call LLM to extract structured knowledge from issue thread."""
-        from qdash.common.copilot.settings import load_copilot_config
+        from qdash.common.copilot.config import load_copilot_config
 
         config = load_copilot_config()
         if not config.enabled:

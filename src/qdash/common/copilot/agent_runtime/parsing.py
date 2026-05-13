@@ -8,10 +8,10 @@ import re
 from typing import TYPE_CHECKING, Any
 
 from qdash.common.copilot.agent_runtime.rendering import legacy_to_blocks
-from qdash.common.copilot.analysis_models import AnalysisResponse
+from qdash.common.copilot.contracts import AnalysisResponse
 
 if TYPE_CHECKING:
-    from qdash.common.copilot.settings import CopilotConfig
+    from qdash.common.copilot.config import CopilotConfig
 
 logger = logging.getLogger(__name__)
 
@@ -78,7 +78,9 @@ def extract_triage_fallback(content: str) -> AnalysisResponse | None:
         summary=fields["Primary reason"] or "Analysis complete",
         assessment=_TRIAGE_ASSESSMENT.get(decision, "warning"),
         explanation=triage,
-        potential_issues=[] if decision in {"PASS", "PASS_WITH_NOTE"} else [fields["Primary reason"]],
+        potential_issues=[]
+        if decision in {"PASS", "PASS_WITH_NOTE"}
+        else [fields["Primary reason"]],
         recommendations=[fields["Recommended action"]] if fields["Recommended action"] else [],
     )
 

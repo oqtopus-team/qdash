@@ -35,13 +35,13 @@ from qdash.api.schemas.copilot_chat_session import (
 from qdash.api.services.copilot_chat_session_service import (
     CopilotChatSessionService,
 )
-from qdash.common.copilot.analysis_models import (
+from qdash.common.copilot.config import CopilotConfig, ModelConfig, load_copilot_config
+from qdash.common.copilot.contracts import (
     AnalysisResponse,
     AnalyzeRequest,
     ChatRequest,
 )
 from qdash.common.copilot.runtime import CopilotRuntime
-from qdash.common.copilot.settings import CopilotConfig, ModelConfig, load_copilot_config
 from qdash.datamodel.task_knowledge import get_task_knowledge
 
 router = APIRouter()

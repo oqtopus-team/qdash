@@ -41,8 +41,8 @@ from qdash.common.copilot.tooling.registry import ToolExecutorRegistryBuilder
 from qdash.common.json_utils import sanitize_for_json
 
 if TYPE_CHECKING:
-    from qdash.common.copilot.analysis_models import AnalysisContextResult
-    from qdash.common.copilot.settings import CopilotConfig
+    from qdash.common.copilot.config import CopilotConfig
+    from qdash.common.copilot.contracts import AnalysisContextResult
 
 logger = logging.getLogger(__name__)
 

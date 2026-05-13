@@ -21,8 +21,8 @@ if TYPE_CHECKING:
         ToolExecutor,
         ToolExecutors,
     )
-    from qdash.common.copilot.python_sandbox import SandboxChartSpec, SandboxResult
-    from qdash.common.copilot.settings import CopilotConfig
+    from qdash.common.copilot.config import CopilotConfig
+    from qdash.common.copilot.tooling.sandbox import SandboxChartSpec, SandboxResult
 
 logger = logging.getLogger(__name__)
 
@@ -85,7 +85,7 @@ def wrap_tool_executors(
         wrapped["generate_chip_heatmap"] = heatmap_wrapper
 
     def python_wrapper(args: dict[str, Any]) -> SandboxResult | dict[str, Any]:
-        from qdash.common.copilot.python_sandbox import execute_python_analysis
+        from qdash.common.copilot.tooling.sandbox import execute_python_analysis
 
         result = execute_python_analysis(args["code"], data_store)
         if isinstance(result, dict) and result.get("chart"):
@@ -244,7 +244,9 @@ async def run_responses_api(
                         tool_result = executor(args)
                     except KeyError as e:
                         logger.warning("Tool %s missing required argument: %s", fc.name, e)
-                        tool_result = {"error": f"Missing required argument: {e}. Please provide all required parameters."}
+                        tool_result = {
+                            "error": f"Missing required argument: {e}. Please provide all required parameters."
+                        }
                     except Exception as e:
                         logger.warning("Tool %s execution failed: %s", fc.name, e)
                         tool_result = {"error": str(e)}
@@ -257,7 +259,9 @@ async def run_responses_api(
                         len(output_str),
                         MAX_TOOL_RESULT_CHARS,
                     )
-                    output_str = output_str[:MAX_TOOL_RESULT_CHARS] + '... [TRUNCATED - result too large]"}'
+                    output_str = (
+                        output_str[:MAX_TOOL_RESULT_CHARS] + '... [TRUNCATED - result too large]"}'
+                    )
 
                 new_input.append(
                     {
@@ -381,7 +385,9 @@ async def run_chat_completions_with_tools(
             if "reasoning_effort" in msg and "reasoning_effort" in kw:
                 kw.pop("reasoning_effort")
                 return await client.chat.completions.create(**kw)
-            if ("response_format" in msg or "json_schema" in msg or "strict" in msg) and "response_format" in kw:
+            if (
+                "response_format" in msg or "json_schema" in msg or "strict" in msg
+            ) and "response_format" in kw:
                 kw["response_format"] = {"type": "json_object"}
                 try:
                     return await client.chat.completions.create(**kw)
@@ -435,13 +441,17 @@ async def run_chat_completions_with_tools(
                 try:
                     tool_result = executor(args)
                 except KeyError as e:
-                    tool_result = {"error": f"Missing required argument: {e}. Please provide all required parameters."}
+                    tool_result = {
+                        "error": f"Missing required argument: {e}. Please provide all required parameters."
+                    }
                 except Exception as e:
                     tool_result = {"error": str(e)}
 
             output_str = json.dumps(sanitize_nan(tool_result), default=str, ensure_ascii=False)
             if len(output_str) > MAX_TOOL_RESULT_CHARS:
-                output_str = output_str[:MAX_TOOL_RESULT_CHARS] + "... [TRUNCATED - result too large]"
+                output_str = (
+                    output_str[:MAX_TOOL_RESULT_CHARS] + "... [TRUNCATED - result too large]"
+                )
             msgs.append({"role": "tool", "tool_call_id": tc.id, "content": output_str})
 
         if on_status:

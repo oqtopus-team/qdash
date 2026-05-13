@@ -12,10 +12,10 @@ from qdash.common.copilot.agent_runtime.client import build_client
 from qdash.common.copilot.agent_runtime.parsing import strip_code_fences
 
 if TYPE_CHECKING:
-    from qdash.common.copilot.analysis_models import AnalysisResponse
-    from qdash.common.copilot.settings import ModelConfig
+    from qdash.common.copilot.config import ModelConfig
+    from qdash.common.copilot.contracts import AnalysisResponse
 
-from qdash.common.copilot.settings import CopilotConfig
+from qdash.common.copilot.config import CopilotConfig
 
 logger = logging.getLogger(__name__)
 

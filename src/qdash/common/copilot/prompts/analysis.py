@@ -7,8 +7,8 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
+    from qdash.common.copilot.config import ScoringThreshold
     from qdash.common.copilot.prompts.models import AnalysisPromptOptions
-    from qdash.common.copilot.settings import ScoringThreshold
 
 ANALYSIS_SYSTEM_PROMPT_BASE = """\
 You are an expert in superconducting qubit calibration.

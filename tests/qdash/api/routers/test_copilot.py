@@ -11,7 +11,7 @@ from qdash.common.copilot.agent import (
     _wrap_tool_executors,
 )
 from qdash.common.copilot.agent_runtime.rendering import build_llm_summary, legacy_to_blocks
-from qdash.common.copilot.analysis_models import AnalysisResponse
+from qdash.common.copilot.contracts import AnalysisResponse
 from qdash.common.copilot.runtime import CopilotRuntime
 from qdash.common.copilot.tooling.schemas import AGENT_TOOLS
 
