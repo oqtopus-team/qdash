@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
-    from qdash.common.copilot.analysis_models import TaskAnalysisContext
+    from qdash.common.copilot.prompts.models import AnalysisPromptOptions
     from qdash.common.copilot.settings import ScoringThreshold
 
 ANALYSIS_SYSTEM_PROMPT_BASE = """\
@@ -146,32 +146,25 @@ def _build_scoring_threshold_section(scoring: Mapping[str, ScoringThreshold] | N
     return "\n".join(threshold_lines)
 
 
-def build_analysis_system_prompt(
-    context: TaskAnalysisContext,
-    *,
-    language_instruction: str,
-    scoring: Mapping[str, ScoringThreshold] | None = None,
-    include_response_format: bool = False,
-    has_expected_images: bool = False,
-    has_experiment_image: bool = False,
-) -> str:
+def build_analysis_system_prompt(options: AnalysisPromptOptions) -> str:
     """Build the full system prompt for task analysis and AI triage."""
-    parts = [ANALYSIS_SYSTEM_PROMPT_BASE, language_instruction]
+    context = options.context
+    parts = [ANALYSIS_SYSTEM_PROMPT_BASE, options.language_instruction]
 
-    if has_expected_images or has_experiment_image:
+    if options.has_expected_images or options.has_experiment_image:
         img_instructions = ["\n## Image analysis"]
-        if has_expected_images and has_experiment_image:
+        if options.has_expected_images and options.has_experiment_image:
             img_instructions.append(
                 "Reference images showing expected results are provided along with "
                 "the actual experimental result image. Compare the actual result with "
                 "these references to identify deviations, anomalies, or quality issues."
             )
-        elif has_expected_images:
+        elif options.has_expected_images:
             img_instructions.append(
                 "Reference images showing expected results are provided. "
                 "Use them to understand what a good result looks like for this task."
             )
-        elif has_experiment_image:
+        elif options.has_experiment_image:
             img_instructions.append(
                 "The actual experimental result image is provided. "
                 "Analyze the graph/figure for quality, fit accuracy, and anomalies."
@@ -181,7 +174,7 @@ def build_analysis_system_prompt(
     parts.append(context.task_knowledge_prompt)
     parts.append(REVIEW_TRIAGE_INSTRUCTION)
 
-    scoring_section = _build_scoring_threshold_section(scoring)
+    scoring_section = _build_scoring_threshold_section(options.scoring)
     if scoring_section:
         parts.append(scoring_section)
 
@@ -255,7 +248,7 @@ def build_analysis_system_prompt(
                     cp_lines.append(f"- {key}: {val}")
         parts.append("\n".join(cp_lines))
 
-    if include_response_format:
+    if options.include_response_format:
         parts.append(RESPONSE_FORMAT_INSTRUCTION)
 
     return "\n\n".join(parts)

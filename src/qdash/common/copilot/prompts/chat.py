@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
+    from qdash.common.copilot.prompts.models import ChatPromptContext
     from qdash.common.copilot.settings import ScoringThreshold
 
 CHAT_COMPLETIONS_STRICT_EMULATION = """\
@@ -210,32 +211,25 @@ def _build_scoring_threshold_section(scoring: Mapping[str, ScoringThreshold] | N
     return "\n".join(threshold_lines)
 
 
-def build_chat_system_prompt(
-    *,
-    language_instruction: str,
-    scoring: Mapping[str, ScoringThreshold] | None = None,
-    chip_id: str | None = None,
-    qid: str | None = None,
-    qubit_params: dict[str, Any] | None = None,
-) -> str:
+def build_chat_system_prompt(context: ChatPromptContext) -> str:
     """Build the system prompt for the generic chat endpoint."""
-    parts = [CHAT_SYSTEM_PROMPT, language_instruction]
+    parts = [CHAT_SYSTEM_PROMPT, context.language_instruction]
 
-    scoring_section = _build_scoring_threshold_section(scoring)
+    scoring_section = _build_scoring_threshold_section(context.scoring)
     if scoring_section:
         parts.append(scoring_section)
 
-    if chip_id:
-        if qid:
-            lines = [f"\n## Current context: Qubit {qid} (Chip: {chip_id})"]
+    if context.chip_id:
+        if context.qid:
+            lines = [f"\n## Current context: Qubit {context.qid} (Chip: {context.chip_id})"]
         else:
-            lines = [f"\n## Current context: Chip {chip_id}"]
+            lines = [f"\n## Current context: Chip {context.chip_id}"]
             lines.append(
                 "No specific qubit selected. Use this chip_id as default when calling tools."
             )
-        if qubit_params:
+        if context.qubit_params:
             lines.append("\n### Current qubit parameters")
-            for key, val in qubit_params.items():
+            for key, val in context.qubit_params.items():
                 if isinstance(val, dict) and "value" in val:
                     lines.append(f"- {key}: {val['value']} {val.get('unit', '')}")
                 else:
