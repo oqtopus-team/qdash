@@ -60,11 +60,28 @@ Paths in `.trufflehog-exclude-paths.txt` are excluded from history scanning. Eac
 ```
 \.gitleaks\.toml
 docs/design/api-testing-guidelines\.md
+docs/development/api/testing\.md
 docs/development/credential-scan\.md
 poetry\.lock
 scripts/migrate_user_tokens\.py
 tests/conftest\.py
 ```
+
+#### Exclude entries and why they are safe
+
+Because Trufflehog walks **full git history**, the exclude list must cover both currently-tracked files and files that only exist in older commits.
+
+| Entry | Status | Why excluding is safe |
+| --- | --- | --- |
+| `\.gitleaks\.toml` | tracked | Contains the Gitleaks allowlist itself — the literal `mongodb://root:example@mongo:27017` and placeholder tokens (`ADMIN_TOKEN`, `YOUR_TOKEN`) would otherwise be re-flagged as credentials. None are real secrets; see the Gitleaks allowlist table above. |
+| `docs/design/api-testing-guidelines\.md` | deleted (history only) | Removed in commit `50b0fd31`. Old API testing guideline document that referenced example tokens. Excluded so historical commits do not trigger findings. |
+| `docs/development/api/testing\.md` | tracked | API testing guide. May reference token names and example fixtures in code samples. None are live credentials. |
+| `docs/development/credential-scan\.md` | tracked | This document itself. Contains example tool output with mock values such as `AKIAIOSFODNN7EXAMPLE` and fabricated commit hashes used to illustrate finding format. |
+| `poetry\.lock` | deleted (history only) | Removed in commit `e840268b` when the project moved to `uv`. Lockfile entries contain public package integrity digests that look high-entropy. |
+| `scripts/migrate_user_tokens\.py` | deleted (history only) | Removed in commit `cca42d62`. One-shot migration script that operated on user-token records; variable names and field-key strings match credential-detector patterns even though no live secret was ever embedded. |
+| `tests/conftest\.py` | tracked | Pytest fixtures set environment variables to obvious dummy values (`"test-token"`, `"test-openai-key"`, etc.) so the test client can boot without real credentials. None are real. |
+
+Trufflehog only reports **verified** findings, so unverified pattern matches in these files would not have triggered an action anyway — but excluding them keeps scans quiet and prevents future verifiers (added by Trufflehog upstream) from probing fixture values.
 
 ## Running Locally
 
@@ -142,10 +159,3 @@ Because Trufflehog only flags verified secrets, **the credential is almost certa
 Prefer narrow regexes over broad path allowlists — broad allowlists hide real future leaks in the same file.
 
 **Trufflehog** — add the path regex to `.trufflehog-exclude-paths.txt`. Only do this for files that legitimately contain credential-shaped strings (test fixtures, documentation about credentials). If the finding is verified, do not allowlist; rotate.
-
-## Responding to a Real Leak
-
-1. **Rotate the credential immediately.** Anything pushed to a remote should be assumed compromised, even if the commit was reverted.
-2. Remove the secret from the working tree and commit the fix.
-3. Decide whether history rewriting is warranted. For public repos with verified hits, rewrite (`git filter-repo`) and force-push after coordinating with the team. For private repos where rotation is sufficient, leaving history alone is often the pragmatic choice.
-4. Open an internal ticket recording what leaked, when, and what was rotated.
