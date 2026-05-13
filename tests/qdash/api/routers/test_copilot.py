@@ -7,8 +7,8 @@ from typing import TYPE_CHECKING, Any
 from unittest.mock import MagicMock, patch
 
 from qdash.api.lib.ai_labels import TOOL_LABELS
-from qdash.api.services.copilot_data_facade import CopilotDataFacade
 from qdash.common.copilot.analysis_models import AnalysisResponse
+from qdash.common.copilot.data_facade import CopilotDataFacade
 from qdash.common.copilot.llm_agent import (
     AGENT_TOOLS,
     _build_llm_summary,

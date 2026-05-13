@@ -5,7 +5,7 @@ from __future__ import annotations
 import math
 from unittest.mock import MagicMock, patch
 
-from qdash.api.services.copilot_data_facade import FALLBACK_QUERY_LIMIT, CopilotDataFacade
+from qdash.common.copilot.data_facade import FALLBACK_QUERY_LIMIT, CopilotDataFacade
 from qdash.common.copilot.settings import AnalysisConfig, CopilotConfig, ModelConfig
 
 
