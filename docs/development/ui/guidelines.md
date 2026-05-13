@@ -112,7 +112,7 @@ ui/
 
 Next.js App Router uses **route groups** (folders in parentheses) for organization:
 
-- `(auth)/` - Routes requiring authentication. Protected by middleware.
+- `(auth)/` - Routes requiring authentication. Protected by Next.js proxy.
 - `(public)/` - Routes accessible without authentication.
 
 ```tsx

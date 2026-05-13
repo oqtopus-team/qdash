@@ -8,10 +8,10 @@
     "build": "next build --turbo",
     "build:webpack": "next build",
     "start": "next start",
-    "lint": "oxlint src/app src/components src/contexts src/hooks src/lib src/types src/middleware.ts",
-    "lint:fix": "oxlint src/app src/components src/contexts src/hooks src/lib src/types src/middleware.ts --fix",
-    "fmt": "oxfmt --write src/app src/components src/contexts src/hooks src/lib src/types src/middleware.ts package.json tsconfig.json .oxlintrc.json .oxfmt.json",
-    "fmt:check": "oxfmt --check src/app src/components src/contexts src/hooks src/lib src/types src/middleware.ts package.json tsconfig.json .oxlintrc.json .oxfmt.json",
+    "lint": "oxlint src/app src/components src/contexts src/hooks src/lib src/types src/proxy.ts",
+    "lint:fix": "oxlint src/app src/components src/contexts src/hooks src/lib src/types src/proxy.ts --fix",
+    "fmt": "oxfmt --write src/app src/components src/contexts src/hooks src/lib src/types src/proxy.ts package.json tsconfig.json .oxlintrc.json .oxfmt.json",
+    "fmt:check": "oxfmt --check src/app src/components src/contexts src/hooks src/lib src/types src/proxy.ts package.json tsconfig.json .oxlintrc.json .oxfmt.json",
     "test": "vitest",
     "test:run": "vitest run",
     "knip": "knip",
@@ -67,7 +67,6 @@
     "tailwindcss": "^4.1.11",
     "typescript": "^6.0.3",
     "vite": "^8.0.12",
-    "vite-tsconfig-paths": "^6.1.1",
     "vitest": "^4.1.6"
   },
   "overrides": {

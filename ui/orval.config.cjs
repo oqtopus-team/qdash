@@ -18,7 +18,7 @@ module.exports = {
       target: "../docs/oas/openapi.json",
     },
     // hooks: {
-    //   afterAllFilesWrite: "npx eslint . --fix",
+    //   afterAllFilesWrite: "bun run fmt && bun run lint:fix",
     // },
   },
 };

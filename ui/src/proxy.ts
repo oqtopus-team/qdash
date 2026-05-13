@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const token = request.cookies.get("access_token");
   const isLoginPage = request.nextUrl.pathname === "/login";
   const isSignupPage = request.nextUrl.pathname === "/signup";
@@ -33,7 +33,7 @@ export function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     /*
-     * Apply middleware to the following paths:
+     * Apply proxy to the following paths:
      * - All paths (/:path*)
      * - Root path (/)
      * Exclude: _next/static, _next/image, favicon, static files (images, etc.)
