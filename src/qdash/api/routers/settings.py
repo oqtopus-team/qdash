@@ -4,6 +4,7 @@ from logging import getLogger
 from typing import Annotated
 
 from fastapi import APIRouter, Depends
+
 from qdash.config import Settings
 from qdash.config import get_settings as get_settings_dependency
 

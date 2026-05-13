@@ -18,10 +18,7 @@ import {
 
 import { useGetParameterHistory } from "@/client/provenance/provenance";
 import { useMetricsConfig } from "@/hooks/useMetricsConfig";
-import {
-  getDaisySelectStyles,
-  getDaisySelectStylesSm,
-} from "@/lib/react-select-theme";
+import { getDaisySelectStyles, getDaisySelectStylesSm } from "@/lib/react-select-theme";
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { formatDateTime } from "@/lib/utils/datetime";
 import type { ParameterVersionResponse } from "@/schemas/parameterVersionResponse";
@@ -59,8 +56,7 @@ export function ParameterHistoryPanel({
 }: ParameterHistoryPanelProps) {
   // Use controlled state from URL when callbacks are provided
   const [localParameter, setLocalParameter] = useState(initialParameter);
-  const [prevInitialParameter, setPrevInitialParameter] =
-    useState(initialParameter);
+  const [prevInitialParameter, setPrevInitialParameter] = useState(initialParameter);
   const [localQid, setLocalQid] = useState(initialQid);
   const [prevInitialQid, setPrevInitialQid] = useState(initialQid);
   const [isSearching, setIsSearching] = useState(autoSearch);
@@ -76,13 +72,8 @@ export function ParameterHistoryPanel({
   }
 
   // Version diff state
-  const [diffSelection, setDiffSelection] = useState<[string, string | null]>([
-    "",
-    null,
-  ]);
-  const [prevDiffKey, setPrevDiffKey] = useState(
-    `${initialParameter}:${initialQid}`,
-  );
+  const [diffSelection, setDiffSelection] = useState<[string, string | null]>(["", null]);
+  const [prevDiffKey, setPrevDiffKey] = useState(`${initialParameter}:${initialQid}`);
 
   // Parallel comparison state
   const [compareParameter, setCompareParameter] = useState("");
@@ -116,21 +107,11 @@ export function ParameterHistoryPanel({
   );
 
   const selectStyles = useMemo(
-    () =>
-      getDaisySelectStyles<
-        ParameterOption,
-        false,
-        GroupBase<ParameterOption>
-      >(),
+    () => getDaisySelectStyles<ParameterOption, false, GroupBase<ParameterOption>>(),
     [],
   );
   const selectStylesSm = useMemo(
-    () =>
-      getDaisySelectStylesSm<
-        ParameterOption,
-        false,
-        GroupBase<ParameterOption>
-      >(),
+    () => getDaisySelectStylesSm<ParameterOption, false, GroupBase<ParameterOption>>(),
     [],
   );
 
@@ -159,20 +140,18 @@ export function ParameterHistoryPanel({
   const data = response?.data;
 
   // Comparison parameter fetch
-  const { data: compareResponse, isLoading: isCompareLoading } =
-    useGetParameterHistory(
-      {
-        parameter_name: compareParameter,
-        qid: compareQid || localQid,
-        limit: 50,
+  const { data: compareResponse, isLoading: isCompareLoading } = useGetParameterHistory(
+    {
+      parameter_name: compareParameter,
+      qid: compareQid || localQid,
+      limit: 50,
+    },
+    {
+      query: {
+        enabled: isComparing && !!compareParameter && !!(compareQid || localQid),
       },
-      {
-        query: {
-          enabled:
-            isComparing && !!compareParameter && !!(compareQid || localQid),
-        },
-      },
-    );
+    },
+  );
   const compareData = compareResponse?.data;
 
   // --- Auto-search: trigger search whenever both parameter and qid are set ---
@@ -256,28 +235,20 @@ export function ParameterHistoryPanel({
   };
 
   const getTrendIcon = (current: number, previous: number | null) => {
-    if (previous === null)
-      return <Minus className="h-4 w-4 text-base-content/50" />;
-    if (current > previous)
-      return <TrendingUp className="h-4 w-4 text-success" />;
-    if (current < previous)
-      return <TrendingDown className="h-4 w-4 text-error" />;
+    if (previous === null) return <Minus className="h-4 w-4 text-base-content/50" />;
+    if (current > previous) return <TrendingUp className="h-4 w-4 text-success" />;
+    if (current < previous) return <TrendingDown className="h-4 w-4 text-error" />;
     return <Minus className="h-4 w-4 text-base-content/50" />;
   };
 
   // Chart data
-  const chartVersions = useMemo(
-    () => [...(data?.versions ?? [])].reverse(),
-    [data],
-  );
+  const chartVersions = useMemo(() => [...(data?.versions ?? [])].reverse(), [data]);
   const compareChartVersions = useMemo(
     () => [...(compareData?.versions ?? [])].reverse(),
     [compareData],
   );
 
-  const hasNumericValues = chartVersions.some(
-    (v) => typeof v.value === "number",
-  );
+  const hasNumericValues = chartVersions.some((v) => typeof v.value === "number");
   const showChart = hasNumericValues && chartVersions.length >= 2;
   const showCompareColumns = isComparing && !!compareData;
 
@@ -299,9 +270,7 @@ export function ParameterHistoryPanel({
       .sort((a, b) => a.ts - b.ts);
 
     for (const mainVer of data.versions) {
-      const mainTs = mainVer.valid_from
-        ? new Date(mainVer.valid_from).getTime()
-        : 0;
+      const mainTs = mainVer.valid_from ? new Date(mainVer.valid_from).getTime() : 0;
       // Find closest compare version
       let best = compareWithTs[0];
       let bestDiff = Math.abs(mainTs - best.ts);
@@ -319,9 +288,7 @@ export function ParameterHistoryPanel({
 
   const compareLabel = useMemo(() => {
     if (!compareData) return "";
-    const metricOpt = allMetricOptions.find(
-      (o) => o.value === compareData.parameter_name,
-    );
+    const metricOpt = allMetricOptions.find((o) => o.value === compareData.parameter_name);
     return metricOpt?.label ?? compareData.parameter_name;
   }, [compareData, allMetricOptions]);
 
@@ -329,17 +296,11 @@ export function ParameterHistoryPanel({
     const traces: Plotly.Data[] = [];
     if (!showChart) return traces;
 
-    const hasErrors = chartVersions.some(
-      (v) => v.error !== undefined && v.error !== null,
-    );
+    const hasErrors = chartVersions.some((v) => v.error !== undefined && v.error !== null);
 
     traces.push({
-      x: chartVersions.map((v) =>
-        v.valid_from ? new Date(v.valid_from).toISOString() : "",
-      ),
-      y: chartVersions.map((v) =>
-        typeof v.value === "number" ? v.value : null,
-      ),
+      x: chartVersions.map((v) => (v.valid_from ? new Date(v.valid_from).toISOString() : "")),
+      y: chartVersions.map((v) => (typeof v.value === "number" ? v.value : null)),
       error_y: hasErrors
         ? {
             type: "data" as const,
@@ -363,9 +324,7 @@ export function ParameterHistoryPanel({
         x: compareChartVersions.map((v) =>
           v.valid_from ? new Date(v.valid_from).toISOString() : "",
         ),
-        y: compareChartVersions.map((v) =>
-          typeof v.value === "number" ? v.value : null,
-        ),
+        y: compareChartVersions.map((v) => (typeof v.value === "number" ? v.value : null)),
         error_y: hasCompareErrors
           ? {
               type: "data" as const,
@@ -444,13 +403,7 @@ export function ParameterHistoryPanel({
     }
 
     return layout;
-  }, [
-    data,
-    compareData,
-    compareLabel,
-    isComparing,
-    compareChartVersions.length,
-  ]);
+  }, [data, compareData, compareLabel, isComparing, compareChartVersions.length]);
 
   // Version diff computation
   const diffVersions = useMemo(() => {
@@ -478,22 +431,15 @@ export function ParameterHistoryPanel({
       {/* Search Form */}
       <div className="card bg-base-200">
         <div className="card-body p-4 sm:p-6">
-          <h3 className="card-title text-base sm:text-lg">
-            Search Parameter History
-          </h3>
+          <h3 className="card-title text-base sm:text-lg">Search Parameter History</h3>
           <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
             <div className="form-control flex-1">
               <label className="label py-1">
-                <span className="label-text text-xs sm:text-sm">
-                  Parameter Name
-                </span>
+                <span className="label-text text-xs sm:text-sm">Parameter Name</span>
               </label>
               <Select<ParameterOption, false, GroupBase<ParameterOption>>
                 options={parameterOptions}
-                value={
-                  allMetricOptions.find((o) => o.value === localParameter) ??
-                  null
-                }
+                value={allMetricOptions.find((o) => o.value === localParameter) ?? null}
                 onChange={(option: SingleValue<ParameterOption>) => {
                   handleParameterSelect(option?.value ?? "");
                 }}
@@ -536,22 +482,15 @@ export function ParameterHistoryPanel({
           <div className="card-body p-4 sm:p-6">
             <div className="flex items-center gap-2">
               <BarChart3 className="h-4 w-4" />
-              <h3 className="card-title text-sm sm:text-base">
-                Compare with another parameter
-              </h3>
+              <h3 className="card-title text-sm sm:text-base">Compare with another parameter</h3>
             </div>
             {isComparing && compareData ? (
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="badge badge-secondary gap-1">
                   {compareLabel} ({compareData.qid})
                 </span>
-                {isCompareLoading && (
-                  <span className="loading loading-spinner loading-xs"></span>
-                )}
-                <button
-                  className="btn btn-xs btn-ghost"
-                  onClick={handleRemoveCompare}
-                >
+                {isCompareLoading && <span className="loading loading-spinner loading-xs"></span>}
+                <button className="btn btn-xs btn-ghost" onClick={handleRemoveCompare}>
                   <X className="h-3 w-3" />
                   Remove
                 </button>
@@ -561,11 +500,7 @@ export function ParameterHistoryPanel({
                 <div className="form-control flex-1">
                   <Select<ParameterOption, false, GroupBase<ParameterOption>>
                     options={parameterOptions}
-                    value={
-                      allMetricOptions.find(
-                        (o) => o.value === compareParameter,
-                      ) ?? null
-                    }
+                    value={allMetricOptions.find((o) => o.value === compareParameter) ?? null}
                     onChange={(option: SingleValue<ParameterOption>) => {
                       setCompareParameter(option?.value ?? "");
                     }}
@@ -664,9 +599,7 @@ export function ParameterHistoryPanel({
                   <thead>
                     <tr>
                       <th className="w-8">
-                        <span className="text-xs text-base-content/50">
-                          Diff
-                        </span>
+                        <span className="text-xs text-base-content/50">Diff</span>
                       </th>
                       <th>Version</th>
                       <th>Value</th>
@@ -676,26 +609,17 @@ export function ParameterHistoryPanel({
                       {showCompareColumns && (
                         <>
                           <th className="border-l border-base-300">
-                            <span
-                              className="text-xs"
-                              style={{ color: "#e377c2" }}
-                            >
+                            <span className="text-xs" style={{ color: "#e377c2" }}>
                               {compareLabel}
                             </span>
                           </th>
                           <th className="hidden md:table-cell">
-                            <span
-                              className="text-xs"
-                              style={{ color: "#e377c2" }}
-                            >
+                            <span className="text-xs" style={{ color: "#e377c2" }}>
                               Error
                             </span>
                           </th>
                           <th className="hidden sm:table-cell">
-                            <span
-                              className="text-xs"
-                              style={{ color: "#e377c2" }}
-                            >
+                            <span className="text-xs" style={{ color: "#e377c2" }}>
                               Trend
                             </span>
                           </th>
@@ -710,60 +634,43 @@ export function ParameterHistoryPanel({
                   <tbody>
                     {data.versions.map((version, index) => {
                       const previousValue =
-                        index < data.versions.length - 1
-                          ? data.versions[index + 1].value
-                          : null;
+                        index < data.versions.length - 1 ? data.versions[index + 1].value : null;
                       const selected = isDiffSelected(version.entity_id);
                       const matched = showCompareColumns
                         ? compareVersionMap.get(version.entity_id)
                         : undefined;
                       return (
-                        <tr
-                          key={version.entity_id}
-                          className={selected ? "bg-primary/10" : ""}
-                        >
+                        <tr key={version.entity_id} className={selected ? "bg-primary/10" : ""}>
                           <td>
                             <input
                               type="checkbox"
                               className="checkbox checkbox-xs checkbox-primary"
                               checked={selected}
-                              onChange={() =>
-                                handleDiffToggle(version.entity_id)
-                              }
+                              onChange={() => handleDiffToggle(version.entity_id)}
                             />
                           </td>
                           <td>
-                            <span className="badge badge-outline badge-sm">
-                              v{version.version}
-                            </span>
+                            <span className="badge badge-outline badge-sm">v{version.version}</span>
                           </td>
                           <td className="font-mono text-xs sm:text-sm">
                             {formatValue(version.value)}
                           </td>
-                          <td className="hidden sm:table-cell">
-                            {version.unit || "-"}
-                          </td>
+                          <td className="hidden sm:table-cell">{version.unit || "-"}</td>
                           <td className="font-mono text-xs hidden md:table-cell">
-                            {version.error
-                              ? `±${version.error.toExponential(2)}`
-                              : "-"}
+                            {version.error ? `±${version.error.toExponential(2)}` : "-"}
                           </td>
                           <td className="hidden sm:table-cell">
                             {typeof version.value === "number" &&
                               getTrendIcon(
                                 version.value,
-                                typeof previousValue === "number"
-                                  ? previousValue
-                                  : null,
+                                typeof previousValue === "number" ? previousValue : null,
                               )}
                           </td>
                           {showCompareColumns &&
                             (() => {
                               const matchedPrev =
                                 index < data.versions.length - 1
-                                  ? compareVersionMap.get(
-                                      data.versions[index + 1].entity_id,
-                                    )
+                                  ? compareVersionMap.get(data.versions[index + 1].entity_id)
                                   : undefined;
                               return (
                                 <>
@@ -777,17 +684,14 @@ export function ParameterHistoryPanel({
                                     className="font-mono text-xs hidden md:table-cell"
                                     style={{ color: "#e377c2" }}
                                   >
-                                    {matched?.error
-                                      ? `±${matched.error.toExponential(2)}`
-                                      : "-"}
+                                    {matched?.error ? `±${matched.error.toExponential(2)}` : "-"}
                                   </td>
                                   <td className="hidden sm:table-cell">
                                     {matched &&
                                       typeof matched.value === "number" &&
                                       getTrendIcon(
                                         matched.value,
-                                        matchedPrev &&
-                                          typeof matchedPrev.value === "number"
+                                        matchedPrev && typeof matchedPrev.value === "number"
                                           ? matchedPrev.value
                                           : null,
                                       )}
@@ -796,9 +700,7 @@ export function ParameterHistoryPanel({
                               );
                             })()}
                           <td className="hidden lg:table-cell">
-                            <span className="text-sm">
-                              {version.task_name || "-"}
-                            </span>
+                            <span className="text-sm">{version.task_name || "-"}</span>
                           </td>
                           <td className="text-xs sm:text-sm hidden md:table-cell">
                             {formatDate(version.valid_from)}
@@ -812,9 +714,7 @@ export function ParameterHistoryPanel({
                             <td>
                               <button
                                 className="btn btn-xs btn-ghost"
-                                onClick={() =>
-                                  onExploreLineage(version.entity_id)
-                                }
+                                onClick={() => onExploreLineage(version.entity_id)}
                                 title="View lineage graph"
                               >
                                 <GitBranch className="h-3 w-3" />
@@ -886,9 +786,7 @@ function DiffCard({
         {/* Older version */}
         <div className="bg-base-100 rounded-lg p-3 space-y-1">
           <div className="flex items-center justify-between">
-            <span className="badge badge-outline badge-sm">
-              v{older.version}
-            </span>
+            <span className="badge badge-outline badge-sm">v{older.version}</span>
             {onExploreLineage && (
               <button
                 className="btn btn-xs btn-ghost"
@@ -901,20 +799,14 @@ function DiffCard({
           </div>
           <div className="font-mono text-sm">{formatValue(older.value)}</div>
           <div className="text-xs text-base-content/60">{older.unit || ""}</div>
-          <div className="text-xs text-base-content/60">
-            {older.task_name || "-"}
-          </div>
-          <div className="text-xs text-base-content/50">
-            {formatDate(older.valid_from)}
-          </div>
+          <div className="text-xs text-base-content/60">{older.task_name || "-"}</div>
+          <div className="text-xs text-base-content/50">{formatDate(older.valid_from)}</div>
         </div>
 
         {/* Newer version */}
         <div className="bg-base-100 rounded-lg p-3 space-y-1">
           <div className="flex items-center justify-between">
-            <span className="badge badge-outline badge-sm">
-              v{newer.version}
-            </span>
+            <span className="badge badge-outline badge-sm">v{newer.version}</span>
             {onExploreLineage && (
               <button
                 className="btn btn-xs btn-ghost"
@@ -927,12 +819,8 @@ function DiffCard({
           </div>
           <div className="font-mono text-sm">{formatValue(newer.value)}</div>
           <div className="text-xs text-base-content/60">{newer.unit || ""}</div>
-          <div className="text-xs text-base-content/60">
-            {newer.task_name || "-"}
-          </div>
-          <div className="text-xs text-base-content/50">
-            {formatDate(newer.valid_from)}
-          </div>
+          <div className="text-xs text-base-content/60">{newer.task_name || "-"}</div>
+          <div className="text-xs text-base-content/50">{formatDate(newer.valid_from)}</div>
         </div>
       </div>
 
@@ -957,9 +845,7 @@ function DiffCard({
         </div>
       )}
       {delta === null && (
-        <div className="text-xs text-base-content/50">
-          Delta not available (non-numeric values)
-        </div>
+        <div className="text-xs text-base-content/50">Delta not available (non-numeric values)</div>
       )}
 
       {/* Figure Comparison */}
@@ -973,21 +859,13 @@ function DiffCard({
             <div className="text-xs text-base-content/60 mb-1">
               v{older.version} — {older.task_name || "-"}
             </div>
-            <TaskFigure
-              taskId={older.task_id}
-              qid={older.qid ?? ""}
-              className="w-full rounded"
-            />
+            <TaskFigure taskId={older.task_id} qid={older.qid ?? ""} className="w-full rounded" />
           </div>
           <div className="bg-base-100 rounded-lg p-2">
             <div className="text-xs text-base-content/60 mb-1">
               v{newer.version} — {newer.task_name || "-"}
             </div>
-            <TaskFigure
-              taskId={newer.task_id}
-              qid={newer.qid ?? ""}
-              className="w-full rounded"
-            />
+            <TaskFigure taskId={newer.task_id} qid={newer.qid ?? ""} className="w-full rounded" />
           </div>
         </div>
       </div>

@@ -5,7 +5,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { useToast } from "@/components/ui/Toast";
-import { formatDateTime } from "@/lib/utils/datetime";
+import { dateToDateInput, formatDateTime } from "@/lib/utils/datetime";
 
 import type { ScheduleFlowRequest, FlowScheduleSummary } from "@/schemas";
 
@@ -36,15 +36,12 @@ export function FlowSchedulePanel({ flowName }: FlowSchedulePanelProps) {
   });
 
   const schedules =
-    (schedulesData?.data &&
-      "schedules" in schedulesData.data &&
-      schedulesData.data.schedules) ||
+    (schedulesData?.data && "schedules" in schedulesData.data && schedulesData.data.schedules) ||
     [];
 
   // Create schedule mutation
   const createScheduleMutation = useMutation({
-    mutationFn: ({ data }: { data: ScheduleFlowRequest }) =>
-      scheduleFlow(flowName, data),
+    mutationFn: ({ data }: { data: ScheduleFlowRequest }) => scheduleFlow(flowName, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["flow-schedules", flowName] });
       queryClient.invalidateQueries({ queryKey: ["flow-schedules"] });
@@ -59,8 +56,7 @@ export function FlowSchedulePanel({ flowName }: FlowSchedulePanelProps) {
 
   // Delete schedule mutation
   const deleteScheduleMutation = useMutation({
-    mutationFn: ({ scheduleId }: { scheduleId: string }) =>
-      deleteFlowSchedule(scheduleId),
+    mutationFn: ({ scheduleId }: { scheduleId: string }) => deleteFlowSchedule(scheduleId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["flow-schedules", flowName] });
       queryClient.invalidateQueries({ queryKey: ["flow-schedules"] });
@@ -73,13 +69,8 @@ export function FlowSchedulePanel({ flowName }: FlowSchedulePanelProps) {
 
   // Update schedule mutation (toggle active)
   const updateScheduleMutation = useMutation({
-    mutationFn: ({
-      scheduleId,
-      data,
-    }: {
-      scheduleId: string;
-      data: { active: boolean };
-    }) => updateFlowSchedule(scheduleId, data),
+    mutationFn: ({ scheduleId, data }: { scheduleId: string; data: { active: boolean } }) =>
+      updateFlowSchedule(scheduleId, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["flow-schedules", flowName] });
       queryClient.invalidateQueries({ queryKey: ["flow-schedules"] });
@@ -142,9 +133,7 @@ export function FlowSchedulePanel({ flowName }: FlowSchedulePanelProps) {
       <div className="flex gap-2">
         <button
           onClick={() => setScheduleType("cron")}
-          className={`btn btn-xs flex-1 ${
-            scheduleType === "cron" ? "btn-primary" : "btn-ghost"
-          }`}
+          className={`btn btn-xs flex-1 ${scheduleType === "cron" ? "btn-primary" : "btn-ghost"}`}
         >
           Cron
         </button>
@@ -173,9 +162,7 @@ export function FlowSchedulePanel({ flowName }: FlowSchedulePanelProps) {
               onChange={(e) => setCronExpression(e.target.value)}
             />
             <label className="label">
-              <span className="label-text-alt text-xs">
-                Timezone: Asia/Tokyo (JST)
-              </span>
+              <span className="label-text-alt text-xs">Timezone: Asia/Tokyo (JST)</span>
             </label>
           </div>
 
@@ -187,9 +174,7 @@ export function FlowSchedulePanel({ flowName }: FlowSchedulePanelProps) {
                 checked={isActive}
                 onChange={(e) => setIsActive(e.target.checked)}
               />
-              <span className="label-text text-xs">
-                Enable schedule immediately
-              </span>
+              <span className="label-text text-xs">Enable schedule immediately</span>
             </label>
             <label className="label">
               <span className="label-text-alt text-xs">
@@ -226,14 +211,9 @@ export function FlowSchedulePanel({ flowName }: FlowSchedulePanelProps) {
                 className="select select-bordered select-sm text-xs flex-1"
                 value={scheduledTime.split("T")[1]?.split(":")[0] || "00"}
                 onChange={(e) => {
-                  const date =
-                    scheduledTime.split("T")[0] ||
-                    new Date().toISOString().split("T")[0];
-                  const currentMinute =
-                    scheduledTime.split("T")[1]?.split(":")[1] || "00";
-                  setScheduledTime(
-                    `${date}T${e.target.value}:${currentMinute}`,
-                  );
+                  const date = scheduledTime.split("T")[0] || dateToDateInput(new Date());
+                  const currentMinute = scheduledTime.split("T")[1]?.split(":")[1] || "00";
+                  setScheduledTime(`${date}T${e.target.value}:${currentMinute}`);
                 }}
               >
                 {Array.from({ length: 24 }, (_, i) => {
@@ -250,11 +230,8 @@ export function FlowSchedulePanel({ flowName }: FlowSchedulePanelProps) {
                 className="select select-bordered select-sm text-xs flex-1"
                 value={scheduledTime.split("T")[1]?.split(":")[1] || "00"}
                 onChange={(e) => {
-                  const date =
-                    scheduledTime.split("T")[0] ||
-                    new Date().toISOString().split("T")[0];
-                  const currentHour =
-                    scheduledTime.split("T")[1]?.split(":")[0] || "00";
+                  const date = scheduledTime.split("T")[0] || dateToDateInput(new Date());
+                  const currentHour = scheduledTime.split("T")[1]?.split(":")[0] || "00";
                   setScheduledTime(`${date}T${currentHour}:${e.target.value}`);
                 }}
               >
@@ -270,9 +247,7 @@ export function FlowSchedulePanel({ flowName }: FlowSchedulePanelProps) {
             </div>
           </div>
           <label className="label py-0">
-            <span className="label-text-alt text-xs">
-              Timezone: Asia/Tokyo (JST)
-            </span>
+            <span className="label-text-alt text-xs">Timezone: Asia/Tokyo (JST)</span>
           </label>
         </div>
       )}
@@ -293,18 +268,14 @@ export function FlowSchedulePanel({ flowName }: FlowSchedulePanelProps) {
       {/* Existing Schedules List */}
       <div className="divider my-2"></div>
 
-      <h4 className="text-xs font-semibold text-base-content/60 uppercase">
-        Active Schedules
-      </h4>
+      <h4 className="text-xs font-semibold text-base-content/60 uppercase">Active Schedules</h4>
 
       {isLoading ? (
         <div className="flex justify-center py-4">
           <span className="loading loading-spinner loading-sm"></span>
         </div>
       ) : schedules.length === 0 ? (
-        <p className="text-xs text-base-content/50 text-center py-4">
-          No schedules configured
-        </p>
+        <p className="text-xs text-base-content/50 text-center py-4">No schedules configured</p>
       ) : (
         <div className="space-y-2">
           {schedules.map((schedule) => (
@@ -319,23 +290,17 @@ export function FlowSchedulePanel({ flowName }: FlowSchedulePanelProps) {
                   <div className="flex items-center gap-2">
                     <span
                       className={`badge badge-xs ${
-                        schedule.schedule_type === "cron"
-                          ? "badge-primary"
-                          : "badge-secondary"
+                        schedule.schedule_type === "cron" ? "badge-primary" : "badge-secondary"
                       }`}
                     >
                       {schedule.schedule_type}
                     </span>
-                    {!schedule.active && (
-                      <span className="badge badge-xs badge-ghost">Paused</span>
-                    )}
+                    {!schedule.active && <span className="badge badge-xs badge-ghost">Paused</span>}
                   </div>
                   {schedule.cron && (
                     <p
                       className={`text-xs font-mono mt-1 ${
-                        schedule.active
-                          ? "text-base-content"
-                          : "text-base-content/50"
+                        schedule.active ? "text-base-content" : "text-base-content/50"
                       }`}
                     >
                       {schedule.cron}
@@ -377,25 +342,19 @@ export function FlowSchedulePanel({ flowName }: FlowSchedulePanelProps) {
       {/* Cron Expression Helper */}
       {scheduleType === "cron" && (
         <div className="bg-base-200 rounded p-3 mt-4">
-          <h5 className="text-xs font-semibold text-base-content/60 mb-2">
-            Cron Examples
-          </h5>
+          <h5 className="text-xs font-semibold text-base-content/60 mb-2">Cron Examples</h5>
           <div className="space-y-1 text-xs text-base-content/50">
             <p>
-              <code className="text-base-content">0 2 * * *</code> - Daily at
-              2:00 AM
+              <code className="text-base-content">0 2 * * *</code> - Daily at 2:00 AM
             </p>
             <p>
-              <code className="text-base-content">0 */6 * * *</code> - Every 6
-              hours
+              <code className="text-base-content">0 */6 * * *</code> - Every 6 hours
             </p>
             <p>
-              <code className="text-base-content">0 0 * * 1</code> - Every
-              Monday at midnight
+              <code className="text-base-content">0 0 * * 1</code> - Every Monday at midnight
             </p>
             <p>
-              <code className="text-base-content">30 14 1 * *</code> - 1st of
-              month at 2:30 PM
+              <code className="text-base-content">30 14 1 * *</code> - 1st of month at 2:30 PM
             </p>
           </div>
         </div>

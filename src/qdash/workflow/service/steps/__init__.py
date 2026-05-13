@@ -37,6 +37,11 @@ from qdash.workflow.service.steps.base import (
     TransformStep,
 )
 
+# Box setup steps
+from qdash.workflow.service.steps.box_setup import (
+    ConfigureAll,
+)
+
 # MUX-level bring-up steps
 from qdash.workflow.service.steps.bringup import (
     BringUp,
@@ -63,7 +68,6 @@ from qdash.workflow.service.steps.pipeline import (
 
 # 2-Qubit and system steps
 from qdash.workflow.service.steps.two_qubit import (
-    CheckSkew,
     CustomTwoQubit,
     GenerateCRSchedule,
     SetCRSchedule,
@@ -71,27 +75,27 @@ from qdash.workflow.service.steps.two_qubit import (
 )
 
 __all__ = [
-    # Base classes
-    "Step",
-    "CalibrationStep",
-    "TransformStep",
-    # Context and Pipeline
-    "StepContext",
-    "Pipeline",
     # MUX-level bring-up steps
     "BringUp",
+    "CalibrationStep",
+    # Box setup steps
+    "ConfigureAll",
     # 1-Qubit steps
     "CustomOneQubit",
-    "OneQubitCheck",
-    "OneQubitFineTune",
+    # 2-Qubit steps
+    "CustomTwoQubit",
     # Filter steps
     "FilterByMetric",
     "FilterByStatus",
-    # 2-Qubit steps
-    "CustomTwoQubit",
     "GenerateCRSchedule",
+    "OneQubitCheck",
+    "OneQubitFineTune",
+    "Pipeline",
     "SetCRSchedule",
+    # Base classes
+    "Step",
+    # Context and Pipeline
+    "StepContext",
+    "TransformStep",
     "TwoQubitCalibration",
-    # System steps
-    "CheckSkew",
 ]

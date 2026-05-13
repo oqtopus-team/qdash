@@ -14,27 +14,21 @@ describe("useCDFUrlState", () => {
     expect(result.current.selectedChip).toBe("");
     expect(result.current.timeRange).toBe("7d");
     expect(result.current.selectionMode).toBe("latest");
-    expect(result.current.selectedParameters).toEqual([
-      ...URL_DEFAULTS.CDF_PARAMETERS,
-    ]);
+    expect(result.current.selectedParameters).toEqual([...URL_DEFAULTS.CDF_PARAMETERS]);
     expect(result.current.showAsErrorRate).toBe(false);
   });
 
   it("reads initial values from URL params", () => {
     const { result } = renderHook(() => useCDFUrlState(), {
       wrapper: withNuqsTestingAdapter({
-        searchParams:
-          "chip=CHIP01&range=30d&mode=best&params=frequency,amplitude&errorRate=true",
+        searchParams: "chip=CHIP01&range=30d&mode=best&params=frequency,amplitude&errorRate=true",
       }),
     });
 
     expect(result.current.selectedChip).toBe("CHIP01");
     expect(result.current.timeRange).toBe("30d");
     expect(result.current.selectionMode).toBe("best");
-    expect(result.current.selectedParameters).toEqual([
-      "frequency",
-      "amplitude",
-    ]);
+    expect(result.current.selectedParameters).toEqual(["frequency", "amplitude"]);
     expect(result.current.showAsErrorRate).toBe(true);
   });
 
@@ -50,9 +44,7 @@ describe("useCDFUrlState", () => {
     });
 
     // Should return defaults
-    expect(result.current.selectedParameters).toEqual([
-      ...URL_DEFAULTS.CDF_PARAMETERS,
-    ]);
+    expect(result.current.selectedParameters).toEqual([...URL_DEFAULTS.CDF_PARAMETERS]);
   });
 
   it("setSelectedParameters with non-default values keeps them", () => {
@@ -64,10 +56,7 @@ describe("useCDFUrlState", () => {
       result.current.setSelectedParameters(["frequency", "fidelity"]);
     });
 
-    expect(result.current.selectedParameters).toEqual([
-      "frequency",
-      "fidelity",
-    ]);
+    expect(result.current.selectedParameters).toEqual(["frequency", "fidelity"]);
   });
 
   it("setShowAsErrorRate with false (default) cleans URL param", () => {

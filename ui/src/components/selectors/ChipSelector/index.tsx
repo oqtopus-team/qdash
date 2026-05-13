@@ -8,6 +8,7 @@ import type { SingleValue } from "react-select";
 
 import { useListChips } from "@/client/chip/chip";
 import { useSelectStyles } from "@/hooks/useSelectStyles";
+import { formatDate } from "@/lib/utils/datetime";
 
 interface ChipOption {
   value: string;
@@ -22,10 +23,7 @@ interface ChipSelectorProps {
 
 const PLACEHOLDER = "Select a chip";
 
-export function ChipSelector({
-  selectedChip,
-  onChipSelect,
-}: ChipSelectorProps) {
+export function ChipSelector({ selectedChip, onChipSelect }: ChipSelectorProps) {
   // Use lightweight endpoint (~0.2KB vs ~300KB with embedded data)
   const { data: chips, isLoading, isError } = useListChips();
 
@@ -40,11 +38,7 @@ export function ChipSelector({
       })
       .map((chip) => ({
         value: chip.chip_id,
-        label: `${chip.chip_id} ${
-          chip.installed_at
-            ? `(${new Date(chip.installed_at).toLocaleDateString()})`
-            : ""
-        }`,
+        label: `${chip.chip_id} ${chip.installed_at ? `(${formatDate(chip.installed_at)})` : ""}`,
         installed_at: chip.installed_at,
       }));
   }, [chips]);

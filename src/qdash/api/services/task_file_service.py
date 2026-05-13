@@ -12,6 +12,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 from fastapi import HTTPException
+
 from qdash.api.lib.backend_config import (
     get_task_category,
     get_tasks,

@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 from prefect import get_run_logger
+
 from qdash.workflow.engine.backend.factory import create_backend
 from qdash.workflow.engine.execution.service import ExecutionService
 from qdash.workflow.engine.task.context import TaskContext
@@ -519,7 +520,7 @@ class CalibOrchestrator:
         execution_service, executed_context = result
         self._execution_service = execution_service
 
-        return cast(TaskContext, executed_context)
+        return cast("TaskContext", executed_context)
 
     def _merge_and_extract_results(
         self,

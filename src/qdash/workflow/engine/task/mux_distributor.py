@@ -164,7 +164,7 @@ class MuxDistributor:
                         task_name, task_type, target_qid, png_paths, json_paths
                     )
 
-                self._backend_saver.save_mux_qid(task, execution_service, target_qid)
+                self._backend_saver.save_mux_qid(task, execution_service, target_qid, backend)
 
             self._state_manager.update_task_status_to_completed(
                 task_name, f"{task_name} completed (MUX distribution)", task_type, target_qid

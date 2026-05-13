@@ -27,9 +27,7 @@ function useThemeScheme(): "light" | "dark" {
   const [scheme, setScheme] = useState<"light" | "dark">("light");
   useEffect(() => {
     const compute = () => {
-      const t =
-        document.documentElement.getAttribute("data-theme")?.toLowerCase() ??
-        "";
+      const t = document.documentElement.getAttribute("data-theme")?.toLowerCase() ?? "";
       const dark = ["dark", "night", "dracula", "dim", "abyss", "dev-dark"];
       setScheme(dark.includes(t) ? "dark" : "light");
     };
@@ -92,9 +90,9 @@ export function CooldownWiringSection({
         />
       </div>
       <div className="text-[11px] text-base-content/50 mt-1">
-        Type <kbd className="kbd kbd-xs">/</kbd> for blocks (table, image,
-        heading, list, toggle, code, …). Paste images with{" "}
-        <kbd className="kbd kbd-xs">⌘/Ctrl+V</kbd>. Changes save automatically.
+        Type <kbd className="kbd kbd-xs">/</kbd> for blocks (table, image, heading, list, toggle,
+        code, …). Paste images with <kbd className="kbd kbd-xs">⌘/Ctrl+V</kbd>. Changes save
+        automatically.
       </div>
 
       <div className="mt-3">

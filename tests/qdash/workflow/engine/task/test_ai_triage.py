@@ -96,6 +96,23 @@ def test_enqueue_accepts_failed_ai_triage_task(
     mock_executor.submit.assert_called_once()
 
 
+@patch("qdash.workflow.engine.task.ai_triage._EXECUTOR")
+@patch("qdash.common.copilot.config.load_copilot_config")
+def test_enqueue_skips_running_ai_triage_task(
+    mock_load_config: MagicMock,
+    mock_executor: MagicMock,
+) -> None:
+    """Automatic AI triage waits for a terminal task result."""
+    mock_load_config.return_value = _config()
+
+    enqueue_ai_triage_note(
+        _task("CheckQubitSpectroscopy", "4", status=TaskStatusModel.RUNNING),
+        _execution_model(),
+    )
+
+    mock_executor.submit.assert_not_called()
+
+
 def test_ai_triage_config_applies_local_vlm_defaults_only_to_triage() -> None:
     config = CopilotConfig(
         model=ModelConfig(provider="openai", name="gpt-4.1", max_output_tokens=4096),

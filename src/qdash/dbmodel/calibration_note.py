@@ -7,6 +7,7 @@ from bunnet import Document
 from pydantic import ConfigDict, Field
 from pymongo import ASCENDING, IndexModel
 from pymongo.errors import DuplicateKeyError
+
 from qdash.common.datetime_utils import now
 from qdash.datamodel.system_info import SystemInfoModel
 from qdash.dbmodel.user import UserDocument
@@ -130,7 +131,6 @@ class CalibrationNoteDocument(Document):
                 "project_id": project_id,
                 "execution_id": execution_id,
                 "task_id": task_id,
-                "user_id": user_id,
                 "username": username,
                 "chip_id": chip_id,
             },

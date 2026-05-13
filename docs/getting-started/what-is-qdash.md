@@ -73,7 +73,7 @@ Here are some screenshots of QDash in action:
 ### Backend
 
 - **Framework**: FastAPI
-- **Language**: Python 3.10-3.12
+- **Language**: Python 3.11-3.12
 - **Database**: MongoDB (Bunnet ODM), PostgreSQL
 - **Authentication**: JWT
 

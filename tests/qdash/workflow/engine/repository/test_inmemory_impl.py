@@ -1,6 +1,7 @@
 """Tests for InMemory repository implementations."""
 
 import pytest
+
 from qdash.datamodel.execution import (
     ExecutionModel,
     ExecutionStatusModel,

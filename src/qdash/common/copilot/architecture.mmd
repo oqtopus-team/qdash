@@ -1,0 +1,18 @@
+flowchart TD
+    API["API / Workflow"] --> Agent["agent.py"]
+    API --> Runtime["runtime.py"]
+
+    Agent --> Prompts["prompts/"]
+    Agent --> AgentRuntime["agent_runtime/"]
+    AgentRuntime --> Tooling["tooling/"]
+    AgentRuntime --> Contracts["contracts/"]
+    AgentRuntime --> Config["config/"]
+
+    Runtime --> Services["services/"]
+    Runtime --> Tooling
+    Runtime --> Formatters["formatters/"]
+    Runtime --> Config
+    Runtime --> Contracts
+
+    Services --> DataAccess["services/data_access.py"]
+    Tooling --> Sandbox["tooling/sandbox.py"]

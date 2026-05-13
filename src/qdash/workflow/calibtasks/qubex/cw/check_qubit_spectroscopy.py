@@ -32,6 +32,7 @@ class CheckQubitSpectroscopy(QubexTask):
     timeout: int = 60 * 120
     input_parameters: ClassVar[dict[str, ParameterModel | None]] = {
         "readout_frequency": None,  # Load from DB
+        "readout_amplitude": None,  # Load from DB
     }
     run_parameters: ClassVar[dict[str, RunParameterModel]] = {
         "frequency_range": RunParameterModel(
@@ -222,8 +223,7 @@ class CheckQubitSpectroscopy(QubexTask):
                         )
             else:
                 print(
-                    f"[WARNING] Failed to detect qubit frequency for qid={qid}: "
-                    "no f01 peak found"
+                    f"[WARNING] Failed to detect qubit frequency for qid={qid}: no f01 peak found"
                 )
         except Exception:
             logger.warning(
@@ -264,8 +264,7 @@ class CheckQubitSpectroscopy(QubexTask):
         # We still return figures so they are saved before the task is marked failed.
         if estimated_frequency < 3.0:
             error_msg = (
-                f"Qubit frequency too low for qid={qid}: "
-                f"{estimated_frequency:.6f} GHz < 3.0 GHz"
+                f"Qubit frequency too low for qid={qid}: {estimated_frequency:.6f} GHz < 3.0 GHz"
             )
             print(f"[ERROR] {error_msg}")
             return PostProcessResult(
@@ -303,7 +302,7 @@ class CheckQubitSpectroscopy(QubexTask):
         result = exp.qubit_spectroscopy(
             label,
             frequency_range=self._select_frequency_range(backend),
-            readout_amplitude=self.run_parameters["readout_amplitude"].get_value(),
+            readout_amplitude=self._get_readout_amplitude_value(),
             readout_frequency=readout_freq_param.value,
         )
 

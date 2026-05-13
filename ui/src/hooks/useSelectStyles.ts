@@ -17,17 +17,9 @@ export function useSelectStyles<
   T,
   IsMulti extends boolean = false,
   Group extends GroupBase<T> = GroupBase<T>,
->({
-  labels,
-  placeholder,
-  charWidth = 8,
-  padding = 60,
-}: UseSelectStylesOptions) {
+>({ labels, placeholder, charWidth = 8, padding = 60 }: UseSelectStylesOptions) {
   const minWidth = useMemo(() => {
-    const maxLength = Math.max(
-      ...labels.map((l) => l.length),
-      placeholder.length,
-    );
+    const maxLength = Math.max(...labels.map((l) => l.length), placeholder.length);
     return maxLength * charWidth + padding;
   }, [labels, placeholder, charWidth, padding]);
 

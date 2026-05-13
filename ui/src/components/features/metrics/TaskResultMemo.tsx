@@ -14,6 +14,7 @@ import {
   useUpsertTaskNote,
 } from "@/client/note/note";
 import { MarkdownContent } from "@/components/ui/MarkdownContent";
+import { formatDateTime } from "@/lib/utils/datetime";
 
 interface TaskResultMemoProps {
   taskId: string;
@@ -27,11 +28,7 @@ interface TaskResultMemoProps {
  * Free-form note attached to a task result. Renders right above the issues
  * thread inside QubitMetricHistoryModal.
  */
-export function TaskResultMemo({
-  taskId,
-  chipId,
-  hideWhenEmpty = false,
-}: TaskResultMemoProps) {
+export function TaskResultMemo({ taskId, chipId, hideWhenEmpty = false }: TaskResultMemoProps) {
   const queryClient = useQueryClient();
   const { data, isLoading } = useGetTaskNote(taskId, {
     query: {
@@ -48,10 +45,7 @@ export function TaskResultMemo({
 
   const [isEditing, setIsEditing] = useState(false);
   const [draft, setDraft] = useState(noteContent);
-  const aiTriageSummary = useMemo(
-    () => getAiTriageSummary(noteContent),
-    [noteContent],
-  );
+  const aiTriageSummary = useMemo(() => getAiTriageSummary(noteContent), [noteContent]);
   const [isExpanded, setIsExpanded] = useState(!aiTriageSummary);
 
   useEffect(() => {
@@ -117,17 +111,12 @@ export function TaskResultMemo({
           {note?.updated_by && (
             <span className="text-xs font-normal text-base-content/60">
               · last edit by {note.updated_by}
-              {note.updated_at && (
-                <> · {new Date(note.updated_at).toLocaleString()}</>
-              )}
+              {note.updated_at && <> · {formatDateTime(note.updated_at)}</>}
             </span>
           )}
         </h3>
         {!isEditing && (
-          <button
-            onClick={() => setIsEditing(true)}
-            className="btn btn-xs btn-ghost gap-1"
-          >
+          <button onClick={() => setIsEditing(true)} className="btn btn-xs btn-ghost gap-1">
             <Pencil className="h-3 w-3" />
             {note ? "Edit" : "Add note"}
           </button>
@@ -178,9 +167,7 @@ export function TaskResultMemo({
             </div>
             {(upsertMutation.error || deleteMutation.error) && (
               <div className="text-xs text-error mt-1">
-                {extractErrorMessage(
-                  upsertMutation.error ?? deleteMutation.error,
-                )}
+                {extractErrorMessage(upsertMutation.error ?? deleteMutation.error)}
               </div>
             )}
           </>
@@ -189,11 +176,7 @@ export function TaskResultMemo({
         ) : note ? (
           <>
             <MarkdownContent
-              content={
-                aiTriageSummary && !isExpanded
-                  ? aiTriageSummary.summary
-                  : noteContent
-              }
+              content={aiTriageSummary && !isExpanded ? aiTriageSummary.summary : noteContent}
               className="break-words [&>:first-child]:mt-0 [&>:last-child]:mb-0 [&_ul]:my-1.5 [&_ol]:my-1.5 [&_li]:my-0.5 [&_li>p]:my-0"
             />
             {aiTriageSummary && (
@@ -216,18 +199,14 @@ export function TaskResultMemo({
   );
 }
 
-function getAiTriageSummary(
-  content: string,
-): { summary: string; decision: string | null } | null {
+function getAiTriageSummary(content: string): { summary: string; decision: string | null } | null {
   const header = "## AI triage";
   const headerIndex = content.indexOf(header);
   if (headerIndex === -1) return null;
 
   const separatorIndex = content.indexOf("\n\n---\n\n", headerIndex);
   const section =
-    separatorIndex === -1
-      ? content.slice(headerIndex)
-      : content.slice(headerIndex, separatorIndex);
+    separatorIndex === -1 ? content.slice(headerIndex) : content.slice(headerIndex, separatorIndex);
   const body = section.slice(header.length).trim();
   if (!body) return null;
 

@@ -1,31 +1,27 @@
 "use client";
 
 import Link from "next/link";
-import {
-  AtSign,
-  CheckCheck,
-  Inbox,
-  MessageSquare,
-  StickyNote,
-} from "lucide-react";
+import { AtSign, CheckCheck, Inbox, MessageSquare, StickyNote } from "lucide-react";
 
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PageContainer } from "@/components/ui/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
-import {
-  useNotificationActions,
-  useNotifications,
-} from "@/hooks/useNotifications";
+import { useNotificationActions, useNotifications } from "@/hooks/useNotifications";
 import { formatRelativeTime } from "@/lib/utils/datetime";
 import type { NotificationResponse } from "@/schemas";
 
 function kindIcon(kind: string) {
+  if (kind === "forum_reply" || kind === "forum_mention") {
+    return <MessageSquare className="h-4 w-4" />;
+  }
   if (kind === "issue_reply") return <MessageSquare className="h-4 w-4" />;
   if (kind === "note_mention") return <StickyNote className="h-4 w-4" />;
   return <AtSign className="h-4 w-4" />;
 }
 
 function kindLabel(kind: string) {
+  if (kind === "forum_reply") return "Forum reply";
+  if (kind === "forum_mention") return "Forum mention";
   if (kind === "issue_reply") return "Reply";
   if (kind === "note_mention") return "Note mention";
   if (kind === "mention") return "Mention";
@@ -52,9 +48,7 @@ function NotificationRow({
       <div className="flex items-start gap-3">
         <div
           className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
-            unread
-              ? "bg-primary text-primary-content"
-              : "bg-base-200 text-base-content/60"
+            unread ? "bg-primary text-primary-content" : "bg-base-200 text-base-content/60"
           }`}
         >
           {kindIcon(notification.kind)}
@@ -62,17 +56,11 @@ function NotificationRow({
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-medium text-sm">{notification.title}</span>
-            <span className="badge badge-xs badge-ghost">
-              {kindLabel(notification.kind)}
-            </span>
-            {unread && (
-              <span className="badge badge-xs badge-primary">Unread</span>
-            )}
+            <span className="badge badge-xs badge-ghost">{kindLabel(notification.kind)}</span>
+            {unread && <span className="badge badge-xs badge-primary">Unread</span>}
           </div>
           {notification.excerpt && (
-            <p className="mt-1 line-clamp-2 text-sm text-base-content/65">
-              {notification.excerpt}
-            </p>
+            <p className="mt-1 line-clamp-2 text-sm text-base-content/65">{notification.excerpt}</p>
           )}
           <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-base-content/45">
             <span className="font-mono">{notification.actor_username}</span>

@@ -31,9 +31,7 @@ interface GroupedMetricsCdfProps {
 type MetricsCdfChartProps = SingleMetricCdfProps | GroupedMetricsCdfProps;
 
 // Type guard to check if props are for grouped metrics
-function isGroupedProps(
-  props: MetricsCdfChartProps,
-): props is GroupedMetricsCdfProps {
+function isGroupedProps(props: MetricsCdfChartProps): props is GroupedMetricsCdfProps {
   return "metricsData" in props;
 }
 
@@ -53,9 +51,7 @@ interface CdfDataPoint {
   median: number;
 }
 
-function calculateCdf(
-  data: { [key: string]: MetricDataItem } | null,
-): CdfDataPoint | null {
+function calculateCdf(data: { [key: string]: MetricDataItem } | null): CdfDataPoint | null {
   if (!data) return null;
 
   const values = Object.values(data)
@@ -197,10 +193,7 @@ export function MetricsCdfChart(props: MetricsCdfChartProps) {
         </button>
       </div>
       <div className="collapse-content p-0">
-        <div
-          className="p-2 w-full border-t border-base-300"
-          style={{ minHeight: 250 }}
-        >
+        <div className="p-2 w-full border-t border-base-300" style={{ minHeight: 250 }}>
           <Plot
             data={plotData}
             layout={{

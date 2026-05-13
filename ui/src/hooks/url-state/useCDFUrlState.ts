@@ -1,11 +1,6 @@
 import { useCallback, useState, useEffect } from "react";
 
-import {
-  useQueryState,
-  parseAsString,
-  parseAsArrayOf,
-  parseAsBoolean,
-} from "nuqs";
+import { useQueryState, parseAsString, parseAsArrayOf, parseAsBoolean } from "nuqs";
 
 import { URL_DEFAULTS, type TimeRange, type SelectionMode } from "./types";
 
@@ -27,27 +22,18 @@ export function useCDFUrlState(): UseCDFUrlStateResult {
   const [isInitialized, setIsInitialized] = useState(false);
 
   // URL state management for CDF view
-  const [selectedChip, setSelectedChipState] = useQueryState(
-    "chip",
-    parseAsString,
-  );
+  const [selectedChip, setSelectedChipState] = useQueryState("chip", parseAsString);
 
   const [timeRange, setTimeRangeState] = useQueryState("range", parseAsString);
 
-  const [selectionMode, setSelectionModeState] = useQueryState(
-    "mode",
-    parseAsString,
-  );
+  const [selectionMode, setSelectionModeState] = useQueryState("mode", parseAsString);
 
   const [selectedParameters, setSelectedParametersState] = useQueryState(
     "params",
     parseAsArrayOf(parseAsString),
   );
 
-  const [showAsErrorRate, setShowAsErrorRateState] = useQueryState(
-    "errorRate",
-    parseAsBoolean,
-  );
+  const [showAsErrorRate, setShowAsErrorRateState] = useQueryState("errorRate", parseAsBoolean);
 
   // Mark as initialized after first render
   useEffect(() => {
@@ -96,9 +82,7 @@ export function useCDFUrlState(): UseCDFUrlStateResult {
 
   const setShowAsErrorRate = useCallback(
     (show: boolean) => {
-      setShowAsErrorRateState(
-        show === URL_DEFAULTS.SHOW_ERROR_RATE ? null : show,
-      ); // Remove default from URL
+      setShowAsErrorRateState(show === URL_DEFAULTS.SHOW_ERROR_RATE ? null : show); // Remove default from URL
     },
     [setShowAsErrorRateState],
   );

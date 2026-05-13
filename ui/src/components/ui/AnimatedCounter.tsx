@@ -25,8 +25,7 @@ interface AnimatedCounterProps {
 const easingFunctions = {
   linear: (t: number) => t,
   easeOut: (t: number) => 1 - Math.pow(1 - t, 3),
-  easeInOut: (t: number) =>
-    t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2,
+  easeInOut: (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2),
 };
 
 /**
@@ -44,8 +43,8 @@ export function AnimatedCounter({
 }: AnimatedCounterProps) {
   const [displayValue, setDisplayValue] = useState(0);
   const previousValueRef = useRef(0);
-  const animationRef = useRef<number>();
-  const startTimeRef = useRef<number>();
+  const animationRef = useRef<number | undefined>(undefined);
+  const startTimeRef = useRef<number | undefined>(undefined);
 
   useEffect(() => {
     const startValue = previousValueRef.current;

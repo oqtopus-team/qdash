@@ -1,6 +1,12 @@
 from typing import Any, ClassVar
 
 import plotly.graph_objects as go
+from qubex.measurement.measurement_defaults import (
+    DEFAULT_INTERVAL,
+    DEFAULT_READOUT_DURATION,
+    DEFAULT_SHOTS,
+)
+
 from qdash.datamodel.task import ParameterModel, RunParameterModel
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
@@ -8,11 +14,6 @@ from qdash.workflow.calibtasks.base import (
 )
 from qdash.workflow.calibtasks.qubex.base import QubexTask
 from qdash.workflow.engine.backend.qubex import QubexBackend
-from qubex.measurement.measurement_defaults import (
-    DEFAULT_INTERVAL,
-    DEFAULT_READOUT_DURATION,
-    DEFAULT_SHOTS,
-)
 
 
 class CheckRamsey(QubexTask):
@@ -249,7 +250,7 @@ class CheckRamsey(QubexTask):
             )
         if selected_fit is None:
             raise ValueError(
-                f"No valid Ramsey fit available for Q{qid}. " "Fit failed for the selected axis."
+                f"No valid Ramsey fit available for Q{qid}. Fit failed for the selected axis."
             )
 
         logger.info(f"  Bare frequency: {selected_result.bare_freq:.6f} GHz")

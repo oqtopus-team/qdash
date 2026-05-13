@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from qdash.repository.protocols import ExecutionCounterRepository
 
-from qdash.common.datetime_utils import now
+from qdash.common.datetime_utils import local_now
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +46,7 @@ def generate_execution_id(
 
         counter_repo = MongoExecutionCounterRepository()
 
-    date_str = now().strftime("%Y%m%d")
+    date_str = local_now().strftime("%Y%m%d")
     execution_index = counter_repo.get_next_index(
         date=date_str,
         username=username,

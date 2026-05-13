@@ -11,8 +11,9 @@ from __future__ import annotations
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
-from qdash.api.dependencies import get_cooldown_wiring_event_service  # noqa: TCH002
-from qdash.api.lib.project import (  # noqa: TCH002
+
+from qdash.api.dependencies import get_cooldown_wiring_event_service
+from qdash.api.lib.project import (
     ProjectContext,
     get_project_context,
     get_project_context_editor,
@@ -22,7 +23,7 @@ from qdash.api.schemas.cooldown_wiring_event import (
     CooldownWiringEventResponse,
     ListCooldownWiringEventsResponse,
 )
-from qdash.api.services.cooldown_wiring_event_service import (  # noqa: TCH002
+from qdash.api.services.cooldown_wiring_event_service import (
     CooldownWiringEventService,
 )
 

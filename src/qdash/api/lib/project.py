@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import Annotated, cast
 
 from fastapi import Depends, Header, HTTPException, Path, status
+
 from qdash.api.lib.auth import get_current_active_user
 from qdash.api.schemas.auth import User
 from qdash.datamodel.project import ProjectPermission, ProjectRole, role_has_permission

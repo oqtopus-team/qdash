@@ -1,20 +1,24 @@
 from __future__ import annotations
 
 import contextlib
+import logging
 import os
 import tempfile
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol, cast
 
 from filelock import FileLock
-from qdash.datamodel.task import ParameterModel
-from qdash.workflow.engine.backend.qubex_paths import get_qubex_paths
-from qdash.workflow.worker.flows.push_props.formatter import represent_none
 from ruamel.yaml import YAML
 from ruamel.yaml.comments import CommentedMap
 
+from qdash.datamodel.task import ParameterModel
+from qdash.workflow.engine.backend.qubex_paths import get_qubex_paths
+from qdash.workflow.worker.flows.push_props.formatter import represent_none
+
 if TYPE_CHECKING:
     from qdash.workflow.engine.backend.base import BaseBackend
+
+logger = logging.getLogger(__name__)
 
 
 class ParamsUpdater(Protocol):
@@ -146,6 +150,21 @@ class _QubexParamsUpdater:
         except ValueError:
             return qid
 
+        config = getattr(self._backend, "config", {})
+        project_id = config.get("project_id")
+        chip_id = config.get("chip_id") or self._chip_id
+        if project_id and chip_id:
+            try:
+                from qdash.common.qubit_utils import qid_to_label_from_chip
+
+                return qid_to_label_from_chip(qid, project_id=project_id, chip_id=chip_id)
+            except Exception:
+                logger.debug(
+                    "Failed to resolve qid label from chip metadata for qid=%s",
+                    qid,
+                    exc_info=True,
+                )
+
         try:
             experiment = self._backend.get_instance()
         except Exception:
@@ -153,13 +172,16 @@ class _QubexParamsUpdater:
 
         get_label = getattr(experiment, "get_qubit_label", None)
         if callable(get_label):
-            return cast(str, get_label(index))
+            return cast("str", get_label(index))
         return None
 
     @staticmethod
     def _extract_value(param: Any) -> float | int | str | None:
         if isinstance(param, ParameterModel):
             return _QubexParamsUpdater._coerce_value(param.value)
+
+        if isinstance(param, dict) and "value" in param:
+            return _QubexParamsUpdater._coerce_value(param.get("value"))
 
         value = getattr(param, "value", param)
         return _QubexParamsUpdater._coerce_value(value)
@@ -189,6 +211,7 @@ class _QubexParamsUpdater:
             return
 
         lock_path = file_path.with_suffix(file_path.suffix + ".lock")
+        lock_path.touch(exist_ok=True)
 
         with FileLock(lock_path):
             # Read current data under lock
@@ -228,6 +251,8 @@ class _QubexParamsUpdater:
 
             # Atomic rename (overwrites target)
             os.replace(tmp_path, file_path)
+
+        lock_path.touch(exist_ok=True)
 
     @staticmethod
     def _values_equal(current: Any, new: Any) -> bool:

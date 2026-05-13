@@ -1,36 +1,52 @@
-import { formatInTimeZone, toZonedTime } from "date-fns-tz";
+import { formatInTimeZone } from "date-fns-tz";
 
-export function dateToDateTimeLocal(date: Date): string {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  const h = String(date.getHours()).padStart(2, "0");
-  const min = String(date.getMinutes()).padStart(2, "0");
-  return `${y}-${m}-${d}T${h}:${min}`;
+const DEFAULT_TIMEZONE = process.env.NEXT_PUBLIC_TIMEZONE || "Asia/Tokyo";
+const ISO_DATETIME_WITHOUT_TIMEZONE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?$/;
+
+function normalizeUtcInput(utcString: string): string {
+  if (ISO_DATETIME_WITHOUT_TIMEZONE.test(utcString)) {
+    return `${utcString}Z`;
+  }
+  return utcString;
 }
 
-export function toDateTimeLocal(isoString: string): string {
-  if (isoString.includes("T")) return isoString.slice(0, 16);
+function parseUtcDate(utcString: string): Date {
+  return new Date(normalizeUtcInput(utcString));
+}
+
+export function dateToDateTimeLocal(date: Date, timezone: string = DEFAULT_TIMEZONE): string {
+  return formatInTimeZone(date, timezone, "yyyy-MM-dd'T'HH:mm");
+}
+
+export function dateToDateInput(date: Date, timezone: string = DEFAULT_TIMEZONE): string {
+  return formatInTimeZone(date, timezone, "yyyy-MM-dd");
+}
+
+export function toDateTimeLocal(
+  isoString: string | null | undefined,
+  timezone: string = DEFAULT_TIMEZONE,
+): string {
+  if (!isoString) return "";
+  if (isoString.includes("T")) {
+    return formatInTimeZone(normalizeUtcInput(isoString), timezone, "yyyy-MM-dd'T'HH:mm");
+  }
   return `${isoString}T00:00`;
 }
 
-export function toIsoSeconds(dt: string): string {
-  if (dt.length === 16) return `${dt}:00${getTimezoneOffsetString()}`;
+export function toIsoSeconds(dt: string, timezone: string = DEFAULT_TIMEZONE): string {
+  if (dt.length === 16) return `${dt}:00${getTimezoneOffsetString(timezone, dt)}`;
   return dt;
 }
 
-const DEFAULT_TIMEZONE = process.env.NEXT_PUBLIC_TIMEZONE || "Asia/Tokyo";
-
 export function getTimezoneOffsetString(
   timezone: string = DEFAULT_TIMEZONE,
+  referenceDate: Date | string = new Date(),
 ): string {
   const fmt = new Intl.DateTimeFormat("en-US", {
     timeZone: timezone,
     timeZoneName: "longOffset",
   });
-  const part = fmt
-    .formatToParts(new Date())
-    .find((p) => p.type === "timeZoneName");
+  const part = fmt.formatToParts(new Date(referenceDate)).find((p) => p.type === "timeZoneName");
   const raw = part?.value ?? "GMT";
   if (raw === "GMT") return "+00:00";
   return raw.replace("GMT", "");
@@ -51,7 +67,7 @@ export function formatDateTime(
 ): string {
   if (!utcString) return "-";
   try {
-    return formatInTimeZone(utcString, timezone, format);
+    return formatInTimeZone(normalizeUtcInput(utcString), timezone, format);
   } catch {
     return utcString;
   }
@@ -113,11 +129,7 @@ export function formatRelativeTime(
   if (!utcString) return "";
 
   try {
-    // Convert UTC to target timezone
-    const date = toZonedTime(new Date(utcString), timezone);
-    const now = toZonedTime(new Date(), timezone);
-
-    const diffMs = now.getTime() - date.getTime();
+    const diffMs = Date.now() - parseUtcDate(utcString).getTime();
     const diffMins = Math.floor(diffMs / (1000 * 60));
     const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));

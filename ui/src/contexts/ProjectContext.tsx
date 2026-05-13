@@ -1,14 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useState,
-  useEffect,
-  useMemo,
-} from "react";
+import { createContext, useCallback, useContext, useState, useEffect, useMemo } from "react";
 
 import { useQueryClient } from "@tanstack/react-query";
 import { usePathname } from "next/navigation";
@@ -17,10 +10,7 @@ import { useAuth } from "./AuthContext";
 
 import type { ProjectResponse, ProjectRole } from "@/schemas";
 
-import {
-  useListProjects,
-  useListProjectMembers,
-} from "@/client/projects/projects";
+import { useListProjects, useListProjectMembers } from "@/client/projects/projects";
 
 interface ProjectContextType {
   currentProject: ProjectResponse | null;
@@ -55,9 +45,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const [urlProjectId, setUrlProjectId] = useState<string | null>(null);
   const [urlProjectInitialized, setUrlProjectInitialized] = useState(false);
-  const [currentProject, setCurrentProject] = useState<ProjectResponse | null>(
-    null,
-  );
+  const [currentProject, setCurrentProject] = useState<ProjectResponse | null>(null);
   const [projectId, setProjectId] = useState<string | null>(null);
   const [role, setRole] = useState<ProjectRole | null>(null);
 
@@ -85,9 +73,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       setRole(null);
       return;
     }
-    const membership = membersData.data.members.find(
-      (m) => m.username === user.username,
-    );
+    const membership = membersData.data.members.find((m) => m.username === user.username);
     setRole((membership?.role as ProjectRole) ?? null);
   }, [membersData, user?.username]);
 
@@ -129,9 +115,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const readProjectFromUrl = useCallback(() => {
-    const nextUrlProjectId = new URLSearchParams(window.location.search).get(
-      "project",
-    );
+    const nextUrlProjectId = new URLSearchParams(window.location.search).get("project");
     setUrlProjectId(nextUrlProjectId);
     setUrlProjectInitialized(true);
     return nextUrlProjectId;
@@ -155,17 +139,14 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     if (!urlProjectInitialized || !projects.length) return;
 
     const storedProjectId = localStorage.getItem(PROJECT_STORAGE_KEY);
-    const urlProject = urlProjectId
-      ? projects.find((p) => p.project_id === urlProjectId)
-      : null;
+    const urlProject = urlProjectId ? projects.find((p) => p.project_id === urlProjectId) : null;
     const storedProject = storedProjectId
       ? projects.find((p) => p.project_id === storedProjectId)
       : null;
     const defaultProject = user?.default_project_id
       ? projects.find((p) => p.project_id === user.default_project_id)
       : null;
-    const nextProject =
-      urlProject ?? storedProject ?? defaultProject ?? projects[0] ?? null;
+    const nextProject = urlProject ?? storedProject ?? defaultProject ?? projects[0] ?? null;
 
     if (!nextProject) return;
 
@@ -208,13 +189,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     setRole(null);
     localStorage.removeItem(PROJECT_STORAGE_KEY);
     clearProjectFromUrl();
-  }, [
-    accessToken,
-    clearProjectFromUrl,
-    isLoading,
-    projects.length,
-    urlProjectInitialized,
-  ]);
+  }, [accessToken, clearProjectFromUrl, isLoading, projects.length, urlProjectInitialized]);
 
   const switchProject = useCallback(
     (newProjectId: string) => {
@@ -239,8 +214,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
   const isEditor = role === "editor";
   const isViewer = role === "viewer";
   const can = useCallback(
-    (permission: ProjectPermission) =>
-      role ? ROLE_PERMISSIONS[role].includes(permission) : false,
+    (permission: ProjectPermission) => (role ? ROLE_PERMISSIONS[role].includes(permission) : false),
     [role],
   );
   const canEdit = can("write");

@@ -1,15 +1,8 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import {
-  Search,
-  X,
-  AlertTriangle,
-  BookOpen,
-  Image as ImageIcon,
-  FileText,
-} from "lucide-react";
+import { Search, X, AlertTriangle, BookOpen, Image as ImageIcon, FileText } from "lucide-react";
 import { PageContainer } from "@/components/ui/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -36,12 +29,8 @@ function TaskCard({ item }: { item: TaskKnowledgeSummaryResponse }) {
       className="bg-base-100 rounded-lg border border-base-300 cursor-pointer hover:border-primary/50 transition-colors"
     >
       <div className="p-4">
-        <h3 className="text-sm font-semibold font-mono text-primary mb-1">
-          {item.name}
-        </h3>
-        <p className="text-sm text-base-content/70 line-clamp-2 mb-2">
-          {item.summary}
-        </p>
+        <h3 className="text-sm font-semibold font-mono text-primary mb-1">{item.name}</h3>
+        <p className="text-sm text-base-content/70 line-clamp-2 mb-2">{item.summary}</p>
         <div className="flex items-center gap-3 text-xs text-base-content/50">
           {(item.failure_mode_count ?? 0) > 0 && (
             <span className="flex items-center gap-1">
@@ -84,9 +73,7 @@ export function TaskKnowledgePageContent() {
     if (!searchInput.trim()) return items;
     const q = searchInput.toLowerCase();
     return items.filter(
-      (item) =>
-        item.name.toLowerCase().includes(q) ||
-        item.summary.toLowerCase().includes(q),
+      (item) => item.name.toLowerCase().includes(q) || item.summary.toLowerCase().includes(q),
     );
   }, [resp?.data?.items, searchInput]);
 

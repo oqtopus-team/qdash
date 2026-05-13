@@ -1,13 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import {
-  Component,
-  type ReactNode,
-  useCallback,
-  useRef,
-  useState,
-} from "react";
+import { Component, type ReactNode, useCallback, useRef, useState } from "react";
 
 const Plot = dynamic(() => import("@/components/charts/Plot"), { ssr: false });
 
@@ -20,10 +14,7 @@ interface ErrorBoundaryState {
   hasError: boolean;
 }
 
-class ChartErrorBoundary extends Component<
-  { children: ReactNode },
-  ErrorBoundaryState
-> {
+class ChartErrorBoundary extends Component<{ children: ReactNode }, ErrorBoundaryState> {
   state: ErrorBoundaryState = { hasError: false };
 
   static getDerivedStateFromError(): ErrorBoundaryState {
@@ -112,24 +103,15 @@ export function ChatPlotlyChart({ data, layout }: ChatPlotlyChartProps) {
         </div>
       </ChartErrorBoundary>
 
-      <dialog
-        ref={dialogRef}
-        className="modal"
-        onClose={() => setIsExpanded(false)}
-      >
+      <dialog ref={dialogRef} className="modal" onClose={() => setIsExpanded(false)}>
         <div className="modal-box w-11/12 max-w-5xl h-[80vh] flex flex-col p-4">
           <div className="flex justify-between items-center mb-2">
             <h3 className="font-bold text-sm">
               {typeof layout.title === "string"
                 ? layout.title
-                : (((layout.title as Record<string, unknown>)
-                    ?.text as string) ?? "Chart")}
+                : (((layout.title as Record<string, unknown>)?.text as string) ?? "Chart")}
             </h3>
-            <button
-              type="button"
-              onClick={closeLightbox}
-              className="btn btn-sm btn-ghost"
-            >
+            <button type="button" onClick={closeLightbox} className="btn btn-sm btn-ghost">
               ✕
             </button>
           </div>

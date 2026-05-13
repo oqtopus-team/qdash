@@ -21,7 +21,8 @@ describe("useCSVExport", () => {
     vi.spyOn(document.body, "removeChild").mockImplementation((node) => node);
 
     createObjectURLMock = vi.fn().mockReturnValue("blob:mock-url");
-    globalThis.URL.createObjectURL = createObjectURLMock;
+    globalThis.URL.createObjectURL =
+      createObjectURLMock as unknown as typeof globalThis.URL.createObjectURL;
   });
 
   afterEach(() => {
@@ -47,10 +48,7 @@ describe("useCSVExport", () => {
       const blob = createObjectURLMock.mock.calls[0][0] as Blob;
       expect(blob.type).toBe("text/csv;charset=utf-8;");
 
-      expect(mockLink.setAttribute).toHaveBeenCalledWith(
-        "download",
-        "test.csv",
-      );
+      expect(mockLink.setAttribute).toHaveBeenCalledWith("download", "test.csv");
       expect(mockLink.click).toHaveBeenCalledOnce();
     });
 

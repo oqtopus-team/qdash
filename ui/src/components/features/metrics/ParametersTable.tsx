@@ -49,9 +49,7 @@ export function ParametersTable({
           : { value: val };
       // If there's an override, start with the overridden value
       const override = overrides?.[key];
-      initial[key] = override
-        ? String(override.currentValue)
-        : String(paramValue.value ?? "");
+      initial[key] = override ? String(override.currentValue) : String(paramValue.value ?? "");
     }
     setEditedValues(initial);
     setIsEditing(true);

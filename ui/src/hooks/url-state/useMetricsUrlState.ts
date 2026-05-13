@@ -2,12 +2,9 @@ import { useCallback, useState, useEffect } from "react";
 
 import { useQueryState, parseAsString, parseAsInteger } from "nuqs";
 
-import {
-  type TimeRange,
-  type RangeMode,
-  type SelectionMode,
-  type MetricType,
-} from "./types";
+import { dateToDateInput } from "@/lib/utils/datetime";
+
+import { type TimeRange, type RangeMode, type SelectionMode, type MetricType } from "./types";
 
 interface UseMetricsUrlStateResult {
   selectedChip: string;
@@ -34,34 +31,19 @@ interface UseMetricsUrlStateResult {
 export function useMetricsUrlState(): UseMetricsUrlStateResult {
   const [isInitialized, setIsInitialized] = useState(false);
 
-  const [selectedChip, setSelectedChipState] = useQueryState(
-    "chip",
-    parseAsString,
-  );
+  const [selectedChip, setSelectedChipState] = useQueryState("chip", parseAsString);
 
-  const [rangeMode, setRangeModeState] = useQueryState(
-    "rangeMode",
-    parseAsString,
-  );
+  const [rangeMode, setRangeModeState] = useQueryState("rangeMode", parseAsString);
 
   const [timeRange, setTimeRangeState] = useQueryState("range", parseAsString);
 
-  const [selectionMode, setSelectionModeState] = useQueryState(
-    "mode",
-    parseAsString,
-  );
+  const [selectionMode, setSelectionModeState] = useQueryState("mode", parseAsString);
 
   const [metricType, setMetricTypeState] = useQueryState("type", parseAsString);
 
-  const [selectedMetric, setSelectedMetricState] = useQueryState(
-    "metric",
-    parseAsString,
-  );
+  const [selectedMetric, setSelectedMetricState] = useQueryState("metric", parseAsString);
 
-  const [customDays, setCustomDaysState] = useQueryState(
-    "days",
-    parseAsInteger,
-  );
+  const [customDays, setCustomDaysState] = useQueryState("days", parseAsInteger);
 
   const [startDate, setStartDateState] = useQueryState("start", parseAsString);
   const [endDate, setEndDateState] = useQueryState("end", parseAsString);
@@ -92,16 +74,9 @@ export function useMetricsUrlState(): UseMetricsUrlStateResult {
         // switch to absolute mode, unless the user already has dates set.
         if (!startDate && !endDate) {
           const today = new Date();
-          const sixDaysAgo = new Date();
-          sixDaysAgo.setDate(today.getDate() - 6);
-          const toIso = (d: Date) => {
-            const y = d.getFullYear();
-            const m = String(d.getMonth() + 1).padStart(2, "0");
-            const day = String(d.getDate()).padStart(2, "0");
-            return `${y}-${m}-${day}`;
-          };
-          setStartDateState(toIso(sixDaysAgo));
-          setEndDateState(toIso(today));
+          const sixDaysAgo = new Date(today.getTime() - 6 * 24 * 60 * 60 * 1000);
+          setStartDateState(dateToDateInput(sixDaysAgo));
+          setEndDateState(dateToDateInput(today));
         }
       }
     },

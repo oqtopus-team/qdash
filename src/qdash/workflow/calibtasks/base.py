@@ -9,8 +9,8 @@ __all__ = [
     "BaseTask",
     "PostProcessResult",
     "PreProcessResult",
-    "RunResult",
     "RunParameterModel",
+    "RunResult",
 ]
 
 

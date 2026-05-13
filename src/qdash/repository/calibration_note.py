@@ -10,6 +10,7 @@ from typing import Any
 
 from bunnet import SortDirection
 from pymongo.errors import DuplicateKeyError
+
 from qdash.common.datetime_utils import now
 from qdash.datamodel.calibration_note import CalibrationNoteModel
 from qdash.dbmodel.calibration_note import CalibrationNoteDocument
@@ -202,7 +203,6 @@ class MongoCalibrationNoteRepository:
                 "project_id": note.project_id,
                 "execution_id": note.execution_id,
                 "task_id": note.task_id,
-                "user_id": user_id,
                 "username": note.username,
                 "chip_id": note.chip_id,
             },
@@ -236,6 +236,73 @@ class MongoCalibrationNoteRepository:
         # All retries exhausted, raise the last error
         logger.error(
             "Failed to upsert calibration note after %d attempts: %s",
+            max_retries,
+            query,
+        )
+        raise last_error  # type: ignore[misc]
+
+    def upsert_on_insert(
+        self, note: CalibrationNoteModel, max_retries: int = 3
+    ) -> CalibrationNoteModel:
+        """Create a calibration note if absent without replacing existing note content.
+
+        Workflow workers initialize the same master note in parallel. A normal
+        upsert would replace ``note`` wholesale and can erase fields that another
+        worker has already merged. This method only sets ``note`` on insert.
+        """
+        from pymongo import ReturnDocument
+
+        user_id = note.user_id or self._user_id_for_username(note.username)
+        query = {
+            "project_id": note.project_id,
+            "execution_id": note.execution_id,
+            "task_id": note.task_id,
+            "username": note.username,
+            "chip_id": note.chip_id,
+        }
+
+        timestamp = now()
+        update = {
+            "$set": {
+                "user_id": user_id,
+                "timestamp": timestamp,
+            },
+            "$inc": {"version": 1},
+            "$setOnInsert": {
+                "project_id": note.project_id,
+                "execution_id": note.execution_id,
+                "task_id": note.task_id,
+                "username": note.username,
+                "chip_id": note.chip_id,
+                "note": note.note,
+            },
+        }
+
+        collection = CalibrationNoteDocument.get_motor_collection()
+
+        last_error: DuplicateKeyError | None = None
+        for attempt in range(max_retries):
+            try:
+                result = collection.find_one_and_update(
+                    query,
+                    update,
+                    upsert=True,
+                    return_document=ReturnDocument.AFTER,
+                )
+                doc = CalibrationNoteDocument.model_validate(result)
+                return self._to_model(doc)
+            except DuplicateKeyError as e:  # noqa: PERF203
+                last_error = e
+                logger.warning(
+                    "DuplicateKeyError on upsert_on_insert attempt %d/%d for %s, retrying...",
+                    attempt + 1,
+                    max_retries,
+                    query,
+                )
+                time.sleep(0.1 * (2**attempt))
+
+        logger.error(
+            "Failed to upsert_on_insert calibration note after %d attempts: %s",
             max_retries,
             query,
         )

@@ -2,17 +2,23 @@
 
 import { useState, useCallback, useRef } from "react";
 import {
-  useAnalysisChatContext,
-  type ChatSession,
-} from "@/contexts/AnalysisChatContext";
+  useCopilotChatSessionContext,
+  type CopilotChatSession,
+} from "@/contexts/CopilotChatSessionContext";
 import type { ChatMessage } from "@/hooks/useAnalysisChat";
+import type { ModelOverride } from "@/lib/copilotModels";
 import { buildHeaders, consumeSSEEvents } from "@/lib/sse-utils";
 
 // Re-export for backward compat
 export type CopilotMessage = ChatMessage;
-export type CopilotSession = ChatSession;
+export type CopilotSession = CopilotChatSession;
 
-export function useCopilotChat() {
+interface UseCopilotChatOptions {
+  modelOverride?: ModelOverride | null;
+}
+
+export function useCopilotChat(options?: UseCopilotChatOptions) {
+  const modelOverride = options?.modelOverride ?? null;
   const {
     sessions,
     activeSessionId,
@@ -23,7 +29,7 @@ export function useCopilotChat() {
     clearActiveSession: ctxClearActiveSession,
     updateSessionMessages,
     autoTitleSession,
-  } = useAnalysisChatContext();
+  } = useCopilotChatSessionContext();
 
   const [isLoading, setIsLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
@@ -91,6 +97,7 @@ export function useCopilotChat() {
               role: m.role,
               content: m.content,
             })),
+            model_override: modelOverride,
           }),
           signal: controller.signal,
         });
@@ -121,10 +128,7 @@ export function useCopilotChat() {
             if (evt.event === "status") {
               const payload = JSON.parse(evt.data);
               setStatusMessage(payload.message);
-              if (
-                payload.completed_tools &&
-                Array.isArray(payload.completed_tools)
-              ) {
+              if (payload.completed_tools && Array.isArray(payload.completed_tools)) {
                 setCompletedTools(payload.completed_tools);
               }
             } else if (evt.event === "result") {
@@ -157,11 +161,7 @@ export function useCopilotChat() {
           content: `Error: ${errorMsg}`,
         };
         // Re-read messages from context to get latest state
-        updateSessionMessages(sessionId!, [
-          ...currentMessages,
-          userMsg,
-          errorAssistant,
-        ]);
+        updateSessionMessages(sessionId!, [...currentMessages, userMsg, errorAssistant]);
       } finally {
         setIsLoading(false);
         setStatusMessage(null);
@@ -175,6 +175,7 @@ export function useCopilotChat() {
       createNewSession,
       updateSessionMessages,
       autoTitleSession,
+      modelOverride,
     ],
   );
 

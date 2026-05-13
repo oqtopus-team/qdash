@@ -44,22 +44,12 @@ export function QuantumLoader({
         <div className={`quantum-loader-core ${coreSize[size]}`} />
 
         {/* Orbiting particles */}
-        <div
-          className={`quantum-loader-orbit quantum-loader-orbit-1 ${orbitSize[size]}`}
-        />
-        <div
-          className={`quantum-loader-orbit quantum-loader-orbit-2 ${orbitSize[size]}`}
-        />
-        <div
-          className={`quantum-loader-orbit quantum-loader-orbit-3 ${orbitSize[size]}`}
-        />
+        <div className={`quantum-loader-orbit quantum-loader-orbit-1 ${orbitSize[size]}`} />
+        <div className={`quantum-loader-orbit quantum-loader-orbit-2 ${orbitSize[size]}`} />
+        <div className={`quantum-loader-orbit quantum-loader-orbit-3 ${orbitSize[size]}`} />
       </div>
 
-      {showLabel && (
-        <span className="text-sm text-base-content/70 animate-pulse">
-          {label}
-        </span>
-      )}
+      {showLabel && <span className="text-sm text-base-content/70 animate-pulse">{label}</span>}
     </div>
   );
 }

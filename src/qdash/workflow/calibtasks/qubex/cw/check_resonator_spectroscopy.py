@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import copy
 import logging
 from typing import TYPE_CHECKING, Any, ClassVar
@@ -5,10 +7,16 @@ from typing import TYPE_CHECKING, Any, ClassVar
 from qdash.analysis.spectroscopy import (
     NUM_RESONATORS,
     PEAK_POSITIONS,
+    BareShiftBoundary,
     EstimateResonatorFrequencyConfig,
+    RemoveFalseSpikeRange,
     create_bare_shift_boundary_estimator,
     create_marked_figure,
+    estimate_local_bare_shift_boundary,
+    estimate_minimum_usable_power,
+    estimate_optimal_powers,
     estimate_resonator_frequency_from_figure,
+    remove_false_spike_from_figure,
 )
 from qdash.datamodel.task import ParameterModel, RunParameterModel
 from qdash.workflow.calibtasks.base import (
@@ -16,10 +24,11 @@ from qdash.workflow.calibtasks.base import (
     RunResult,
 )
 from qdash.workflow.calibtasks.qubex.base import QubexTask
-from qdash.workflow.engine.backend.qubex import QubexBackend
 
 if TYPE_CHECKING:
     import plotly.graph_objs as go
+
+    from qdash.workflow.engine.backend.qubex import QubexBackend
 
 logger = logging.getLogger(__name__)
 
@@ -97,7 +106,7 @@ class CheckResonatorSpectroscopy(QubexTask):
         "bare_shift_estimator_type": RunParameterModel(
             unit="",
             value_type="str",
-            value="config",
+            value="high_frequency_strength",
             description=(
                 "How to pick the bare-shift boundary. "
                 "'config' uses high_power_min/max/low_power; "
@@ -114,10 +123,33 @@ class CheckResonatorSpectroscopy(QubexTask):
                 "'high_frequency_strength'."
             ),
         ),
+        "minimum_usable_power_correlation_coefficient_min": RunParameterModel(
+            unit="a.u.",
+            value_type="float",
+            value=0.9,
+            description=(
+                "Minimum adjacent-row correlation used to estimate the minimum "
+                "usable power for optimal_power calculation."
+            ),
+        ),
     }
     output_parameters: ClassVar[dict[str, ParameterModel]] = {
         "readout_frequency": ParameterModel(
             unit="GHz", description="Estimated resonator frequency from spectroscopy"
+        ),
+        "optimal_power": ParameterModel(
+            unit="dB",
+            description=(
+                "Estimated optimal readout power from the minimum usable power "
+                "and local bare-shift boundary."
+            ),
+        ),
+        "readout_amplitude": ParameterModel(
+            unit="a.u.",
+            description=(
+                "Readout amplitude converted from optimal_power "
+                "(amplitude = 10**(optimal_power/20))."
+            ),
         ),
     }
 
@@ -135,9 +167,15 @@ class CheckResonatorSpectroscopy(QubexTask):
         """
         result = run_result.raw_result
         raw_fig: go.Figure = result["fig"]
+        analysis_fig = self._prepare_analysis_figure(raw_fig)
 
         # Estimate resonator frequency and create marked figure
         estimated_frequency = 0.0
+        optimal_power: float | None = None
+        readout_amplitude: float | None = None
+        minimum_usable_power: float | None = None
+        local_boundaries: list[BareShiftBoundary] | None = None
+        optimal_powers: list[float] | None = None
         marked_fig = None
         try:
             config = EstimateResonatorFrequencyConfig(
@@ -145,11 +183,19 @@ class CheckResonatorSpectroscopy(QubexTask):
                 high_power_min=self.run_parameters["high_power_min"].get_value(),
                 high_power_max=self.run_parameters["high_power_max"].get_value(),
                 low_power=self.run_parameters["low_power"].get_value(),
+                minimum_usable_power_correlation_coefficient_min=self.run_parameters[
+                    "minimum_usable_power_correlation_coefficient_min"
+                ].get_value(),
+            )
+            boundary = BareShiftBoundary(
+                low_power=config.low_power,
+                high_power_min=config.high_power_min,
+                high_power_max=config.high_power_max,
             )
 
             estimator_type = self.run_parameters["bare_shift_estimator_type"].get_value()
             if estimator_type and estimator_type != "config":
-                trace = raw_fig.data[0]
+                trace = analysis_fig.data[0]
                 estimator = create_bare_shift_boundary_estimator(
                     type=estimator_type,
                     args={
@@ -169,19 +215,49 @@ class CheckResonatorSpectroscopy(QubexTask):
                 )
 
             resonances, rejected, frequencies = estimate_resonator_frequency_from_figure(
-                raw_fig, config
+                analysis_fig, config
             )
-            marked_fig = create_marked_figure(raw_fig, resonances, rejected_resonances=rejected)
+            trace = analysis_fig.data[0]
+            ys = list(trace.y)
+            zs = list(trace.z)
+            minimum_usable_power = estimate_minimum_usable_power(
+                ys,
+                zs,
+                boundary.low_power,
+                correlation_coefficient_min=(
+                    config.minimum_usable_power_correlation_coefficient_min
+                ),
+            )
+            local_boundaries = [
+                estimate_local_bare_shift_boundary(ys, resonance)
+                for resonance in resonances + rejected
+            ]
+            selected_local_boundaries = local_boundaries[: len(resonances)]
+            optimal_powers = estimate_optimal_powers(
+                ys,
+                selected_local_boundaries,
+                minimum_usable_power,
+            )
+            marked_fig = create_marked_figure(
+                analysis_fig,
+                resonances,
+                local_boundaries=selected_local_boundaries,
+                optimal_powers=optimal_powers,
+            )
 
             if len(frequencies) == NUM_RESONATORS:
                 # Get frequency for current qid based on its position in the MUX
                 id_in_mux = int(qid) % 4
                 resonance_index = PEAK_POSITIONS[id_in_mux]
                 estimated_frequency = frequencies[resonance_index]
+                optimal_power = optimal_powers[resonance_index]
+                readout_amplitude = float(10 ** (optimal_power / 20))
                 # Use print for Prefect UI visibility (log_prints=True captures these)
                 print(
                     f"Estimated resonator frequency for qid={qid}: "
                     f"{estimated_frequency:.6f} GHz (id_in_mux={id_in_mux}, "
+                    f"optimal_power={optimal_power:.2f} dB, "
+                    f"readout_amplitude={readout_amplitude:.6f} a.u., "
                     f"all={[f'{f:.6f}' for f in frequencies]})"
                 )
             else:
@@ -205,6 +281,10 @@ class CheckResonatorSpectroscopy(QubexTask):
         # between multiple qids (output_parameters is a ClassVar)
         output_params_copy = copy.deepcopy(self.output_parameters)
         output_params_copy["readout_frequency"].value = estimated_frequency
+        if optimal_power is not None:
+            output_params_copy["optimal_power"].value = optimal_power
+        if readout_amplitude is not None:
+            output_params_copy["readout_amplitude"].value = readout_amplitude
         for value in output_params_copy.values():
             value.execution_id = execution_id
 
@@ -212,6 +292,30 @@ class CheckResonatorSpectroscopy(QubexTask):
             output_parameters=output_params_copy,
             figures=figures,
         )
+
+    def _prepare_analysis_figure(self, raw_fig: go.Figure) -> go.Figure:
+        """Apply script-compatible denoising to a copy of the raw figure."""
+        import plotly.graph_objects as pgo
+
+        analysis_fig = pgo.Figure(raw_fig)
+        trace = analysis_fig.data[0]
+        xs = list(trace.x)
+        if not xs:
+            return analysis_fig
+
+        spike_ranges = (
+            [
+                RemoveFalseSpikeRange(5.998, 6.000),
+                RemoveFalseSpikeRange(6.498, 6.500),
+            ]
+            if max(xs) < 7.0
+            else [
+                RemoveFalseSpikeRange(9.998, 10.000),
+                RemoveFalseSpikeRange(10.248, 10.250),
+                RemoveFalseSpikeRange(10.498, 10.500),
+            ]
+        )
+        return remove_false_spike_from_figure(analysis_fig, spike_ranges)
 
     def _select_frequency_range(self, backend: QubexBackend) -> Any:
         """Pick the resonator-spectroscopy frequency range for the current chip.

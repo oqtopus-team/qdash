@@ -2,21 +2,10 @@
 
 type LoadingSpinnerProps = {
   size?: "xs" | "sm" | "md" | "lg";
-  color?:
-    | "primary"
-    | "secondary"
-    | "accent"
-    | "neutral"
-    | "info"
-    | "success"
-    | "warning"
-    | "error";
+  color?: "primary" | "secondary" | "accent" | "neutral" | "info" | "success" | "warning" | "error";
 };
 
-export function LoadingSpinner({
-  size = "lg",
-  color = "primary",
-}: LoadingSpinnerProps = {}) {
+export function LoadingSpinner({ size = "lg", color = "primary" }: LoadingSpinnerProps = {}) {
   return (
     <div className="flex justify-center items-center h-full">
       <span

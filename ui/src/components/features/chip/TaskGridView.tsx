@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import { useState } from "react";
 
 import type { Task } from "@/schemas";
 
@@ -8,6 +8,7 @@ import { FluentEmoji } from "@/components/ui/FluentEmoji";
 
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { TaskDetailModal } from "@/components/features/chip/modals/TaskDetailModal";
+import { formatDate, formatTime } from "@/lib/utils/datetime";
 
 interface TaskWithId extends Task {
   taskId: string;
@@ -45,23 +46,10 @@ export function TaskGridView({
 
   const formatDateTime = (dateStr?: string | null) => {
     if (!dateStr) return "-";
-    const date = new Date(dateStr);
     return (
       <>
-        <div className="font-medium">
-          {date.toLocaleDateString("ja-JP", {
-            year: "numeric",
-            month: "2-digit",
-            day: "2-digit",
-          })}
-        </div>
-        <div className="text-xs text-base-content/60">
-          {date.toLocaleTimeString("ja-JP", {
-            hour: "2-digit",
-            minute: "2-digit",
-            second: "2-digit",
-          })}
-        </div>
+        <div className="font-medium">{formatDate(dateStr)}</div>
+        <div className="text-xs text-base-content/60">{formatTime(dateStr)}</div>
       </>
     );
   };
@@ -123,25 +111,18 @@ export function TaskGridView({
 
                 {/* Task Info */}
                 <div className="space-y-2">
-                  <div
-                    className="font-semibold text-sm truncate"
-                    title={task.name}
-                  >
+                  <div className="font-semibold text-sm truncate" title={task.name}>
                     {task.name}
                   </div>
 
                   <div className="text-sm">{formatDateTime(task.start_at)}</div>
 
                   {task.elapsed_time && (
-                    <div className="text-xs text-base-content/60">
-                      ⏱ {task.elapsed_time}
-                    </div>
+                    <div className="text-xs text-base-content/60">⏱ {task.elapsed_time}</div>
                   )}
 
                   {task.message && (
-                    <div className="text-xs text-base-content/70 line-clamp-2">
-                      {task.message}
-                    </div>
+                    <div className="text-xs text-base-content/70 line-clamp-2">{task.message}</div>
                   )}
 
                   {task.output_parameters && (

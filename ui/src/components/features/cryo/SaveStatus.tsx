@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 
 import { AlertCircle, Check, Loader2 } from "lucide-react";
 
+import { formatDate } from "@/lib/utils/datetime";
+
 type SaveState = "idle" | "saving" | "saved" | "error";
 
 function useNow(intervalMs: number, enabled: boolean): number {
@@ -25,16 +27,10 @@ function formatAgo(savedAt: Date | null, now: number): string {
   if (minutes < 60) return `${minutes}m ago`;
   const hours = Math.floor(minutes / 60);
   if (hours < 24) return `${hours}h ago`;
-  return savedAt.toLocaleDateString();
+  return formatDate(savedAt.toISOString());
 }
 
-export function SaveStatus({
-  state,
-  savedAt,
-}: {
-  state: SaveState;
-  savedAt: Date | null;
-}) {
+export function SaveStatus({ state, savedAt }: { state: SaveState; savedAt: Date | null }) {
   const now = useNow(15_000, state === "saved" && savedAt !== null);
   if (state === "saving") {
     return (
@@ -83,8 +79,7 @@ interface AutosaveHandle<T> {
   flush: () => Promise<void>;
 }
 
-const defaultIsEqual = <T,>(a: T, b: T): boolean =>
-  JSON.stringify(a) === JSON.stringify(b);
+const defaultIsEqual = <T,>(a: T, b: T): boolean => JSON.stringify(a) === JSON.stringify(b);
 
 /**
  * Drives a debounced autosave with a status state machine.
@@ -96,15 +91,8 @@ const defaultIsEqual = <T,>(a: T, b: T): boolean =>
  *   <input onChange={(e) => auto.schedule(e.target.value)} />
  *   <SaveStatus state={auto.state} savedAt={auto.savedAt} />
  */
-export function useDebouncedAutosave<T>(
-  opts: UseDebouncedAutosaveOptions<T>,
-): AutosaveHandle<T> {
-  const {
-    isEqual = defaultIsEqual,
-    initialBaseline,
-    delayMs = 800,
-    save,
-  } = opts;
+export function useDebouncedAutosave<T>(opts: UseDebouncedAutosaveOptions<T>): AutosaveHandle<T> {
+  const { isEqual = defaultIsEqual, initialBaseline, delayMs = 800, save } = opts;
   const [state, setState] = useState<SaveState>("idle");
   const [savedAt, setSavedAt] = useState<Date | null>(null);
   const baselineRef = useRef<T>(initialBaseline);
@@ -154,7 +142,6 @@ export function useDebouncedAutosave<T>(
         void flush();
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return { state, savedAt, schedule, flush };

@@ -1,8 +1,8 @@
 """Flow repository implementation."""
 
-from datetime import datetime
 from typing import Any
 
+from qdash.common.datetime_utils import now
 from qdash.dbmodel.flow import FlowDocument
 from qdash.dbmodel.user import UserDocument
 
@@ -194,7 +194,7 @@ class MongoFlowRepository:
             flow.deployment_id = deployment_id
         if tags is not None:
             flow.tags = tags
-        flow.updated_at = datetime.now()
+        flow.updated_at = now()
         flow.save()
         return flow
 

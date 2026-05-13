@@ -54,8 +54,8 @@ model:
 analysis_models:
   - provider: ollama
     name: gemma4:26b
-    base_url: env:GEMMA_BASE_URL
-    api_key_env: GEMMA_API_KEY
+    base_url: env:OLLAMA_BASE_URL
+    api_key_env: OLLAMA_API_KEY
     keep_alive: 30m
     temperature: 1.0
     top_p: 0.95
@@ -65,8 +65,8 @@ analysis_models:
     max_output_tokens: 4096
   - provider: ollama
     name: gemma4:31b
-    base_url: env:GEMMA_BASE_URL
-    api_key_env: GEMMA_API_KEY
+    base_url: env:OLLAMA_BASE_URL
+    api_key_env: OLLAMA_API_KEY
     keep_alive: 30m
     temperature: 1.0
     top_p: 0.95
@@ -110,9 +110,10 @@ Configuration is loaded via `ConfigLoader` with local override support (`copilot
 | Variable | Purpose |
 |----------|---------|
 | `OPENAI_API_KEY` | OpenAI API authentication |
-| `OLLAMA_URL` | Ollama server URL (default: `http://localhost:11434`) |
-| `GEMMA_BASE_URL` | Optional OpenAI-compatible base URL for the Gemma analysis model |
-| `GEMMA_API_KEY` | Optional API key used with the Gemma analysis model |
+| `OLLAMA_BASE_URL` | Ollama / OpenAI-compatible server URL (default: `http://localhost:11434`) |
+| `OLLAMA_API_KEY` | Optional API key for the Ollama / OpenAI-compatible server |
+| `DS4_BASE_URL` | DeepSeek v4 OpenAI-compatible gateway base URL |
+| `DS4_API_KEY` | DeepSeek v4 API key |
 | `NEXT_PUBLIC_API_URL` | API base URL for frontend (default: `/api`) |
 
 ## Two Modes
@@ -138,7 +139,7 @@ A standalone page (`/copilot`) for general questions about the calibration syste
 
 ### Automatic AI Triage
 
-Automatic AI triage attaches an LLM-generated operational review note to selected task results after they are persisted. It is designed for tasks where visual or contextual review is valuable, but sending every calibration result to an LLM would be too slow or expensive.
+Automatic AI triage attaches an LLM-generated operational review note to selected terminal task results after they are persisted. It is designed for tasks where visual or contextual review is valuable, but sending every calibration result to an LLM would be too slow or expensive.
 
 - **Entry point**: `enqueue_ai_triage_note()` in `src/qdash/workflow/engine/task/ai_triage.py`
 - **Trigger**: task-result history save paths in the workflow recorder and repository
@@ -152,7 +153,7 @@ Automatic AI triage attaches an LLM-generated operational review note to selecte
 - **Storage**: task-result `user_note.content`, under a `## AI triage` Markdown section
 - **UI**: task detail modals render the note as Markdown; chip page badges are shown only when the triage decision requires review
 
-The hook is best effort. It must not block calibration progress and must not change the task outcome when the LLM request fails. Both successful and failed task results are eligible when the task name is listed in `ai_triage_tasks`.
+The hook is best effort. It must not block calibration progress and must not change the task outcome when the LLM request fails. Both successful and failed task results are eligible when the task name is listed in `ai_triage_tasks`; running, pending, scheduled, and skipped results are ignored. Automatic triage uses the current task result, current qubit parameters, task knowledge, figures, and reference images, but drops historical result runs from the prompt so the dashboard note is not framed as a past-history comparison.
 
 For `CheckResonatorSpectroscopy`, QDash records one AI triage note per MUX group. The representative result is the qid where `int(qid) % 4 == 0`; copied sibling resonator results are skipped to avoid duplicate LLM calls and duplicate notes.
 

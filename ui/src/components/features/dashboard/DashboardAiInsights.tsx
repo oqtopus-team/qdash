@@ -85,8 +85,7 @@ export function DashboardAiInsights({
   );
   const { data, isLoading, isError } = useQuery({
     queryKey,
-    queryFn: () =>
-      getDashboardAiInsights({ chipId, selectionMode, startAt, endAt }),
+    queryFn: () => getDashboardAiInsights({ chipId, selectionMode, startAt, endAt }),
     enabled: Boolean(chipId),
     staleTime: 30_000,
   });
@@ -101,11 +100,7 @@ export function DashboardAiInsights({
   }
 
   if (isError) {
-    return (
-      <div className="text-sm text-error">
-        Failed to load dashboard insights.
-      </div>
-    );
+    return <div className="text-sm text-error">Failed to load dashboard insights.</div>;
   }
 
   if (!data || data.insights.length === 0) {
@@ -135,9 +130,7 @@ export function DashboardAiInsights({
         {data.insights.map((insight) => (
           <article
             key={`${insight.category}-${insight.title}`}
-            className={`rounded-lg border p-3 space-y-2 ${severityClass(
-              insight.severity,
-            )}`}
+            className={`rounded-lg border p-3 space-y-2 ${severityClass(insight.severity)}`}
           >
             <div className="flex items-start gap-2">
               <span className="mt-0.5 flex-shrink-0">
@@ -145,12 +138,8 @@ export function DashboardAiInsights({
               </span>
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  <h4 className="text-sm font-semibold text-base-content">
-                    {insight.title}
-                  </h4>
-                  <span className="badge badge-outline badge-xs">
-                    {insight.confidence}
-                  </span>
+                  <h4 className="text-sm font-semibold text-base-content">{insight.title}</h4>
+                  <span className="badge badge-outline badge-xs">{insight.confidence}</span>
                 </div>
                 {insight.affected_targets.length > 0 && (
                   <p className="text-xs text-base-content/60 mt-0.5">
@@ -161,17 +150,12 @@ export function DashboardAiInsights({
             </div>
             <ul className="space-y-1">
               {insight.evidence.slice(0, 2).map((item) => (
-                <li
-                  key={item}
-                  className="text-xs text-base-content/75 break-words"
-                >
+                <li key={item} className="text-xs text-base-content/75 break-words">
                   {item}
                 </li>
               ))}
             </ul>
-            <p className="text-xs font-medium text-base-content">
-              {insight.recommended_action}
-            </p>
+            <p className="text-xs font-medium text-base-content">{insight.recommended_action}</p>
           </article>
         ))}
       </div>

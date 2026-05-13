@@ -313,7 +313,7 @@ bun run build
 
 ## Linting
 
-### Running ESLint
+### Running Oxlint
 
 ```bash
 cd ui
@@ -321,36 +321,26 @@ cd ui
 # Check for issues
 bun run lint
 
-# Auto-fix issues
+# Auto-format files
 bun run fmt
 ```
 
-### ESLint Configuration
+### Oxlint Configuration
 
-```javascript
-// eslint.config.mjs
-export default [
-  {
-    ignores: [
-      "node_modules/**",
-      ".next/**",
-      "src/schemas/**", // Auto-generated types
-      "src/client/**", // Auto-generated client
+```json
+// .oxlintrc.json
+{
+  "plugins": ["typescript", "react", "nextjs"],
+  "rules": {
+    "react/rules-of-hooks": "error",
+    "react/exhaustive-deps": "warn",
+    "typescript/no-unused-vars": [
+      "warn",
+      { "argsIgnorePattern": "^_", "varsIgnorePattern": "^_" }
     ],
-  },
-  {
-    files: ["**/*.{ts,tsx}"],
-    rules: {
-      "react-hooks/rules-of-hooks": "error",
-      "react-hooks/exhaustive-deps": "warn",
-      "@typescript-eslint/no-unused-vars": [
-        "warn",
-        { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
-      ],
-      "@typescript-eslint/no-explicit-any": "warn",
-    },
-  },
-];
+    "typescript/no-explicit-any": "warn"
+  }
+}
 ```
 
 ### Common Lint Issues
@@ -391,7 +381,7 @@ useEffect(() => {
 useEffect(() => {
   // Run only on mount
   fetchData(userId);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // oxlint-disable-next-line react/exhaustive-deps
 }, []);
 ```
 
@@ -417,7 +407,7 @@ The build process includes:
 
 1. **Compilation** - TypeScript to JavaScript
 2. **Type Checking** - Full TypeScript validation
-3. **Linting** - ESLint checks
+3. **Linting** - Oxlint checks
 4. **Optimization** - Tree shaking, minification
 5. **Static Generation** - Pre-render static pages
 

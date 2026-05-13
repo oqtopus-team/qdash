@@ -1,29 +1,15 @@
 "use client";
 
-import React, { useMemo, useRef, useState, useCallback } from "react";
+import { useMemo, useRef, useState, useCallback, useEffect } from "react";
 import Link from "next/link";
-import {
-  TransformWrapper,
-  TransformComponent,
-  useControls,
-} from "react-zoom-pan-pinch";
+import { TransformWrapper, TransformComponent, useControls } from "react-zoom-pan-pinch";
 
-import {
-  ArrowRightLeft,
-  GitBranch,
-  ZoomIn,
-  ZoomOut,
-  Maximize2,
-  Move,
-} from "lucide-react";
+import { ArrowRightLeft, GitBranch, ZoomIn, ZoomOut, Maximize2, Move } from "lucide-react";
 
 import { RegionZoomToggle } from "@/components/ui/RegionZoomToggle";
 import { useGridLayout } from "@/hooks/useGridLayout";
 import { useTopologyConfig } from "@/hooks/useTopologyConfig";
-import {
-  getQubitGridPosition,
-  type TopologyLayoutParams,
-} from "@/lib/utils/grid-position";
+import { getQubitGridPosition, type TopologyLayoutParams } from "@/lib/utils/grid-position";
 import { calculateGridDimension, cellFontSize } from "@/lib/utils/grid-layout";
 
 import { CouplingMetricHistoryModal } from "./CouplingMetricHistoryModal";
@@ -159,7 +145,14 @@ export function CouplingMetricsGrid({
   const [isDirectionReversed, setIsDirectionReversed] = useState(false);
 
   // View mode state: 'pan-zoom' for DOM with pan/zoom, 'region' for region zoom
-  const [viewMode, setViewMode] = useState<"pan-zoom" | "region">("pan-zoom");
+  const [viewMode, setViewMode] = useState<"pan-zoom" | "region">("region");
+
+  // Region tab is only available for square grids; fall back to pan-zoom otherwise.
+  useEffect(() => {
+    if (!isSquareGrid && viewMode === "region") {
+      setViewMode("pan-zoom");
+    }
+  }, [isSquareGrid, viewMode]);
 
   // Region selection state
   const [regionSelectionEnabled, setRegionSelectionEnabled] = useState(false);
@@ -194,29 +187,25 @@ export function CouplingMetricsGrid({
   } | null>(null);
 
   // Modal state
-  const [selectedCouplingInfo, setSelectedCouplingInfo] =
-    useState<SelectedCouplingInfo | null>(null);
+  const [selectedCouplingInfo, setSelectedCouplingInfo] = useState<SelectedCouplingInfo | null>(
+    null,
+  );
   const isModalOpen = selectedCouplingInfo !== null;
 
   // Use grid layout hook for responsive sizing
   const displayCols = zoomMode === "region" ? regionSize : gridCols;
   const displayRows = zoomMode === "region" ? regionSize : gridRows;
-  const { containerRef, cellSize, isMobile, viewportHeight, gap, padding } =
-    useGridLayout({
-      cols: displayCols,
-      rows: displayRows,
-      reservedHeight: { mobile: 300, desktop: 350 },
-      deps: [metricData],
-    });
+  const { containerRef, cellSize, isMobile, viewportHeight, gap, padding } = useGridLayout({
+    cols: displayCols,
+    rows: displayRows,
+    reservedHeight: { mobile: 300, desktop: 350 },
+    deps: [metricData],
+  });
 
   const numRegions = Math.floor(effectiveGridSize / regionSize);
 
   // Helper function to interpolate between two hex colors
-  const interpolateColor = (
-    color1: string,
-    color2: string,
-    factor: number,
-  ): string => {
+  const interpolateColor = (color1: string, color2: string, factor: number): string => {
     const c1 = parseInt(color1.slice(1), 16);
     const c2 = parseInt(color2.slice(1), 16);
 
@@ -236,11 +225,7 @@ export function CouplingMetricsGrid({
   };
 
   // Calculate color for a value
-  const getColor = (
-    value: number | null,
-    autoMin: number,
-    autoMax: number,
-  ): string | null => {
+  const getColor = (value: number | null, autoMin: number, autoMax: number): string | null => {
     if (value === null || value === undefined) {
       return null;
     }
@@ -248,10 +233,8 @@ export function CouplingMetricsGrid({
     const { colors } = colorScale;
     if (colors.length === 0) return null;
 
-    const effectiveMin =
-      colorScale.min === 0 && colorScale.max === 0 ? autoMin : colorScale.min;
-    const effectiveMax =
-      colorScale.min === 0 && colorScale.max === 0 ? autoMax : colorScale.max;
+    const effectiveMin = colorScale.min === 0 && colorScale.max === 0 ? autoMin : colorScale.min;
+    const effectiveMax = colorScale.min === 0 && colorScale.max === 0 ? autoMax : colorScale.max;
 
     if (effectiveMin === effectiveMax) {
       return colors[colors.length - 1];
@@ -339,8 +322,7 @@ export function CouplingMetricsGrid({
   // Use empty object if no data, so grid structure is still shown
   const displayData = metricData ?? {};
 
-  const displayGridSize =
-    zoomMode === "region" ? regionSize : effectiveGridSize;
+  const displayGridSize = zoomMode === "region" ? regionSize : effectiveGridSize;
   const displayCellSize = zoomMode === "region" ? cellSize * 0.8 : cellSize;
   const displayGridStart = selectedRegion
     ? {
@@ -354,18 +336,8 @@ export function CouplingMetricsGrid({
     <div
       className="relative flex-shrink-0"
       style={{
-        width: calculateGridDimension(
-          displayGridSize,
-          displayCellSize,
-          isMobile,
-          viewportHeight,
-        ),
-        height: calculateGridDimension(
-          displayGridSize,
-          displayCellSize,
-          isMobile,
-          viewportHeight,
-        ),
+        width: calculateGridDimension(displayGridSize, displayCellSize, isMobile, viewportHeight),
+        height: calculateGridDimension(displayGridSize, displayCellSize, isMobile, viewportHeight),
         maxWidth: viewMode === "pan-zoom" ? "none" : "100%",
       }}
     >
@@ -374,10 +346,7 @@ export function CouplingMetricsGrid({
         // Use topology qubits if available, otherwise fall back to computed positions
         const qubitList = topologyQubits
           ? Object.keys(topologyQubits).map(Number)
-          : Array.from(
-              { length: effectiveGridSize * effectiveGridSize },
-              (_, i) => i,
-            );
+          : Array.from({ length: effectiveGridSize * effectiveGridSize }, (_, i) => i);
 
         return qubitList
           .filter((qid) => isQubitInRegion(qid))
@@ -432,21 +401,15 @@ export function CouplingMetricsGrid({
             const muxLocalCol = idx % numMuxCols;
 
             // Calculate actual MUX position considering zoom offset
-            const muxActualRow =
-              Math.floor(displayGridStart.row / muxSize) + muxLocalRow;
-            const muxActualCol =
-              Math.floor(displayGridStart.col / muxSize) + muxLocalCol;
-            const muxIndex =
-              muxActualRow * Math.floor(effectiveGridSize / muxSize) +
-              muxActualCol;
+            const muxActualRow = Math.floor(displayGridStart.row / muxSize) + muxLocalRow;
+            const muxActualCol = Math.floor(displayGridStart.col / muxSize) + muxLocalCol;
+            const muxIndex = muxActualRow * Math.floor(effectiveGridSize / muxSize) + muxActualCol;
 
             // Calculate center position of MUX group
             const muxCenterX =
-              (muxLocalCol * muxSize + muxSize / 2) * (displayCellSize + gap) -
-              gap / 2;
+              (muxLocalCol * muxSize + muxSize / 2) * (displayCellSize + gap) - gap / 2;
             const muxCenterY =
-              (muxLocalRow * muxSize + muxSize / 2) * (displayCellSize + gap) -
-              gap / 2;
+              (muxLocalRow * muxSize + muxSize / 2) * (displayCellSize + gap) - gap / 2;
 
             return (
               <div
@@ -505,16 +468,12 @@ export function CouplingMetricsGrid({
             const displayRow2 = row2 - displayGridStart.row;
             const displayCol2 = col2 - displayGridStart.col;
             const centerX =
-              ((displayCol1 + displayCol2) / 2) * (displayCellSize + gap) +
-              displayCellSize / 2;
+              ((displayCol1 + displayCol2) / 2) * (displayCellSize + gap) + displayCellSize / 2;
             const centerY =
-              ((displayRow1 + displayRow2) / 2) * (displayCellSize + gap) +
-              displayCellSize / 2;
+              ((displayRow1 + displayRow2) / 2) * (displayCellSize + gap) + displayCellSize / 2;
 
             const value = metric?.value ?? null;
-            const bgColor = stats
-              ? getColor(value, stats.min, stats.max)
-              : null;
+            const bgColor = stats ? getColor(value, stats.min, stats.max) : null;
 
             // Calculate direction arrow angle from source to target qubit positions
             const [srcQ, tgtQ] = couplingId.split("-");
@@ -529,9 +488,7 @@ export function CouplingMetricsGrid({
             return (
               <button
                 key={couplingId}
-                onClick={() =>
-                  metric && setSelectedCouplingInfo({ couplingId, metric })
-                }
+                onClick={() => metric && setSelectedCouplingInfo({ couplingId, metric })}
                 style={{
                   position: "absolute",
                   top: centerY,
@@ -575,14 +532,7 @@ export function CouplingMetricsGrid({
                       transform: `rotate(${arrowAngle}deg)`,
                     }}
                   >
-                    <line
-                      x1="1"
-                      y1="3.5"
-                      x2="14"
-                      y2="3.5"
-                      stroke="white"
-                      strokeWidth="1.5"
-                    />
+                    <line x1="1" y1="3.5" x2="14" y2="3.5" stroke="white" strokeWidth="1.5" />
                     <polyline
                       points="11,0.5 16,3.5 11,6.5"
                       fill="none"
@@ -610,9 +560,7 @@ export function CouplingMetricsGrid({
           {Array.from({ length: numRegions * numRegions }).map((_, index) => {
             const regionRow = Math.floor(index / numRegions);
             const regionCol = index % numRegions;
-            const isHovered =
-              hoveredRegion?.row === regionRow &&
-              hoveredRegion?.col === regionCol;
+            const isHovered = hoveredRegion?.row === regionRow && hoveredRegion?.col === regionCol;
 
             const regionX = regionCol * regionSize * (displayCellSize + gap);
             const regionY = regionRow * regionSize * (displayCellSize + gap);
@@ -633,9 +581,7 @@ export function CouplingMetricsGrid({
                   width: regionWidth,
                   height: regionHeight,
                 }}
-                onMouseEnter={() =>
-                  setHoveredRegion({ row: regionRow, col: regionCol })
-                }
+                onMouseEnter={() => setHoveredRegion({ row: regionRow, col: regionCol })}
                 onMouseLeave={() => setHoveredRegion(null)}
                 onClick={() => {
                   setSelectedRegion({ row: regionRow, col: regionCol });
@@ -659,6 +605,15 @@ export function CouplingMetricsGrid({
       {/* View mode toggle */}
       <div className="flex items-center justify-between px-1 md:px-4 py-2">
         <div className="tabs tabs-boxed bg-base-200/50 p-1">
+          {isSquareGrid && (
+            <button
+              className={`tab gap-2 ${viewMode === "region" ? "tab-active" : ""}`}
+              onClick={() => setViewMode("region")}
+            >
+              <Maximize2 className="h-4 w-4" />
+              <span className="hidden sm:inline">Region</span>
+            </button>
+          )}
           <button
             className={`tab gap-2 ${viewMode === "pan-zoom" ? "tab-active" : ""}`}
             onClick={() => {
@@ -671,15 +626,6 @@ export function CouplingMetricsGrid({
             <Move className="h-4 w-4" />
             <span className="hidden sm:inline">DOM</span>
           </button>
-          {isSquareGrid && (
-            <button
-              className={`tab gap-2 ${viewMode === "region" ? "tab-active" : ""}`}
-              onClick={() => setViewMode("region")}
-            >
-              <Maximize2 className="h-4 w-4" />
-              <span className="hidden sm:inline">Region</span>
-            </button>
-          )}
         </div>
 
         <div className="flex items-center gap-2">
@@ -692,16 +638,10 @@ export function CouplingMetricsGrid({
           <button
             onClick={() => setIsDirectionReversed((prev) => !prev)}
             className={`btn btn-sm gap-1.5 ${isDirectionReversed ? "btn-secondary" : "btn-outline"}`}
-            title={
-              isDirectionReversed
-                ? "Showing reverse direction"
-                : "Showing forward direction"
-            }
+            title={isDirectionReversed ? "Showing reverse direction" : "Showing forward direction"}
           >
             <ArrowRightLeft className="h-3.5 w-3.5" />
-            <span className="text-xs">
-              {isDirectionReversed ? "Reverse" : "Forward"}
-            </span>
+            <span className="text-xs">{isDirectionReversed ? "Reverse" : "Forward"}</span>
           </button>
         </div>
       </div>
@@ -738,12 +678,13 @@ export function CouplingMetricsGrid({
             initialScale={1}
             minScale={0.3}
             maxScale={4}
-            wheel={{ step: 0.08, smoothStep: 0.004 }}
+            wheel={{ step: 0.08 }}
             pinch={{ step: 5 }}
             doubleClick={{ mode: "zoomIn", step: 0.7 }}
             panning={{ velocityDisabled: false }}
             smooth={true}
-            onTransformed={handleTransform}
+            centerOnInit={true}
+            onTransform={handleTransform}
           >
             <ZoomControls />
             <TransformComponent

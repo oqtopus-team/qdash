@@ -22,27 +22,15 @@ export function useChipUrlState(): UseChipUrlStateResult {
   const [isInitialized, setIsInitialized] = useState(false);
 
   // URL state management - don't use withDefault to preserve URL params
-  const [selectedChip, setSelectedChipState] = useQueryState(
-    "chip",
-    parseAsString,
-  );
+  const [selectedChip, setSelectedChipState] = useQueryState("chip", parseAsString);
 
-  const [selectedDate, setSelectedDateState] = useQueryState(
-    "date",
-    parseAsString,
-  );
+  const [selectedDate, setSelectedDateState] = useQueryState("date", parseAsString);
 
-  const [selectedTask, setSelectedTaskState] = useQueryState(
-    "task",
-    parseAsString,
-  );
+  const [selectedTask, setSelectedTaskState] = useQueryState("task", parseAsString);
 
   const [viewMode, setViewModeState] = useQueryState("view", parseAsString);
 
-  const [qubitViewMode, setQubitViewModeState] = useQueryState(
-    "qview",
-    parseAsString,
-  );
+  const [qubitViewMode, setQubitViewModeState] = useQueryState("qview", parseAsString);
 
   // Mark as initialized after first render
   useEffect(() => {

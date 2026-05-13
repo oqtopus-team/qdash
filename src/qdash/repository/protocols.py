@@ -781,6 +781,15 @@ class CalibrationNoteRepository(Protocol):
         """
         ...
 
+    def upsert_on_insert(self, note: CalibrationNoteModel) -> CalibrationNoteModel:
+        """Create a calibration note if absent without replacing an existing note.
+
+        This is used when initializing workflow-local calibration note files.
+        Parallel workers may initialize the same master note, so existing note
+        content must not be overwritten by a stale snapshot.
+        """
+        ...
+
     def merge_note_fields(
         self,
         query_filter: dict[str, str],

@@ -54,9 +54,7 @@ export function RecalibrationRecommendationsPanel({
     <div className="card bg-base-200">
       <div className="card-body p-4 sm:p-6">
         <div className="flex items-center justify-between gap-3">
-          <h3 className="card-title text-base sm:text-lg">
-            Suggested Next Actions
-          </h3>
+          <h3 className="card-title text-base sm:text-lg">Suggested Next Actions</h3>
           <div className="flex items-center gap-2">
             <button
               className="btn btn-xs btn-ghost"
@@ -77,8 +75,8 @@ export function RecalibrationRecommendationsPanel({
         </div>
 
         <p className="text-sm text-base-content/70">
-          Use this list as a runbook: re-run higher priority tasks first to
-          restore downstream parameter consistency.
+          Use this list as a runbook: re-run higher priority tasks first to restore downstream
+          parameter consistency.
         </p>
 
         {entity && (
@@ -103,9 +101,7 @@ export function RecalibrationRecommendationsPanel({
         {isLoading && (
           <div className="flex items-center gap-2 py-2">
             <span className="loading loading-spinner loading-sm"></span>
-            <span className="text-sm text-base-content/60">
-              Computing recommendations...
-            </span>
+            <span className="text-sm text-base-content/60">Computing recommendations...</span>
           </div>
         )}
 
@@ -121,9 +117,7 @@ export function RecalibrationRecommendationsPanel({
               <span className="badge badge-outline">
                 affected: {rec.total_affected_parameters ?? 0}
               </span>
-              <span className="badge badge-outline">
-                depth: {rec.max_depth_reached ?? 0}
-              </span>
+              <span className="badge badge-outline">depth: {rec.max_depth_reached ?? 0}</span>
               {rec.source_parameter_name && rec.source_qid && (
                 <span className="badge badge-primary">
                   {rec.source_parameter_name} ({rec.source_qid})
@@ -145,12 +139,8 @@ export function RecalibrationRecommendationsPanel({
                     <summary className="collapse-title py-2">
                       <div className="flex items-center justify-between gap-3">
                         <div className="flex items-center gap-2 min-w-0">
-                          <span className="badge badge-primary badge-sm">
-                            P{t.priority}
-                          </span>
-                          <span className="font-medium truncate">
-                            {t.task_name}
-                          </span>
+                          <span className="badge badge-primary badge-sm">P{t.priority}</span>
+                          <span className="font-medium truncate">{t.task_name}</span>
                         </div>
                         <div className="hidden sm:flex flex-wrap gap-1 justify-end">
                           <span className="badge badge-outline badge-sm">
@@ -163,9 +153,7 @@ export function RecalibrationRecommendationsPanel({
                       </div>
                     </summary>
                     <div className="collapse-content">
-                      <div className="text-sm text-base-content/70">
-                        {t.reason || "-"}
-                      </div>
+                      <div className="text-sm text-base-content/70">{t.reason || "-"}</div>
                       <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
                         <div>
                           <div className="text-xs font-medium text-base-content/60 mb-1">
@@ -173,20 +161,13 @@ export function RecalibrationRecommendationsPanel({
                           </div>
                           <div className="flex flex-wrap gap-1">
                             {(t.affected_parameters ?? []).length === 0 ? (
-                              <span className="text-xs text-base-content/50">
-                                -
-                              </span>
+                              <span className="text-xs text-base-content/50">-</span>
                             ) : (
-                              (t.affected_parameters ?? [])
-                                .slice(0, 20)
-                                .map((p) => (
-                                  <span
-                                    key={p}
-                                    className="badge badge-outline badge-sm"
-                                  >
-                                    {p}
-                                  </span>
-                                ))
+                              (t.affected_parameters ?? []).slice(0, 20).map((p) => (
+                                <span key={p} className="badge badge-outline badge-sm">
+                                  {p}
+                                </span>
+                              ))
                             )}
                             {(t.affected_parameters ?? []).length > 20 && (
                               <span className="badge badge-outline badge-sm">
@@ -201,15 +182,10 @@ export function RecalibrationRecommendationsPanel({
                           </div>
                           <div className="flex flex-wrap gap-1">
                             {(t.affected_qids ?? []).length === 0 ? (
-                              <span className="text-xs text-base-content/50">
-                                -
-                              </span>
+                              <span className="text-xs text-base-content/50">-</span>
                             ) : (
                               (t.affected_qids ?? []).slice(0, 20).map((q) => (
-                                <span
-                                  key={q}
-                                  className="badge badge-outline badge-sm"
-                                >
+                                <span key={q} className="badge badge-outline badge-sm">
                                   {q}
                                 </span>
                               ))

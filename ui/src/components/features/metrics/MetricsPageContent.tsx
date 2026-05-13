@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { SlidersHorizontal } from "lucide-react";
 import Select, { type GroupBase, type SingleValue } from "react-select";
@@ -26,7 +26,7 @@ import { useMetricsUrlState } from "@/hooks/useUrlState";
 import { getDaisySelectStyles } from "@/lib/react-select-theme";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { getTimezoneOffsetString } from "@/lib/utils/datetime";
+import { dateToDateInput, formatDate, getTimezoneOffsetString } from "@/lib/utils/datetime";
 import { PageFiltersBar } from "@/components/ui/PageFiltersBar";
 
 type MetricOption = {
@@ -97,19 +97,12 @@ export function MetricsPageContent() {
 
   // Get topology ID from chip data
   const topologyId = useMemo(() => {
-    return (
-      chipData?.data?.topology_id ??
-      `square-lattice-mux-${chipData?.data?.size ?? 64}`
-    );
+    return chipData?.data?.topology_id ?? `square-lattice-mux-${chipData?.data?.size ?? 64}`;
   }, [chipData?.data?.topology_id, chipData?.data?.size]);
 
   // Set default chip when data loads
   useEffect(() => {
-    if (
-      !selectedChip &&
-      chipsData?.data?.chips &&
-      chipsData.data.chips.length > 0
-    ) {
+    if (!selectedChip && chipsData?.data?.chips && chipsData.data.chips.length > 0) {
       const sortedChips = [...chipsData.data.chips].sort((a, b) => {
         const dateA = a.installed_at ? new Date(a.installed_at).getTime() : 0;
         const dateB = b.installed_at ? new Date(b.installed_at).getTime() : 0;
@@ -139,12 +132,8 @@ export function MetricsPageContent() {
             ? 24 * 30
             : 24 * 7; // Default to 7 days
 
-  const absoluteStartIso = startDate
-    ? `${startDate}T00:00:00${getTimezoneOffsetString()}`
-    : null;
-  const absoluteEndIso = endDate
-    ? `${endDate}T23:59:59${getTimezoneOffsetString()}`
-    : null;
+  const absoluteStartIso = startDate ? `${startDate}T00:00:00${getTimezoneOffsetString()}` : null;
+  const absoluteEndIso = endDate ? `${endDate}T23:59:59${getTimezoneOffsetString()}` : null;
 
   const metricsQueryParams = isAbsolute
     ? {
@@ -162,16 +151,12 @@ export function MetricsPageContent() {
 
   const withinHours = isAbsolute ? undefined : relativeWithinHours;
 
-  const { data, isLoading, isError } = useGetChipMetrics(
-    selectedChip,
-    metricsQueryParams,
-    {
-      query: {
-        enabled: canFetch,
-        staleTime: 30000,
-      },
+  const { data, isLoading, isError } = useGetChipMetrics(selectedChip, metricsQueryParams, {
+    query: {
+      enabled: canFetch,
+      staleTime: 30000,
     },
-  );
+  });
 
   // Get color scale as hex values for inline styles
   const hexColors = useMemo(() => {
@@ -213,25 +198,12 @@ export function MetricsPageContent() {
   // Save current metric selection to localStorage when it changes
   useEffect(() => {
     if (!isInitialized || isConfigLoading) return;
-    if (
-      metricType === "qubit" &&
-      qubitMetrics.some((m) => m.key === selectedMetric)
-    ) {
+    if (metricType === "qubit" && qubitMetrics.some((m) => m.key === selectedMetric)) {
       saveToLocalStorage(STORAGE_KEY_QUBIT, selectedMetric);
-    } else if (
-      metricType === "coupling" &&
-      couplingMetrics.some((m) => m.key === selectedMetric)
-    ) {
+    } else if (metricType === "coupling" && couplingMetrics.some((m) => m.key === selectedMetric)) {
       saveToLocalStorage(STORAGE_KEY_COUPLING, selectedMetric);
     }
-  }, [
-    selectedMetric,
-    metricType,
-    qubitMetrics,
-    couplingMetrics,
-    isInitialized,
-    isConfigLoading,
-  ]);
+  }, [selectedMetric, metricType, qubitMetrics, couplingMetrics, isInitialized, isConfigLoading]);
 
   // Restore metric from localStorage when metric type changes and current metric is invalid
   useEffect(() => {
@@ -239,16 +211,11 @@ export function MetricsPageContent() {
     const metrics = metricType === "qubit" ? qubitMetrics : couplingMetrics;
     if (metrics.length === 0) return;
     if (metrics.some((m) => m.key === selectedMetricRef.current)) return;
-    const key =
-      metricType === "qubit" ? STORAGE_KEY_QUBIT : STORAGE_KEY_COUPLING;
+    const key = metricType === "qubit" ? STORAGE_KEY_QUBIT : STORAGE_KEY_COUPLING;
     const defaultMetric =
-      metricType === "qubit"
-        ? "t1"
-        : (couplingMetrics[0]?.key ?? "zx90_gate_fidelity");
+      metricType === "qubit" ? "t1" : (couplingMetrics[0]?.key ?? "zx90_gate_fidelity");
     const saved = getFromLocalStorage(key);
-    setSelectedMetric(
-      saved && metrics.some((m) => m.key === saved) ? saved : defaultMetric,
-    );
+    setSelectedMetric(saved && metrics.some((m) => m.key === saved) ? saved : defaultMetric);
   }, [
     metricType,
     qubitMetrics,
@@ -288,14 +255,11 @@ export function MetricsPageContent() {
     if (!data?.data || !currentMetricConfig) return null;
 
     const metricsSource =
-      metricType === "qubit"
-        ? data.data.qubit_metrics
-        : data.data.coupling_metrics;
+      metricType === "qubit" ? data.data.qubit_metrics : data.data.coupling_metrics;
 
     if (!metricsSource) return null;
 
-    const rawData =
-      metricsSource[currentMetricConfig.key as keyof typeof metricsSource];
+    const rawData = metricsSource[currentMetricConfig.key as keyof typeof metricsSource];
 
     if (!rawData) return null;
 
@@ -340,20 +304,16 @@ export function MetricsPageContent() {
     if (!data?.data) return {};
 
     const metricsSource =
-      metricType === "qubit"
-        ? data.data.qubit_metrics
-        : data.data.coupling_metrics;
+      metricType === "qubit" ? data.data.qubit_metrics : data.data.coupling_metrics;
 
     if (!metricsSource) return {};
 
-    const result: Record<string, { [key: string]: { value: number | null } }> =
-      {};
+    const result: Record<string, { [key: string]: { value: number | null } }> = {};
 
     const configList = metricType === "qubit" ? qubitMetrics : couplingMetrics;
 
     configList.forEach((metricConfig) => {
-      const rawData =
-        metricsSource[metricConfig.key as keyof typeof metricsSource];
+      const rawData = metricsSource[metricConfig.key as keyof typeof metricsSource];
       if (!rawData) return;
 
       const scaledData: { [key: string]: { value: number | null } } = {};
@@ -380,11 +340,8 @@ export function MetricsPageContent() {
 
   // Get CDF group that contains the selected metric
   const currentCdfGroup = useMemo(() => {
-    const groups =
-      metricType === "qubit" ? cdfGroups.qubit : cdfGroups.coupling;
-    return (
-      groups.find((group) => group.metrics.includes(selectedMetric)) || null
-    );
+    const groups = metricType === "qubit" ? cdfGroups.qubit : cdfGroups.coupling;
+    return groups.find((group) => group.metrics.includes(selectedMetric)) || null;
   }, [metricType, cdfGroups, selectedMetric]);
 
   // Show skeleton during initial loading
@@ -409,11 +366,7 @@ export function MetricsPageContent() {
                 metricData={metricData}
                 metricConfig={currentMetricConfig}
                 selectionMode={selectionMode}
-                timeRange={
-                  isAbsolute
-                    ? `absolute:${startDate ?? ""}..${endDate ?? ""}`
-                    : timeRange
-                }
+                timeRange={isAbsolute ? `absolute:${startDate ?? ""}..${endDate ?? ""}` : timeRange}
                 disabled={!selectedChip || isLoading}
               />
               <MetricsPdfDownloadButton
@@ -451,9 +404,7 @@ export function MetricsPageContent() {
                 <select
                   className="select select-sm select-bordered"
                   value={rangeMode}
-                  onChange={(e) =>
-                    setRangeMode(e.target.value as "relative" | "absolute")
-                  }
+                  onChange={(e) => setRangeMode(e.target.value as "relative" | "absolute")}
                   title="Switch between relative range (last N days) and absolute date range"
                 >
                   <option value="relative">Relative</option>
@@ -505,10 +456,7 @@ export function MetricsPageContent() {
                       </button>
                     </div>
                     {timeRange === "custom" && (
-                      <CustomDaysInput
-                        value={customDays ?? 90}
-                        onChange={setCustomDays}
-                      />
+                      <CustomDaysInput value={customDays ?? 90} onChange={setCustomDays} />
                     )}
                   </div>
                 ) : (
@@ -561,10 +509,7 @@ export function MetricsPageContent() {
 
             <PageFiltersBar.Group>
               <PageFiltersBar.Item>
-                <ChipSelector
-                  selectedChip={selectedChip}
-                  onChipSelect={setSelectedChip}
-                />
+                <ChipSelector selectedChip={selectedChip} onChipSelect={setSelectedChip} />
               </PageFiltersBar.Item>
 
               <PageFiltersBar.Item>
@@ -572,14 +517,8 @@ export function MetricsPageContent() {
                   chipId={selectedChip}
                   onPick={(cd) => {
                     setRangeMode("absolute");
-                    setStartDate(
-                      new Date(cd.started_at).toISOString().slice(0, 10),
-                    );
-                    setEndDate(
-                      cd.ended_at
-                        ? new Date(cd.ended_at).toISOString().slice(0, 10)
-                        : new Date().toISOString().slice(0, 10),
-                    );
+                    setStartDate(formatDate(cd.started_at));
+                    setEndDate(cd.ended_at ? formatDate(cd.ended_at) : dateToDateInput(new Date()));
                   }}
                 />
               </PageFiltersBar.Item>
@@ -589,11 +528,7 @@ export function MetricsPageContent() {
                   className="w-full sm:w-64 text-base-content"
                   classNamePrefix="react-select"
                   options={groupedMetricOptions}
-                  value={
-                    metricOptions.find(
-                      (option) => option.value === selectedMetric,
-                    ) ?? null
-                  }
+                  value={metricOptions.find((option) => option.value === selectedMetric) ?? null}
                   onChange={(option: SingleValue<MetricOption>) => {
                     if (option) {
                       setSelectedMetric(option.value);
@@ -618,19 +553,11 @@ export function MetricsPageContent() {
           />
         ) : isLoading ? (
           <div className="flex items-center justify-center h-96">
-            <QuantumLoader
-              size="lg"
-              showLabel
-              label="Loading metrics data..."
-            />
+            <QuantumLoader size="lg" showLabel label="Loading metrics data..." />
           </div>
         ) : isConfigLoading ? (
           <div className="flex items-center justify-center h-96">
-            <QuantumLoader
-              size="lg"
-              showLabel
-              label="Loading metrics configuration..."
-            />
+            <QuantumLoader size="lg" showLabel label="Loading metrics configuration..." />
           </div>
         ) : isConfigError ? (
           <EmptyState
@@ -650,12 +577,8 @@ export function MetricsPageContent() {
           <>
             {/* Metric Title */}
             <div className="flex items-center gap-3">
-              <h2 className="text-xl md:text-2xl font-bold">
-                {currentMetricConfig.title}
-              </h2>
-              <span className="badge badge-outline badge-sm">
-                {currentMetricConfig.unit}
-              </span>
+              <h2 className="text-xl md:text-2xl font-bold">{currentMetricConfig.title}</h2>
+              <span className="badge badge-outline badge-sm">{currentMetricConfig.unit}</span>
             </div>
 
             {/* Stats Summary Cards */}
@@ -731,10 +654,7 @@ interface CdfWithCoverageProps {
     metrics: string[];
   };
   metricsConfig: { key: string; title: string }[];
-  allMetricsData: Record<
-    string,
-    { [key: string]: { value: number | null } } | null
-  >;
+  allMetricsData: Record<string, { [key: string]: { value: number | null } } | null>;
   metricData: { [key: string]: { value: number | null } } | null;
   gridSize: number;
   metricType: "qubit" | "coupling";
@@ -802,8 +722,7 @@ function AbsoluteDateRangePicker({
   onStartChange: (value: string | null) => void;
   onEndChange: (value: string | null) => void;
 }) {
-  const hasInvertedRange =
-    startDate !== null && endDate !== null && startDate > endDate;
+  const hasInvertedRange = startDate !== null && endDate !== null && startDate > endDate;
 
   return (
     <div className="flex flex-col gap-1">
@@ -832,22 +751,14 @@ function AbsoluteDateRangePicker({
         </label>
       </div>
       {hasInvertedRange && (
-        <span className="text-xs text-error">
-          Start date must be on or before end date
-        </span>
+        <span className="text-xs text-error">Start date must be on or before end date</span>
       )}
     </div>
   );
 }
 
 // Extracted input component for custom days with debounced URL updates
-function CustomDaysInput({
-  value,
-  onChange,
-}: {
-  value: number;
-  onChange: (days: number) => void;
-}) {
+function CustomDaysInput({ value, onChange }: { value: number; onChange: (days: number) => void }) {
   const [localValue, setLocalValue] = useState(String(value));
   const inputRef = useRef<HTMLInputElement>(null);
 

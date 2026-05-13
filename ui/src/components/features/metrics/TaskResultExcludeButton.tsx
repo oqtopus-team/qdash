@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Ban, RotateCcw } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useSetTaskResultExcluded } from "@/client/task-result/task-result";
@@ -112,8 +112,8 @@ export function TaskResultExcludeButton({
         <div className="modal-box">
           <h3 className="font-bold text-base mb-2">Exclude this measurement</h3>
           <p className="text-sm text-base-content/70 mb-3">
-            Excluded measurements are skipped on the dashboard and metrics
-            screens. Raw data is preserved and you can restore it later.
+            Excluded measurements are skipped on the dashboard and metrics screens. Raw data is
+            preserved and you can restore it later.
           </p>
           <label className="label">
             <span className="label-text text-sm">Reason (optional)</span>

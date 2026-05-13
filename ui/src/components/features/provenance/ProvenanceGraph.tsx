@@ -70,9 +70,7 @@ function EntityNode({ data, selected }: NodeProps) {
   // Compact value + unit + error in one line
   const valueParts: string[] = [];
   if (typedData.value)
-    valueParts.push(
-      `${typedData.value}${typedData.unit ? ` ${typedData.unit}` : ""}`,
-    );
+    valueParts.push(`${typedData.value}${typedData.unit ? ` ${typedData.unit}` : ""}`);
   if (typedData.error) valueParts.push(`±${typedData.error}`);
   const valueText = valueParts.join("  ");
 
@@ -83,9 +81,7 @@ function EntityNode({ data, selected }: NodeProps) {
       } ${typedData.lowConfidence ? "border-warning" : ""} ${typedData.hasNewerVersion ? "border-info" : ""}`}
       style={{
         backgroundColor: styles.background,
-        borderColor: typedData.hasNewerVersion
-          ? "hsl(var(--in))"
-          : styles.borderColor,
+        borderColor: typedData.hasNewerVersion ? "hsl(var(--in))" : styles.borderColor,
         opacity: typedData.dimmed ? 0.25 : 1,
       }}
     >
@@ -97,28 +93,18 @@ function EntityNode({ data, selected }: NodeProps) {
           </span>
           {/* Hover tooltip - stale */}
           <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-base-100 border border-info/30 text-base-content text-xs rounded-lg shadow-lg opacity-0 group-hover/entity:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
-            <div className="font-semibold text-info mb-1">
-              Input version updated
-            </div>
+            <div className="font-semibold text-info mb-1">Input version updated</div>
             <div>
               <span className="font-mono">v{typedData.nodeVersion}</span>
               <span className="mx-1">&rarr;</span>
-              <span className="font-mono font-semibold">
-                v{typedData.latestVersion}
-              </span>
+              <span className="font-mono font-semibold">v{typedData.latestVersion}</span>
             </div>
-            <div className="text-base-content/60 mt-1">
-              Recalibration recommended
-            </div>
+            <div className="text-base-content/60 mt-1">Recalibration recommended</div>
             <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-[6px] border-r-[6px] border-t-[6px] border-l-transparent border-r-transparent border-t-base-100" />
           </div>
         </>
       )}
-      <Handle
-        type="target"
-        position={Position.Top}
-        className="!bg-primary !w-2 !h-2"
-      />
+      <Handle type="target" position={Position.Top} className="!bg-primary !w-2 !h-2" />
       {/* Row 1: name + qid */}
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-1.5 min-w-0">
@@ -127,9 +113,7 @@ function EntityNode({ data, selected }: NodeProps) {
               typedData.isOrigin ? "bg-primary" : "bg-primary/40"
             }`}
           />
-          <div className="font-semibold text-xs truncate">
-            {typedData.label}
-          </div>
+          <div className="font-semibold text-xs truncate">{typedData.label}</div>
         </div>
         {typedData.qid && (
           <span className="text-[10px] text-primary/70 font-mono flex-shrink-0">
@@ -155,11 +139,7 @@ function EntityNode({ data, selected }: NodeProps) {
             v{typedData.nodeVersion} &rarr; v{typedData.latestVersion}
           </div>
         )}
-      <Handle
-        type="source"
-        position={Position.Bottom}
-        className="!bg-primary !w-2 !h-2"
-      />
+      <Handle type="source" position={Position.Bottom} className="!bg-primary !w-2 !h-2" />
     </div>
   );
 }
@@ -213,17 +193,11 @@ function ActivityNode({ data, selected }: NodeProps) {
           </span>
           {/* Hover tooltip */}
           <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-base-100 border border-info/30 text-base-content text-xs rounded-lg shadow-lg opacity-0 group-hover/activity:opacity-100 transition-opacity pointer-events-none z-50 min-w-[180px]">
-            <div className="font-semibold text-info mb-1">
-              Stale inputs detected
-            </div>
-            {typedData.staleInputNames &&
-            typedData.staleInputNames.length > 0 ? (
+            <div className="font-semibold text-info mb-1">Stale inputs detected</div>
+            {typedData.staleInputNames && typedData.staleInputNames.length > 0 ? (
               <ul className="space-y-0.5">
                 {typedData.staleInputNames.map((name, i) => (
-                  <li
-                    key={i}
-                    className="font-mono text-[11px] text-base-content/80"
-                  >
+                  <li key={i} className="font-mono text-[11px] text-base-content/80">
                     {name}
                   </li>
                 ))}
@@ -234,18 +208,12 @@ function ActivityNode({ data, selected }: NodeProps) {
                 {typedData.staleInputCount === 1 ? "" : "s"} updated
               </div>
             )}
-            <div className="text-base-content/60 mt-1">
-              Recalibration recommended
-            </div>
+            <div className="text-base-content/60 mt-1">Recalibration recommended</div>
             <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-[6px] border-r-[6px] border-t-[6px] border-l-transparent border-r-transparent border-t-base-100" />
           </div>
         </>
       )}
-      <Handle
-        type="target"
-        position={Position.Top}
-        className="!bg-secondary !w-2 !h-2"
-      />
+      <Handle type="target" position={Position.Top} className="!bg-secondary !w-2 !h-2" />
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
           <div className="w-2 h-2 rounded-sm bg-secondary/60 flex-shrink-0" />
@@ -256,15 +224,11 @@ function ActivityNode({ data, selected }: NodeProps) {
           </div>
         </div>
         {typedData.isTaskFlow && typedData.qid && (
-          <span className="badge badge-secondary badge-sm flex-shrink-0">
-            {typedData.qid}
-          </span>
+          <span className="badge badge-secondary badge-sm flex-shrink-0">{typedData.qid}</span>
         )}
       </div>
       {typedData.status && (
-        <div className={`text-xs ${statusClass} mt-1 capitalize`}>
-          {typedData.status}
-        </div>
+        <div className={`text-xs ${statusClass} mt-1 capitalize`}>{typedData.status}</div>
       )}
       {hasStaleInputs && (
         <div className="text-[10px] font-mono mt-1 rounded px-2 py-1 text-center bg-info/10 text-info">
@@ -273,15 +237,9 @@ function ActivityNode({ data, selected }: NodeProps) {
         </div>
       )}
       {typedData.taskId && !hasStaleInputs && (
-        <div className="text-[10px] text-base-content/50 mt-1 truncate">
-          Click to view details
-        </div>
+        <div className="text-[10px] text-base-content/50 mt-1 truncate">Click to view details</div>
       )}
-      <Handle
-        type="source"
-        position={Position.Bottom}
-        className="!bg-secondary !w-2 !h-2"
-      />
+      <Handle type="source" position={Position.Bottom} className="!bg-secondary !w-2 !h-2" />
     </div>
   );
 }
@@ -442,10 +400,7 @@ function buildUndirectedAdjacency(edges: LineageEdgeResponse[]) {
   return adjacency;
 }
 
-function computeHopDistances(
-  originId: string,
-  edges: LineageEdgeResponse[],
-): Map<string, number> {
+function computeHopDistances(originId: string, edges: LineageEdgeResponse[]): Map<string, number> {
   const adjacency = buildUndirectedAdjacency(edges);
   const distance = new Map<string, number>();
   const queue: string[] = [];
@@ -591,8 +546,7 @@ function convertToFlowElements(
           if (node.entity.value === 0) {
             lowConfidence = true;
           } else {
-            lowConfidence =
-              Math.abs(node.entity.error / node.entity.value) >= 0.05;
+            lowConfidence = Math.abs(node.entity.error / node.entity.value) >= 0.05;
           }
         }
       }
@@ -605,9 +559,7 @@ function convertToFlowElements(
 
     // For activity nodes in task flow, propagate stale input info
     const staleInputCount =
-      !isEntity && staleInputsByActivity
-        ? (staleInputsByActivity.get(node.node_id) ?? 0)
-        : 0;
+      !isEntity && staleInputsByActivity ? (staleInputsByActivity.get(node.node_id) ?? 0) : 0;
     const staleInputNames =
       !isEntity && staleInputNamesByActivity
         ? (staleInputNamesByActivity.get(node.node_id) ?? [])
@@ -639,8 +591,7 @@ function convertToFlowElements(
   // Convert edges
   const flowEdges: Edge[] = apiEdges.map((edge, index) => {
     const strokeColor =
-      EDGE_COLORS[edge.relation_type as keyof typeof EDGE_COLORS] ||
-      EDGE_COLORS.default;
+      EDGE_COLORS[edge.relation_type as keyof typeof EDGE_COLORS] || EDGE_COLORS.default;
 
     return {
       id: `edge-${index}`,
@@ -711,11 +662,7 @@ export function ProvenanceGraph({
 
   const matchingNodeIds = useMemo(() => {
     if (!searchQuery) return new Set<string>();
-    return new Set(
-      apiNodes
-        .filter((n) => nodeMatchesQuery(n, searchQuery))
-        .map((n) => n.node_id),
-    );
+    return new Set(apiNodes.filter((n) => nodeMatchesQuery(n, searchQuery)).map((n) => n.node_id));
   }, [apiNodes, searchQuery]);
 
   const hopDistances = useMemo(() => {
@@ -735,15 +682,12 @@ export function ProvenanceGraph({
     }
   }, [focusHops, maxDistance]);
 
-  const effectiveShowAll =
-    showAll || (!!searchQuery && matchingNodeIds.size > 0);
+  const effectiveShowAll = showAll || (!!searchQuery && matchingNodeIds.size > 0);
   const maxHopsToShow = effectiveShowAll ? Number.POSITIVE_INFINITY : focusHops;
 
   const constrainedApiNodes = useMemo(() => {
     if (!originId) return apiNodes;
-    return apiNodes.filter(
-      (n) => (hopDistances.get(n.node_id) ?? Infinity) <= maxHopsToShow,
-    );
+    return apiNodes.filter((n) => (hopDistances.get(n.node_id) ?? Infinity) <= maxHopsToShow);
   }, [apiNodes, hopDistances, maxHopsToShow, originId]);
 
   const constrainedNodeIds = useMemo(
@@ -753,9 +697,7 @@ export function ProvenanceGraph({
 
   const constrainedApiEdges = useMemo(() => {
     return filteredApiEdges.filter(
-      (e) =>
-        constrainedNodeIds.has(e.source_id) &&
-        constrainedNodeIds.has(e.target_id),
+      (e) => constrainedNodeIds.has(e.source_id) && constrainedNodeIds.has(e.target_id),
     );
   }, [filteredApiEdges, constrainedNodeIds]);
 
@@ -787,11 +729,7 @@ export function ProvenanceGraph({
     staleInputNamesByActivity,
   } = useMemo(() => {
     if (viewDetail === "taskFlow") {
-      return collapseToTaskFlow(
-        constrainedApiNodes,
-        constrainedApiEdges,
-        directInputIds,
-      );
+      return collapseToTaskFlow(constrainedApiNodes, constrainedApiEdges, directInputIds);
     }
     return {
       nodes: constrainedApiNodes,
@@ -831,10 +769,7 @@ export function ProvenanceGraph({
       if (!hasSearch) return new Set<string>();
       const neighbors = new Set<string>(matchingNodeIds);
       for (const edge of baseEdges) {
-        if (
-          matchingNodeIds.has(edge.source) ||
-          matchingNodeIds.has(edge.target)
-        ) {
+        if (matchingNodeIds.has(edge.source) || matchingNodeIds.has(edge.target)) {
           neighbors.add(edge.source);
           neighbors.add(edge.target);
         }
@@ -846,9 +781,7 @@ export function ProvenanceGraph({
       const isMatch = matchingNodeIds.has(node.id);
       const dimmed = hasSearch ? !matchNeighborhood.has(node.id) : false;
       const isPinned =
-        node.type === "activity" &&
-        !!pinnedTask?.nodeId &&
-        node.id === pinnedTask.nodeId;
+        node.type === "activity" && !!pinnedTask?.nodeId && node.id === pinnedTask.nodeId;
       return {
         ...node,
         data: {
@@ -865,10 +798,7 @@ export function ProvenanceGraph({
       const dimmed =
         !!searchQuery &&
         matchingNodeIds.size > 0 &&
-        !(
-          matchNeighborhood.has(edge.source) ||
-          matchNeighborhood.has(edge.target)
-        );
+        !(matchNeighborhood.has(edge.source) || matchNeighborhood.has(edge.target));
       return {
         ...edge,
         style: {
@@ -879,14 +809,7 @@ export function ProvenanceGraph({
     });
 
     return { nodes: withDecorations, edges: withEdgeDimming };
-  }, [
-    baseNodes,
-    baseEdges,
-    matchingNodeIds,
-    searchQuery,
-    pinnedTask?.nodeId,
-    isTaskFlow,
-  ]);
+  }, [baseNodes, baseEdges, matchingNodeIds, searchQuery, pinnedTask?.nodeId, isTaskFlow]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
@@ -905,9 +828,7 @@ export function ProvenanceGraph({
         const taskId = (nodeData?.taskId as string) || "";
         const qid = (nodeData.qid as string) || "0";
         const taskName =
-          typeof nodeData.label === "string"
-            ? (nodeData.label as string)
-            : undefined;
+          typeof nodeData.label === "string" ? (nodeData.label as string) : undefined;
         setPinnedTask((prev) => {
           if (prev?.nodeId === node.id) return null;
           return { taskId, qid, taskName, nodeId: node.id };
@@ -921,19 +842,13 @@ export function ProvenanceGraph({
     const entityCount = initialNodes.filter((n) => n.type === "entity").length;
     const taskCount = initialNodes.filter((n) => n.type === "activity").length;
     const failedTasks = initialNodes.filter(
-      (n) =>
-        n.type === "activity" &&
-        (n.data as Record<string, unknown>)?.status === "failed",
+      (n) => n.type === "activity" && (n.data as Record<string, unknown>)?.status === "failed",
     ).length;
     const lowConfidenceParams = initialNodes.filter(
-      (n) =>
-        n.type === "entity" &&
-        (n.data as Record<string, unknown>)?.lowConfidence,
+      (n) => n.type === "entity" && (n.data as Record<string, unknown>)?.lowConfidence,
     ).length;
     const staleInputs = initialNodes.filter(
-      (n) =>
-        n.type === "entity" &&
-        (n.data as Record<string, unknown>)?.hasNewerVersion,
+      (n) => n.type === "entity" && (n.data as Record<string, unknown>)?.hasNewerVersion,
     ).length;
     return {
       entityCount,
@@ -951,9 +866,7 @@ export function ProvenanceGraph({
           <FluentEmoji name="empty" size={64} />
         </div>
         <p className="text-lg font-medium">No lineage data</p>
-        <p className="text-sm mt-1">
-          Select a parameter to explore its provenance
-        </p>
+        <p className="text-sm mt-1">Select a parameter to explore its provenance</p>
       </div>
     );
   }
@@ -979,17 +892,12 @@ export function ProvenanceGraph({
       </div>
       <div className="flex flex-col sm:flex-row items-center gap-2 bg-base-100/90 border border-base-300 rounded-lg px-3 py-2 shadow-sm w-full sm:w-auto">
         <div className="flex items-center gap-2">
-          <div className="text-xs text-base-content/60 whitespace-nowrap">
-            Focus
-          </div>
+          <div className="text-xs text-base-content/60 whitespace-nowrap">Focus</div>
           <input
             type="range"
             min={1}
             max={Math.max(1, Math.min(10, maxDistance || 10))}
-            value={Math.min(
-              focusHops,
-              Math.max(1, Math.min(10, maxDistance || 10)),
-            )}
+            value={Math.min(focusHops, Math.max(1, Math.min(10, maxDistance || 10)))}
             onChange={(e) => setFocusHops(Number(e.target.value))}
             className="range range-xs range-primary w-28 pointer-events-auto"
             disabled={effectiveShowAll}
@@ -1079,20 +987,13 @@ export function ProvenanceGraph({
           }}
           proOptions={{ hideAttribution: true }}
         >
-          <Background
-            color="currentColor"
-            className="text-base-content/10"
-            gap={20}
-            size={1}
-          />
+          <Background color="currentColor" className="text-base-content/10" gap={20} size={1} />
           <Controls
             className="!bg-base-100 !border-base-300 !rounded-lg !shadow"
             showInteractive={false}
           />
           <MiniMap
-            nodeColor={(node) =>
-              node.type === "entity" ? "oklch(var(--p))" : "oklch(var(--s))"
-            }
+            nodeColor={(node) => (node.type === "entity" ? "oklch(var(--p))" : "oklch(var(--s))")}
             maskColor="rgba(0,0,0,0.1)"
             className="!bg-base-100/80 !border-base-300 !rounded-lg"
             pannable
@@ -1111,9 +1012,7 @@ export function ProvenanceGraph({
             </span>
             Controls
           </summary>
-          <div className="flex flex-col gap-2 items-start mt-2">
-            {controlsBody}
-          </div>
+          <div className="flex flex-col gap-2 items-start mt-2">{controlsBody}</div>
         </details>
         {/* Controls — PC: always visible (hidden below sm) */}
         <div className="hidden sm:flex sm:flex-row sm:flex-wrap gap-2 items-center absolute top-4 left-4 right-4 z-20 pointer-events-none">

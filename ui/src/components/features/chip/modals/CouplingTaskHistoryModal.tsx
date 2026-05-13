@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import React, { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback } from "react";
 import Link from "next/link";
 import { useQueryClient } from "@tanstack/react-query";
 import { ChevronRight, History, FileText, GitBranch, Bot } from "lucide-react";
@@ -22,10 +22,7 @@ import type { AnalysisContext } from "@/hooks/useAnalysisChat";
 import { useAnalysisChatContext } from "@/contexts/AnalysisChatContext";
 
 const PlotlyRenderer = dynamic(
-  () =>
-    import("@/components/charts/PlotlyRenderer").then(
-      (mod) => mod.PlotlyRenderer,
-    ),
+  () => import("@/components/charts/PlotlyRenderer").then((mod) => mod.PlotlyRenderer),
   { ssr: false },
 );
 
@@ -66,10 +63,7 @@ export function CouplingTaskHistoryModal({
           data: {
             chip_id: chipId,
             qid: couplingId,
-            parameters: updatedParams as Record<
-              string,
-              Record<string, unknown>
-            >,
+            parameters: updatedParams as Record<string, Record<string, unknown>>,
           },
         });
         await queryClient.invalidateQueries({ predicate: isChipMetricsQuery });
@@ -91,8 +85,7 @@ export function CouplingTaskHistoryModal({
   );
 
   const resolveQid = (taskQid: string, qidRole?: string): string => {
-    if (!qidRole || qidRole === "self" || qidRole === "coupling")
-      return taskQid;
+    if (!qidRole || qidRole === "self" || qidRole === "coupling") return taskQid;
     const match = taskQid.match(/^(\d+)-(\d+)$/);
     if (!match) return taskQid;
     const [, control, target] = match;
@@ -170,9 +163,7 @@ export function CouplingTaskHistoryModal({
           <History className="h-4 w-4 text-primary" />
           <h3 className="text-sm font-bold text-base-content">History</h3>
         </div>
-        <p className="text-xs text-base-content/50">
-          {historyArray.length} results
-        </p>
+        <p className="text-xs text-base-content/50">{historyArray.length} results</p>
       </div>
       <div className="flex-1 overflow-y-auto min-h-0">
         <div className="flex flex-col gap-2">
@@ -192,23 +183,15 @@ export function CouplingTaskHistoryModal({
                   <div className="min-w-0 flex-1">
                     <div className="font-bold text-sm">
                       {item.task.status === "completed" ? (
-                        <span className={isSelected ? "" : "text-success"}>
-                          Completed
-                        </span>
+                        <span className={isSelected ? "" : "text-success"}>Completed</span>
                       ) : item.task.status === "failed" ? (
-                        <span className={isSelected ? "" : "text-error"}>
-                          Failed
-                        </span>
+                        <span className={isSelected ? "" : "text-error"}>Failed</span>
                       ) : (
-                        <span className={isSelected ? "" : "text-warning"}>
-                          {item.task.status}
-                        </span>
+                        <span className={isSelected ? "" : "text-warning"}>{item.task.status}</span>
                       )}
                     </div>
                     <div className="text-xs opacity-70 mt-1">
-                      {item.task.end_at
-                        ? formatDateTimeCompact(item.task.end_at)
-                        : "N/A"}
+                      {item.task.end_at ? formatDateTimeCompact(item.task.end_at) : "N/A"}
                     </div>
                     {idx === 0 && (
                       <span
@@ -263,11 +246,7 @@ export function CouplingTaskHistoryModal({
           <button
             className="btn btn-xs btn-ghost"
             disabled={selectedIndex === historyArray.length - 1}
-            onClick={() =>
-              handleSelectIndex(
-                Math.min(historyArray.length - 1, selectedIndex + 1),
-              )
-            }
+            onClick={() => handleSelectIndex(Math.min(historyArray.length - 1, selectedIndex + 1))}
           >
             Older →
           </button>
@@ -320,17 +299,11 @@ export function CouplingTaskHistoryModal({
       {hasJsonFigures && (
         <div className="flex justify-center mt-2 gap-2 items-center">
           {viewMode === "static" ? (
-            <button
-              className="btn btn-xs btn-primary"
-              onClick={() => setViewMode("interactive")}
-            >
+            <button className="btn btn-xs btn-primary" onClick={() => setViewMode("interactive")}>
               Interactive
             </button>
           ) : (
-            <button
-              className="btn btn-xs btn-ghost"
-              onClick={() => setViewMode("static")}
-            >
+            <button className="btn btn-xs btn-ghost" onClick={() => setViewMode("static")}>
               Static
             </button>
           )}
@@ -394,21 +367,13 @@ export function CouplingTaskHistoryModal({
                   ? Object.entries(selectedTask.input_parameters)
                   : [];
                 const [key, paramValue] =
-                  (outputs[0] as
-                    | [string, Record<string, unknown>]
-                    | undefined) ??
-                  (inputs[0] as
-                    | [string, Record<string, unknown>]
-                    | undefined) ??
+                  (outputs[0] as [string, Record<string, unknown>] | undefined) ??
+                  (inputs[0] as [string, Record<string, unknown>] | undefined) ??
                   [];
                 if (key && paramValue) {
                   const pv = paramValue as Record<string, unknown>;
-                  const parameterName =
-                    (pv?.parameter_name as string | undefined) || key;
-                  const resolvedQid = resolveQid(
-                    couplingId,
-                    pv?.qid_role as string | undefined,
-                  );
+                  const parameterName = (pv?.parameter_name as string | undefined) || key;
+                  const resolvedQid = resolveQid(couplingId, pv?.qid_role as string | undefined);
                   return buildProvenanceUrl(parameterName, resolvedQid);
                 }
                 return "/provenance";
@@ -432,11 +397,7 @@ export function CouplingTaskHistoryModal({
       )}
 
       {selectedTask?.task_id && (
-        <TaskResultMemo
-          taskId={selectedTask.task_id}
-          chipId={chipId}
-          hideWhenEmpty
-        />
+        <TaskResultMemo taskId={selectedTask.task_id} chipId={chipId} hideWhenEmpty />
       )}
 
       {/* Parameters */}
@@ -446,9 +407,7 @@ export function CouplingTaskHistoryModal({
             Object.keys(selectedTask.input_parameters).length > 0 && (
               <ParametersTable
                 title="Input Parameters"
-                parameters={
-                  selectedTask.input_parameters as Record<string, unknown>
-                }
+                parameters={selectedTask.input_parameters as Record<string, unknown>}
               />
             )}
           {selectedTask.output_parameters &&
@@ -456,9 +415,7 @@ export function CouplingTaskHistoryModal({
               <>
                 <ParametersTable
                   title="Output Parameters"
-                  parameters={
-                    selectedTask.output_parameters as Record<string, unknown>
-                  }
+                  parameters={selectedTask.output_parameters as Record<string, unknown>}
                   editable
                   onSave={handleSaveParameters}
                   isSaving={updateParamsMutation.isPending}
@@ -477,22 +434,17 @@ export function CouplingTaskHistoryModal({
                 )}
               </>
             )}
-          {selectedTask.run_parameters &&
-            Object.keys(selectedTask.run_parameters).length > 0 && (
-              <ParametersTable
-                title="Run Parameters"
-                parameters={
-                  selectedTask.run_parameters as Record<string, unknown>
-                }
-              />
-            )}
+          {selectedTask.run_parameters && Object.keys(selectedTask.run_parameters).length > 0 && (
+            <ParametersTable
+              title="Run Parameters"
+              parameters={selectedTask.run_parameters as Record<string, unknown>}
+            />
+          )}
         </div>
       )}
 
       {/* Issues */}
-      {selectedTask?.task_id && (
-        <TaskResultIssues taskId={selectedTask.task_id} />
-      )}
+      {selectedTask?.task_id && <TaskResultIssues taskId={selectedTask.task_id} />}
     </div>
   );
 
@@ -513,10 +465,7 @@ export function CouplingTaskHistoryModal({
           <h3 className="font-bold text-base sm:text-lg truncate pr-2">
             {taskName} - {couplingId}
           </h3>
-          <button
-            onClick={onClose}
-            className="btn btn-sm btn-circle btn-ghost flex-shrink-0"
-          >
+          <button onClick={onClose} className="btn btn-sm btn-circle btn-ghost flex-shrink-0">
             ✕
           </button>
         </div>
@@ -575,9 +524,7 @@ export function CouplingTaskHistoryModal({
               <div className="w-1/3 flex flex-col min-h-0 border-r border-base-300 pr-4">
                 {renderHistoryList()}
               </div>
-              <div className="w-2/3 overflow-y-auto min-h-0">
-                {renderTaskDetails()}
-              </div>
+              <div className="w-2/3 overflow-y-auto min-h-0">{renderTaskDetails()}</div>
             </div>
           </div>
         )}

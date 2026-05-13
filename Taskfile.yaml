@@ -23,8 +23,8 @@ tasks:
       - docker compose -f ../compose.yaml restart api && sleep 2
       - curl http://api:$API_PORT/openapi.json | jq > ../docs/oas/openapi.json
       - bunx orval@7.14.0 --config ./orval.config.cjs
-      - bunx prettier . --write --log-level error
-      - bunx eslint . --fix -c eslint.config.mjs --quiet
+      - bun run fmt
+      - bun run lint:fix
     desc: Generate the TypeScript client
 
   knowledge:
@@ -167,25 +167,50 @@ tasks:
     dir: ui
     desc: Run UI linting and formatting (auto-fix)
     cmds:
-      - bunx prettier . --write --log-level error
-      - bunx eslint . --fix -c eslint.config.mjs --quiet
+      - bun run fmt
+      - bun run lint:fix
+
+  # =============================================================================
+  # Secret Scanning
+  # =============================================================================
+
+  scan-secrets:
+    desc: Run full secret scan with Trufflehog (git history + filesystem)
+    cmds:
+      - trufflehog git file://. --only-verified --fail --exclude-paths=.trufflehog-exclude-paths.txt
+
+  scan-secrets-all:
+    desc: Run Trufflehog scan including unverified findings
+    cmds:
+      - trufflehog git file://. --fail --exclude-paths=.trufflehog-exclude-paths.txt
+
+  scan-leaks:
+    desc: Run Gitleaks scan on current changes (pre-commit equivalent)
+    cmds:
+      - gitleaks detect --source . --verbose
+
+  scan-leaks-staged:
+    desc: Run Gitleaks on staged files only
+    cmds:
+      - gitleaks protect --staged --verbose
 
   # =============================================================================
   # Local Check (run before push)
   # =============================================================================
 
   check:
-    desc: Run all checks locally (lint, typecheck, test)
+    desc: Run all checks locally (lint, typecheck, test, UI, audit)
     cmds:
       - task: ci-lint
       - task: ci-typecheck
       - task: ci-test
+      - task: ci-ui
+      - task: scan-leaks
 
   check-all:
-    desc: Run all checks including UI
+    desc: Run the full local check suite
     cmds:
       - task: check
-      - task: ci-ui
 
   # =============================================================================
   # CI Checks (check-only, no auto-fix)
@@ -231,8 +256,11 @@ tasks:
     dir: ui
     cmds:
       - bun run test:run
-      - bunx eslint . -c eslint.config.mjs
-      - bunx prettier . --check
+      - bunx tsc --noEmit
+      - bun run lint
+      - bun run fmt:check
+      - bun run knip
+      - bun audit
 
   ci-ui-build:
     desc: Build UI for production

@@ -1,27 +1,17 @@
 "use client";
 
-import React, { useMemo, useState, useRef, useCallback, memo } from "react";
+import { useMemo, useState, useRef, useCallback, useEffect, memo } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
-import {
-  TransformWrapper,
-  TransformComponent,
-  useControls,
-} from "react-zoom-pan-pinch";
+import { TransformWrapper, TransformComponent, useControls } from "react-zoom-pan-pinch";
 
 import { GitBranch, ZoomIn, ZoomOut, Maximize2, Move } from "lucide-react";
 
 import { RegionZoomToggle } from "@/components/ui/RegionZoomToggle";
 import { useGridLayout } from "@/hooks/useGridLayout";
 import { useTopologyConfig } from "@/hooks/useTopologyConfig";
-import {
-  getQubitGridPosition,
-  type TopologyLayoutParams,
-} from "@/lib/utils/grid-position";
-import {
-  calculateGridContainerWidth,
-  cellFontSize,
-} from "@/lib/utils/grid-layout";
+import { getQubitGridPosition, type TopologyLayoutParams } from "@/lib/utils/grid-position";
+import { calculateGridContainerWidth, cellFontSize } from "@/lib/utils/grid-layout";
 
 import { QubitMetricHistoryModal } from "./QubitMetricHistoryModal";
 
@@ -132,9 +122,7 @@ const GridCell = memo(function GridCell({
   onClick,
 }: GridCellProps) {
   const fontSizes = getCellFontSizes(cellSize);
-  const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(
-    null,
-  );
+  const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
   // When cells are small, hide stddev and unit to prevent text from being crushed
   const effectiveShowUnits = showUnits && !fontSizes.hideExtras;
 
@@ -245,14 +233,8 @@ const GridCell = memo(function GridCell({
 });
 
 // Empty cell component
-const EmptyCell = memo(function EmptyCell({
-  muxBgClass,
-}: {
-  muxBgClass: string;
-}) {
-  return (
-    <div className={`aspect-square bg-base-300/50 rounded-lg ${muxBgClass}`} />
-  );
+const EmptyCell = memo(function EmptyCell({ muxBgClass }: { muxBgClass: string }) {
+  return <div className={`aspect-square bg-base-300/50 rounded-lg ${muxBgClass}`} />;
 });
 
 export function QubitMetricsGrid({
@@ -306,7 +288,7 @@ export function QubitMetricsGrid({
   );
 
   // View mode state: 'pan-zoom' for DOM with pan/zoom, 'region' for region zoom
-  const [viewMode, setViewMode] = useState<"pan-zoom" | "region">("pan-zoom");
+  const [viewMode, setViewMode] = useState<"pan-zoom" | "region">("region");
   const [regionSelectionEnabled, setRegionSelectionEnabled] = useState(false);
   const [zoomMode, setZoomMode] = useState<"full" | "region">("full");
   const [selectedRegion, setSelectedRegion] = useState<{
@@ -323,57 +305,56 @@ export function QubitMetricsGrid({
   const lodTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Modal state
-  const [selectedQubitInfo, setSelectedQubitInfo] =
-    useState<SelectedQubitInfo | null>(null);
+  const [selectedQubitInfo, setSelectedQubitInfo] = useState<SelectedQubitInfo | null>(null);
   // Grid layout
   const displayCols = zoomMode === "region" ? regionSize : gridCols;
   const displayRows = zoomMode === "region" ? regionSize : gridRows;
-  const { containerRef, cellSize, isMobile, viewportHeight, gap, padding } =
-    useGridLayout({
-      cols: displayCols,
-      rows: displayRows,
-      reservedHeight: { mobile: 300, desktop: 350 },
-      deps: [metricData],
-    });
+  const { containerRef, cellSize, isMobile, viewportHeight, gap, padding } = useGridLayout({
+    cols: displayCols,
+    rows: displayRows,
+    reservedHeight: { mobile: 300, desktop: 350 },
+    deps: [metricData],
+  });
 
   const isModalOpen = selectedQubitInfo !== null;
 
   const numRegions = Math.floor(effectiveGridSize / regionSize);
   const isSquareGrid = gridRows === gridCols;
 
+  // Region tab is only available for square grids; fall back to pan-zoom otherwise.
+  useEffect(() => {
+    if (!isSquareGrid && viewMode === "region") {
+      setViewMode("pan-zoom");
+    }
+  }, [isSquareGrid, viewMode]);
+
   // Debounced LOD update to avoid excessive re-renders during zoom
-  const handleTransform = useCallback(
-    (_: unknown, state: { scale: number }) => {
-      if (lodTimeoutRef.current) {
-        clearTimeout(lodTimeoutRef.current);
-      }
-      lodTimeoutRef.current = setTimeout(() => {
-        const scale = state.scale;
-        const newLod = scale >= 0.9 ? "high" : scale >= 0.6 ? "medium" : "low";
-        setLodLevel((prev) => (prev !== newLod ? newLod : prev));
-      }, 100);
-    },
-    [],
-  );
+  const handleTransform = useCallback((_: unknown, state: { scale: number }) => {
+    if (lodTimeoutRef.current) {
+      clearTimeout(lodTimeoutRef.current);
+    }
+    lodTimeoutRef.current = setTimeout(() => {
+      const scale = state.scale;
+      const newLod = scale >= 0.9 ? "high" : scale >= 0.6 ? "medium" : "low";
+      setLodLevel((prev) => (prev !== newLod ? newLod : prev));
+    }, 100);
+  }, []);
 
   // Color interpolation
-  const interpolateColor = useCallback(
-    (color1: string, color2: string, factor: number): string => {
-      const c1 = parseInt(color1.slice(1), 16);
-      const c2 = parseInt(color2.slice(1), 16);
-      const r1 = (c1 >> 16) & 0xff,
-        g1 = (c1 >> 8) & 0xff,
-        b1 = c1 & 0xff;
-      const r2 = (c2 >> 16) & 0xff,
-        g2 = (c2 >> 8) & 0xff,
-        b2 = c2 & 0xff;
-      const r = Math.round(r1 + (r2 - r1) * factor);
-      const g = Math.round(g1 + (g2 - g1) * factor);
-      const b = Math.round(b1 + (b2 - b1) * factor);
-      return `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`;
-    },
-    [],
-  );
+  const interpolateColor = useCallback((color1: string, color2: string, factor: number): string => {
+    const c1 = parseInt(color1.slice(1), 16);
+    const c2 = parseInt(color2.slice(1), 16);
+    const r1 = (c1 >> 16) & 0xff,
+      g1 = (c1 >> 8) & 0xff,
+      b1 = c1 & 0xff;
+    const r2 = (c2 >> 16) & 0xff,
+      g2 = (c2 >> 8) & 0xff,
+      b2 = c2 & 0xff;
+    const r = Math.round(r1 + (r2 - r1) * factor);
+    const g = Math.round(g1 + (g2 - g1) * factor);
+    const b = Math.round(b1 + (b2 - b1) * factor);
+    return `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`;
+  }, []);
 
   // Get color for value
   const getColor = useCallback(
@@ -382,10 +363,8 @@ export function QubitMetricsGrid({
       const { colors } = colorScale;
       if (colors.length === 0) return null;
 
-      const effectiveMin =
-        colorScale.min === 0 && colorScale.max === 0 ? autoMin : colorScale.min;
-      const effectiveMax =
-        colorScale.min === 0 && colorScale.max === 0 ? autoMax : colorScale.max;
+      const effectiveMin = colorScale.min === 0 && colorScale.max === 0 ? autoMin : colorScale.min;
+      const effectiveMax = colorScale.min === 0 && colorScale.max === 0 ? autoMax : colorScale.max;
 
       if (effectiveMin === effectiveMax) return colors[colors.length - 1];
 
@@ -549,9 +528,7 @@ export function QubitMetricsGrid({
               showValues={showValues}
               showUnits={showUnits}
               cellSize={displayCellSize}
-              onClick={() =>
-                cell.metric && handleCellClick(cell.qid!, cell.metric)
-              }
+              onClick={() => cell.metric && handleCellClick(cell.qid!, cell.metric)}
             />
           );
         })}
@@ -576,23 +553,14 @@ export function QubitMetricsGrid({
                 const numMuxCols = Math.ceil(displayCols / muxSize);
                 const muxLocalRow = Math.floor(idx / numMuxCols);
                 const muxLocalCol = idx % numMuxCols;
-                const muxActualRow =
-                  Math.floor(displayGridStart.row / muxSize) + muxLocalRow;
-                const muxActualCol =
-                  Math.floor(displayGridStart.col / muxSize) + muxLocalCol;
+                const muxActualRow = Math.floor(displayGridStart.row / muxSize) + muxLocalRow;
+                const muxActualCol = Math.floor(displayGridStart.col / muxSize) + muxLocalCol;
                 const muxIndex =
-                  muxActualRow * Math.floor(effectiveGridSize / muxSize) +
-                  muxActualCol;
+                  muxActualRow * Math.floor(effectiveGridSize / muxSize) + muxActualCol;
                 const startCol = muxLocalCol * muxSize + 1;
                 const startRow = muxLocalRow * muxSize + 1;
-                const spanCols = Math.min(
-                  muxSize,
-                  displayCols - muxLocalCol * muxSize,
-                );
-                const spanRows = Math.min(
-                  muxSize,
-                  displayRows - muxLocalRow * muxSize,
-                );
+                const spanCols = Math.min(muxSize, displayCols - muxLocalCol * muxSize);
+                const spanRows = Math.min(muxSize, displayRows - muxLocalRow * muxSize);
                 if (spanCols <= 0 || spanRows <= 0) return null;
 
                 return (
@@ -618,62 +586,54 @@ export function QubitMetricsGrid({
         )}
 
         {/* Region selection overlay */}
-        {zoomMode === "full" &&
-          regionSelectionEnabled &&
-          isSquareGrid &&
-          viewMode === "region" && (
+        {zoomMode === "full" && regionSelectionEnabled && isSquareGrid && viewMode === "region" && (
+          <div
+            className="absolute inset-0 pointer-events-none z-20"
+            style={{ padding: `${padding / 2}px` }}
+          >
             <div
-              className="absolute inset-0 pointer-events-none z-20"
-              style={{ padding: `${padding / 2}px` }}
+              className="grid w-full h-full"
+              style={{
+                gap: `${gap}px`,
+                gridTemplateColumns: `repeat(${displayCols}, minmax(${displayCellSize}px, 1fr))`,
+                gridTemplateRows: `repeat(${displayRows}, minmax(${displayCellSize}px, 1fr))`,
+              }}
             >
-              <div
-                className="grid w-full h-full"
-                style={{
-                  gap: `${gap}px`,
-                  gridTemplateColumns: `repeat(${displayCols}, minmax(${displayCellSize}px, 1fr))`,
-                  gridTemplateRows: `repeat(${displayRows}, minmax(${displayCellSize}px, 1fr))`,
-                }}
-              >
-                {Array.from({ length: numRegions * numRegions }).map(
-                  (_, index) => {
-                    const regionRow = Math.floor(index / numRegions);
-                    const regionCol = index % numRegions;
-                    const isHovered =
-                      hoveredRegion?.row === regionRow &&
-                      hoveredRegion?.col === regionCol;
+              {Array.from({ length: numRegions * numRegions }).map((_, index) => {
+                const regionRow = Math.floor(index / numRegions);
+                const regionCol = index % numRegions;
+                const isHovered =
+                  hoveredRegion?.row === regionRow && hoveredRegion?.col === regionCol;
 
-                    return (
-                      <button
-                        key={index}
-                        className={`pointer-events-auto transition-colors duration-200 rounded-lg flex items-center justify-center ${
-                          isHovered
-                            ? "bg-primary/30 border-2 border-primary shadow-lg z-10"
-                            : "bg-primary/5 border-2 border-primary/20 hover:border-primary/40 hover:bg-primary/10"
-                        }`}
-                        style={{
-                          gridColumn: `${regionCol * regionSize + 1} / span ${regionSize}`,
-                          gridRow: `${regionRow * regionSize + 1} / span ${regionSize}`,
-                        }}
-                        onMouseEnter={() =>
-                          setHoveredRegion({ row: regionRow, col: regionCol })
-                        }
-                        onMouseLeave={() => setHoveredRegion(null)}
-                        onClick={() => {
-                          setSelectedRegion({ row: regionRow, col: regionCol });
-                          setZoomMode("region");
-                        }}
-                        title={`Zoom to region (${regionRow + 1}, ${regionCol + 1})`}
-                      >
-                        <span className="text-xs font-bold text-white bg-black/50 px-2 py-1 rounded">
-                          {regionRow},{regionCol}
-                        </span>
-                      </button>
-                    );
-                  },
-                )}
-              </div>
+                return (
+                  <button
+                    key={index}
+                    className={`pointer-events-auto transition-colors duration-200 rounded-lg flex items-center justify-center ${
+                      isHovered
+                        ? "bg-primary/30 border-2 border-primary shadow-lg z-10"
+                        : "bg-primary/5 border-2 border-primary/20 hover:border-primary/40 hover:bg-primary/10"
+                    }`}
+                    style={{
+                      gridColumn: `${regionCol * regionSize + 1} / span ${regionSize}`,
+                      gridRow: `${regionRow * regionSize + 1} / span ${regionSize}`,
+                    }}
+                    onMouseEnter={() => setHoveredRegion({ row: regionRow, col: regionCol })}
+                    onMouseLeave={() => setHoveredRegion(null)}
+                    onClick={() => {
+                      setSelectedRegion({ row: regionRow, col: regionCol });
+                      setZoomMode("region");
+                    }}
+                    title={`Zoom to region (${regionRow + 1}, ${regionCol + 1})`}
+                  >
+                    <span className="text-xs font-bold text-white bg-black/50 px-2 py-1 rounded">
+                      {regionRow},{regionCol}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
-          )}
+          </div>
+        )}
       </div>
     ),
     [
@@ -710,6 +670,15 @@ export function QubitMetricsGrid({
       {/* View Mode Toggle */}
       <div className="flex items-center gap-4">
         <div className="tabs tabs-boxed bg-base-200 w-fit">
+          {isSquareGrid && (
+            <button
+              className={`tab gap-2 ${viewMode === "region" ? "tab-active" : ""}`}
+              onClick={() => setViewMode("region")}
+            >
+              <Maximize2 className="h-4 w-4" />
+              <span className="hidden sm:inline">Region</span>
+            </button>
+          )}
           <button
             className={`tab gap-2 ${viewMode === "pan-zoom" ? "tab-active" : ""}`}
             onClick={() => {
@@ -722,22 +691,10 @@ export function QubitMetricsGrid({
             <Move className="h-4 w-4" />
             <span className="hidden sm:inline">DOM</span>
           </button>
-          {isSquareGrid && (
-            <button
-              className={`tab gap-2 ${viewMode === "region" ? "tab-active" : ""}`}
-              onClick={() => setViewMode("region")}
-            >
-              <Maximize2 className="h-4 w-4" />
-              <span className="hidden sm:inline">Region</span>
-            </button>
-          )}
         </div>
 
         {viewMode === "region" && zoomMode === "full" && isSquareGrid && (
-          <RegionZoomToggle
-            enabled={regionSelectionEnabled}
-            onToggle={setRegionSelectionEnabled}
-          />
+          <RegionZoomToggle enabled={regionSelectionEnabled} onToggle={setRegionSelectionEnabled} />
         )}
       </div>
 
@@ -780,12 +737,13 @@ export function QubitMetricsGrid({
             initialScale={1}
             minScale={0.3}
             maxScale={4}
-            wheel={{ step: 0.08, smoothStep: 0.004 }}
+            wheel={{ step: 0.08 }}
             pinch={{ step: 5 }}
             doubleClick={{ mode: "zoomIn", step: 0.7 }}
             panning={{ velocityDisabled: false }}
             smooth={true}
-            onTransformed={handleTransform}
+            centerOnInit={true}
+            onTransform={handleTransform}
           >
             <ZoomControls />
             <TransformComponent

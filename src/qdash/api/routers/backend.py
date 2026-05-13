@@ -4,6 +4,7 @@ import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends
+
 from qdash.api.dependencies import get_backend_repository
 from qdash.api.lib.project import (
     ProjectContext,

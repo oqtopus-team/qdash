@@ -3,6 +3,7 @@ from typing import Any, ClassVar
 from bunnet import Document
 from pydantic import ConfigDict, Field
 from pymongo import ASCENDING, IndexModel
+
 from qdash.datamodel.note import NoteModel
 from qdash.datamodel.qubit import QubitModel
 from qdash.datamodel.system_info import SystemInfoModel
@@ -79,10 +80,19 @@ class QubitDocument(Document):
         qid: str,
         chip_id: str,
         output_parameters: dict[str, Any],
-        project_id: str,
+        project_id: str | None,
     ) -> "QubitDocument":
         """Update the QubitDocument's calibration data with new values."""
-        qubit_doc = cls.find_one({"username": username, "qid": qid, "chip_id": chip_id}).run()
+        query: dict[str, Any] = {"qid": qid, "chip_id": chip_id}
+        if project_id:
+            query["project_id"] = project_id
+            qubit_doc = cls.find_one(query).run()
+        else:
+            qubit_doc = None
+
+        if qubit_doc is None:
+            qubit_doc = cls.find_one({"username": username, "qid": qid, "chip_id": chip_id}).run()
+
         if qubit_doc is None:
             raise ValueError(f"Qubit {qid} not found in chip {chip_id}")
         # Merge new calibration data into the existing data

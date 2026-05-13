@@ -14,10 +14,7 @@ import {
 } from "lucide-react";
 
 import { ChipSelector } from "@/components/selectors/ChipSelector";
-import {
-  useCompareSeedValues,
-  useImportSeedParameters,
-} from "@/client/calibration/calibration";
+import { useCompareSeedValues, useImportSeedParameters } from "@/client/calibration/calibration";
 import type { SeedImportSource } from "@/schemas";
 
 // Status badge colors
@@ -65,9 +62,7 @@ interface CompareData {
 export function SeedParametersPanel() {
   const [selectedChip, setSelectedChip] = useState<string>("");
   const [expandedParams, setExpandedParams] = useState<Set<string>>(new Set());
-  const [selectedQubits, setSelectedQubits] = useState<
-    Record<string, Set<string>>
-  >({});
+  const [selectedQubits, setSelectedQubits] = useState<Record<string, Set<string>>>({});
   const [confirmDialog, setConfirmDialog] = useState<{
     open: boolean;
     mode: "all" | "selected";
@@ -143,18 +138,15 @@ export function SeedParametersPanel() {
   }, []);
 
   // Select all non-same qubits in a parameter
-  const selectAllInParam = useCallback(
-    (paramName: string, paramData: ParameterData) => {
-      const qidsToSelect = Object.entries(paramData.qubits)
-        .filter(([, q]) => q.status !== "same")
-        .map(([qid]) => qid);
-      setSelectedQubits((prev) => ({
-        ...prev,
-        [paramName]: new Set(qidsToSelect),
-      }));
-    },
-    [],
-  );
+  const selectAllInParam = useCallback((paramName: string, paramData: ParameterData) => {
+    const qidsToSelect = Object.entries(paramData.qubits)
+      .filter(([, q]) => q.status !== "same")
+      .map(([qid]) => qid);
+    setSelectedQubits((prev) => ({
+      ...prev,
+      [paramName]: new Set(qidsToSelect),
+    }));
+  }, []);
 
   // Clear selection for a parameter
   const clearParamSelection = useCallback((paramName: string) => {
@@ -166,10 +158,7 @@ export function SeedParametersPanel() {
 
   // Get total selected count
   const selectedCount = useMemo(() => {
-    return Object.values(selectedQubits).reduce(
-      (sum, set) => sum + set.size,
-      0,
-    );
+    return Object.values(selectedQubits).reduce((sum, set) => sum + set.size, 0);
   }, [selectedQubits]);
 
   // Count items that would be overwritten for a given mode
@@ -284,17 +273,14 @@ export function SeedParametersPanel() {
               onClick={() => refetch()}
               disabled={isRefetching}
             >
-              <RefreshCw
-                className={`h-4 w-4 ${isRefetching ? "animate-spin" : ""}`}
-              />
+              <RefreshCw className={`h-4 w-4 ${isRefetching ? "animate-spin" : ""}`} />
               Refresh
             </button>
           )}
         </div>
 
         <p className="text-sm text-base-content/70 mb-4">
-          Compare and import initial calibration parameters from qubex YAML
-          files.
+          Compare and import initial calibration parameters from qubex YAML files.
         </p>
 
         {/* Chip Selection */}
@@ -302,10 +288,7 @@ export function SeedParametersPanel() {
           <label className="label">
             <span className="label-text">Target Chip</span>
           </label>
-          <ChipSelector
-            selectedChip={selectedChip}
-            onChipSelect={setSelectedChip}
-          />
+          <ChipSelector selectedChip={selectedChip} onChipSelect={setSelectedChip} />
         </div>
 
         {/* Loading State */}
@@ -335,8 +318,7 @@ export function SeedParametersPanel() {
           <div className="alert alert-success mb-4">
             <Check className="h-5 w-5" />
             <span>
-              Imported {importMutation.data?.data?.imported_count} parameters
-              successfully
+              Imported {importMutation.data?.data?.imported_count} parameters successfully
             </span>
           </div>
         )}
@@ -374,9 +356,7 @@ export function SeedParametersPanel() {
                       )}
                       <span className="font-medium">{paramName}</span>
                       {paramData.unit && (
-                        <span className="text-xs text-base-content/50">
-                          ({paramData.unit})
-                        </span>
+                        <span className="text-xs text-base-content/50">({paramData.unit})</span>
                       )}
                     </div>
                     <div className="flex items-center gap-2">
@@ -430,44 +410,36 @@ export function SeedParametersPanel() {
                             </tr>
                           </thead>
                           <tbody>
-                            {Object.entries(paramData.qubits).map(
-                              ([qid, qubitData]) => (
-                                <tr
-                                  key={qid}
-                                  className={
-                                    qubitData.status === "same"
-                                      ? "opacity-50"
-                                      : ""
-                                  }
-                                >
-                                  <td>
-                                    <input
-                                      type="checkbox"
-                                      className="checkbox checkbox-xs"
-                                      checked={paramSelected.has(qid)}
-                                      disabled={qubitData.status === "same"}
-                                      onChange={() =>
-                                        toggleQubit(paramName, qid)
-                                      }
-                                    />
-                                  </td>
-                                  <td className="font-mono">{qid}</td>
-                                  <td className="font-mono text-xs">
-                                    {formatValue(qubitData.yaml_value)}
-                                  </td>
-                                  <td className="font-mono text-xs">
-                                    {formatValue(qubitData.qdash_value)}
-                                  </td>
-                                  <td>
-                                    <span
-                                      className={`badge badge-xs ${STATUS_STYLES[qubitData.status]}`}
-                                    >
-                                      {STATUS_LABELS[qubitData.status]}
-                                    </span>
-                                  </td>
-                                </tr>
-                              ),
-                            )}
+                            {Object.entries(paramData.qubits).map(([qid, qubitData]) => (
+                              <tr
+                                key={qid}
+                                className={qubitData.status === "same" ? "opacity-50" : ""}
+                              >
+                                <td>
+                                  <input
+                                    type="checkbox"
+                                    className="checkbox checkbox-xs"
+                                    checked={paramSelected.has(qid)}
+                                    disabled={qubitData.status === "same"}
+                                    onChange={() => toggleQubit(paramName, qid)}
+                                  />
+                                </td>
+                                <td className="font-mono">{qid}</td>
+                                <td className="font-mono text-xs">
+                                  {formatValue(qubitData.yaml_value)}
+                                </td>
+                                <td className="font-mono text-xs">
+                                  {formatValue(qubitData.qdash_value)}
+                                </td>
+                                <td>
+                                  <span
+                                    className={`badge badge-xs ${STATUS_STYLES[qubitData.status]}`}
+                                  >
+                                    {STATUS_LABELS[qubitData.status]}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
                           </tbody>
                         </table>
                       </div>
@@ -517,10 +489,7 @@ export function SeedParametersPanel() {
                 className="dropdown-content z-[1] menu p-2 shadow bg-base-100 rounded-box w-56"
               >
                 <li>
-                  <button
-                    onClick={() => requestImport("all")}
-                    disabled={importMutation.isPending}
-                  >
+                  <button onClick={() => requestImport("all")} disabled={importMutation.isPending}>
                     Import All New/Different ({counts.new + counts.different})
                   </button>
                 </li>
@@ -547,14 +516,11 @@ export function SeedParametersPanel() {
                   <h3 className="font-bold text-lg">Confirm Overwrite</h3>
                   <p className="py-4">
                     This will overwrite{" "}
-                    <span className="font-bold text-warning">
-                      {confirmDialog.diffCount}
-                    </span>{" "}
+                    <span className="font-bold text-warning">{confirmDialog.diffCount}</span>{" "}
                     existing calibration value(s) with YAML seed values.
                   </p>
                   <p className="text-sm text-base-content/70">
-                    Existing measured values will be replaced. This action
-                    cannot be undone.
+                    Existing measured values will be replaced. This action cannot be undone.
                   </p>
                 </div>
               </div>

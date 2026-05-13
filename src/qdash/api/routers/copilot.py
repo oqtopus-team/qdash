@@ -18,16 +18,30 @@ from fastapi.responses import Response, StreamingResponse
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
-from qdash.api.dependencies import get_copilot_data_service  # noqa: TCH002
+from qdash.api.dependencies import (
+    get_copilot_chat_session_service,
+    get_copilot_runtime,
+)
 from qdash.api.lib.ai_labels import STATUS_LABELS, TOOL_LABELS
-from qdash.api.lib.copilot_analysis import (
+from qdash.api.lib.auth import get_current_active_user
+from qdash.api.lib.sse import SSETaskBridge, sse_event
+from qdash.api.schemas.auth import User
+from qdash.api.schemas.copilot_chat_session import (
+    CopilotChatSessionResponse,
+    CreateCopilotChatSessionRequest,
+    ListCopilotChatSessionsResponse,
+    UpdateCopilotChatSessionRequest,
+)
+from qdash.api.services.copilot_chat_session_service import (
+    CopilotChatSessionService,
+)
+from qdash.common.copilot.config import CopilotConfig, ModelConfig, load_copilot_config
+from qdash.common.copilot.contracts import (
     AnalysisResponse,
     AnalyzeRequest,
     ChatRequest,
 )
-from qdash.api.lib.copilot_config import CopilotConfig, load_copilot_config
-from qdash.api.lib.sse import SSETaskBridge, sse_event
-from qdash.api.services.copilot_data_service import CopilotDataService
+from qdash.common.copilot.runtime import CopilotRuntime
 from qdash.datamodel.task_knowledge import get_task_knowledge
 
 router = APIRouter()
@@ -40,6 +54,27 @@ def _config_with_request_model(config: CopilotConfig, request: AnalyzeRequest) -
     if request.analysis_model_override is None:
         return config
     return config.model_copy(update={"analysis_model": request.analysis_model_override})
+
+
+def _resolve_chat_model(config: CopilotConfig, override: ModelConfig | None) -> ModelConfig | None:
+    """Pick the chat model to use for a request.
+
+    Priority: per-request override > first entry of `chat_models` > None (caller
+    uses ``config.model`` as-is).
+    """
+    if override is not None:
+        return override
+    if config.chat_models:
+        return config.chat_models[0]
+    return None
+
+
+def _config_with_chat_model(config: CopilotConfig, request: ChatRequest) -> CopilotConfig:
+    """Apply the resolved chat model to ``config.model`` for this request."""
+    resolved = _resolve_chat_model(config, request.chat_model_override)
+    if resolved is None:
+        return config
+    return config.model_copy(update={"model": resolved})
 
 
 @router.get(
@@ -87,7 +122,7 @@ def get_expected_image(task_name: str, index: int) -> Response:
 )
 async def analyze_task_result(
     request: AnalyzeRequest,
-    copilot_data_service: Annotated[CopilotDataService, Depends(get_copilot_data_service)],
+    copilot_runtime: Annotated[CopilotRuntime, Depends(get_copilot_runtime)],
 ) -> dict[str, Any]:
     """Analyze a calibration task result using LLM.
 
@@ -111,7 +146,7 @@ async def analyze_task_result(
     analysis_config = _config_with_request_model(config, request)
 
     # Build analysis context (resolves knowledge, qubit params, images, etc.)
-    ctx = copilot_data_service.build_analysis_context(
+    ctx = copilot_runtime.build_analysis_context(
         task_name=request.task_name,
         chip_id=request.chip_id,
         qid=request.qid,
@@ -121,11 +156,11 @@ async def analyze_task_result(
     )
 
     # Build tool executors for function calling
-    tool_executors = copilot_data_service.build_tool_executors()
+    tool_executors = copilot_runtime.build_tool_executors()
 
     # Run the analysis agent
     try:
-        from qdash.api.lib.copilot_agent import run_analysis
+        from qdash.common.copilot.agent import run_analysis
 
         result = await run_analysis(
             context=ctx.context,
@@ -136,7 +171,7 @@ async def analyze_task_result(
             conversation_history=request.conversation_history,
             tool_executors=tool_executors,
         )
-        result["images_sent"] = CopilotDataService.build_images_sent_metadata(
+        result["images_sent"] = CopilotRuntime.build_images_sent_metadata(
             ctx.image_base64,
             ctx.figure_paths,
             ctx.expected_images,
@@ -156,7 +191,7 @@ async def analyze_task_result(
 @router.post("/analyze/stream", include_in_schema=False)
 async def analyze_task_result_stream(
     request: AnalyzeRequest,
-    copilot_data_service: Annotated[CopilotDataService, Depends(get_copilot_data_service)],
+    copilot_runtime: Annotated[CopilotRuntime, Depends(get_copilot_runtime)],
 ) -> StreamingResponse:
     """SSE streaming version of analyze_task_result.
 
@@ -176,7 +211,7 @@ async def analyze_task_result_stream(
             {"step": "build_context", "message": "分析コンテキストを構築中..."},
         )
         await asyncio.sleep(0)
-        ctx = copilot_data_service.build_analysis_context(
+        ctx = copilot_runtime.build_analysis_context(
             task_name=request.task_name,
             chip_id=request.chip_id,
             qid=request.qid,
@@ -202,11 +237,11 @@ async def analyze_task_result_stream(
 
         # Run analysis with tool progress streaming
         yield sse_event("status", {"step": "run_analysis", "message": "AIが分析中..."})
-        tool_executors = copilot_data_service.build_tool_executors()
+        tool_executors = copilot_runtime.build_tool_executors()
         bridge = SSETaskBridge(tool_labels=TOOL_LABELS, status_labels=STATUS_LABELS)
 
         try:
-            from qdash.api.lib.copilot_agent import run_analysis
+            from qdash.common.copilot.agent import run_analysis
 
             coro = partial(
                 run_analysis,
@@ -240,7 +275,7 @@ async def analyze_task_result_stream(
             return
 
         # Inject images_sent metadata
-        result["images_sent"] = CopilotDataService.build_images_sent_metadata(
+        result["images_sent"] = CopilotRuntime.build_images_sent_metadata(
             ctx.image_base64,
             ctx.figure_paths,
             ctx.expected_images,
@@ -261,7 +296,7 @@ async def analyze_task_result_stream(
 @router.post("/chat/stream", include_in_schema=False)
 async def chat_stream(
     request: ChatRequest,
-    copilot_data_service: Annotated[CopilotDataService, Depends(get_copilot_data_service)],
+    copilot_runtime: Annotated[CopilotRuntime, Depends(get_copilot_runtime)],
 ) -> StreamingResponse:
     """SSE streaming generic chat endpoint.
 
@@ -273,6 +308,7 @@ async def chat_stream(
         if not config.enabled:
             yield sse_event("error", {"step": "init", "detail": "Copilot is not enabled"})
             return
+        chat_config = _config_with_chat_model(config, request)
 
         # Load config and resolve default chip_id
         yield sse_event("status", {"step": "load_config", "message": "設定を読み込み中..."})
@@ -283,7 +319,7 @@ async def chat_stream(
 
         # Resolve default chip_id if not provided
         if not chip_id:
-            chip_id = copilot_data_service.load_default_chip_id()
+            chip_id = copilot_runtime.load_default_chip_id()
 
         # Optionally load qubit params
         qubit_params: dict[str, Any] = {}
@@ -293,20 +329,20 @@ async def chat_stream(
                 {"step": "load_qubit_params", "message": "キュービットパラメータを取得中..."},
             )
             await asyncio.sleep(0)
-            qubit_params = copilot_data_service.load_qubit_params(chip_id, qid)
+            qubit_params = copilot_runtime.load_qubit_params(chip_id, qid)
 
         # Run chat with tool progress streaming
         yield sse_event("status", {"step": "run_chat", "message": "AIが応答中..."})
-        tool_executors = copilot_data_service.build_tool_executors()
+        tool_executors = copilot_runtime.build_tool_executors()
         bridge = SSETaskBridge(tool_labels=TOOL_LABELS, status_labels=STATUS_LABELS)
 
         try:
-            from qdash.api.lib.copilot_agent import run_chat
+            from qdash.common.copilot.agent import run_chat
 
             coro = partial(
                 run_chat,
                 user_message=request.message,
-                config=config,
+                config=chat_config,
                 chip_id=chip_id,
                 qid=qid,
                 qubit_params=qubit_params if qubit_params else None,
@@ -344,3 +380,83 @@ async def chat_stream(
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+@router.get(
+    "/chat/sessions",
+    summary="List the current user's chat sessions",
+    operation_id="listCopilotChatSessions",
+    response_model=ListCopilotChatSessionsResponse,
+)
+def list_copilot_chat_sessions(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    service: Annotated[CopilotChatSessionService, Depends(get_copilot_chat_session_service)],
+) -> ListCopilotChatSessionsResponse:
+    """Return all persisted chat sessions owned by the current user."""
+    return service.list_sessions(username=current_user.username)
+
+
+@router.get(
+    "/chat/sessions/{session_id}",
+    summary="Get a chat session with messages",
+    operation_id="getCopilotChatSession",
+    response_model=CopilotChatSessionResponse,
+)
+def get_copilot_chat_session(
+    session_id: str,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    service: Annotated[CopilotChatSessionService, Depends(get_copilot_chat_session_service)],
+) -> CopilotChatSessionResponse:
+    """Return one chat session including the full message list."""
+    return service.get_session(username=current_user.username, session_id=session_id)
+
+
+@router.post(
+    "/chat/sessions",
+    summary="Create a new chat session",
+    operation_id="createCopilotChatSession",
+    response_model=CopilotChatSessionResponse,
+)
+def create_copilot_chat_session(
+    request: CreateCopilotChatSessionRequest,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    service: Annotated[CopilotChatSessionService, Depends(get_copilot_chat_session_service)],
+) -> CopilotChatSessionResponse:
+    """Create a new chat session owned by the current user."""
+    return service.create_session(username=current_user.username, request=request)
+
+
+@router.patch(
+    "/chat/sessions/{session_id}",
+    summary="Update a chat session",
+    operation_id="updateCopilotChatSession",
+    response_model=CopilotChatSessionResponse,
+)
+def update_copilot_chat_session(
+    session_id: str,
+    request: UpdateCopilotChatSessionRequest,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    service: Annotated[CopilotChatSessionService, Depends(get_copilot_chat_session_service)],
+) -> CopilotChatSessionResponse:
+    """Update title, context, or messages of an existing chat session."""
+    return service.update_session(
+        username=current_user.username,
+        session_id=session_id,
+        request=request,
+    )
+
+
+@router.delete(
+    "/chat/sessions/{session_id}",
+    summary="Delete a chat session",
+    operation_id="deleteCopilotChatSession",
+    response_model=dict[str, bool],
+)
+def delete_copilot_chat_session(
+    session_id: str,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    service: Annotated[CopilotChatSessionService, Depends(get_copilot_chat_session_service)],
+) -> dict[str, bool]:
+    """Delete a chat session owned by the current user."""
+    service.delete_session(username=current_user.username, session_id=session_id)
+    return {"deleted": True}

@@ -1,5 +1,7 @@
 "use client";
 
+import Image from "next/image";
+
 export default function GlobalError({
   reset,
 }: {
@@ -12,16 +14,17 @@ export default function GlobalError({
         <div className="min-h-screen flex items-center justify-center bg-gray-100">
           <div className="text-center px-4">
             <div className="mb-6 opacity-60">
-              <img
+              <Image
                 src="/oqtopus_logo.svg"
                 alt="Oqtopus Logo"
+                width={128}
+                height={128}
+                priority
                 className="w-32 h-32 mx-auto"
               />
             </div>
 
-            <h1 className="text-3xl font-bold text-gray-800 mb-4">
-              Something went wrong
-            </h1>
+            <h1 className="text-3xl font-bold text-gray-800 mb-4">Something went wrong</h1>
 
             <p className="text-gray-600 text-lg max-w-md mx-auto mb-8">
               An unexpected error occurred. Please try again.

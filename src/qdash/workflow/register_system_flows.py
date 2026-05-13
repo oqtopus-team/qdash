@@ -26,9 +26,7 @@ DEPLOYMENT_NAME = "system-single-task"
 
 async def register_system_flows() -> None:
     """Register the single-task-executor deployment via deployment-service."""
-    logger.info(
-        f"Registering system deployment '{DEPLOYMENT_NAME}' " f"via {DEPLOYMENT_SERVICE_URL}"
-    )
+    logger.info(f"Registering system deployment '{DEPLOYMENT_NAME}' via {DEPLOYMENT_SERVICE_URL}")
 
     async with httpx.AsyncClient() as client:
         response = await client.post(

@@ -49,6 +49,7 @@ if TYPE_CHECKING:
     from qdash.workflow.service.targets import Target
 
 from prefect import get_run_logger
+
 from qdash.common.backend_config import get_default_backend
 from qdash.common.datetime_utils import now
 from qdash.workflow.engine import CalibConfig, CalibOrchestrator
@@ -182,12 +183,12 @@ def _cancel_executions_by_flow_run_id(
 
 __all__ = [
     "CalibService",
-    "on_flow_cancellation",
-    "generate_execution_id",
     # Re-exported for backward compatibility (used by strategy.py, two_qubit.py)
     "finish_calibration",
+    "generate_execution_id",
     "get_session",
     "init_calibration",
+    "on_flow_cancellation",
 ]
 
 
@@ -280,7 +281,7 @@ class CalibService:
             enable_github_pull: Whether to pull latest config from GitHub before starting
             enable_github: Enable GitHub integration (default: True). Sets both pull and push.
             github_push_config: Configuration for GitHub push operations
-            muxes: List of MUX IDs for system-level tasks like CheckSkew (default: None)
+            muxes: List of MUX IDs for system-level tasks (default: None)
             project_id: Project ID for multi-tenancy support. If None, auto-resolved
                 from username's default_project_id.
             skip_execution: Skip Execution document creation (for wrapper/parent sessions
@@ -1186,8 +1187,6 @@ class CalibService:
             results["one_qubit_fine_tune"] = ctx.one_qubit_fine_tune
         if ctx.two_qubit is not None:
             results["two_qubit"] = ctx.two_qubit
-        if ctx.skew_check is not None:
-            results["skew_check"] = ctx.skew_check
         if ctx.filters:
             results["filters"] = ctx.filters
         if ctx.metadata:

@@ -3,7 +3,8 @@ from typing import Any, ClassVar
 from bunnet import Document
 from pydantic import ConfigDict, Field
 from pymongo import ASCENDING, DESCENDING, IndexModel
-from qdash.common.datetime_utils import now
+
+from qdash.common.datetime_utils import local_now
 from qdash.datamodel.qubit import QubitModel
 from qdash.datamodel.system_info import SystemInfoModel
 from qdash.dbmodel.user import UserDocument
@@ -39,7 +40,7 @@ class QubitHistoryDocument(Document):
     )
     system_info: SystemInfoModel = Field(..., description="The system information")
     recorded_date: str = Field(
-        default_factory=lambda: now().strftime("%Y%m%d"),
+        default_factory=lambda: local_now().strftime("%Y%m%d"),
         description="The date when this history record was created",
     )
 
@@ -90,7 +91,7 @@ class QubitHistoryDocument(Document):
     @classmethod
     def create_history(cls, qubit: QubitModel) -> "QubitHistoryDocument":
         """Create a history record from a QubitDocument."""
-        today = now().strftime("%Y%m%d")
+        today = local_now().strftime("%Y%m%d")
         cooldown_id = cls._resolve_cooldown_id(project_id=qubit.project_id, chip_id=qubit.chip_id)
         username = qubit.username
         if username is None:

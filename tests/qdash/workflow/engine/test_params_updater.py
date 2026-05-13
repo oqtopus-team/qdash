@@ -3,12 +3,13 @@
 import io
 import tempfile
 from pathlib import Path
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
-from qdash.workflow.engine.params_updater import _QubexParamsUpdater
 from ruamel.yaml import YAML
 from ruamel.yaml.comments import CommentedMap
+
+from qdash.workflow.engine.params_updater import _QubexParamsUpdater
 
 
 class TestParamsUpdaterNoneHandling:
@@ -195,6 +196,33 @@ data:
 
         # Should not raise
         updater._update_yaml(nonexistent, "Q00", 10.0)
+
+    def test_extract_value_from_db_parameter_dict(self, updater):
+        """Test DB calibration data dictionaries can be written to params files."""
+        assert updater._extract_value({"value": 0.125, "unit": "a.u."}) == 0.125
+
+    def test_preconnect_label_resolution_uses_chip_metadata(self, tmp_path):
+        """Test qid labels can be resolved before Qubex Experiment connects."""
+        params_dir = tmp_path / "params"
+        params_dir.mkdir()
+        (params_dir / "control_amplitude.yaml").write_text("data:\n  Q047: 0.1\n")
+
+        backend = MagicMock()
+        backend.config = {
+            "project_id": "project-1",
+            "chip_id": "144Qv1",
+            "params_dir": str(params_dir),
+        }
+        backend.get_instance.side_effect = AssertionError("should not connect")
+        updater = _QubexParamsUpdater(backend, chip_id="144Qv1")
+
+        with patch(
+            "qdash.common.qubit_utils._get_chip_size",
+            return_value=144,
+        ):
+            updater.update("47", {"control_amplitude": {"value": 0.25}})
+
+        assert "Q047: 0.25" in (params_dir / "control_amplitude.yaml").read_text()
 
     def test_insert_ordered_between_existing(self, updater, yaml_file):
         """Test that new qubit is inserted in correct order."""

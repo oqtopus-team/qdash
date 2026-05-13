@@ -19,9 +19,9 @@ if __name__ == "__main__":
     os.makedirs("/app/logs", exist_ok=True)
 
     # Run setup scripts then start the worker (all arguments are hardcoded)
-    subprocess.run([sys.executable, "setup_work_pool.py"], check=True)  # noqa: S603
-    subprocess.run([sys.executable, "register_system_flows.py"], check=True)  # noqa: S603
-    subprocess.run(  # noqa: S603
+    subprocess.run([sys.executable, "setup_work_pool.py"], check=True)
+    subprocess.run([sys.executable, "register_system_flows.py"], check=True)
+    subprocess.run(
         ["prefect", "worker", "start", "--pool", "user-flows-pool"],  # noqa: S607
         check=True,
     )

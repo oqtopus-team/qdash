@@ -3,14 +3,17 @@ from __future__ import annotations
 import zipfile
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import patch
 
-from qdash.api.lib.copilot_config import AnalysisConfig, CopilotConfig, ModelConfig
 from qdash.api.services.task_result_service import TaskResultService
+from qdash.common.copilot.config import AnalysisConfig, CopilotConfig, ModelConfig
+from qdash.common.datetime_utils import end_of_day, parse_date, start_of_day
 from qdash.datamodel.note import AiTriageReviewModel
 from qdash.datamodel.system_info import SystemInfoModel
-from qdash.repository.protocols import ChipRepository, TaskResultHistoryRepository
+
+if TYPE_CHECKING:
+    from qdash.repository.protocols import ChipRepository, TaskResultHistoryRepository
 
 
 class _TaskResultDoc(SimpleNamespace):
@@ -25,6 +28,12 @@ class _ChipRepo:
         return ["0", "1", "2"]
 
     def get_coupling_ids(self, project_id: str, chip_id: str) -> list[str]:
+        return ["0-1"]
+
+    def get_historical_qubit_ids(self, project_id: str, chip_id: str, date: str) -> list[str]:
+        return ["0", "1"]
+
+    def get_historical_coupling_ids(self, project_id: str, chip_id: str, date: str) -> list[str]:
         return ["0-1"]
 
 
@@ -85,8 +94,8 @@ def _ai_triage_config(tasks: list[str] | None = None) -> CopilotConfig:
 
 def _service(repo: _TaskResultRepo) -> TaskResultService:
     return TaskResultService(
-        chip_repository=cast(ChipRepository, _ChipRepo()),
-        task_result_repository=cast(TaskResultHistoryRepository, repo),
+        chip_repository=cast("ChipRepository", _ChipRepo()),
+        task_result_repository=cast("TaskResultHistoryRepository", repo),
     )
 
 
@@ -120,6 +129,7 @@ def test_request_bulk_ai_triage_enqueues_latest_result_per_qid_with_upsert() -> 
         "chip_id": "chip-1",
         "name": "CheckRabi",
         "qid": {"$in": ["0", "1", "2"]},
+        "status": {"$in": ["completed", "failed"]},
     }
     assert enqueue.call_count == 2
     assert enqueue.call_args_list[0].args[0].task_id == "new-q0"
@@ -129,6 +139,26 @@ def test_request_bulk_ai_triage_enqueues_latest_result_per_qid_with_upsert() -> 
     assert repo.docs[0].ai_triage.model_provider == "openai"
     assert repo.docs[0].ai_triage.model_name == "gpt-5.1"
     assert repo.docs[0].saved is True
+
+
+def test_request_bulk_ai_triage_filters_to_terminal_results() -> None:
+    now = datetime(2026, 5, 5, tzinfo=timezone.utc)
+    repo = _TaskResultRepo([_doc("new-q0", "0", now)])
+    service = _service(repo)
+
+    with (
+        patch.object(service, "_load_ai_triage_config", return_value=_ai_triage_config()),
+        patch.object(service, "_enqueue_ai_triage_for_document"),
+    ):
+        service.request_bulk_ai_triage(
+            project_id="proj-1",
+            chip_id="chip-1",
+            task="CheckRabi",
+            entity_type="qubit",
+        )
+
+    assert repo.last_query is not None
+    assert repo.last_query["status"] == {"$in": ["completed", "failed"]}
 
 
 def test_request_bulk_ai_triage_limits_to_selected_task_ids() -> None:
@@ -184,6 +214,33 @@ def test_request_bulk_ai_triage_passes_model_override() -> None:
     assert repo.docs[0].ai_triage.model_name == "claude-sonnet-4.5"
 
 
+def test_request_bulk_ai_triage_historical_date_filters_by_day() -> None:
+    now = datetime(2026, 5, 5, 12, tzinfo=timezone.utc)
+    repo = _TaskResultRepo([_doc("hist-q0", "0", now)])
+    service = _service(repo)
+
+    with (
+        patch.object(service, "_load_ai_triage_config", return_value=_ai_triage_config()),
+        patch.object(service, "_enqueue_ai_triage_for_document"),
+    ):
+        response = service.request_bulk_ai_triage(
+            project_id="proj-1",
+            chip_id="chip-1",
+            task="CheckRabi",
+            entity_type="qubit",
+            date="20260505",
+        )
+
+    assert response.date == "20260505"
+    assert repo.last_query is not None
+    assert repo.last_query["qid"] == {"$in": ["0", "1"]}
+    parsed_date = parse_date("20260505", "YYYYMMDD")
+    assert repo.last_query["start_at"] == {
+        "$gte": start_of_day(parsed_date),
+        "$lt": end_of_day(parsed_date),
+    }
+
+
 def test_request_bulk_ai_triage_skips_task_not_configured() -> None:
     repo = _TaskResultRepo([])
     service = _service(repo)
@@ -234,6 +291,27 @@ def test_bulk_ai_triage_forced_markdown_marks_missing_f01_as_no_signal() -> None
     assert markdown is not None
     assert "- Decision: `FAIL`" in markdown
     assert "- Human label suggestion: `NO_SIGNAL`" in markdown
+
+
+def test_persist_ai_triage_markdown_marks_empty_content_as_failed() -> None:
+    with (
+        patch.object(TaskResultService, "_set_ai_triage_status") as set_status,
+        patch.object(TaskResultService, "_upsert_ai_triage_note") as upsert,
+    ):
+        TaskResultService._persist_ai_triage_markdown(
+            project_id="proj-1",
+            task_id="task-1",
+            markdown="",
+            selected_model=ModelConfig(provider="openai", name="gpt-5.1"),
+        )
+
+    set_status.assert_called_once_with(
+        "proj-1",
+        "task-1",
+        "failed",
+        error="AI triage returned empty content",
+    )
+    upsert.assert_not_called()
 
 
 def test_create_figures_zip_includes_ai_triage_markdown(tmp_path) -> None:

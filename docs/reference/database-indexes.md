@@ -222,6 +222,46 @@ db.note_event.create_index(
 - `GET /note-events/by-target?scope=&target_id=` — per-target timeline
 - `GET /note-events/search?q=` — cross-chip text search
 
+### MetricNoteDocument
+
+Current-state storage for dashboard metric notes. One row represents one target metric note in one operational scope: explicit cool-down, manual time range, or legacy global scope.
+
+```python
+db.metric_note.create_index(
+    [
+        ("project_id", 1),
+        ("chip_id", 1),
+        ("target_type", 1),
+        ("target_id", 1),
+        ("metric_key", 1),
+        ("scope_key", 1),
+    ],
+    unique=True,
+    name="metric_note_unique_scope_idx",
+)
+db.metric_note.create_index(
+    [
+        ("project_id", 1),
+        ("chip_id", 1),
+        ("scope_key", 1),
+        ("target_type", 1),
+        ("target_id", 1),
+    ],
+    name="metric_note_summary_idx",
+)
+db.metric_note.create_index(
+    [
+        ("project_id", 1),
+        ("chip_id", 1),
+        ("scope_started_at", -1),
+        ("scope_ended_at", -1),
+    ],
+    name="metric_note_time_scope_idx",
+)
+```
+
+**Usage**: `GET /chips/{chip_id}/notes-summary` reads current notes for the requested `cooldown_id` or `start_at`/`end_at`. `PUT/DELETE /chips/{chip_id}/.../metric-notes/{metric_key}` writes the same scoped current-state row and appends an audit event to `note_event`.
+
 ## Performance Impact
 
 Without indexes:

@@ -22,10 +22,7 @@ interface PageFiltersBarProps {
  * </PageFiltersBar>
  * ```
  */
-export function PageFiltersBar({
-  children,
-  className = "",
-}: PageFiltersBarProps) {
+export function PageFiltersBar({ children, className = "" }: PageFiltersBarProps) {
   return (
     <div
       // Enable wrapping to prevent filter controls from overlapping on smaller screens
@@ -47,11 +44,7 @@ interface FilterGroupProps {
 /**
  * Group of filters within the filter bar
  */
-function FilterGroup({
-  children,
-  position = "start",
-  className = "",
-}: FilterGroupProps) {
+function FilterGroup({ children, position = "start", className = "" }: FilterGroupProps) {
   const positionClass = position === "end" ? "md:ml-auto" : "";
 
   return (
@@ -80,9 +73,7 @@ function FilterItem({ children, label, className = "" }: FilterItemProps) {
     <div className={`w-full sm:w-auto ${className}`}>
       {label && (
         <label className="label py-1 sm:hidden">
-          <span className="label-text text-xs text-base-content/60">
-            {label}
-          </span>
+          <span className="label-text text-xs text-base-content/60">{label}</span>
         </label>
       )}
       {children}

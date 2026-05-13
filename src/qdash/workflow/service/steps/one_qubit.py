@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 from prefect import get_run_logger
+
 from qdash.workflow.service.results import OneQubitResult
 from qdash.workflow.service.steps.base import CalibrationStep
 from qdash.workflow.service.tasks import CHECK_1Q_TASKS, FULL_1Q_TASKS_AFTER_CHECK
@@ -334,8 +335,7 @@ class OneQubitFineTune(CalibrationStep):
         qids = ctx.candidate_qids if ctx.candidate_qids else targets.to_qids(service.chip_id)
 
         logger.info(
-            f"[{self.name}] Starting with mode={self.mode}, "
-            f"{len(tasks)} tasks, {len(qids)} qubits"
+            f"[{self.name}] Starting with mode={self.mode}, {len(tasks)} tasks, {len(qids)} qubits"
         )
 
         if not qids:

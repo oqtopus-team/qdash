@@ -1,10 +1,9 @@
-"""2-Qubit calibration and system steps.
+"""2-Qubit calibration steps.
 
-This module defines steps for 2-qubit calibration and system-level tasks:
+This module defines steps for 2-qubit calibration:
 - CustomTwoQubit: Flexible custom 2Q task execution
 - GenerateCRSchedule: CR schedule generation
 - TwoQubitCalibration: Full 2Q calibration
-- CheckSkew: System-level skew check
 """
 
 from __future__ import annotations
@@ -13,8 +12,9 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 from prefect import get_run_logger
+
 from qdash.workflow.engine.backend.qubex_paths import get_qubex_paths
-from qdash.workflow.service.results import SkewCheckResult, TwoQubitResult
+from qdash.workflow.service.results import TwoQubitResult
 from qdash.workflow.service.steps.base import CalibrationStep, TransformStep
 from qdash.workflow.service.tasks import FULL_2Q_TASKS
 
@@ -109,8 +109,7 @@ class CustomTwoQubit(CalibrationStep):
         coupling_groups = [[f"{c}-{t}" for c, t in group] for group in parallel_groups]
         total_pairs = sum(len(g) for g in coupling_groups)
         logger.info(
-            f"[{self.name}] Executing {total_pairs} coupling pairs in "
-            f"{len(coupling_groups)} groups"
+            f"[{self.name}] Executing {total_pairs} coupling pairs in {len(coupling_groups)} groups"
         )
 
         # Execute
@@ -431,8 +430,7 @@ class TwoQubitCalibration(CalibrationStep):
         coupling_groups = [[f"{c}-{t}" for c, t in group] for group in parallel_groups]
         total_pairs = sum(len(g) for g in coupling_groups)
         logger.info(
-            f"[{self.name}] Executing {total_pairs} coupling pairs in "
-            f"{len(coupling_groups)} groups"
+            f"[{self.name}] Executing {total_pairs} coupling pairs in {len(coupling_groups)} groups"
         )
 
         # Execute
@@ -549,69 +547,3 @@ class TwoQubitCalibration(CalibrationStep):
                     coh_param.value if hasattr(coh_param, "value") else coh_param
                 )
         return metrics
-
-
-@dataclass
-class CheckSkew(CalibrationStep):
-    """System-level skew check step.
-
-    Checks timing skew across MUX channels. This is a system-level task
-    that doesn't target specific qubits.
-
-    Note: This step uses execute_task directly with qid="" for system tasks.
-    """
-
-    muxes: list[int] | None = None
-
-    @property
-    def name(self) -> str:
-        return "check_skew"
-
-    @property
-    def provides(self) -> set[str]:
-        return {"skew_check"}
-
-    def execute(
-        self,
-        service: CalibService,
-        targets: Target,
-        ctx: StepContext,
-    ) -> StepContext:
-        """Execute skew check."""
-        logger = get_run_logger()
-
-        muxes = self.muxes
-        if muxes is None:
-            muxes = [0, 1, 2, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
-
-        logger.info(f"[{self.name}] Checking skew for {len(muxes)} MUX channels")
-
-        # Initialize session for system task
-        service._initialize([])
-
-        try:
-            raw_result = service.execute_task(
-                "CheckSkew",
-                qid="",
-                task_details={"CheckSkew": {"muxes": muxes}},
-            )
-
-            ctx.skew_check = SkewCheckResult(
-                passed=True,  # TODO: evaluate actual skew values
-                raw=raw_result,
-            )
-
-            service.finish_calibration()
-        except BaseException as e:
-            from qdash.workflow.service.calib_service import _is_cancellation
-
-            if _is_cancellation(e):
-                logger.info(f"[{self.name}] Cancelled")
-                service.cancel_calibration()
-            else:
-                logger.error(f"[{self.name}] Failed: {e}")
-                service.fail_calibration(str(e))
-            raise
-
-        logger.info(f"[{self.name}] Completed")
-        return ctx

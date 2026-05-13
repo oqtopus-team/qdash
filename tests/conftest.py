@@ -144,6 +144,7 @@ def test_client(init_db):
 
     """
     from fastapi.testclient import TestClient
+
     from qdash.api.main import app
 
     return TestClient(app)

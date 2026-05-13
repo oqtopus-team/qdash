@@ -4,14 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
-import {
-  ArrowLeft,
-  Lock,
-  MessageSquare,
-  Pencil,
-  Trash2,
-  Unlock,
-} from "lucide-react";
+import { ArrowLeft, Lock, MessageSquare, Pencil, Trash2, Unlock } from "lucide-react";
 
 import {
   getGetForumPostQueryKey,
@@ -42,10 +35,7 @@ import { getForumCategory, toForumCategoryDefinition } from "./categories";
 const REPLY_PAGE_SIZE = 100;
 
 function isEdited(createdAt: string, updatedAt: string): boolean {
-  return (
-    Math.abs(new Date(updatedAt).getTime() - new Date(createdAt).getTime()) >
-    1000
-  );
+  return Math.abs(new Date(updatedAt).getTime() - new Date(createdAt).getTime()) > 1000;
 }
 
 function PostBody({
@@ -91,24 +81,16 @@ function PostBody({
           {isAi ? (
             <QdashBotAvatar size={24} />
           ) : (
-            <UserAvatar
-              username={post.username}
-              avatarKey={post.avatar_key}
-              size={24}
-            />
+            <UserAvatar username={post.username} avatarKey={post.avatar_key} size={24} />
           )}
-          <span
-            className={`badge badge-sm ${isAi ? "badge-primary" : "badge-neutral"}`}
-          >
+          <span className={`badge badge-sm ${isAi ? "badge-primary" : "badge-neutral"}`}>
             {post.username}
           </span>
           <span className="text-xs text-base-content/40">
             {formatRelativeTime(post.created_at)}
           </span>
           {isEdited(post.created_at, post.updated_at) && (
-            <span className="text-xs italic text-base-content/30">
-              (edited)
-            </span>
+            <span className="text-xs italic text-base-content/30">(edited)</span>
           )}
         </div>
         {canEdit && !editing && !isAi && (
@@ -157,19 +139,12 @@ function PostBody({
               onClick={onSave}
               disabled={!editContent.trim() || saving}
             >
-              {saving ? (
-                <span className="loading loading-spinner loading-xs" />
-              ) : (
-                "Save"
-              )}
+              {saving ? <span className="loading loading-spinner loading-xs" /> : "Save"}
             </button>
           </div>
         </div>
       ) : (
-        <MarkdownContent
-          content={post.content}
-          className="text-sm text-base-content/80"
-        />
+        <MarkdownContent content={post.content} className="text-sm text-base-content/80" />
       )}
     </div>
   );
@@ -190,24 +165,21 @@ export function ForumDetailPage({ postId }: { postId: string }) {
   const [editReplyContent, setEditReplyContent] = useState("");
   const [replyLimit, setReplyLimit] = useState(REPLY_PAGE_SIZE);
 
-  const { data: postResponse, isLoading: postLoading } = useGetForumPost(
-    postId,
-    { query: { staleTime: 30_000 } },
-  );
+  const { data: postResponse, isLoading: postLoading } = useGetForumPost(postId, {
+    query: { staleTime: 30_000 },
+  });
   const post = postResponse?.data ?? null;
-  const { data: repliesResponse, isLoading: repliesLoading } =
-    useGetForumPostReplies(
-      postId,
-      { skip: 0, limit: replyLimit },
-      { query: { enabled: !!post } },
-    );
+  const { data: repliesResponse, isLoading: repliesLoading } = useGetForumPostReplies(
+    postId,
+    { skip: 0, limit: replyLimit },
+    { query: { enabled: !!post } },
+  );
   const replies = repliesResponse?.data ?? [];
   const { data: categoriesResponse } = useListForumCategories(undefined, {
     query: { staleTime: 60_000 },
   });
   const categories = useMemo(
-    () =>
-      categoriesResponse?.data.categories.map(toForumCategoryDefinition) ?? [],
+    () => categoriesResponse?.data.categories.map(toForumCategoryDefinition) ?? [],
     [categoriesResponse?.data.categories],
   );
 
@@ -217,6 +189,11 @@ export function ForumDetailPage({ postId }: { postId: string }) {
   const mentionCandidates = useMemo(
     () => [
       { id: "qdash", label: "QDash" },
+      {
+        id: "project",
+        label: "Project",
+        secondaryLabel: "Notify all project members",
+      },
       ...(membersResponse?.data.members
         ?.filter((member) => member.username !== currentUsername)
         .map((member) => ({
@@ -353,9 +330,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
                 <CategoryIcon className="h-3 w-3" />
                 {category.label}
               </span>
-              {post.is_closed && (
-                <span className="badge badge-sm badge-ghost">Closed</span>
-              )}
+              {post.is_closed && <span className="badge badge-sm badge-ghost">Closed</span>}
             </div>
             {editingRoot ? (
               <input
@@ -372,12 +347,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
           (post.is_closed ? (
             <button
               className="btn btn-ghost btn-sm gap-1"
-              onClick={() =>
-                reopenMutation.mutate(
-                  { postId },
-                  { onSuccess: invalidateThread },
-                )
-              }
+              onClick={() => reopenMutation.mutate({ postId }, { onSuccess: invalidateThread })}
             >
               <Unlock className="h-3.5 w-3.5" />
               Reopen
@@ -385,12 +355,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
           ) : (
             <button
               className="btn btn-ghost btn-sm gap-1"
-              onClick={() =>
-                closeMutation.mutate(
-                  { postId },
-                  { onSuccess: invalidateThread },
-                )
-              }
+              onClick={() => closeMutation.mutate({ postId }, { onSuccess: invalidateThread })}
             >
               <Lock className="h-3.5 w-3.5" />
               Close
@@ -446,9 +411,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
               <div className="flex justify-center py-2">
                 <button
                   className="btn btn-ghost btn-sm"
-                  onClick={() =>
-                    setReplyLimit((current) => current + REPLY_PAGE_SIZE)
-                  }
+                  onClick={() => setReplyLimit((current) => current + REPLY_PAGE_SIZE)}
                 >
                   Load more
                 </button>
@@ -468,9 +431,7 @@ export function ForumDetailPage({ postId }: { postId: string }) {
             </div>
           </div>
         )}
-        {aiError && (
-          <div className="px-2 py-1 text-xs text-error">{aiError}</div>
-        )}
+        {aiError && <div className="px-2 py-1 text-xs text-error">{aiError}</div>}
       </div>
 
       <div className="ml-4 pb-8 pl-4">

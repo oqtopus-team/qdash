@@ -3,6 +3,7 @@ from typing import Any, ClassVar
 from bunnet import Document
 from pydantic import ConfigDict, Field
 from pymongo import ASCENDING, IndexModel
+
 from qdash.datamodel.coupling import CouplingModel
 from qdash.datamodel.note import NoteModel
 from qdash.datamodel.system_info import SystemInfoModel
@@ -79,10 +80,21 @@ class CouplingDocument(Document):
         qid: str,
         chip_id: str,
         output_parameters: dict[str, Any],
-        project_id: str,
+        project_id: str | None,
     ) -> "CouplingDocument":
         """Update the CouplingDocument's calibration data with new values."""
-        coupling_doc = cls.find_one({"username": username, "qid": qid, "chip_id": chip_id}).run()
+        query: dict[str, Any] = {"qid": qid, "chip_id": chip_id}
+        if project_id:
+            query["project_id"] = project_id
+            coupling_doc = cls.find_one(query).run()
+        else:
+            coupling_doc = None
+
+        if coupling_doc is None:
+            coupling_doc = cls.find_one(
+                {"username": username, "qid": qid, "chip_id": chip_id}
+            ).run()
+
         if coupling_doc is None:
             raise ValueError(f"Coupling {qid} not found in chip {chip_id}")
         coupling_doc.user_id = cls._user_id_for_username(username)

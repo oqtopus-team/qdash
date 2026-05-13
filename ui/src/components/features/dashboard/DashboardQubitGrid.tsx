@@ -5,12 +5,9 @@ import { useMemo, useState } from "react";
 import { StickyNote } from "lucide-react";
 
 import { useTopologyConfig } from "@/hooks/useTopologyConfig";
-import {
-  getQubitGridPosition,
-  type TopologyLayoutParams,
-} from "@/lib/utils/grid-position";
+import { getQubitGridPosition, type TopologyLayoutParams } from "@/lib/utils/grid-position";
 
-import type { NoteEntryWithMetric } from "./ChipNoteEditor";
+import type { NoteEntryWithMetric } from "./MetricNotePanel";
 import { DashboardNoteTooltip } from "./DashboardNoteTooltip";
 
 interface MetricValue {
@@ -56,12 +53,7 @@ function interpolateColor(c1: string, c2: string, factor: number): string {
   return `#${((1 << 24) + (r << 16) + (g << 8) + bl).toString(16).slice(1)}`;
 }
 
-function pickColor(
-  value: number,
-  min: number,
-  max: number,
-  colors: string[],
-): string | null {
+function pickColor(value: number, min: number, max: number, colors: string[]): string | null {
   if (colors.length === 0) return null;
   if (min === max) return colors[colors.length - 1];
   const t = Math.max(0, Math.min(1, (value - min) / (max - min)));
@@ -172,30 +164,17 @@ export function DashboardQubitGrid({
     >
       {cells.map(({ row, col, qid }) => {
         if (qid === undefined) {
-          return (
-            <div
-              key={`${row}-${col}`}
-              className="rounded-md bg-base-300/30 aspect-square"
-            />
-          );
+          return <div key={`${row}-${col}`} className="rounded-md bg-base-300/30 aspect-square" />;
         }
         const metric = metricData?.[qid];
         const value = metric?.value ?? null;
-        const bg =
-          value !== null ? pickColor(value, autoMin, autoMax, colors) : null;
+        const bg = value !== null ? pickColor(value, autoMin, autoMax, colors) : null;
         const hasNote = notedQids?.has(qid) ?? false;
-        const hasCrossMetricNote =
-          !hasNote && (crossMetricNotedQids?.has(qid) ?? false);
+        const hasCrossMetricNote = !hasNote && (crossMetricNotedQids?.has(qid) ?? false);
         const handleClick = () => onQubitClick?.(qid);
         const titleText =
-          (value !== null
-            ? `${qid}: ${value.toFixed(4)} ${unit}`
-            : `${qid}: No data`) +
-          (hasNote
-            ? " · has note"
-            : hasCrossMetricNote
-              ? " · note on other metric"
-              : "") +
+          (value !== null ? `${qid}: ${value.toFixed(4)} ${unit}` : `${qid}: No data`) +
+          (hasNote ? " · has note" : hasCrossMetricNote ? " · note on other metric" : "") +
           (onQubitClick ? " (click to edit note)" : "");
         const Tag = onQubitClick ? "button" : "div";
         return (
@@ -212,9 +191,7 @@ export function DashboardQubitGrid({
             }}
             onMouseLeave={() => setHover(null)}
             className={`aspect-square rounded-md flex flex-col items-center justify-center relative shadow-sm text-left ${
-              onQubitClick
-                ? "cursor-pointer hover:ring-2 hover:ring-primary/60"
-                : ""
+              onQubitClick ? "cursor-pointer hover:ring-2 hover:ring-primary/60" : ""
             }`}
             style={{ backgroundColor: bg ?? undefined }}
             aria-label={titleText}
@@ -247,9 +224,7 @@ export function DashboardQubitGrid({
                 {value.toFixed(2)}
               </span>
             ) : (
-              <span className="text-[10px] text-base-content/40 mt-1.5">
-                N/A
-              </span>
+              <span className="text-[10px] text-base-content/40 mt-1.5">N/A</span>
             )}
           </Tag>
         );
@@ -261,9 +236,7 @@ export function DashboardQubitGrid({
           const others = allNotes.filter((n) => n.metricKey !== metricKey);
           const v = metricData?.[hover.qid]?.value ?? null;
           const header =
-            v !== null
-              ? `Q${hover.qid}: ${v.toFixed(4)} ${unit}`
-              : `Q${hover.qid}: No data`;
+            v !== null ? `Q${hover.qid}: ${v.toFixed(4)} ${unit}` : `Q${hover.qid}: No data`;
           return (
             <DashboardNoteTooltip
               position={{ x: hover.x, y: hover.y }}

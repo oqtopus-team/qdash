@@ -4,6 +4,7 @@ from logging import getLogger
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException
+
 from qdash.api.dependencies import (
     get_calibration_service,
     get_manual_update_service,

@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+from functools import lru_cache
+
 from bunnet import SortDirection
+
 from qdash.dbmodel.note_event import NoteEventDocument
 from qdash.dbmodel.user import UserDocument
 
@@ -11,6 +14,7 @@ class MongoNoteEventRepository:
     """Append + query helpers for NoteEventDocument."""
 
     @staticmethod
+    @lru_cache(maxsize=1024)
     def _user_id_for_username(username: str) -> str | None:
         user = UserDocument.find_one({"username": username}).run()
         return user.user_id if user else None

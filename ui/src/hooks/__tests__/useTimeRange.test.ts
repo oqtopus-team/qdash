@@ -78,9 +78,7 @@ describe("useTimeRange", () => {
       result.current.updateStartAt("2024-01-01T00:00:00.000+09:00");
     });
 
-    expect(result.current.timeRange.startAt).toBe(
-      "2024-01-01T00:00:00.000+09:00",
-    );
+    expect(result.current.timeRange.startAt).toBe("2024-01-01T00:00:00.000+09:00");
     expect(result.current.timeRange.isStartAtLocked).toBe(true);
   });
 
@@ -91,9 +89,7 @@ describe("useTimeRange", () => {
       result.current.updateEndAt("2024-12-31T23:59:59.000+09:00");
     });
 
-    expect(result.current.timeRange.endAt).toBe(
-      "2024-12-31T23:59:59.000+09:00",
-    );
+    expect(result.current.timeRange.endAt).toBe("2024-12-31T23:59:59.000+09:00");
     expect(result.current.timeRange.isEndAtLocked).toBe(true);
   });
 
@@ -108,7 +104,7 @@ describe("useTimeRange", () => {
     });
 
     // Both should update since neither is locked
-    expect(result.current.timeRange.endAt).toContain("13:00:00");
+    expect(result.current.timeRange.endAt).toContain("22:00:00");
   });
 
   it("refreshTimeRange preserves locked start time", () => {
@@ -167,9 +163,7 @@ describe("useTimeRange", () => {
         result.current.toggleEndAtLock();
       });
 
-      expect(result.current.getLockStatusDescription()).toBe(
-        "Both times are fixed",
-      );
+      expect(result.current.getLockStatusDescription()).toBe("Both times are fixed");
     });
 
     it("describes only start locked", () => {

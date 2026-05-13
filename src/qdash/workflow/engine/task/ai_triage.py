@@ -39,6 +39,7 @@ markdown block. Do not put prose before it.
 - Recommended action: ...
 - Optional note: ...
 """
+AI_TRIAGE_ELIGIBLE_STATUSES = frozenset({"completed", "failed"})
 
 _EXECUTOR = ThreadPoolExecutor(max_workers=AI_TRIAGE_WORKERS, thread_name_prefix="ai-triage")
 _IN_FLIGHT_TASK_IDS: set[str] = set()
@@ -74,10 +75,17 @@ def enqueue_ai_triage_note(
                 config.analysis.ai_triage_tasks,
             )
             return
+        if not _is_terminal_ai_triage_result(task):
+            _log_info(
+                "AI triage enqueue skipped: task=%s task_id=%s status=%s non_terminal=true",
+                task.name,
+                task.task_id,
+                _task_status_value(task),
+            )
+            return
         if _is_non_representative_mux_result(task):
             _log_info(
-                "AI triage enqueue skipped: task=%s task_id=%s qid=%s "
-                "non_representative_mux=true",
+                "AI triage enqueue skipped: task=%s task_id=%s qid=%s non_representative_mux=true",
                 task.name,
                 task.task_id,
                 getattr(task, "qid", ""),
@@ -166,6 +174,14 @@ def maybe_attach_ai_triage_note(
                 config.analysis.ai_triage_tasks,
             )
             return
+        if not _is_terminal_ai_triage_result(task):
+            _log_info(
+                "AI triage skipped: task=%s task_id=%s status=%s non_terminal=true",
+                task.name,
+                task.task_id,
+                _task_status_value(task),
+            )
+            return
         if _is_non_representative_mux_result(task):
             _log_info(
                 "AI triage skipped: task=%s task_id=%s qid=%s non_representative_mux=true",
@@ -211,7 +227,7 @@ def _prefect_logger() -> logging.Logger | None:
     try:
         from prefect import get_run_logger
 
-        return cast(logging.Logger, get_run_logger())
+        return cast("logging.Logger", get_run_logger())
     except Exception:
         return None
 
@@ -314,6 +330,17 @@ def _is_non_representative_mux_result(task: BaseTaskResultModel) -> bool:
         return False
 
 
+def _task_status_value(task: BaseTaskResultModel) -> str:
+    """Return the task status as its persisted string value."""
+    status = getattr(task, "status", "")
+    return str(getattr(status, "value", status))
+
+
+def _is_terminal_ai_triage_result(task: BaseTaskResultModel) -> bool:
+    """Return whether this task result is ready for AI triage."""
+    return _task_status_value(task) in AI_TRIAGE_ELIGIBLE_STATUSES
+
+
 def _run_ai_triage(
     task: BaseTaskResultModel,
     execution_model: ExecutionModel,
@@ -321,10 +348,10 @@ def _run_ai_triage(
 ) -> str | None:
     """Run Copilot analysis and return markdown content."""
     from qdash.common.copilot.agent import blocks_to_markdown, run_analysis
-    from qdash.common.copilot.data_service import CopilotDataService
+    from qdash.common.copilot.runtime import CopilotRuntime
 
     config = _ai_triage_config(config)
-    service = CopilotDataService()
+    service = CopilotRuntime()
     ctx = service.build_analysis_context(
         task_name=task.name,
         chip_id=execution_model.chip_id,
@@ -333,6 +360,7 @@ def _run_ai_triage(
         image_base64=None,
         config=config,
     )
+    ctx.context = ctx.context.model_copy(update={"recent_values": [], "history_results": []})
     if forced := _forced_ai_triage_markdown(task.name, ctx.context.output_parameters):
         return forced
     selected_model = _select_analysis_model(config)
@@ -379,8 +407,7 @@ def _upsert_ai_triage_note(
     existing = _get_existing_task_note_content(task, execution_model)
 
     triage_section = (
-        f"{AI_TRIAGE_HEADER}\n\n{_format_review_metadata(model)}\n\n"
-        f"{_truncate_markdown(markdown)}"
+        f"{AI_TRIAGE_HEADER}\n\n{_format_review_metadata(model)}\n\n{_truncate_markdown(markdown)}"
     )
     if AI_TRIAGE_SECTION_RE.search(existing):
         remainder = AI_TRIAGE_SECTION_RE.sub("", existing).strip()

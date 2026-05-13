@@ -1,6 +1,7 @@
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.routing import APIRoute
+
 from qdash.api.db.session import lifespan
 from qdash.api.lib.auth import get_current_active_user
 from qdash.api.middleware.request_id import RequestIdMiddleware
@@ -35,6 +36,7 @@ from qdash.api.routers import (
     task_result,
     topology,
 )
+from qdash.config import get_settings, resolve_api_cors_origins
 
 
 def custom_generate_unique_id(route: APIRoute) -> str:
@@ -74,8 +76,8 @@ app = FastAPI(
     },
 )
 
-
-origins = ["*"]
+app_settings = get_settings()
+origins = resolve_api_cors_origins(app_settings)
 
 app.add_middleware(
     CORSMiddleware,

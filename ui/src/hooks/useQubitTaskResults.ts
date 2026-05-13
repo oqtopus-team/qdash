@@ -9,6 +9,7 @@ import {
   useGetLatestQubitTaskResults,
   useGetHistoricalQubitTaskResults,
 } from "@/client/task-result/task-result";
+import { dateToDateInput } from "@/lib/utils/datetime";
 
 interface UseQubitTaskResultsOptions {
   chipId: string;
@@ -27,9 +28,7 @@ export function useQubitTaskResults({
 }: UseQubitTaskResultsOptions) {
   const isLatest = selectedDate === "latest";
   const canFetch = Boolean(chipId && task);
-  const dateForHistorical = isLatest
-    ? new Date().toISOString().split("T")[0]
-    : selectedDate;
+  const dateForHistorical = isLatest ? dateToDateInput(new Date()) : selectedDate;
 
   // Always call both hooks, but only enable one based on condition
   const latestResult = useGetLatestQubitTaskResults(

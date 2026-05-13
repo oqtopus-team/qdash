@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, Any
 
 from bunnet import SortDirection
 from fastapi import HTTPException
+
 from qdash.analysis.spectroscopy import (
     NUM_RESONATORS,
     PEAK_POSITIONS,
@@ -235,7 +236,7 @@ class ReanalysisService:
             raise HTTPException(
                 status_code=409,
                 detail=(
-                    f"Task result {doc.task_id!r} has no stored figure JSON; " "cannot re-analyze."
+                    f"Task result {doc.task_id!r} has no stored figure JSON; cannot re-analyze."
                 ),
             )
         figure_path = Path(doc.json_figure_path[0])

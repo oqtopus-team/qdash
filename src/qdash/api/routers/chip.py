@@ -10,11 +10,12 @@ import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from qdash.api.dependencies import (  # noqa: TCH002
+
+from qdash.api.dependencies import (
     get_chip_service,
     get_reanalysis_service,
 )
-from qdash.api.lib.project import (  # noqa: TCH002
+from qdash.api.lib.project import (
     ProjectContext,
     get_project_context,
     get_project_context_editor,
@@ -42,8 +43,8 @@ from qdash.api.schemas.reanalysis import (
 )
 from qdash.api.schemas.success import SuccessResponse
 from qdash.api.services.chip_initializer import ChipInitializer
-from qdash.api.services.chip_service import ChipService  # noqa: TCH002
-from qdash.api.services.reanalysis_service import ReanalysisService  # noqa: TCH002
+from qdash.api.services.chip_service import ChipService
+from qdash.api.services.reanalysis_service import ReanalysisService
 
 router = APIRouter()
 

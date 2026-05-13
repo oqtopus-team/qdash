@@ -67,16 +67,16 @@ def add_task(
         # Initialize list if qid doesn't exist (for MUX distribution)
         if qid not in task_result.qubit_tasks:
             task_result.qubit_tasks[qid] = []
-        task_result.qubit_tasks[qid].append(cast(QubitTaskModel, task))
+        task_result.qubit_tasks[qid].append(cast("QubitTaskModel", task))
     elif task_type == TaskTypes.COUPLING:
         # Initialize list if qid doesn't exist
         if qid not in task_result.coupling_tasks:
             task_result.coupling_tasks[qid] = []
-        task_result.coupling_tasks[qid].append(cast(CouplingTaskModel, task))
+        task_result.coupling_tasks[qid].append(cast("CouplingTaskModel", task))
     elif task_type == TaskTypes.GLOBAL:
-        task_result.global_tasks.append(cast(GlobalTaskModel, task))
+        task_result.global_tasks.append(cast("GlobalTaskModel", task))
     elif task_type == TaskTypes.SYSTEM:
-        task_result.system_tasks.append(cast(SystemTaskModel, task))
+        task_result.system_tasks.append(cast("SystemTaskModel", task))
 
 
 def iter_tasks(

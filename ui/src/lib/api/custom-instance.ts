@@ -2,6 +2,8 @@ import Axios, { AxiosHeaders } from "axios";
 
 import type { AxiosRequestConfig, AxiosResponse } from "axios";
 
+import { getAccessToken, getProjectId } from "@/lib/auth/session";
+
 export const AXIOS_INSTANCE = Axios.create({
   // Use /api proxy route (handled by Next.js rewrites)
   // Falls back to direct API URL for backward compatibility
@@ -10,26 +12,18 @@ export const AXIOS_INSTANCE = Axios.create({
 
 // Add request interceptor
 AXIOS_INSTANCE.interceptors.request.use((config) => {
-  // Get token from cookie
-  const token = document.cookie
-    .split("; ")
-    .find((row) => row.startsWith("access_token="))
-    ?.split("=")[1];
+  const token = getAccessToken();
 
   if (token) {
-    // Decode token
-    const decodedToken = decodeURIComponent(token);
-    // Set Authorization: Bearer header
     if (!config.headers) {
       config.headers = new AxiosHeaders();
     }
     if (config.headers instanceof AxiosHeaders) {
-      config.headers.set("Authorization", `Bearer ${decodedToken}`);
-      const projectId = localStorage.getItem("qdash_current_project_id");
+      config.headers.set("Authorization", `Bearer ${token}`);
+      const projectId = getProjectId();
       if (projectId) {
         config.headers.set("X-Project-Id", projectId);
       }
-      console.debug("Setting Authorization header for URL:", config.url);
     }
   }
 

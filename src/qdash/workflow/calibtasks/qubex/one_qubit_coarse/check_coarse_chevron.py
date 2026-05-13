@@ -3,6 +3,8 @@ from typing import ClassVar
 
 import numpy as np
 import plotly.graph_objects as go
+from qubex.measurement.measurement_defaults import DEFAULT_READOUT_DURATION
+
 from qdash.datamodel.task import ParameterModel, RunParameterModel
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
@@ -11,7 +13,6 @@ from qdash.workflow.calibtasks.base import (
 )
 from qdash.workflow.calibtasks.qubex.base import QubexTask
 from qdash.workflow.engine.backend.qubex import QubexBackend
-from qubex.measurement.measurement_defaults import DEFAULT_READOUT_DURATION
 
 DEFAULT_READOUT_AMPLITUDE = 0.2
 DEFAULT_CONTROL_AMPLITUDE = 0.0625
@@ -35,6 +36,7 @@ class CheckCoarseChevron(QubexTask):
         # task then writes back the proper qubit_frequency from fit_detuned_rabi.
         "coarse_qubit_frequency": None,
         "readout_frequency": None,
+        "readout_amplitude": None,
         "control_amplitude": ParameterModel(
             value=DEFAULT_CONTROL_AMPLITUDE, unit="a.u.", description="Control pulse amplitude"
         ),
@@ -99,9 +101,9 @@ class CheckCoarseChevron(QubexTask):
         self.output_parameters["control_amplitude"].value = result.get(
             "control_amplitude_used", DEFAULT_CONTROL_AMPLITUDE
         )
-        ra_param = self.run_parameters.get("readout_amplitude")
-        if ra_param is not None:
-            self.output_parameters["readout_amplitude"].value = ra_param.get_value()
+        self.output_parameters["readout_amplitude"].value = result.get(
+            "readout_amplitude_used", self._get_readout_amplitude_value()
+        )
         output_parameters = self.attach_execution_id(execution_id)
         base_fig = result["fig"][label]
         resonant_freq = result["resonant_frequencies"].get(label)
@@ -120,7 +122,7 @@ class CheckCoarseChevron(QubexTask):
 
         qubit_freq = self.output_parameters["qubit_frequency"].value
         if qubit_freq is not None and qubit_freq < 3.0:
-            error_msg = f"Qubit frequency too low for qid={qid}: " f"{qubit_freq:.6f} GHz < 3.0 GHz"
+            error_msg = f"Qubit frequency too low for qid={qid}: {qubit_freq:.6f} GHz < 3.0 GHz"
             print(f"[ERROR] {error_msg}")
             return PostProcessResult(
                 output_parameters=output_parameters,
@@ -139,8 +141,7 @@ class CheckCoarseChevron(QubexTask):
         assert readout_frequency is not None
         assert qubit_frequency is not None
 
-        ra_param = self.run_parameters.get("readout_amplitude")
-        readout_amp = ra_param.get_value() if ra_param is not None else DEFAULT_READOUT_AMPLITUDE
+        readout_amp = self._get_readout_amplitude_value()
 
         ca_param = self.input_parameters.get("control_amplitude")
         ctrl_amp_value = ca_param.value if ca_param is not None else DEFAULT_CONTROL_AMPLITUDE
@@ -178,4 +179,5 @@ class CheckCoarseChevron(QubexTask):
 
         self.save_calibration(backend)
         result["control_amplitude_used"] = ctrl_amp_value
+        result["readout_amplitude_used"] = readout_amp
         return RunResult(raw_result=result)

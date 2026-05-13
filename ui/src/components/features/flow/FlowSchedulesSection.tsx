@@ -35,11 +35,7 @@ function ScheduleRow({ schedule }: { schedule: FlowScheduleSummary }) {
           <div className="truncate font-semibold">{schedule.flow_name}</div>
           <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-base-content/60">
             <span>{formatScheduleType(schedule)}</span>
-            <span
-              className={`badge badge-xs ${
-                schedule.active ? "badge-success" : "badge-ghost"
-              }`}
-            >
+            <span className={`badge badge-xs ${schedule.active ? "badge-success" : "badge-ghost"}`}>
               {schedule.active ? "Active" : "Inactive"}
             </span>
           </div>
@@ -49,9 +45,7 @@ function ScheduleRow({ schedule }: { schedule: FlowScheduleSummary }) {
       <div className="mt-3 grid gap-1.5 text-xs text-base-content/70">
         <div className="flex min-w-0 items-center gap-2">
           <Clock className="h-3.5 w-3.5 shrink-0 text-base-content/40" />
-          <span className={isCron ? "font-mono" : ""}>
-            {getNextRunLabel(schedule)}
-          </span>
+          <span className={isCron ? "font-mono" : ""}>{getNextRunLabel(schedule)}</span>
         </div>
         <div className="flex min-w-0 items-center gap-2">
           <CalendarClock className="h-3.5 w-3.5 shrink-0 text-base-content/40" />
@@ -125,17 +119,11 @@ export function FlowSchedulesSection() {
   }
 
   const activeCount = schedules.filter((schedule) => schedule.active).length;
-  const recurringCount = schedules.filter(
-    (schedule) => schedule.schedule_type === "cron",
-  ).length;
+  const recurringCount = schedules.filter((schedule) => schedule.schedule_type === "cron").length;
 
   const sortedSchedules = [...schedules].sort((a, b) => {
-    const aTime = a.next_run
-      ? new Date(a.next_run).getTime()
-      : Number.MAX_SAFE_INTEGER;
-    const bTime = b.next_run
-      ? new Date(b.next_run).getTime()
-      : Number.MAX_SAFE_INTEGER;
+    const aTime = a.next_run ? new Date(a.next_run).getTime() : Number.MAX_SAFE_INTEGER;
+    const bTime = b.next_run ? new Date(b.next_run).getTime() : Number.MAX_SAFE_INTEGER;
     if (aTime !== bTime) return aTime - bTime;
     return a.flow_name.localeCompare(b.flow_name);
   });
@@ -144,9 +132,7 @@ export function FlowSchedulesSection() {
     <SectionShell
       headerActions={
         <div className="flex flex-wrap gap-1.5">
-          <span className="badge badge-outline badge-sm">
-            {recurringCount} cron
-          </span>
+          <span className="badge badge-outline badge-sm">{recurringCount} cron</span>
           <span className="badge badge-outline badge-sm">
             {schedules.length - recurringCount} one-time
           </span>

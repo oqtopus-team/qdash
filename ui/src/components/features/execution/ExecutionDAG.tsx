@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import React from "react";
 
 import {
   ReactFlow,
@@ -189,10 +188,7 @@ function FlowContent({
       >
         <Background />
         <Controls />
-        <Panel
-          position="top-left"
-          className="bg-base-100 p-2 rounded flex items-center gap-2"
-        >
+        <Panel position="top-left" className="bg-base-100 p-2 rounded flex items-center gap-2">
           <div className="text-sm">Click nodes to see details</div>
           <button
             onClick={() =>
@@ -364,17 +360,12 @@ export function ExecutionDAG({ tasks }: ExecutionDAGProps) {
       </ReactFlowProvider>
 
       {isMaximized && !selectedTask && (
-        <div
-          className="fixed inset-0 bg-black/50 z-40"
-          onClick={() => setIsMaximized(false)}
-        />
+        <div className="fixed inset-0 bg-black/50 z-40" onClick={() => setIsMaximized(false)} />
       )}
       {selectedTask && (
         <div
           className={`bg-base-100 p-4 rounded-lg shadow overflow-y-auto ${
-            isMaximized
-              ? "fixed right-8 top-[5vh] w-[400px] z-50 max-h-[90vh]"
-              : "w-[30%]"
+            isMaximized ? "fixed right-8 top-[5vh] w-[400px] z-50 max-h-[90vh]" : "w-[30%]"
           }`}
           style={{ height: isMaximized ? "auto" : "600px" }}
         >
@@ -437,9 +428,7 @@ export function ExecutionDAG({ tasks }: ExecutionDAGProps) {
             {selectedTask.startAt && (
               <div>
                 <div className="font-medium">Start Time</div>
-                <div className="text-sm">
-                  {formatDateTime(selectedTask.startAt)}
-                </div>
+                <div className="text-sm">{formatDateTime(selectedTask.startAt)}</div>
               </div>
             )}
 
@@ -467,11 +456,7 @@ export function ExecutionDAG({ tasks }: ExecutionDAGProps) {
               <div>
                 <div className="font-medium mb-1">Input Parameters</div>
                 <div className="bg-base-200 p-2 rounded text-sm">
-                  <JsonView
-                    src={selectedTask.inputParameters}
-                    theme="vscode"
-                    collapsed={1}
-                  />
+                  <JsonView src={selectedTask.inputParameters} theme="vscode" collapsed={1} />
                 </div>
               </div>
             )}
@@ -480,11 +465,7 @@ export function ExecutionDAG({ tasks }: ExecutionDAGProps) {
               <div>
                 <div className="font-medium mb-1">Output Parameters</div>
                 <div className="bg-base-200 p-2 rounded text-sm">
-                  <JsonView
-                    src={selectedTask.outputParameters}
-                    theme="vscode"
-                    collapsed={1}
-                  />
+                  <JsonView src={selectedTask.outputParameters} theme="vscode" collapsed={1} />
                 </div>
               </div>
             )}

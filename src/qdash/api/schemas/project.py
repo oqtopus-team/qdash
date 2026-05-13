@@ -3,6 +3,7 @@
 from datetime import datetime
 
 from pydantic import BaseModel, Field
+
 from qdash.datamodel.project import ProjectRole
 from qdash.datamodel.user import USERNAME_PATTERN_DESCRIPTION, Username
 

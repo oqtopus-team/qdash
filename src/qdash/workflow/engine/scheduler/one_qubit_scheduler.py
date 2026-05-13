@@ -51,6 +51,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import yaml
+
 from qdash.workflow.engine.backend.qubex_paths import get_qubex_paths
 from qdash.workflow.engine.scheduler.one_qubit_types import (
     BOX_A,
@@ -285,8 +286,8 @@ class OneQubitScheduler:
                         box_b_to_muxes[module_id].append(mux_id)
 
         # Sort MUX IDs for deterministic ordering
-        for module_id in box_b_to_muxes:
-            box_b_to_muxes[module_id].sort()
+        for module_id, mux_ids in box_b_to_muxes.items():
+            mux_ids.sort()
 
         self._box_b_module_to_muxes = box_b_to_muxes
         return box_b_to_muxes
@@ -397,14 +398,12 @@ class OneQubitScheduler:
                 qid_to_mux=qid_to_mux,
             )
 
-            for mux_id in mux_groups:
-                mux_groups[mux_id] = ordering_strategy.order_qids_in_mux(
-                    mux_id, mux_groups[mux_id], context
-                )
+            for mux_id, mux_qids in mux_groups.items():
+                mux_groups[mux_id] = ordering_strategy.order_qids_in_mux(mux_id, mux_qids, context)
         else:
             # Default: sort by qubit ID
-            for mux_id in mux_groups:
-                mux_groups[mux_id] = sorted(mux_groups[mux_id], key=lambda x: int(x))
+            for mux_id, mux_qids in mux_groups.items():
+                mux_groups[mux_id] = sorted(mux_qids, key=int)
 
         # Return groups sorted by MUX ID
         return [mux_groups[mux_id] for mux_id in sorted(mux_groups.keys())]

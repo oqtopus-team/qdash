@@ -28,10 +28,7 @@
       ]
     },
     "drawio": {
-      "command": "npx",
-      "args": [
-        "@drawio/mcp"
-      ]
+      "url": "https://mcp.draw.io/mcp"
     }
   }
 }

@@ -9,6 +9,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 from uuid import uuid4
 
+from starlette.exceptions import HTTPException
+
 from qdash.api.lib.json_utils import sanitize_for_json
 from qdash.api.schemas.issue import IssueResponse, ListIssuesResponse
 from qdash.api.schemas.success import SuccessResponse
@@ -16,7 +18,6 @@ from qdash.common.paths import CALIB_DATA_BASE
 from qdash.datamodel.project import ProjectRole
 from qdash.dbmodel.issue import IssueDocument
 from qdash.dbmodel.user import UserDocument
-from starlette.exceptions import HTTPException
 
 if TYPE_CHECKING:
     from qdash.api.services.notification_service import NotificationService
@@ -97,7 +98,7 @@ class IssueService:
         Falls back to a JSON code block when the conversion returns empty.
         Returns ``None`` only if even the fallback fails.
         """
-        from qdash.api.lib.copilot_agent import blocks_to_markdown
+        from qdash.common.copilot.agent import blocks_to_markdown
 
         markdown_content = blocks_to_markdown(result)
         if markdown_content:
@@ -550,9 +551,7 @@ class IssueService:
         if content_type not in ALLOWED_CONTENT_TYPES:
             raise HTTPException(
                 status_code=400,
-                detail=(
-                    f"Unsupported image type: {content_type}. " "Allowed: png, jpeg, gif, webp"
-                ),
+                detail=(f"Unsupported image type: {content_type}. Allowed: png, jpeg, gif, webp"),
             )
 
         if len(data) > MAX_IMAGE_SIZE:

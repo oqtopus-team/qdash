@@ -46,8 +46,7 @@ export function CDFView() {
     isInitialized,
   } = useCDFUrlState();
 
-  const { startDate, endDate, setStartDate, setEndDate, setQuickRange } =
-    useRangeModeUrlState();
+  const { startDate, endDate, setStartDate, setEndDate, setQuickRange } = useRangeModeUrlState();
 
   // Load metrics configuration from backend
   const {
@@ -97,8 +96,7 @@ export function CDFView() {
     const configs: Record<string, MetricConfig> = {};
     selectedParameters.forEach((param) => {
       const config =
-        qubitMetrics.find((m) => m.key === param) ||
-        couplingMetrics.find((m) => m.key === param);
+        qubitMetrics.find((m) => m.key === param) || couplingMetrics.find((m) => m.key === param);
       if (config) {
         configs[param] = config;
       }
@@ -127,9 +125,7 @@ export function CDFView() {
 
     // Check if current parameters are valid
     const allMetrics = [...qubitMetrics, ...couplingMetrics];
-    const validParams = selectedParameters.filter((p) =>
-      allMetrics.some((m) => m.key === p),
-    );
+    const validParams = selectedParameters.filter((p) => allMetrics.some((m) => m.key === p));
 
     if (validParams.length === 0 && qubitMetrics.length > 0) {
       // Set default: t1 if available
@@ -142,23 +138,14 @@ export function CDFView() {
     } else if (validParams.length !== selectedParameters.length) {
       setSelectedParameters(validParams);
     }
-  }, [
-    qubitMetrics,
-    couplingMetrics,
-    selectedParameters,
-    setSelectedParameters,
-  ]);
+  }, [qubitMetrics, couplingMetrics, selectedParameters, setSelectedParameters]);
 
   // Fetch chips data
   const { data: chipsResponse } = useListChips();
 
   // Set default chip on mount
   useEffect(() => {
-    if (
-      !selectedChip &&
-      chipsResponse?.data?.chips &&
-      chipsResponse.data.chips.length > 0
-    ) {
+    if (!selectedChip && chipsResponse?.data?.chips && chipsResponse.data.chips.length > 0) {
       const sortedChips = [...chipsResponse.data.chips].sort((a, b) => {
         const dateA = a.installed_at ? new Date(a.installed_at).getTime() : 0;
         const dateB = b.installed_at ? new Date(b.installed_at).getTime() : 0;
@@ -226,37 +213,31 @@ export function CDFView() {
 
       const allValues: { value: number; qid: string }[] = [];
 
-      Object.entries(rawData).forEach(
-        ([entityId, metricValue]: [string, unknown]) => {
-          const value = (metricValue as Record<string, unknown>)?.value;
-          if (
-            value === null ||
-            value === undefined ||
-            typeof value !== "number"
-          ) {
-            return;
+      Object.entries(rawData).forEach(([entityId, metricValue]: [string, unknown]) => {
+        const value = (metricValue as Record<string, unknown>)?.value;
+        if (value === null || value === undefined || typeof value !== "number") {
+          return;
+        }
+
+        // Apply scale from config
+        let scaledValue = value * config.scale;
+
+        // For percentage metrics, convert to error rate if needed
+        if (isPercentageMetric(config.unit)) {
+          if (showAsErrorRate) {
+            scaledValue = 100 - scaledValue;
           }
+        }
 
-          // Apply scale from config
-          let scaledValue = value * config.scale;
-
-          // For percentage metrics, convert to error rate if needed
-          if (isPercentageMetric(config.unit)) {
-            if (showAsErrorRate) {
-              scaledValue = 100 - scaledValue;
-            }
-          }
-
-          // Format entity ID
-          const formattedId = isCoupling
+        // Format entity ID
+        const formattedId = isCoupling
+          ? entityId
+          : entityId.startsWith("Q")
             ? entityId
-            : entityId.startsWith("Q")
-              ? entityId
-              : `Q${entityId.padStart(2, "0")}`;
+            : `Q${entityId.padStart(2, "0")}`;
 
-          allValues.push({ qid: formattedId, value: scaledValue });
-        },
-      );
+        allValues.push({ qid: formattedId, value: scaledValue });
+      });
 
       if (allValues.length === 0) {
         results[paramKey] = {
@@ -274,14 +255,12 @@ export function CDFView() {
       const sortedValues = [...allValues].sort((a, b) => a.value - b.value);
 
       // Calculate CDF
-      const cdfData: CumulativeDataPoint[] = sortedValues.map(
-        (item, index) => ({
-          value: item.value,
-          cdf: (index + 1) / sortedValues.length,
-          survivalFunction: 1 - (index + 1) / sortedValues.length,
-          qid: item.qid,
-        }),
-      );
+      const cdfData: CumulativeDataPoint[] = sortedValues.map((item, index) => ({
+        value: item.value,
+        cdf: (index + 1) / sortedValues.length,
+        survivalFunction: 1 - (index + 1) / sortedValues.length,
+        qid: item.qid,
+      }));
 
       // Calculate statistics
       const valuesOnly = sortedValues.map((item) => item.value);
@@ -291,8 +270,7 @@ export function CDFView() {
           : (valuesOnly[Math.floor(valuesOnly.length / 2) - 1] +
               valuesOnly[Math.floor(valuesOnly.length / 2)]) /
             2;
-      const meanValue =
-        valuesOnly.reduce((sum, val) => sum + val, 0) / valuesOnly.length;
+      const meanValue = valuesOnly.reduce((sum, val) => sum + val, 0) / valuesOnly.length;
 
       const getPercentile = (values: number[], p: number): number => {
         if (values.length === 0) return 0;
@@ -331,10 +309,7 @@ export function CDFView() {
         },
         name: config.title,
         hovertemplate:
-          "Value: %{x:.4f}<br>" +
-          "P(X ≤ value): %{y:.2%}" +
-          "<br>" +
-          "<extra></extra>",
+          "Value: %{x:.4f}<br>" + "P(X ≤ value): %{y:.2%}" + "<br>" + "<extra></extra>",
       };
 
       // Median line
@@ -392,13 +367,7 @@ export function CDFView() {
     });
 
     return results;
-  }, [
-    metricsData,
-    selectedParameters,
-    selectedMetricConfigs,
-    couplingMetrics,
-    showAsErrorRate,
-  ]);
+  }, [metricsData, selectedParameters, selectedMetricConfigs, couplingMetrics, showAsErrorRate]);
 
   // Primary parameter data
   const primaryParameter = selectedParameters[0];
@@ -543,27 +512,26 @@ export function CDFView() {
         font: { size: 18 },
       },
       xaxis: {
-        title:
-          selectedParameters.length > 1
-            ? "Parameter Value"
-            : `${primaryConfig?.title || primaryParameter} (${
-                isPercentageMetric(primaryConfig?.unit)
-                  ? showAsErrorRate
-                    ? "Error Rate %"
-                    : "%"
-                  : primaryConfig?.unit || ""
-              })`,
+        title: {
+          text:
+            selectedParameters.length > 1
+              ? "Parameter Value"
+              : `${primaryConfig?.title || primaryParameter} (${
+                  isPercentageMetric(primaryConfig?.unit)
+                    ? showAsErrorRate
+                      ? "Error Rate %"
+                      : "%"
+                    : primaryConfig?.unit || ""
+                })`,
+        },
         gridcolor: "#e5e7eb",
         showgrid: true,
         zeroline: false,
-        type:
-          hasPercentageMetrics && showAsErrorRate
-            ? ("log" as const)
-            : ("linear" as const),
+        type: hasPercentageMetrics && showAsErrorRate ? ("log" as const) : ("linear" as const),
         tickformat: hasPercentageMetrics && showAsErrorRate ? ".1e" : undefined,
       },
       yaxis: {
-        title: "Cumulative Probability P(X ≤ value)",
+        title: { text: "Cumulative Probability P(X ≤ value)" },
         gridcolor: "#e5e7eb",
         showgrid: true,
         zeroline: false,
@@ -727,10 +695,7 @@ export function CDFView() {
               </div>
 
               <div className="w-28 sm:w-48">
-                <ChipSelector
-                  selectedChip={selectedChip}
-                  onChipSelect={setSelectedChip}
-                />
+                <ChipSelector selectedChip={selectedChip} onChipSelect={setSelectedChip} />
               </div>
 
               {/* Parameter Selection - inline on mobile */}
@@ -743,14 +708,9 @@ export function CDFView() {
                       const config = selectedMetricConfigs[p];
                       return config ? { value: p, label: config.title } : null;
                     })
-                    .filter(
-                      (item): item is { value: string; label: string } =>
-                        item !== null,
-                    )}
+                    .filter((item): item is { value: string; label: string } => item !== null)}
                   onChange={(options) => {
-                    const values = options
-                      ? options.map((option) => option!.value)
-                      : [];
+                    const values = options ? options.map((option) => option!.value) : [];
                     setSelectedParameters(values);
                   }}
                   placeholder="Select parameters"
@@ -797,11 +757,7 @@ export function CDFView() {
                   className={`join-item btn btn-xs sm:btn-sm h-full ${selectionMode === "best" ? "btn-primary" : ""} ${!isBestModeSupported ? "btn-disabled" : ""}`}
                   onClick={() => setSelectionMode("best")}
                   disabled={!isBestModeSupported}
-                  title={
-                    !isBestModeSupported
-                      ? "Best mode not available"
-                      : "Show best values"
-                  }
+                  title={!isBestModeSupported ? "Best mode not available" : "Show best values"}
                 >
                   Best
                 </button>
@@ -830,9 +786,7 @@ export function CDFView() {
               <button
                 className="btn btn-outline btn-xs sm:btn-sm h-8 sm:h-9 ml-auto sm:ml-0"
                 onClick={handleExportCSV}
-                disabled={
-                  !primaryData.tableData || primaryData.tableData.length === 0
-                }
+                disabled={!primaryData.tableData || primaryData.tableData.length === 0}
               >
                 Export
               </button>
@@ -845,13 +799,7 @@ export function CDFView() {
               {selectedParameters.map((param) => {
                 const data = processedDataByParameter[param];
                 const config = selectedMetricConfigs[param];
-                if (
-                  !data ||
-                  data.median === null ||
-                  data.mean === null ||
-                  !config
-                )
-                  return null;
+                if (!data || data.median === null || data.mean === null || !config) return null;
 
                 const colors: Record<string, string> = {
                   t1: "text-blue-600",
@@ -880,9 +828,7 @@ export function CDFView() {
                   <div key={param}>
                     {/* Mobile: Grid layout */}
                     <div className="sm:hidden">
-                      <div className={`text-xs font-medium mb-1 ${colorClass}`}>
-                        {config.title}
-                      </div>
+                      <div className={`text-xs font-medium mb-1 ${colorClass}`}>{config.title}</div>
                       <div className="grid grid-cols-3 gap-2">
                         <div className="bg-base-200 rounded-lg p-2 text-center">
                           <div className="text-xs text-base-content/60">N</div>
@@ -891,27 +837,21 @@ export function CDFView() {
                           </div>
                         </div>
                         <div className="bg-base-200 rounded-lg p-2 text-center">
-                          <div className="text-xs text-base-content/60">
-                            Median
-                          </div>
+                          <div className="text-xs text-base-content/60">Median</div>
                           <div className="text-sm font-bold text-primary">
                             {formatValue(data.median)}
                             {unit}
                           </div>
                         </div>
                         <div className="bg-base-200 rounded-lg p-2 text-center">
-                          <div className="text-xs text-base-content/60">
-                            Mean
-                          </div>
+                          <div className="text-xs text-base-content/60">Mean</div>
                           <div className="text-sm font-bold text-secondary">
                             {formatValue(data.mean)}
                             {unit}
                           </div>
                         </div>
                         <div className="bg-base-200 rounded-lg p-2 text-center col-span-3">
-                          <div className="text-xs text-base-content/60">
-                            P10 / P90
-                          </div>
+                          <div className="text-xs text-base-content/60">P10 / P90</div>
                           <div className="text-sm font-bold text-accent">
                             {formatValue(data.percentile10!)}
                             {unit} / {formatValue(data.percentile90!)}
@@ -924,9 +864,7 @@ export function CDFView() {
                     <div className="stats shadow w-full hidden sm:inline-grid">
                       <div className="stat py-2 flex-1">
                         <div className="stat-title text-xs">Parameter</div>
-                        <div className={`stat-value text-sm ${colorClass}`}>
-                          {config.title}
-                        </div>
+                        <div className={`stat-value text-sm ${colorClass}`}>{config.title}</div>
                       </div>
                       <div className="stat py-2 flex-1">
                         <div className="stat-title text-xs">N_valid</div>
@@ -995,8 +933,7 @@ export function CDFView() {
                   key: param,
                   label: `${config?.title || param} (${unit.trim()})`,
                   sortable: true,
-                  render: (v: number | null | undefined) =>
-                    v != null ? v.toFixed(4) : "-",
+                  render: (v: number | null | undefined) => (v != null ? v.toFixed(4) : "-"),
                 };
               }),
             ]}

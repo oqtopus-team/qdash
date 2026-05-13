@@ -14,6 +14,7 @@ import uuid
 from typing import Any
 
 import yaml
+
 from qdash.api.schemas.calibration import (
     SeedImportRequest,
     SeedImportResponse,
@@ -570,7 +571,7 @@ class SeedImportService:
         )
 
         logger.debug(
-            f"Recorded provenance for {param_name}:{qid} " f"(entity_id={param_version.entity_id})"
+            f"Recorded provenance for {param_name}:{qid} (entity_id={param_version.entity_id})"
         )
 
     def get_available_parameters(self, chip_id: str) -> list[str]:

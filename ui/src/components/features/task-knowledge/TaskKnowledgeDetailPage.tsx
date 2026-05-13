@@ -10,10 +10,9 @@ function useTaskKnowledgeMarkdown(taskName: string) {
   return useQuery({
     queryKey: ["task-knowledge-markdown", taskName],
     queryFn: async () => {
-      const resp = await AXIOS_INSTANCE.get(
-        `/tasks/${taskName}/knowledge/markdown`,
-        { responseType: "text" },
-      );
+      const resp = await AXIOS_INSTANCE.get(`/tasks/${taskName}/knowledge/markdown`, {
+        responseType: "text",
+      });
       return resp.data as string;
     },
   });
@@ -21,11 +20,7 @@ function useTaskKnowledgeMarkdown(taskName: string) {
 
 export function TaskKnowledgeDetailPage({ taskName }: { taskName: string }) {
   const router = useRouter();
-  const {
-    data: markdown,
-    isLoading,
-    error,
-  } = useTaskKnowledgeMarkdown(taskName);
+  const { data: markdown, isLoading, error } = useTaskKnowledgeMarkdown(taskName);
 
   if (isLoading) {
     return (

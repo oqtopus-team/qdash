@@ -29,14 +29,12 @@ backends:
     tasks:
       # Box Setup
       - Configure
+      - ConfigureAll
       - LinkUp
       - CheckStatus
       - CheckNoise
       - DumpBox
       - ReadoutConfigure
-
-      # System Level
-      - CheckSkew
 
       # CW (Continuous Wave) Measurements
       - CheckReflectionCoefficient
@@ -111,14 +109,12 @@ backends:
 categories:
   "Box Setup":
     - Configure
+    - ConfigureAll
     - LinkUp
     - CheckStatus
     - CheckNoise
     - DumpBox
     - ReadoutConfigure
-
-  "System":
-    - CheckSkew
 
   "CW Measurements":
     - CheckReflectionCoefficient

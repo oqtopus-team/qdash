@@ -5,6 +5,7 @@ from typing import ClassVar
 from bunnet import Document
 from pydantic import ConfigDict, Field
 from pymongo import ASCENDING, IndexModel
+
 from qdash.datamodel.system_info import SystemInfoModel
 
 

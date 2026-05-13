@@ -9,6 +9,7 @@ from __future__ import annotations
 import logging
 import math
 from collections import defaultdict, deque
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, cast
 
 from qdash.api.lib.metrics_config import MetricMetadata, load_metrics_config
@@ -47,6 +48,36 @@ logger = logging.getLogger(__name__)
 
 
 _VERSIONS_BUFFER = 5  # Extra versions to fetch beyond min_streak
+
+
+@dataclass(frozen=True)
+class _DegradationTrendConfig:
+    """Inputs needed to evaluate degradation trends across parameter versions."""
+
+    target_params: list[str]
+    eval_modes: dict[str, str]
+    all_metrics: dict[str, MetricMetadata]
+
+
+@dataclass
+class _RecommendationTaskInfo:
+    """Accumulated impact-graph state for one recommended recalibration task."""
+
+    qids: set[str]
+    parameters: set[str]
+    min_depth: float
+    example: tuple[str, str, int] | None = None
+
+
+@dataclass(frozen=True)
+class _RecalibrationRecommendationContext:
+    """Shared context derived from the impact graph for recommendation building."""
+
+    source_param_name: str
+    source_qid: str
+    task_info: dict[str, _RecommendationTaskInfo]
+    affected_entity_count: int
+    max_depth_reached: int
 
 
 class ProvenanceService:
@@ -118,52 +149,13 @@ class ProvenanceService:
             entity_id=entity_id,
             max_depth=max_depth,
         )
-
-        nodes: list[LineageNodeResponse] = []
-        edges: list[LineageEdgeResponse] = []
-
-        # Convert nodes from LineageGraph format
-        for node_item in lineage_data.get("nodes", []):
-            node_dict = dict(node_item)  # Convert TypedDict to regular dict
-            node = LineageNodeResponse(
-                node_type=str(node_dict.get("type", "entity")),
-                node_id=str(node_dict.get("id", "")),
-                depth=0,
-                entity=self._build_version_from_metadata(node_dict)
-                if node_dict.get("type") == "entity"
-                else None,
-                activity=self._build_activity_from_metadata(node_dict)
-                if node_dict.get("type") == "activity"
-                else None,
-            )
-            nodes.append(node)
-
-        # Convert edges
-        for edge_item in lineage_data.get("edges", []):
-            edge_dict = dict(edge_item)  # Convert TypedDict to regular dict
-            edges.append(
-                LineageEdgeResponse(
-                    relation_type=str(edge_dict.get("relation_type", "")),
-                    source_id=str(edge_dict.get("source", "")),
-                    target_id=str(edge_dict.get("target", "")),
-                )
-            )
-
-        depths = self._compute_graph_depths(origin_id=entity_id, edges=edges, reverse=False)
-        for node in nodes:
-            node.depth = depths.get(node.node_id, 0)
+        nodes, edges = self._build_graph_responses(lineage_data, origin_id=entity_id, reverse=False)
 
         # Enrich entity nodes with latest version info (staleness check)
         self._enrich_nodes_with_latest_version(project_id, nodes)
 
-        # Find or create origin node
-        origin = next(
-            (n for n in nodes if n.node_id == entity_id),
-            LineageNodeResponse(node_type="entity", node_id=entity_id, depth=0),
-        )
-
         return LineageResponse(
-            origin=origin,
+            origin=self._find_graph_origin(nodes, entity_id),
             nodes=nodes,
             edges=edges,
             max_depth=max_depth,
@@ -198,52 +190,53 @@ class ProvenanceService:
             entity_id=entity_id,
             max_depth=max_depth,
         )
-
-        nodes: list[LineageNodeResponse] = []
-        edges: list[LineageEdgeResponse] = []
-
-        # Convert nodes from LineageGraph format
-        for node_item in impact_data.get("nodes", []):
-            node_dict = dict(node_item)  # Convert TypedDict to regular dict
-            node = LineageNodeResponse(
-                node_type=str(node_dict.get("type", "entity")),
-                node_id=str(node_dict.get("id", "")),
-                depth=0,
-                entity=self._build_version_from_metadata(node_dict)
-                if node_dict.get("type") == "entity"
-                else None,
-                activity=self._build_activity_from_metadata(node_dict)
-                if node_dict.get("type") == "activity"
-                else None,
-            )
-            nodes.append(node)
-
-        # Convert edges
-        for edge_item in impact_data.get("edges", []):
-            edge_dict = dict(edge_item)  # Convert TypedDict to regular dict
-            edges.append(
-                LineageEdgeResponse(
-                    relation_type=str(edge_dict.get("relation_type", "")),
-                    source_id=str(edge_dict.get("source", "")),
-                    target_id=str(edge_dict.get("target", "")),
-                )
-            )
-
-        depths = self._compute_graph_depths(origin_id=entity_id, edges=edges, reverse=True)
-        for node in nodes:
-            node.depth = depths.get(node.node_id, 0)
-
-        # Find or create origin node
-        origin = next(
-            (n for n in nodes if n.node_id == entity_id),
-            LineageNodeResponse(node_type="entity", node_id=entity_id, depth=0),
-        )
+        nodes, edges = self._build_graph_responses(impact_data, origin_id=entity_id, reverse=True)
 
         return ImpactResponse(
-            origin=origin,
+            origin=self._find_graph_origin(nodes, entity_id),
             nodes=nodes,
             edges=edges,
             max_depth=max_depth,
+        )
+
+    def _build_graph_responses(
+        self,
+        graph_data: Any,
+        *,
+        origin_id: str,
+        reverse: bool,
+    ) -> tuple[list[LineageNodeResponse], list[LineageEdgeResponse]]:
+        """Convert raw graph data into schema nodes and edges with computed depths."""
+        nodes = [self._build_graph_node(node_item) for node_item in graph_data.get("nodes", [])]
+        edges = self._build_lineage_edges(graph_data.get("edges", []))
+        depths = self._compute_graph_depths(origin_id=origin_id, edges=edges, reverse=reverse)
+        for node in nodes:
+            node.depth = depths.get(node.node_id, 0)
+        return nodes, edges
+
+    def _build_graph_node(self, node_item: Any) -> LineageNodeResponse:
+        """Convert one raw graph node into the shared response schema."""
+        node_dict = dict(node_item)
+        node_type = str(node_dict.get("type", "entity"))
+        return LineageNodeResponse(
+            node_type=node_type,
+            node_id=str(node_dict.get("id", "")),
+            depth=0,
+            entity=self._build_version_from_metadata(node_dict) if node_type == "entity" else None,
+            activity=self._build_activity_from_metadata(node_dict)
+            if node_type == "activity"
+            else None,
+        )
+
+    @staticmethod
+    def _find_graph_origin(
+        nodes: list[LineageNodeResponse],
+        entity_id: str,
+    ) -> LineageNodeResponse:
+        """Return the origin node if present, or a placeholder entity node otherwise."""
+        return next(
+            (node for node in nodes if node.node_id == entity_id),
+            LineageNodeResponse(node_type="entity", node_id=entity_id, depth=0),
         )
 
     @staticmethod
@@ -364,46 +357,7 @@ class ProvenanceService:
             execution_id_2=execution_id_after,
         )
 
-        added: list[ParameterDiffResponse] = []
-        removed: list[ParameterDiffResponse] = []
-        changed: list[ParameterDiffResponse] = []
-        unchanged_count = 0
-
-        for diff in diffs:
-            change_type = diff.get("change_type", "")
-            before_data = diff.get("before")
-            after_data = diff.get("after")
-
-            value_before = before_data.get("value") if before_data else None
-            value_after = after_data.get("value") if after_data else None
-
-            # Calculate delta for numeric values
-            delta = None
-            delta_percent = None
-            if (
-                change_type == "changed"
-                and isinstance(value_before, (int, float))
-                and isinstance(value_after, (int, float))
-            ):
-                delta = value_after - value_before
-                if value_before != 0:
-                    delta_percent = (delta / value_before) * 100
-
-            param_diff = ParameterDiffResponse(
-                parameter_name=diff.get("parameter_name", ""),
-                qid=diff.get("qid", ""),
-                value_before=value_before,
-                value_after=value_after,
-                delta=delta,
-                delta_percent=delta_percent,
-            )
-
-            if change_type == "added":
-                added.append(param_diff)
-            elif change_type == "removed":
-                removed.append(param_diff)
-            elif change_type == "changed":
-                changed.append(param_diff)
+        added, removed, changed = self._partition_execution_diffs(diffs)
 
         return ExecutionComparisonResponse(
             execution_id_before=execution_id_before,
@@ -411,8 +365,72 @@ class ProvenanceService:
             added_parameters=added,
             removed_parameters=removed,
             changed_parameters=changed,
-            unchanged_count=unchanged_count,
+            unchanged_count=0,
         )
+
+    def _partition_execution_diffs(
+        self,
+        diffs: list[Any],
+    ) -> tuple[
+        list[ParameterDiffResponse],
+        list[ParameterDiffResponse],
+        list[ParameterDiffResponse],
+    ]:
+        """Split raw execution diffs into added, removed, and changed response lists."""
+        added: list[ParameterDiffResponse] = []
+        removed: list[ParameterDiffResponse] = []
+        changed: list[ParameterDiffResponse] = []
+
+        for diff in diffs:
+            param_diff = self._build_execution_diff(diff)
+            change_type = diff.get("change_type", "")
+            if change_type == "added":
+                added.append(param_diff)
+            elif change_type == "removed":
+                removed.append(param_diff)
+            elif change_type == "changed":
+                changed.append(param_diff)
+
+        return added, removed, changed
+
+    def _build_execution_diff(self, diff: Any) -> ParameterDiffResponse:
+        """Convert one raw repository diff into the API response schema."""
+        before_data = diff.get("before")
+        after_data = diff.get("after")
+        value_before = before_data.get("value") if before_data else None
+        value_after = after_data.get("value") if after_data else None
+        delta, delta_percent = self._calculate_execution_diff_delta(
+            change_type=diff.get("change_type", ""),
+            value_before=value_before,
+            value_after=value_after,
+        )
+        return ParameterDiffResponse(
+            parameter_name=diff.get("parameter_name", ""),
+            qid=diff.get("qid", ""),
+            value_before=value_before,
+            value_after=value_after,
+            delta=delta,
+            delta_percent=delta_percent,
+        )
+
+    @staticmethod
+    def _calculate_execution_diff_delta(
+        *,
+        change_type: str,
+        value_before: Any,
+        value_after: Any,
+    ) -> tuple[float | None, float | None]:
+        """Calculate numeric deltas for changed parameters only."""
+        if (
+            change_type != "changed"
+            or not isinstance(value_before, (int, float))
+            or not isinstance(value_after, (int, float))
+        ):
+            return None, None
+        delta = float(value_after) - float(value_before)
+        if value_before == 0:
+            return delta, None
+        return delta, (delta / float(value_before)) * 100
 
     def get_parameter_history(
         self,
@@ -567,74 +585,17 @@ class ProvenanceService:
 
         """
         try:
-            from qdash.common.datetime_utils import ensure_timezone
-
-            # Get recent parameter versions (version > 1 means there was a change)
-            # Fetch more if filtering by parameter names
-            fetch_limit = limit * 5 if parameter_names else limit * 2
-            recent_docs = self.parameter_version_repo.get_recent(project_id, limit=fetch_limit)
-
-            changes: list[ParameterChangeResponse] = []
-
-            for doc in recent_docs:
-                if len(changes) >= limit:
-                    break
-
-                # Filter by parameter names if specified
-                if parameter_names and doc.parameter_name not in parameter_names:
-                    continue
-
-                # Skip version 1 (first version has no previous)
-                current_version = getattr(doc, "version", 1)
-                if current_version <= 1:
-                    continue
-
-                # Get previous version
-                previous = self.parameter_version_repo.get_version(
-                    project_id=project_id,
-                    parameter_name=doc.parameter_name,
-                    qid=doc.qid,
-                    version=current_version - 1,
-                )
-
-                current_value = getattr(doc, "value", None)
-                previous_value = getattr(previous, "value", None) if previous else None
-                current_error = float(getattr(doc, "error", 0.0) or 0.0)
-                previous_error = float(getattr(previous, "error", 0.0) or 0.0) if previous else None
-
-                # Calculate delta
-                delta = None
-                delta_percent = None
-                if (
-                    current_value is not None
-                    and previous_value is not None
-                    and isinstance(current_value, (int, float))
-                    and isinstance(previous_value, (int, float))
-                ):
-                    delta = float(current_value) - float(previous_value)
-                    if previous_value != 0:
-                        delta_percent = (delta / float(previous_value)) * 100
-
-                changes.append(
-                    ParameterChangeResponse(
-                        entity_id=doc.entity_id,
-                        parameter_name=doc.parameter_name,
-                        qid=doc.qid,
-                        value=self._sanitize_value(current_value),
-                        previous_value=self._sanitize_value(previous_value)
-                        if previous_value is not None
-                        else None,
-                        unit=getattr(doc, "unit", ""),
-                        delta=delta,
-                        delta_percent=delta_percent,
-                        version=current_version,
-                        valid_from=ensure_timezone(getattr(doc, "valid_from", None)),
-                        task_name=getattr(doc, "task_name", ""),
-                        execution_id=getattr(doc, "execution_id", ""),
-                        error=current_error,
-                        previous_error=previous_error,
-                    )
-                )
+            recent_docs = self._load_recent_change_candidates(
+                project_id=project_id,
+                limit=limit,
+                parameter_names=parameter_names,
+            )
+            changes = self._build_recent_changes(
+                project_id=project_id,
+                recent_docs=recent_docs,
+                limit=limit,
+                parameter_names=parameter_names,
+            )
 
             return RecentChangesResponse(
                 changes=changes,
@@ -643,6 +604,103 @@ class ProvenanceService:
         except Exception as e:
             logger.warning(f"Failed to get recent changes: {e}")
             return RecentChangesResponse(changes=[], total_count=0)
+
+    def _load_recent_change_candidates(
+        self,
+        *,
+        project_id: str,
+        limit: int,
+        parameter_names: list[str] | None,
+    ) -> list[Any]:
+        """Load enough recent versions to satisfy filtering and version checks."""
+        fetch_limit = limit * 5 if parameter_names else limit * 2
+        return self.parameter_version_repo.get_recent(project_id, limit=fetch_limit)
+
+    def _build_recent_changes(
+        self,
+        *,
+        project_id: str,
+        recent_docs: list[Any],
+        limit: int,
+        parameter_names: list[str] | None,
+    ) -> list[ParameterChangeResponse]:
+        """Convert recent version documents into change responses."""
+        changes: list[ParameterChangeResponse] = []
+        for doc in recent_docs:
+            if len(changes) >= limit:
+                break
+            if not self._is_recent_change_candidate(doc, parameter_names):
+                continue
+            change = self._build_recent_change(project_id=project_id, doc=doc)
+            if change is not None:
+                changes.append(change)
+        return changes
+
+    @staticmethod
+    def _is_recent_change_candidate(doc: Any, parameter_names: list[str] | None) -> bool:
+        """Return whether a recent version doc should be diffed against its predecessor."""
+        if parameter_names and getattr(doc, "parameter_name", "") not in parameter_names:
+            return False
+        return getattr(doc, "version", 1) > 1
+
+    def _build_recent_change(
+        self,
+        *,
+        project_id: str,
+        doc: Any,
+    ) -> ParameterChangeResponse | None:
+        """Build one recent-change response from a current and previous version pair."""
+        from qdash.common.datetime_utils import ensure_timezone
+
+        current_version = getattr(doc, "version", 1)
+        if current_version <= 1:
+            return None
+
+        previous = self.parameter_version_repo.get_version(
+            project_id=project_id,
+            parameter_name=doc.parameter_name,
+            qid=doc.qid,
+            version=current_version - 1,
+        )
+        current_value = getattr(doc, "value", None)
+        previous_value = getattr(previous, "value", None) if previous else None
+        current_error = float(getattr(doc, "error", 0.0) or 0.0)
+        previous_error = float(getattr(previous, "error", 0.0) or 0.0) if previous else None
+        delta, delta_percent = self._calculate_recent_change_delta(current_value, previous_value)
+
+        return ParameterChangeResponse(
+            entity_id=doc.entity_id,
+            parameter_name=doc.parameter_name,
+            qid=doc.qid,
+            value=self._sanitize_value(current_value),
+            previous_value=self._sanitize_value(previous_value)
+            if previous_value is not None
+            else None,
+            unit=getattr(doc, "unit", ""),
+            delta=delta,
+            delta_percent=delta_percent,
+            version=current_version,
+            valid_from=ensure_timezone(getattr(doc, "valid_from", None)),
+            task_name=getattr(doc, "task_name", ""),
+            execution_id=getattr(doc, "execution_id", ""),
+            error=current_error,
+            previous_error=previous_error,
+        )
+
+    @staticmethod
+    def _calculate_recent_change_delta(
+        current_value: Any,
+        previous_value: Any,
+    ) -> tuple[float | None, float | None]:
+        """Calculate absolute and percent delta between numeric version values."""
+        if not isinstance(current_value, (int, float)) or not isinstance(
+            previous_value, (int, float)
+        ):
+            return None, None
+        delta = float(current_value) - float(previous_value)
+        if previous_value == 0:
+            return delta, None
+        return delta, (delta / float(previous_value)) * 100
 
     def get_policy_violations(
         self,
@@ -722,81 +780,19 @@ class ProvenanceService:
 
         """
         try:
-            from qdash.common.datetime_utils import ensure_timezone
-
-            eval_modes, all_metrics = self._load_evaluation_modes(parameter_names)
-
-            # Determine target parameters
-            if parameter_names:
-                target_params = [p for p in parameter_names if p in eval_modes]
-            else:
-                target_params = list(eval_modes.keys())
-
-            if not target_params:
+            trend_config = self._build_degradation_trend_config(parameter_names)
+            if not trend_config.target_params:
                 return DegradationTrendsResponse(trends=[], total_count=0)
 
-            # Bulk fetch recent versions
             bulk_data = self.parameter_version_repo.get_recent_versions_bulk(
                 project_id,
-                parameter_names=target_params,
+                parameter_names=trend_config.target_params,
                 versions_per_param=min_streak + _VERSIONS_BUFFER,
             )
-
-            trends: list[DegradationTrendResponse] = []
-
-            for item in bulk_data:
-                param_name = item.get("parameter_name", "")
-                qid = item.get("qid", "")
-                versions = item.get("versions", [])
-
-                if param_name not in eval_modes:
-                    continue
-                if len(versions) < 2:
-                    continue
-
-                mode = eval_modes[param_name]
-                streak = self._detect_streak(versions, mode)
-
-                if streak < min_streak:
-                    continue
-
-                total_delta, total_delta_pct, delta_per_step = self._calculate_trend_metrics(
-                    versions, streak
-                )
-
-                # Build sparkline values (oldest first, i.e. reverse of versions[:streak+1])
-                sparkline_versions = versions[: streak + 1]
-                sparkline_versions.reverse()
-                values = [
-                    float(v.get("value", 0))
-                    for v in sparkline_versions
-                    if isinstance(v.get("value"), (int, float))
-                ]
-
-                param_meta = all_metrics.get(param_name)
-                unit = param_meta.unit if param_meta else ""
-                newest_val = versions[0].get("value", 0)
-
-                trends.append(
-                    DegradationTrendResponse(
-                        parameter_name=param_name,
-                        qid=qid,
-                        evaluation_mode=mode,
-                        streak_count=streak,
-                        total_delta=total_delta,
-                        total_delta_percent=total_delta_pct,
-                        delta_per_step=delta_per_step,
-                        current_value=self._sanitize_value(newest_val),
-                        current_entity_id=versions[0].get("entity_id", ""),
-                        unit=unit,
-                        values=values,
-                        valid_from=ensure_timezone(versions[0].get("valid_from")),
-                    )
-                )
-
-            # Sort: streak descending, then |total_delta_percent| descending
-            trends.sort(
-                key=lambda t: (-t.streak_count, -abs(t.total_delta_percent)),
+            trends = self._build_degradation_trends(
+                bulk_data=bulk_data,
+                min_streak=min_streak,
+                trend_config=trend_config,
             )
 
             return DegradationTrendsResponse(
@@ -809,6 +805,98 @@ class ProvenanceService:
         except Exception:
             logger.exception("Unexpected error in get_degradation_trends")
             raise
+
+    def _build_degradation_trend_config(
+        self,
+        parameter_names: list[str] | None,
+    ) -> _DegradationTrendConfig:
+        """Resolve metric metadata and the subset of parameters eligible for trend checks."""
+        eval_modes, all_metrics = self._load_evaluation_modes(parameter_names)
+        if parameter_names:
+            target_params = [name for name in parameter_names if name in eval_modes]
+        else:
+            target_params = list(eval_modes.keys())
+        return _DegradationTrendConfig(
+            target_params=target_params,
+            eval_modes=eval_modes,
+            all_metrics=all_metrics,
+        )
+
+    def _build_degradation_trends(
+        self,
+        *,
+        bulk_data: list[dict[str, Any]],
+        min_streak: int,
+        trend_config: _DegradationTrendConfig,
+    ) -> list[DegradationTrendResponse]:
+        """Convert bulk repository results into sorted degradation trends."""
+        trends: list[DegradationTrendResponse] = []
+        for item in bulk_data:
+            trend = self._build_degradation_trend(
+                item=item,
+                min_streak=min_streak,
+                trend_config=trend_config,
+            )
+            if trend is not None:
+                trends.append(trend)
+
+        trends.sort(key=lambda trend: (-trend.streak_count, -abs(trend.total_delta_percent)))
+        return trends
+
+    def _build_degradation_trend(
+        self,
+        *,
+        item: dict[str, Any],
+        min_streak: int,
+        trend_config: _DegradationTrendConfig,
+    ) -> DegradationTrendResponse | None:
+        """Build one degradation trend response from a bulk-data item."""
+        from qdash.common.datetime_utils import ensure_timezone
+
+        param_name = item.get("parameter_name", "")
+        versions = item.get("versions", [])
+        if param_name not in trend_config.eval_modes or len(versions) < 2:
+            return None
+
+        mode = trend_config.eval_modes[param_name]
+        streak = self._detect_streak(versions, mode)
+        if streak < min_streak:
+            return None
+
+        total_delta, total_delta_pct, delta_per_step = self._calculate_trend_metrics(
+            versions, streak
+        )
+        param_meta = trend_config.all_metrics.get(param_name)
+        sparkline_values = self._build_degradation_sparkline_values(versions, streak)
+        newest_val = versions[0].get("value", 0)
+
+        return DegradationTrendResponse(
+            parameter_name=param_name,
+            qid=item.get("qid", ""),
+            evaluation_mode=mode,
+            streak_count=streak,
+            total_delta=total_delta,
+            total_delta_percent=total_delta_pct,
+            delta_per_step=delta_per_step,
+            current_value=self._sanitize_value(newest_val),
+            current_entity_id=versions[0].get("entity_id", ""),
+            unit=param_meta.unit if param_meta else "",
+            values=sparkline_values,
+            valid_from=ensure_timezone(versions[0].get("valid_from")),
+        )
+
+    @staticmethod
+    def _build_degradation_sparkline_values(
+        versions: list[dict[str, Any]],
+        streak: int,
+    ) -> list[float]:
+        """Build oldest-first numeric values for trend sparklines."""
+        sparkline_versions = list(reversed(versions[: streak + 1]))
+        return [
+            float(version.get("value", 0))
+            for version in sparkline_versions
+            if isinstance(version.get("value"), (int, float))
+        ]
 
     def _load_evaluation_modes(
         self,
@@ -1091,131 +1179,179 @@ class ProvenanceService:
             Prioritized list of recommended tasks
 
         """
-        # Get the source entity info
-        source_entity = self.parameter_version_repo.get_by_entity_id(entity_id)
-        source_param_name = ""
-        source_qid = ""
-        if source_entity:
-            source_param_name = getattr(source_entity, "parameter_name", "")
-            source_qid = getattr(source_entity, "qid", "")
-
-        # Get impact graph
+        source_param_name, source_qid = self._get_recalibration_source_info(entity_id)
         impact_data = self.provenance_relation_repo.get_impact(
             project_id=project_id,
             entity_id=entity_id,
             max_depth=max_depth,
         )
-
-        edges: list[LineageEdgeResponse] = [
-            LineageEdgeResponse(
-                relation_type=str(dict(e).get("relation_type", "")),
-                source_id=str(dict(e).get("source", "")),
-                target_id=str(dict(e).get("target", "")),
-            )
-            for e in impact_data.get("edges", [])
-        ]
-        depths = self._compute_graph_depths(origin_id=entity_id, edges=edges, reverse=True)
-
-        # Extract activities and their affected parameters from the impact graph.
-        # task_name -> {qids: set, parameters: set, min_depth: int, example: tuple | None}
-        task_info: dict[str, dict[str, Any]] = {}
-        affected_entity_count = 0
-        max_depth_reached = 0
-
-        for node_item in impact_data.get("nodes", []):
-            node_dict = dict(node_item)
-            node_type = str(node_dict.get("type", ""))
-            metadata = cast(dict[str, Any], node_dict.get("metadata") or {})
-            node_id = str(node_dict.get("id", ""))
-            node_depth = depths.get(node_id, 0)
-            max_depth_reached = max(max_depth_reached, node_depth)
-
-            if node_type == "activity":
-                task_name = str(metadata.get("task_name", ""))
-                qid = str(metadata.get("qid", ""))
-                if task_name:
-                    if task_name not in task_info:
-                        task_info[task_name] = {
-                            "qids": set(),
-                            "parameters": set(),
-                            "min_depth": float("inf"),
-                            "example": None,  # (param_name, qid, depth)
-                        }
-                    if qid:
-                        task_info[task_name]["qids"].add(qid)
-                    task_info[task_name]["min_depth"] = min(
-                        task_info[task_name]["min_depth"], node_depth
-                    )
-
-            elif node_type == "entity":
-                # Count affected entities (excluding source)
-                if node_id != entity_id:
-                    affected_entity_count += 1
-
-                # Track which parameters each task affects
-                param_name = str(metadata.get("parameter_name", ""))
-                task_name = str(metadata.get("task_name", ""))
-                qid = str(metadata.get("qid", ""))
-                if task_name and param_name:
-                    if task_name not in task_info:
-                        task_info[task_name] = {
-                            "qids": set(),
-                            "parameters": set(),
-                            "min_depth": float("inf"),
-                            "example": None,  # (param_name, qid, depth)
-                        }
-                    task_info[task_name]["parameters"].add(param_name)
-                    if qid:
-                        task_info[task_name]["qids"].add(qid)
-                    task_info[task_name]["min_depth"] = min(
-                        task_info[task_name]["min_depth"], node_depth
-                    )
-                    ex = task_info[task_name]["example"]
-                    if ex is None or node_depth < ex[2]:
-                        task_info[task_name]["example"] = (param_name, qid, node_depth)
-
-        # Build recommendations sorted by proximity (min_depth)
-        sorted_tasks = sorted(
-            task_info.items(),
-            key=lambda x: (x[1]["min_depth"], x[0]),
+        recommendation_context = self._build_recalibration_recommendation_context(
+            entity_id=entity_id,
+            impact_data=impact_data,
+            source_param_name=source_param_name,
+            source_qid=source_qid,
         )
-
-        recommendations = []
-        for priority, (task_name, info) in enumerate(sorted_tasks, start=1):
-            qids = sorted(info["qids"])
-            params = sorted(info["parameters"])
-            min_depth = info["min_depth"] if info["min_depth"] != float("inf") else 0
-
-            reason_parts = [
-                f"Found in impact graph (min depth={min_depth})",
-                f"would update {len(params)} parameter(s)",
-            ]
-            if source_param_name and source_qid:
-                reason_parts.append(f"triggered by {source_param_name} ({source_qid}) change")
-            example = info.get("example")
-            if example is not None:
-                ex_param, ex_qid, ex_depth = example
-                reason_parts.append(f"e.g., {ex_param} ({ex_qid}) at depth={ex_depth}")
-            reason = "; ".join(reason_parts)
-
-            recommendations.append(
-                RecommendedTaskResponse(
-                    task_name=task_name,
-                    priority=priority,
-                    affected_parameters=params,
-                    affected_qids=qids,
-                    reason=reason,
-                )
-            )
 
         return RecalibrationRecommendationResponse(
             source_entity_id=entity_id,
             source_parameter_name=source_param_name,
             source_qid=source_qid,
-            recommended_tasks=recommendations,
-            total_affected_parameters=affected_entity_count,
+            recommended_tasks=self._build_recalibration_recommendations(recommendation_context),
+            total_affected_parameters=recommendation_context.affected_entity_count,
+            max_depth_reached=recommendation_context.max_depth_reached,
+        )
+
+    def _get_recalibration_source_info(self, entity_id: str) -> tuple[str, str]:
+        """Return the source parameter name and qid for a recommendation request."""
+        source_entity = self.parameter_version_repo.get_by_entity_id(entity_id)
+        if source_entity is None:
+            return "", ""
+        return (
+            getattr(source_entity, "parameter_name", ""),
+            getattr(source_entity, "qid", ""),
+        )
+
+    def _build_recalibration_recommendation_context(
+        self,
+        *,
+        entity_id: str,
+        impact_data: Any,
+        source_param_name: str,
+        source_qid: str,
+    ) -> _RecalibrationRecommendationContext:
+        """Aggregate impact-graph nodes into task-level recommendation inputs."""
+        edges = self._build_lineage_edges(impact_data.get("edges", []))
+        depths = self._compute_graph_depths(origin_id=entity_id, edges=edges, reverse=True)
+
+        task_info: dict[str, _RecommendationTaskInfo] = {}
+        affected_entity_count = 0
+        max_depth_reached = 0
+
+        for node_item in impact_data.get("nodes", []):
+            node_dict = dict(node_item)
+            node_id = str(node_dict.get("id", ""))
+            node_depth = depths.get(node_id, 0)
+            max_depth_reached = max(max_depth_reached, node_depth)
+
+            node_type = str(node_dict.get("type", ""))
+            metadata = cast("dict[str, Any]", node_dict.get("metadata") or {})
+            if node_type == "activity":
+                self._record_recalibration_activity(task_info, metadata, node_depth)
+                continue
+            if node_type == "entity":
+                if node_id != entity_id:
+                    affected_entity_count += 1
+                self._record_recalibration_entity(task_info, metadata, node_depth)
+
+        return _RecalibrationRecommendationContext(
+            source_param_name=source_param_name,
+            source_qid=source_qid,
+            task_info=task_info,
+            affected_entity_count=affected_entity_count,
             max_depth_reached=max_depth_reached,
         )
+
+    @staticmethod
+    def _build_lineage_edges(raw_edges: list[Any]) -> list[LineageEdgeResponse]:
+        """Convert raw graph edges into schema responses for depth computation."""
+        return [
+            LineageEdgeResponse(
+                relation_type=str(dict(edge).get("relation_type", "")),
+                source_id=str(dict(edge).get("source", "")),
+                target_id=str(dict(edge).get("target", "")),
+            )
+            for edge in raw_edges
+        ]
+
+    @staticmethod
+    def _get_or_create_recommendation_task(
+        task_info: dict[str, _RecommendationTaskInfo],
+        task_name: str,
+    ) -> _RecommendationTaskInfo:
+        """Return the accumulator for one task, creating it on first use."""
+        if task_name not in task_info:
+            task_info[task_name] = _RecommendationTaskInfo(
+                qids=set(),
+                parameters=set(),
+                min_depth=float("inf"),
+            )
+        return task_info[task_name]
+
+    def _record_recalibration_activity(
+        self,
+        task_info: dict[str, _RecommendationTaskInfo],
+        metadata: dict[str, Any],
+        node_depth: int,
+    ) -> None:
+        """Record task/qid information from an activity node."""
+        task_name = str(metadata.get("task_name", ""))
+        if not task_name:
+            return
+        task_entry = self._get_or_create_recommendation_task(task_info, task_name)
+        qid = str(metadata.get("qid", ""))
+        if qid:
+            task_entry.qids.add(qid)
+        task_entry.min_depth = min(task_entry.min_depth, node_depth)
+
+    def _record_recalibration_entity(
+        self,
+        task_info: dict[str, _RecommendationTaskInfo],
+        metadata: dict[str, Any],
+        node_depth: int,
+    ) -> None:
+        """Record affected parameter information from an entity node."""
+        task_name = str(metadata.get("task_name", ""))
+        param_name = str(metadata.get("parameter_name", ""))
+        if not task_name or not param_name:
+            return
+        task_entry = self._get_or_create_recommendation_task(task_info, task_name)
+        task_entry.parameters.add(param_name)
+        qid = str(metadata.get("qid", ""))
+        if qid:
+            task_entry.qids.add(qid)
+        task_entry.min_depth = min(task_entry.min_depth, node_depth)
+        if task_entry.example is None or node_depth < task_entry.example[2]:
+            task_entry.example = (param_name, qid, node_depth)
+
+    def _build_recalibration_recommendations(
+        self,
+        context: _RecalibrationRecommendationContext,
+    ) -> list[RecommendedTaskResponse]:
+        """Build sorted recommendation responses from aggregated task info."""
+        sorted_tasks = sorted(
+            context.task_info.items(),
+            key=lambda item: (item[1].min_depth, item[0]),
+        )
+        return [
+            RecommendedTaskResponse(
+                task_name=task_name,
+                priority=priority,
+                affected_parameters=sorted(info.parameters),
+                affected_qids=sorted(info.qids),
+                reason=self._build_recalibration_reason(info, context),
+            )
+            for priority, (task_name, info) in enumerate(sorted_tasks, start=1)
+        ]
+
+    @staticmethod
+    def _build_recalibration_reason(
+        info: _RecommendationTaskInfo,
+        context: _RecalibrationRecommendationContext,
+    ) -> str:
+        """Build the explanatory reason text for one recommended task."""
+        min_depth = info.min_depth if info.min_depth != float("inf") else 0
+        reason_parts = [
+            f"Found in impact graph (min depth={min_depth})",
+            f"would update {len(info.parameters)} parameter(s)",
+        ]
+        if context.source_param_name and context.source_qid:
+            reason_parts.append(
+                f"triggered by {context.source_param_name} ({context.source_qid}) change"
+            )
+        if info.example is not None:
+            param_name, qid, depth = info.example
+            reason_parts.append(f"e.g., {param_name} ({qid}) at depth={depth}")
+        return "; ".join(reason_parts)
 
     def _build_version_from_metadata(self, item: dict[str, Any]) -> ParameterVersionResponse | None:
         """Build a ParameterVersionResponse from node metadata.

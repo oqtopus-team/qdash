@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from bunnet import SortDirection
+
 from qdash.dbmodel.cooldown_wiring_event import CooldownWiringEventDocument
 from qdash.dbmodel.user import UserDocument
 

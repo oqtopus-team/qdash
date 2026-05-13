@@ -22,6 +22,7 @@ import re
 from typing import Any, Protocol, runtime_checkable
 
 from bunnet import SortDirection
+
 from qdash.datamodel.execution import ExecutionModel
 from qdash.datamodel.task import BaseTaskResultModel, ParameterModel
 from qdash.dbmodel.provenance import ProvenanceRelationType

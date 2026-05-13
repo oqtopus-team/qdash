@@ -7,6 +7,8 @@ from bunnet import Document, SortDirection
 from pydantic import ConfigDict, Field
 from pymongo import ASCENDING, DESCENDING, IndexModel
 
+from qdash.common.datetime_utils import now
+
 
 class FlowDocument(Document):
     """Project-defined Flow metadata.
@@ -42,12 +44,8 @@ class FlowDocument(Document):
     )
     file_path: str = Field(..., description="Relative path to .py file")
     deployment_id: str | None = Field(default=None, description="Prefect deployment ID")
-    created_at: datetime = Field(
-        default_factory=lambda: datetime.now(), description="Creation timestamp"
-    )
-    updated_at: datetime = Field(
-        default_factory=lambda: datetime.now(), description="Last update timestamp"
-    )
+    created_at: datetime = Field(default_factory=now, description="Creation timestamp")
+    updated_at: datetime = Field(default_factory=now, description="Last update timestamp")
     tags: list[str] = Field(default_factory=list, description="Tags for categorization")
 
     model_config = ConfigDict(

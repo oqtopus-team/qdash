@@ -10,8 +10,9 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
-from qdash.api.dependencies import get_config_service  # noqa: TCH002
-from qdash.api.services.config_service import ConfigService  # noqa: TCH002
+
+from qdash.api.dependencies import get_config_service
+from qdash.api.services.config_service import ConfigService
 
 router = APIRouter(tags=["config"])
 

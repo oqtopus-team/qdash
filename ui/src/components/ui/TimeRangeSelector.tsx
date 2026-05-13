@@ -35,22 +35,13 @@ export function TimeRangeSelector({
       <div className="flex items-center gap-3">
         <span className="text-sm font-medium">Time Range</span>
         <div className="join">
-          <button
-            className="join-item btn btn-sm"
-            onClick={() => onQuickRange(1)}
-          >
+          <button className="join-item btn btn-sm" onClick={() => onQuickRange(1)}>
             1D
           </button>
-          <button
-            className="join-item btn btn-sm"
-            onClick={() => onQuickRange(7)}
-          >
+          <button className="join-item btn btn-sm" onClick={() => onQuickRange(7)}>
             7D
           </button>
-          <button
-            className="join-item btn btn-sm"
-            onClick={() => onQuickRange(30)}
-          >
+          <button className="join-item btn btn-sm" onClick={() => onQuickRange(30)}>
             30D
           </button>
         </div>

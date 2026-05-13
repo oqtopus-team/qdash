@@ -7,7 +7,7 @@ import { StickyNote } from "lucide-react";
 import { useTopologyConfig } from "@/hooks/useTopologyConfig";
 import { getQubitGridPosition } from "@/lib/utils/grid-position";
 
-import type { NoteEntryWithMetric } from "./ChipNoteEditor";
+import type { NoteEntryWithMetric } from "./MetricNotePanel";
 import { DashboardNoteTooltip } from "./DashboardNoteTooltip";
 
 interface MetricValue {
@@ -44,12 +44,7 @@ function interpolateColor(c1: string, c2: string, factor: number): string {
   return `#${((1 << 24) + (r << 16) + (g << 8) + bl).toString(16).slice(1)}`;
 }
 
-function pickColor(
-  value: number,
-  min: number,
-  max: number,
-  colors: string[],
-): string | null {
+function pickColor(value: number, min: number, max: number, colors: string[]): string | null {
   if (colors.length === 0) return null;
   if (min === max) return colors[colors.length - 1];
   const t = Math.max(0, Math.min(1, (value - min) / (max - min)));
@@ -138,8 +133,7 @@ export function DashboardCouplingGrid({
   }, [metricData]);
 
   const couplingList: [number, number][] = useMemo(() => {
-    if (topologyCouplings && topologyCouplings.length > 0)
-      return topologyCouplings;
+    if (topologyCouplings && topologyCouplings.length > 0) return topologyCouplings;
     if (!metricData) return [];
     return Object.keys(metricData).map((key) => {
       const [a, b] = key.split("-").map(Number);
@@ -157,10 +151,7 @@ export function DashboardCouplingGrid({
 
   return (
     <div className="w-full overflow-x-auto">
-      <div
-        className="relative mx-auto"
-        style={{ width, height, maxWidth: "100%" }}
-      >
+      <div className="relative mx-auto" style={{ width, height, maxWidth: "100%" }}>
         {/* Qubit cells (background) */}
         {Array.from({ length: gridRows * gridCols }).map((_, idx) => {
           const row = Math.floor(idx / gridCols);
@@ -202,9 +193,7 @@ export function DashboardCouplingGrid({
                 height: cellSize,
               }}
             >
-              <span className="text-[10px] font-semibold px-1 leading-tight">
-                {qid}
-              </span>
+              <span className="text-[10px] font-semibold px-1 leading-tight">{qid}</span>
             </div>
           );
         })}
@@ -217,12 +206,9 @@ export function DashboardCouplingGrid({
           const couplingId = `${qid1}-${qid2}`;
           const metric = metricData?.[couplingId];
           const value = metric?.value ?? null;
-          const bg =
-            value !== null ? pickColor(value, autoMin, autoMax, colors) : null;
-          const centerX =
-            ((pos1.col + pos2.col) / 2) * (cellSize + gap) + cellSize / 2;
-          const centerY =
-            ((pos1.row + pos2.row) / 2) * (cellSize + gap) + cellSize / 2;
+          const bg = value !== null ? pickColor(value, autoMin, autoMax, colors) : null;
+          const centerX = ((pos1.col + pos2.col) / 2) * (cellSize + gap) + cellSize / 2;
+          const centerY = ((pos1.row + pos2.row) / 2) * (cellSize + gap) + cellSize / 2;
           const dx = pos2.col - pos1.col;
           const dy = pos2.row - pos1.row;
           const arrowAngle = (Math.atan2(dy, dx) * 180) / Math.PI;
@@ -235,11 +221,7 @@ export function DashboardCouplingGrid({
             (value !== null
               ? `Q${qid1}→Q${qid2}: ${value.toFixed(4)} ${unit}`
               : `Q${qid1}→Q${qid2}: No data`) +
-            (hasNote
-              ? " · has note"
-              : hasCrossMetricNote
-                ? " · note on other metric"
-                : "") +
+            (hasNote ? " · has note" : hasCrossMetricNote ? " · note on other metric" : "") +
             (onCouplingClick ? " (click to edit note)" : "");
           return (
             <Tag
@@ -273,9 +255,7 @@ export function DashboardCouplingGrid({
                   {value.toFixed(2)}
                 </span>
               ) : (
-                <span className="text-[9px] text-base-content/50 leading-none">
-                  —
-                </span>
+                <span className="text-[9px] text-base-content/50 leading-none">—</span>
               )}
               <svg
                 width="12"
@@ -328,9 +308,7 @@ export function DashboardCouplingGrid({
             const v = metricData?.[hover.key]?.value ?? null;
             const [a, b] = hover.key.split("-");
             const header =
-              v !== null
-                ? `Q${a} → Q${b}: ${v.toFixed(4)} ${unit}`
-                : `Q${a} → Q${b}: No data`;
+              v !== null ? `Q${a} → Q${b}: ${v.toFixed(4)} ${unit}` : `Q${a} → Q${b}: No data`;
             return (
               <DashboardNoteTooltip
                 position={{ x: hover.x, y: hover.y }}

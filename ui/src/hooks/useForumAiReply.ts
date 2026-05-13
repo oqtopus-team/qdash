@@ -22,15 +22,12 @@ export function useForumAiReply() {
 
       try {
         const baseURL = process.env.NEXT_PUBLIC_API_URL || "/api";
-        const response = await fetch(
-          `${baseURL}/forum/posts/${postId}/ai-reply/stream`,
-          {
-            method: "POST",
-            headers: buildHeaders(),
-            body: JSON.stringify({ user_message: userMessage }),
-            signal: controller.signal,
-          },
-        );
+        const response = await fetch(`${baseURL}/forum/posts/${postId}/ai-reply/stream`, {
+          method: "POST",
+          headers: buildHeaders(),
+          body: JSON.stringify({ user_message: userMessage }),
+          signal: controller.signal,
+        });
 
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}: ${response.statusText}`);

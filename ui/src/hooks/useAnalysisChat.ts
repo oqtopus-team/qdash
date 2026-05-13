@@ -3,6 +3,8 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { flushSync } from "react-dom";
 
+import { buildAuthHeaders } from "@/lib/auth/session";
+import { readErrorResponse } from "@/lib/sse-utils";
 import type { ModelOverride } from "@/lib/copilotModels";
 
 export interface ChatMessage {
@@ -54,42 +56,8 @@ export interface AnalysisContext {
   taskId: string;
 }
 
-const PROJECT_STORAGE_KEY = "qdash_current_project_id";
-
 function buildHeaders(): Record<string, string> {
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-  };
-
-  // Match custom-instance.ts interceptor: cookie "access_token"
-  const accessToken = document.cookie
-    .split("; ")
-    .find((row) => row.startsWith("access_token="))
-    ?.split("=")[1];
-  if (accessToken) {
-    headers["Authorization"] = `Bearer ${decodeURIComponent(accessToken)}`;
-  }
-
-  // Match AxiosProvider interceptor: cookie "token" (username)
-  const token = document.cookie
-    .split("; ")
-    .find((row) => row.startsWith("token="))
-    ?.split("=")[1];
-  if (token) {
-    const decoded = decodeURIComponent(token);
-    if (!headers["Authorization"]) {
-      headers["Authorization"] = `Bearer ${decoded}`;
-    }
-    headers["X-Username"] = decoded;
-  }
-
-  // Match AxiosProvider: localStorage project ID
-  const projectId = localStorage.getItem(PROJECT_STORAGE_KEY);
-  if (projectId) {
-    headers["X-Project-Id"] = projectId;
-  }
-
-  return headers;
+  return buildAuthHeaders();
 }
 
 interface SSEEvent {
@@ -148,9 +116,7 @@ export function useAnalysisChat(
     modelOverride?: ModelOverride | null;
   },
 ) {
-  const [messages, setMessagesRaw] = useState<ChatMessage[]>(
-    options?.initialMessages ?? [],
-  );
+  const [messages, setMessagesRaw] = useState<ChatMessage[]>(options?.initialMessages ?? []);
   const [isLoading, setIsLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -235,7 +201,7 @@ export function useAnalysisChat(
         });
 
         if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          throw new Error(await readErrorResponse(response));
         }
 
         const reader = response.body?.getReader();
@@ -273,13 +239,8 @@ export function useAnalysisChat(
                 ]);
               } else {
                 // Legacy format fallback
-                const formattedResponse = formatAnalysisResponse(
-                  result as AnalysisResult,
-                );
-                setMessages((prev) => [
-                  ...prev,
-                  { role: "assistant", content: formattedResponse },
-                ]);
+                const formattedResponse = formatAnalysisResponse(result as AnalysisResult);
+                setMessages((prev) => [...prev, { role: "assistant", content: formattedResponse }]);
               }
             } else if (evt.event === "error") {
               const payload = JSON.parse(evt.data);
@@ -291,8 +252,7 @@ export function useAnalysisChat(
         if (err instanceof DOMException && err.name === "AbortError") {
           return;
         }
-        const errorMsg =
-          err instanceof Error ? err.message : "Analysis request failed";
+        const errorMsg = err instanceof Error ? err.message : "Analysis request failed";
         setError(errorMsg);
         setMessages((prev) => [
           ...prev,
@@ -332,11 +292,7 @@ function formatAnalysisResponse(result: AnalysisResult): string {
 
   // Assessment badge
   const badge =
-    result.assessment === "good"
-      ? "Good"
-      : result.assessment === "warning"
-        ? "Warning"
-        : "Bad";
+    result.assessment === "good" ? "Good" : result.assessment === "warning" ? "Warning" : "Bad";
   parts.push(`**[${badge}]** ${result.summary}\n`);
 
   // Explanation

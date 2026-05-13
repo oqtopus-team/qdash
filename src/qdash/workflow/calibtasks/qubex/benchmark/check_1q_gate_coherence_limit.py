@@ -2,6 +2,8 @@ from typing import ClassVar
 
 import numpy as np
 import plotly.graph_objects as go
+from qubex.analysis.util import calc_1q_gate_coherence_limit
+
 from qdash.datamodel.task import ParameterModel, RunParameterModel
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
@@ -9,7 +11,6 @@ from qdash.workflow.calibtasks.base import (
 )
 from qdash.workflow.calibtasks.qubex.base import QubexTask
 from qdash.workflow.engine.backend.qubex import QubexBackend
-from qubex.analysis.util import calc_1q_gate_coherence_limit
 
 
 class Check1QGateCoherenceLimit(QubexTask):

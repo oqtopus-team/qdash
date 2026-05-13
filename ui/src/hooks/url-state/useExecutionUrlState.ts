@@ -12,10 +12,7 @@ export function useExecutionUrlState(): UseExecutionUrlStateResult {
   const [isInitialized, setIsInitialized] = useState(false);
 
   // URL state management for execution page
-  const [selectedChip, setSelectedChipState] = useQueryState(
-    "chip",
-    parseAsString,
-  );
+  const [selectedChip, setSelectedChipState] = useQueryState("chip", parseAsString);
 
   // Mark as initialized after first render
   useEffect(() => {

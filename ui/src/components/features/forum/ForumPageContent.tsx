@@ -3,15 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useQueryClient } from "@tanstack/react-query";
-import {
-  Lock,
-  MessageSquare,
-  Plus,
-  Settings,
-  Trash2,
-  Unlock,
-  X,
-} from "lucide-react";
+import { Lock, MessageSquare, Plus, Settings, Trash2, Unlock, X } from "lucide-react";
 
 import {
   getListForumCategoriesQueryKey,
@@ -75,11 +67,7 @@ function ForumThreadCard({
       <Link href={`/forum/${post.id}`} className="block p-4">
         <div className="flex items-start gap-3">
           <div className="hidden sm:flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-base-200">
-            <UserAvatar
-              username={post.username}
-              avatarKey={post.avatar_key}
-              size={28}
-            />
+            <UserAvatar username={post.username} avatarKey={post.avatar_key} size={28} />
           </div>
           <div className="min-w-0 flex-1">
             <div className="mb-2 flex flex-wrap items-center gap-2">
@@ -87,21 +75,15 @@ function ForumThreadCard({
                 <Icon className="h-3 w-3" />
                 {category.shortLabel}
               </span>
-              <span className="badge badge-sm badge-neutral">
-                {post.username}
-              </span>
+              <span className="badge badge-sm badge-neutral">{post.username}</span>
               <span className="text-xs text-base-content/40">
                 {formatRelativeTime(post.created_at)}
               </span>
-              {post.is_closed && (
-                <span className="badge badge-sm badge-ghost">Closed</span>
-              )}
+              {post.is_closed && <span className="badge badge-sm badge-ghost">Closed</span>}
             </div>
-            <h2 className="mb-1 truncate text-sm font-semibold">
-              {post.title}
-            </h2>
+            <h2 className="mb-1 truncate text-sm font-semibold">{post.title}</h2>
             <div className="line-clamp-2 text-sm text-base-content/75">
-              <MarkdownContent content={post.content} />
+              <MarkdownContent content={post.content} preview />
             </div>
             <div className="mt-3 flex items-center gap-3 text-xs text-base-content/50">
               <span className="flex items-center gap-1">
@@ -116,18 +98,12 @@ function ForumThreadCard({
       {canManage && (
         <div className="border-t border-base-300 px-4 py-2">
           {post.is_closed ? (
-            <button
-              className="btn btn-ghost btn-xs gap-1"
-              onClick={() => onReopen(post.id)}
-            >
+            <button className="btn btn-ghost btn-xs gap-1" onClick={() => onReopen(post.id)}>
               <Unlock className="h-3 w-3" />
               Reopen
             </button>
           ) : (
-            <button
-              className="btn btn-ghost btn-xs gap-1"
-              onClick={() => onClose(post.id)}
-            >
+            <button className="btn btn-ghost btn-xs gap-1" onClick={() => onClose(post.id)}>
               <Lock className="h-3 w-3" />
               Close
             </button>
@@ -186,6 +162,11 @@ export function ForumPageContent() {
   const mentionCandidates = useMemo(
     () => [
       { id: "qdash", label: "QDash" },
+      {
+        id: "project",
+        label: "Project",
+        secondaryLabel: "Notify all project members",
+      },
       ...(membersResponse?.data.members
         ?.filter((member) => member.username !== user?.username)
         .map((member) => ({
@@ -290,11 +271,7 @@ export function ForumPageContent() {
               className="btn btn-primary btn-sm gap-2"
               onClick={() => setShowComposer((open) => !open)}
             >
-              {showComposer ? (
-                <X className="h-4 w-4" />
-              ) : (
-                <Plus className="h-4 w-4" />
-              )}
+              {showComposer ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
               {showComposer ? "Close" : "New Thread"}
             </button>
           </div>
@@ -332,8 +309,7 @@ export function ForumPageContent() {
             <div className="flex items-center justify-between gap-3">
               <h2 className="card-title text-sm">Forum Categories</h2>
               <span className="text-xs text-base-content/50">
-                Deleting archives the category and keeps existing threads
-                readable.
+                Deleting archives the category and keeps existing threads readable.
               </span>
             </div>
             <div className="mb-4 grid gap-2 sm:grid-cols-[150px_180px_1fr_130px_160px_auto]">
@@ -398,9 +374,7 @@ export function ForumPageContent() {
                 className="btn btn-primary btn-sm"
                 onClick={submitCategory}
                 disabled={
-                  !categoryKey.trim() ||
-                  !categoryName.trim() ||
-                  createCategoryMutation.isPending
+                  !categoryKey.trim() || !categoryName.trim() || createCategoryMutation.isPending
                 }
               >
                 Add
@@ -417,16 +391,10 @@ export function ForumPageContent() {
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
                         <Icon className="h-4 w-4 text-base-content/60" />
-                        <span className="truncate text-sm font-medium">
-                          {item.label}
-                        </span>
-                        <span className={`badge badge-xs ${item.badgeClass}`}>
-                          {item.id}
-                        </span>
+                        <span className="truncate text-sm font-medium">{item.label}</span>
+                        <span className={`badge badge-xs ${item.badgeClass}`}>{item.id}</span>
                       </div>
-                      <p className="truncate text-xs text-base-content/50">
-                        {item.description}
-                      </p>
+                      <p className="truncate text-xs text-base-content/50">{item.description}</p>
                     </div>
                     <button
                       className="btn btn-ghost btn-xs text-error"
@@ -440,9 +408,8 @@ export function ForumPageContent() {
                               }
                               if (newCategory === item.id) {
                                 setNewCategory(
-                                  categories.find(
-                                    (candidate) => candidate.id !== item.id,
-                                  )?.id ?? "other",
+                                  categories.find((candidate) => candidate.id !== item.id)?.id ??
+                                    "other",
                                 );
                               }
                               invalidateCategories();
@@ -476,10 +443,7 @@ export function ForumPageContent() {
           ))}
         </div>
         {category !== "all" && (
-          <button
-            className="btn btn-ghost btn-xs gap-1"
-            onClick={() => setCategoryFilter("all")}
-          >
+          <button className="btn btn-ghost btn-xs gap-1" onClick={() => setCategoryFilter("all")}>
             <X className="h-3 w-3" />
             Clear category
           </button>
@@ -544,16 +508,10 @@ export function ForumPageContent() {
                 categories={categories}
                 canManage={isOwner || user?.username === post.username}
                 onClose={(postId) =>
-                  closeMutation.mutate(
-                    { postId },
-                    { onSuccess: invalidateList },
-                  )
+                  closeMutation.mutate({ postId }, { onSuccess: invalidateList })
                 }
                 onReopen={(postId) =>
-                  reopenMutation.mutate(
-                    { postId },
-                    { onSuccess: invalidateList },
-                  )
+                  reopenMutation.mutate({ postId }, { onSuccess: invalidateList })
                 }
               />
             ))}

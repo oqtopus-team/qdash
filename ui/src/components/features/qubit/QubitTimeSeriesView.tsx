@@ -12,10 +12,7 @@ import { TagSelector } from "@/components/selectors/TagSelector";
 import { DataTable } from "@/components/ui/DataTable";
 import { ErrorCard } from "@/components/ui/ErrorCard";
 import { useCSVExport } from "@/hooks/useCSVExport";
-import {
-  useQubitTimeseries,
-  useQubitParameters,
-} from "@/hooks/useQubitTimeseries";
+import { useQubitTimeseries, useQubitParameters } from "@/hooks/useQubitTimeseries";
 import { useTimeRange } from "@/hooks/useTimeRange";
 import { useQubitTimeSeriesUrlState } from "@/hooks/useUrlState";
 
@@ -24,17 +21,10 @@ interface QubitTimeSeriesViewProps {
   qubitId: string;
 }
 
-export function QubitTimeSeriesView({
-  chipId,
-  qubitId,
-}: QubitTimeSeriesViewProps) {
+export function QubitTimeSeriesView({ chipId, qubitId }: QubitTimeSeriesViewProps) {
   // URL state management for parameter and tag selection
-  const {
-    selectedParameter,
-    selectedTag,
-    setSelectedParameter,
-    setSelectedTag,
-  } = useQubitTimeSeriesUrlState();
+  const { selectedParameter, selectedTag, setSelectedParameter, setSelectedTag } =
+    useQubitTimeSeriesUrlState();
 
   // Time range management with manual refresh
   const {
@@ -47,22 +37,16 @@ export function QubitTimeSeriesView({
   } = useTimeRange({ initialDays: 30 });
 
   // Fetch parameters and tags
-  const {
-    parameters,
-    tags,
-    isLoading: isLoadingMeta,
-    error: metaError,
-  } = useQubitParameters();
+  const { parameters, tags, isLoading: isLoadingMeta, error: metaError } = useQubitParameters();
 
   // Fetch time series data
-  const { tableData, plotData, metadata, isLoading, error, refetch } =
-    useQubitTimeseries({
-      chipId,
-      qubitId,
-      parameter: selectedParameter as ParameterKey,
-      tag: selectedTag as TagKey,
-      timeRange,
-    });
+  const { tableData, plotData, metadata, isLoading, error, refetch } = useQubitTimeseries({
+    chipId,
+    qubitId,
+    parameter: selectedParameter as ParameterKey,
+    tag: selectedTag as TagKey,
+    timeRange,
+  });
 
   // CSV export functionality
   const { exportTimeSeriesCSV } = useCSVExport();
@@ -90,14 +74,14 @@ export function QubitTimeSeriesView({
         font: { size: 20 },
       },
       xaxis: {
-        title: "Time (JST)",
+        title: { text: "Time (JST)" },
         type: "date",
         tickformat: "%Y-%m-%d %H:%M",
         gridcolor: "#eee",
         zeroline: false,
       },
       yaxis: {
-        title: `${metadata.description} [${metadata.unit}]`,
+        title: { text: `${metadata.description} [${metadata.unit}]` },
         type: "linear",
         gridcolor: "#eee",
         zeroline: false,
@@ -118,9 +102,7 @@ export function QubitTimeSeriesView({
     return (
       <ErrorCard
         message={
-          (metaError as Error)?.message ||
-          (error as Error)?.message ||
-          "Failed to load data"
+          (metaError as Error)?.message || (error as Error)?.message || "Failed to load data"
         }
         onRetry={() => {
           if (metaError) window.location.reload();
@@ -182,9 +164,7 @@ export function QubitTimeSeriesView({
           <ParameterSelector
             parameters={parameters}
             selectedParameter={selectedParameter}
-            onParameterSelect={(param) =>
-              setSelectedParameter(param as ParameterKey)
-            }
+            onParameterSelect={(param) => setSelectedParameter(param as ParameterKey)}
             disabled={isLoadingMeta}
           />
           <TagSelector
