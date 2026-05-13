@@ -210,3 +210,150 @@ class TestLoadAvailableParameters:
         result = self.service.load_available_parameters("chip-1", qid="5")
         assert "error" in result
         assert "qid=5" in result["error"]
+
+
+class TestLoadChipParameterTimeseries:
+    """Tests for per-chip parameter timeseries aggregation."""
+
+    def _doc(self, qid: str, value: float, start_at: str, unit: str = "us") -> MagicMock:
+        doc = MagicMock()
+        doc.qid = qid
+        doc.start_at.isoformat.return_value = start_at
+        doc.output_parameters = {"t1": {"value": value, "unit": unit}}
+        return doc
+
+    def test_returns_error_when_no_data_found(self):
+        data_access = MagicMock()
+        data_access.load_chip_parameter_timeseries_docs.return_value = []
+        service = CopilotDataService(data_access=data_access)
+
+        result = service.load_chip_parameter_timeseries("t1", "chip-1")
+
+        assert result == {"error": "No data for 't1' on chip 'chip-1'"}
+
+    def test_builds_qubit_and_chip_statistics(self):
+        data_access = MagicMock()
+        data_access.load_chip_parameter_timeseries_docs.return_value = [
+            self._doc("1", 12.0, "2025-01-01T12:00:00"),
+            self._doc("0", 10.0, "2025-01-01T10:00:00"),
+            self._doc("0", 8.0, "2025-01-01T09:00:00"),
+            self._doc("1", 12.1, "2025-01-01T11:00:00"),
+        ]
+        service = CopilotDataService(data_access=data_access)
+
+        result = service.load_chip_parameter_timeseries("t1", "chip-1", last_n=2)
+
+        assert result["chip_id"] == "chip-1"
+        assert result["parameter_name"] == "t1"
+        assert result["unit"] == "us"
+        assert result["num_qubits"] == 2
+        assert result["statistics"]["count"] == 2
+        assert result["statistics"]["mean"] == 11
+        assert result["statistics"]["median"] == 11
+        assert result["statistics"]["min"] == 10
+        assert result["statistics"]["max"] == 12
+        assert "stdev" in result["statistics"]
+        assert [qubit["qid"] for qubit in result["qubits"]] == ["0", "1"]
+        assert result["qubits"][0]["latest"] == 10
+        assert result["qubits"][0]["trend"] == "up"
+        assert result["qubits"][1]["latest"] == 12
+        assert result["qubits"][1]["trend"] == "stable"
+        assert result["timeseries"] == [
+            {"qid": "0", "t": "2025-01-01T09:00:00", "v": 8.0},
+            {"qid": "0", "t": "2025-01-01T10:00:00", "v": 10.0},
+            {"qid": "1", "t": "2025-01-01T11:00:00", "v": 12.1},
+            {"qid": "1", "t": "2025-01-01T12:00:00", "v": 12.0},
+        ]
+
+    def test_non_numeric_latest_is_excluded_from_chip_statistics(self):
+        data_access = MagicMock()
+        doc = MagicMock()
+        doc.qid = "0"
+        doc.start_at.isoformat.return_value = "2025-01-01T10:00:00"
+        doc.output_parameters = {"t1": {"value": "bad", "unit": "us"}}
+        data_access.load_chip_parameter_timeseries_docs.return_value = [doc]
+        service = CopilotDataService(data_access=data_access)
+
+        result = service.load_chip_parameter_timeseries("t1", "chip-1")
+
+        assert result["statistics"] == {
+            "count": 0,
+            "mean": 0,
+            "median": 0,
+            "min": 0,
+            "max": 0,
+        }
+        assert result["qubits"][0]["latest"] == "bad"
+
+
+class TestLoadChipSummary:
+    """Tests for chip-level qubit summary aggregation."""
+
+    def _doc(self, qid: str, data: dict[str, object]) -> MagicMock:
+        doc = MagicMock()
+        doc.qid = qid
+        doc.data = data
+        return doc
+
+    def test_returns_error_when_chip_has_no_qubits(self):
+        data_access = MagicMock()
+        data_access.load_qubits_for_chip.return_value = []
+        service = CopilotDataService(data_access=data_access)
+
+        result = service.load_chip_summary("chip-1")
+
+        assert result == {"error": "No qubits found for chip_id=chip-1"}
+
+    def test_builds_statistics_and_uniform_qubit_rows(self):
+        data_access = MagicMock()
+        data_access.load_qubits_for_chip.return_value = [
+            self._doc("1", {"t1": {"value": 12.0}, "label": "good"}),
+            self._doc("0", {"t1": {"value": 10.0}, "label": "best", "t2": {"value": 7.0}}),
+        ]
+        service = CopilotDataService(data_access=data_access)
+
+        result = service.load_chip_summary("chip-1")
+
+        assert result["chip_id"] == "chip-1"
+        assert result["num_qubits"] == 2
+        assert result["statistics"]["t1"] == {
+            "mean": 11,
+            "median": 11,
+            "stdev": 1.414,
+            "min": 10,
+            "max": 12,
+            "count": 2,
+        }
+        assert result["statistics"]["t2"] == {
+            "mean": 7,
+            "median": 7,
+            "stdev": 0.0,
+            "min": 7,
+            "max": 7,
+            "count": 1,
+        }
+        assert result["qubits"] == [
+            {"qid": "0", "label": "best", "t1": 10.0, "t2": 7.0},
+            {"qid": "1", "label": "good", "t1": 12.0, "t2": None},
+        ]
+
+    def test_parameter_filter_applies_before_statistics(self):
+        data_access = MagicMock()
+        data_access.load_qubits_for_chip.return_value = [
+            self._doc("0", {"t1": {"value": 10.0}, "t2": {"value": 7.0}}),
+        ]
+        service = CopilotDataService(data_access=data_access)
+
+        result = service.load_chip_summary("chip-1", param_names=["t2"])
+
+        assert result["statistics"] == {
+            "t2": {
+                "mean": 7,
+                "median": 7,
+                "stdev": 0.0,
+                "min": 7,
+                "max": 7,
+                "count": 1,
+            }
+        }
+        assert result["qubits"] == [{"qid": "0", "t2": 7.0}]
