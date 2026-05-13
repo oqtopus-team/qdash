@@ -9,17 +9,18 @@ from __future__ import annotations
 
 import functools
 import itertools
+from collections import Counter
 from dataclasses import dataclass, field
 from operator import attrgetter, itemgetter
 from typing import TYPE_CHECKING, NamedTuple
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Callable, Sequence
 
     import plotly.graph_objs as go
-    from qdash.analysis.spectroscopy.bare_shift import BareShiftBoundary
 
 import numpy as np
+from qdash.analysis.spectroscopy.bare_shift import BareShiftBoundary
 from scipy.ndimage import convolve1d
 from scipy.signal import find_peaks as scipy_find_peaks
 
@@ -57,9 +58,15 @@ class PeakGroup:
 class Resonance:
     """Represents a detected resonance combining high and low power peaks."""
 
-    def __init__(self, high_power_peaks: PeakGroup | None, low_power_peak: Peak | None):
+    def __init__(
+        self,
+        high_power_peaks: PeakGroup | None,
+        low_power_peak: Peak | None,
+        complementary_peaks: list[Peak] | None = None,
+    ):
         self.high_power_peaks = high_power_peaks
         self.low_power_peak = low_power_peak
+        self.complementary_peaks = complementary_peaks or []
 
     @property
     def x(self) -> int:
@@ -71,17 +78,19 @@ class Resonance:
         return -1
 
     @functools.cached_property
-    def score(self) -> tuple[bool, bool, float, float]:
+    def score(self) -> tuple[bool, float, bool, float, float]:
         """Score tuple used to rank resonances.
 
         Order of preference (descending):
           1. has a high-power peak group
-          2. has a low-power peak
-          3. high_power_grad (more strongly downward-sloped is better)
-          4. max_prominence across all peaks
+          2. high_power_x_span
+          3. has a low-power peak
+          4. high_power_grad (more strongly downward-sloped is better)
+          5. max_prominence across all peaks
         """
         return (
             self.has_high_power_peaks,
+            self.high_power_x_span,
             self.has_low_power_peak,
             self.high_power_grad,
             self.max_prominence,
@@ -103,11 +112,20 @@ class Resonance:
         return max(self._compute_grad(p0, p1) for p0, p1 in itertools.combinations(self.peaks, 2))
 
     @functools.cached_property
+    def high_power_x_span(self) -> float:
+        """X span of high-power peaks; larger spans are preferred by script logic."""
+        if not self.high_power_peaks:
+            return float("-inf")
+        xs = [peak.x for peak in self.high_power_peaks.peaks]
+        return float(max(xs) - min(xs))
+
+    @functools.cached_property
     def peaks(self) -> list[Peak]:
         """All peaks associated with this resonance."""
         peaks: list[Peak] = []
         if self.high_power_peaks:
             peaks.extend(self.high_power_peaks.peaks)
+        peaks.extend(self.complementary_peaks)
         if self.low_power_peak:
             peaks.append(self.low_power_peak)
         return peaks
@@ -179,6 +197,7 @@ class EstimateResonatorFrequencyConfig:
         default_factory=ComposeResonancesConfig
     )
     group_resonances_conf: GroupResonancesConfig = field(default_factory=GroupResonancesConfig)
+    minimum_usable_power_correlation_coefficient_min: float = 0.9
 
     def with_boundary(self, boundary: BareShiftBoundary) -> EstimateResonatorFrequencyConfig:
         """Return a copy of this config with power bounds taken from a boundary."""
@@ -192,6 +211,9 @@ class EstimateResonatorFrequencyConfig:
             group_peaks_conf=self.group_peaks_conf,
             compose_resonances_conf=self.compose_resonances_conf,
             group_resonances_conf=self.group_resonances_conf,
+            minimum_usable_power_correlation_coefficient_min=(
+                self.minimum_usable_power_correlation_coefficient_min
+            ),
         )
 
 
@@ -397,6 +419,86 @@ def _detect_low_power_peaks(
     ]
 
 
+def _detect_complementary_peaks(
+    ys: Sequence[float],
+    zs: Sequence[Sequence[float]],
+    config: EstimateResonatorFrequencyConfig,
+    resonances: Sequence[Resonance],
+) -> dict[int, list[Peak]]:
+    """Detect extra peaks between the low- and high-power resonance endpoints."""
+    if config.high_power_min is None or config.high_power_max is None:
+        return {}
+
+    y_idx_high_min = _arg_closest(ys, config.high_power_min)
+    y_idx_high_max = _arg_closest(ys, config.high_power_max)
+
+    if y_idx_high_min > y_idx_high_max:
+        y_idx_high_min, y_idx_high_max = y_idx_high_max, y_idx_high_min
+
+    known_peaks = list(itertools.chain.from_iterable(res.peaks for res in resonances))
+
+    def is_known_peak(x_idx: int, y_idx: int) -> bool:
+        return any(x_idx == known_peak.x and y_idx == known_peak.y for known_peak in known_peaks)
+
+    peaks: dict[int, list[Peak]] = {}
+    for y_idx in range(y_idx_high_min, y_idx_high_max + 1):
+        peak_xs, prominences = _detect_peaks(
+            trace=zs[y_idx],
+            num_resonators=config.num_resonators * 2,
+            smooth_sigma=config.find_peaks_conf_low.smooth_sigma,
+            distance=config.find_peaks_conf_low.distance,
+            prominence=config.find_peaks_conf_low.prominence,
+        )
+        peaks[y_idx] = [
+            Peak(peak_idx, y_idx, prominence)
+            for peak_idx, prominence in zip(peak_xs, prominences, strict=False)
+            if not is_known_peak(peak_idx, y_idx)
+        ]
+
+    return peaks
+
+
+def _complement_peaks(
+    len_ys: int,
+    complementary_peaks: dict[int, list[Peak]],
+    resonance: Resonance,
+) -> Resonance:
+    """Attach intermediate peaks found between a resonance's endpoints."""
+    if resonance.high_power_peaks and resonance.low_power_peak:
+        peak0 = resonance.high_power_peaks.bottom
+        peak1 = resonance.low_power_peak
+    elif resonance.high_power_peaks:
+        peak0 = resonance.high_power_peaks.bottom
+        peak1 = resonance.high_power_peaks.bottom
+    elif resonance.low_power_peak:
+        peak0 = Peak(x=resonance.low_power_peak.x, y=len_ys, prominence=0)
+        peak1 = resonance.low_power_peak
+    else:
+        return resonance
+
+    x_min = min(peak0.x, peak1.x)
+    x_max = max(peak0.x, peak1.x)
+    y_min = min(peak0.y, peak1.y) + 1
+    y_max = max(peak0.y, peak1.y) - 1
+
+    if y_min > y_max:
+        return resonance
+
+    target_peaks: list[Peak] = []
+    for y_idx in range(y_min, y_max + 1):
+        if y_idx not in complementary_peaks:
+            continue
+        candidates = [peak for peak in complementary_peaks[y_idx] if x_min <= peak.x <= x_max]
+        if candidates:
+            target_peaks.append(sorted(candidates, key=attrgetter("x"))[0])
+
+    return Resonance(
+        high_power_peaks=resonance.high_power_peaks,
+        low_power_peak=resonance.low_power_peak,
+        complementary_peaks=target_peaks,
+    )
+
+
 def _select_resonances(
     peak_groups: Sequence[PeakGroup],
     low_power_peaks: Sequence[Peak],
@@ -428,6 +530,102 @@ def _select_resonances(
     return selected, rejected
 
 
+def _find_first_left(
+    arr: Sequence[float],
+    start: int,
+    predicate: Callable[[float], bool],
+) -> int | None:
+    start = min(start, len(arr) - 1)
+    for i in range(start, -1, -1):
+        if predicate(arr[i]):
+            return i
+    return None
+
+
+@dataclass(frozen=True)
+class CorrelationBasedMinimumUsablePowerEstimator:
+    """Estimate the lowest usable power using adjacent-row correlation."""
+
+    coef_min: float
+
+    def estimate_idx(self, zs: Sequence[Sequence[float]], idx_base: int) -> int:
+        correlation_rel = [np.corrcoef(zs)[i][i + 1] for i in range(len(zs) - 1)]
+        correlated_rightmost = _find_first_left(
+            correlation_rel, idx_base, lambda x: x >= self.coef_min
+        )
+        if correlated_rightmost is None:
+            return idx_base
+        first_below_threshold = _find_first_left(
+            correlation_rel, correlated_rightmost, lambda x: x < self.coef_min
+        )
+        if first_below_threshold is None:
+            return 0
+        return first_below_threshold + 1
+
+
+def _sort_by_count_x_desc(peaks: Sequence[Peak]) -> list[tuple[int, int]]:
+    return sorted(
+        Counter(map(attrgetter("x"), peaks)).items(),
+        key=lambda item: (item[1], item[0]),
+        reverse=True,
+    )
+
+
+def estimate_local_bare_shift_boundary(
+    ys: Sequence[float],
+    resonance: Resonance,
+) -> BareShiftBoundary:
+    """Estimate a local bare-shift boundary for one resonance."""
+    x_fixed = next(x for x, _ in _sort_by_count_x_desc(resonance.peaks) if x >= resonance.x)
+    y_fixed = next(
+        peak.y
+        for peak in sorted(resonance.peaks, key=attrgetter("y"), reverse=True)
+        if peak.x == x_fixed
+    )
+
+    if y_fixed + 1 < len(ys):
+        return BareShiftBoundary(
+            low_power=float(ys[y_fixed]),
+            high_power_min=float(ys[y_fixed + 1]),
+            high_power_max=float(ys[-1]),
+        )
+    return BareShiftBoundary(
+        low_power=float(ys[-1]),
+        high_power_min=None,
+        high_power_max=None,
+    )
+
+
+def estimate_minimum_usable_power(
+    ys: Sequence[float],
+    zs: Sequence[Sequence[float]],
+    low_power: float,
+    *,
+    correlation_coefficient_min: float = 0.9,
+) -> float:
+    """Estimate the minimum usable readout power from spectroscopy correlations."""
+    y_idx_base = _arg_closest(ys, low_power)
+    estimator = CorrelationBasedMinimumUsablePowerEstimator(coef_min=correlation_coefficient_min)
+    y_idx_min = estimator.estimate_idx(zs=zs, idx_base=y_idx_base)
+    return float(ys[y_idx_min])
+
+
+def estimate_optimal_powers(
+    ys: Sequence[float],
+    local_boundaries: Sequence[BareShiftBoundary],
+    minimum_usable_power: float,
+) -> list[float]:
+    """Estimate optimal powers as midpoints between minimum usable and local low power."""
+    y_idx_0 = _arg_closest(ys, minimum_usable_power)
+
+    def compute_mid(y: float) -> float:
+        y_idx_1 = _arg_closest(ys, y)
+        y_idx_mid = (y_idx_0 + y_idx_1) // 2
+        return float(ys[y_idx_mid])
+
+    return [compute_mid(boundary.low_power) for boundary in local_boundaries]
+
+
 def estimate_resonator_frequency(
     xs: Sequence[float],
     ys: Sequence[float],
@@ -454,6 +652,18 @@ def estimate_resonator_frequency(
     peak_groups = _detect_high_power_peak_groups(ys, zs, config)
     low_power_peaks = _detect_low_power_peaks(ys, zs, config)
     selected, rejected = _select_resonances(peak_groups, low_power_peaks, config)
+    complementary_peaks = _detect_complementary_peaks(
+        ys,
+        zs,
+        config,
+        selected + rejected,
+    )
+    selected = [
+        _complement_peaks(len(ys), complementary_peaks, resonance) for resonance in selected
+    ]
+    rejected = [
+        _complement_peaks(len(ys), complementary_peaks, resonance) for resonance in rejected
+    ]
 
     frequencies = [float(xs[r.x]) for r in selected]
 
@@ -502,6 +712,9 @@ def create_marked_figure(
     fig: go.Figure,
     resonances: list[Resonance],
     rejected_resonances: list[Resonance] | None = None,
+    local_boundaries: list[BareShiftBoundary] | None = None,
+    optimal_powers: list[float] | None = None,
+    minimum_usable_power: float | None = None,
     show_high_power_peaks: bool = True,
     selected_color: str = "red",
     rejected_color: str = "orange",
@@ -512,6 +725,12 @@ def create_marked_figure(
         fig: Original plotly figure containing the spectroscopy data.
         resonances: List of detected resonances to mark as selected.
         rejected_resonances: List of rejected resonances to mark differently.
+        local_boundaries: Optional local bare-shift boundaries for resonances
+            followed by rejected_resonances.
+        optimal_powers: Optional optimal powers for resonances followed by
+            rejected_resonances.
+        minimum_usable_power: Optional minimum usable power to draw as a
+            horizontal guide.
         show_high_power_peaks: Whether to show high-power peak markers.
         selected_color: Color for selected resonance vertical lines.
         rejected_color: Color for rejected resonance vertical lines.
@@ -530,6 +749,8 @@ def create_marked_figure(
     all_resonances = list(resonances)
     if rejected_resonances:
         all_resonances.extend(rejected_resonances)
+
+    x_diff = float(xs[1] - xs[0]) if len(xs) > 1 else 0.0
 
     if show_high_power_peaks:
         peak_groups = sorted(
@@ -556,6 +777,57 @@ def create_marked_figure(
                 )
             )
 
+    for i, resonance in enumerate(all_resonances):
+        color = MARKER_COLORS[i % len(MARKER_COLORS)]
+        if resonance.low_power_peak:
+            marked_fig.add_trace(
+                pgo.Scatter(
+                    x=[xs[resonance.low_power_peak.x]],
+                    y=[ys[resonance.low_power_peak.y]],
+                    mode="markers",
+                    marker={"color": color, "size": 8, "symbol": "circle"},
+                    showlegend=False,
+                )
+            )
+
+        if resonance.complementary_peaks:
+            marked_fig.add_trace(
+                pgo.Scatter(
+                    x=[xs[peak.x] for peak in resonance.complementary_peaks],
+                    y=[ys[peak.y] for peak in resonance.complementary_peaks],
+                    mode="markers",
+                    marker={"color": color, "size": 8, "symbol": "diamond"},
+                    showlegend=False,
+                )
+            )
+
+        if local_boundaries and i < len(local_boundaries):
+            marked_fig.add_trace(
+                pgo.Scatter(
+                    x=[xs[resonance.x] + x_diff * 8],
+                    y=[local_boundaries[i].low_power],
+                    mode="markers",
+                    marker={"color": color, "size": 6, "symbol": "triangle-left"},
+                    showlegend=False,
+                )
+            )
+
+        if optimal_powers and i < len(optimal_powers):
+            marked_fig.add_trace(
+                pgo.Scatter(
+                    x=[xs[resonance.x]],
+                    y=[optimal_powers[i]],
+                    mode="markers",
+                    marker={
+                        "color": color,
+                        "size": 10,
+                        "symbol": "star",
+                        "line": {"color": "white", "width": 1},
+                    },
+                    showlegend=False,
+                )
+            )
+
     for resonance in resonances:
         marked_fig.add_vline(
             x=xs[resonance.x],
@@ -572,6 +844,14 @@ def create_marked_figure(
                 line_color=rejected_color,
                 line_dash="dash",
             )
+
+    if minimum_usable_power is not None:
+        marked_fig.add_hline(
+            y=minimum_usable_power,
+            line_width=1,
+            line_color="yellow",
+            line_dash="dot",
+        )
 
     return marked_fig
 

@@ -46,7 +46,8 @@ class BringUp(CalibrationStep):
     Provides: bringup
 
     Metrics extracted:
-    - estimated_resonator_frequency (GHz): From resonator spectroscopy
+    - readout_frequency (GHz): From resonator spectroscopy
+    - readout_amplitude (a.u.): From resonator spectroscopy optimal power
     - qubit_frequency (GHz): f01 transition frequency from qubit spectroscopy
     - anharmonicity (GHz): alpha = f12 - f01 (typically negative for transmon)
 
@@ -191,13 +192,20 @@ class BringUp(CalibrationStep):
         """Extract metrics from raw result."""
         metrics: dict[str, float] = {}
 
-        # Resonator frequency from CheckResonatorSpectroscopy
+        # Readout parameters from CheckResonatorSpectroscopy
         reso_result = raw.get("CheckResonatorSpectroscopy", {})
         if reso_result and not reso_result.get("skipped", False):
-            freq_param = reso_result.get("estimated_resonator_frequency")
+            freq_param = reso_result.get("readout_frequency") or reso_result.get(
+                "estimated_resonator_frequency"
+            )
             if freq_param is not None:
-                metrics["estimated_resonator_frequency"] = (
+                metrics["readout_frequency"] = (
                     freq_param.value if hasattr(freq_param, "value") else freq_param
+                )
+            amp_param = reso_result.get("readout_amplitude")
+            if amp_param is not None:
+                metrics["readout_amplitude"] = (
+                    amp_param.value if hasattr(amp_param, "value") else amp_param
                 )
 
         # Coarse qubit frequency and anharmonicity from CheckQubitSpectroscopy

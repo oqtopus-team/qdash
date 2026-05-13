@@ -2,6 +2,7 @@
 
 import { Suspense } from "react";
 import { CopilotChatPage } from "@/components/features/chat/CopilotChatPage";
+import { CopilotChatSessionProvider } from "@/contexts/CopilotChatSessionContext";
 
 function ChatPageSkeleton() {
   return (
@@ -15,7 +16,9 @@ function ChatPageSkeleton() {
 export default function ChatPage() {
   return (
     <Suspense fallback={<ChatPageSkeleton />}>
-      <CopilotChatPage />
+      <CopilotChatSessionProvider>
+        <CopilotChatPage />
+      </CopilotChatSessionProvider>
     </Suspense>
   );
 }

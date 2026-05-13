@@ -19,7 +19,7 @@ from qdash.api.schemas.metrics import (
     MetricValue,
     QubitMetricHistoryResponse,
 )
-from qdash.common.datetime_utils import now, to_datetime
+from qdash.common.datetime_utils import local_now, now, to_datetime
 
 if TYPE_CHECKING:
     from io import BytesIO
@@ -460,7 +460,7 @@ class MetricsService:
             logger.error(f"Failed to generate PDF report: {e}")
             raise HTTPException(status_code=500, detail=f"PDF generation failed: {e!s}") from e
 
-        timestamp = now().strftime("%Y%m%d_%H%M%S")
+        timestamp = local_now().strftime("%Y%m%d_%H%M%S")
         filename = f"metrics_report_{chip_id}_{timestamp}.pdf"
 
         return pdf_buffer, filename, chip.topology_id

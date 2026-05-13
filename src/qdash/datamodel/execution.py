@@ -3,7 +3,12 @@ from enum import Enum
 from typing import Any
 
 from pydantic import BaseModel, Field, field_serializer, field_validator
-from qdash.common.datetime_utils import ensure_timezone, format_elapsed_time, parse_elapsed_time
+from qdash.common.datetime_utils import (
+    ensure_timezone,
+    format_elapsed_time,
+    format_iso,
+    parse_elapsed_time,
+)
 from qdash.datamodel.system_info import SystemInfoModel
 
 __all__ = [
@@ -87,7 +92,7 @@ class ExecutionModel(BaseModel):
     @classmethod
     def _serialize_datetime(cls, v: datetime | None) -> str | None:
         """Serialize datetime to ISO format for JSON compatibility."""
-        return v.isoformat() if v else None
+        return format_iso(v)
 
     @field_serializer("elapsed_time")
     @classmethod

@@ -2,7 +2,9 @@
 
 import { createPortal } from "react-dom";
 
-import type { NoteEntryWithMetric } from "./ChipNoteEditor";
+import { formatDateTime } from "@/lib/utils/datetime";
+
+import type { NoteEntryWithMetric } from "./MetricNotePanel";
 
 interface DashboardNoteTooltipProps {
   /** Anchor position in viewport coordinates (top-center of the source cell). */
@@ -66,7 +68,7 @@ export function DashboardNoteTooltip({
           </div>
           <p className="whitespace-pre-wrap break-words">{current.content}</p>
           <div className="text-[10px] text-base-content/50 mt-0.5">
-            {current.username} · {new Date(current.updatedAt).toLocaleString()}
+            {current.username} · {formatDateTime(current.updatedAt)}
           </div>
         </div>
       )}
@@ -83,7 +85,7 @@ export function DashboardNoteTooltip({
                   {n.content}
                 </p>
                 <div className="text-[10px] text-base-content/50">
-                  {n.username} · {new Date(n.updatedAt).toLocaleString()}
+                  {n.username} · {formatDateTime(n.updatedAt)}
                 </div>
               </li>
             ))}

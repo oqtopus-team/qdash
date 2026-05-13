@@ -17,6 +17,7 @@ import {
   useGetProvenanceLineage,
   useGetParameterHistory,
 } from "@/client/provenance/provenance";
+import { formatDate } from "@/lib/utils/datetime";
 
 import { LineagePathComparison } from "./LineagePathComparison";
 import { ProvenanceGraph } from "./ProvenanceGraph";
@@ -226,9 +227,7 @@ export function LineageExplorerPanel({
                     {versions.map((v) => (
                       <option key={v.entity_id} value={v.entity_id}>
                         v{v.version}
-                        {v.valid_from
-                          ? ` — ${new Date(v.valid_from).toLocaleDateString()}`
-                          : ""}
+                        {v.valid_from ? ` — ${formatDate(v.valid_from)}` : ""}
                       </option>
                     ))}
                   </select>
@@ -284,7 +283,7 @@ export function LineageExplorerPanel({
                           <option key={v.entity_id} value={v.entity_id}>
                             v{v.version}
                             {v.valid_from
-                              ? ` — ${new Date(v.valid_from).toLocaleDateString()}`
+                              ? ` — ${formatDate(v.valid_from)}`
                               : ""}
                           </option>
                         ))}

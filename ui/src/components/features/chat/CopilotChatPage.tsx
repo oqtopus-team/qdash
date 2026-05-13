@@ -23,6 +23,7 @@ import {
   Loader2,
   Sparkles,
   ArrowRight,
+  Cpu,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -33,6 +34,14 @@ import {
 } from "@/hooks/useCopilotChat";
 import { ChatPlotlyChart } from "@/components/features/chat/ChatPlotlyChart";
 import { CodeBlock } from "@/components/features/chat/CodeBlock";
+import { useGetCopilotConfig } from "@/client/copilot/copilot";
+import {
+  buildChatModelOptions,
+  getStoredChatModelKey,
+  resolveChatModelOption,
+  setStoredChatModelKey,
+} from "@/lib/copilotModels";
+import { formatDateTime, formatDateTimeCompact } from "@/lib/utils/datetime";
 import type { BlocksResult } from "@/hooks/useAnalysisChat";
 
 // ---------------------------------------------------------------------------
@@ -280,11 +289,11 @@ function formatTime(ts: number): string {
   const diffDays = Math.floor(diffMs / 86400000);
 
   if (diffDays === 0) {
-    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    return formatDateTime(d.toISOString(), "HH:mm");
   }
   if (diffDays === 1) return "Yesterday";
   if (diffDays < 7) return `${diffDays}d ago`;
-  return d.toLocaleDateString([], { month: "short", day: "numeric" });
+  return formatDateTimeCompact(d.toISOString()).split(" ")[0];
 }
 
 function SessionListItem({
@@ -311,11 +320,6 @@ function SessionListItem({
         <div className="min-w-0 flex-1">
           <div className="text-sm font-medium truncate">{session.title}</div>
           <div className="flex items-center gap-2 mt-1 text-xs text-base-content/50">
-            {session.context?.qid && (
-              <span className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-base-300/50 text-[10px] font-medium">
-                {session.context.qid}
-              </span>
-            )}
             <span>{session.messages.length} msgs</span>
             <span className="text-base-content/30">
               {formatTime(session.updatedAt)}
@@ -365,6 +369,22 @@ const SUGGESTED_QUESTIONS = [
 // ---------------------------------------------------------------------------
 
 export function CopilotChatPage() {
+  const [selectedModelKey, setSelectedModelKey] = useState(
+    getStoredChatModelKey,
+  );
+  const { data: copilotConfigResponse } = useGetCopilotConfig();
+  const modelOptions = useMemo(
+    () => buildChatModelOptions(copilotConfigResponse?.data ?? null),
+    [copilotConfigResponse?.data],
+  );
+  const selectedModel = resolveChatModelOption(modelOptions, selectedModelKey);
+  const modelOverride = selectedModel?.model ?? null;
+
+  const handleModelChange = (key: string) => {
+    setSelectedModelKey(key);
+    setStoredChatModelKey(key);
+  };
+
   const {
     sessions,
     activeSession,
@@ -378,7 +398,7 @@ export function CopilotChatPage() {
     deleteSession,
     sendMessage,
     clearActiveSession,
-  } = useCopilotChat();
+  } = useCopilotChat({ modelOverride });
 
   const [input, setInput] = useState("");
   const [showSessionSidebar, setShowSessionSidebar] = useState(true);
@@ -492,6 +512,23 @@ export function CopilotChatPage() {
               {activeSession?.title || "AI Chat"}
             </h2>
           </div>
+          {modelOptions.length > 1 && (
+            <label className="flex items-center gap-1 mr-1" title="Chat model">
+              <Cpu className="w-3.5 h-3.5 text-base-content/40" />
+              <select
+                className="select select-bordered select-xs w-44 text-xs"
+                value={selectedModel.key}
+                onChange={(event) => handleModelChange(event.target.value)}
+                disabled={isLoading}
+              >
+                {modelOptions.map((option) => (
+                  <option key={option.key} value={option.key}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           {messages.length > 0 && (
             <button
               onClick={clearActiveSession}

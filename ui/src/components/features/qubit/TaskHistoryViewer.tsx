@@ -11,6 +11,7 @@ import { PlotlyRenderer } from "@/components/charts/PlotlyRenderer";
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { TaskGridView } from "@/components/features/chip/TaskGridView";
 import { ReanalysisPanel } from "@/components/features/qubit/ReanalysisPanel";
+import { formatDate, formatTime } from "@/lib/utils/datetime";
 
 const REANALYZABLE_TASKS = new Set([
   "CheckResonatorSpectroscopy",
@@ -146,22 +147,11 @@ export function TaskHistoryViewer({
 
   const formatDateTime = (dateStr?: string | null) => {
     if (!dateStr) return "-";
-    const date = new Date(dateStr);
     return (
       <>
-        <div className="font-medium">
-          {date.toLocaleDateString("ja-JP", {
-            year: "numeric",
-            month: "2-digit",
-            day: "2-digit",
-          })}
-        </div>
+        <div className="font-medium">{formatDate(dateStr)}</div>
         <div className="text-xs text-base-content/60">
-          {date.toLocaleTimeString("ja-JP", {
-            hour: "2-digit",
-            minute: "2-digit",
-            second: "2-digit",
-          })}
+          {formatTime(dateStr)}
         </div>
       </>
     );

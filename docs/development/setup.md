@@ -15,7 +15,7 @@
 
 | Tool                                        | Version   | Description                          |
 | ------------------------------------------- | --------- | ------------------------------------ |
-| [Python](https://www.python.org/downloads/) | 3.10-3.12 | Backend development                  |
+| [Python](https://www.python.org/downloads/) | 3.11-3.12 | Backend development                  |
 | [Bun](https://bun.sh/)                      | 1.0+      | Frontend package manager and runtime |
 | [Node.js](https://nodejs.org/)              | 20+       | Alternative frontend runtime         |
 

@@ -6,7 +6,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import { keepPreviousData } from "@tanstack/react-query";
 import { Bot } from "lucide-react";
 
-import { formatDateTime } from "@/lib/utils/datetime";
+import { dateToDateInput, formatDateTime } from "@/lib/utils/datetime";
 
 import { CouplingGrid } from "./CouplingGrid";
 import { TaskResultGrid } from "./TaskResultGrid";
@@ -123,9 +123,13 @@ export function ChipPageContent() {
   // Get task list from task-files API
   const { data: taskInfoData } = useListTaskInfo({ backend: defaultBackend });
 
-  const { data: notesSummaryData } = useGetChipNotesSummary(selectedChip, {
-    query: { enabled: !!selectedChip, staleTime: 30_000 },
-  });
+  const { data: notesSummaryData } = useGetChipNotesSummary(
+    selectedChip,
+    undefined,
+    {
+      query: { enabled: !!selectedChip, staleTime: 30_000 },
+    },
+  );
 
   const aiTriageBadgesByTaskId = useMemo(() => {
     const badges = new Map<string, AiTriageBadgeState>();
@@ -465,7 +469,7 @@ export function ChipPageContent() {
                     const target = cd.ended_at
                       ? new Date(cd.ended_at)
                       : new Date();
-                    setSelectedDate(target.toISOString().slice(0, 10));
+                    setSelectedDate(dateToDateInput(target));
                   }}
                 />
               </PageFiltersBar.Item>

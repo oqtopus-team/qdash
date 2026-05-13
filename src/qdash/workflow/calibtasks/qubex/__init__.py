@@ -46,6 +46,9 @@ from qdash.workflow.calibtasks.qubex.one_qubit_coarse.check_hpi_pulse import Che
 from qdash.workflow.calibtasks.qubex.one_qubit_coarse.check_optimal_readout_amplitude import (
     CheckOptimalReadoutAmplitude,
 )
+from qdash.workflow.calibtasks.qubex.one_qubit_coarse.check_optimal_readout_frequency import (
+    CheckOptimalReadoutFrequency,
+)
 from qdash.workflow.calibtasks.qubex.one_qubit_coarse.check_pi_pulse import CheckPIPulse
 from qdash.workflow.calibtasks.qubex.one_qubit_coarse.check_qubit import CheckQubit
 from qdash.workflow.calibtasks.qubex.one_qubit_coarse.check_qubit_frequency import (
@@ -130,6 +133,7 @@ __all__ = [
     "CheckQubitFrequencies",
     "CheckQubitSpectroscopy",
     "CheckOptimalReadoutAmplitude",
+    "CheckOptimalReadoutFrequency",
     "CheckDispersiveShift",
     "CheckControlAmplitude",
 ]

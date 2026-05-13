@@ -33,6 +33,9 @@ from qdash.analysis.spectroscopy.estimate_resonator_frequency import (
     Resonance,
     create_marked_figure,
     estimate_and_mark_figure,
+    estimate_local_bare_shift_boundary,
+    estimate_minimum_usable_power,
+    estimate_optimal_powers,
     estimate_resonator_frequency,
     estimate_resonator_frequency_from_figure,
 )
@@ -62,6 +65,9 @@ __all__ = [
     "Resonance",
     "create_marked_figure",
     "estimate_and_mark_figure",
+    "estimate_local_bare_shift_boundary",
+    "estimate_minimum_usable_power",
+    "estimate_optimal_powers",
     "estimate_resonator_frequency",
     "estimate_resonator_frequency_from_figure",
     # Bare-shift boundary estimation

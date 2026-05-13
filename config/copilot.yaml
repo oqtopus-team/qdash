@@ -11,11 +11,13 @@ thinking_language: en
 response_language: ja
 
 # Model configuration
-# `model` is used for general chat (side-panel Q&A, tool use, explanations).
-# `analysis_models` lists selectable models for task result analysis.
-# The first entry is the default. If omitted, QDash falls back to the general
-# `model` below. The older single `analysis_model` key is still supported for
-# local overrides.
+# `model` is used as the default for general chat (side-panel Q&A, tool use, explanations).
+# `chat_models` lists selectable models for general chat. The first entry is the
+# default. If omitted, QDash falls back to the general `model` below.
+# `analysis_models` lists selectable models for task result analysis. The first
+# entry is the default. If omitted, QDash falls back to the general `model`
+# below. The older single `analysis_model` key is still supported for local
+# overrides.
 model:
   # Provider: "openai", "anthropic", or "ollama"
   provider: openai
@@ -25,6 +27,39 @@ model:
   temperature: 0.7
   # Maximum tokens for response
   max_output_tokens: 4096
+
+# Selectable models for general chat (UI shows a dropdown). The first entry is
+# the default. The configured `model` above is also offered as a fallback.
+chat_models:
+  - provider: ollama
+    name: gemma4:26b
+    # Ollama endpoint. Set GEMMA_BASE_URL to your Ollama server URL,
+    # e.g. http://localhost:11434. QDash appends /v1 automatically.
+    base_url: env:GEMMA_BASE_URL
+    # Optional. If unset or missing, Ollama uses a dummy "ollama" API key.
+    api_key_env: GEMMA_API_KEY
+    keep_alive: 30m
+    temperature: 1.0
+    top_p: 0.95
+    top_k: 64
+    reasoning_effort: none
+    disable_thinking_instruction: true
+    max_output_tokens: 4096
+  - provider: ollama
+    name: gemma4:31b
+    base_url: env:GEMMA_BASE_URL
+    api_key_env: GEMMA_API_KEY
+    keep_alive: 30m
+    temperature: 1.0
+    top_p: 0.95
+    top_k: 64
+    reasoning_effort: none
+    disable_thinking_instruction: true
+    max_output_tokens: 4096
+  - provider: openai
+    name: gpt-5.4
+    temperature: 0.7
+    max_output_tokens: 4096
 
 # Specialized models for task result analysis (chevron patterns, Rabi, etc.).
 analysis_models:
@@ -173,8 +208,9 @@ analysis:
   # optional overrides only when a lower-latency triage mode is required.
   ai_triage_max_expected_images: null
   ai_triage_max_output_tokens: null
-  # Task results whose notes should receive automatic AI triage. Both completed
-  # and failed results are eligible; the hook runs asynchronously after history
+  # Terminal task results whose notes should receive automatic AI triage. Both
+  # completed and failed results are eligible; running, pending, scheduled, and
+  # skipped results are ignored. The hook runs asynchronously after history
   # persistence and does not block calibration progress.
   ai_triage_tasks:
     - CheckQubitSpectroscopy

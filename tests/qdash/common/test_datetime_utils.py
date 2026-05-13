@@ -1,9 +1,53 @@
 """Tests for datetime_utils module."""
 
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta, timezone
 
 import pytest
-from qdash.common.datetime_utils import parse_elapsed_time
+from qdash.common.datetime_utils import (
+    ensure_timezone,
+    format_iso,
+    local_now,
+    now,
+    parse_elapsed_time,
+    to_datetime,
+)
+
+
+class TestCurrentTime:
+    """Tests for storage and local current time helpers."""
+
+    def test_now_returns_utc_datetime(self) -> None:
+        """Storage timestamps are timezone-aware UTC datetimes."""
+        current = now()
+
+        assert current.tzinfo is UTC
+        assert current.utcoffset() == timedelta(0)
+
+    def test_local_now_uses_configured_timezone(self) -> None:
+        """Calendar labels can still use the configured application timezone."""
+        current = local_now()
+
+        assert current.tzinfo is not None
+        assert current.utcoffset() == timedelta(hours=9)
+
+    def test_ensure_timezone_normalizes_aware_datetime_to_utc(self) -> None:
+        """Datetime inputs with an offset are normalized before storage/serialization."""
+        jst = timezone(timedelta(hours=9))
+        value = datetime(2024, 6, 15, 12, 0, tzinfo=jst)
+
+        result = ensure_timezone(value)
+
+        assert result == datetime(2024, 6, 15, 3, 0, tzinfo=UTC)
+
+    def test_format_iso_outputs_utc_offset(self) -> None:
+        """ISO formatting uses UTC even when the input has another offset."""
+        jst = timezone(timedelta(hours=9))
+
+        assert format_iso(datetime(2024, 6, 15, 12, 0, tzinfo=jst)) == ("2024-06-15T03:00:00+00:00")
+
+    def test_to_datetime_normalizes_iso_string_to_utc(self) -> None:
+        """ISO strings with offsets are normalized to UTC datetimes."""
+        assert to_datetime("2024-06-15T12:00:00+09:00") == datetime(2024, 6, 15, 3, 0, tzinfo=UTC)
 
 
 class TestParseElapsedTime:

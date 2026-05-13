@@ -6,6 +6,8 @@ to MongoDB and updating backend parameters (e.g. Qubex YAML files).
 Extracted from TaskExecutor to isolate backend-specific persistence concerns.
 """
 
+from __future__ import annotations
+
 import logging
 from typing import TYPE_CHECKING, Any
 
@@ -44,7 +46,7 @@ class BackendSaver:
 
     def __init__(
         self,
-        state_manager: "TaskStateManager",
+        state_manager: TaskStateManager,
         username: str,
         calib_dir: str,
         task_manager_id: str,
@@ -58,10 +60,10 @@ class BackendSaver:
 
     def save(
         self,
-        task: "TaskProtocol",
-        execution_service: "ExecutionService",
+        task: TaskProtocol,
+        execution_service: ExecutionService,
         qid: str,
-        backend: "BaseBackend",
+        backend: BaseBackend,
         success: bool,
     ) -> None:
         """Dispatch to the correct backend-specific saver.
@@ -87,9 +89,10 @@ class BackendSaver:
 
     def save_mux_qid(
         self,
-        task: "TaskProtocol",
-        execution_service: "ExecutionService",
+        task: TaskProtocol,
+        execution_service: ExecutionService,
         qid: str,
+        backend: BaseBackend | None = None,
     ) -> None:
         """Save MUX task results for a single qid to database.
 
@@ -101,6 +104,8 @@ class BackendSaver:
             The execution service
         qid : str
             The qubit ID
+        backend : BaseBackend | None
+            Backend used to sync parameter files for immediate downstream tasks.
         """
         task_name = task.get_name()
         task_type = task.get_task_type()
@@ -123,13 +128,15 @@ class BackendSaver:
             project_id=execution_service.project_id,
         )
         # Note: calib_data is already updated by put_output_parameters
+        if backend is not None:
+            self._update_backend_params(backend, execution_service, qid, output_parameters)
 
     def _save_qubex(
         self,
-        task: "TaskProtocol",
-        execution_service: "ExecutionService",
+        task: TaskProtocol,
+        execution_service: ExecutionService,
         qid: str,
-        backend: "BaseBackend",
+        backend: BaseBackend,
         success: bool,
     ) -> None:
         """Qubex-specific save processing.
@@ -213,8 +220,8 @@ class BackendSaver:
 
     def _update_backend_params(
         self,
-        backend: "BaseBackend",
-        execution_service: "ExecutionService",
+        backend: BaseBackend,
+        execution_service: ExecutionService,
         qid: str,
         output_parameters: dict[str, Any],
     ) -> None:

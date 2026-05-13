@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 
 import { useDeleteCryostat } from "@/client/cryostat/cryostat";
+import { formatDate } from "@/lib/utils/datetime";
 
 import { CooldownItem } from "./CooldownItem";
 import { CooldownTimeline } from "./CooldownTimeline";
@@ -281,7 +282,7 @@ function ActiveCooldownBanner({
               {cooldown.cooldown_id}
             </span>
             <span className="text-xs text-base-content/60 tabular-nums">
-              · {formatRelativeDays(days)} ({start.toLocaleDateString()})
+              · {formatRelativeDays(days)} ({formatDate(cooldown.started_at)})
             </span>
           </div>
           {cooldown.chip_ids.length > 0 && (

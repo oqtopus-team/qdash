@@ -6,6 +6,7 @@ from qdash.dbmodel.chip import ChipDocument
 from qdash.dbmodel.chip_history import ChipHistoryDocument
 from qdash.dbmodel.cooldown import CooldownDocument
 from qdash.dbmodel.cooldown_wiring_event import CooldownWiringEventDocument
+from qdash.dbmodel.copilot_chat_session import CopilotChatSessionDocument
 from qdash.dbmodel.coupling import CouplingDocument
 from qdash.dbmodel.coupling_history import CouplingHistoryDocument
 from qdash.dbmodel.cryostat import CryostatDocument
@@ -16,6 +17,7 @@ from qdash.dbmodel.flow import FlowDocument
 from qdash.dbmodel.forum import ForumCategoryDocument, ForumPostDocument
 from qdash.dbmodel.issue import IssueDocument
 from qdash.dbmodel.issue_knowledge import IssueKnowledgeDocument
+from qdash.dbmodel.metric_note import MetricNoteDocument
 from qdash.dbmodel.note_event import NoteEventDocument
 from qdash.dbmodel.notification import NotificationDocument
 from qdash.dbmodel.project import ProjectDocument
@@ -58,11 +60,13 @@ def document_models() -> list[Any]:
         ForumPostDocument,
         IssueDocument,
         IssueKnowledgeDocument,
+        MetricNoteDocument,
         NoteEventDocument,
         NotificationDocument,
         CryostatDocument,
         CooldownDocument,
         CooldownWiringEventDocument,
+        CopilotChatSessionDocument,
         # Provenance tracking
         ParameterVersionDocument,
         ProvenanceRelationDocument,

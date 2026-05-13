@@ -1,6 +1,6 @@
 # Datetime Handling
 
-QDash stores native `datetime` objects in MongoDB, returns ISO8601 UTC strings via the API, and converts to Asia/Tokyo timezone for display in the frontend.
+QDash stores native `datetime` objects in MongoDB, returns ISO8601 UTC strings via the API, and converts them to the configured UI timezone for display in the frontend. The default UI timezone is Asia/Tokyo.
 
 ## Data Flow
 
@@ -10,9 +10,11 @@ The diagram above shows the complete datetime and elapsed time handling flow acr
 
 ## Backend (Python)
 
-### Timezone Configuration
+### Calendar Timezone Configuration
 
-The default timezone is configured in `src/qdash/config.py`:
+The server calendar timezone is configured in `src/qdash/config.py` and is used
+only for server-generated calendar labels such as `recorded_date` and execution
+ID date prefixes:
 
 ```python
 timezone: str = "Asia/Tokyo"
@@ -24,8 +26,9 @@ All datetime operations should use `src/qdash/common/datetime_utils.py`:
 
 | Function | Description |
 |----------|-------------|
-| `now()` | Get current datetime in configured timezone |
-| `now_iso()` | Get current datetime as ISO8601 string |
+| `now()` | Get current UTC datetime for DB/API storage |
+| `local_now()` | Get current datetime in configured calendar timezone for server labels such as YYYYMMDD |
+| `now_iso()` | Get current UTC datetime as ISO8601 string |
 | `ensure_timezone(value)` | Ensure datetime is timezone-aware (handles naive MongoDB datetimes) |
 | `to_datetime(value)` | Convert string/datetime/pendulum to standard datetime |
 | `format_iso(dt)` | Format datetime as ISO8601 string |
@@ -65,7 +68,7 @@ def _ensure_timezone(cls, v: Any) -> datetime | None:
 
 ### Utility Module
 
-All datetime formatting should use `ui/src/utils/datetime.ts`:
+All datetime formatting should use `ui/src/lib/utils/datetime.ts`:
 
 | Function | Format | Example Output |
 |----------|--------|----------------|
@@ -74,10 +77,14 @@ All datetime formatting should use `ui/src/utils/datetime.ts`:
 | `formatTime(utcString)` | `HH:mm:ss` | `10:30:45` |
 | `formatDateTimeCompact(utcString)` | `MM/dd HH:mm` | `12/21 10:30` |
 
+By default, frontend utilities use `NEXT_PUBLIC_TIMEZONE`, falling back to
+`Asia/Tokyo`. Pass an explicit timezone only for tests or a UI that intentionally
+needs a different fixed timezone.
+
 ### Usage Example
 
 ```typescript
-import { formatDateTime, formatDateTimeCompact } from "@/utils/datetime";
+import { formatDateTime, formatDateTimeCompact } from "@/lib/utils/datetime";
 
 // Full datetime
 <span>{formatDateTime(execution.start_at)}</span>
@@ -100,6 +107,8 @@ import { formatDateTime, formatDateTimeCompact } from "@/utils/datetime";
 ## Conventions
 
 - Always use utility functions — never use `new Date().toLocaleString()` directly
+- Use `dateToDateInput()`, `dateToDateTimeLocal()`, and `toDateTimeLocal()` before putting dates into native date/datetime inputs
+- Use `toIsoSeconds()` when submitting `datetime-local` values so the configured UI timezone offset is explicit
 - Handle null/undefined — API responses may have null datetime fields
 - Use `formatDateTimeCompact()` for space-constrained UIs
 - Store `elapsed_time` as seconds (float) before MongoDB storage
@@ -107,6 +116,6 @@ import { formatDateTime, formatDateTimeCompact } from "@/utils/datetime";
 ## Implementation Files
 
 - `src/qdash/common/datetime_utils.py` — backend utilities
-- `ui/src/utils/datetime.ts` — frontend utilities
+- `ui/src/lib/utils/datetime.ts` — frontend utilities
 - `src/qdash/api/schemas/*.py` — API schemas
 - `src/qdash/dbmodel/*.py` — DB models

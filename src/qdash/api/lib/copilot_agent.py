@@ -2220,7 +2220,6 @@ async def run_chat(
 
     """
     client = _build_client(config)
-    provider = config.model.provider
 
     system_prompt = _build_chat_system_prompt(
         config=config,
@@ -2229,37 +2228,27 @@ async def run_chat(
         qubit_params=qubit_params,
     )
 
-    if provider == "ollama":
-        messages = _build_messages(
-            system_prompt + RESPONSE_FORMAT_INSTRUCTION,
-            user_message,
-            image_base64,
-            conversation_history,
-        )
-        content = await _run_chat_completions(client, messages, config)
-        response = _parse_response(content)
-        return _legacy_to_blocks(response, config)
+    # Ollama 0.13.3+ exposes `/v1/responses` with the same tool-call,
+    # function_call_output, and `text.format: json_schema` semantics as OpenAI,
+    # so chat uses one unified Responses API path regardless of provider.
+    input_items = _build_input(user_message, image_base64, conversation_history)
+
+    if tool_executors:
+        data_store: dict[str, Any] = {}
+        rate_limited = _wrap_rate_limited_executors(tool_executors)
+        wrapped_executors, collected_charts = _wrap_tool_executors(rate_limited, data_store)
     else:
-        input_items = _build_input(user_message, image_base64, conversation_history)
+        wrapped_executors, collected_charts = None, []
 
-        # Wrap tools: data store + chart collection + rate limiting
-        if tool_executors:
-            wrapped_executors: ToolExecutors | None = None
-            data_store: dict[str, Any] = {}
-            rate_limited = _wrap_rate_limited_executors(tool_executors)
-            wrapped_executors, collected_charts = _wrap_tool_executors(rate_limited, data_store)
-        else:
-            wrapped_executors, collected_charts = None, []
-
-        content = await _run_responses_api(
-            client,
-            system_prompt,
-            input_items,
-            config,
-            wrapped_executors,
-            response_schema=BLOCKS_RESPONSE_SCHEMA,
-            strict_schema=False,
-            on_tool_call=on_tool_call,
-            on_status=on_status,
-        )
-        return _inject_collected_charts(_parse_blocks_response(content, config), collected_charts)
+    content = await _run_responses_api(
+        client,
+        system_prompt,
+        input_items,
+        config,
+        wrapped_executors,
+        response_schema=BLOCKS_RESPONSE_SCHEMA,
+        strict_schema=False,
+        on_tool_call=on_tool_call,
+        on_status=on_status,
+    )
+    return _inject_collected_charts(_parse_blocks_response(content, config), collected_charts)

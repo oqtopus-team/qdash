@@ -3,7 +3,7 @@ from typing import Any, ClassVar
 from bunnet import Document
 from pydantic import ConfigDict, Field
 from pymongo import ASCENDING, DESCENDING, IndexModel
-from qdash.common.datetime_utils import now
+from qdash.common.datetime_utils import local_now
 from qdash.datamodel.coupling import CouplingModel
 from qdash.datamodel.system_info import SystemInfoModel
 from qdash.dbmodel.user import UserDocument
@@ -39,7 +39,7 @@ class CouplingHistoryDocument(Document):
     )
     system_info: SystemInfoModel = Field(..., description="The system information")
     recorded_date: str = Field(
-        default_factory=lambda: now().strftime("%Y%m%d"),
+        default_factory=lambda: local_now().strftime("%Y%m%d"),
         description="The date when this history record was created",
     )
 
@@ -90,7 +90,7 @@ class CouplingHistoryDocument(Document):
     @classmethod
     def create_history(cls, coupling: CouplingModel) -> "CouplingHistoryDocument":
         """Create a history record from a CouplingDocument."""
-        today = now().strftime("%Y%m%d")
+        today = local_now().strftime("%Y%m%d")
         cooldown_id = cls._resolve_cooldown_id(
             project_id=coupling.project_id, chip_id=coupling.chip_id
         )

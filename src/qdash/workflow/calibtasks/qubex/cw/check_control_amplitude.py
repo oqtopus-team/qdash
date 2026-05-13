@@ -36,6 +36,7 @@ class CheckControlAmplitude(QubexTask):
         # fit refines this to sub-MHz precision and writes back coarse_qubit_frequency.
         "coarse_qubit_frequency": None,
         "readout_frequency": None,  # Load from DB
+        "readout_amplitude": None,  # Load from DB
         # Seed drive amplitude. Comes from CheckQubitSpectroscopy and is the
         # threshold amplitude where f01 first appears in the spectroscopy heatmap
         # — NOT a Rabi-rate-derived control_amplitude.
@@ -209,7 +210,7 @@ class CheckControlAmplitude(QubexTask):
 
         qubit_frequency = float(qubit_freq_param.value)
         readout_frequency = float(readout_freq_param.value)
-        readout_amplitude = float(self.run_parameters["readout_amplitude"].get_value())
+        readout_amplitude = self._get_readout_amplitude_value()
         coarse_control_amplitude = float(seed_amp_param.value)
         headroom_db = float(self.run_parameters["seed_amplitude_headroom_db"].get_value())
         max_seed_amplitude = float(self.run_parameters["max_seed_amplitude"].get_value())

@@ -268,7 +268,7 @@ function IssueCard({
           <h3 className="text-sm font-semibold mb-1">{issue.title}</h3>
         )}
         <div className="text-sm text-base-content/80 mb-3 line-clamp-3">
-          <MarkdownContent content={issue.content} />
+          <MarkdownContent content={issue.content} preview />
         </div>
         <div className="flex items-center gap-3">
           {canManage &&

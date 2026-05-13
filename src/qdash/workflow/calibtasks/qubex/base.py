@@ -287,6 +287,18 @@ class QubexTask(BaseTask):
             return float(param.get_value())
         return float(param.value)
 
+    def _get_readout_amplitude_value(self) -> float:
+        """Return readout_amplitude from loaded inputs, falling back to run defaults."""
+        input_param = self.input_parameters.get("readout_amplitude")
+        if input_param is not None and input_param.value is not None:
+            return float(input_param.value)
+
+        run_param = self.run_parameters.get("readout_amplitude")
+        if run_param is not None:
+            return float(run_param.get_value())
+
+        raise ValueError("readout_amplitude parameter is required")
+
     def _is_frequency_overridden(self, backend: "QubexBackend", qid: str) -> bool:
         """Check if qubit_frequency was explicitly overridden from default.
 

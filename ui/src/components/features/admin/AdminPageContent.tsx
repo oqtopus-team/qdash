@@ -34,6 +34,7 @@ import { PageContainer } from "@/components/ui/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { AdminPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
 import { useAuth } from "@/contexts/AuthContext";
+import { formatDate } from "@/lib/utils/datetime";
 
 export function AdminPageContent() {
   const { user } = useAuth();
@@ -508,7 +509,7 @@ export function AdminPageContent() {
                       </span>
                       {project.created_at && (
                         <span className="ml-2">
-                          · {new Date(project.created_at).toLocaleDateString()}
+                          · {formatDate(project.created_at)}
                         </span>
                       )}
                     </div>
@@ -573,9 +574,7 @@ export function AdminPageContent() {
                           </span>
                         </td>
                         <td className="text-sm text-base-content/60">
-                          {project.created_at
-                            ? new Date(project.created_at).toLocaleDateString()
-                            : "-"}
+                          {formatDate(project.created_at)}
                         </td>
                         <td>
                           <div className="flex gap-2">
@@ -1237,7 +1236,7 @@ function downloadBulkImportResult(result: BulkUserImportResponse) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = `qdash-user-import-${new Date().toISOString().slice(0, 10)}.csv`;
+  link.download = `qdash-user-import-${formatDate(new Date().toISOString())}.csv`;
   document.body.appendChild(link);
   link.click();
   link.remove();

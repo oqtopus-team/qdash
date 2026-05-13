@@ -32,6 +32,7 @@ class CheckQubitSpectroscopy(QubexTask):
     timeout: int = 60 * 120
     input_parameters: ClassVar[dict[str, ParameterModel | None]] = {
         "readout_frequency": None,  # Load from DB
+        "readout_amplitude": None,  # Load from DB
     }
     run_parameters: ClassVar[dict[str, RunParameterModel]] = {
         "frequency_range": RunParameterModel(
@@ -303,7 +304,7 @@ class CheckQubitSpectroscopy(QubexTask):
         result = exp.qubit_spectroscopy(
             label,
             frequency_range=self._select_frequency_range(backend),
-            readout_amplitude=self.run_parameters["readout_amplitude"].get_value(),
+            readout_amplitude=self._get_readout_amplitude_value(),
             readout_frequency=readout_freq_param.value,
         )
 

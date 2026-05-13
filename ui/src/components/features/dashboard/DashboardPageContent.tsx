@@ -2,10 +2,14 @@
 
 import { useEffect, useMemo, useState } from "react";
 
+import { StickyNote } from "lucide-react";
+
 import { useListChips, useGetChip } from "@/client/chip/chip";
+import { useListCooldowns } from "@/client/cooldown/cooldown";
 import { useGetChipMetrics } from "@/client/metrics/metrics";
 import { useGetChipNotesSummary } from "@/client/note/note";
-import type { TargetNoteEntry } from "@/schemas";
+import { useListProjectMembers } from "@/client/projects/projects";
+import type { GetChipNotesSummaryParams, TargetNoteEntry } from "@/schemas";
 import { ChipSelector } from "@/components/selectors/ChipSelector";
 import { CooldownSelector } from "@/components/selectors/CooldownSelector";
 import { Card } from "@/components/ui/Card";
@@ -17,6 +21,9 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { QuantumLoader } from "@/components/ui/QuantumLoader";
 import { TimeRangeSelector } from "@/components/ui/TimeRangeSelector";
 import { MetricsPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
+import type { MentionCandidate } from "@/components/ui/MarkdownEditor";
+import { useAuth } from "@/contexts/AuthContext";
+import { useProject } from "@/contexts/ProjectContext";
 import { useMetricsConfig } from "@/hooks/useMetricsConfig";
 import { useMetricsQueryParams } from "@/hooks/useMetricsQueryParams";
 import { useMetricsUrlState, useRangeModeUrlState } from "@/hooks/useUrlState";
@@ -28,8 +35,9 @@ import { DashboardCouplingGrid } from "./DashboardCouplingGrid";
 import { DashboardNotesSummary } from "./DashboardNotesSummary";
 import { DashboardQubitGrid } from "./DashboardQubitGrid";
 import { DashboardSummaryTable } from "./DashboardSummaryTable";
-import { type NoteEntry, type NoteEntryWithMetric } from "./ChipNoteEditor";
+import { DashboardChipNoteModal } from "./DashboardChipNoteModal";
 import { DashboardMetricModal } from "./DashboardMetricModal";
+import { type NoteEntry, type NoteEntryWithMetric } from "./MetricNotePanel";
 
 interface MetricValueLike {
   value: number | null;
@@ -76,6 +84,8 @@ function scaleData(
 }
 
 export function DashboardPageContent() {
+  const { user } = useAuth();
+  const { projectId } = useProject();
   const { selectedChip, selectionMode, setSelectedChip, setSelectionMode } =
     useMetricsUrlState();
 
@@ -92,6 +102,13 @@ export function DashboardPageContent() {
 
   const { data: chipsData, isLoading: isChipsLoading } = useListChips();
   const { data: chipData } = useGetChip(selectedChip);
+  const { data: cooldownsData } = useListCooldowns(
+    { chip_id: selectedChip || undefined },
+    { query: { enabled: !!selectedChip, staleTime: 30_000 } },
+  );
+  const { data: membersResponse } = useListProjectMembers(projectId ?? "", {
+    query: { enabled: !!projectId },
+  });
 
   const topologyId = useMemo(
     () =>
@@ -99,8 +116,39 @@ export function DashboardPageContent() {
       `square-lattice-mux-${chipData?.data?.size ?? 64}`,
     [chipData?.data?.topology_id, chipData?.data?.size],
   );
+  const chipHasNote = !!chipData?.data?.note?.content?.trim();
+  const currentCooldownId = chipData?.data?.current_cooldown_id ?? null;
+  const cooldowns = cooldownsData?.data?.cooldowns ?? [];
+  const activeCooldown =
+    cooldowns.find((cooldown) => cooldown.cooldown_id === currentCooldownId) ??
+    null;
 
   const qubitCount = chipData?.data?.size ?? 64;
+  const [selectedCooldownId, setSelectedCooldownId] = useState<string | null>(
+    null,
+  );
+  const [hasInitializedCooldownSelection, setHasInitializedCooldownSelection] =
+    useState(false);
+
+  const mentionCandidates: MentionCandidate[] = useMemo(
+    () => [
+      { id: "qdash", label: "QDash" },
+      {
+        id: "project",
+        label: "Project",
+        secondaryLabel: "Notify all project members",
+      },
+      ...(membersResponse?.data.members
+        ?.filter((member) => member.username !== user?.username)
+        .map((member) => ({
+          id: member.username,
+          label: member.display_name || member.username,
+          secondaryLabel: member.organization ?? undefined,
+          avatarKey: member.avatar_key,
+        })) ?? []),
+    ],
+    [membersResponse?.data.members, user?.username],
+  );
 
   // Default chip
   useEffect(() => {
@@ -118,12 +166,48 @@ export function DashboardPageContent() {
     }
   }, [selectedChip, chipsData, setSelectedChip]);
 
+  useEffect(() => {
+    setHasInitializedCooldownSelection(false);
+  }, [selectedChip]);
+
+  useEffect(() => {
+    if (hasInitializedCooldownSelection) return;
+    if (!currentCooldownId || !activeCooldown) return;
+    setSelectedCooldownId(currentCooldownId);
+    setStartDate(dateToDateTimeLocal(new Date(activeCooldown.started_at)));
+    setEndDate(
+      dateToDateTimeLocal(
+        activeCooldown.ended_at
+          ? new Date(activeCooldown.ended_at)
+          : new Date(),
+      ),
+    );
+    setHasInitializedCooldownSelection(true);
+  }, [
+    activeCooldown,
+    currentCooldownId,
+    hasInitializedCooldownSelection,
+    setEndDate,
+    setStartDate,
+  ]);
+
   const { queryParams, canFetch } = useMetricsQueryParams({
     selectionMode,
     startDate,
     endDate,
     selectedChip,
   });
+
+  const noteScopeParams = useMemo<GetChipNotesSummaryParams>(
+    () =>
+      selectedCooldownId
+        ? { cooldown_id: selectedCooldownId }
+        : {
+            start_at: queryParams.start_at,
+            end_at: queryParams.end_at,
+          },
+    [queryParams.end_at, queryParams.start_at, selectedCooldownId],
+  );
 
   const { data, isLoading, isError } = useGetChipMetrics(
     selectedChip,
@@ -169,9 +253,13 @@ export function DashboardPageContent() {
   }, [data, couplingMetrics]);
 
   // All notes for this chip (qubit/coupling general + per-metric + task) in one fetch.
-  const { data: summaryData } = useGetChipNotesSummary(selectedChip, {
-    query: { enabled: !!selectedChip, staleTime: 30_000 },
-  });
+  const { data: summaryData } = useGetChipNotesSummary(
+    selectedChip,
+    noteScopeParams,
+    {
+      query: { enabled: !!selectedChip, staleTime: 30_000 },
+    },
+  );
   const summary = summaryData?.data;
 
   const taskNotes = useMemo(
@@ -245,6 +333,7 @@ export function DashboardPageContent() {
     metricTitle: string;
     metricUnit: string;
   } | null>(null);
+  const [showChipNote, setShowChipNote] = useState(false);
 
   const editingExisting =
     editingNote && notesByMetric[editingNote.metricKey]?.[editingNote.targetId]
@@ -308,13 +397,20 @@ export function DashboardPageContent() {
             <PageFiltersBar.Item>
               <ChipSelector
                 selectedChip={selectedChip}
-                onChipSelect={setSelectedChip}
+                onChipSelect={(chipId) => {
+                  setSelectedCooldownId(null);
+                  setHasInitializedCooldownSelection(false);
+                  setSelectedChip(chipId);
+                }}
               />
             </PageFiltersBar.Item>
             <PageFiltersBar.Item>
               <CooldownSelector
                 chipId={selectedChip}
+                selectedCooldownId={selectedCooldownId}
                 onPick={(cd) => {
+                  setSelectedCooldownId(cd.cooldown_id);
+                  setHasInitializedCooldownSelection(true);
                   setStartDate(dateToDateTimeLocal(new Date(cd.started_at)));
                   setEndDate(
                     dateToDateTimeLocal(
@@ -323,6 +419,20 @@ export function DashboardPageContent() {
                   );
                 }}
               />
+            </PageFiltersBar.Item>
+            <PageFiltersBar.Item>
+              <button
+                className={`btn btn-sm gap-1 ${
+                  chipHasNote ? "btn-warning" : "btn-outline"
+                }`}
+                onClick={() => setShowChipNote(true)}
+                disabled={!selectedChip}
+                type="button"
+                title="Edit chip-level note"
+              >
+                <StickyNote className="h-4 w-4" />
+                Chip note
+              </button>
             </PageFiltersBar.Item>
           </PageFiltersBar.Group>
 
@@ -348,9 +458,21 @@ export function DashboardPageContent() {
         <TimeRangeSelector
           startDate={startDate}
           endDate={endDate}
-          onStartDateChange={setStartDate}
-          onEndDateChange={setEndDate}
-          onQuickRange={setQuickRange}
+          onStartDateChange={(value) => {
+            setSelectedCooldownId(null);
+            setHasInitializedCooldownSelection(true);
+            setStartDate(value);
+          }}
+          onEndDateChange={(value) => {
+            setSelectedCooldownId(null);
+            setHasInitializedCooldownSelection(true);
+            setEndDate(value);
+          }}
+          onQuickRange={(range) => {
+            setSelectedCooldownId(null);
+            setHasInitializedCooldownSelection(true);
+            setQuickRange(range);
+          }}
         />
 
         {/* Body */}
@@ -617,9 +739,20 @@ export function DashboardPageContent() {
           metricUnit={editingNote.metricUnit}
           startAt={queryParams.start_at}
           endAt={queryParams.end_at}
+          cooldownId={selectedCooldownId}
+          cooldownLabel={selectedCooldownId}
+          noteScopeParams={noteScopeParams}
           chipNote={editingExisting}
           otherNotes={editingOtherNotes}
+          mentionCandidates={mentionCandidates}
           onClose={() => setEditingNote(null)}
+        />
+      )}
+
+      {showChipNote && selectedChip && (
+        <DashboardChipNoteModal
+          chipId={selectedChip}
+          onClose={() => setShowChipNote(false)}
         />
       )}
     </PageContainer>
