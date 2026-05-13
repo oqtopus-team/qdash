@@ -12,6 +12,11 @@ from typing import TYPE_CHECKING, Any, Protocol, cast
 
 from bunnet import SortDirection
 
+from qdash.common.copilot.analysis_context_service import AnalysisContextBuilder
+from qdash.common.copilot.heatmap_service import (
+    ChipHeatmapLoader,
+    TaskResultHistoryRepositoryProtocol,
+)
 from qdash.common.json_utils import sanitize_for_json
 
 if TYPE_CHECKING:
@@ -31,16 +36,6 @@ MAX_FIGURE_SIZE = 5 * 1024 * 1024  # 5MB
 FALLBACK_QUERY_LIMIT = 500  # Max documents to scan for manual aggregation fallback
 
 
-@dataclass
-class _MetricValue:
-    """Minimal metric payload for shared chart helpers."""
-
-    value: float | None = None
-    task_id: str | None = None
-    execution_id: str | None = None
-    stddev: float | None = None
-
-
 @dataclass(frozen=True)
 class _ParameterTimeseriesEntry:
     """Normalized per-document value used for chip-level parameter timeseries."""
@@ -55,49 +50,6 @@ class _LineageGraphData:
 
     nodes: list[dict[str, Any]]
     edges: list[dict[str, Any]]
-
-
-@dataclass(frozen=True)
-class _HeatmapContext:
-    """Resolved inputs needed to build a chip heatmap response."""
-
-    chip: Any
-    project_id: str
-    meta: Any
-    geometry: Any
-    cutoff_time: Any
-
-
-class _TaskResultHistoryRepositoryProtocol(Protocol):
-    def aggregate_best_metrics(
-        self,
-        *,
-        chip_id: str,
-        project_id: str,
-        entity_type: str,
-        metric_modes: dict[str, str],
-        cutoff_time: Any = None,
-    ) -> dict[str, dict[str, dict[str, Any]]]: ...
-
-    def aggregate_latest_metrics(
-        self,
-        *,
-        chip_id: str,
-        project_id: str,
-        entity_type: str,
-        metric_keys: set[str],
-        cutoff_time: Any = None,
-    ) -> dict[str, dict[str, dict[str, Any]]]: ...
-
-    def aggregate_average_metrics(
-        self,
-        *,
-        chip_id: str,
-        project_id: str,
-        entity_type: str,
-        metric_keys: set[str],
-        cutoff_time: Any = None,
-    ) -> dict[str, dict[str, dict[str, Any]]]: ...
 
 
 class _ParameterVersionRepositoryProtocol(Protocol):
@@ -239,10 +191,10 @@ class _CopilotDataAccess:
 
         return cast("_ProvenanceServiceProtocol", _ProvenanceAdapter())
 
-    def create_task_result_history_repository(self) -> _TaskResultHistoryRepositoryProtocol:
+    def create_task_result_history_repository(self) -> TaskResultHistoryRepositoryProtocol:
         from qdash.repository.task_result_history import MongoTaskResultHistoryRepository
 
-        return cast("_TaskResultHistoryRepositoryProtocol", MongoTaskResultHistoryRepository())
+        return cast("TaskResultHistoryRepositoryProtocol", MongoTaskResultHistoryRepository())
 
     def load_parameter_timeseries_docs(
         self, parameter_name: str, chip_id: str, qid: str, last_n: int
@@ -387,6 +339,67 @@ class CopilotDataService:
 
     def __init__(self, data_access: _CopilotDataAccess | None = None) -> None:
         self._data_access = data_access or _CopilotDataAccess()
+        self._analysis_context_builder = AnalysisContextBuilder(
+            load_qubit_params=self._analysis_load_qubit_params,
+            load_task_result=self._analysis_load_task_result,
+            load_task_history=self._analysis_load_task_history,
+            load_neighbor_qubit_params=self._analysis_load_neighbor_qubit_params,
+            load_coupling_params=self._analysis_load_coupling_params,
+            load_figure_as_base64=self._analysis_load_figure_as_base64,
+            collect_expected_images=self._analysis_collect_expected_images,
+        )
+        self._heatmap_loader = ChipHeatmapLoader(
+            data_access=self._data_access,
+            compact_number=_compact_number,
+        )
+
+    def _analysis_load_qubit_params(self, chip_id: str, qid: str) -> dict[str, Any]:
+        """Forward qubit-param lookup for analysis context assembly."""
+        return self.load_qubit_params(chip_id, qid)
+
+    def _analysis_load_task_result(self, task_id: str) -> dict[str, Any] | None:
+        """Forward task-result lookup for analysis context assembly."""
+        return self.load_task_result(task_id)
+
+    def _analysis_load_task_history(
+        self,
+        task_name: str,
+        chip_id: str,
+        qid: str,
+        last_n: int,
+    ) -> list[dict[str, Any]]:
+        """Forward task-history lookup for analysis context assembly."""
+        return self.load_task_history(task_name, chip_id, qid, last_n)
+
+    def _analysis_load_neighbor_qubit_params(
+        self,
+        chip_id: str,
+        qid: str,
+        params: list[str] | None,
+    ) -> dict[str, dict[str, Any]]:
+        """Forward neighbor-qubit lookup for analysis context assembly."""
+        return self.load_neighbor_qubit_params(chip_id, qid, params or [])
+
+    def _analysis_load_coupling_params(
+        self,
+        chip_id: str,
+        qid: str,
+        params: list[str] | None,
+    ) -> dict[str, dict[str, Any]]:
+        """Forward coupling lookup for analysis context assembly."""
+        return self.load_coupling_params(chip_id, qid, params or [])
+
+    def _analysis_load_figure_as_base64(self, figure_paths: list[str]) -> str | None:
+        """Forward figure loading for analysis context assembly."""
+        return self.load_figure_as_base64(figure_paths)
+
+    def _analysis_collect_expected_images(
+        self,
+        knowledge: Any,
+        max_images: int | None,
+    ) -> list[tuple[str, str]]:
+        """Forward expected-image lookup for analysis context assembly."""
+        return self.collect_expected_images(knowledge, max_images=max_images)
 
     def load_default_chip_id(self) -> str | None:
         """Load the most recently installed chip_id from DB."""
@@ -1331,222 +1344,12 @@ class CopilotDataService:
 
         Returns a Plotly figure dict suitable for the chat UI.
         """
-        from datetime import timedelta
-
-        from qdash.common.metrics_chart import (
-            build_chip_geometry,
-            chip_geometry_from_topology,
-            create_qubit_heatmap,
-        )
-        from qdash.common.metrics_config import get_qubit_metric_metadata, load_metrics_config
-        from qdash.common.topology_config import load_topology
-
-        meta = get_qubit_metric_metadata(metric_name)
-        if meta is None:
-            return self._unknown_heatmap_metric_error(metric_name, load_metrics_config)
-
-        chip = self._data_access.load_chip(chip_id)
-        if chip is None:
-            return {"error": f"Chip '{chip_id}' not found"}
-
-        heatmap_context = _HeatmapContext(
-            chip=chip,
-            project_id=str(chip.project_id),
-            meta=meta,
-            geometry=self._build_chip_heatmap_geometry(
-                chip=chip,
-                load_topology=load_topology,
-                build_chip_geometry=build_chip_geometry,
-                chip_geometry_from_topology=chip_geometry_from_topology,
-            ),
-            cutoff_time=self._build_heatmap_cutoff_time(within_hours, timedelta),
-        )
-
-        metric_data_or_error = self._load_chip_heatmap_metric_data(
+        return self._heatmap_loader.load_chip_heatmap(
             chip_id=chip_id,
             metric_name=metric_name,
             selection_mode=selection_mode,
-            context=heatmap_context,
+            within_hours=within_hours,
         )
-        if "error" in metric_data_or_error:
-            return metric_data_or_error
-        metric_data = cast("dict[str, _MetricValue]", metric_data_or_error)
-
-        if not metric_data:
-            return {"error": f"No data found for metric '{metric_name}' on chip '{chip_id}'"}
-
-        fig = create_qubit_heatmap(
-            metric_data=metric_data,
-            geometry=heatmap_context.geometry,
-            metric_scale=heatmap_context.meta.scale,
-            metric_title=heatmap_context.meta.title,
-            metric_unit=heatmap_context.meta.unit,
-            compact=True,
-        )
-        statistics = self._build_chip_heatmap_statistics(
-            metric_data=metric_data,
-            geometry=heatmap_context.geometry,
-            meta=heatmap_context.meta,
-        )
-
-        fig_dict = fig.to_dict()
-        return {
-            "chart": {"data": fig_dict["data"], "layout": fig_dict["layout"]},
-            "statistics": statistics,
-        }
-
-    @staticmethod
-    def _unknown_heatmap_metric_error(metric_name: str, load_metrics_config: Any) -> dict[str, str]:
-        """Build the validation error for an unknown qubit metric name."""
-        config = load_metrics_config()
-        available = sorted(config.qubit_metrics.keys())
-        return {
-            "error": (
-                f"Unknown qubit metric '{metric_name}'. "
-                f"Available metrics: {', '.join(available)}"
-            )
-        }
-
-    def _build_chip_heatmap_geometry(
-        self,
-        *,
-        chip: Any,
-        load_topology: Any,
-        build_chip_geometry: Any,
-        chip_geometry_from_topology: Any,
-    ) -> Any:
-        """Build chip geometry, falling back to a grid when topology loading fails."""
-        if chip.topology_id:
-            try:
-                topology = load_topology(chip.topology_id)
-                return chip_geometry_from_topology(topology)
-            except (FileNotFoundError, ValueError, KeyError) as exc:
-                logger.warning("Failed to load topology '%s': %s", chip.topology_id, exc)
-        return self._build_fallback_chip_geometry(chip, build_chip_geometry)
-
-    @staticmethod
-    def _build_fallback_chip_geometry(chip: Any, build_chip_geometry: Any) -> Any:
-        """Build a simple grid geometry when topology data is unavailable."""
-        n_qubits = chip.size or 0
-        return build_chip_geometry(n_qubits, int(math.sqrt(n_qubits)) if n_qubits else 1)
-
-    @staticmethod
-    def _build_heatmap_cutoff_time(within_hours: int | None, timedelta_type: Any) -> Any:
-        """Resolve the optional aggregation cutoff timestamp."""
-        if not within_hours:
-            return None
-        from qdash.common.datetime_utils import now
-
-        return now() - timedelta_type(hours=within_hours)
-
-    def _load_chip_heatmap_metric_data(
-        self,
-        *,
-        chip_id: str,
-        metric_name: str,
-        selection_mode: str,
-        context: _HeatmapContext,
-    ) -> dict[str, _MetricValue] | dict[str, str]:
-        """Aggregate heatmap metric data for a chip and normalize the repository payload."""
-        repo = self._data_access.create_task_result_history_repository()
-        try:
-            aggregation = self._aggregate_chip_heatmap_metrics(
-                repo=repo,
-                chip_id=chip_id,
-                metric_name=metric_name,
-                selection_mode=selection_mode,
-                context=context,
-            )
-        except (KeyError, ValueError, TypeError) as exc:
-            logger.warning("Metrics aggregation failed for %s/%s: %s", chip_id, metric_name, exc)
-            return {"error": f"Failed to aggregate metrics: {exc}"}
-
-        return self._normalize_chip_heatmap_metric_data(aggregation, metric_name)
-
-    @staticmethod
-    def _aggregate_chip_heatmap_metrics(
-        *,
-        repo: _TaskResultHistoryRepositoryProtocol,
-        chip_id: str,
-        metric_name: str,
-        selection_mode: str,
-        context: _HeatmapContext,
-    ) -> dict[str, dict[str, dict[str, Any]]]:
-        """Run the appropriate repository aggregation for the requested heatmap mode."""
-        metric_keys = {metric_name}
-        if selection_mode == "best":
-            eval_mode = context.meta.evaluation.mode
-            if eval_mode in {"maximize", "minimize"}:
-                return repo.aggregate_best_metrics(
-                    chip_id=chip_id,
-                    project_id=context.project_id,
-                    entity_type="qubit",
-                    metric_modes={metric_name: eval_mode},
-                    cutoff_time=context.cutoff_time,
-                )
-            return repo.aggregate_latest_metrics(
-                chip_id=chip_id,
-                project_id=context.project_id,
-                entity_type="qubit",
-                metric_keys=metric_keys,
-                cutoff_time=context.cutoff_time,
-            )
-        if selection_mode == "average":
-            return repo.aggregate_average_metrics(
-                chip_id=chip_id,
-                project_id=context.project_id,
-                entity_type="qubit",
-                metric_keys=metric_keys,
-                cutoff_time=context.cutoff_time,
-            )
-        return repo.aggregate_latest_metrics(
-            chip_id=chip_id,
-            project_id=context.project_id,
-            entity_type="qubit",
-            metric_keys=metric_keys,
-            cutoff_time=context.cutoff_time,
-        )
-
-    @staticmethod
-    def _normalize_chip_heatmap_metric_data(
-        aggregation: dict[str, dict[str, dict[str, Any]]],
-        metric_name: str,
-    ) -> dict[str, _MetricValue]:
-        """Convert repository aggregation results into chart-ready metric values."""
-        metric_data: dict[str, _MetricValue] = {}
-        for entity_id, result in aggregation.get(metric_name, {}).items():
-            metric_data[entity_id] = _MetricValue(
-                value=result["value"],
-                task_id=result.get("task_id"),
-                execution_id=result["execution_id"],
-                stddev=result.get("stddev"),
-            )
-        return metric_data
-
-    @staticmethod
-    def _build_chip_heatmap_statistics(
-        *,
-        metric_data: dict[str, _MetricValue],
-        geometry: Any,
-        meta: Any,
-    ) -> dict[str, Any]:
-        """Build basic summary statistics for a chip heatmap result."""
-        raw_values = [mv.value * meta.scale for mv in metric_data.values() if mv.value is not None]
-        if not raw_values:
-            return {}
-
-        import numpy as np
-
-        return {
-            "count": len(raw_values),
-            "total_qubits": geometry.n_qubits,
-            "coverage": f"{len(raw_values) / geometry.n_qubits * 100:.1f}%",
-            "median": float(np.median(raw_values)),
-            "mean": float(np.mean(raw_values)),
-            "min": float(np.min(raw_values)),
-            "max": float(np.max(raw_values)),
-            "unit": meta.unit,
-        }
 
     def load_available_parameters(
         self,
@@ -1594,124 +1397,14 @@ class CopilotDataService:
         previously inlined in both ``analyze_task_result`` and
         ``analyze_task_result_stream``.
         """
-        from qdash.common.copilot.analysis import (
-            AnalysisContextResult,
-            TaskAnalysisContext,
-        )
-        from qdash.datamodel.task_knowledge import get_task_knowledge
-
-        knowledge = get_task_knowledge(task_name)
-        knowledge_prompt = self._build_task_knowledge_prompt(task_name, knowledge)
-        qubit_params = self.load_qubit_params(chip_id, qid)
-        task_result = self.load_task_result(task_id)
-        input_params, output_params, run_params, figure_paths = self._extract_task_result_payload(
-            task_result
-        )
-        history_results, neighbor_qubit_params, coupling_params = (
-            self._load_related_analysis_context(
-                task_name=task_name,
-                chip_id=chip_id,
-                qid=qid,
-                knowledge=knowledge,
-            )
-        )
-        image_base64, expected_images = self._resolve_analysis_images(
-            knowledge=knowledge,
-            task_result=task_result,
-            figure_paths=figure_paths,
+        return self._analysis_context_builder.build_analysis_context(
+            task_name=task_name,
+            chip_id=chip_id,
+            qid=qid,
+            task_id=task_id,
             image_base64=image_base64,
             config=config,
         )
-
-        context = TaskAnalysisContext(
-            task_knowledge_prompt=knowledge_prompt,
-            chip_id=chip_id,
-            qid=qid,
-            qubit_params=qubit_params,
-            input_parameters=input_params,
-            output_parameters=output_params,
-            run_parameters=run_params,
-            history_results=history_results,
-            neighbor_qubit_params=neighbor_qubit_params,
-            coupling_params=coupling_params,
-        )
-
-        return AnalysisContextResult(
-            context=context,
-            image_base64=image_base64,
-            expected_images=expected_images,
-            figure_paths=figure_paths,
-        )
-
-    @staticmethod
-    def _build_task_knowledge_prompt(task_name: str, knowledge: Any) -> str:
-        """Build the prompt prefix from task knowledge or fall back to the task name."""
-        return knowledge.to_prompt() if knowledge else f"Task: {task_name}"
-
-    @staticmethod
-    def _extract_task_result_payload(
-        task_result: dict[str, Any] | None,
-    ) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any], list[str]]:
-        """Extract task-result fields used by analysis context assembly."""
-        if not task_result:
-            return {}, {}, {}, []
-        return (
-            task_result.get("input_parameters", {}),
-            task_result.get("output_parameters", {}),
-            task_result.get("run_parameters", {}),
-            task_result.get("figure_path", []),
-        )
-
-    def _load_related_analysis_context(
-        self,
-        *,
-        task_name: str,
-        chip_id: str,
-        qid: str,
-        knowledge: Any,
-    ) -> tuple[list[dict[str, Any]], dict[str, dict[str, Any]], dict[str, dict[str, Any]]]:
-        """Load history and neighborhood context declared by task knowledge."""
-        history_results: list[dict[str, Any]] = []
-        neighbor_qubit_params: dict[str, dict[str, Any]] = {}
-        coupling_params: dict[str, dict[str, Any]] = {}
-        if not knowledge or not knowledge.related_context:
-            return history_results, neighbor_qubit_params, coupling_params
-
-        for related_context in knowledge.related_context:
-            if related_context.type == "history":
-                history_results = self.load_task_history(
-                    task_name, chip_id, qid, related_context.last_n
-                )
-            elif related_context.type == "neighbor_qubits":
-                neighbor_qubit_params = self.load_neighbor_qubit_params(
-                    chip_id, qid, related_context.params
-                )
-            elif related_context.type == "coupling":
-                coupling_params = self.load_coupling_params(chip_id, qid, related_context.params)
-
-        return history_results, neighbor_qubit_params, coupling_params
-
-    def _resolve_analysis_images(
-        self,
-        *,
-        knowledge: Any,
-        task_result: dict[str, Any] | None,
-        figure_paths: list[str],
-        image_base64: str | None,
-        config: CopilotConfig,
-    ) -> tuple[str | None, list[tuple[str, str]]]:
-        """Resolve experiment and expected images for multimodal analysis."""
-        expected_images: list[tuple[str, str]] = []
-        if not config.analysis.multimodal:
-            return image_base64, expected_images
-
-        if not image_base64 and task_result:
-            image_base64 = self.load_figure_as_base64(figure_paths)
-        expected_images = self.collect_expected_images(
-            knowledge,
-            max_images=config.analysis.max_expected_images,
-        )
-        return image_base64, expected_images
 
     @staticmethod
     def build_images_sent_metadata(
