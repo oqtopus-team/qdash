@@ -3,7 +3,7 @@
 amplitude-analytics==1.2.3
     # via prefect-client
 annotated-doc==0.0.4
-    # via typer
+    # via fastapi
 annotated-types==0.7.0
     # via pydantic
 anyio==4.8.0
@@ -34,8 +34,6 @@ charset-normalizer==3.4.1
 click==8.1.8
     # via
     #   bunnet
-    #   rich-toolkit
-    #   typer
     #   uvicorn
 cloudpickle==3.1.2
     # via prefect-client
@@ -45,9 +43,7 @@ colorama==0.4.6
     #   griffecli
     #   tqdm
     #   uvicorn
-contourpy==1.3.2 ; python_full_version < '3.11'
-    # via matplotlib
-contourpy==1.3.3 ; python_full_version >= '3.11'
+contourpy==1.3.3
     # via matplotlib
 coolname==5.0.0
     # via prefect-client
@@ -59,28 +55,18 @@ dateparser==1.4.0
 distro==1.9.0
     # via openai
 dnspython==2.7.0
-    # via
-    #   email-validator
-    #   pymongo
-ecdsa==0.19.0
-    # via python-jose
-email-validator==2.2.0
-    # via fastapi
+    # via pymongo
 exceptiongroup==1.2.2
-    # via
-    #   anyio
-    #   prefect-client
-fastapi==0.111.1
     # via prefect-client
-fastapi-cli==0.0.7
-    # via fastapi
-fonttools==4.59.0
+fastapi==0.136.1
+    # via prefect-client
+fonttools==4.62.1
     # via matplotlib
 fsspec==2026.4.0
     # via prefect-client
 gitdb==4.0.12
     # via gitpython
-gitpython==3.1.45
+gitpython==3.1.50
 graphviz==0.21
     # via prefect-client
 griffe==2.0.2
@@ -92,7 +78,7 @@ griffelib==2.0.2
     #   griffe
     #   griffecli
 gunicorn==22.0.0
-h11==0.14.0
+h11==0.16.0
     # via
     #   httpcore
     #   uvicorn
@@ -100,7 +86,7 @@ h2==4.3.0
     # via httpx
 hpack==4.1.0
     # via h2
-httpcore==1.0.7
+httpcore==1.0.9
     # via
     #   httpx
     #   prefect-client
@@ -108,7 +94,6 @@ httptools==0.6.4
     # via uvicorn
 httpx==0.27.2
     # via
-    #   fastapi
     #   openai
     #   prefect-client
 humanize==4.15.0
@@ -118,12 +103,9 @@ hyperframe==6.1.0
 idna==3.10
     # via
     #   anyio
-    #   email-validator
     #   httpx
 importlib-metadata==8.7.1
     # via opentelemetry-api
-jinja2==3.1.6
-    # via fastapi
 jiter==0.13.0
     # via openai
 jsonpatch==1.33
@@ -141,13 +123,10 @@ lazy-model==0.2.0
     # via bunnet
 markdown-it-py==3.0.0
     # via rich
-markupsafe==3.0.2
-    # via jinja2
 matplotlib==3.8.0
 mdurl==0.1.2
     # via markdown-it-py
-networkx==3.4.2 ; python_full_version < '3.11'
-networkx==3.5 ; python_full_version >= '3.11'
+networkx==3.5
 numpy==1.26.0
     # via
     #   contourpy
@@ -174,7 +153,7 @@ pendulum==3.1.0
     # via
     #   prefect-client
     #   qdash
-pillow==11.3.0
+pillow==12.2.0
     # via
     #   matplotlib
     #   reportlab
@@ -182,10 +161,6 @@ plotly==5.24.1
 prefect-client==3.7.0
 prometheus-client==0.25.0
     # via prefect-client
-pyasn1==0.4.8
-    # via
-    #   python-jose
-    #   rsa
 pydantic==2.13.4
     # via
     #   bunnet
@@ -203,7 +178,7 @@ pydantic-extra-types==2.11.1
     # via prefect-client
 pydantic-settings==2.14.0
     # via prefect-client
-pygments==2.19.1
+pygments==2.20.0
     # via rich
 pymongo==4.8.0
     # via
@@ -219,14 +194,12 @@ python-dateutil==2.9.0.post0
     #   pandas
     #   pendulum
     #   prefect-client
-python-dotenv==1.0.1
+python-dotenv==1.2.2
     # via
     #   pydantic-settings
     #   uvicorn
-python-jose==3.4.0
 python-json-logger==3.3.0
-python-multipart==0.0.20
-    # via fastapi
+python-multipart==0.0.28
 python-slugify==8.0.4
     # via prefect-client
 pytz==2025.2
@@ -249,18 +222,11 @@ reportlab==4.4.3
 rfc3339-validator==0.1.4
     # via prefect-client
 rich==13.9.4
-    # via
-    #   prefect-client
-    #   rich-toolkit
-    #   typer
-rich-toolkit==0.13.2
-    # via fastapi-cli
+    # via prefect-client
 rpds-py==0.23.1
     # via
     #   jsonschema
     #   referencing
-rsa==4.9
-    # via python-jose
 ruamel-yaml==0.18.17
     # via prefect-client
 ruamel-yaml-clib==0.2.15 ; platform_python_implementation == 'CPython'
@@ -269,11 +235,8 @@ ruamel-yaml-clib==0.2.15 ; platform_python_implementation == 'CPython'
     #   ruamel-yaml
 ruff==0.5.5
 scipy==1.13.1
-shellingham==1.5.4
-    # via typer
 six==1.17.0
     # via
-    #   ecdsa
     #   python-dateutil
     #   rfc3339-validator
 smmap==5.0.2
@@ -285,7 +248,7 @@ sniffio==1.3.1
     #   httpx
     #   openai
     #   prefect-client
-starlette==0.37.2
+starlette==1.0.0
     # via fastapi
 tenacity==9.1.2
     # via plotly
@@ -297,12 +260,9 @@ toml==0.10.2
     #   prefect-client
 tqdm==4.66.5
     # via openai
-typer==0.23.1
-    # via fastapi-cli
 typing-extensions==4.15.0
     # via
     #   anyio
-    #   bunnet
     #   fastapi
     #   openai
     #   opentelemetry-api
@@ -311,12 +271,11 @@ typing-extensions==4.15.0
     #   pydantic-core
     #   pydantic-extra-types
     #   referencing
-    #   rich
-    #   rich-toolkit
+    #   starlette
     #   typing-inspection
-    #   uvicorn
 typing-inspection==0.4.2
     # via
+    #   fastapi
     #   pydantic
     #   pydantic-settings
 tzdata==2025.2
@@ -326,11 +285,8 @@ tzdata==2025.2
     #   tzlocal
 tzlocal==5.3.1
     # via dateparser
-uvicorn==0.34.0
-    # via
-    #   fastapi
-    #   fastapi-cli
-    #   prefect-client
+uvicorn==0.46.0
+    # via prefect-client
 uvloop==0.21.0 ; platform_python_implementation != 'PyPy' and sys_platform != 'cygwin' and sys_platform != 'win32'
     # via uvicorn
 watchfiles==1.0.4

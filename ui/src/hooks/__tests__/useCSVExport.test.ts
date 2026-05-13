@@ -21,7 +21,8 @@ describe("useCSVExport", () => {
     vi.spyOn(document.body, "removeChild").mockImplementation((node) => node);
 
     createObjectURLMock = vi.fn().mockReturnValue("blob:mock-url");
-    globalThis.URL.createObjectURL = createObjectURLMock;
+    globalThis.URL.createObjectURL =
+      createObjectURLMock as unknown as typeof globalThis.URL.createObjectURL;
   });
 
   afterEach(() => {
