@@ -13,7 +13,7 @@ import { buildHeaders, consumeSSEEvents } from "@/lib/sse-utils";
 export type CopilotMessage = ChatMessage;
 export type CopilotSession = ChatSession;
 
-export interface UseCopilotChatOptions {
+interface UseCopilotChatOptions {
   modelOverride?: ModelOverride | null;
 }
 
