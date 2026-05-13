@@ -57,6 +57,17 @@ class _LineageGraphData:
     edges: list[dict[str, Any]]
 
 
+@dataclass(frozen=True)
+class _HeatmapContext:
+    """Resolved inputs needed to build a chip heatmap response."""
+
+    chip: Any
+    project_id: str
+    meta: Any
+    geometry: Any
+    cutoff_time: Any
+
+
 class _TaskResultHistoryRepositoryProtocol(Protocol):
     def aggregate_best_metrics(
         self,
@@ -1330,129 +1341,211 @@ class CopilotDataService:
         from qdash.common.metrics_config import get_qubit_metric_metadata, load_metrics_config
         from qdash.common.topology_config import load_topology
 
-        # Validate metric name
         meta = get_qubit_metric_metadata(metric_name)
         if meta is None:
-            config = load_metrics_config()
-            available = sorted(config.qubit_metrics.keys())
-            return {
-                "error": (
-                    f"Unknown qubit metric '{metric_name}'. "
-                    f"Available metrics: {', '.join(available)}"
-                )
-            }
+            return self._unknown_heatmap_metric_error(metric_name, load_metrics_config)
 
-        # Resolve chip
         chip = self._data_access.load_chip(chip_id)
         if chip is None:
             return {"error": f"Chip '{chip_id}' not found"}
-        project_id = str(chip.project_id)
 
-        # Build geometry
-        if chip.topology_id:
-            try:
-                topology = load_topology(chip.topology_id)
-                geometry = chip_geometry_from_topology(topology)
-            except (FileNotFoundError, ValueError, KeyError) as e:
-                logger.warning("Failed to load topology '%s': %s", chip.topology_id, e)
-                n = chip.size or 0
-                geometry = build_chip_geometry(n, int(math.sqrt(n)) if n else 1)
-        else:
-            n = chip.size or 0
-            geometry = build_chip_geometry(n, int(math.sqrt(n)) if n else 1)
+        heatmap_context = _HeatmapContext(
+            chip=chip,
+            project_id=str(chip.project_id),
+            meta=meta,
+            geometry=self._build_chip_heatmap_geometry(
+                chip=chip,
+                load_topology=load_topology,
+                build_chip_geometry=build_chip_geometry,
+                chip_geometry_from_topology=chip_geometry_from_topology,
+            ),
+            cutoff_time=self._build_heatmap_cutoff_time(within_hours, timedelta),
+        )
 
-        # Cutoff time
-        cutoff_time = None
-        if within_hours:
-            from qdash.common.datetime_utils import now
-
-            cutoff_time = now() - timedelta(hours=within_hours)
-
-        # Aggregate metrics
-        repo = self._data_access.create_task_result_history_repository()
-        valid_keys = {metric_name}
-
-        try:
-            if selection_mode == "best":
-                eval_mode = meta.evaluation.mode
-                if eval_mode == "maximize" or eval_mode == "minimize":
-                    agg = repo.aggregate_best_metrics(
-                        chip_id=chip_id,
-                        project_id=project_id,
-                        entity_type="qubit",
-                        metric_modes={metric_name: eval_mode},
-                        cutoff_time=cutoff_time,
-                    )
-                else:
-                    agg = repo.aggregate_latest_metrics(
-                        chip_id=chip_id,
-                        project_id=project_id,
-                        entity_type="qubit",
-                        metric_keys=valid_keys,
-                        cutoff_time=cutoff_time,
-                    )
-            elif selection_mode == "average":
-                agg = repo.aggregate_average_metrics(
-                    chip_id=chip_id,
-                    project_id=project_id,
-                    entity_type="qubit",
-                    metric_keys=valid_keys,
-                    cutoff_time=cutoff_time,
-                )
-            else:
-                agg = repo.aggregate_latest_metrics(
-                    chip_id=chip_id,
-                    project_id=project_id,
-                    entity_type="qubit",
-                    metric_keys=valid_keys,
-                    cutoff_time=cutoff_time,
-                )
-        except (KeyError, ValueError, TypeError) as e:
-            logger.warning("Metrics aggregation failed for %s/%s: %s", chip_id, metric_name, e)
-            return {"error": f"Failed to aggregate metrics: {e}"}
-
-        metric_data: dict[str, _MetricValue] = {}
-        for entity_id, result in agg.get(metric_name, {}).items():
-            metric_data[entity_id] = _MetricValue(
-                value=result["value"],
-                task_id=result.get("task_id"),
-                execution_id=result["execution_id"],
-                stddev=result.get("stddev"),
-            )
+        metric_data_or_error = self._load_chip_heatmap_metric_data(
+            chip_id=chip_id,
+            metric_name=metric_name,
+            selection_mode=selection_mode,
+            context=heatmap_context,
+        )
+        if "error" in metric_data_or_error:
+            return metric_data_or_error
+        metric_data = cast("dict[str, _MetricValue]", metric_data_or_error)
 
         if not metric_data:
             return {"error": f"No data found for metric '{metric_name}' on chip '{chip_id}'"}
 
         fig = create_qubit_heatmap(
             metric_data=metric_data,
-            geometry=geometry,
-            metric_scale=meta.scale,
-            metric_title=meta.title,
-            metric_unit=meta.unit,
+            geometry=heatmap_context.geometry,
+            metric_scale=heatmap_context.meta.scale,
+            metric_title=heatmap_context.meta.title,
+            metric_unit=heatmap_context.meta.unit,
             compact=True,
         )
-
-        # Compute basic statistics
-        raw_values = [mv.value * meta.scale for mv in metric_data.values() if mv.value is not None]
-        statistics: dict[str, Any] = {}
-        if raw_values:
-            import numpy as np
-
-            statistics = {
-                "count": len(raw_values),
-                "total_qubits": geometry.n_qubits,
-                "coverage": f"{len(raw_values) / geometry.n_qubits * 100:.1f}%",
-                "median": float(np.median(raw_values)),
-                "mean": float(np.mean(raw_values)),
-                "min": float(np.min(raw_values)),
-                "max": float(np.max(raw_values)),
-                "unit": meta.unit,
-            }
+        statistics = self._build_chip_heatmap_statistics(
+            metric_data=metric_data,
+            geometry=heatmap_context.geometry,
+            meta=heatmap_context.meta,
+        )
 
         fig_dict = fig.to_dict()
         return {
             "chart": {"data": fig_dict["data"], "layout": fig_dict["layout"]},
             "statistics": statistics,
+        }
+
+    @staticmethod
+    def _unknown_heatmap_metric_error(metric_name: str, load_metrics_config: Any) -> dict[str, str]:
+        """Build the validation error for an unknown qubit metric name."""
+        config = load_metrics_config()
+        available = sorted(config.qubit_metrics.keys())
+        return {
+            "error": (
+                f"Unknown qubit metric '{metric_name}'. "
+                f"Available metrics: {', '.join(available)}"
+            )
+        }
+
+    def _build_chip_heatmap_geometry(
+        self,
+        *,
+        chip: Any,
+        load_topology: Any,
+        build_chip_geometry: Any,
+        chip_geometry_from_topology: Any,
+    ) -> Any:
+        """Build chip geometry, falling back to a grid when topology loading fails."""
+        if chip.topology_id:
+            try:
+                topology = load_topology(chip.topology_id)
+                return chip_geometry_from_topology(topology)
+            except (FileNotFoundError, ValueError, KeyError) as exc:
+                logger.warning("Failed to load topology '%s': %s", chip.topology_id, exc)
+        return self._build_fallback_chip_geometry(chip, build_chip_geometry)
+
+    @staticmethod
+    def _build_fallback_chip_geometry(chip: Any, build_chip_geometry: Any) -> Any:
+        """Build a simple grid geometry when topology data is unavailable."""
+        n_qubits = chip.size or 0
+        return build_chip_geometry(n_qubits, int(math.sqrt(n_qubits)) if n_qubits else 1)
+
+    @staticmethod
+    def _build_heatmap_cutoff_time(within_hours: int | None, timedelta_type: Any) -> Any:
+        """Resolve the optional aggregation cutoff timestamp."""
+        if not within_hours:
+            return None
+        from qdash.common.datetime_utils import now
+
+        return now() - timedelta_type(hours=within_hours)
+
+    def _load_chip_heatmap_metric_data(
+        self,
+        *,
+        chip_id: str,
+        metric_name: str,
+        selection_mode: str,
+        context: _HeatmapContext,
+    ) -> dict[str, _MetricValue] | dict[str, str]:
+        """Aggregate heatmap metric data for a chip and normalize the repository payload."""
+        repo = self._data_access.create_task_result_history_repository()
+        try:
+            aggregation = self._aggregate_chip_heatmap_metrics(
+                repo=repo,
+                chip_id=chip_id,
+                metric_name=metric_name,
+                selection_mode=selection_mode,
+                context=context,
+            )
+        except (KeyError, ValueError, TypeError) as exc:
+            logger.warning("Metrics aggregation failed for %s/%s: %s", chip_id, metric_name, exc)
+            return {"error": f"Failed to aggregate metrics: {exc}"}
+
+        return self._normalize_chip_heatmap_metric_data(aggregation, metric_name)
+
+    @staticmethod
+    def _aggregate_chip_heatmap_metrics(
+        *,
+        repo: _TaskResultHistoryRepositoryProtocol,
+        chip_id: str,
+        metric_name: str,
+        selection_mode: str,
+        context: _HeatmapContext,
+    ) -> dict[str, dict[str, dict[str, Any]]]:
+        """Run the appropriate repository aggregation for the requested heatmap mode."""
+        metric_keys = {metric_name}
+        if selection_mode == "best":
+            eval_mode = context.meta.evaluation.mode
+            if eval_mode in {"maximize", "minimize"}:
+                return repo.aggregate_best_metrics(
+                    chip_id=chip_id,
+                    project_id=context.project_id,
+                    entity_type="qubit",
+                    metric_modes={metric_name: eval_mode},
+                    cutoff_time=context.cutoff_time,
+                )
+            return repo.aggregate_latest_metrics(
+                chip_id=chip_id,
+                project_id=context.project_id,
+                entity_type="qubit",
+                metric_keys=metric_keys,
+                cutoff_time=context.cutoff_time,
+            )
+        if selection_mode == "average":
+            return repo.aggregate_average_metrics(
+                chip_id=chip_id,
+                project_id=context.project_id,
+                entity_type="qubit",
+                metric_keys=metric_keys,
+                cutoff_time=context.cutoff_time,
+            )
+        return repo.aggregate_latest_metrics(
+            chip_id=chip_id,
+            project_id=context.project_id,
+            entity_type="qubit",
+            metric_keys=metric_keys,
+            cutoff_time=context.cutoff_time,
+        )
+
+    @staticmethod
+    def _normalize_chip_heatmap_metric_data(
+        aggregation: dict[str, dict[str, dict[str, Any]]],
+        metric_name: str,
+    ) -> dict[str, _MetricValue]:
+        """Convert repository aggregation results into chart-ready metric values."""
+        metric_data: dict[str, _MetricValue] = {}
+        for entity_id, result in aggregation.get(metric_name, {}).items():
+            metric_data[entity_id] = _MetricValue(
+                value=result["value"],
+                task_id=result.get("task_id"),
+                execution_id=result["execution_id"],
+                stddev=result.get("stddev"),
+            )
+        return metric_data
+
+    @staticmethod
+    def _build_chip_heatmap_statistics(
+        *,
+        metric_data: dict[str, _MetricValue],
+        geometry: Any,
+        meta: Any,
+    ) -> dict[str, Any]:
+        """Build basic summary statistics for a chip heatmap result."""
+        raw_values = [mv.value * meta.scale for mv in metric_data.values() if mv.value is not None]
+        if not raw_values:
+            return {}
+
+        import numpy as np
+
+        return {
+            "count": len(raw_values),
+            "total_qubits": geometry.n_qubits,
+            "coverage": f"{len(raw_values) / geometry.n_qubits * 100:.1f}%",
+            "median": float(np.median(raw_values)),
+            "mean": float(np.mean(raw_values)),
+            "min": float(np.min(raw_values)),
+            "max": float(np.max(raw_values)),
+            "unit": meta.unit,
         }
 
     def load_available_parameters(
@@ -1645,6 +1738,15 @@ class CopilotDataService:
         """
         from qdash.common.copilot.sandbox import execute_python_analysis
 
+        return (
+            self._build_qubit_analysis_tool_executors()
+            | self._build_chip_overview_tool_executors()
+            | self._build_history_and_provenance_tool_executors()
+            | {"execute_python_analysis": lambda args: execute_python_analysis(args["code"])}
+        )
+
+    def _build_qubit_analysis_tool_executors(self) -> dict[str, Any]:
+        """Build tool executors for task-result and qubit-level analysis lookups."""
         return {
             "get_qubit_params": lambda args: self.load_qubit_params(args["chip_id"], args["qid"]),
             "get_latest_task_result": lambda args: self.load_latest_task_result(
@@ -1656,9 +1758,8 @@ class CopilotDataService:
             "get_parameter_timeseries": lambda args: self.load_parameter_timeseries(
                 args["parameter_name"], args["chip_id"], args["qid"], args.get("last_n", 10)
             ),
-            "execute_python_analysis": lambda args: execute_python_analysis(args["code"]),
-            "get_chip_summary": lambda args: self.load_chip_summary(
-                args["chip_id"], args.get("param_names")
+            "compare_qubits": lambda args: self.load_compare_qubits(
+                args["chip_id"], args["qids"], args.get("param_names")
             ),
             "get_coupling_params": lambda args: self.load_coupling_params_tool(
                 args["chip_id"],
@@ -1666,13 +1767,38 @@ class CopilotDataService:
                 args.get("qubit_id"),
                 args.get("param_names"),
             ),
+        }
+
+    def _build_chip_overview_tool_executors(self) -> dict[str, Any]:
+        """Build tool executors for chip summaries, topology, and metric overviews."""
+        return {
+            "get_chip_summary": lambda args: self.load_chip_summary(
+                args["chip_id"], args.get("param_names")
+            ),
+            "get_chip_topology": lambda args: self.load_chip_topology(args["chip_id"]),
+            "generate_chip_heatmap": lambda args: self.load_chip_heatmap(
+                args["chip_id"],
+                args["metric_name"],
+                args.get("selection_mode", "latest"),
+                args.get("within_hours"),
+            ),
+            "list_available_parameters": lambda args: self.load_available_parameters(
+                args["chip_id"], args.get("qid")
+            ),
+            "get_chip_parameter_timeseries": lambda args: self.load_chip_parameter_timeseries(
+                args["parameter_name"],
+                args["chip_id"],
+                args.get("last_n", 10),
+                args.get("qids"),
+            ),
+        }
+
+    def _build_history_and_provenance_tool_executors(self) -> dict[str, Any]:
+        """Build tool executors for execution history, notes, and provenance lookups."""
+        return {
             "get_execution_history": lambda args: self.load_execution_history(
                 args["chip_id"], args.get("status"), args.get("tags"), args.get("last_n", 10)
             ),
-            "compare_qubits": lambda args: self.load_compare_qubits(
-                args["chip_id"], args["qids"], args.get("param_names")
-            ),
-            "get_chip_topology": lambda args: self.load_chip_topology(args["chip_id"]),
             "search_task_results": lambda args: self.load_search_task_results(
                 args["chip_id"],
                 args.get("task_name"),
@@ -1692,20 +1818,5 @@ class CopilotDataService:
             ),
             "get_provenance_lineage_graph": lambda args: self.load_provenance_lineage_graph(
                 args["entity_id"], args["chip_id"], args.get("max_depth", 5)
-            ),
-            "generate_chip_heatmap": lambda args: self.load_chip_heatmap(
-                args["chip_id"],
-                args["metric_name"],
-                args.get("selection_mode", "latest"),
-                args.get("within_hours"),
-            ),
-            "list_available_parameters": lambda args: self.load_available_parameters(
-                args["chip_id"], args.get("qid")
-            ),
-            "get_chip_parameter_timeseries": lambda args: self.load_chip_parameter_timeseries(
-                args["parameter_name"],
-                args["chip_id"],
-                args.get("last_n", 10),
-                args.get("qids"),
             ),
         }
