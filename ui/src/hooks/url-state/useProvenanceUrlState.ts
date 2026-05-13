@@ -22,10 +22,7 @@ export function useProvenanceUrlState(): UseProvenanceUrlStateResult {
 
   // URL state management for provenance page
   const [activeTab, setActiveTabState] = useQueryState("tab", parseAsString);
-  const [parameter, setParameterState] = useQueryState(
-    "parameter",
-    parseAsString,
-  );
+  const [parameter, setParameterState] = useQueryState("parameter", parseAsString);
   const [qid, setQidState] = useQueryState("qid", parseAsString);
   const [entityId, setEntityIdState] = useQueryState("entity", parseAsString);
 

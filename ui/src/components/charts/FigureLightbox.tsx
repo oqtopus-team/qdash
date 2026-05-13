@@ -2,18 +2,11 @@
 
 import { useCallback, useEffect, useState } from "react";
 import dynamic from "next/dynamic";
-import {
-  TransformWrapper,
-  TransformComponent,
-  useControls,
-} from "react-zoom-pan-pinch";
+import { TransformWrapper, TransformComponent, useControls } from "react-zoom-pan-pinch";
 import { X, ZoomIn, ZoomOut, Maximize2, LineChart, Image } from "lucide-react";
 
 const PlotlyRenderer = dynamic(
-  () =>
-    import("@/components/charts/PlotlyRenderer").then(
-      (mod) => mod.PlotlyRenderer,
-    ),
+  () => import("@/components/charts/PlotlyRenderer").then((mod) => mod.PlotlyRenderer),
   { ssr: false },
 );
 
@@ -93,12 +86,7 @@ function LightboxControls({
   );
 }
 
-export function FigureLightbox({
-  src,
-  alt,
-  jsonFigurePath,
-  onClose,
-}: FigureLightboxProps) {
+export function FigureLightbox({ src, alt, jsonFigurePath, onClose }: FigureLightboxProps) {
   const [isInteractive, setIsInteractive] = useState(false);
 
   const handleKeyDown = useCallback(

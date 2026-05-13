@@ -21,9 +21,7 @@ export function useManualOverrides(qid: string) {
     for (const edit of edits) {
       map[edit.parameter_name] = {
         currentValue: edit.value as number | string,
-        editedAt: edit.edited_at
-          ? formatDateTimeCompact(String(edit.edited_at))
-          : undefined,
+        editedAt: edit.edited_at ? formatDateTimeCompact(String(edit.edited_at)) : undefined,
       };
     }
     return map;

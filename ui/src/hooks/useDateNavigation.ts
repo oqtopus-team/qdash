@@ -35,9 +35,7 @@ export function useDateNavigation(
     const dates = ["latest"];
     if (datesResponse?.data?.data && Array.isArray(datesResponse.data.data)) {
       // Sort dates in descending order (newest first)
-      const sortedDates = [...datesResponse.data.data].sort((a, b) =>
-        b.localeCompare(a),
-      );
+      const sortedDates = [...datesResponse.data.data].sort((a, b) => b.localeCompare(a));
       dates.push(...sortedDates);
     }
     return dates;
@@ -46,10 +44,7 @@ export function useDateNavigation(
   // Format date string for display (YYYYMMDD -> YYYY/MM/DD)
   const formatDate = useCallback((dateStr: string): string => {
     if (dateStr === "latest") return "Latest";
-    return `${dateStr.slice(0, 4)}/${dateStr.slice(4, 6)}/${dateStr.slice(
-      6,
-      8,
-    )}`;
+    return `${dateStr.slice(0, 4)}/${dateStr.slice(4, 6)}/${dateStr.slice(6, 8)}`;
   }, []);
 
   // Optimize indexOf performance by caching the current index

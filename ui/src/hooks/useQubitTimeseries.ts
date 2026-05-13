@@ -1,12 +1,7 @@
 import { useMemo } from "react";
 
 import type { ParameterModel } from "@/schemas";
-import type {
-  ParameterKey,
-  TagKey,
-  TimeSeriesDataPoint,
-  TimeRangeState,
-} from "@/types/qubit";
+import type { ParameterKey, TagKey, TimeSeriesDataPoint, TimeRangeState } from "@/types/qubit";
 
 import { useListTags } from "@/client/tag/tag";
 import { useGetTimeseriesTaskResults } from "@/client/task-result/task-result";
@@ -26,14 +21,7 @@ interface UseQubitTimeseriesOptions {
  * Custom hook for fetching and processing qubit time series data
  */
 export function useQubitTimeseries(options: UseQubitTimeseriesOptions) {
-  const {
-    chipId,
-    qubitId,
-    parameter,
-    tag,
-    timeRange,
-    enabled = true,
-  } = options;
+  const { chipId, qubitId, parameter, tag, timeRange, enabled = true } = options;
 
   // Fetch time series data
   const {
@@ -96,9 +84,7 @@ export function useQubitTimeseries(options: UseQubitTimeseriesOptions) {
         }
         return 0;
       });
-      const errorArray = qubitData.map(
-        (point: ParameterModel) => point.error || 0,
-      );
+      const errorArray = qubitData.map((point: ParameterModel) => point.error || 0);
 
       return [
         {
@@ -125,9 +111,7 @@ export function useQubitTimeseries(options: UseQubitTimeseriesOptions) {
           hovertemplate:
             "Time: %{x}<br>" +
             "Value: %{y:.8f}" +
-            (errorArray.some((e) => e > 0)
-              ? "<br>Error: ±%{error_y.array:.8f}"
-              : "") +
+            (errorArray.some((e) => e > 0) ? "<br>Error: ±%{error_y.array:.8f}" : "") +
             "<br>Qubit: " +
             qubitId +
             "<extra></extra>",

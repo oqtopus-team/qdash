@@ -8,10 +8,7 @@ import { ImageIcon, BarChart3, Code2 } from "lucide-react";
 import { CodeBlock } from "@/components/features/chat/CodeBlock";
 
 const ChatPlotlyChart = dynamic(
-  () =>
-    import("@/components/features/chat/ChatPlotlyChart").then(
-      (m) => m.ChatPlotlyChart,
-    ),
+  () => import("@/components/features/chat/ChatPlotlyChart").then((m) => m.ChatPlotlyChart),
   { ssr: false },
 );
 
@@ -49,12 +46,7 @@ function MermaidDiagram({ code }: { code: string }) {
     };
   }, [code, uniqueId]);
 
-  return (
-    <div
-      ref={containerRef}
-      className="my-3 flex justify-center overflow-x-auto"
-    />
-  );
+  return <div ref={containerRef} className="my-3 flex justify-center overflow-x-auto" />;
 }
 
 const MENTION_RE = /@([A-Za-z0-9_.-]+)\b/g;

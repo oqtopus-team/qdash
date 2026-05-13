@@ -1,19 +1,17 @@
 {
   "name": "ui",
-  "homepage": "/inbox",
-  "private": true,
   "version": "0.0.0",
-  "engines": {
-    "node": ">=20.0.0",
-    "bun": ">=1.0.0"
-  },
+  "private": true,
+  "homepage": "/inbox",
   "scripts": {
     "dev": "next dev --turbo",
     "build": "next build --turbo",
     "build:webpack": "next build",
     "start": "next start",
-    "lint": "eslint src --max-warnings 15",
-    "fmt": "eslint src --fix",
+    "lint": "oxlint src/app src/components src/contexts src/hooks src/lib src/types src/middleware.ts",
+    "lint:fix": "oxlint src/app src/components src/contexts src/hooks src/lib src/types src/middleware.ts --fix",
+    "fmt": "oxfmt --write src/app src/components src/contexts src/hooks src/lib src/types src/middleware.ts package.json tsconfig.json .oxlintrc.json .oxfmt.json",
+    "fmt:check": "oxfmt --check src/app src/components src/contexts src/hooks src/lib src/types src/middleware.ts package.json tsconfig.json .oxlintrc.json .oxfmt.json",
     "test": "vitest",
     "test:run": "vitest run",
     "knip": "knip",
@@ -48,7 +46,6 @@
     "theme-change": "^2.5.0"
   },
   "devDependencies": {
-    "@next/eslint-plugin-next": "^16.1.6",
     "@tailwindcss/postcss": "^4.0.9",
     "@tailwindcss/typography": "^0.5.19",
     "@testing-library/dom": "^10.4.1",
@@ -61,23 +58,20 @@
     "@vitejs/plugin-react": "^6.0.1",
     "autoprefixer": "^10.4.21",
     "daisyui": "^5.5.8",
-    "eslint": "^9.39.1",
-    "eslint-plugin-react": "^7.37.5",
-    "eslint-plugin-react-hooks": "^7.1.1",
     "jsdom": "^29.1.1",
     "knip": "^6.13.1",
+    "oxfmt": "^0.49.0",
+    "oxlint": "^1.64.0",
     "postcss": "^8.5.14",
     "postcss-load-config": "^6.0.1",
     "tailwindcss": "^4.1.11",
     "typescript": "^6.0.3",
-    "typescript-eslint": "^8.49.0",
     "vite": "^8.0.12",
     "vite-tsconfig-paths": "^6.1.1",
     "vitest": "^4.1.6"
   },
   "overrides": {
     "@babel/runtime": "^7.26.10",
-    "@eslint/plugin-kit": "^0.3.4",
     "ajv": "^6.14.0",
     "brace-expansion": "^2.0.3",
     "dompurify": "^3.4.0",
@@ -99,5 +93,9 @@
     "uuid": "^11.1.1",
     "webpack": "^5.105.0",
     "yaml": "^2.8.3"
+  },
+  "engines": {
+    "bun": ">=1.0.0",
+    "node": ">=20.0.0"
   }
 }

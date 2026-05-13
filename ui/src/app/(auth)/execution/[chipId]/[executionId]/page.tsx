@@ -7,9 +7,7 @@ interface ExecutionDetailPageProps {
   }>;
 }
 
-export default async function ExecutionDetailPage({
-  params,
-}: ExecutionDetailPageProps) {
+export default async function ExecutionDetailPage({ params }: ExecutionDetailPageProps) {
   const { chipId, executionId } = await params;
 
   return <ExecutionDetailClient chipId={chipId} executionId={executionId} />;

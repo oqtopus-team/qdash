@@ -82,9 +82,7 @@ export function QubitTaskCard({
                   .slice(0, 3)
                   .map(([key, value]) => {
                     const paramValue = (
-                      typeof value === "object" &&
-                      value !== null &&
-                      "value" in value
+                      typeof value === "object" && value !== null && "value" in value
                         ? value
                         : { value }
                     ) as {
@@ -105,18 +103,14 @@ export function QubitTaskCard({
                   })}
                 {Object.keys(taskData.output_parameters).length > 3 && (
                   <div className="text-xs text-center text-base-content/60 mt-1">
-                    +{Object.keys(taskData.output_parameters).length - 3}{" "}
-                    more...
+                    +{Object.keys(taskData.output_parameters).length - 3} more...
                   </div>
                 )}
               </div>
             )}
 
             <div className="card-actions justify-end">
-              <button
-                className="btn btn-sm btn-primary"
-                onClick={() => onViewDetails(task.name)}
-              >
+              <button className="btn btn-sm btn-primary" onClick={() => onViewDetails(task.name)}>
                 View Details
               </button>
             </div>

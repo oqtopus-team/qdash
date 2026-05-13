@@ -28,9 +28,7 @@ export function useQubitTaskResults({
 }: UseQubitTaskResultsOptions) {
   const isLatest = selectedDate === "latest";
   const canFetch = Boolean(chipId && task);
-  const dateForHistorical = isLatest
-    ? dateToDateInput(new Date())
-    : selectedDate;
+  const dateForHistorical = isLatest ? dateToDateInput(new Date()) : selectedDate;
 
   // Always call both hooks, but only enable one based on condition
   const latestResult = useGetLatestQubitTaskResults(

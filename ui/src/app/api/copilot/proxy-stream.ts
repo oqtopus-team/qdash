@@ -6,8 +6,7 @@
  * FastAPI backend to the browser.
  */
 
-const INTERNAL_API_URL =
-  process.env.INTERNAL_API_URL || "http://localhost:5715";
+const INTERNAL_API_URL = process.env.INTERNAL_API_URL || "http://localhost:5715";
 
 /**
  * Forward relevant headers from the incoming request to the backend.
@@ -42,10 +41,7 @@ function forwardHeaders(request: Request): Record<string, string> {
  * Next.js Response, ensuring chunks are forwarded as they arrive without
  * buffering.
  */
-export async function proxySSEStream(
-  request: Request,
-  backendPath: string,
-): Promise<Response> {
+export async function proxySSEStream(request: Request, backendPath: string): Promise<Response> {
   const body = await request.text();
 
   const upstream = await fetch(`${INTERNAL_API_URL}${backendPath}`, {

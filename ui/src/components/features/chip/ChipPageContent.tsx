@@ -11,20 +11,14 @@ import { dateToDateInput, formatDateTime } from "@/lib/utils/datetime";
 import { CouplingGrid } from "./CouplingGrid";
 import { TaskResultGrid } from "./TaskResultGrid";
 import { ChipManageModal } from "./ChipManageModal";
-import {
-  getAiTriageBadgeState,
-  type AiTriageBadgeState,
-} from "./aiTriageBadge";
+import { getAiTriageBadgeState, type AiTriageBadgeState } from "./aiTriageBadge";
 import { CreateChipModal } from "./modals/CreateChipModal";
 
 import type { Task, MuxDetailResponseDetail, TaskInfo } from "@/schemas";
 
 import { useListChipMuxes, useGetChip, useListChips } from "@/client/chip/chip";
 import { useGetChipNotesSummary } from "@/client/note/note";
-import {
-  useListTaskInfo,
-  useGetTaskFileSettings,
-} from "@/client/task-file/task-file";
+import { useListTaskInfo, useGetTaskFileSettings } from "@/client/task-file/task-file";
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { TaskDetailModal } from "@/components/features/chip/modals/TaskDetailModal";
 import { ChipSelector } from "@/components/selectors/ChipSelector";
@@ -70,8 +64,7 @@ export function ChipPageContent() {
 
   // Get topology config to check if MUX is enabled
   const topologyId =
-    chipData?.data?.topology_id ??
-    `square-lattice-mux-${chipData?.data?.size ?? 64}`;
+    chipData?.data?.topology_id ?? `square-lattice-mux-${chipData?.data?.size ?? 64}`;
   const { hasMux = true } = useTopologyConfig(topologyId) ?? {};
 
   // Set default chip only when URL is initialized and no chip is selected from URL
@@ -108,8 +101,7 @@ export function ChipPageContent() {
   const [expandedMuxes, setExpandedMuxes] = useState<{
     [key: string]: boolean;
   }>({});
-  const [selectedTaskInfo, setSelectedTaskInfo] =
-    useState<SelectedTaskInfo | null>(null);
+  const [selectedTaskInfo, setSelectedTaskInfo] = useState<SelectedTaskInfo | null>(null);
   const [isCreateChipModalOpen, setIsCreateChipModalOpen] = useState(false);
   const [isManageChipModalOpen, setIsManageChipModalOpen] = useState(false);
 
@@ -123,13 +115,9 @@ export function ChipPageContent() {
   // Get task list from task-files API
   const { data: taskInfoData } = useListTaskInfo({ backend: defaultBackend });
 
-  const { data: notesSummaryData } = useGetChipNotesSummary(
-    selectedChip,
-    undefined,
-    {
-      query: { enabled: !!selectedChip, staleTime: 30_000 },
-    },
-  );
+  const { data: notesSummaryData } = useGetChipNotesSummary(selectedChip, undefined, {
+    query: { enabled: !!selectedChip, staleTime: 30_000 },
+  });
 
   const aiTriageBadgesByTaskId = useMemo(() => {
     const badges = new Map<string, AiTriageBadgeState>();
@@ -164,13 +152,9 @@ export function ChipPageContent() {
 
     // Only set defaults if no task is selected or if the current task doesn't match the view mode
     if (viewMode === "2q" && taskList.length > 0) {
-      const availableTasks = taskList.filter(
-        (task: TaskInfo) => task.task_type === "coupling",
-      );
+      const availableTasks = taskList.filter((task: TaskInfo) => task.task_type === "coupling");
       // Check if current task is valid for 2q view
-      const currentTaskValid = availableTasks.some(
-        (task: TaskInfo) => task.name === selectedTask,
-      );
+      const currentTaskValid = availableTasks.some((task: TaskInfo) => task.name === selectedTask);
 
       if (!currentTaskValid) {
         const checkBellState = availableTasks.find(
@@ -183,26 +167,16 @@ export function ChipPageContent() {
         }
       }
     } else if (viewMode === "1q" && taskList.length > 0) {
-      const availableTasks = taskList.filter(
-        (task: TaskInfo) => task.task_type === "qubit",
-      );
+      const availableTasks = taskList.filter((task: TaskInfo) => task.task_type === "qubit");
       // Check if current task is valid for 1q view
-      const currentTaskValid = availableTasks.some(
-        (task: TaskInfo) => task.name === selectedTask,
-      );
+      const currentTaskValid = availableTasks.some((task: TaskInfo) => task.name === selectedTask);
 
       if (!currentTaskValid && !selectedTask) {
         // Only set default if no task is selected
         setSelectedTask("CheckRabi");
       }
     }
-  }, [
-    viewMode,
-    taskInfoData?.data?.tasks,
-    isInitialized,
-    selectedTask,
-    setSelectedTask,
-  ]);
+  }, [viewMode, taskInfoData?.data?.tasks, isInitialized, selectedTask, setSelectedTask]);
   const {
     data: muxData,
     isLoading: isLoadingMux,
@@ -235,13 +209,11 @@ export function ChipPageContent() {
         let foundTask: Task | null = null;
         Object.values(muxData.data.muxes).forEach((muxDetail) => {
           Object.values(muxDetail.detail).forEach((tasksByName) => {
-            Object.values(tasksByName as { [key: string]: Task }).forEach(
-              (task) => {
-                if (task.qid === selectedTaskInfo.qid && task.figure_path) {
-                  foundTask = task;
-                }
-              },
-            );
+            Object.values(tasksByName as { [key: string]: Task }).forEach((task) => {
+              if (task.qid === selectedTaskInfo.qid && task.figure_path) {
+                foundTask = task;
+              }
+            });
           });
         });
 
@@ -274,12 +246,7 @@ export function ChipPageContent() {
   // Get all QIDs for this mux (always 4 qids based on mux number)
   const getQidsForMux = (muxNum: number): string[] => {
     const startQid = muxNum * 4;
-    return [
-      String(startQid),
-      String(startQid + 1),
-      String(startQid + 2),
-      String(startQid + 3),
-    ];
+    return [String(startQid), String(startQid + 1), String(startQid + 2), String(startQid + 3)];
   };
 
   // Group tasks by name for each mux
@@ -291,16 +258,14 @@ export function ChipPageContent() {
     // Iterate through each QID in the mux detail
     Object.entries(detail).forEach(([qid, tasksByName]) => {
       // Iterate through each task
-      Object.entries(tasksByName as { [key: string]: Task }).forEach(
-        ([taskName, task]) => {
-          if (task.status !== "completed" && task.status !== "failed") return;
+      Object.entries(tasksByName as { [key: string]: Task }).forEach(([taskName, task]) => {
+        if (task.status !== "completed" && task.status !== "failed") return;
 
-          if (!taskGroups[taskName]) {
-            taskGroups[taskName] = {};
-          }
-          taskGroups[taskName][qid] = task;
-        },
-      );
+        if (!taskGroups[taskName]) {
+          taskGroups[taskName] = {};
+        }
+        taskGroups[taskName][qid] = task;
+      });
     });
 
     return taskGroups;
@@ -336,8 +301,7 @@ export function ChipPageContent() {
 
     if (diffInSeconds < 60) return "just now";
     if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
-    if (diffInSeconds < 86400)
-      return `${Math.floor(diffInSeconds / 3600)}h ago`;
+    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`;
     return formatDateTime(date.toISOString());
   };
 
@@ -359,14 +323,12 @@ export function ChipPageContent() {
   };
 
   // Get tasks based on view mode
-  const filteredTasks = (taskInfoData?.data?.tasks || []).filter(
-    (task: TaskInfo) => {
-      if (viewMode === "2q") {
-        return task.task_type === "coupling";
-      }
-      return task.task_type === "qubit";
-    },
-  );
+  const filteredTasks = (taskInfoData?.data?.tasks || []).filter((task: TaskInfo) => {
+    if (viewMode === "2q") {
+      return task.task_type === "coupling";
+    }
+    return task.task_type === "qubit";
+  });
 
   // Show skeleton during initial loading
   if (!isInitialized || isChipsLoading) {
@@ -447,10 +409,7 @@ export function ChipPageContent() {
           <PageFiltersBar>
             <PageFiltersBar.Group>
               <PageFiltersBar.Item className="sm:min-w-48">
-                <ChipSelector
-                  selectedChip={selectedChip}
-                  onChipSelect={setSelectedChip}
-                />
+                <ChipSelector selectedChip={selectedChip} onChipSelect={setSelectedChip} />
               </PageFiltersBar.Item>
               <PageFiltersBar.Item className="sm:min-w-48">
                 <DateSelector
@@ -466,9 +425,7 @@ export function ChipPageContent() {
                   onPick={(cd) => {
                     // Jump to the most recent day within the cool-down so the
                     // chip page shows its end-of-cool-down state.
-                    const target = cd.ended_at
-                      ? new Date(cd.ended_at)
-                      : new Date();
+                    const target = cd.ended_at ? new Date(cd.ended_at) : new Date();
                     setSelectedDate(dateToDateInput(target));
                   }}
                 />
@@ -529,8 +486,7 @@ export function ChipPageContent() {
             <TaskResultGrid
               chipId={selectedChip}
               topologyId={
-                chipData?.data?.topology_id ??
-                `square-lattice-mux-${chipData?.data?.size ?? 64}`
+                chipData?.data?.topology_id ?? `square-lattice-mux-${chipData?.data?.size ?? 64}`
               }
               selectedTask={selectedTask}
               selectedDate={selectedDate}
@@ -542,8 +498,7 @@ export function ChipPageContent() {
             <CouplingGrid
               chipId={selectedChip}
               topologyId={
-                chipData?.data?.topology_id ??
-                `square-lattice-mux-${chipData?.data?.size ?? 64}`
+                chipData?.data?.topology_id ?? `square-lattice-mux-${chipData?.data?.size ?? 64}`
               }
               selectedTask={selectedTask}
               selectedDate={selectedDate}
@@ -590,9 +545,7 @@ export function ChipPageContent() {
                       </div>
                       <div
                         className={`text-sm ${
-                          updateInfo.isRecent
-                            ? "text-primary font-medium"
-                            : "text-base-content/60"
+                          updateInfo.isRecent ? "text-primary font-medium" : "text-base-content/60"
                         }`}
                       >
                         Last updated: {lastUpdateText}
@@ -602,130 +555,117 @@ export function ChipPageContent() {
                       <div className="p-4 border-t">
                         {/* Task Results Grid */}
                         <div className="space-y-6">
-                          {Object.entries(taskGroups).map(
-                            ([taskName, qidResults]) => (
-                              <div
-                                key={taskName}
-                                className="border-t pt-4 first:border-t-0 first:pt-0"
-                              >
-                                <h3 className="text-lg font-medium mb-3">
-                                  {taskName}
-                                </h3>
-                                <div className="grid grid-cols-1 min-[400px]:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
-                                  {qids.map((qid) => {
-                                    const task = qidResults[qid];
+                          {Object.entries(taskGroups).map(([taskName, qidResults]) => (
+                            <div
+                              key={taskName}
+                              className="border-t pt-4 first:border-t-0 first:pt-0"
+                            >
+                              <h3 className="text-lg font-medium mb-3">{taskName}</h3>
+                              <div className="grid grid-cols-1 min-[400px]:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+                                {qids.map((qid) => {
+                                  const task = qidResults[qid];
 
-                                    // Show placeholder if task doesn't exist
-                                    if (!task) {
-                                      return (
-                                        <div
-                                          key={qid}
-                                          className="card bg-base-200/30 shadow-sm rounded-xl overflow-hidden border border-dashed border-base-content/20"
-                                        >
-                                          <div className="card-body p-2">
-                                            <div className="text-sm font-medium mb-2">
-                                              <div className="flex justify-between items-center mb-1">
-                                                <span className="text-base-content/40">
-                                                  QID: {qid}
-                                                </span>
-                                              </div>
-                                            </div>
-                                            <div className="text-xs text-base-content/30 italic text-center py-4">
-                                              No result
+                                  // Show placeholder if task doesn't exist
+                                  if (!task) {
+                                    return (
+                                      <div
+                                        key={qid}
+                                        className="card bg-base-200/30 shadow-sm rounded-xl overflow-hidden border border-dashed border-base-content/20"
+                                      >
+                                        <div className="card-body p-2">
+                                          <div className="text-sm font-medium mb-2">
+                                            <div className="flex justify-between items-center mb-1">
+                                              <span className="text-base-content/40">
+                                                QID: {qid}
+                                              </span>
                                             </div>
                                           </div>
+                                          <div className="text-xs text-base-content/30 italic text-center py-4">
+                                            No result
+                                          </div>
                                         </div>
-                                      );
-                                    }
+                                      </div>
+                                    );
+                                  }
 
-                                    const figurePath = getFigurePath(task);
-                                    const aiTriageBadge = task.task_id
-                                      ? aiTriageBadgesByTaskId.get(task.task_id)
-                                      : null;
+                                  const figurePath = getFigurePath(task);
+                                  const aiTriageBadge = task.task_id
+                                    ? aiTriageBadgesByTaskId.get(task.task_id)
+                                    : null;
 
-                                    return (
-                                      <div key={qid} className="relative group">
-                                        <button
-                                          onClick={() => {
-                                            if (figurePath) {
-                                              setSelectedTaskInfo({
-                                                qid,
-                                                task,
-                                              });
-                                            }
-                                          }}
-                                          className="card bg-base-100 shadow-sm rounded-xl overflow-hidden transition-all duration-200 hover:shadow-xl hover:scale-105 relative w-full"
-                                        >
-                                          <div className="card-body p-2">
-                                            <div className="text-sm font-medium mb-2">
-                                              <div className="flex justify-between items-center mb-1">
-                                                <span>QID: {qid}</span>
-                                                <div className="flex items-center gap-1">
-                                                  {aiTriageBadge && (
-                                                    <span
-                                                      className={`badge ${aiTriageBadge.badgeClass} badge-xs gap-1`}
-                                                      title={
-                                                        aiTriageBadge.title
-                                                      }
-                                                    >
-                                                      <Bot className="h-3 w-3" />
-                                                      {aiTriageBadge.label}
-                                                    </span>
-                                                  )}
-                                                  <div
-                                                    className={`w-2 h-2 rounded-full ${
-                                                      task.status ===
-                                                      "completed"
-                                                        ? "bg-success"
-                                                        : task.status ===
-                                                            "failed"
-                                                          ? "bg-error"
-                                                          : "bg-warning"
-                                                    }`}
-                                                  />
-                                                </div>
-                                              </div>
-                                              {task.end_at && (
-                                                <div className="text-xs text-base-content/60">
-                                                  Updated:{" "}
-                                                  {formatRelativeTime(
-                                                    new Date(task.end_at),
-                                                  )}
-                                                </div>
-                                              )}
-                                            </div>
-                                            {task.figure_path && (
-                                              <div className="relative h-48 rounded-lg overflow-hidden">
-                                                <TaskFigure
-                                                  path={task.figure_path}
-                                                  qid={qid}
-                                                  className="w-full h-48 object-contain"
+                                  return (
+                                    <div key={qid} className="relative group">
+                                      <button
+                                        onClick={() => {
+                                          if (figurePath) {
+                                            setSelectedTaskInfo({
+                                              qid,
+                                              task,
+                                            });
+                                          }
+                                        }}
+                                        className="card bg-base-100 shadow-sm rounded-xl overflow-hidden transition-all duration-200 hover:shadow-xl hover:scale-105 relative w-full"
+                                      >
+                                        <div className="card-body p-2">
+                                          <div className="text-sm font-medium mb-2">
+                                            <div className="flex justify-between items-center mb-1">
+                                              <span>QID: {qid}</span>
+                                              <div className="flex items-center gap-1">
+                                                {aiTriageBadge && (
+                                                  <span
+                                                    className={`badge ${aiTriageBadge.badgeClass} badge-xs gap-1`}
+                                                    title={aiTriageBadge.title}
+                                                  >
+                                                    <Bot className="h-3 w-3" />
+                                                    {aiTriageBadge.label}
+                                                  </span>
+                                                )}
+                                                <div
+                                                  className={`w-2 h-2 rounded-full ${
+                                                    task.status === "completed"
+                                                      ? "bg-success"
+                                                      : task.status === "failed"
+                                                        ? "bg-error"
+                                                        : "bg-warning"
+                                                  }`}
                                                 />
+                                              </div>
+                                            </div>
+                                            {task.end_at && (
+                                              <div className="text-xs text-base-content/60">
+                                                Updated: {formatRelativeTime(new Date(task.end_at))}
                                               </div>
                                             )}
                                           </div>
-                                        </button>
+                                          {task.figure_path && (
+                                            <div className="relative h-48 rounded-lg overflow-hidden">
+                                              <TaskFigure
+                                                path={task.figure_path}
+                                                qid={qid}
+                                                className="w-full h-48 object-contain"
+                                              />
+                                            </div>
+                                          )}
+                                        </div>
+                                      </button>
 
-                                        {/* Detail Analysis Button */}
-                                        <button
-                                          onClick={(event) => {
-                                            event.stopPropagation();
-                                            router.push(
-                                              `/chip/${selectedChip}/qubit/${qid}`,
-                                            );
-                                          }}
-                                          className="absolute top-2 right-2 btn btn-xs btn-primary opacity-0 group-hover:opacity-100 transition-opacity duration-200"
-                                          title="Detailed Analysis"
-                                        >
-                                          Detail
-                                        </button>
-                                      </div>
-                                    );
-                                  })}
-                                </div>
+                                      {/* Detail Analysis Button */}
+                                      <button
+                                        onClick={(event) => {
+                                          event.stopPropagation();
+                                          router.push(`/chip/${selectedChip}/qubit/${qid}`);
+                                        }}
+                                        className="absolute top-2 right-2 btn btn-xs btn-primary opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                                        title="Detailed Analysis"
+                                      >
+                                        Detail
+                                      </button>
+                                    </div>
+                                  );
+                                })}
                               </div>
-                            ),
-                          )}
+                            </div>
+                          ))}
                         </div>
                       </div>
                     )}

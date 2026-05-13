@@ -18,20 +18,10 @@ interface PageContainerProps {
  * </PageContainer>
  * ```
  */
-export function PageContainer({
-  children,
-  className = "",
-  maxWidth = false,
-}: PageContainerProps) {
+export function PageContainer({ children, className = "", maxWidth = false }: PageContainerProps) {
   return (
-    <div
-      className={`w-full min-h-screen bg-base-100/50 px-4 md:px-6 py-6 md:py-8 ${className}`}
-    >
-      {maxWidth ? (
-        <div className="max-w-[1600px] mx-auto">{children}</div>
-      ) : (
-        children
-      )}
+    <div className={`w-full min-h-screen bg-base-100/50 px-4 md:px-6 py-6 md:py-8 ${className}`}>
+      {maxWidth ? <div className="max-w-[1600px] mx-auto">{children}</div> : children}
     </div>
   );
 }

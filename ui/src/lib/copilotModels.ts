@@ -29,21 +29,12 @@ function readModel(value: unknown): ModelOverride | null {
     provider: raw.provider,
     name: raw.name,
     temperature:
-      typeof raw.temperature === "number" || raw.temperature === null
-        ? raw.temperature
-        : undefined,
+      typeof raw.temperature === "number" || raw.temperature === null ? raw.temperature : undefined,
     max_output_tokens:
-      typeof raw.max_output_tokens === "number"
-        ? raw.max_output_tokens
-        : undefined,
-    base_url:
-      typeof raw.base_url === "string" || raw.base_url === null
-        ? raw.base_url
-        : undefined,
+      typeof raw.max_output_tokens === "number" ? raw.max_output_tokens : undefined,
+    base_url: typeof raw.base_url === "string" || raw.base_url === null ? raw.base_url : undefined,
     api_key_env:
-      typeof raw.api_key_env === "string" || raw.api_key_env === null
-        ? raw.api_key_env
-        : undefined,
+      typeof raw.api_key_env === "string" || raw.api_key_env === null ? raw.api_key_env : undefined,
     api_style: typeof raw.api_style === "string" ? raw.api_style : undefined,
     reasoning_effort:
       typeof raw.reasoning_effort === "string" || raw.reasoning_effort === null
@@ -56,9 +47,7 @@ function modelIdentity(model: ModelOverride): string {
   return `${model.provider}:${model.name}`;
 }
 
-export function buildAnalysisModelOptions(
-  config: Record<string, unknown> | null,
-): ModelOption[] {
+export function buildAnalysisModelOptions(config: Record<string, unknown> | null): ModelOption[] {
   if (!config) {
     return [
       {
@@ -70,19 +59,13 @@ export function buildAnalysisModelOptions(
     ];
   }
 
-  const analysisModels = Array.isArray(config.analysis_models)
-    ? config.analysis_models
-    : [];
+  const analysisModels = Array.isArray(config.analysis_models) ? config.analysis_models : [];
   const configuredModel =
-    readModel(analysisModels[0]) ??
-    readModel(config.analysis_model) ??
-    readModel(config.model);
+    readModel(analysisModels[0]) ?? readModel(config.analysis_model) ?? readModel(config.model);
   const options: ModelOption[] = [
     {
       key: "default",
-      label: configuredModel
-        ? `Configured: ${configuredModel.name}`
-        : "Configured model",
+      label: configuredModel ? `Configured: ${configuredModel.name}` : "Configured model",
       model: null,
       isConfiguredDefault: true,
     },
@@ -124,10 +107,7 @@ export function setStoredAnalysisModelKey(key: string) {
   localStorage.setItem(ANALYSIS_MODEL_STORAGE_KEY, key);
 }
 
-export function resolveAnalysisModelOption(
-  options: ModelOption[],
-  key: string,
-): ModelOption {
+export function resolveAnalysisModelOption(options: ModelOption[], key: string): ModelOption {
   return (
     options.find((option) => option.key === key) ??
     options.find((option) => option.isConfiguredDefault) ??
@@ -135,9 +115,7 @@ export function resolveAnalysisModelOption(
   );
 }
 
-export function buildChatModelOptions(
-  config: Record<string, unknown> | null,
-): ModelOption[] {
+export function buildChatModelOptions(config: Record<string, unknown> | null): ModelOption[] {
   if (!config) {
     return [
       {
@@ -149,16 +127,12 @@ export function buildChatModelOptions(
     ];
   }
 
-  const chatModels = Array.isArray(config.chat_models)
-    ? config.chat_models
-    : [];
+  const chatModels = Array.isArray(config.chat_models) ? config.chat_models : [];
   const configuredModel = readModel(chatModels[0]) ?? readModel(config.model);
   const options: ModelOption[] = [
     {
       key: "default",
-      label: configuredModel
-        ? `Configured: ${configuredModel.name}`
-        : "Configured model",
+      label: configuredModel ? `Configured: ${configuredModel.name}` : "Configured model",
       model: null,
       isConfiguredDefault: true,
     },
@@ -199,10 +173,7 @@ export function setStoredChatModelKey(key: string) {
   localStorage.setItem(CHAT_MODEL_STORAGE_KEY, key);
 }
 
-export function resolveChatModelOption(
-  options: ModelOption[],
-  key: string,
-): ModelOption {
+export function resolveChatModelOption(options: ModelOption[], key: string): ModelOption {
   return (
     options.find((option) => option.key === key) ??
     options.find((option) => option.isConfiguredDefault) ??

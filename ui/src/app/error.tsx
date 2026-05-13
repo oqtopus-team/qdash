@@ -46,13 +46,10 @@ export default function Error({
           </svg>
         </div>
 
-        <h1 className="text-3xl lg:text-4xl font-bold text-base-content">
-          Something went wrong
-        </h1>
+        <h1 className="text-3xl lg:text-4xl font-bold text-base-content">Something went wrong</h1>
 
         <p className="text-base-content/60 text-lg max-w-md mt-2">
-          An unexpected error occurred. Please try again or contact support if
-          the problem persists.
+          An unexpected error occurred. Please try again or contact support if the problem persists.
         </p>
 
         <div className="flex flex-col sm:flex-row gap-4 mt-8">

@@ -35,8 +35,7 @@ const EMOJI_MAP: Record<string, string> = {
   // Objects
   gear: "Gear/3D/gear_3d.png",
   wrench: "Wrench/3D/wrench_3d.png",
-  "magnifying-glass":
-    "Magnifying%20glass%20tilted%20left/3D/magnifying_glass_tilted_left_3d.png",
+  "magnifying-glass": "Magnifying%20glass%20tilted%20left/3D/magnifying_glass_tilted_left_3d.png",
   folder: "File%20folder/3D/file_folder_3d.png",
   file: "Page%20facing%20up/3D/page_facing_up_3d.png",
 
@@ -148,8 +147,7 @@ export function getAvatarEmoji(username: string): string {
   return AVATAR_EMOJIS[index];
 }
 
-const CDN_BASE =
-  "https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets";
+const CDN_BASE = "https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets";
 
 interface FluentEmojiProps {
   /** Emoji name from EMOJI_MAP or direct asset path */
@@ -162,12 +160,7 @@ interface FluentEmojiProps {
   alt?: string;
 }
 
-export function FluentEmoji({
-  name,
-  size = 24,
-  className = "",
-  alt,
-}: FluentEmojiProps) {
+export function FluentEmoji({ name, size = 24, className = "", alt }: FluentEmojiProps) {
   const assetPath = EMOJI_MAP[name] || name;
   const src = `${CDN_BASE}/${assetPath}`;
 

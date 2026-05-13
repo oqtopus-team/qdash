@@ -2,10 +2,7 @@
 
 import { useMemo, useState, useEffect } from "react";
 
-import {
-  AnimatedCounter,
-  AnimatedPercentage,
-} from "@/components/ui/AnimatedCounter";
+import { AnimatedCounter, AnimatedPercentage } from "@/components/ui/AnimatedCounter";
 import type { ExecutionResponseSummary } from "@/schemas";
 
 interface ExecutionStatsProps {
@@ -14,11 +11,7 @@ interface ExecutionStatsProps {
   onTagSelect: (tag: string | null) => void;
 }
 
-export function ExecutionStats({
-  executions,
-  selectedTag,
-  onTagSelect,
-}: ExecutionStatsProps) {
+export function ExecutionStats({ executions, selectedTag, onTagSelect }: ExecutionStatsProps) {
   const [availableTags, setAvailableTags] = useState<string[]>([]);
 
   // Get list of available tags
@@ -42,21 +35,15 @@ export function ExecutionStats({
     const completedExecutions = filteredExecutions.filter(
       (exec) => exec.status === "completed",
     ).length;
-    const failedExecutions = filteredExecutions.filter(
-      (exec) => exec.status === "failed",
-    ).length;
-    const runningExecutions = filteredExecutions.filter(
-      (exec) => exec.status === "running",
-    ).length;
+    const failedExecutions = filteredExecutions.filter((exec) => exec.status === "failed").length;
+    const runningExecutions = filteredExecutions.filter((exec) => exec.status === "running").length;
     const cancelledExecutions = filteredExecutions.filter(
       (exec) => exec.status === "cancelled",
     ).length;
 
     // Calculate execution times (only completed executions)
     const completedExecutionTimes = filteredExecutions
-      .filter(
-        (exec) => exec.status === "completed" && exec.start_at && exec.end_at,
-      )
+      .filter((exec) => exec.status === "completed" && exec.start_at && exec.end_at)
       .map((exec) => {
         try {
           const start = new Date(exec.start_at!).getTime();
@@ -72,24 +59,15 @@ export function ExecutionStats({
 
     const averageTime =
       completedExecutionTimes.length > 0
-        ? completedExecutionTimes.reduce((a, b) => a + b, 0) /
-          completedExecutionTimes.length
+        ? completedExecutionTimes.reduce((a, b) => a + b, 0) / completedExecutionTimes.length
         : 0;
 
-    const maxTime =
-      completedExecutionTimes.length > 0
-        ? Math.max(...completedExecutionTimes)
-        : 0;
-    const minTime =
-      completedExecutionTimes.length > 0
-        ? Math.min(...completedExecutionTimes)
-        : 0;
+    const maxTime = completedExecutionTimes.length > 0 ? Math.max(...completedExecutionTimes) : 0;
+    const minTime = completedExecutionTimes.length > 0 ? Math.min(...completedExecutionTimes) : 0;
 
     // Calculate success rate
     const successRate =
-      totalExecutions > 0
-        ? ((completedExecutions / totalExecutions) * 100).toFixed(1)
-        : "0.0";
+      totalExecutions > 0 ? ((completedExecutions / totalExecutions) * 100).toFixed(1) : "0.0";
 
     return {
       totalExecutions,
@@ -125,9 +103,7 @@ export function ExecutionStats({
         {availableTags.map((tag) => (
           <button
             key={tag}
-            className={`btn btn-xs sm:btn-sm ${
-              selectedTag === tag ? "btn-primary" : "btn-ghost"
-            }`}
+            className={`btn btn-xs sm:btn-sm ${selectedTag === tag ? "btn-primary" : "btn-ghost"}`}
             onClick={() => onTagSelect(tag)}
           >
             {tag}
@@ -140,15 +116,11 @@ export function ExecutionStats({
         <div className="bg-base-200 rounded-lg p-3 text-center">
           <div className="text-xs text-base-content/60">Total</div>
           <div className="text-lg font-bold">{stats.totalExecutions}</div>
-          <div className="text-xs text-base-content/60">
-            {stats.successRate}% success
-          </div>
+          <div className="text-xs text-base-content/60">{stats.successRate}% success</div>
         </div>
         <div className="bg-base-200 rounded-lg p-3 text-center">
           <div className="text-xs text-base-content/60">Status</div>
-          <div className="text-lg font-bold text-success">
-            {stats.completedExecutions}
-          </div>
+          <div className="text-lg font-bold text-success">{stats.completedExecutions}</div>
           <div className="text-xs">
             <span className="text-error">{stats.failedExecutions}F</span>
             {" / "}
@@ -159,18 +131,12 @@ export function ExecutionStats({
         </div>
         <div className="bg-base-200 rounded-lg p-3 text-center">
           <div className="text-xs text-base-content/60">Avg Time</div>
-          <div className="text-lg font-bold text-primary">
-            {formatTime(stats.averageTime)}
-          </div>
+          <div className="text-lg font-bold text-primary">{formatTime(stats.averageTime)}</div>
         </div>
         <div className="bg-base-200 rounded-lg p-3 text-center">
           <div className="text-xs text-base-content/60">Time Range</div>
-          <div className="text-sm font-bold text-secondary">
-            {formatTime(stats.minTime)}
-          </div>
-          <div className="text-xs text-base-content/60">
-            - {formatTime(stats.maxTime)}
-          </div>
+          <div className="text-sm font-bold text-secondary">{formatTime(stats.minTime)}</div>
+          <div className="text-xs text-base-content/60">- {formatTime(stats.maxTime)}</div>
         </div>
       </div>
 
@@ -185,10 +151,7 @@ export function ExecutionStats({
             </div>
             <div className="stat-desc">
               Success Rate:{" "}
-              <AnimatedPercentage
-                value={parseFloat(stats.successRate)}
-                duration={800}
-              />
+              <AnimatedPercentage value={parseFloat(stats.successRate)} duration={800} />
             </div>
           </div>
         </div>
@@ -198,35 +161,20 @@ export function ExecutionStats({
           <div className="stat">
             <div className="stat-title">Status</div>
             <div className="stat-value text-success">
-              <AnimatedCounter
-                value={stats.completedExecutions}
-                duration={800}
-              />
+              <AnimatedCounter value={stats.completedExecutions} duration={800} />
             </div>
             <div className="stat-desc">
               <span className="text-success">Completed</span> /{" "}
               <span className="text-error">
-                <AnimatedCounter
-                  value={stats.failedExecutions}
-                  duration={800}
-                />{" "}
-                Failed
+                <AnimatedCounter value={stats.failedExecutions} duration={800} /> Failed
               </span>{" "}
               /{" "}
               <span className="text-neutral">
-                <AnimatedCounter
-                  value={stats.cancelledExecutions}
-                  duration={800}
-                />{" "}
-                Cancelled
+                <AnimatedCounter value={stats.cancelledExecutions} duration={800} /> Cancelled
               </span>{" "}
               /{" "}
               <span className="text-info">
-                <AnimatedCounter
-                  value={stats.runningExecutions}
-                  duration={800}
-                />{" "}
-                Running
+                <AnimatedCounter value={stats.runningExecutions} duration={800} /> Running
               </span>
             </div>
           </div>
@@ -236,9 +184,7 @@ export function ExecutionStats({
         <div className="stats shadow">
           <div className="stat">
             <div className="stat-title">Average Time</div>
-            <div className="stat-value text-primary">
-              {formatTime(stats.averageTime)}
-            </div>
+            <div className="stat-value text-primary">{formatTime(stats.averageTime)}</div>
             <div className="stat-desc">Per execution</div>
           </div>
         </div>

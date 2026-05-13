@@ -3,10 +3,7 @@
 import dynamic from "next/dynamic";
 import { useState, useEffect } from "react";
 
-import {
-  useListFlowHelperFiles,
-  useGetFlowHelperFile,
-} from "@/client/flow/flow";
+import { useListFlowHelperFiles, useGetFlowHelperFile } from "@/client/flow/flow";
 
 // Monaco Editor for viewing helper files (read-only)
 const Editor = dynamic(() => import("@monaco-editor/react"), { ssr: false });
@@ -29,13 +26,15 @@ export function FlowImportsPanel() {
   }, [files, selectedFile]);
 
   // Fetch selected file content using generated client
-  const { data: fileContent, isLoading: isLoadingContent } =
-    useGetFlowHelperFile(selectedFile || "", {
+  const { data: fileContent, isLoading: isLoadingContent } = useGetFlowHelperFile(
+    selectedFile || "",
+    {
       query: {
         enabled: !!selectedFile,
         staleTime: 1000 * 60 * 60, // Cache for 1 hour
       },
-    });
+    },
+  );
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-base-300">
@@ -47,9 +46,7 @@ export function FlowImportsPanel() {
           </span>
         </div>
         {isLoadingFiles ? (
-          <div className="px-3 py-2 text-xs text-base-content/50">
-            Loading...
-          </div>
+          <div className="px-3 py-2 text-xs text-base-content/50">Loading...</div>
         ) : (
           <div className="flex">
             {files?.data?.map((file) => (
@@ -107,9 +104,7 @@ export function FlowImportsPanel() {
 
       {/* Footer hint */}
       <div className="px-4 py-2 bg-base-200 border-t border-base-300 text-xs text-base-content/50">
-        <code className="text-secondary">
-          from qdash.workflow.service import ...
-        </code>
+        <code className="text-secondary">from qdash.workflow.service import ...</code>
         <span className="ml-4 text-base-content/30">Read-only reference</span>
       </div>
     </div>

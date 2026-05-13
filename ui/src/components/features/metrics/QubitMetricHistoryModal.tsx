@@ -4,14 +4,7 @@ import { useState, useMemo, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useQueryClient } from "@tanstack/react-query";
 
-import {
-  ChevronRight,
-  GitBranch,
-  History,
-  ListTodo,
-  FileText,
-  Bot,
-} from "lucide-react";
+import { ChevronRight, GitBranch, History, ListTodo, FileText, Bot } from "lucide-react";
 
 import { useGetQubitMetricHistory } from "@/client/metrics/metrics";
 import { useGetExecution } from "@/client/execution/execution";
@@ -44,11 +37,7 @@ interface ExecutionGroup {
   items: MetricHistoryItem[];
 }
 
-function formatMetricValue(
-  value: number | null,
-  unit: string,
-  precision: number = 2,
-): string {
+function formatMetricValue(value: number | null, unit: string, precision: number = 2): string {
   if (value === null || value === undefined) return "N/A";
   const displayValue = unit === "%" ? value * 100 : value;
   return displayValue.toFixed(precision);
@@ -65,9 +54,7 @@ export function QubitMetricHistoryModal({
   startAt,
   endAt,
 }: QubitMetricHistoryModalProps) {
-  const [selectedExecutionId, setSelectedExecutionId] = useState<string | null>(
-    null,
-  );
+  const [selectedExecutionId, setSelectedExecutionId] = useState<string | null>(null);
   const [selectedTaskIndex, setSelectedTaskIndex] = useState(0);
   const [mobileTab, setMobileTab] = useState<MobileTab>("history");
   const [saveMessage, setSaveMessage] = useState<{
@@ -123,8 +110,7 @@ export function QubitMetricHistoryModal({
     });
     // Sort by timestamp (newest first)
     return Array.from(groups.values()).sort(
-      (a, b) =>
-        new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
+      (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
     );
   }, [filteredHistory]);
 
@@ -147,9 +133,7 @@ export function QubitMetricHistoryModal({
     return executionDetailData.data.task.filter((t) => t.qid === qid);
   }, [executionDetailData, qid]);
 
-  const selectedGroup = executionGroups.find(
-    (g) => g.executionId === selectedExecutionId,
-  );
+  const selectedGroup = executionGroups.find((g) => g.executionId === selectedExecutionId);
 
   // Auto-select first execution when data loads
   useEffect(() => {
@@ -164,9 +148,7 @@ export function QubitMetricHistoryModal({
       // Find the task_id from history that corresponds to this metric
       const historyTaskId = selectedGroup.items[0]?.task_id;
       if (historyTaskId) {
-        const matchingIndex = executionTasks.findIndex(
-          (task) => task.task_id === historyTaskId,
-        );
+        const matchingIndex = executionTasks.findIndex((task) => task.task_id === historyTaskId);
         setSelectedTaskIndex(matchingIndex >= 0 ? matchingIndex : 0);
       } else {
         setSelectedTaskIndex(0);
@@ -178,10 +160,7 @@ export function QubitMetricHistoryModal({
 
   // Ensure task index is valid
   useEffect(() => {
-    if (
-      selectedTaskIndex >= executionTasks.length &&
-      executionTasks.length > 0
-    ) {
+    if (selectedTaskIndex >= executionTasks.length && executionTasks.length > 0) {
       setSelectedTaskIndex(0);
     }
   }, [executionTasks.length, selectedTaskIndex]);
@@ -220,10 +199,7 @@ export function QubitMetricHistoryModal({
           data: {
             chip_id: chipId,
             qid: qid,
-            parameters: updatedParams as Record<
-              string,
-              Record<string, unknown>
-            >,
+            parameters: updatedParams as Record<string, Record<string, unknown>>,
           },
         });
         // Invalidate metrics queries so grid and history refresh
@@ -238,8 +214,7 @@ export function QubitMetricHistoryModal({
         });
         setTimeout(() => setSaveMessage(null), 5000);
       } catch (err) {
-        const message =
-          err instanceof Error ? err.message : "Failed to save parameters";
+        const message = err instanceof Error ? err.message : "Failed to save parameters";
         setSaveMessage({ type: "error", text: message });
       }
     },
@@ -272,9 +247,7 @@ export function QubitMetricHistoryModal({
         </svg>
         <span>
           No {metricName} history available for {qid}
-          {startAt || endAt
-            ? " in the selected date range"
-            : " in the last 365 days"}
+          {startAt || endAt ? " in the selected date range" : " in the last 365 days"}
         </span>
       </div>
     );
@@ -286,9 +259,7 @@ export function QubitMetricHistoryModal({
       <div className="mb-3 shrink-0">
         <div className="flex items-center gap-2 mb-1">
           <History className="h-4 w-4 text-primary" />
-          <h3 className="text-sm font-bold text-base-content">
-            Execution History
-          </h3>
+          <h3 className="text-sm font-bold text-base-content">Execution History</h3>
         </div>
         <p className="text-xs text-base-content/50">
           {executionGroups.length} executions with {metricName}
@@ -322,40 +293,28 @@ export function QubitMetricHistoryModal({
               >
                 <div className="flex justify-between items-start">
                   <div className="min-w-0 flex-1">
-                    <div
-                      className={`font-bold text-lg ${
-                        isExcluded ? "line-through" : ""
-                      }`}
-                    >
+                    <div className={`font-bold text-lg ${isExcluded ? "line-through" : ""}`}>
                       {formatMetricValue(metricItem?.value, metricUnit, 4)}{" "}
-                      <span className="text-sm font-normal opacity-80">
-                        {metricUnit}
-                      </span>
+                      <span className="text-sm font-normal opacity-80">{metricUnit}</span>
                     </div>
                     <div className="text-xs opacity-70 mt-1">
                       {formatDateTimeCompact(group.timestamp)}
                     </div>
                     {metricItem?.name && (
-                      <div className="text-xs opacity-60 mt-1 truncate">
-                        {metricItem.name}
-                      </div>
+                      <div className="text-xs opacity-60 mt-1 truncate">{metricItem.name}</div>
                     )}
                     <div className="flex flex-wrap items-center gap-1 mt-1">
                       {idx === 0 && (
                         <span
                           className={`badge badge-xs ${
-                            isSelected
-                              ? "badge-primary-content"
-                              : "badge-success"
+                            isSelected ? "badge-primary-content" : "badge-success"
                           }`}
                         >
                           Latest
                         </span>
                       )}
                       {isExcluded && (
-                        <span className="badge badge-xs badge-warning gap-1">
-                          Excluded
-                        </span>
+                        <span className="badge badge-xs badge-warning gap-1">Excluded</span>
                       )}
                     </div>
                   </div>
@@ -380,9 +339,7 @@ export function QubitMetricHistoryModal({
       <div className="mb-3 shrink-0">
         <div className="flex items-center gap-2 mb-1">
           <ListTodo className="h-4 w-4 text-secondary" />
-          <h3 className="text-sm font-bold text-base-content">
-            Tasks in Execution
-          </h3>
+          <h3 className="text-sm font-bold text-base-content">Tasks in Execution</h3>
         </div>
         {selectedExecutionId && (
           <p className="text-[0.65rem] text-base-content/50 font-mono truncate">
@@ -396,9 +353,7 @@ export function QubitMetricHistoryModal({
             <span className="loading loading-spinner loading-md"></span>
           </div>
         ) : isExecutionError ? (
-          <div className="text-sm text-error py-4">
-            Failed to load execution
-          </div>
+          <div className="text-sm text-error py-4">Failed to load execution</div>
         ) : executionTasks.length === 0 ? (
           <div className="text-center py-8">
             <ListTodo className="h-8 w-8 mx-auto text-base-content/30 mb-2" />
@@ -413,9 +368,7 @@ export function QubitMetricHistoryModal({
           <div className="flex flex-col gap-2">
             {executionTasks.map((task, idx) => {
               const isSelected = idx === selectedTaskIndex;
-              const isMatchingMetric = task.name
-                ?.toLowerCase()
-                .includes(metricName.toLowerCase());
+              const isMatchingMetric = task.name?.toLowerCase().includes(metricName.toLowerCase());
 
               return (
                 <button
@@ -433,15 +386,11 @@ export function QubitMetricHistoryModal({
                   <div className="flex justify-between items-start">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <span className="font-bold text-sm truncate">
-                          {task.name || "Unnamed"}
-                        </span>
+                        <span className="font-bold text-sm truncate">{task.name || "Unnamed"}</span>
                         {isMatchingMetric && (
                           <span
                             className={`badge badge-xs ${
-                              isSelected
-                                ? "badge-secondary-content"
-                                : "badge-accent"
+                              isSelected ? "badge-secondary-content" : "badge-accent"
                             }`}
                           >
                             {metricName}
@@ -449,9 +398,7 @@ export function QubitMetricHistoryModal({
                         )}
                       </div>
                       <div className="text-xs opacity-70 mt-1">
-                        {task.start_at
-                          ? formatDateTimeCompact(String(task.start_at))
-                          : ""}
+                        {task.start_at ? formatDateTimeCompact(String(task.start_at)) : ""}
                       </div>
                       <span
                         className={`badge badge-xs mt-1 ${
@@ -502,9 +449,7 @@ export function QubitMetricHistoryModal({
           <button
             className="btn btn-xs btn-ghost"
             disabled={selectedTaskIndex === 0}
-            onClick={() =>
-              setSelectedTaskIndex((prev) => Math.max(0, prev - 1))
-            }
+            onClick={() => setSelectedTaskIndex((prev) => Math.max(0, prev - 1))}
           >
             ← Prev
           </button>
@@ -512,9 +457,7 @@ export function QubitMetricHistoryModal({
             className="btn btn-xs btn-ghost"
             disabled={selectedTaskIndex === executionTasks.length - 1}
             onClick={() =>
-              setSelectedTaskIndex((prev) =>
-                Math.min(executionTasks.length - 1, prev + 1),
-              )
+              setSelectedTaskIndex((prev) => Math.min(executionTasks.length - 1, prev + 1))
             }
           >
             Next →
@@ -530,9 +473,7 @@ export function QubitMetricHistoryModal({
           <div className="flex flex-col items-center justify-center text-base-content/40">
             <FileText className="h-12 w-12 mb-3 opacity-30" />
             <p className="text-sm">
-              {selectedExecutionId
-                ? `Select a task to view details`
-                : "Select an execution first"}
+              {selectedExecutionId ? `Select a task to view details` : "Select an execution first"}
             </p>
           </div>
         ) : selectedTask.figure_path ? (
@@ -596,8 +537,7 @@ export function QubitMetricHistoryModal({
             <div className="flex items-center gap-2">
               <span className="font-semibold">Metric Value:</span>
               <span className="font-mono">
-                {formatMetricValue(selectedGroup.items[0].value, metricUnit, 4)}{" "}
-                {metricUnit}
+                {formatMetricValue(selectedGroup.items[0].value, metricUnit, 4)} {metricUnit}
               </span>
             </div>
           )}
@@ -639,9 +579,7 @@ export function QubitMetricHistoryModal({
             Object.keys(selectedTask.input_parameters).length > 0 && (
               <ParametersTable
                 title="Input Parameters"
-                parameters={
-                  selectedTask.input_parameters as Record<string, unknown>
-                }
+                parameters={selectedTask.input_parameters as Record<string, unknown>}
               />
             )}
           {selectedTask.output_parameters &&
@@ -649,9 +587,7 @@ export function QubitMetricHistoryModal({
               <>
                 <ParametersTable
                   title="Output Parameters"
-                  parameters={
-                    selectedTask.output_parameters as Record<string, unknown>
-                  }
+                  parameters={selectedTask.output_parameters as Record<string, unknown>}
                   editable
                   onSave={handleSaveParameters}
                   isSaving={updateParamsMutation.isPending}
@@ -670,27 +606,20 @@ export function QubitMetricHistoryModal({
                 )}
               </>
             )}
-          {selectedTask.run_parameters &&
-            Object.keys(selectedTask.run_parameters).length > 0 && (
-              <ParametersTable
-                title="Run Parameters"
-                parameters={
-                  selectedTask.run_parameters as Record<string, unknown>
-                }
-              />
-            )}
+          {selectedTask.run_parameters && Object.keys(selectedTask.run_parameters).length > 0 && (
+            <ParametersTable
+              title="Run Parameters"
+              parameters={selectedTask.run_parameters as Record<string, unknown>}
+            />
+          )}
         </div>
       )}
 
       {/* Memo (above issues) */}
-      {selectedTask?.task_id && (
-        <TaskResultMemo taskId={selectedTask.task_id} chipId={chipId} />
-      )}
+      {selectedTask?.task_id && <TaskResultMemo taskId={selectedTask.task_id} chipId={chipId} />}
 
       {/* Issues */}
-      {selectedTask?.task_id && (
-        <TaskResultIssues taskId={selectedTask.task_id} />
-      )}
+      {selectedTask?.task_id && <TaskResultIssues taskId={selectedTask.task_id} />}
     </div>
   );
 
@@ -743,9 +672,7 @@ export function QubitMetricHistoryModal({
         </div>
 
         {/* Column 3: Details – scrollable */}
-        <div className="w-1/2 overflow-y-auto min-h-0">
-          {renderTaskDetails()}
-        </div>
+        <div className="w-1/2 overflow-y-auto min-h-0">{renderTaskDetails()}</div>
       </div>
     </div>
   );

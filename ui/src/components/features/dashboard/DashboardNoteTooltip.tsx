@@ -63,9 +63,7 @@ export function DashboardNoteTooltip({
       <div className="font-semibold tabular-nums">{header}</div>
       {current && (
         <div className="border-l-2 border-warning pl-2">
-          <div className="text-[10px] uppercase tracking-wide text-warning">
-            this metric
-          </div>
+          <div className="text-[10px] uppercase tracking-wide text-warning">this metric</div>
           <p className="whitespace-pre-wrap break-words">{current.content}</p>
           <div className="text-[10px] text-base-content/50 mt-0.5">
             {current.username} · {formatDateTime(current.updatedAt)}
@@ -81,9 +79,7 @@ export function DashboardNoteTooltip({
             {others.map((n) => (
               <li key={n.metricKey} className="border-l-2 border-base-300 pl-2">
                 <div className="font-semibold text-[11px]">{n.metricTitle}</div>
-                <p className="whitespace-pre-wrap break-words text-base-content/80">
-                  {n.content}
-                </p>
+                <p className="whitespace-pre-wrap break-words text-base-content/80">{n.content}</p>
                 <div className="text-[10px] text-base-content/50">
                   {n.username} · {formatDateTime(n.updatedAt)}
                 </div>

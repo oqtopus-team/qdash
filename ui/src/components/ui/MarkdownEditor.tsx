@@ -58,8 +58,7 @@ function wrapSelection(
 ): WrapResult {
   const selected = text.slice(start, end);
   const placeholder = selected || "text";
-  const newText =
-    text.slice(0, start) + prefix + placeholder + suffix + text.slice(end);
+  const newText = text.slice(0, start) + prefix + placeholder + suffix + text.slice(end);
   return {
     text: newText,
     selectionStart: start + prefix.length,
@@ -67,12 +66,7 @@ function wrapSelection(
   };
 }
 
-function insertLinePrefix(
-  text: string,
-  start: number,
-  end: number,
-  prefix: string,
-): WrapResult {
+function insertLinePrefix(text: string, start: number, end: number, prefix: string): WrapResult {
   const selected = text.slice(start, end);
   if (selected) {
     const lines = selected.split("\n");
@@ -245,9 +239,7 @@ export function MarkdownEditor({
         const idx = current.indexOf(placeholder);
         if (idx !== -1) {
           onChange(
-            current.slice(0, idx) +
-              `![image](${url})` +
-              current.slice(idx + placeholder.length),
+            current.slice(0, idx) + `![image](${url})` + current.slice(idx + placeholder.length),
           );
         } else {
           onChange(current + `\n![image](${url})`);
@@ -355,9 +347,7 @@ export function MarkdownEditor({
       }
       if (e.key === "ArrowUp") {
         e.preventDefault();
-        setMentionIndex(
-          (i) => (i - 1 + filteredMentions.length) % filteredMentions.length,
-        );
+        setMentionIndex((i) => (i - 1 + filteredMentions.length) % filteredMentions.length);
         return;
       }
       if (e.key === "Enter" || e.key === "Tab") {
@@ -493,9 +483,7 @@ export function MarkdownEditor({
                       </span>
                       <span className="text-base-content/50 text-xs truncate">
                         @{candidate.id}
-                        {candidate.secondaryLabel
-                          ? ` · ${candidate.secondaryLabel}`
-                          : ""}
+                        {candidate.secondaryLabel ? ` · ${candidate.secondaryLabel}` : ""}
                       </span>
                     </span>
                   </button>
@@ -509,9 +497,7 @@ export function MarkdownEditor({
           {value.trim() ? (
             <MarkdownContent content={value} />
           ) : (
-            <p className="text-sm text-base-content/40 italic">
-              Nothing to preview
-            </p>
+            <p className="text-sm text-base-content/40 italic">Nothing to preview</p>
           )}
         </div>
       )}

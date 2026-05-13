@@ -47,9 +47,7 @@ export function DashboardSummaryTable({ rows }: DashboardSummaryTableProps) {
           .map((v) => v.value)
           .filter((v): v is number => v !== null && v !== undefined);
         const sorted = [...values].sort((a, b) => a - b);
-        const median = sorted.length
-          ? sorted[Math.floor(sorted.length / 2)]
-          : null;
+        const median = sorted.length ? sorted[Math.floor(sorted.length / 2)] : null;
         const min = values.length ? Math.min(...values) : null;
         const max = values.length ? Math.max(...values) : null;
         const total = r.expectedTotal || values.length;

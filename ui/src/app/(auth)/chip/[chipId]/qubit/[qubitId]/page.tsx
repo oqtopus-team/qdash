@@ -11,10 +11,7 @@ import type { TaskInfo } from "@/schemas";
 import { QubitDetailPageSkeleton } from "@/components/ui/Skeleton/PageSkeletons";
 
 import { useGetChip } from "@/client/chip/chip";
-import {
-  useListTaskInfo,
-  useGetTaskFileSettings,
-} from "@/client/task-file/task-file";
+import { useListTaskInfo, useGetTaskFileSettings } from "@/client/task-file/task-file";
 import { QubitTaskCard } from "@/components/features/qubit/QubitTaskCard";
 import { QubitTimeSeriesView } from "@/components/features/qubit/QubitTimeSeriesView";
 import { TaskHistoryViewer } from "@/components/features/qubit/TaskHistoryViewer";
@@ -48,8 +45,7 @@ function QubitDetailPageContent() {
   const { data: chipData, isLoading: isChipLoading } = useGetChip(chipId);
 
   // Get task file settings to determine default backend
-  const { data: taskFileSettings, isLoading: isSettingsLoading } =
-    useGetTaskFileSettings();
+  const { data: taskFileSettings, isLoading: isSettingsLoading } = useGetTaskFileSettings();
   const defaultBackend = taskFileSettings?.data?.default_backend || "qubex";
 
   // Get task list from task-files API
@@ -64,11 +60,7 @@ function QubitDetailPageContent() {
     }
   }, [isInitialized, chipId, selectedChip, setSelectedChip]);
 
-  const { formatDate } = useDateNavigation(
-    chipId,
-    selectedDate,
-    setSelectedDate,
-  );
+  const { formatDate } = useDateNavigation(chipId, selectedDate, setSelectedDate);
 
   // Get filtered tasks for qubit type
   const filteredTasks = (taskInfoData?.data?.tasks || []).filter(
@@ -83,12 +75,7 @@ function QubitDetailPageContent() {
   }, [isInitialized, selectedTask, filteredTasks, setSelectedTask]);
 
   // Show skeleton during initial loading
-  if (
-    !isInitialized ||
-    isChipLoading ||
-    isSettingsLoading ||
-    isTaskInfoLoading
-  ) {
+  if (!isInitialized || isChipLoading || isSettingsLoading || isTaskInfoLoading) {
     return <QubitDetailPageSkeleton />;
   }
 
@@ -109,27 +96,21 @@ function QubitDetailPageContent() {
             </h1>
             <div className="join rounded-lg overflow-hidden">
               <button
-                className={`join-item btn btn-sm ${
-                  viewMode === "dashboard" ? "btn-primary" : ""
-                }`}
+                className={`join-item btn btn-sm ${viewMode === "dashboard" ? "btn-primary" : ""}`}
                 onClick={() => setViewMode("dashboard")}
               >
                 <Eye size={18} />
                 <span className="ml-2">Dashboard</span>
               </button>
               <button
-                className={`join-item btn btn-sm ${
-                  viewMode === "history" ? "btn-primary" : ""
-                }`}
+                className={`join-item btn btn-sm ${viewMode === "history" ? "btn-primary" : ""}`}
                 onClick={() => setViewMode("history")}
               >
                 <Clock size={18} />
                 <span className="ml-2">History</span>
               </button>
               <button
-                className={`join-item btn btn-sm ${
-                  viewMode === "timeseries" ? "btn-primary" : ""
-                }`}
+                className={`join-item btn btn-sm ${viewMode === "timeseries" ? "btn-primary" : ""}`}
                 onClick={() => setViewMode("timeseries")}
               >
                 <TrendingUp size={18} />
@@ -184,23 +165,17 @@ function QubitDetailPageContent() {
                 </div>
                 <div className="stat">
                   <div className="stat-title">Chip</div>
-                  <div className="stat-value text-sm">
-                    {chipData?.data?.chip_id}
-                  </div>
+                  <div className="stat-value text-sm">{chipData?.data?.chip_id}</div>
                 </div>
                 <div className="stat">
                   <div className="stat-title">Date</div>
                   <div className="stat-value text-sm">
-                    {selectedDate === "latest"
-                      ? "Latest"
-                      : formatDate(selectedDate)}
+                    {selectedDate === "latest" ? "Latest" : formatDate(selectedDate)}
                   </div>
                 </div>
                 <div className="stat">
                   <div className="stat-title">Experiments</div>
-                  <div className="stat-value text-sm">
-                    {filteredTasks.length}
-                  </div>
+                  <div className="stat-value text-sm">{filteredTasks.length}</div>
                 </div>
               </div>
 

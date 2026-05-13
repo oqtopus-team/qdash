@@ -19,10 +19,7 @@ export function useImageUpload(target: ImageUploadTarget = "issues") {
       try {
         const formData = new FormData();
         formData.append("file", file);
-        const response = await AXIOS_INSTANCE.post<{ url: string }>(
-          UPLOAD_PATHS[target],
-          formData,
-        );
+        const response = await AXIOS_INSTANCE.post<{ url: string }>(UPLOAD_PATHS[target], formData);
         return response.data.url;
       } finally {
         setIsUploading(false);

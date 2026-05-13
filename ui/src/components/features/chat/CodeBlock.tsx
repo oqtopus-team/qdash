@@ -123,12 +123,9 @@ function highlightPython(code: string): React.ReactNode[] {
         continue;
       }
       // Number
-      if (
-        /\d/.test(line[i]) &&
-        (i === 0 || /[\s(=,[\-+*/%<>]/.test(line[i - 1]))
-      ) {
+      if (/\d/.test(line[i]) && (i === 0 || /[\s(=,[\-+*/%<>]/.test(line[i - 1]))) {
         let j = i;
-        while (j < line.length && /[\d._eE+\-]/.test(line[j])) j++;
+        while (j < line.length && /[\d._eE+-]/.test(line[j])) j++;
         tokens.push(
           <span key={`${lineIdx}-${i}`} className="text-info">
             {line.slice(i, j)}
@@ -144,10 +141,7 @@ function highlightPython(code: string): React.ReactNode[] {
         const word = line.slice(i, j);
         if (PYTHON_KEYWORDS.has(word)) {
           tokens.push(
-            <span
-              key={`${lineIdx}-${i}`}
-              className="text-primary font-semibold"
-            >
+            <span key={`${lineIdx}-${i}`} className="text-primary font-semibold">
               {word}
             </span>,
           );

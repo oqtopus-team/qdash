@@ -39,29 +39,23 @@ describe("toIsoSeconds", () => {
 
 describe("toDateTimeLocal", () => {
   it("converts UTC ISO input to configured timezone datetime-local", () => {
-    expect(toDateTimeLocal("2024-06-15T03:00:00+00:00", "Asia/Tokyo")).toBe(
-      "2024-06-15T12:00",
-    );
+    expect(toDateTimeLocal("2024-06-15T03:00:00+00:00", "Asia/Tokyo")).toBe("2024-06-15T12:00");
   });
 
   it("treats timezone-less datetime input as UTC", () => {
-    expect(toDateTimeLocal("2024-06-15T03:00:00", "Asia/Tokyo")).toBe(
-      "2024-06-15T12:00",
-    );
+    expect(toDateTimeLocal("2024-06-15T03:00:00", "Asia/Tokyo")).toBe("2024-06-15T12:00");
   });
 
   it("appends T00:00 when input has no T", () => {
-    expect(toDateTimeLocal("2024-06-15", "Asia/Tokyo")).toBe(
-      "2024-06-15T00:00",
-    );
+    expect(toDateTimeLocal("2024-06-15", "Asia/Tokyo")).toBe("2024-06-15T00:00");
   });
 });
 
 describe("formatDateTime", () => {
   it("treats timezone-less datetime input as UTC", () => {
-    expect(
-      formatDateTime("2024-06-15T03:00:00", "yyyy-MM-dd HH:mm", "Asia/Tokyo"),
-    ).toBe("2024-06-15 12:00");
+    expect(formatDateTime("2024-06-15T03:00:00", "yyyy-MM-dd HH:mm", "Asia/Tokyo")).toBe(
+      "2024-06-15 12:00",
+    );
   });
 });
 
@@ -72,9 +66,7 @@ describe("formatRelativeTime", () => {
     Date.now = () => now;
 
     try {
-      expect(formatRelativeTime("2024-06-15T03:00:00", "Asia/Tokyo")).toBe(
-        "5m ago",
-      );
+      expect(formatRelativeTime("2024-06-15T03:00:00", "Asia/Tokyo")).toBe("5m ago");
     } finally {
       Date.now = originalNow;
     }
@@ -83,16 +75,14 @@ describe("formatRelativeTime", () => {
 
 describe("dateToDateInput", () => {
   it("formats a Date in the configured timezone", () => {
-    expect(
-      dateToDateInput(new Date("2024-06-14T15:00:00.000Z"), "Asia/Tokyo"),
-    ).toBe("2024-06-15");
+    expect(dateToDateInput(new Date("2024-06-14T15:00:00.000Z"), "Asia/Tokyo")).toBe("2024-06-15");
   });
 });
 
 describe("dateToDateTimeLocal", () => {
   it("formats a Date in the configured timezone for datetime-local inputs", () => {
-    expect(
-      dateToDateTimeLocal(new Date("2024-06-15T03:30:00.000Z"), "Asia/Tokyo"),
-    ).toBe("2024-06-15T12:30");
+    expect(dateToDateTimeLocal(new Date("2024-06-15T03:30:00.000Z"), "Asia/Tokyo")).toBe(
+      "2024-06-15T12:30",
+    );
   });
 });

@@ -3,10 +3,7 @@
 import dynamic from "next/dynamic";
 
 const PlotlyRenderer = dynamic(
-  () =>
-    import("@/components/charts/PlotlyRenderer").then(
-      (mod) => mod.PlotlyRenderer,
-    ),
+  () => import("@/components/charts/PlotlyRenderer").then((mod) => mod.PlotlyRenderer),
   { ssr: false },
 );
 
@@ -41,11 +38,7 @@ export function InteractiveFigureContent({
       </div>
       {showNavigation && (
         <div className="mt-4 flex justify-center gap-2">
-          <button
-            className="btn btn-xs"
-            onClick={onNavigatePrevious}
-            disabled={figureIndex === 0}
-          >
+          <button className="btn btn-xs" onClick={onNavigatePrevious} disabled={figureIndex === 0}>
             ◀
           </button>
           <span className="text-sm">

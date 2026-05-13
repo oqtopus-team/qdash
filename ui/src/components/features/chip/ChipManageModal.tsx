@@ -23,15 +23,10 @@ interface ChipManageModalProps {
   onDeleted?: () => void;
 }
 
-export function ChipManageModal({
-  chipId,
-  onClose,
-  onDeleted,
-}: ChipManageModalProps) {
+export function ChipManageModal({ chipId, onClose, onDeleted }: ChipManageModalProps) {
   const queryClient = useQueryClient();
   const { data: chipData } = useGetChip(chipId);
-  const { data: impactData, refetch: refetchImpact } =
-    useGetChipDeletionImpact(chipId);
+  const { data: impactData, refetch: refetchImpact } = useGetChipDeletionImpact(chipId);
   const updateChip = useUpdateChip();
   const deleteChip = useDeleteChip();
 
@@ -109,8 +104,7 @@ export function ChipManageModal({
                 <span className="opacity-60">Size:</span> {chip.size} qubits
               </div>
               <div>
-                <span className="opacity-60">Installed:</span>{" "}
-                {formatDateTime(chip.installed_at)}
+                <span className="opacity-60">Installed:</span> {formatDateTime(chip.installed_at)}
               </div>
               <div className="col-span-2">
                 <span className="opacity-60">Current cool-down:</span>{" "}
@@ -175,16 +169,15 @@ export function ChipManageModal({
               {impact && (
                 <div className="text-xs space-y-1">
                   <div>
-                    <span className="font-semibold">Hard-deleted:</span>{" "}
-                    {impact.qubits} qubit{impact.qubits !== 1 ? "s" : ""},{" "}
-                    {impact.couplings} coupling
+                    <span className="font-semibold">Hard-deleted:</span> {impact.qubits} qubit
+                    {impact.qubits !== 1 ? "s" : ""}, {impact.couplings} coupling
                     {impact.couplings !== 1 ? "s" : ""}
                   </div>
                   <div className="text-base-content/60">
-                    <span className="font-semibold">Retained for audit:</span>{" "}
-                    {impact.task_results} task result
-                    {impact.task_results !== 1 ? "s" : ""},{" "}
-                    {impact.qubit_history_snapshots} qubit snapshot
+                    <span className="font-semibold">Retained for audit:</span> {impact.task_results}{" "}
+                    task result
+                    {impact.task_results !== 1 ? "s" : ""}, {impact.qubit_history_snapshots} qubit
+                    snapshot
                     {impact.qubit_history_snapshots !== 1 ? "s" : ""},{" "}
                     {impact.coupling_history_snapshots} coupling snapshot
                     {impact.coupling_history_snapshots !== 1 ? "s" : ""}
@@ -205,8 +198,7 @@ export function ChipManageModal({
                         onChange={(e) => setForceDelete(e.target.checked)}
                       />
                       <span>
-                        I understand this will cascade-delete the chip&apos;s
-                        qubits and couplings.
+                        I understand this will cascade-delete the chip&apos;s qubits and couplings.
                       </span>
                     </label>
                   )}
@@ -257,13 +249,7 @@ export function ChipManageModal({
   );
 }
 
-function Field({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
       <label className="block text-xs text-base-content/60 mb-1">{label}</label>

@@ -148,9 +148,7 @@ export function useAnalysisChat(
     modelOverride?: ModelOverride | null;
   },
 ) {
-  const [messages, setMessagesRaw] = useState<ChatMessage[]>(
-    options?.initialMessages ?? [],
-  );
+  const [messages, setMessagesRaw] = useState<ChatMessage[]>(options?.initialMessages ?? []);
   const [isLoading, setIsLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -273,13 +271,8 @@ export function useAnalysisChat(
                 ]);
               } else {
                 // Legacy format fallback
-                const formattedResponse = formatAnalysisResponse(
-                  result as AnalysisResult,
-                );
-                setMessages((prev) => [
-                  ...prev,
-                  { role: "assistant", content: formattedResponse },
-                ]);
+                const formattedResponse = formatAnalysisResponse(result as AnalysisResult);
+                setMessages((prev) => [...prev, { role: "assistant", content: formattedResponse }]);
               }
             } else if (evt.event === "error") {
               const payload = JSON.parse(evt.data);
@@ -291,8 +284,7 @@ export function useAnalysisChat(
         if (err instanceof DOMException && err.name === "AbortError") {
           return;
         }
-        const errorMsg =
-          err instanceof Error ? err.message : "Analysis request failed";
+        const errorMsg = err instanceof Error ? err.message : "Analysis request failed";
         setError(errorMsg);
         setMessages((prev) => [
           ...prev,
@@ -332,11 +324,7 @@ function formatAnalysisResponse(result: AnalysisResult): string {
 
   // Assessment badge
   const badge =
-    result.assessment === "good"
-      ? "Good"
-      : result.assessment === "warning"
-        ? "Warning"
-        : "Bad";
+    result.assessment === "good" ? "Good" : result.assessment === "warning" ? "Warning" : "Bad";
   parts.push(`**[${badge}]** ${result.summary}\n`);
 
   // Explanation

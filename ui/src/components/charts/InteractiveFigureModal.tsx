@@ -25,8 +25,7 @@ export function InteractiveFigureModal({
 }: InteractiveFigureModalProps) {
   if (!isOpen) return null;
 
-  const displayTitle =
-    figureIndex !== undefined ? `${title} ${figureIndex + 1}` : title;
+  const displayTitle = figureIndex !== undefined ? `${title} ${figureIndex + 1}` : title;
 
   return (
     <dialog className="modal modal-open">

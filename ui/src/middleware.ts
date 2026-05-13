@@ -6,8 +6,7 @@ export function middleware(request: NextRequest) {
   const isLoginPage = request.nextUrl.pathname === "/login";
   const isSignupPage = request.nextUrl.pathname === "/signup";
   const isApiRoute =
-    request.nextUrl.pathname.startsWith("/api/") ||
-    request.nextUrl.pathname === "/api";
+    request.nextUrl.pathname.startsWith("/api/") || request.nextUrl.pathname === "/api";
 
   if (isApiRoute) {
     return NextResponse.next();

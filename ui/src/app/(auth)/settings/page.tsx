@@ -26,10 +26,7 @@ import {
   setStoredAnalysisModelKey,
 } from "@/lib/copilotModels";
 import type { MemberResponse, ProjectRole } from "@/schemas";
-import {
-  getGetCurrentUserQueryKey,
-  useUpdateCurrentUserProfile,
-} from "@/client/auth/auth";
+import { getGetCurrentUserQueryKey, useUpdateCurrentUserProfile } from "@/client/auth/auth";
 import { AVATAR_PRESETS, UserAvatar } from "@/components/ui/UserAvatar";
 
 type Tab = "appearance" | "project" | "copilot" | "account" | "api";
@@ -48,18 +45,13 @@ function mutationErrorMessage(error: unknown) {
 }
 
 function CopilotSettingsPanel() {
-  const [selectedModelKey, setSelectedModelKey] = useState(
-    getStoredAnalysisModelKey,
-  );
+  const [selectedModelKey, setSelectedModelKey] = useState(getStoredAnalysisModelKey);
   const { data: copilotConfigResponse, isLoading } = useGetCopilotConfig();
   const modelOptions = useMemo(
     () => buildAnalysisModelOptions(copilotConfigResponse?.data ?? null),
     [copilotConfigResponse?.data],
   );
-  const selectedModel = resolveAnalysisModelOption(
-    modelOptions,
-    selectedModelKey,
-  );
+  const selectedModel = resolveAnalysisModelOption(modelOptions, selectedModelKey);
 
   const handleModelChange = (key: string) => {
     setSelectedModelKey(key);
@@ -72,9 +64,7 @@ function CopilotSettingsPanel() {
         <h2 className="card-title text-xl mb-4">Copilot Settings</h2>
         <div className="flex flex-col gap-6">
           <div className="flex flex-col gap-3">
-            <label className="text-sm font-medium">
-              Default analysis model
-            </label>
+            <label className="text-sm font-medium">Default analysis model</label>
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
               <select
                 className="select select-bordered w-full sm:max-w-md"
@@ -94,9 +84,8 @@ function CopilotSettingsPanel() {
               </div>
             </div>
             <p className="text-sm text-base-content/60">
-              This controls the default model used when asking about calibration
-              task results in Ask AI. The available choices come from
-              copilot.yaml.
+              This controls the default model used when asking about calibration task results in Ask
+              AI. The available choices come from copilot.yaml.
             </p>
           </div>
 
@@ -149,8 +138,7 @@ function ProfileSettingsPanel() {
   };
 
   const isDirty =
-    displayName.trim() !== (user?.display_name ?? "") ||
-    avatarKey !== (user?.avatar_key ?? "");
+    displayName.trim() !== (user?.display_name ?? "") || avatarKey !== (user?.avatar_key ?? "");
 
   return (
     <div className="card bg-base-200 shadow-lg">
@@ -158,16 +146,10 @@ function ProfileSettingsPanel() {
         <h2 className="card-title text-xl mb-4">Profile</h2>
         <div className="grid gap-6 lg:grid-cols-[220px_1fr]">
           <div className="flex flex-col items-center gap-3 rounded-lg bg-base-100 p-4">
-            <UserAvatar
-              username={user?.username ?? ""}
-              avatarKey={avatarKey}
-              size={72}
-            />
+            <UserAvatar username={user?.username ?? ""} avatarKey={avatarKey} size={72} />
             <div className="text-center">
               <div className="font-medium">{displayName || user?.username}</div>
-              <div className="text-xs text-base-content/50">
-                @{user?.username}
-              </div>
+              <div className="text-xs text-base-content/50">@{user?.username}</div>
             </div>
           </div>
           <div className="space-y-5">
@@ -202,18 +184,12 @@ function ProfileSettingsPanel() {
                     key={preset.key}
                     type="button"
                     className={`btn h-12 min-h-0 rounded-lg p-1 ${
-                      avatarKey === preset.key
-                        ? "btn-primary"
-                        : "btn-ghost bg-base-100"
+                      avatarKey === preset.key ? "btn-primary" : "btn-ghost bg-base-100"
                     }`}
                     onClick={() => setAvatarKey(preset.key)}
                     title={preset.label}
                   >
-                    <UserAvatar
-                      username={user?.username ?? ""}
-                      avatarKey={preset.key}
-                      size={28}
-                    />
+                    <UserAvatar username={user?.username ?? ""} avatarKey={preset.key} size={28} />
                   </button>
                 ))}
               </div>
@@ -266,15 +242,11 @@ function ProjectMembersPanel() {
   const removeMutation = useRemoveProjectMember();
   const members = membersQuery.data?.data.members ?? [];
   const isMutating =
-    inviteMutation.isPending ||
-    updateMutation.isPending ||
-    removeMutation.isPending;
+    inviteMutation.isPending || updateMutation.isPending || removeMutation.isPending;
   const memberError =
     localError ||
     (inviteMutation.error || updateMutation.error || removeMutation.error
-      ? mutationErrorMessage(
-          inviteMutation.error || updateMutation.error || removeMutation.error,
-        )
+      ? mutationErrorMessage(inviteMutation.error || updateMutation.error || removeMutation.error)
       : null);
 
   const refreshMembers = () => {
@@ -305,10 +277,7 @@ function ProjectMembersPanel() {
     }
   };
 
-  const handleRoleChange = async (
-    member: MemberResponse,
-    role: ProjectRole,
-  ) => {
+  const handleRoleChange = async (member: MemberResponse, role: ProjectRole) => {
     if (!projectId || member.role === role) return;
     setLocalError(null);
     try {
@@ -348,9 +317,7 @@ function ProjectMembersPanel() {
                 {currentProject?.name ?? "Current project"}
               </p>
             </div>
-            <div
-              className={`badge ${isOwner ? "badge-secondary" : "badge-ghost"} w-fit`}
-            >
+            <div className={`badge ${isOwner ? "badge-secondary" : "badge-ghost"} w-fit`}>
               {isOwner ? "Owner controls" : "Read only"}
             </div>
           </div>
@@ -358,8 +325,8 @@ function ProjectMembersPanel() {
           {!isOwner && (
             <div className="alert alert-info mt-4">
               <span>
-                Only the project owner can invite members, remove members, or
-                change Viewer and Editor roles.
+                Only the project owner can invite members, remove members, or change Viewer and
+                Editor roles.
               </span>
             </div>
           )}
@@ -375,9 +342,7 @@ function ProjectMembersPanel() {
               <select
                 className="select select-bordered w-full"
                 value={inviteRole}
-                onChange={(event) =>
-                  setInviteRole(event.target.value as ProjectRole)
-                }
+                onChange={(event) => setInviteRole(event.target.value as ProjectRole)}
               >
                 <option value="viewer">Viewer</option>
                 <option value="editor">Editor</option>
@@ -417,10 +382,7 @@ function ProjectMembersPanel() {
                   </tr>
                 ) : members.length === 0 ? (
                   <tr>
-                    <td
-                      colSpan={4}
-                      className="py-8 text-center text-base-content/60"
-                    >
+                    <td colSpan={4} className="py-8 text-center text-base-content/60">
                       No members found
                     </td>
                   </tr>
@@ -438,10 +400,7 @@ function ProjectMembersPanel() {
                               value={member.role}
                               disabled={isMutating}
                               onChange={(event) =>
-                                handleRoleChange(
-                                  member,
-                                  event.target.value as ProjectRole,
-                                )
+                                handleRoleChange(member, event.target.value as ProjectRole)
                               }
                             >
                               {editableProjectRoles.map((role) => (
@@ -451,17 +410,13 @@ function ProjectMembersPanel() {
                               ))}
                             </select>
                           ) : (
-                            <span
-                              className={`badge ${roleBadgeClass(member.role)}`}
-                            >
+                            <span className={`badge ${roleBadgeClass(member.role)}`}>
                               {member.role}
                             </span>
                           )}
                         </td>
                         <td>
-                          <span className="badge badge-ghost">
-                            {member.status}
-                          </span>
+                          <span className="badge badge-ghost">{member.status}</span>
                         </td>
                         <td className="text-right">
                           {isOwner && !isProjectOwner ? (
@@ -488,16 +443,15 @@ function ProjectMembersPanel() {
 
           <div className="mt-3 grid gap-2 text-sm text-base-content/60 md:grid-cols-3">
             <p>
-              <span className="font-medium text-base-content">Viewer</span> can
-              read project data.
+              <span className="font-medium text-base-content">Viewer</span> can read project data.
             </p>
             <p>
-              <span className="font-medium text-base-content">Editor</span> can
-              run workflows and update operational data.
+              <span className="font-medium text-base-content">Editor</span> can run workflows and
+              update operational data.
             </p>
             <p>
-              <span className="font-medium text-base-content">Owner</span>{" "}
-              manages project settings and membership.
+              <span className="font-medium text-base-content">Owner</span> manages project settings
+              and membership.
             </p>
           </div>
         </div>
@@ -542,10 +496,7 @@ export default function SettingsPage() {
 
   return (
     <PageContainer>
-      <PageHeader
-        title="Settings"
-        description="Customize your experience and manage account"
-      />
+      <PageHeader title="Settings" description="Customize your experience and manage account" />
       <div className="w-full gap-8">
         <div className="tabs tabs-boxed mb-4 sm:mb-6 w-full sm:w-fit overflow-x-auto flex-nowrap">
           <a
@@ -599,9 +550,7 @@ export default function SettingsPage() {
                         d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
                       />
                     </svg>
-                    <span>
-                      Dev environment: Using purple theme for visual distinction
-                    </span>
+                    <span>Dev environment: Using purple theme for visual distinction</span>
                   </div>
                 )}
                 <div className="flex flex-col gap-6">
@@ -684,22 +633,12 @@ export default function SettingsPage() {
 
                     {/* Example components */}
                     <div className="flex flex-col gap-3">
-                      <h3 className="text-sm font-medium">
-                        Preview Components
-                      </h3>
+                      <h3 className="text-sm font-medium">Preview Components</h3>
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                        <button className="btn btn-primary btn-sm w-full">
-                          Primary
-                        </button>
-                        <button className="btn btn-secondary btn-sm w-full">
-                          Secondary
-                        </button>
-                        <button className="btn btn-accent btn-sm w-full">
-                          Accent
-                        </button>
-                        <button className="btn btn-neutral btn-sm w-full">
-                          Neutral
-                        </button>
+                        <button className="btn btn-primary btn-sm w-full">Primary</button>
+                        <button className="btn btn-secondary btn-sm w-full">Secondary</button>
+                        <button className="btn btn-accent btn-sm w-full">Accent</button>
+                        <button className="btn btn-neutral btn-sm w-full">Neutral</button>
                       </div>
                     </div>
                   </div>
@@ -715,8 +654,7 @@ export default function SettingsPage() {
               {user?.must_change_password && (
                 <div className="alert alert-warning">
                   <span>
-                    You are using a temporary password. Change it before
-                    continuing regular work.
+                    You are using a temporary password. Change it before continuing regular work.
                   </span>
                 </div>
               )}
@@ -730,8 +668,8 @@ export default function SettingsPage() {
                 <div className="flex flex-col gap-6">
                   <div className="flex flex-col gap-3">
                     <p className="text-sm text-base-content/70">
-                      Use this token to authenticate API requests. Include it in
-                      the Authorization header:
+                      Use this token to authenticate API requests. Include it in the Authorization
+                      header:
                     </p>
                     <code className="bg-base-300 p-3 rounded-lg text-sm">
                       Authorization: Bearer {"<your-token>"}
@@ -739,9 +677,7 @@ export default function SettingsPage() {
                   </div>
 
                   <div className="flex flex-col gap-3">
-                    <label className="text-sm font-medium">
-                      Your Access Token
-                    </label>
+                    <label className="text-sm font-medium">Your Access Token</label>
                     <div className="flex flex-col gap-2">
                       <input
                         type={showToken ? "text" : "password"}
@@ -790,9 +726,7 @@ export default function SettingsPage() {
                               />
                             </svg>
                           )}
-                          <span className="hidden sm:inline">
-                            {showToken ? "Hide" : "Show"}
-                          </span>
+                          <span className="hidden sm:inline">{showToken ? "Hide" : "Show"}</span>
                         </button>
                         <button
                           className={`btn btn-sm flex-1 ${copied ? "btn-success" : "btn-primary"}`}
@@ -841,18 +775,13 @@ export default function SettingsPage() {
                   </div>
 
                   <div className="flex flex-col gap-3">
-                    <label className="text-sm font-medium">
-                      Example Usage (curl)
-                    </label>
+                    <label className="text-sm font-medium">Example Usage (curl)</label>
                     <div className="relative">
                       <div className="mockup-code text-xs sm:text-sm overflow-x-auto">
                         <pre className="whitespace-pre-wrap break-all sm:whitespace-pre sm:break-normal">
                           <code>
                             curl -H "Authorization: Bearer{" "}
-                            {showToken && accessToken
-                              ? accessToken
-                              : "<your-token>"}
-                            " \
+                            {showToken && accessToken ? accessToken : "<your-token>"}" \
                           </code>
                         </pre>
                         <pre>
@@ -894,9 +823,7 @@ export default function SettingsPage() {
                             />
                           </svg>
                         )}
-                        <span className="hidden sm:inline">
-                          {copiedCurl ? "Copied!" : "Copy"}
-                        </span>
+                        <span className="hidden sm:inline">{copiedCurl ? "Copied!" : "Copy"}</span>
                       </button>
                     </div>
                   </div>
@@ -918,8 +845,7 @@ export default function SettingsPage() {
                     <div>
                       <p className="font-medium">Keep your token secure</p>
                       <p className="text-sm">
-                        This token provides full access to your account. Do not
-                        share it publicly.
+                        This token provides full access to your account. Do not share it publicly.
                       </p>
                     </div>
                   </div>

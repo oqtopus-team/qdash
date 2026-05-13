@@ -93,9 +93,7 @@ export function MetricsPdfDownloadButton({
           </>
         )}
       </button>
-      {error && (
-        <div className="text-xs text-error max-w-48 text-right">{error}</div>
-      )}
+      {error && <div className="text-xs text-error max-w-48 text-right">{error}</div>}
     </div>
   );
 }

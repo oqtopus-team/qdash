@@ -44,12 +44,7 @@ function formatValue(value: unknown): string {
   return String(value);
 }
 
-export function TaskDetailPanel({
-  activityNodeId,
-  nodes,
-  edges,
-  onClose,
-}: TaskDetailPanelProps) {
+export function TaskDetailPanel({ activityNodeId, nodes, edges, onClose }: TaskDetailPanelProps) {
   const activityNode = useMemo(
     () => nodes.find((n) => n.node_id === activityNodeId),
     [nodes, activityNodeId],
@@ -65,9 +60,7 @@ export function TaskDetailPanel({
   //   → target_id is the input entity
   const inputParams = useMemo<ParameterInfo[]>(() => {
     return edges
-      .filter(
-        (e) => e.relation_type === "used" && e.source_id === activityNodeId,
-      )
+      .filter((e) => e.relation_type === "used" && e.source_id === activityNodeId)
       .map((e) => {
         const node = nodeMap.get(e.target_id);
         if (!node?.entity) return null;
@@ -86,11 +79,7 @@ export function TaskDetailPanel({
   //   → source_id is the output entity
   const outputParams = useMemo<ParameterInfo[]>(() => {
     return edges
-      .filter(
-        (e) =>
-          e.relation_type === "wasGeneratedBy" &&
-          e.target_id === activityNodeId,
-      )
+      .filter((e) => e.relation_type === "wasGeneratedBy" && e.target_id === activityNodeId)
       .map((e) => {
         const node = nodeMap.get(e.source_id);
         if (!node?.entity) return null;
@@ -137,9 +126,7 @@ export function TaskDetailPanel({
             <div className="font-semibold text-sm truncate">{taskName}</div>
             <div className="flex items-center gap-2 mt-1">
               {statusBadge}
-              {qid && (
-                <span className="badge badge-outline badge-sm">{qid}</span>
-              )}
+              {qid && <span className="badge badge-outline badge-sm">{qid}</span>}
             </div>
           </div>
           <button
@@ -156,11 +143,7 @@ export function TaskDetailPanel({
       {hasFigure && (
         <div className="min-h-0 max-h-[50%] overflow-y-auto border-b border-base-300 p-2">
           <div className="rounded-lg border border-base-300 overflow-hidden">
-            <TaskFigure
-              taskId={activity!.task_id}
-              qid={qid!}
-              className="w-full h-auto"
-            />
+            <TaskFigure taskId={activity!.task_id} qid={qid!} className="w-full h-auto" />
           </div>
         </div>
       )}
@@ -174,14 +157,10 @@ export function TaskDetailPanel({
             <h4 className="text-xs font-semibold uppercase tracking-wide text-base-content/60">
               Output Parameters
             </h4>
-            <span className="badge badge-ghost badge-xs">
-              {outputParams.length}
-            </span>
+            <span className="badge badge-ghost badge-xs">{outputParams.length}</span>
           </div>
           {outputParams.length === 0 ? (
-            <div className="text-xs text-base-content/40 pl-3">
-              No output parameters
-            </div>
+            <div className="text-xs text-base-content/40 pl-3">No output parameters</div>
           ) : (
             <div className="space-y-1">
               {outputParams.map((p) => (
@@ -190,13 +169,9 @@ export function TaskDetailPanel({
                   className="px-3 py-2 rounded-lg border border-green-500/20 bg-green-500/5"
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-sm font-medium truncate">
-                      {p.name}
-                    </span>
+                    <span className="text-sm font-medium truncate">{p.name}</span>
                     {p.qid && (
-                      <span className="badge badge-outline badge-xs flex-shrink-0">
-                        {p.qid}
-                      </span>
+                      <span className="badge badge-outline badge-xs flex-shrink-0">{p.qid}</span>
                     )}
                   </div>
                   {p.value && (
@@ -217,14 +192,10 @@ export function TaskDetailPanel({
             <h4 className="text-xs font-semibold uppercase tracking-wide text-base-content/60">
               Input Parameters
             </h4>
-            <span className="badge badge-ghost badge-xs">
-              {inputParams.length}
-            </span>
+            <span className="badge badge-ghost badge-xs">{inputParams.length}</span>
           </div>
           {inputParams.length === 0 ? (
-            <div className="text-xs text-base-content/40 pl-3">
-              No input parameters
-            </div>
+            <div className="text-xs text-base-content/40 pl-3">No input parameters</div>
           ) : (
             <div className="space-y-1">
               {inputParams.map((p) => (
@@ -233,13 +204,9 @@ export function TaskDetailPanel({
                   className="px-3 py-2 rounded-lg border border-amber-500/20 bg-amber-500/5"
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-sm font-medium truncate">
-                      {p.name}
-                    </span>
+                    <span className="text-sm font-medium truncate">{p.name}</span>
                     {p.qid && (
-                      <span className="badge badge-outline badge-xs flex-shrink-0">
-                        {p.qid}
-                      </span>
+                      <span className="badge badge-outline badge-xs flex-shrink-0">{p.qid}</span>
                     )}
                   </div>
                   {p.value && (

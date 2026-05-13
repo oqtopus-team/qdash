@@ -14,10 +14,7 @@ declare module "reagraph" {
     edges: any[];
     layoutType?: string;
     layoutOverrides?: {
-      getNodePosition?: (
-        id: string,
-        args: NodePositionArgs,
-      ) => { x: number; y: number; z: number };
+      getNodePosition?: (id: string, args: NodePositionArgs) => { x: number; y: number; z: number };
     };
     onNodePointerOver?: (node: any) => void;
     onEdgePointerOver?: (edge: any) => void;

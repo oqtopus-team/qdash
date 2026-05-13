@@ -32,9 +32,7 @@ export function SkeletonTable({
             <tr key={rowIndex}>
               {Array.from({ length: columns }).map((_, colIndex) => (
                 <td key={colIndex}>
-                  <div
-                    className={`skeleton h-3.5 ${colIndex === 0 ? "w-11/12" : "w-3/4"}`}
-                  />
+                  <div className={`skeleton h-3.5 ${colIndex === 0 ? "w-11/12" : "w-3/4"}`} />
                 </td>
               ))}
             </tr>

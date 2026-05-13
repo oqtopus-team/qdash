@@ -15,10 +15,7 @@ import { TimeRangeSelector } from "@/components/ui/TimeRangeSelector";
 import { useCSVExport } from "@/hooks/useCSVExport";
 import { useMetricsConfig } from "@/hooks/useMetricsConfig";
 import { useMetricsQueryParams } from "@/hooks/useMetricsQueryParams";
-import {
-  useHistogramUrlState,
-  useRangeModeUrlState,
-} from "@/hooks/useUrlState";
+import { useHistogramUrlState, useRangeModeUrlState } from "@/hooks/useUrlState";
 import { naturalSortQIDs } from "@/lib/utils/qid";
 
 interface HistogramDataPoint {
@@ -54,8 +51,7 @@ export function HistogramView() {
     isInitialized,
   } = useHistogramUrlState();
 
-  const { startDate, endDate, setStartDate, setEndDate, setQuickRange } =
-    useRangeModeUrlState();
+  const { startDate, endDate, setStartDate, setEndDate, setQuickRange } = useRangeModeUrlState();
 
   // Load metrics configuration from backend
   const {
@@ -98,8 +94,7 @@ export function HistogramView() {
   );
 
   // Select appropriate metrics options based on type
-  const metricOptions =
-    metricType === "qubit" ? qubitMetricOptions : couplingMetricOptions;
+  const metricOptions = metricType === "qubit" ? qubitMetricOptions : couplingMetricOptions;
 
   // Get current metric configuration (search both qubit and coupling)
   const currentMetricConfig = useMemo(() => {
@@ -155,9 +150,7 @@ export function HistogramView() {
       ...qubitMetrics.filter((m) => m.threshold),
       ...couplingMetrics.filter((m) => m.threshold),
     ];
-    const isCurrentValid = allMetricsWithThreshold.some(
-      (m) => m.key === selectedParameter,
-    );
+    const isCurrentValid = allMetricsWithThreshold.some((m) => m.key === selectedParameter);
 
     if (!isCurrentValid && allMetricsWithThreshold.length > 0) {
       setSelectedParameter(allMetricsWithThreshold[0].key);
@@ -169,11 +162,7 @@ export function HistogramView() {
 
   // Set default chip on mount
   useEffect(() => {
-    if (
-      !selectedChip &&
-      chipsResponse?.data?.chips &&
-      chipsResponse.data.chips.length > 0
-    ) {
+    if (!selectedChip && chipsResponse?.data?.chips && chipsResponse.data.chips.length > 0) {
       const sortedChips = [...chipsResponse.data.chips].sort((a, b) => {
         const dateA = a.installed_at ? new Date(a.installed_at).getTime() : 0;
         const dateB = b.installed_at ? new Date(b.installed_at).getTime() : 0;
@@ -220,55 +209,42 @@ export function HistogramView() {
 
     if (!metricsSource) return [];
 
-    const rawData =
-      metricsSource[selectedParameter as keyof typeof metricsSource];
+    const rawData = metricsSource[selectedParameter as keyof typeof metricsSource];
     if (!rawData) return [];
 
     const allValues: HistogramDataPoint[] = [];
 
-    Object.entries(rawData).forEach(
-      ([entityId, metricValue]: [string, unknown]) => {
-        const value = (metricValue as Record<string, unknown>)?.value;
-        if (
-          value === null ||
-          value === undefined ||
-          typeof value !== "number"
-        ) {
-          return;
+    Object.entries(rawData).forEach(([entityId, metricValue]: [string, unknown]) => {
+      const value = (metricValue as Record<string, unknown>)?.value;
+      if (value === null || value === undefined || typeof value !== "number") {
+        return;
+      }
+
+      // Apply scale from config
+      let scaledValue = value * currentMetricConfig.scale;
+
+      // For percentage metrics, convert to error rate if needed
+      if (isPercentageMetric(currentMetricConfig.unit)) {
+        if (showAsErrorRate) {
+          // Convert scaled percentage to error rate
+          scaledValue = 100 - scaledValue;
         }
+      }
 
-        // Apply scale from config
-        let scaledValue = value * currentMetricConfig.scale;
-
-        // For percentage metrics, convert to error rate if needed
-        if (isPercentageMetric(currentMetricConfig.unit)) {
-          if (showAsErrorRate) {
-            // Convert scaled percentage to error rate
-            scaledValue = 100 - scaledValue;
-          }
-        }
-
-        // Format entity ID
-        const formattedId = isCoupling
+      // Format entity ID
+      const formattedId = isCoupling
+        ? entityId
+        : entityId.startsWith("Q")
           ? entityId
-          : entityId.startsWith("Q")
-            ? entityId
-            : `Q${entityId.padStart(2, "0")}`;
+          : `Q${entityId.padStart(2, "0")}`;
 
-        allValues.push({ qid: formattedId, value: scaledValue });
-      },
-    );
+      allValues.push({ qid: formattedId, value: scaledValue });
+    });
 
     // Sort by QID for consistent ordering
     allValues.sort((a, b) => naturalSortQIDs(a.qid, b.qid));
     return allValues;
-  }, [
-    metricsData,
-    currentMetricConfig,
-    selectedParameter,
-    metricType,
-    showAsErrorRate,
-  ]);
+  }, [metricsData, currentMetricConfig, selectedParameter, metricType, showAsErrorRate]);
 
   // Extract all metrics data for table display (all metrics for current type)
   const allMetricsTableData = useMemo(() => {
@@ -293,10 +269,7 @@ export function HistogramView() {
     });
 
     // Build table data with all metrics for each entity
-    const tableData: ({ entityId: string } & Record<
-      string,
-      string | number | null
-    >)[] = [];
+    const tableData: ({ entityId: string } & Record<string, string | number | null>)[] = [];
 
     entityIds.forEach((entityId) => {
       const formattedId = isCoupling
@@ -305,20 +278,17 @@ export function HistogramView() {
           ? entityId
           : `Q${entityId.padStart(2, "0")}`;
 
-      const row: { entityId: string } & Record<string, string | number | null> =
-        { entityId: formattedId };
+      const row: { entityId: string } & Record<string, string | number | null> = {
+        entityId: formattedId,
+      };
 
       metricsConfig.forEach((metric) => {
-        const metricData = metricsSource[
-          metric.key as keyof typeof metricsSource
-        ] as Record<string, { value?: unknown }> | undefined;
+        const metricData = metricsSource[metric.key as keyof typeof metricsSource] as
+          | Record<string, { value?: unknown }>
+          | undefined;
         const value = metricData?.[entityId]?.value;
 
-        if (
-          value !== null &&
-          value !== undefined &&
-          typeof value === "number"
-        ) {
+        if (value !== null && value !== undefined && typeof value === "number") {
           // Apply scale
           let scaledValue = value * metric.scale;
 
@@ -367,8 +337,7 @@ export function HistogramView() {
 
     // Calculate yield percentage
     let yieldCount = 0;
-    const activeThreshold =
-      customThreshold ?? currentMetricConfig?.threshold?.value;
+    const activeThreshold = customThreshold ?? currentMetricConfig?.threshold?.value;
 
     if (activeThreshold !== undefined && activeThreshold !== null) {
       const isPercent = isPercentageMetric(currentMetricConfig?.unit);
@@ -388,8 +357,7 @@ export function HistogramView() {
       }
     }
 
-    const yieldPercent =
-      histogramData.length > 0 ? (yieldCount / histogramData.length) * 100 : 0;
+    const yieldPercent = histogramData.length > 0 ? (yieldCount / histogramData.length) * 100 : 0;
 
     return {
       mean,
@@ -406,8 +374,7 @@ export function HistogramView() {
     if (histogramData.length === 0) return [];
 
     const isPercent = isPercentageMetric(currentMetricConfig?.unit);
-    const activeThreshold =
-      customThreshold ?? currentMetricConfig?.threshold?.value;
+    const activeThreshold = customThreshold ?? currentMetricConfig?.threshold?.value;
 
     // Bar chart with QID on x-axis
     const barTrace = {
@@ -437,8 +404,7 @@ export function HistogramView() {
           }
         }),
       },
-      hovertemplate:
-        "Entity: %{x}<br>" + "Value: %{y:.4f}<br>" + "<extra></extra>",
+      hovertemplate: "Entity: %{x}<br>" + "Value: %{y:.4f}<br>" + "<extra></extra>",
     };
 
     // Mean line
@@ -520,8 +486,7 @@ export function HistogramView() {
         gridcolor: "#e5e7eb",
         showgrid: true,
         zeroline: false,
-        type:
-          isPercent && showAsErrorRate ? ("log" as const) : ("linear" as const),
+        type: isPercent && showAsErrorRate ? ("log" as const) : ("linear" as const),
         tickformat: isPercent && showAsErrorRate ? ".1e" : undefined,
       },
       hovermode: "closest" as const,
@@ -636,8 +601,7 @@ export function HistogramView() {
 
   // Get current slider value from threshold
   const sliderValue = useMemo(() => {
-    const activeThreshold =
-      customThreshold ?? currentMetricConfig?.threshold?.value;
+    const activeThreshold = customThreshold ?? currentMetricConfig?.threshold?.value;
     if (activeThreshold === undefined || activeThreshold === null) {
       return sliderDisplayConfig.min;
     }
@@ -653,12 +617,7 @@ export function HistogramView() {
     }
 
     return activeThreshold * 100;
-  }, [
-    customThreshold,
-    currentMetricConfig,
-    showAsErrorRate,
-    sliderDisplayConfig,
-  ]);
+  }, [customThreshold, currentMetricConfig, showAsErrorRate, sliderDisplayConfig]);
 
   // Convert slider value to threshold and update state
   const handleSliderChange = useCallback(
@@ -680,8 +639,7 @@ export function HistogramView() {
 
   // Format threshold for display
   const thresholdDisplayText = useMemo(() => {
-    const activeThreshold =
-      customThreshold ?? currentMetricConfig?.threshold?.value;
+    const activeThreshold = customThreshold ?? currentMetricConfig?.threshold?.value;
     if (activeThreshold === undefined || activeThreshold === null) return "N/A";
 
     const isPercent = isPercentageMetric(currentMetricConfig?.unit);
@@ -762,10 +720,7 @@ export function HistogramView() {
               </div>
 
               <div className="w-full sm:w-48">
-                <ChipSelector
-                  selectedChip={selectedChip}
-                  onChipSelect={setSelectedChip}
-                />
+                <ChipSelector selectedChip={selectedChip} onChipSelect={setSelectedChip} />
               </div>
 
               <div className="w-full sm:w-56">
@@ -773,11 +728,7 @@ export function HistogramView() {
                   className="text-base-content"
                   classNamePrefix="react-select"
                   options={metricOptions}
-                  value={
-                    metricOptions.find(
-                      (option) => option.value === selectedParameter,
-                    ) ?? null
-                  }
+                  value={metricOptions.find((option) => option.value === selectedParameter) ?? null}
                   onChange={(option: SingleValue<MetricOption>) => {
                     if (option) {
                       setSelectedParameter(option.value);
@@ -812,11 +763,7 @@ export function HistogramView() {
                   className={`join-item btn btn-xs sm:btn-sm h-full ${selectionMode === "best" ? "btn-primary" : ""} ${!isBestModeSupported ? "btn-disabled" : ""}`}
                   onClick={() => setSelectionMode("best")}
                   disabled={!isBestModeSupported}
-                  title={
-                    !isBestModeSupported
-                      ? "Best mode not available"
-                      : "Show best values"
-                  }
+                  title={!isBestModeSupported ? "Best mode not available" : "Show best values"}
                 >
                   Best
                 </button>
@@ -887,9 +834,7 @@ export function HistogramView() {
               <div className="grid grid-cols-3 gap-2 sm:hidden">
                 <div className="bg-base-200 rounded-lg p-2 text-center">
                   <div className="text-xs text-base-content/60">Count</div>
-                  <div className="text-sm font-bold text-primary">
-                    {statistics.count}
-                  </div>
+                  <div className="text-sm font-bold text-primary">{statistics.count}</div>
                 </div>
                 <div className="bg-base-200 rounded-lg p-2 text-center">
                   <div className="text-xs text-base-content/60">Mean</div>
@@ -905,15 +850,11 @@ export function HistogramView() {
                 </div>
                 <div className="bg-base-200 rounded-lg p-2 text-center">
                   <div className="text-xs text-base-content/60">Min</div>
-                  <div className="text-sm font-bold">
-                    {statistics.min.toFixed(2)}
-                  </div>
+                  <div className="text-sm font-bold">{statistics.min.toFixed(2)}</div>
                 </div>
                 <div className="bg-base-200 rounded-lg p-2 text-center">
                   <div className="text-xs text-base-content/60">Max</div>
-                  <div className="text-sm font-bold">
-                    {statistics.max.toFixed(2)}
-                  </div>
+                  <div className="text-sm font-bold">{statistics.max.toFixed(2)}</div>
                 </div>
                 <div className="bg-base-200 rounded-lg p-2 text-center">
                   <div className="text-xs text-base-content/60">Yield</div>
@@ -926,9 +867,7 @@ export function HistogramView() {
               <div className="stats stats-horizontal shadow w-full hidden sm:inline-grid">
                 <div className="stat py-2">
                   <div className="stat-title text-xs">Count</div>
-                  <div className="stat-value text-primary text-lg">
-                    {statistics.count}
-                  </div>
+                  <div className="stat-value text-primary text-lg">{statistics.count}</div>
                 </div>
                 <div className="stat py-2">
                   <div className="stat-title text-xs">Mean</div>
@@ -983,21 +922,14 @@ export function HistogramView() {
                 label: metricType === "coupling" ? "Coupling" : "Qubit",
                 sortable: true,
               },
-              ...(metricType === "qubit" ? qubitMetrics : couplingMetrics).map(
-                (metric) => ({
-                  key: metric.key,
-                  label: `${metric.title} (${
-                    !isPercentageMetric(metric.unit)
-                      ? metric.unit
-                      : showAsErrorRate
-                        ? "Err%"
-                        : "%"
-                  })`,
-                  sortable: true,
-                  render: (v: number | null) =>
-                    v !== null ? v.toFixed(4) : "-",
-                }),
-              ),
+              ...(metricType === "qubit" ? qubitMetrics : couplingMetrics).map((metric) => ({
+                key: metric.key,
+                label: `${metric.title} (${
+                  !isPercentageMetric(metric.unit) ? metric.unit : showAsErrorRate ? "Err%" : "%"
+                })`,
+                sortable: true,
+                render: (v: number | null) => (v !== null ? v.toFixed(4) : "-"),
+              })),
             ]}
             pageSize={20}
           />

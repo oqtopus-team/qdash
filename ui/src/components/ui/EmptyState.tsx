@@ -58,15 +58,9 @@ export function EmptyState({
       <div className="mb-4 opacity-80">
         <FluentEmoji name={emoji} size={styles.emoji} />
       </div>
-      <h3 className={`font-medium text-base-content/70 ${styles.title}`}>
-        {title}
-      </h3>
+      <h3 className={`font-medium text-base-content/70 ${styles.title}`}>{title}</h3>
       {description && (
-        <p
-          className={`mt-1 text-base-content/50 max-w-sm ${styles.description}`}
-        >
-          {description}
-        </p>
+        <p className={`mt-1 text-base-content/50 max-w-sm ${styles.description}`}>{description}</p>
       )}
       {action && <div className="mt-4">{action}</div>}
     </div>

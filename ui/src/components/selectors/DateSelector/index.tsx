@@ -45,10 +45,7 @@ export function DateSelector({
   // Format date string for display (YYYYMMDD -> YYYY/MM/DD)
   const formatDate = (dateStr: string): string => {
     if (dateStr === "latest") return "Latest";
-    return `${dateStr.slice(0, 4)}/${dateStr.slice(4, 6)}/${dateStr.slice(
-      6,
-      8,
-    )}`;
+    return `${dateStr.slice(0, 4)}/${dateStr.slice(4, 6)}/${dateStr.slice(6, 8)}`;
   };
 
   const handleChange = (option: SingleValue<DateOption>) => {

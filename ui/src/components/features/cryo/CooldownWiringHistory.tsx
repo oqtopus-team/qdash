@@ -17,9 +17,7 @@ interface CooldownWiringHistoryProps {
   cooldownId: string;
 }
 
-export function CooldownWiringHistory({
-  cooldownId,
-}: CooldownWiringHistoryProps) {
+export function CooldownWiringHistory({ cooldownId }: CooldownWiringHistoryProps) {
   const queryClient = useQueryClient();
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [comment, setComment] = useState("");
@@ -68,11 +66,7 @@ export function CooldownWiringHistory({
         <span className="text-base-content/60 font-semibold uppercase tracking-wide">
           Wiring history
         </span>
-        <button
-          type="button"
-          className="btn btn-xs btn-primary"
-          onClick={openModal}
-        >
+        <button type="button" className="btn btn-xs btn-primary" onClick={openModal}>
           Save checkpoint
         </button>
       </div>
@@ -81,8 +75,8 @@ export function CooldownWiringHistory({
         <div className="text-base-content/50 italic">Loading…</div>
       ) : events.length === 0 ? (
         <div className="text-base-content/50 italic">
-          No checkpoints yet. Click <em>Save checkpoint</em> after a wiring
-          change to record it here.
+          No checkpoints yet. Click <em>Save checkpoint</em> after a wiring change to record it
+          here.
         </div>
       ) : (
         <ul className="space-y-1">
@@ -91,9 +85,7 @@ export function CooldownWiringHistory({
               key={ev.id}
               event={ev}
               expanded={expandedId === ev.id}
-              onToggle={() =>
-                setExpandedId((cur) => (cur === ev.id ? null : ev.id))
-              }
+              onToggle={() => setExpandedId((cur) => (cur === ev.id ? null : ev.id))}
             />
           ))}
         </ul>
@@ -103,8 +95,7 @@ export function CooldownWiringHistory({
         <div className="modal-box max-w-md">
           <h3 className="font-semibold text-sm mb-2">Save wiring checkpoint</h3>
           <p className="text-xs text-base-content/60 mb-3">
-            Capture the current wiring as a snapshot. Briefly describe what
-            changed (required).
+            Capture the current wiring as a snapshot. Briefly describe what changed (required).
           </p>
           <textarea
             className="textarea textarea-bordered w-full text-sm"
@@ -156,14 +147,8 @@ function CheckpointRow({
   const hasSnapshot = event.wiring_info_snapshot.trim().length > 0;
   return (
     <li className="border border-base-300 rounded px-2 py-1.5">
-      <button
-        type="button"
-        className="flex w-full items-start gap-2 text-left"
-        onClick={onToggle}
-      >
-        <span className="text-base-content/50 shrink-0 w-4">
-          {expanded ? "▾" : "▸"}
-        </span>
+      <button type="button" className="flex w-full items-start gap-2 text-left" onClick={onToggle}>
+        <span className="text-base-content/50 shrink-0 w-4">{expanded ? "▾" : "▸"}</span>
         <div className="flex-1 min-w-0">
           <div className="flex items-baseline gap-2 flex-wrap">
             <span
@@ -172,14 +157,10 @@ function CheckpointRow({
             >
               {formatDateTime(event.created_at, "yyyy-MM-dd HH:mm")}
             </span>
-            <span className="text-base-content/50">
-              · {formatRelativeTime(event.created_at)}
-            </span>
+            <span className="text-base-content/50">· {formatRelativeTime(event.created_at)}</span>
             <span className="text-base-content/60">· {event.actor}</span>
           </div>
-          <div className="text-base-content/90 break-words">
-            {event.comment}
-          </div>
+          <div className="text-base-content/90 break-words">{event.comment}</div>
         </div>
       </button>
       {expanded && (

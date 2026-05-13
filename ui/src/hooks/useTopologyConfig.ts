@@ -74,9 +74,7 @@ export function useTopologyConfig(topologyId: string) {
   // Parse and transform topology data
   const parsedData = useMemo(() => {
     const axiosResponse = data as { data?: { data?: TopologyDefinition } };
-    const apiResponse = axiosResponse?.data as
-      | { data?: TopologyDefinition }
-      | undefined;
+    const apiResponse = axiosResponse?.data as { data?: TopologyDefinition } | undefined;
     const topology = apiResponse?.data;
 
     if (!topology) {
@@ -107,8 +105,7 @@ export function useTopologyConfig(topologyId: string) {
       hasMux: topology.mux?.enabled ?? false,
       showMuxBoundaries: topology.visualization?.show_mux_boundaries ?? false,
       layoutType: (topology.layout_type ?? "grid") as LayoutType,
-      directionConvention: (topology.direction_convention ??
-        "unspecified") as DirectionConvention,
+      directionConvention: (topology.direction_convention ?? "unspecified") as DirectionConvention,
       getQubitPosition,
       positionMap,
     };

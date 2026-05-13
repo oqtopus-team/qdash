@@ -86,11 +86,9 @@ function scaleData(
 export function DashboardPageContent() {
   const { user } = useAuth();
   const { projectId } = useProject();
-  const { selectedChip, selectionMode, setSelectedChip, setSelectionMode } =
-    useMetricsUrlState();
+  const { selectedChip, selectionMode, setSelectedChip, setSelectionMode } = useMetricsUrlState();
 
-  const { startDate, endDate, setStartDate, setEndDate, setQuickRange } =
-    useRangeModeUrlState();
+  const { startDate, endDate, setStartDate, setEndDate, setQuickRange } = useRangeModeUrlState();
 
   const {
     qubitMetrics,
@@ -111,24 +109,18 @@ export function DashboardPageContent() {
   });
 
   const topologyId = useMemo(
-    () =>
-      chipData?.data?.topology_id ??
-      `square-lattice-mux-${chipData?.data?.size ?? 64}`,
+    () => chipData?.data?.topology_id ?? `square-lattice-mux-${chipData?.data?.size ?? 64}`,
     [chipData?.data?.topology_id, chipData?.data?.size],
   );
   const chipHasNote = !!chipData?.data?.note?.content?.trim();
   const currentCooldownId = chipData?.data?.current_cooldown_id ?? null;
   const cooldowns = cooldownsData?.data?.cooldowns ?? [];
   const activeCooldown =
-    cooldowns.find((cooldown) => cooldown.cooldown_id === currentCooldownId) ??
-    null;
+    cooldowns.find((cooldown) => cooldown.cooldown_id === currentCooldownId) ?? null;
 
   const qubitCount = chipData?.data?.size ?? 64;
-  const [selectedCooldownId, setSelectedCooldownId] = useState<string | null>(
-    null,
-  );
-  const [hasInitializedCooldownSelection, setHasInitializedCooldownSelection] =
-    useState(false);
+  const [selectedCooldownId, setSelectedCooldownId] = useState<string | null>(null);
+  const [hasInitializedCooldownSelection, setHasInitializedCooldownSelection] = useState(false);
 
   const mentionCandidates: MentionCandidate[] = useMemo(
     () => [
@@ -152,11 +144,7 @@ export function DashboardPageContent() {
 
   // Default chip
   useEffect(() => {
-    if (
-      !selectedChip &&
-      chipsData?.data?.chips &&
-      chipsData.data.chips.length > 0
-    ) {
+    if (!selectedChip && chipsData?.data?.chips && chipsData.data.chips.length > 0) {
       const sorted = [...chipsData.data.chips].sort((a, b) => {
         const da = a.installed_at ? new Date(a.installed_at).getTime() : 0;
         const db = b.installed_at ? new Date(b.installed_at).getTime() : 0;
@@ -176,11 +164,7 @@ export function DashboardPageContent() {
     setSelectedCooldownId(currentCooldownId);
     setStartDate(dateToDateTimeLocal(new Date(activeCooldown.started_at)));
     setEndDate(
-      dateToDateTimeLocal(
-        activeCooldown.ended_at
-          ? new Date(activeCooldown.ended_at)
-          : new Date(),
-      ),
+      dateToDateTimeLocal(activeCooldown.ended_at ? new Date(activeCooldown.ended_at) : new Date()),
     );
     setHasInitializedCooldownSelection(true);
   }, [
@@ -209,19 +193,12 @@ export function DashboardPageContent() {
     [queryParams.end_at, queryParams.start_at, selectedCooldownId],
   );
 
-  const { data, isLoading, isError } = useGetChipMetrics(
-    selectedChip,
-    queryParams,
-    {
-      query: { enabled: canFetch, staleTime: 30000 },
-    },
-  );
+  const { data, isLoading, isError } = useGetChipMetrics(selectedChip, queryParams, {
+    query: { enabled: canFetch, staleTime: 30000 },
+  });
 
   const colors = useMemo(
-    () =>
-      colorScale.colors && colorScale.colors.length > 0
-        ? colorScale.colors
-        : FALLBACK_COLORS,
+    () => (colorScale.colors && colorScale.colors.length > 0 ? colorScale.colors : FALLBACK_COLORS),
     [colorScale],
   );
 
@@ -253,13 +230,9 @@ export function DashboardPageContent() {
   }, [data, couplingMetrics]);
 
   // All notes for this chip (qubit/coupling general + per-metric + task) in one fetch.
-  const { data: summaryData } = useGetChipNotesSummary(
-    selectedChip,
-    noteScopeParams,
-    {
-      query: { enabled: !!selectedChip, staleTime: 30_000 },
-    },
-  );
+  const { data: summaryData } = useGetChipNotesSummary(selectedChip, noteScopeParams, {
+    query: { enabled: !!selectedChip, staleTime: 30_000 },
+  });
   const summary = summaryData?.data;
 
   const taskNotes = useMemo(
@@ -280,18 +253,16 @@ export function DashboardPageContent() {
     const map: Record<string, Record<string, NoteEntry>> = {};
     const collect = (entries: TargetNoteEntry[] | undefined) => {
       (entries ?? []).forEach((entry) => {
-        Object.entries(entry.metric_notes ?? {}).forEach(
-          ([metricKey, note]) => {
-            if (!map[metricKey]) map[metricKey] = {};
-            map[metricKey][entry.target_id] = {
-              targetId: entry.target_id,
-              metricKey,
-              content: note?.content ?? "",
-              username: note?.updated_by ?? "",
-              updatedAt: note?.updated_at ?? "",
-            };
-          },
-        );
+        Object.entries(entry.metric_notes ?? {}).forEach(([metricKey, note]) => {
+          if (!map[metricKey]) map[metricKey] = {};
+          map[metricKey][entry.target_id] = {
+            targetId: entry.target_id,
+            metricKey,
+            content: note?.content ?? "",
+            username: note?.updated_by ?? "",
+            updatedAt: note?.updated_at ?? "",
+          };
+        });
       });
     };
     collect(summary?.qubits);
@@ -307,19 +278,17 @@ export function DashboardPageContent() {
     const map: Record<string, NoteEntryWithMetric[]> = {};
     const collect = (entries: TargetNoteEntry[] | undefined) => {
       (entries ?? []).forEach((entry) => {
-        Object.entries(entry.metric_notes ?? {}).forEach(
-          ([metricKey, note]) => {
-            if (!map[entry.target_id]) map[entry.target_id] = [];
-            map[entry.target_id].push({
-              targetId: entry.target_id,
-              metricKey,
-              metricTitle: titleByKey.get(metricKey) ?? metricKey,
-              content: note?.content ?? "",
-              username: note?.updated_by ?? "",
-              updatedAt: note?.updated_at ?? "",
-            });
-          },
-        );
+        Object.entries(entry.metric_notes ?? {}).forEach(([metricKey, note]) => {
+          if (!map[entry.target_id]) map[entry.target_id] = [];
+          map[entry.target_id].push({
+            targetId: entry.target_id,
+            metricKey,
+            metricTitle: titleByKey.get(metricKey) ?? metricKey,
+            content: note?.content ?? "",
+            username: note?.updated_by ?? "",
+            updatedAt: note?.updated_at ?? "",
+          });
+        });
       });
     };
     collect(summary?.qubits);
@@ -368,13 +337,7 @@ export function DashboardPageContent() {
       };
     });
     return [...qubitRows, ...couplingRows];
-  }, [
-    qubitMetrics,
-    couplingMetrics,
-    qubitMetricData,
-    couplingMetricData,
-    qubitCount,
-  ]);
+  }, [qubitMetrics, couplingMetrics, qubitMetricData, couplingMetricData, qubitCount]);
 
   if (isConfigLoading || isChipsLoading) {
     return <MetricsPageSkeleton />;
@@ -412,19 +375,13 @@ export function DashboardPageContent() {
                   setSelectedCooldownId(cd.cooldown_id);
                   setHasInitializedCooldownSelection(true);
                   setStartDate(dateToDateTimeLocal(new Date(cd.started_at)));
-                  setEndDate(
-                    dateToDateTimeLocal(
-                      cd.ended_at ? new Date(cd.ended_at) : new Date(),
-                    ),
-                  );
+                  setEndDate(dateToDateTimeLocal(cd.ended_at ? new Date(cd.ended_at) : new Date()));
                 }}
               />
             </PageFiltersBar.Item>
             <PageFiltersBar.Item>
               <button
-                className={`btn btn-sm gap-1 ${
-                  chipHasNote ? "btn-warning" : "btn-outline"
-                }`}
+                className={`btn btn-sm gap-1 ${chipHasNote ? "btn-warning" : "btn-outline"}`}
                 onClick={() => setShowChipNote(true)}
                 disabled={!selectedChip}
                 type="button"
@@ -547,17 +504,12 @@ export function DashboardPageContent() {
               <details>
                 <summary className="cursor-pointer list-none flex items-center justify-between">
                   <div>
-                    <h3 className="text-lg font-semibold">
-                      All Metrics Summary
-                    </h3>
+                    <h3 className="text-lg font-semibold">All Metrics Summary</h3>
                     <p className="text-sm text-base-content/60">
-                      Coverage, median, min and max for every metric in the
-                      active time range.
+                      Coverage, median, min and max for every metric in the active time range.
                     </p>
                   </div>
-                  <span className="text-xs text-base-content/50">
-                    click to expand
-                  </span>
+                  <span className="text-xs text-base-content/50">click to expand</span>
                 </summary>
                 <div className="mt-4">
                   <DashboardSummaryTable rows={summaryRows} />
@@ -575,9 +527,7 @@ export function DashboardPageContent() {
               >
                 <div className="space-y-8">
                   {qubitMetrics.map((m) => {
-                    const noted = new Set(
-                      Object.keys(notesByMetric[m.key] ?? {}),
-                    );
+                    const noted = new Set(Object.keys(notesByMetric[m.key] ?? {}));
                     const crossMetricNoted = new Set<string>();
                     Object.keys(notesByTarget).forEach((targetId) => {
                       if (targetId.includes("-")) return; // coupling
@@ -588,9 +538,7 @@ export function DashboardPageContent() {
                       <div key={m.key} className="space-y-2">
                         <div className="flex flex-wrap items-center gap-2">
                           <h4 className="text-base font-semibold">{m.title}</h4>
-                          <span className="badge badge-outline badge-sm">
-                            {m.unit}
-                          </span>
+                          <span className="badge badge-outline badge-sm">{m.unit}</span>
                           {noted.size > 0 && (
                             <span className="badge badge-warning badge-sm">
                               {noted.size} note{noted.size > 1 ? "s" : ""}
@@ -653,9 +601,7 @@ export function DashboardPageContent() {
               >
                 <div className="space-y-6">
                   {couplingMetrics.map((m) => {
-                    const noted = new Set(
-                      Object.keys(notesByMetric[m.key] ?? {}),
-                    );
+                    const noted = new Set(Object.keys(notesByMetric[m.key] ?? {}));
                     const crossMetricNoted = new Set<string>();
                     Object.keys(notesByTarget).forEach((targetId) => {
                       if (!targetId.includes("-")) return; // qubit
@@ -664,17 +610,12 @@ export function DashboardPageContent() {
                     const couplingTotal = couplingMetricData[m.key]
                       ? Object.keys(couplingMetricData[m.key] ?? {}).length
                       : 0;
-                    const cov = coverageOf(
-                      couplingMetricData[m.key],
-                      couplingTotal,
-                    );
+                    const cov = coverageOf(couplingMetricData[m.key], couplingTotal);
                     return (
                       <div key={m.key} className="space-y-2">
                         <div className="flex flex-wrap items-center gap-2">
                           <h4 className="text-base font-semibold">{m.title}</h4>
-                          <span className="badge badge-outline badge-sm">
-                            {m.unit}
-                          </span>
+                          <span className="badge badge-outline badge-sm">{m.unit}</span>
                           {noted.size > 0 && (
                             <span className="badge badge-warning badge-sm">
                               {noted.size} note{noted.size > 1 ? "s" : ""}
@@ -750,10 +691,7 @@ export function DashboardPageContent() {
       )}
 
       {showChipNote && selectedChip && (
-        <DashboardChipNoteModal
-          chipId={selectedChip}
-          onClose={() => setShowChipNote(false)}
-        />
+        <DashboardChipNoteModal chipId={selectedChip} onClose={() => setShowChipNote(false)} />
       )}
     </PageContainer>
   );

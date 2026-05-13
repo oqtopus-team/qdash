@@ -17,17 +17,15 @@ export default function NotFound() {
         </div>
 
         {/* 404 Number */}
-        <h1 className="text-8xl lg:text-9xl font-bold login-title-gradient tracking-tight">
-          404
-        </h1>
+        <h1 className="text-8xl lg:text-9xl font-bold login-title-gradient tracking-tight">404</h1>
 
         {/* Message */}
         <h2 className="text-2xl lg:text-3xl font-semibold text-base-content mt-4">
           Page Not Found
         </h2>
         <p className="text-base-content/60 text-lg max-w-md mt-2">
-          The quantum state you&apos;re looking for seems to have collapsed into
-          a different dimension.
+          The quantum state you&apos;re looking for seems to have collapsed into a different
+          dimension.
         </p>
 
         {/* Action buttons */}
@@ -54,9 +52,7 @@ export default function NotFound() {
 
         {/* Decorative elements */}
         <div className="mt-12 flex gap-2">
-          <span className="badge badge-outline badge-lg opacity-50">
-            Lost in superposition
-          </span>
+          <span className="badge badge-outline badge-lg opacity-50">Lost in superposition</span>
         </div>
       </div>
     </div>

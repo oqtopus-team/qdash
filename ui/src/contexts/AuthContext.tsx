@@ -1,13 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useState,
-  useEffect,
-} from "react";
+import { createContext, useCallback, useContext, useState, useEffect } from "react";
 
 import type { User } from "@/schemas";
 
@@ -47,10 +41,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Remove authentication info
   const removeAuth = useCallback(() => {
     // Remove access token and username cookies
-    document.cookie =
-      "access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax";
-    document.cookie =
-      "username=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax";
+    document.cookie = "access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax";
+    document.cookie = "username=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax";
     setAccessToken(null);
     setUsername(null);
   }, []);
@@ -159,9 +151,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [logoutMutation, removeAuth, loginMutation]);
 
   return (
-    <AuthContext.Provider
-      value={{ user, username, accessToken, login, logout, loading }}
-    >
+    <AuthContext.Provider value={{ user, username, accessToken, login, logout, loading }}>
       {children}
     </AuthContext.Provider>
   );

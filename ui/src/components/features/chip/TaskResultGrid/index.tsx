@@ -13,20 +13,13 @@ import {
 } from "lucide-react";
 import { useMemo, useState, useRef, useCallback, memo, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import {
-  TransformWrapper,
-  TransformComponent,
-  useControls,
-} from "react-zoom-pan-pinch";
+import { TransformWrapper, TransformComponent, useControls } from "react-zoom-pan-pinch";
 
 import type { Task } from "@/schemas";
 
 import { getGetChipNotesSummaryQueryKey } from "@/client/note/note";
 import { useGetCopilotConfig } from "@/client/copilot/copilot";
-import {
-  downloadFiguresAsZip,
-  requestBulkAiTriageReview,
-} from "@/client/task-result/task-result";
+import { downloadFiguresAsZip, requestBulkAiTriageReview } from "@/client/task-result/task-result";
 import { AiTriageConfirmModal } from "@/components/features/chip/AiTriageConfirmModal";
 import type { AiTriageBadgeState } from "@/components/features/chip/aiTriageBadge";
 import {
@@ -46,10 +39,7 @@ import {
   resolveAnalysisModelOption,
   setStoredAnalysisModelKey,
 } from "@/lib/copilotModels";
-import {
-  getQubitGridPosition,
-  type TopologyLayoutParams,
-} from "@/lib/utils/grid-position";
+import { getQubitGridPosition, type TopologyLayoutParams } from "@/lib/utils/grid-position";
 import { calculateGridContainerWidth } from "@/lib/utils/grid-layout";
 
 interface TaskResultGridProps {
@@ -111,14 +101,8 @@ function ZoomControls() {
 }
 
 // Memoized empty cell component
-const EmptyCell = memo(function EmptyCell({
-  muxBgClass,
-}: {
-  muxBgClass: string;
-}) {
-  return (
-    <div className={`aspect-square bg-base-300/50 rounded-lg ${muxBgClass}`} />
-  );
+const EmptyCell = memo(function EmptyCell({ muxBgClass }: { muxBgClass: string }) {
+  return <div className={`aspect-square bg-base-300/50 rounded-lg ${muxBgClass}`} />;
 });
 
 // Status color helper
@@ -133,9 +117,7 @@ function getStatusColor(status: string | undefined): string {
   }
 }
 
-function isAiTriageReviewPending(
-  task: TaskWithAiTriage | null | undefined,
-): boolean {
+function isAiTriageReviewPending(task: TaskWithAiTriage | null | undefined): boolean {
   const status = task?.ai_triage?.status;
   return status === "requested" || status === "running";
 }
@@ -196,9 +178,7 @@ const GridCell = memo(function GridCell({
   onClick,
 }: GridCellProps) {
   const isSelectionMode = isDownloadMode || isAiTriageMode;
-  const isSelected = isDownloadMode
-    ? isSelectedForDownload
-    : isSelectedForAiTriage;
+  const isSelected = isDownloadMode ? isSelectedForDownload : isSelectedForAiTriage;
   const canBeSelected = isDownloadMode ? canBeDownloaded : canBeAiTriaged;
 
   if (!task) {
@@ -206,9 +186,7 @@ const GridCell = memo(function GridCell({
       <div
         className={`aspect-square bg-base-300 rounded-lg flex items-center justify-center relative ${muxBgClass}`}
       >
-        {showLabels && (
-          <div className="text-sm font-medium text-base-content/50">{qid}</div>
-        )}
+        {showLabels && <div className="text-sm font-medium text-base-content/50">{qid}</div>}
       </div>
     );
   }
@@ -219,14 +197,8 @@ const GridCell = memo(function GridCell({
       <button
         onClick={onClick}
         className={`aspect-square rounded-lg shadow-sm relative group cursor-pointer ${getStatusColor(task.status)} ${muxBgClass} ${
-          isSelectionMode && isSelected
-            ? "ring-2 ring-primary ring-offset-1"
-            : ""
-        } ${
-          isSelectionMode && !canBeSelected
-            ? "opacity-40 cursor-not-allowed"
-            : ""
-        }`}
+          isSelectionMode && isSelected ? "ring-2 ring-primary ring-offset-1" : ""
+        } ${isSelectionMode && !canBeSelected ? "opacity-40 cursor-not-allowed" : ""}`}
       >
         {showLabels && (
           <div className="absolute top-0.5 left-0.5 bg-black/30 text-white px-0.5 py-px rounded text-[0.5rem] font-bold">
@@ -271,17 +243,11 @@ const GridCell = memo(function GridCell({
       onClick={onClick}
       className={`aspect-square rounded-xl bg-white shadow-md border border-base-300/60 overflow-hidden transition-all duration-200 hover:shadow-xl hover:scale-105 hover:border-primary/40 relative w-full ${muxBgClass} ${
         isSelectionMode && isSelected ? "ring-2 ring-primary ring-offset-2" : ""
-      } ${
-        isSelectionMode && !canBeSelected ? "opacity-40 cursor-not-allowed" : ""
-      }`}
+      } ${isSelectionMode && !canBeSelected ? "opacity-40 cursor-not-allowed" : ""}`}
     >
       {task.figure_path && figurePath && (
         <div className="absolute inset-1 [&_button]:hidden">
-          <TaskFigure
-            path={figurePath}
-            qid={qid}
-            className="w-full h-full object-contain"
-          />
+          <TaskFigure path={figurePath} qid={qid} className="w-full h-full object-contain" />
         </div>
       )}
       {showLabels && (
@@ -315,9 +281,7 @@ const GridCell = memo(function GridCell({
       {isSelectionMode && canBeSelected && (
         <div
           className={`absolute inset-0 flex items-center justify-center transition-colors ${
-            isSelected
-              ? "bg-primary/20"
-              : "bg-transparent hover:bg-base-content/10"
+            isSelected ? "bg-primary/20" : "bg-transparent hover:bg-base-content/10"
           }`}
         >
           {isSelected && (
@@ -381,43 +345,27 @@ export function TaskResultGrid({
     [hasMux, muxSize, gridSize, layoutType],
   );
 
-  const [selectedTaskInfo, setSelectedTaskInfo] =
-    useState<SelectedTaskInfo | null>(null);
+  const [selectedTaskInfo, setSelectedTaskInfo] = useState<SelectedTaskInfo | null>(null);
 
   // Download selection mode state
-  const [downloadSelectionEnabled, setDownloadSelectionEnabled] =
-    useState(false);
-  const [selectedForDownload, setSelectedForDownload] = useState<Set<string>>(
-    new Set(),
-  );
+  const [downloadSelectionEnabled, setDownloadSelectionEnabled] = useState(false);
+  const [selectedForDownload, setSelectedForDownload] = useState<Set<string>>(new Set());
   const [isDownloading, setIsDownloading] = useState(false);
   const [isDownloadConfirmOpen, setIsDownloadConfirmOpen] = useState(false);
-  const [downloadOptions, setDownloadOptions] = useState<DownloadOptions>(
-    DEFAULT_DOWNLOAD_OPTIONS,
-  );
-  const [aiTriageSelectionEnabled, setAiTriageSelectionEnabled] =
-    useState(false);
-  const [selectedForAiTriage, setSelectedForAiTriage] = useState<Set<string>>(
-    new Set(),
-  );
-  const [pendingAiTriageTaskIds, setPendingAiTriageTaskIds] = useState<
-    Set<string>
-  >(new Set());
+  const [downloadOptions, setDownloadOptions] = useState<DownloadOptions>(DEFAULT_DOWNLOAD_OPTIONS);
+  const [aiTriageSelectionEnabled, setAiTriageSelectionEnabled] = useState(false);
+  const [selectedForAiTriage, setSelectedForAiTriage] = useState<Set<string>>(new Set());
+  const [pendingAiTriageTaskIds, setPendingAiTriageTaskIds] = useState<Set<string>>(new Set());
   const [isRequestingAiTriage, setIsRequestingAiTriage] = useState(false);
   const [isAiTriageConfirmOpen, setIsAiTriageConfirmOpen] = useState(false);
   const [aiTriageStatus, setAiTriageStatus] = useState<string | null>(null);
-  const [selectedModelKey, setSelectedModelKey] = useState(
-    getStoredAnalysisModelKey,
-  );
+  const [selectedModelKey, setSelectedModelKey] = useState(getStoredAnalysisModelKey);
   const { data: copilotConfigResponse } = useGetCopilotConfig();
   const modelOptions = useMemo(
     () => buildAnalysisModelOptions(copilotConfigResponse?.data ?? null),
     [copilotConfigResponse?.data],
   );
-  const selectedModel = resolveAnalysisModelOption(
-    modelOptions,
-    selectedModelKey,
-  );
+  const selectedModel = resolveAnalysisModelOption(modelOptions, selectedModelKey);
 
   // Fetch task results
   const {
@@ -509,29 +457,25 @@ export function TaskResultGrid({
   const displayRows = zoomMode === "region" ? regionSize : gridRows;
 
   // Use grid layout hook for responsive sizing
-  const { containerRef, cellSize, isMobile, viewportHeight, gap, padding } =
-    useGridLayout({
-      cols: displayCols,
-      rows: displayRows,
-      reservedHeight: { mobile: 300, desktop: 350 },
-      deps: [taskResponse, topologyQubits, zoomMode, selectedRegion],
-    });
+  const { containerRef, cellSize, isMobile, viewportHeight, gap, padding } = useGridLayout({
+    cols: displayCols,
+    rows: displayRows,
+    reservedHeight: { mobile: 300, desktop: 350 },
+    deps: [taskResponse, topologyQubits, zoomMode, selectedRegion],
+  });
 
   // Debounced scale update to avoid excessive re-renders during zoom
-  const handleTransform = useCallback(
-    (_: unknown, state: { scale: number }) => {
-      if (lodTimeoutRef.current) {
-        clearTimeout(lodTimeoutRef.current);
-      }
-      lodTimeoutRef.current = setTimeout(() => {
-        setCurrentScale((prev) => {
-          if (prev === null) return state.scale;
-          return Math.abs(prev - state.scale) > 0.05 ? state.scale : prev;
-        });
-      }, 100);
-    },
-    [],
-  );
+  const handleTransform = useCallback((_: unknown, state: { scale: number }) => {
+    if (lodTimeoutRef.current) {
+      clearTimeout(lodTimeoutRef.current);
+    }
+    lodTimeoutRef.current = setTimeout(() => {
+      setCurrentScale((prev) => {
+        if (prev === null) return state.scale;
+        return Math.abs(prev - state.scale) > 0.05 ? state.scale : prev;
+      });
+    }, 100);
+  }, []);
 
   // Calculate initial scale for TransformWrapper (must be before early returns)
   const MIN_FIGURE_CELL_SIZE = 60;
@@ -560,8 +504,7 @@ export function TaskResultGrid({
     });
   }
 
-  const getTaskResult = (qid: string): Task | null =>
-    taskResponse?.data?.result?.[qid] || null;
+  const getTaskResult = (qid: string): Task | null => taskResponse?.data?.result?.[qid] || null;
 
   // Download selection helpers
   const toggleDownloadSelection = (qid: string) => {
@@ -655,12 +598,12 @@ export function TaskResultGrid({
     return hasDownloadableArtifacts(task);
   };
 
-  const availableForDownloadCount = Object.entries(
-    taskResponse?.data?.result || {},
-  ).filter(([, task]) => hasDownloadableArtifacts(task)).length;
-  const availableForAiTriageCount = Object.values(
-    taskResponse?.data?.result || {},
-  ).filter((task) => task.task_id).length;
+  const availableForDownloadCount = Object.entries(taskResponse?.data?.result || {}).filter(
+    ([, task]) => hasDownloadableArtifacts(task),
+  ).length;
+  const availableForAiTriageCount = Object.values(taskResponse?.data?.result || {}).filter(
+    (task) => task.task_id,
+  ).length;
   const copilotConfig = copilotConfigResponse?.data as
     | {
         enabled?: boolean;
@@ -678,9 +621,7 @@ export function TaskResultGrid({
   };
 
   const canAiTriageQid = (qid: string): boolean =>
-    Boolean(
-      isAiTriageTaskConfigured && taskResponse?.data?.result?.[qid]?.task_id,
-    );
+    Boolean(isAiTriageTaskConfigured && taskResponse?.data?.result?.[qid]?.task_id);
 
   const toggleAiTriageSelection = (qid: string) => {
     setSelectedForAiTriage((prev) => {
@@ -695,9 +636,7 @@ export function TaskResultGrid({
   };
 
   const selectAllForAiTriage = () => {
-    const allQids = Object.keys(taskResponse?.data?.result || {}).filter(
-      canAiTriageQid,
-    );
+    const allQids = Object.keys(taskResponse?.data?.result || {}).filter(canAiTriageQid);
     setSelectedForAiTriage(new Set(allQids));
   };
 
@@ -756,16 +695,12 @@ export function TaskResultGrid({
   // For large grids (e.g., 144Q) the calculated cellSize may be very small,
   // but TransformWrapper handles panning/zooming the oversized grid.
   const baseCellSize =
-    viewMode === "pan-zoom"
-      ? Math.max(cellSize, MIN_FIGURE_CELL_SIZE)
-      : cellSize;
-  const displayCellSize =
-    zoomMode === "region" ? baseCellSize * 0.9 : baseCellSize;
+    viewMode === "pan-zoom" ? Math.max(cellSize, MIN_FIGURE_CELL_SIZE) : cellSize;
+  const displayCellSize = zoomMode === "region" ? baseCellSize * 0.9 : baseCellSize;
 
   // LOD flags: compute from effective pixel size (cellSize * zoom scale)
   const activeScale = currentScale ?? initialScale;
-  const effectiveCellSize =
-    displayCellSize * (viewMode === "pan-zoom" ? activeScale : 1);
+  const effectiveCellSize = displayCellSize * (viewMode === "pan-zoom" ? activeScale : 1);
   const showLabels = effectiveCellSize >= 20 || zoomMode === "region";
   const showFigures = effectiveCellSize >= 50 || zoomMode === "region";
 
@@ -778,12 +713,7 @@ export function TaskResultGrid({
         padding: `${padding / 2}px`,
         gridTemplateColumns: `repeat(${displayCols}, minmax(${displayCellSize}px, 1fr))`,
         gridTemplateRows: `repeat(${displayRows}, minmax(${displayCellSize}px, 1fr))`,
-        width: calculateGridContainerWidth(
-          displayCols,
-          displayCellSize,
-          isMobile,
-          viewportHeight,
-        ),
+        width: calculateGridContainerWidth(displayCols, displayCellSize, isMobile, viewportHeight),
       }}
     >
       {Array.from({
@@ -808,9 +738,7 @@ export function TaskResultGrid({
             : "";
 
         const qid = Object.keys(gridPositions).find(
-          (key) =>
-            gridPositions[key].row === actualRow &&
-            gridPositions[key].col === actualCol,
+          (key) => gridPositions[key].row === actualRow && gridPositions[key].col === actualCol,
         );
 
         if (!qid) {
@@ -830,8 +758,7 @@ export function TaskResultGrid({
           : null;
         const isAiTriagePending = Boolean(
           task?.task_id &&
-          (pendingAiTriageTaskIds.has(task.task_id) ||
-            isAiTriageReviewPending(task)),
+          (pendingAiTriageTaskIds.has(task.task_id) || isAiTriageReviewPending(task)),
         );
 
         return (
@@ -889,22 +816,13 @@ export function TaskResultGrid({
               const numMuxCols = Math.ceil(displayCols / muxSize);
               const muxLocalRow = Math.floor(idx / numMuxCols);
               const muxLocalCol = idx % numMuxCols;
-              const muxActualRow =
-                Math.floor(displayGridStart.row / muxSize) + muxLocalRow;
-              const muxActualCol =
-                Math.floor(displayGridStart.col / muxSize) + muxLocalCol;
-              const muxIndex =
-                muxActualRow * Math.floor(gridSize / muxSize) + muxActualCol;
+              const muxActualRow = Math.floor(displayGridStart.row / muxSize) + muxLocalRow;
+              const muxActualCol = Math.floor(displayGridStart.col / muxSize) + muxLocalCol;
+              const muxIndex = muxActualRow * Math.floor(gridSize / muxSize) + muxActualCol;
               const startCol = muxLocalCol * muxSize + 1;
               const startRow = muxLocalRow * muxSize + 1;
-              const spanCols = Math.min(
-                muxSize,
-                displayCols - muxLocalCol * muxSize,
-              );
-              const spanRows = Math.min(
-                muxSize,
-                displayRows - muxLocalRow * muxSize,
-              );
+              const spanCols = Math.min(muxSize, displayCols - muxLocalCol * muxSize);
+              const spanRows = Math.min(muxSize, displayRows - muxLocalRow * muxSize);
               if (spanCols <= 0 || spanRows <= 0) return null;
 
               return (
@@ -927,73 +845,63 @@ export function TaskResultGrid({
       )}
 
       {/* Region selection overlay */}
-      {zoomMode === "full" &&
-        regionSelectionEnabled &&
-        isSquareGrid &&
-        viewMode === "region" && (
+      {zoomMode === "full" && regionSelectionEnabled && isSquareGrid && viewMode === "region" && (
+        <div
+          className="absolute inset-0 pointer-events-none z-20"
+          style={{ padding: `${padding / 2}px` }}
+        >
           <div
-            className="absolute inset-0 pointer-events-none z-20"
-            style={{ padding: `${padding / 2}px` }}
+            className="grid w-full h-full"
+            style={{
+              gap: `${gap}px`,
+              gridTemplateColumns: `repeat(${displayCols}, minmax(${displayCellSize}px, 1fr))`,
+              gridTemplateRows: `repeat(${displayRows}, minmax(${displayCellSize}px, 1fr))`,
+            }}
           >
-            <div
-              className="grid w-full h-full"
-              style={{
-                gap: `${gap}px`,
-                gridTemplateColumns: `repeat(${displayCols}, minmax(${displayCellSize}px, 1fr))`,
-                gridTemplateRows: `repeat(${displayRows}, minmax(${displayCellSize}px, 1fr))`,
-              }}
-            >
-              {Array.from({ length: numRegions * numRegions }).map(
-                (_, index) => {
-                  const regionRow = Math.floor(index / numRegions);
-                  const regionCol = index % numRegions;
-                  const isHovered =
-                    hoveredRegion?.row === regionRow &&
-                    hoveredRegion?.col === regionCol;
+            {Array.from({ length: numRegions * numRegions }).map((_, index) => {
+              const regionRow = Math.floor(index / numRegions);
+              const regionCol = index % numRegions;
+              const isHovered =
+                hoveredRegion?.row === regionRow && hoveredRegion?.col === regionCol;
 
-                  return (
-                    <button
-                      key={index}
-                      className={`pointer-events-auto transition-colors duration-200 rounded-lg flex items-center justify-center ${
-                        isHovered
-                          ? "bg-primary/30 border-2 border-primary shadow-lg z-10"
-                          : "bg-primary/5 border-2 border-primary/20 hover:border-primary/40 hover:bg-primary/10"
-                      }`}
-                      style={{
-                        gridColumn: `${regionCol * regionSize + 1} / span ${regionSize}`,
-                        gridRow: `${regionRow * regionSize + 1} / span ${regionSize}`,
-                      }}
-                      onMouseEnter={() =>
-                        setHoveredRegion({ row: regionRow, col: regionCol })
-                      }
-                      onMouseLeave={() => setHoveredRegion(null)}
-                      onClick={() => {
-                        setSelectedRegion({
-                          row: regionRow,
-                          col: regionCol,
-                        });
-                        setZoomMode("region");
-                      }}
-                      title={`Zoom to region (${regionRow + 1}, ${regionCol + 1})`}
-                    >
-                      <span className="text-xs font-bold text-white bg-black/50 px-2 py-1 rounded">
-                        {regionRow},{regionCol}
-                      </span>
-                    </button>
-                  );
-                },
-              )}
-            </div>
+              return (
+                <button
+                  key={index}
+                  className={`pointer-events-auto transition-colors duration-200 rounded-lg flex items-center justify-center ${
+                    isHovered
+                      ? "bg-primary/30 border-2 border-primary shadow-lg z-10"
+                      : "bg-primary/5 border-2 border-primary/20 hover:border-primary/40 hover:bg-primary/10"
+                  }`}
+                  style={{
+                    gridColumn: `${regionCol * regionSize + 1} / span ${regionSize}`,
+                    gridRow: `${regionRow * regionSize + 1} / span ${regionSize}`,
+                  }}
+                  onMouseEnter={() => setHoveredRegion({ row: regionRow, col: regionCol })}
+                  onMouseLeave={() => setHoveredRegion(null)}
+                  onClick={() => {
+                    setSelectedRegion({
+                      row: regionRow,
+                      col: regionCol,
+                    });
+                    setZoomMode("region");
+                  }}
+                  title={`Zoom to region (${regionRow + 1}, ${regionCol + 1})`}
+                >
+                  <span className="text-xs font-bold text-white bg-black/50 px-2 py-1 rounded">
+                    {regionRow},{regionCol}
+                  </span>
+                </button>
+              );
+            })}
           </div>
-        )}
+        </div>
+      )}
     </div>
   );
 
   return (
     <div className="flex flex-col h-full space-y-2">
-      {isTaskError && (
-        <div className="alert alert-error">Failed to load data</div>
-      )}
+      {isTaskError && <div className="alert alert-error">Failed to load data</div>}
       {/* View Mode Toggle and Download Controls */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
@@ -1038,8 +946,7 @@ export function TaskResultGrid({
             {downloadSelectionEnabled ? (
               <div className="flex items-center gap-2">
                 <span className="text-sm text-base-content/70">
-                  {selectedForDownload.size} / {availableForDownloadCount}{" "}
-                  selected
+                  {selectedForDownload.size} / {availableForDownloadCount} selected
                 </span>
                 <button
                   className="btn btn-xs btn-ghost"
@@ -1081,8 +988,7 @@ export function TaskResultGrid({
             ) : aiTriageSelectionEnabled ? (
               <div className="flex items-center gap-2">
                 <span className="text-sm text-base-content/70">
-                  {selectedForAiTriage.size} / {availableForAiTriageCount}{" "}
-                  selected
+                  {selectedForAiTriage.size} / {availableForAiTriageCount} selected
                 </span>
                 <button
                   className="btn btn-xs btn-ghost"
@@ -1101,9 +1007,7 @@ export function TaskResultGrid({
                 <button
                   className="btn btn-sm btn-primary gap-1"
                   onClick={() => setIsAiTriageConfirmOpen(true)}
-                  disabled={
-                    selectedForAiTriage.size === 0 || isRequestingAiTriage
-                  }
+                  disabled={selectedForAiTriage.size === 0 || isRequestingAiTriage}
                 >
                   {isRequestingAiTriage ? (
                     <span className="loading loading-spinner loading-xs" />
@@ -1134,9 +1038,7 @@ export function TaskResultGrid({
                     selectAllForAiTriage();
                   }}
                   title="Request AI triage review for the displayed task results"
-                  disabled={
-                    availableForAiTriageCount === 0 || !isAiTriageTaskConfigured
-                  }
+                  disabled={availableForAiTriageCount === 0 || !isAiTriageTaskConfigured}
                 >
                   <Bot size={16} />
                   AI Triage

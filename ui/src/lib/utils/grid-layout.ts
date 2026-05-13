@@ -99,10 +99,7 @@ export function getGridGap(isMobile: boolean, viewportHeight?: number): number {
 /**
  * Get the padding size based on mobile state and optional viewport height
  */
-export function getGridPadding(
-  isMobile: boolean,
-  viewportHeight?: number,
-): number {
+export function getGridPadding(isMobile: boolean, viewportHeight?: number): number {
   if (isMobile) return GRID_PADDING.mobile;
   if (viewportHeight !== undefined) {
     return getResponsiveGridConstants(viewportHeight).padding;
@@ -166,11 +163,7 @@ export function checkIsMobile(viewportWidth: number): boolean {
  * keeps text legible when cells become very small; two devices ending up
  * at the same cellSize still produce identical output.
  */
-export function cellFontSize(
-  cellSize: number,
-  ratio: number,
-  minPx = 6,
-): string {
+export function cellFontSize(cellSize: number, ratio: number, minPx = 6): string {
   return `${Math.max(cellSize * ratio, minPx)}px`;
 }
 

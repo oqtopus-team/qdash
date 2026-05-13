@@ -14,15 +14,9 @@ export function useQubitTimeSeriesUrlState(): UseQubitTimeSeriesUrlStateResult {
   const [isInitialized, setIsInitialized] = useState(false);
 
   // URL state management for qubit time series view
-  const [selectedParameter, setSelectedParameterState] = useQueryState(
-    "param",
-    parseAsString,
-  );
+  const [selectedParameter, setSelectedParameterState] = useQueryState("param", parseAsString);
 
-  const [selectedTag, setSelectedTagState] = useQueryState(
-    "tag",
-    parseAsString,
-  );
+  const [selectedTag, setSelectedTagState] = useQueryState("tag", parseAsString);
 
   // Mark as initialized after first render
   useEffect(() => {

@@ -4,15 +4,9 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { MessageSquare, ExternalLink, Plus, Lock, Unlock } from "lucide-react";
-import {
-  useCreateIssue,
-  getGetTaskResultIssuesQueryKey,
-} from "@/client/issue/issue";
+import { useCreateIssue, getGetTaskResultIssuesQueryKey } from "@/client/issue/issue";
 import { useQueryClient } from "@tanstack/react-query";
-import {
-  useTaskResultIssues,
-  type TaskResultIssue,
-} from "@/hooks/useTaskResultIssues";
+import { useTaskResultIssues, type TaskResultIssue } from "@/hooks/useTaskResultIssues";
 import { useProject } from "@/contexts/ProjectContext";
 import { formatRelativeTime } from "@/lib/utils/datetime";
 import { MarkdownContent } from "@/components/ui/MarkdownContent";
@@ -21,9 +15,7 @@ import { useImageUpload } from "@/hooks/useImageUpload";
 
 function getCurrentUsername(): string {
   if (typeof document === "undefined") return "";
-  const match = document.cookie
-    .split("; ")
-    .find((row) => row.startsWith("username="));
+  const match = document.cookie.split("; ").find((row) => row.startsWith("username="));
   return match ? decodeURIComponent(match.split("=")[1]) : "";
 }
 
@@ -48,12 +40,8 @@ function IssueRow({
       <div className="flex items-center justify-between mb-1">
         <div className="flex items-center gap-2">
           <span className="badge badge-xs badge-neutral">{issue.username}</span>
-          <span className="text-base-content/40">
-            {formatRelativeTime(issue.created_at)}
-          </span>
-          {issue.is_closed && (
-            <span className="badge badge-xs badge-ghost">Closed</span>
-          )}
+          <span className="text-base-content/40">{formatRelativeTime(issue.created_at)}</span>
+          {issue.is_closed && <span className="badge badge-xs badge-ghost">Closed</span>}
         </div>
         <div className="flex items-center gap-1">
           <span className="text-base-content/40 flex items-center gap-0.5">
@@ -86,15 +74,9 @@ function IssueRow({
             ))}
         </div>
       </div>
-      {issue.title && (
-        <p className="font-semibold text-xs mb-0.5">{issue.title}</p>
-      )}
+      {issue.title && <p className="font-semibold text-xs mb-0.5">{issue.title}</p>}
       <div className="line-clamp-2">
-        <MarkdownContent
-          content={issue.content}
-          className="text-base-content/80 text-xs"
-          preview
-        />
+        <MarkdownContent content={issue.content} className="text-base-content/80 text-xs" preview />
       </div>
     </div>
   );
@@ -140,9 +122,7 @@ export function TaskResultIssues({ taskId }: TaskResultIssuesProps) {
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
           <MessageSquare className="h-4 w-4 text-base-content/60" />
-          <h4 className="text-xs font-bold text-base-content/70">
-            Issues ({total})
-          </h4>
+          <h4 className="text-xs font-bold text-base-content/70">Issues ({total})</h4>
         </div>
         <div className="flex items-center gap-2">
           <button

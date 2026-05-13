@@ -17,18 +17,12 @@ function SeverityBadge({ severity }: { severity?: string }) {
       : severity === "warning"
         ? "badge-warning"
         : "badge-info";
-  return (
-    <span className={`badge badge-sm ${color}`}>{severity ?? "info"}</span>
-  );
+  return <span className={`badge badge-sm ${color}`}>{severity ?? "info"}</span>;
 }
 
 function StatusBadge({ status }: { status: string }) {
   const color =
-    status === "approved"
-      ? "badge-success"
-      : status === "rejected"
-        ? "badge-error"
-        : "badge-ghost";
+    status === "approved" ? "badge-success" : status === "rejected" ? "badge-error" : "badge-ghost";
   return <span className={`badge badge-sm ${color}`}>{status}</span>;
 }
 
@@ -56,12 +50,8 @@ function KnowledgeCard({
         <div className="flex items-center gap-2 mb-2 flex-wrap">
           <StatusBadge status={item.status} />
           <SeverityBadge severity={item.severity} />
-          <span className="font-mono text-xs text-primary">
-            {item.task_name}
-          </span>
-          {item.qid && (
-            <span className="text-xs text-base-content/40">{item.qid}</span>
-          )}
+          <span className="font-mono text-xs text-primary">{item.task_name}</span>
+          {item.qid && <span className="text-xs text-base-content/40">{item.qid}</span>}
           <span className="text-xs text-base-content/40">
             {formatRelativeTime(item.created_at)}
           </span>
@@ -70,9 +60,7 @@ function KnowledgeCard({
         <h3 className="text-sm font-semibold mb-1">{item.title}</h3>
 
         {item.symptom && (
-          <p className="text-sm text-base-content/70 line-clamp-2 mb-2">
-            {item.symptom}
-          </p>
+          <p className="text-sm text-base-content/70 line-clamp-2 mb-2">{item.symptom}</p>
         )}
 
         {item.lesson_learned && item.lesson_learned.length > 0 && (
@@ -207,13 +195,8 @@ export function IssueKnowledgePageContent() {
           </button>
           {taskNameFilter && (
             <div className="flex items-center gap-1">
-              <span className="badge badge-sm badge-outline">
-                task: {taskNameFilter}
-              </span>
-              <button
-                onClick={clearFilter}
-                className="btn btn-ghost btn-xs p-0 h-auto min-h-0"
-              >
+              <span className="badge badge-sm badge-outline">task: {taskNameFilter}</span>
+              <button onClick={clearFilter} className="btn btn-ghost btn-xs p-0 h-auto min-h-0">
                 <X className="h-3 w-3" />
               </button>
             </div>

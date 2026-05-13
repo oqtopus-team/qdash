@@ -49,9 +49,7 @@ export function TaskGridView({
     return (
       <>
         <div className="font-medium">{formatDate(dateStr)}</div>
-        <div className="text-xs text-base-content/60">
-          {formatTime(dateStr)}
-        </div>
+        <div className="text-xs text-base-content/60">{formatTime(dateStr)}</div>
       </>
     );
   };
@@ -113,25 +111,18 @@ export function TaskGridView({
 
                 {/* Task Info */}
                 <div className="space-y-2">
-                  <div
-                    className="font-semibold text-sm truncate"
-                    title={task.name}
-                  >
+                  <div className="font-semibold text-sm truncate" title={task.name}>
                     {task.name}
                   </div>
 
                   <div className="text-sm">{formatDateTime(task.start_at)}</div>
 
                   {task.elapsed_time && (
-                    <div className="text-xs text-base-content/60">
-                      ⏱ {task.elapsed_time}
-                    </div>
+                    <div className="text-xs text-base-content/60">⏱ {task.elapsed_time}</div>
                   )}
 
                   {task.message && (
-                    <div className="text-xs text-base-content/70 line-clamp-2">
-                      {task.message}
-                    </div>
+                    <div className="text-xs text-base-content/70 line-clamp-2">{task.message}</div>
                   )}
 
                   {task.output_parameters && (

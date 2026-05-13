@@ -8,20 +8,12 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 
 import { useToast } from "@/components/ui/Toast";
 
-import type {
-  SaveFlowRequest,
-  FlowTemplate,
-  SaveFlowResponse,
-} from "@/schemas";
+import type { SaveFlowRequest, FlowTemplate, SaveFlowResponse } from "@/schemas";
 import type { AxiosResponse } from "axios";
 
 import { useGetCurrentUser } from "@/client/auth/auth";
 import { useListChips } from "@/client/chip/chip";
-import {
-  getFlowTemplate,
-  listFlowTemplates,
-  saveFlow,
-} from "@/client/flow/flow";
+import { getFlowTemplate, listFlowTemplates, saveFlow } from "@/client/flow/flow";
 
 // Monaco Editor is only available on client side
 const Editor = dynamic(() => import("@monaco-editor/react"), { ssr: false });
@@ -62,9 +54,7 @@ export default function NewFlowPage() {
     () =>
       (templatesData?.data ?? []).map((template: FlowTemplate) => ({
         value: template.id,
-        label: template.description
-          ? `${template.name} - ${template.description}`
-          : template.name,
+        label: template.description ? `${template.name} - ${template.description}` : template.name,
         description: template.description,
       })),
     [templatesData],
@@ -106,9 +96,7 @@ export default function NewFlowPage() {
         console.error("Failed to load default template:", error);
         toast.error("Failed to load default template");
         // Set a minimal fallback template if loading fails
-        setCode(
-          "# Failed to load template. Please select one from the dropdown.",
-        );
+        setCode("# Failed to load template. Please select one from the dropdown.");
       }
     };
 
@@ -150,9 +138,7 @@ export default function NewFlowPage() {
     }
 
     if (!/^[a-zA-Z0-9_]+$/.test(name)) {
-      toast.error(
-        "Flow name must contain only alphanumeric characters and underscores",
-      );
+      toast.error("Flow name must contain only alphanumeric characters and underscores");
       return;
     }
 
@@ -235,8 +221,7 @@ export default function NewFlowPage() {
         {saveMutation.isError && (
           <div className="alert alert-error mx-4 mt-2">
             <span>
-              Failed to save flow:{" "}
-              {(saveMutation.error as Error)?.message || "Unknown error"}
+              Failed to save flow: {(saveMutation.error as Error)?.message || "Unknown error"}
             </span>
           </div>
         )}
@@ -363,9 +348,7 @@ export default function NewFlowPage() {
 
                 <div className="form-control">
                   <label className="label">
-                    <span className="label-text text-xs">
-                      Entrypoint Function
-                    </span>
+                    <span className="label-text text-xs">Entrypoint Function</span>
                   </label>
                   <input
                     type="text"
@@ -419,9 +402,7 @@ export default function NewFlowPage() {
                     onChange={(e) => setTags(e.target.value)}
                   />
                   <label className="label">
-                    <span className="label-text-alt text-xs">
-                      Comma-separated
-                    </span>
+                    <span className="label-text-alt text-xs">Comma-separated</span>
                   </label>
                 </div>
               </div>

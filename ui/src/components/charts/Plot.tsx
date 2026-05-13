@@ -97,25 +97,11 @@ export default function Plot({
       emitter.removeAllListeners?.("plotly_hover");
       emitter.removeAllListeners?.("plotly_unhover");
       emitter.removeAllListeners?.("plotly_relayout");
-      if (onSelected)
-        emitter.on?.(
-          "plotly_selected",
-          onSelected as (...args: unknown[]) => void,
-        );
-      if (onClick)
-        emitter.on?.("plotly_click", onClick as (...args: unknown[]) => void);
-      if (onHover)
-        emitter.on?.("plotly_hover", onHover as (...args: unknown[]) => void);
-      if (onUnhover)
-        emitter.on?.(
-          "plotly_unhover",
-          onUnhover as (...args: unknown[]) => void,
-        );
-      if (onRelayout)
-        emitter.on?.(
-          "plotly_relayout",
-          onRelayout as (...args: unknown[]) => void,
-        );
+      if (onSelected) emitter.on?.("plotly_selected", onSelected as (...args: unknown[]) => void);
+      if (onClick) emitter.on?.("plotly_click", onClick as (...args: unknown[]) => void);
+      if (onHover) emitter.on?.("plotly_hover", onHover as (...args: unknown[]) => void);
+      if (onUnhover) emitter.on?.("plotly_unhover", onUnhover as (...args: unknown[]) => void);
+      if (onRelayout) emitter.on?.("plotly_relayout", onRelayout as (...args: unknown[]) => void);
     });
 
     return () => {
@@ -141,8 +127,7 @@ export default function Plot({
     if (!container) return;
 
     const resize = () => typedPlotly.Plots.resize(container);
-    const observer =
-      typeof ResizeObserver === "undefined" ? null : new ResizeObserver(resize);
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(resize);
     observer?.observe(container);
     window.addEventListener("resize", resize);
 

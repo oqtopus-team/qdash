@@ -1,11 +1,7 @@
 "use client";
 
 import { useMemo, useState, memo } from "react";
-import {
-  TransformWrapper,
-  TransformComponent,
-  useControls,
-} from "react-zoom-pan-pinch";
+import { TransformWrapper, TransformComponent, useControls } from "react-zoom-pan-pinch";
 import { ZoomIn, ZoomOut, Maximize2 } from "lucide-react";
 
 import type { Task } from "@/schemas";
@@ -15,10 +11,7 @@ import { TaskFigure } from "@/components/charts/TaskFigure";
 import { TaskDetailModal } from "@/components/features/chip/modals/TaskDetailModal";
 import { useGridLayout } from "@/hooks/useGridLayout";
 import { useTopologyConfig } from "@/hooks/useTopologyConfig";
-import {
-  getQubitGridPosition,
-  type TopologyLayoutParams,
-} from "@/lib/utils/grid-position";
+import { getQubitGridPosition, type TopologyLayoutParams } from "@/lib/utils/grid-position";
 import { calculateGridContainerWidth } from "@/lib/utils/grid-layout";
 
 interface ExecutionTopologyViewProps {
@@ -76,14 +69,8 @@ function aggregateStatus(tasks: Task[]): string {
   return "pending";
 }
 
-const EmptyCell = memo(function EmptyCell({
-  muxBgClass,
-}: {
-  muxBgClass: string;
-}) {
-  return (
-    <div className={`aspect-square bg-base-300/50 rounded-lg ${muxBgClass}`} />
-  );
+const EmptyCell = memo(function EmptyCell({ muxBgClass }: { muxBgClass: string }) {
+  return <div className={`aspect-square bg-base-300/50 rounded-lg ${muxBgClass}`} />;
 });
 
 interface TopologyCellProps {
@@ -112,9 +99,7 @@ const TopologyCell = memo(function TopologyCell({
       <div
         className={`aspect-square bg-base-300 rounded-lg flex items-center justify-center relative ${muxBgClass}`}
       >
-        {showLabels && (
-          <div className="text-sm font-medium text-base-content/50">{qid}</div>
-        )}
+        {showLabels && <div className="text-sm font-medium text-base-content/50">{qid}</div>}
       </div>
     );
   }
@@ -162,9 +147,7 @@ const TopologyCell = memo(function TopologyCell({
           {qid}
         </div>
       )}
-      <div
-        className={`absolute bottom-1 right-1 w-2 h-2 rounded-full ${getStatusColor(status)}`}
-      />
+      <div className={`absolute bottom-1 right-1 w-2 h-2 rounded-full ${getStatusColor(status)}`} />
       {tasks.length > 1 && (
         <div className="absolute top-1 right-1 bg-base-100/80 px-1 py-px rounded text-[0.6rem] font-bold">
           {tasks.length}
@@ -187,8 +170,7 @@ export function ExecutionTopologyView({
   });
 
   const chipSize = chipData?.data?.size ?? 64;
-  const topologyId =
-    chipData?.data?.topology_id ?? `square-lattice-mux-${chipSize}`;
+  const topologyId = chipData?.data?.topology_id ?? `square-lattice-mux-${chipSize}`;
 
   // Get topology config
   const {
@@ -258,13 +240,12 @@ export function ExecutionTopologyView({
   }, [tasksByQid, topologyQubits, layoutParams]);
 
   // Responsive grid sizing
-  const { containerRef, cellSize, isMobile, viewportHeight, gap, padding } =
-    useGridLayout({
-      cols: gridCols,
-      rows: gridRows,
-      reservedHeight: { mobile: 300, desktop: 350 },
-      deps: [tasksByQid, topologyQubits],
-    });
+  const { containerRef, cellSize, isMobile, viewportHeight, gap, padding } = useGridLayout({
+    cols: gridCols,
+    rows: gridRows,
+    reservedHeight: { mobile: 300, desktop: 350 },
+    deps: [tasksByQid, topologyQubits],
+  });
 
   const MIN_FIGURE_CELL_SIZE = 60;
   const baseCellSize = Math.max(cellSize, MIN_FIGURE_CELL_SIZE);
@@ -285,9 +266,7 @@ export function ExecutionTopologyView({
     return (
       <div className="flex flex-col items-center justify-center py-12 text-base-content/50">
         <p className="text-sm">No qubit tasks to display in topology view</p>
-        <p className="text-xs mt-1">
-          Coupling tasks are not shown in this view
-        </p>
+        <p className="text-xs mt-1">Coupling tasks are not shown in this view</p>
       </div>
     );
   }
@@ -300,12 +279,7 @@ export function ExecutionTopologyView({
         padding: `${padding / 2}px`,
         gridTemplateColumns: `repeat(${gridCols}, minmax(${baseCellSize}px, 1fr))`,
         gridTemplateRows: `repeat(${gridRows}, minmax(${baseCellSize}px, 1fr))`,
-        width: calculateGridContainerWidth(
-          gridCols,
-          baseCellSize,
-          isMobile,
-          viewportHeight,
-        ),
+        width: calculateGridContainerWidth(gridCols, baseCellSize, isMobile, viewportHeight),
         willChange: "transform",
       }}
     >
@@ -324,8 +298,7 @@ export function ExecutionTopologyView({
             : "";
 
         const qid = Object.keys(gridPositions).find(
-          (key) =>
-            gridPositions[key].row === row && gridPositions[key].col === col,
+          (key) => gridPositions[key].row === row && gridPositions[key].col === col,
         );
 
         if (!qid) {
@@ -383,18 +356,11 @@ export function ExecutionTopologyView({
               const muxLocalCol = idx % numMuxCols;
               const muxActualRow = muxLocalRow;
               const muxActualCol = muxLocalCol;
-              const muxIndex =
-                muxActualRow * Math.floor(gridSize / muxSize) + muxActualCol;
+              const muxIndex = muxActualRow * Math.floor(gridSize / muxSize) + muxActualCol;
               const startCol = muxLocalCol * muxSize + 1;
               const startRow = muxLocalRow * muxSize + 1;
-              const spanCols = Math.min(
-                muxSize,
-                gridCols - muxLocalCol * muxSize,
-              );
-              const spanRows = Math.min(
-                muxSize,
-                gridRows - muxLocalRow * muxSize,
-              );
+              const spanCols = Math.min(muxSize, gridCols - muxLocalCol * muxSize);
+              const spanRows = Math.min(muxSize, gridRows - muxLocalRow * muxSize);
               if (spanCols <= 0 || spanRows <= 0) return null;
 
               return (

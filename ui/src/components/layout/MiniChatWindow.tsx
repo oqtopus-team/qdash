@@ -1,20 +1,10 @@
 "use client";
 
-import React, {
-  useState,
-  useRef,
-  useEffect,
-  useMemo,
-  useCallback,
-} from "react";
+import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { Send, X, Bot, Minus, Maximize2, GripHorizontal } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import {
-  useAnalysisChat,
-  type ChatMessage,
-  type BlocksResult,
-} from "@/hooks/useAnalysisChat";
+import { useAnalysisChat, type ChatMessage, type BlocksResult } from "@/hooks/useAnalysisChat";
 import { useAnalysisChatContext } from "@/contexts/AnalysisChatContext";
 import { ChatPlotlyChart } from "@/components/features/chat/ChatPlotlyChart";
 import { CodeBlock } from "@/components/features/chat/CodeBlock";
@@ -156,14 +146,8 @@ function MiniMessageBubble({ message }: { message: ChatMessage }) {
             {blocksResult.blocks.map((block, i) => {
               if (block.type === "text" && block.content) {
                 return (
-                  <div
-                    key={i}
-                    className="prose prose-sm max-w-none text-xs mt-0.5"
-                  >
-                    <ReactMarkdown
-                      remarkPlugins={[remarkGfm]}
-                      components={markdownComponents}
-                    >
+                  <div key={i} className="prose prose-sm max-w-none text-xs mt-0.5">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
                       {block.content}
                     </ReactMarkdown>
                   </div>
@@ -183,10 +167,7 @@ function MiniMessageBubble({ message }: { message: ChatMessage }) {
           </>
         ) : (
           <div className="prose prose-sm max-w-none text-xs mt-0.5">
-            <ReactMarkdown
-              remarkPlugins={[remarkGfm]}
-              components={markdownComponents}
-            >
+            <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
               {message.content
                 .replace(/\*\*\[Good\]\*\*\s*/, "")
                 .replace(/\*\*\[Warning\]\*\*\s*/, "")
@@ -240,14 +221,8 @@ export function MiniChatWindow() {
   // Default position: bottom-right
   const defaultPos = useMemo(
     () => ({
-      x:
-        typeof window !== "undefined"
-          ? window.innerWidth - WINDOW_WIDTH - MARGIN
-          : 0,
-      y:
-        typeof window !== "undefined"
-          ? window.innerHeight - WINDOW_HEIGHT - MARGIN
-          : 0,
+      x: typeof window !== "undefined" ? window.innerWidth - WINDOW_WIDTH - MARGIN : 0,
+      y: typeof window !== "undefined" ? window.innerHeight - WINDOW_HEIGHT - MARGIN : 0,
     }),
     [],
   );
@@ -274,14 +249,10 @@ export function MiniChatWindow() {
     () => buildAnalysisModelOptions(copilotConfigResponse?.data ?? null),
     [copilotConfigResponse?.data],
   );
-  const selectedModel = resolveAnalysisModelOption(
-    modelOptions,
-    getStoredAnalysisModelKey(),
-  );
+  const selectedModel = resolveAnalysisModelOption(modelOptions, getStoredAnalysisModelKey());
   const modelOverride = effectiveContext ? selectedModel.model : null;
   const effectiveModelName =
-    selectedModel.model?.name ??
-    selectedModel.label.replace(/^Configured:\s*/, "");
+    selectedModel.model?.name ?? selectedModel.label.replace(/^Configured:\s*/, "");
 
   const { messages, isLoading, statusMessage, sendMessage } = useAnalysisChat(
     effectiveContext ?? null,
@@ -371,10 +342,7 @@ export function MiniChatWindow() {
           >
             <Maximize2 className="w-3 h-3" />
           </button>
-          <button
-            onClick={closeMiniChat}
-            className="btn btn-ghost btn-xs btn-square"
-          >
+          <button onClick={closeMiniChat} className="btn btn-ghost btn-xs btn-square">
             <X className="w-3.5 h-3.5" />
           </button>
         </div>
@@ -406,9 +374,7 @@ export function MiniChatWindow() {
                 </div>
               </div>
             ) : (
-              messages.map((msg, idx) => (
-                <MiniMessageBubble key={idx} message={msg} />
-              ))
+              messages.map((msg, idx) => <MiniMessageBubble key={idx} message={msg} />)
             )}
 
             {isLoading && (
@@ -418,9 +384,7 @@ export function MiniChatWindow() {
                 </div>
                 <div className="flex items-center gap-1 py-1">
                   {statusMessage ? (
-                    <span className="text-[10px] text-base-content/60">
-                      {statusMessage}
-                    </span>
+                    <span className="text-[10px] text-base-content/60">{statusMessage}</span>
                   ) : (
                     <>
                       <span

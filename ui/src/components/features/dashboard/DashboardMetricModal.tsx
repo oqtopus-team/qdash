@@ -6,11 +6,7 @@ import Link from "next/link";
 import { CouplingMetricHistoryModal } from "@/components/features/metrics/CouplingMetricHistoryModal";
 import { QubitMetricHistoryModal } from "@/components/features/metrics/QubitMetricHistoryModal";
 
-import {
-  MetricNotePanel,
-  type NoteEntry,
-  type NoteEntryWithMetric,
-} from "./MetricNotePanel";
+import { MetricNotePanel, type NoteEntry, type NoteEntryWithMetric } from "./MetricNotePanel";
 import type { GetChipNotesSummaryParams } from "@/schemas";
 import type { MentionCandidate } from "@/components/ui/MarkdownEditor";
 
@@ -148,10 +144,7 @@ export function DashboardMetricModal({
             </Link>
           )}
           <div className="flex gap-2 ml-auto">
-            <button
-              onClick={onClose}
-              className="btn btn-ghost btn-sm sm:btn-md"
-            >
+            <button onClick={onClose} className="btn btn-ghost btn-sm sm:btn-md">
               Close
             </button>
             {!isCoupling && (

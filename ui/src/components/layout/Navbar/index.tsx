@@ -55,9 +55,7 @@ function ProjectSelector() {
           ) : (
             <FolderLock size={16} aria-hidden="true" />
           )}
-          <span className="max-w-32 truncate">
-            {currentProject?.name ?? "No projects"}
-          </span>
+          <span className="max-w-32 truncate">{currentProject?.name ?? "No projects"}</span>
           <svg
             xmlns="http://www.w3.org/2000/svg"
             fill="none"
@@ -66,11 +64,7 @@ function ProjectSelector() {
             stroke="currentColor"
             className="w-3 h-3"
           >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="m19.5 8.25-7.5 7.5-7.5-7.5"
-            />
+            <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
           </svg>
         </div>
         <ul
@@ -81,9 +75,7 @@ function ProjectSelector() {
             <li>
               <span className="menu-disabled flex flex-col items-start">
                 <span className="font-medium">No projects available</span>
-                <span className="text-xs opacity-60">
-                  Ask an owner or admin for an invitation.
-                </span>
+                <span className="text-xs opacity-60">Ask an owner or admin for an invitation.</span>
               </span>
             </li>
           )}
@@ -91,18 +83,14 @@ function ProjectSelector() {
             <li key={project.project_id}>
               <button
                 className={`flex flex-col items-start ${
-                  currentProject?.project_id === project.project_id
-                    ? "active"
-                    : ""
+                  currentProject?.project_id === project.project_id ? "active" : ""
                 }`}
                 onClick={() => {
                   switchProject(project.project_id);
                   (document.activeElement as HTMLElement)?.blur();
                 }}
               >
-                <span className="font-medium truncate w-full text-left">
-                  {project.name}
-                </span>
+                <span className="font-medium truncate w-full text-left">{project.name}</span>
                 {project.description && (
                   <span className="text-xs opacity-60 truncate w-full text-left">
                     {project.description}

@@ -43,12 +43,7 @@ function ExpandableImage({
   return (
     <div className="relative group inline-flex h-full min-w-0 min-h-0">
       {/* eslint-disable-next-line @next/next/no-img-element -- dynamic API image with native sizing */}
-      <img
-        src={src}
-        alt={alt}
-        className={className}
-        onError={() => setHasError(true)}
-      />
+      <img src={src} alt={alt} className={className} onError={() => setHasError(true)} />
       <button
         type="button"
         onClick={(e) => {
@@ -72,13 +67,7 @@ function ExpandableImage({
   );
 }
 
-export function TaskFigure({
-  path,
-  jsonFigurePath,
-  taskId,
-  qid,
-  className = "",
-}: TaskFigureProps) {
+export function TaskFigure({ path, jsonFigurePath, taskId, qid, className = "" }: TaskFigureProps) {
   // Use generated API client hook when taskId is provided
   const {
     data: taskResultResponse,
@@ -110,13 +99,8 @@ export function TaskFigure({
   }
 
   // Normalize to string array
-  const raw =
-    path || taskResult?.figure_path || taskResult?.json_figure_path || [];
-  const normalizedPaths = Array.isArray(raw)
-    ? raw
-    : typeof raw === "string"
-      ? [raw]
-      : [];
+  const raw = path || taskResult?.figure_path || taskResult?.json_figure_path || [];
+  const normalizedPaths = Array.isArray(raw) ? raw : typeof raw === "string" ? [raw] : [];
 
   // Normalize json figure paths
   const rawJson = jsonFigurePath || taskResult?.json_figure_path || [];

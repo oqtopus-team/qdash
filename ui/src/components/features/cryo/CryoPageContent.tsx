@@ -24,17 +24,12 @@ import { CryostatCard } from "./CryostatCard";
 
 export function CryoPageContent() {
   const queryClient = useQueryClient();
-  const { data: cryostatsData, isLoading: cryostatsLoading } =
-    useListCryostats();
-  const { data: cooldownsData, isLoading: cooldownsLoading } =
-    useListCooldowns();
+  const { data: cryostatsData, isLoading: cryostatsLoading } = useListCryostats();
+  const { data: cooldownsData, isLoading: cooldownsLoading } = useListCooldowns();
   const { data: chipsData } = useListChips();
 
   const cryostats = cryostatsData?.data?.cryostats ?? [];
-  const cooldowns = useMemo(
-    () => cooldownsData?.data?.cooldowns ?? [],
-    [cooldownsData],
-  );
+  const cooldowns = useMemo(() => cooldownsData?.data?.cooldowns ?? [], [cooldownsData]);
   const chips = chipsData?.data?.chips ?? [];
 
   const cooldownsByCryo = useMemo(() => {
@@ -112,10 +107,7 @@ export function CryoPageContent() {
       </div>
 
       {newCryostatOpen && (
-        <NewCryostatModal
-          onClose={() => setNewCryostatOpen(false)}
-          onCreated={invalidate}
-        />
+        <NewCryostatModal onClose={() => setNewCryostatOpen(false)} onCreated={invalidate} />
       )}
       {newCooldownFor && (
         <NewCooldownModal
@@ -157,13 +149,7 @@ function CryoLoadingSkeleton() {
   );
 }
 
-function NewCryostatModal({
-  onClose,
-  onCreated,
-}: {
-  onClose: () => void;
-  onCreated: () => void;
-}) {
+function NewCryostatModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
   const create = useCreateCryostat();
   const [cryoId, setCryoId] = useState("");
   const [name, setName] = useState("");
@@ -280,8 +266,7 @@ function NewCooldownModal({
         />
       </Field>
       <p className="text-xs text-base-content/50 mt-2">
-        Started now. Edit dates, description, and load chips from the detail
-        panel after creation.
+        Started now. Edit dates, description, and load chips from the detail panel after creation.
       </p>
       <ModalFooter
         onCancel={onClose}
@@ -313,11 +298,7 @@ function ModalShell({
       <div className="modal-box w-full max-w-2xl">
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-lg font-bold">{title}</h3>
-          <button
-            className="btn btn-ghost btn-sm btn-square"
-            onClick={onClose}
-            aria-label="Close"
-          >
+          <button className="btn btn-ghost btn-sm btn-square" onClick={onClose} aria-label="Close">
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -367,11 +348,7 @@ function ModalFooter({
       <button className="btn btn-sm btn-ghost" onClick={onCancel}>
         Cancel
       </button>
-      <button
-        className="btn btn-sm btn-primary"
-        onClick={onSubmit}
-        disabled={disabled}
-      >
+      <button className="btn btn-sm btn-primary" onClick={onSubmit} disabled={disabled}>
         {pending ? "Creating…" : submitLabel}
       </button>
     </div>

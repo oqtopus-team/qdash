@@ -1,0 +1,11 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "ignorePatterns": [
+    ".next/**",
+    "**/*.md",
+    "src/app/layout.tsx",
+    "src/client/**",
+    "src/schemas/**"
+  ],
+  "printWidth": 100
+}

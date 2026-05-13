@@ -123,18 +123,14 @@ async function apiListSessions(): Promise<ServerSessionSummary[]> {
 }
 
 async function apiGetSession(sessionId: string): Promise<ServerSessionDetail> {
-  const res = await fetch(
-    `${BASE_URL}${SESSIONS_PATH}/${encodeURIComponent(sessionId)}`,
-    { headers: buildHeaders() },
-  );
+  const res = await fetch(`${BASE_URL}${SESSIONS_PATH}/${encodeURIComponent(sessionId)}`, {
+    headers: buildHeaders(),
+  });
   if (!res.ok) throw new Error(`Failed to get session: ${res.status}`);
   return (await res.json()) as ServerSessionDetail;
 }
 
-async function apiCreateSession(
-  sessionId: string,
-  title: string,
-): Promise<ServerSessionDetail> {
+async function apiCreateSession(sessionId: string, title: string): Promise<ServerSessionDetail> {
   const res = await fetch(`${BASE_URL}${SESSIONS_PATH}`, {
     method: "POST",
     headers: buildHeaders(),
@@ -148,23 +144,20 @@ async function apiUpdateSession(
   sessionId: string,
   patch: { title?: string; messages?: ServerMessage[] },
 ): Promise<ServerSessionDetail> {
-  const res = await fetch(
-    `${BASE_URL}${SESSIONS_PATH}/${encodeURIComponent(sessionId)}`,
-    {
-      method: "PATCH",
-      headers: buildHeaders(),
-      body: JSON.stringify(patch),
-    },
-  );
+  const res = await fetch(`${BASE_URL}${SESSIONS_PATH}/${encodeURIComponent(sessionId)}`, {
+    method: "PATCH",
+    headers: buildHeaders(),
+    body: JSON.stringify(patch),
+  });
   if (!res.ok) throw new Error(`Failed to update session: ${res.status}`);
   return (await res.json()) as ServerSessionDetail;
 }
 
 async function apiDeleteSession(sessionId: string): Promise<void> {
-  const res = await fetch(
-    `${BASE_URL}${SESSIONS_PATH}/${encodeURIComponent(sessionId)}`,
-    { method: "DELETE", headers: buildHeaders() },
-  );
+  const res = await fetch(`${BASE_URL}${SESSIONS_PATH}/${encodeURIComponent(sessionId)}`, {
+    method: "DELETE",
+    headers: buildHeaders(),
+  });
   if (!res.ok && res.status !== 404) {
     throw new Error(`Failed to delete session: ${res.status}`);
   }
@@ -174,14 +167,9 @@ async function apiDeleteSession(sessionId: string): Promise<void> {
 // Context
 // ---------------------------------------------------------------------------
 
-const CopilotChatSessionCtx =
-  createContext<CopilotChatSessionContextValue | null>(null);
+const CopilotChatSessionCtx = createContext<CopilotChatSessionContextValue | null>(null);
 
-export function CopilotChatSessionProvider({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export function CopilotChatSessionProvider({ children }: { children: React.ReactNode }) {
   const [sessions, setSessions] = useState<CopilotChatSession[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [isLoadingSessions, setIsLoadingSessions] = useState(false);
@@ -326,9 +314,7 @@ export function CopilotChatSessionProvider({
     if (!activeSessionId) return;
     const id = activeSessionId;
     setSessions((prev) =>
-      prev.map((s) =>
-        s.id === id ? { ...s, messages: [], updatedAt: Date.now() } : s,
-      ),
+      prev.map((s) => (s.id === id ? { ...s, messages: [], updatedAt: Date.now() } : s)),
     );
     (async () => {
       await awaitCreate(id);
@@ -383,19 +369,14 @@ export function CopilotChatSessionProvider({
 
   // Kept for backward-compat with consumers; title derivation now happens
   // inside `updateSessionMessages` so no separate PATCH is issued here.
-  const autoTitleSession = useCallback(
-    (sessionId: string, firstMessage: string) => {
-      const newTitle = firstMessage.slice(0, 50);
-      setSessions((prev) =>
-        prev.map((s) =>
-          s.id === sessionId && s.title === "New Chat"
-            ? { ...s, title: newTitle }
-            : s,
-        ),
-      );
-    },
-    [],
-  );
+  const autoTitleSession = useCallback((sessionId: string, firstMessage: string) => {
+    const newTitle = firstMessage.slice(0, 50);
+    setSessions((prev) =>
+      prev.map((s) =>
+        s.id === sessionId && s.title === "New Chat" ? { ...s, title: newTitle } : s,
+      ),
+    );
+  }, []);
 
   return (
     <CopilotChatSessionCtx.Provider
@@ -420,9 +401,7 @@ export function CopilotChatSessionProvider({
 export function useCopilotChatSessionContext() {
   const ctx = useContext(CopilotChatSessionCtx);
   if (!ctx) {
-    throw new Error(
-      "useCopilotChatSessionContext must be used within CopilotChatSessionProvider",
-    );
+    throw new Error("useCopilotChatSessionContext must be used within CopilotChatSessionProvider");
   }
   return ctx;
 }

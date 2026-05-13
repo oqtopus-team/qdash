@@ -102,7 +102,8 @@ ui/
 ├── public/                     # Static assets
 ├── vitest.config.mts           # Vitest test configuration
 ├── vitest.setup.ts             # Test setup (jest-dom matchers)
-├── eslint.config.mjs           # ESLint configuration
+├── .oxlintrc.json              # Oxlint configuration
+├── .oxfmt.json                 # Oxfmt configuration
 ├── orval.config.cjs            # API client generation config
 └── tsconfig.json               # TypeScript configuration
 ```
@@ -704,26 +705,24 @@ const chip = response as ChipData; // Unsafe
 
 ## Code Quality
 
-### ESLint Configuration
+### Oxlint Configuration
 
-The project uses ESLint with the following configuration:
+The project uses `oxlint` with the following configuration:
 
-```javascript
-// eslint.config.mjs
-export default [
-  {
-    ignores: ["node_modules/**", ".next/**", "src/schemas/**", "src/client/**"],
-  },
-  {
-    files: ["**/*.{ts,tsx}"],
-    rules: {
-      "react-hooks/rules-of-hooks": "error",
-      "react-hooks/exhaustive-deps": "warn",
-      "@typescript-eslint/no-unused-vars": ["warn", { argsIgnorePattern: "^_", varsIgnorePattern: "^_" }],
-      "@typescript-eslint/no-explicit-any": "warn",
-    },
-  },
-];
+```json
+// .oxlintrc.json
+{
+  "plugins": ["typescript", "react", "nextjs"],
+  "rules": {
+    "react/rules-of-hooks": "error",
+    "react/exhaustive-deps": "warn",
+    "typescript/no-unused-vars": [
+      "warn",
+      { "argsIgnorePattern": "^_", "varsIgnorePattern": "^_" }
+    ],
+    "typescript/no-explicit-any": "warn"
+  }
+}
 ```
 
 **Note:** `no-explicit-any` is set to `warn` to encourage proper typing. Prefix unused variables with `_` to suppress `no-unused-vars` warnings.
@@ -731,14 +730,17 @@ export default [
 ### Running Linters
 
 ```bash
-# Run ESLint
+# Run oxlint
 bun run lint
 
-# Fix auto-fixable issues
+# Auto-format
 bun run fmt
 
 # Type check
 bunx tsc --noEmit
+
+# Check formatting without rewriting files
+bun run fmt:check
 ```
 
 ### Pre-commit Checks
@@ -794,8 +796,10 @@ bun run start
 | `bun run test`      | Run tests in watch mode              |
 | `bun run test:run`  | Run tests once (CI-friendly)         |
 | `task test-ui`      | Run UI tests from project root       |
-| `bun run lint`      | Run ESLint                           |
-| `bun run fmt`       | Fix ESLint issues                    |
+| `bun run lint`      | Run oxlint                           |
+| `bun run lint:fix`  | Apply oxlint auto-fixes              |
+| `bun run fmt`       | Format files with oxfmt              |
+| `bun run fmt:check` | Check formatting with oxfmt          |
 | `bunx tsc --noEmit` | Type check                           |
 | `task generate`     | Regenerate API client                |
 
@@ -813,8 +817,7 @@ This guide is based on the following official documentation and best practices:
 | nuqs (URL State) | [nuqs Documentation](https://nuqs.47ng.com/) |
 | Tailwind CSS | [Tailwind CSS Documentation](https://tailwindcss.com/docs) |
 | DaisyUI | [DaisyUI Components](https://daisyui.com/components/) |
-| TypeScript ESLint | [typescript-eslint Rules](https://typescript-eslint.io/rules/) |
+| Oxc Linter | [Oxlint Documentation](https://oxc.rs/docs/guide/usage/linter.html) |
 | React Hooks Rules | [React Rules of Hooks](https://react.dev/reference/rules/rules-of-hooks) |
 | Plotly.js | [Plotly.js Documentation](https://plotly.com/javascript/) |
 | Export Patterns | [Next.js Lazy Loading with dynamic()](https://nextjs.org/docs/app/building-your-application/optimizing/lazy-loading) |
-
