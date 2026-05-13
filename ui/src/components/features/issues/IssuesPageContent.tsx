@@ -9,16 +9,11 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { MarkdownContent } from "@/components/ui/MarkdownContent";
 import { UserAvatar } from "@/components/ui/UserAvatar";
+import { useAuth } from "@/contexts/AuthContext";
 import { useIssues } from "@/hooks/useIssues";
 import { useProject } from "@/contexts/ProjectContext";
 import { formatRelativeTime } from "@/lib/utils/datetime";
 import type { IssueResponse } from "@/schemas";
-
-function getCurrentUsername(): string {
-  if (typeof document === "undefined") return "";
-  const match = document.cookie.split("; ").find((row) => row.startsWith("username="));
-  return match ? decodeURIComponent(match.split("=")[1]) : "";
-}
 
 function IssueThread({
   issue,
@@ -115,8 +110,8 @@ export function IssuesPageContent() {
     goToPage,
   } = useIssues();
   const { isOwner } = useProject();
+  const { username: currentUser } = useAuth();
   const [filterInput, setFilterInput] = useState("");
-  const currentUser = getCurrentUsername();
 
   const currentPage = Math.floor(skip / pageSize);
   const totalPages = Math.ceil(total / pageSize);

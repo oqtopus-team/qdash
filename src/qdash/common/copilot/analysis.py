@@ -128,6 +128,10 @@ class BlocksAnalysisResponse(BaseModel):
     )
 
 
+# Backward-compatible alias used by API imports and older tests.
+BlocksResponse = BlocksAnalysisResponse
+
+
 class AnalyzeRequest(BaseModel):
     """Request body for POST /copilot/analyze."""
 
@@ -166,3 +170,21 @@ class ChatRequest(BaseModel):
         description="Previous conversation messages [{role, content}, ...]",
     )
     image_base64: str | None = None
+    chat_model_override: ModelConfig | None = Field(
+        default=None,
+        alias="model_override",
+        description=(
+            "Optional per-request model override for general chat. "
+            "When unset, the configured chat_models[0]/model selection is used."
+        ),
+    )
+
+
+def _rebuild_models() -> None:
+    from qdash.common.copilot.config import ModelConfig as _RuntimeModelConfig
+
+    AnalyzeRequest.model_rebuild(_types_namespace={"ModelConfig": _RuntimeModelConfig})
+    ChatRequest.model_rebuild(_types_namespace={"ModelConfig": _RuntimeModelConfig})
+
+
+_rebuild_models()

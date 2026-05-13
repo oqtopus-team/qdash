@@ -24,7 +24,6 @@ Steps:
     FilterByStatus: Filter qubits by success status
     GenerateCRSchedule: Generate CR schedule for 2Q calibration
     TwoQubitCalibration: 2Q coupling calibration
-    CheckSkew: System-level skew check
 
 Example:
     from prefect import flow
@@ -66,7 +65,6 @@ from qdash.workflow.service.session_context import (
 )
 from qdash.workflow.service.steps import (
     CalibrationStep,
-    CheckSkew,
     ConfigureAll,
     CustomOneQubit,
     CustomTwoQubit,
@@ -105,7 +103,6 @@ __all__ = [
     # === High-level API ===
     "CalibService",
     "CalibrationStep",
-    "CheckSkew",
     "ConfigFileType",
     "ConfigureAll",
     "CouplingTargets",

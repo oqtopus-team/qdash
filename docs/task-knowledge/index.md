@@ -13,12 +13,6 @@ Calibration task knowledge base for QDash copilot analysis. Each page describes 
 | [Configure](./box-setup/Configure) | Loads and applies the full calibration state configuration to the control boxes. |
 | [ReadoutConfigure](./box-setup/ReadoutConfigure) | Configures readout parameters for a specified subset of qubits. |
 
-## System
-
-| Task | Description |
-|------|-------------|
-| [CheckSkew](./system/CheckSkew) | Measures and corrects time skew between multiple control boxes. |
-
 ## CW Characterization
 
 | Task | Description |

@@ -12,7 +12,7 @@ import io
 import logging
 import signal
 from contextlib import redirect_stdout
-from typing import Any
+from typing import Any, TypedDict
 
 logger = logging.getLogger(__name__)
 
@@ -93,6 +93,17 @@ SAFE_BUILTINS = {
     "ZeroDivisionError": ZeroDivisionError,
     "Exception": Exception,
 }
+
+
+class SandboxChartSpec(TypedDict, total=False):
+    data: list[Any]
+    layout: dict[str, Any]
+
+
+class SandboxResult(TypedDict):
+    output: str | None
+    chart: SandboxChartSpec | list[SandboxChartSpec] | None
+    error: str | None
 
 
 def _safe_import(
@@ -180,9 +191,7 @@ def _ensure_serializable(obj: Any) -> Any:
     return obj
 
 
-def execute_python_analysis(
-    code: str, context_data: dict[str, Any] | None = None
-) -> dict[str, Any]:
+def execute_python_analysis(code: str, context_data: dict[str, Any] | None = None) -> SandboxResult:
     """Execute Python analysis code in a sandboxed environment.
 
     Parameters
@@ -195,7 +204,7 @@ def execute_python_analysis(
 
     Returns
     -------
-    dict[str, Any]
+    SandboxResult
         Execution result with keys:
         - ``output``: Text output (str)
         - ``chart``: Plotly chart spec (dict) or None

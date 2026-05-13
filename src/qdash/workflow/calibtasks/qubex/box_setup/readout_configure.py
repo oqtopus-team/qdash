@@ -20,7 +20,7 @@ class ReadoutConfigure(QubexTask):
             unit="a.u.",
             value_type="list",
             value=[],
-            description="List of muxes to check skew",
+            description="List of muxes to update readout settings",
         ),
     }
     output_parameters: ClassVar[dict[str, ParameterModel]] = {}

@@ -34,6 +34,7 @@ import {
   type StatusFilter,
   type TaskResultIssue,
 } from "@/hooks/useTaskResultIssues";
+import { useAuth } from "@/contexts/AuthContext";
 import { useProject } from "@/contexts/ProjectContext";
 import { formatDateTime, formatRelativeTime } from "@/lib/utils/datetime";
 import { useToast } from "@/components/ui/Toast";
@@ -181,12 +182,6 @@ function ParameterOverrideSection({
   );
 }
 
-function getCurrentUsername(): string {
-  if (typeof document === "undefined") return "";
-  const match = document.cookie.split("; ").find((row) => row.startsWith("username="));
-  return match ? decodeURIComponent(match.split("=")[1]) : "";
-}
-
 function StatusBadge({ status }: { status: string }) {
   const color =
     status === "success"
@@ -270,8 +265,8 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const toast = useToast();
+  const { username: currentUser } = useAuth();
   const { isOwner } = useProject();
-  const currentUser = getCurrentUsername();
   const [showEditor, setShowEditor] = useState(false);
   const [newIssueTitle, setNewIssueTitle] = useState("");
   const [newIssueContent, setNewIssueContent] = useState("");

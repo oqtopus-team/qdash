@@ -56,14 +56,6 @@
     "function_name": "parallel_retry_calibration"
   },
   {
-    "id": "check_skew",
-    "name": "Check Skew",
-    "description": "System-level skew measurement and calibration across MUX channels.",
-    "category": "system",
-    "filename": "check_skew.py",
-    "function_name": "check_skew"
-  },
-  {
     "id": "fake_calibration",
     "name": "Fake Backend Calibration",
     "description": "Calibration with backend switching. Use backend_name='fake' for testing, 'qubex' for production. Customize tasks list for provenance testing.",

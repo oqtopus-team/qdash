@@ -7,17 +7,12 @@ import { MessageSquare, ExternalLink, Plus, Lock, Unlock } from "lucide-react";
 import { useCreateIssue, getGetTaskResultIssuesQueryKey } from "@/client/issue/issue";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTaskResultIssues, type TaskResultIssue } from "@/hooks/useTaskResultIssues";
+import { useAuth } from "@/contexts/AuthContext";
 import { useProject } from "@/contexts/ProjectContext";
 import { formatRelativeTime } from "@/lib/utils/datetime";
 import { MarkdownContent } from "@/components/ui/MarkdownContent";
 import { MarkdownEditor } from "@/components/ui/MarkdownEditor";
 import { useImageUpload } from "@/hooks/useImageUpload";
-
-function getCurrentUsername(): string {
-  if (typeof document === "undefined") return "";
-  const match = document.cookie.split("; ").find((row) => row.startsWith("username="));
-  return match ? decodeURIComponent(match.split("=")[1]) : "";
-}
 
 function IssueRow({
   issue,
@@ -89,7 +84,7 @@ interface TaskResultIssuesProps {
 export function TaskResultIssues({ taskId }: TaskResultIssuesProps) {
   const queryClient = useQueryClient();
   const { isOwner } = useProject();
-  const currentUser = getCurrentUsername();
+  const { username: currentUser } = useAuth();
   const [showEditor, setShowEditor] = useState(false);
   const [newIssueTitle, setNewIssueTitle] = useState("");
   const [newIssue, setNewIssue] = useState("");

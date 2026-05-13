@@ -10,8 +10,6 @@ Public API:
     - run_full_chip(): Full chip 1Q+2Q calibration
     - sweep(): Parameter sweep
     - two_qubit(): 2-qubit coupling calibration
-    - check_skew(): System-level skew check
-
 Example:
     ```python
     from prefect import flow
