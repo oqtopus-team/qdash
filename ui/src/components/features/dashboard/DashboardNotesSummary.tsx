@@ -7,7 +7,7 @@ import { ExternalLink, StickyNote } from "lucide-react";
 
 import { formatDate } from "@/lib/utils/datetime";
 
-import type { NoteEntryWithMetric } from "./ChipNoteEditor";
+import type { NoteEntryWithMetric } from "./MetricNotePanel";
 
 interface TaskNoteEntry {
   taskId: string;

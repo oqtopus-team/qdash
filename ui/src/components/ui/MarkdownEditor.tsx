@@ -16,7 +16,7 @@ import {
 import { MarkdownContent } from "./MarkdownContent";
 import { QdashBotAvatar, UserAvatar } from "./UserAvatar";
 
-interface MentionCandidate {
+export interface MentionCandidate {
   id: string;
   label: string;
   secondaryLabel?: string;

@@ -10,7 +10,7 @@ import {
   type TopologyLayoutParams,
 } from "@/lib/utils/grid-position";
 
-import type { NoteEntryWithMetric } from "./ChipNoteEditor";
+import type { NoteEntryWithMetric } from "./MetricNotePanel";
 import { DashboardNoteTooltip } from "./DashboardNoteTooltip";
 
 interface MetricValue {
