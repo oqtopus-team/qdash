@@ -20,6 +20,7 @@ from qdash.common.copilot.analysis import AnalysisResponse, TaskAnalysisContext
 
 if TYPE_CHECKING:
     from qdash.common.copilot.config import CopilotConfig, ModelConfig
+    from qdash.common.copilot.sandbox import SandboxChartSpec, SandboxResult
 else:
     from qdash.common.copilot.config import CopilotConfig, ModelConfig
 
@@ -1538,7 +1539,7 @@ def _build_llm_summary(full_result: dict[str, Any], data_key: str) -> dict[str, 
 def _wrap_tool_executors(
     tool_executors: ToolExecutors,
     data_store: dict[str, Any],
-) -> tuple[ToolExecutors, list[dict[str, Any]]]:
+) -> tuple[ToolExecutors, list[SandboxChartSpec | dict[str, Any]]]:
     """Wrap tool executors to handle data store and chart collection.
 
     - **Stored tools** (``get_chip_parameter_timeseries``, ``get_chip_summary``):
@@ -1547,7 +1548,7 @@ def _wrap_tool_executors(
     - **execute_python_analysis**: *data_store* is auto-injected as ``data``;
       charts are collected.
     """
-    collected_charts: list[dict[str, Any]] = []
+    collected_charts: list[SandboxChartSpec | dict[str, Any]] = []
     wrapped = dict(tool_executors)
 
     # Stored tools: full data → data_store, summary → LLM
@@ -1594,7 +1595,7 @@ def _wrap_tool_executors(
         wrapped["generate_chip_heatmap"] = heatmap_wrapper
 
     # execute_python_analysis: data_store auto-injected + chart collection
-    def python_wrapper(args: dict[str, Any]) -> Any:
+    def python_wrapper(args: dict[str, Any]) -> SandboxResult | dict[str, Any]:
         from qdash.common.copilot.sandbox import execute_python_analysis
 
         result = execute_python_analysis(args["code"], data_store)
@@ -1602,7 +1603,7 @@ def _wrap_tool_executors(
             chart = result["chart"]
             if isinstance(chart, list):
                 collected_charts.extend(chart)
-            else:
+            elif chart is not None:
                 collected_charts.append(chart)
             return {
                 "output": result.get("output", ""),
@@ -1678,7 +1679,7 @@ def _sanitize_nan(obj: Any) -> Any:
 
 def _inject_collected_charts(
     result: dict[str, Any],
-    collected_charts: list[dict[str, Any]],
+    collected_charts: list[SandboxChartSpec | dict[str, Any]],
 ) -> dict[str, Any]:
     """Append tool-generated charts to the blocks response."""
     if not collected_charts:
