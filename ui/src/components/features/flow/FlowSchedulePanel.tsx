@@ -5,7 +5,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { useToast } from "@/components/ui/Toast";
-import { formatDateTime } from "@/lib/utils/datetime";
+import { dateToDateInput, formatDateTime } from "@/lib/utils/datetime";
 
 import type { ScheduleFlowRequest, FlowScheduleSummary } from "@/schemas";
 
@@ -227,8 +227,7 @@ export function FlowSchedulePanel({ flowName }: FlowSchedulePanelProps) {
                 value={scheduledTime.split("T")[1]?.split(":")[0] || "00"}
                 onChange={(e) => {
                   const date =
-                    scheduledTime.split("T")[0] ||
-                    new Date().toISOString().split("T")[0];
+                    scheduledTime.split("T")[0] || dateToDateInput(new Date());
                   const currentMinute =
                     scheduledTime.split("T")[1]?.split(":")[1] || "00";
                   setScheduledTime(
@@ -251,8 +250,7 @@ export function FlowSchedulePanel({ flowName }: FlowSchedulePanelProps) {
                 value={scheduledTime.split("T")[1]?.split(":")[1] || "00"}
                 onChange={(e) => {
                   const date =
-                    scheduledTime.split("T")[0] ||
-                    new Date().toISOString().split("T")[0];
+                    scheduledTime.split("T")[0] || dateToDateInput(new Date());
                   const currentHour =
                     scheduledTime.split("T")[1]?.split(":")[0] || "00";
                   setScheduledTime(`${date}T${currentHour}:${e.target.value}`);

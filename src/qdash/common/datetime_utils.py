@@ -4,12 +4,13 @@ This module provides centralized datetime handling with consistent timezone supp
 All datetime operations should use these utilities to ensure consistency across the application.
 
 Design decisions:
-- All datetimes are stored in the configured timezone (default: Asia/Tokyo)
+- All persisted datetimes are stored in UTC
+- Configured timezone (default: Asia/Tokyo) is used only for calendar/date labels
 - pendulum is used for timezone-aware datetime operations
 - Standard datetime objects are used for MongoDB compatibility
 """
 
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from functools import lru_cache
 
 import pendulum
@@ -36,18 +37,21 @@ def get_timezone() -> str:
 
 
 def now() -> datetime:
-    """Get current datetime in the configured timezone.
+    """Get current datetime in UTC.
 
-    Returns a timezone-aware standard datetime object in the configured timezone.
+    Returns a timezone-aware standard datetime object in UTC for DB/API storage.
 
     Returns
     -------
-        datetime: Current datetime in configured timezone
+        datetime: Current datetime in UTC
 
     """
-    tz = get_timezone()
-    pdt = pendulum.now(tz)
-    # Convert to standard datetime for JSON serialization compatibility
+    return datetime.now(UTC)
+
+
+def local_now() -> datetime:
+    """Get current datetime in the configured display/calendar timezone."""
+    pdt = pendulum.now(get_timezone())
     return datetime(
         pdt.year,
         pdt.month,
@@ -90,6 +94,7 @@ def ensure_timezone(value: datetime | None) -> datetime | None:
     if value is None:
         return None
     if value.tzinfo is not None:
+        value = value.astimezone(UTC)
         # Convert pendulum DateTime to standard datetime for JSON serialization
         if isinstance(value, PendulumDateTime):
             return datetime(
@@ -124,30 +129,34 @@ def to_datetime(value: str | datetime | PendulumDateTime | None) -> datetime | N
     if value is None:
         return None
     if isinstance(value, PendulumDateTime):
-        return datetime(
-            value.year,
-            value.month,
-            value.day,
-            value.hour,
-            value.minute,
-            value.second,
-            value.microsecond,
-            tzinfo=value.tzinfo,
+        return ensure_timezone(
+            datetime(
+                value.year,
+                value.month,
+                value.day,
+                value.hour,
+                value.minute,
+                value.second,
+                value.microsecond,
+                tzinfo=value.tzinfo,
+            )
         )
     if isinstance(value, datetime):
         return ensure_timezone(value)
     if isinstance(value, str):
         parsed = pendulum.parse(value)
         if isinstance(parsed, PendulumDateTime):
-            return datetime(
-                parsed.year,
-                parsed.month,
-                parsed.day,
-                parsed.hour,
-                parsed.minute,
-                parsed.second,
-                parsed.microsecond,
-                tzinfo=parsed.tzinfo,
+            return ensure_timezone(
+                datetime(
+                    parsed.year,
+                    parsed.month,
+                    parsed.day,
+                    parsed.hour,
+                    parsed.minute,
+                    parsed.second,
+                    parsed.microsecond,
+                    tzinfo=parsed.tzinfo,
+                )
             )
         raise ValueError(f"Cannot parse datetime string: {value}")
     raise TypeError(f"Unsupported type for datetime conversion: {type(value)}")
@@ -193,7 +202,10 @@ def format_iso(dt: datetime | PendulumDateTime | None) -> str | None:
     """
     if dt is None:
         return None
-    return dt.isoformat()
+    normalized = ensure_timezone(dt)
+    if normalized is None:
+        return None
+    return normalized.isoformat()
 
 
 def calculate_elapsed_time(start: datetime, end: datetime) -> timedelta:

@@ -7,7 +7,7 @@ from typing import Any, Final, Literal
 
 import numpy as np
 from pydantic import BaseModel, Field, field_serializer, field_validator
-from qdash.common.datetime_utils import format_elapsed_time, now, parse_elapsed_time
+from qdash.common.datetime_utils import format_elapsed_time, format_iso, now, parse_elapsed_time
 from qdash.datamodel.system_info import SystemInfoModel
 
 SCHDULED = "scheduled"
@@ -254,7 +254,7 @@ class BaseTaskResultModel(BaseModel):
     @classmethod
     def _serialize_datetime(cls, v: datetime | None) -> str | None:
         """Serialize datetime to ISO format for JSON compatibility."""
-        return v.isoformat() if v else None
+        return format_iso(v)
 
     @field_serializer("elapsed_time")
     @classmethod

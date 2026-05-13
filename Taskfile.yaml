@@ -175,17 +175,18 @@ tasks:
   # =============================================================================
 
   check:
-    desc: Run all checks locally (lint, typecheck, test)
+    desc: Run all checks locally (lint, typecheck, test, UI)
     cmds:
       - task: ci-lint
       - task: ci-typecheck
       - task: ci-test
+      - task: ci-ui
 
   check-all:
-    desc: Run all checks including UI
+    desc: Run all checks including UI production build
     cmds:
       - task: check
-      - task: ci-ui
+      - task: ci-ui-build
 
   # =============================================================================
   # CI Checks (check-only, no auto-fix)

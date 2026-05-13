@@ -5,7 +5,7 @@ import { useState, useEffect, useMemo } from "react";
 import { ExternalLink, ArrowUpRight, StopCircle } from "lucide-react";
 import Link from "next/link";
 
-import { formatDateTime } from "@/lib/utils/datetime";
+import { formatDate, formatDateTime } from "@/lib/utils/datetime";
 
 import { ExecutionStats } from "./ExecutionStats";
 
@@ -147,10 +147,7 @@ export function ExecutionPageContent() {
     if (selectedDate === "latest") return executionData.data.executions;
     return executionData.data.executions.filter((exec) => {
       if (!exec.start_at) return false;
-      const execDate = new Date(exec.start_at);
-      const execDateStr = `${execDate.getFullYear()}${String(
-        execDate.getMonth() + 1,
-      ).padStart(2, "0")}${String(execDate.getDate()).padStart(2, "0")}`;
+      const execDateStr = formatDate(exec.start_at).replace(/-/g, "");
       return execDateStr === selectedDate;
     });
   }, [executionData, selectedDate]);

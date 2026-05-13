@@ -33,6 +33,7 @@ import {
 } from "@/hooks/useCopilotChat";
 import { ChatPlotlyChart } from "@/components/features/chat/ChatPlotlyChart";
 import { CodeBlock } from "@/components/features/chat/CodeBlock";
+import { formatDateTime, formatDateTimeCompact } from "@/lib/utils/datetime";
 import type { BlocksResult } from "@/hooks/useAnalysisChat";
 
 // ---------------------------------------------------------------------------
@@ -280,11 +281,11 @@ function formatTime(ts: number): string {
   const diffDays = Math.floor(diffMs / 86400000);
 
   if (diffDays === 0) {
-    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    return formatDateTime(d.toISOString(), "HH:mm");
   }
   if (diffDays === 1) return "Yesterday";
   if (diffDays < 7) return `${diffDays}d ago`;
-  return d.toLocaleDateString([], { month: "short", day: "numeric" });
+  return formatDateTimeCompact(d.toISOString()).split(" ")[0];
 }
 
 function SessionListItem({

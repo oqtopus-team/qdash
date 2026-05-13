@@ -26,7 +26,11 @@ import { useMetricsUrlState } from "@/hooks/useUrlState";
 import { getDaisySelectStyles } from "@/lib/react-select-theme";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { getTimezoneOffsetString } from "@/lib/utils/datetime";
+import {
+  dateToDateInput,
+  formatDate,
+  getTimezoneOffsetString,
+} from "@/lib/utils/datetime";
 import { PageFiltersBar } from "@/components/ui/PageFiltersBar";
 
 type MetricOption = {
@@ -572,13 +576,11 @@ export function MetricsPageContent() {
                   chipId={selectedChip}
                   onPick={(cd) => {
                     setRangeMode("absolute");
-                    setStartDate(
-                      new Date(cd.started_at).toISOString().slice(0, 10),
-                    );
+                    setStartDate(formatDate(cd.started_at));
                     setEndDate(
                       cd.ended_at
-                        ? new Date(cd.ended_at).toISOString().slice(0, 10)
-                        : new Date().toISOString().slice(0, 10),
+                        ? formatDate(cd.ended_at)
+                        : dateToDateInput(new Date()),
                     );
                   }}
                 />

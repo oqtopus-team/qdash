@@ -8,6 +8,7 @@ import { FluentEmoji } from "@/components/ui/FluentEmoji";
 
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { TaskDetailModal } from "@/components/features/chip/modals/TaskDetailModal";
+import { formatDate, formatTime } from "@/lib/utils/datetime";
 
 interface TaskWithId extends Task {
   taskId: string;
@@ -45,22 +46,11 @@ export function TaskGridView({
 
   const formatDateTime = (dateStr?: string | null) => {
     if (!dateStr) return "-";
-    const date = new Date(dateStr);
     return (
       <>
-        <div className="font-medium">
-          {date.toLocaleDateString("ja-JP", {
-            year: "numeric",
-            month: "2-digit",
-            day: "2-digit",
-          })}
-        </div>
+        <div className="font-medium">{formatDate(dateStr)}</div>
         <div className="text-xs text-base-content/60">
-          {date.toLocaleTimeString("ja-JP", {
-            hour: "2-digit",
-            minute: "2-digit",
-            second: "2-digit",
-          })}
+          {formatTime(dateStr)}
         </div>
       </>
     );
