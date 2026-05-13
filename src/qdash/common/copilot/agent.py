@@ -420,14 +420,10 @@ async def run_analysis(
         # Ollama still uses legacy schema; convert to blocks
         response = _parse_response(content)
         # Calibration-specialized models often ignore language instructions and
-        # reply in English. If the user expects a different language, translate
-        # the free-form fields via the general (frontier) model.
+        # may even answer in a third language. If the user expects a different
+        # language, translate the free-form fields as a post-processing step.
         target_lang = (config.response_language or "en").lower()
-        should_translate = (
-            target_lang != "en"
-            and general_model.provider != "ollama"
-            and general_model is not config.model
-        )
+        should_translate = target_lang != "en"
         if should_translate:
             response = await _translate_analysis_response(response, target_lang, general_model)
         return _legacy_to_blocks(response, config)

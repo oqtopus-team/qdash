@@ -2,12 +2,14 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 from typing import Any
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from qdash.common.copilot.agent import _run_chat_completions
+from qdash.common.copilot.agent import _run_chat_completions, run_analysis
 from qdash.common.copilot.agent_runtime.parsing import parse_response
 from qdash.common.copilot.config import CopilotConfig, ModelConfig
+from qdash.common.copilot.contracts import TaskAnalysisContext
 
 
 def test_parse_response_accepts_review_triage_markdown_without_json() -> None:
@@ -111,3 +113,63 @@ async def test_run_chat_completions_uses_reasoning_when_content_is_empty() -> No
     content = await _run_chat_completions(client, [{"role": "user", "content": "hi"}], config)
 
     assert content == "reasoning triage text"
+
+
+@pytest.mark.asyncio
+async def test_run_analysis_translates_ollama_output_when_target_language_mismatches() -> None:
+    client: Any = SimpleNamespace()
+    config = CopilotConfig(
+        response_language="ja",
+        model=ModelConfig(
+            provider="ollama",
+            name="gemma4:26b",
+            temperature=0,
+        ),
+        analysis_model=ModelConfig(
+            provider="ollama",
+            name="gemma4:26b",
+            temperature=0,
+        ),
+    )
+    context = TaskAnalysisContext(
+        task_knowledge_prompt="knowledge",
+        chip_id="chip",
+        qid="0",
+    )
+    translated = parse_response(
+        "\n".join(
+            [
+                "**Review triage**",
+                "- Decision: `PASS`",
+                "- Human label suggestion: `CORRECT`",
+                "- Accepted parameter(s): f01",
+                "- Needs review: none",
+                "- Primary reason: 日本語で整形しました。",
+                "- Closest knowledge case: none",
+                "- Suggested labels: none",
+                "- Recommended action: accept",
+            ]
+        )
+    )
+
+    with (
+        patch("qdash.common.copilot.agent._build_client", return_value=client),
+        patch(
+            "qdash.common.copilot.agent._run_chat_completions",
+            new=AsyncMock(
+                return_value='{"summary":"한국어 요약","assessment":"good","explanation":"검토 분류\\n결정: PASS"}'
+            ),
+        ),
+        patch(
+            "qdash.common.copilot.agent._translate_analysis_response",
+            new=AsyncMock(return_value=translated),
+        ) as translate_mock,
+    ):
+        result = await run_analysis(
+            context=context,
+            user_message="analyze",
+            config=config,
+        )
+
+    translate_mock.assert_awaited_once()
+    assert result["blocks"][0]["content"].startswith("**Review triage**")
