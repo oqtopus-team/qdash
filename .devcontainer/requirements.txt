@@ -163,8 +163,6 @@ docutils==0.22.4
     # via rich-rst
 e7awghal==0.1.5
     # via quel-ic-config
-ecdsa==0.19.2
-    # via python-jose
 exceptiongroup==1.2.2
     # via
     #   prefect
@@ -493,10 +491,6 @@ pure-eval==0.2.3
     # via stack-data
 py-key-value-aio==0.4.4
     # via pydocket
-pyasn1==0.4.8
-    # via
-    #   python-jose
-    #   rsa
 pybind11-stubgen==2.5.5
     # via quel-ic-config
 pycparser==2.22 ; implementation_name != 'PyPy'
@@ -571,7 +565,6 @@ python-dotenv==1.2.2
     # via
     #   pydantic-settings
     #   uvicorn
-python-jose==3.4.0
 python-json-logger==3.3.0
     # via pydocket
 python-multipart==0.0.28
@@ -676,8 +669,6 @@ rpds-py==0.23.1
     # via
     #   jsonschema
     #   referencing
-rsa==4.9
-    # via python-jose
 ruamel-yaml==0.18.17
     # via
     #   prefect
@@ -719,7 +710,6 @@ shellingham==1.5.4
     # via typer
 six==1.17.0
     # via
-    #   ecdsa
     #   python-dateutil
     #   rfc3339-validator
 slack-sdk==3.36.0

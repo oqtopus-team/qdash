@@ -56,8 +56,6 @@ distro==1.9.0
     # via openai
 dnspython==2.7.0
     # via pymongo
-ecdsa==0.19.2
-    # via python-jose
 exceptiongroup==1.2.2
     # via prefect-client
 fastapi==0.136.1
@@ -163,10 +161,6 @@ plotly==5.24.1
 prefect-client==3.7.0
 prometheus-client==0.25.0
     # via prefect-client
-pyasn1==0.4.8
-    # via
-    #   python-jose
-    #   rsa
 pydantic==2.13.4
     # via
     #   bunnet
@@ -204,7 +198,6 @@ python-dotenv==1.2.2
     # via
     #   pydantic-settings
     #   uvicorn
-python-jose==3.4.0
 python-json-logger==3.3.0
 python-multipart==0.0.28
 python-slugify==8.0.4
@@ -234,8 +227,6 @@ rpds-py==0.23.1
     # via
     #   jsonschema
     #   referencing
-rsa==4.9
-    # via python-jose
 ruamel-yaml==0.18.17
     # via prefect-client
 ruamel-yaml-clib==0.2.15 ; platform_python_implementation == 'CPython'
@@ -246,7 +237,6 @@ ruff==0.5.5
 scipy==1.13.1
 six==1.17.0
     # via
-    #   ecdsa
     #   python-dateutil
     #   rfc3339-validator
 smmap==5.0.2
