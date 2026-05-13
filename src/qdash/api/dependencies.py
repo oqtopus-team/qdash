@@ -18,6 +18,7 @@ from qdash.api.services.chip_service import ChipService
 from qdash.api.services.config_service import ConfigService
 from qdash.api.services.cooldown_service import CooldownService
 from qdash.api.services.cooldown_wiring_event_service import CooldownWiringEventService
+from qdash.api.services.copilot_chat_session_service import CopilotChatSessionService
 from qdash.api.services.copilot_data_service import CopilotDataService
 from qdash.api.services.cryostat_service import CryostatService
 from qdash.api.services.device_topology_service import DeviceTopologyService
@@ -330,6 +331,12 @@ def get_note_service() -> NoteService:
 def get_notification_service() -> NotificationService:
     """Get the notification service instance."""
     return NotificationService()
+
+
+@lru_cache(maxsize=1)
+def get_copilot_chat_session_service() -> CopilotChatSessionService:
+    """Get the copilot chat session service instance."""
+    return CopilotChatSessionService()
 
 
 @lru_cache(maxsize=1)
