@@ -284,7 +284,7 @@ async def issue_ai_reply_stream(
     """
 
     async def event_generator() -> AsyncGenerator[str, None]:
-        from qdash.api.lib.copilot_config import load_copilot_config
+        from qdash.common.copilot.config import load_copilot_config
 
         config = load_copilot_config()
         if not config.enabled:
@@ -328,9 +328,9 @@ async def issue_ai_reply_stream(
         await asyncio.sleep(0)
 
         # Build tool executors
-        from qdash.api.services.copilot_data_service import CopilotDataService
+        from qdash.common.copilot.runtime import CopilotRuntime
 
-        copilot_data_svc = CopilotDataService()
+        copilot_data_svc = CopilotRuntime()
         tool_executors = copilot_data_svc.build_tool_executors()
 
         # Strip @qdash mention from user message before sending to LLM
@@ -346,7 +346,7 @@ async def issue_ai_reply_stream(
         )
 
         try:
-            from qdash.api.lib.copilot_agent import run_chat
+            from qdash.common.copilot.agent import run_chat
 
             coro = partial(
                 run_chat,

@@ -27,18 +27,22 @@ export function getAiTriageBadgeState(content: string): AiTriageBadgeState | nul
 }
 
 function extractAiTriageDecision(content: string): string | null {
-  const match = content.match(/(?:^|\n)\s*(?:-?\s*)?(?:Decision|判定)\s*:\s*`?([A-Z_]+)`?/i);
+  const match = content.match(
+    /(?:^|\n)\s*(?:-?\s*)?(?:Decision|判定|決定|결정)\s*:\s*`?([A-Z_]+)`?/i,
+  );
   return match?.[1]?.toUpperCase() ?? null;
 }
 
 function hasAiTriageNeedsReview(content: string): boolean {
   const needsReviewMatch = content.match(
-    /(?:^|\n)\s*(?:-?\s*)?(?:Needs review|要レビュー)\s*:\s*([^\n]+)/i,
+    /(?:^|\n)\s*(?:-?\s*)?(?:Needs review|要レビュー|検討必要|검토 필요)\s*:\s*([^\n]+)/i,
   );
   if (!needsReviewMatch) return false;
 
   const needsReview = needsReviewMatch[1].replace(/[`*]/g, "").trim().toLowerCase();
-  return Boolean(needsReview && needsReview !== "none" && needsReview !== "なし");
+  return Boolean(
+    needsReview && needsReview !== "none" && needsReview !== "なし" && needsReview !== "없음",
+  );
 }
 
 const reviewRequiredBadge: AiTriageBadgeState = {

@@ -15,6 +15,8 @@ from qdash.api.schemas.provenance import (
     ParameterVersionResponse,
     PolicyViolationsResponse,
     ProvenanceStatsResponse,
+    RecalibrationRecommendationResponse,
+    RecentChangesResponse,
 )
 from qdash.api.services.provenance_service import ProvenanceService
 
@@ -87,6 +89,105 @@ class TestProvenanceService:
         result = service.get_entity("test_project", "param:Q0:exec-001:task-001")
 
         assert result is None
+
+    def test_get_recalibration_recommendations_groups_tasks_by_depth(self, service, mock_repos):
+        """Impact graph nodes are grouped per task and sorted by minimum depth."""
+        source_entity = MagicMock()
+        source_entity.parameter_name = "qubit_frequency"
+        source_entity.qid = "Q0"
+        mock_repos["parameter_version"].get_by_entity_id.return_value = source_entity
+        mock_repos["provenance_relation"].get_impact.return_value = {
+            "nodes": [
+                {
+                    "id": "source",
+                    "type": "entity",
+                    "metadata": {"parameter_name": "qubit_frequency", "qid": "Q0"},
+                },
+                {
+                    "id": "task-rabi",
+                    "type": "activity",
+                    "metadata": {"task_name": "CheckRabi", "qid": "Q0"},
+                },
+                {
+                    "id": "entity-rabi",
+                    "type": "entity",
+                    "metadata": {
+                        "task_name": "CheckRabi",
+                        "parameter_name": "rabi_amplitude",
+                        "qid": "Q0",
+                    },
+                },
+                {
+                    "id": "task-t1",
+                    "type": "activity",
+                    "metadata": {"task_name": "CheckT1", "qid": "Q1"},
+                },
+                {
+                    "id": "entity-t1",
+                    "type": "entity",
+                    "metadata": {
+                        "task_name": "CheckT1",
+                        "parameter_name": "t1",
+                        "qid": "Q1",
+                    },
+                },
+            ],
+            "edges": [
+                {"relation_type": "used", "source": "task-rabi", "target": "source"},
+                {"relation_type": "generated", "source": "entity-rabi", "target": "task-rabi"},
+                {"relation_type": "used", "source": "task-t1", "target": "entity-rabi"},
+                {"relation_type": "generated", "source": "entity-t1", "target": "task-t1"},
+            ],
+        }
+
+        result = service.get_recalibration_recommendations("proj", "source")
+
+        assert isinstance(result, RecalibrationRecommendationResponse)
+        assert result.source_parameter_name == "qubit_frequency"
+        assert result.source_qid == "Q0"
+        assert result.total_affected_parameters == 2
+        assert result.max_depth_reached == 4
+        assert [task.task_name for task in result.recommended_tasks] == ["CheckRabi", "CheckT1"]
+        assert [task.priority for task in result.recommended_tasks] == [1, 2]
+        assert result.recommended_tasks[0].affected_parameters == ["rabi_amplitude"]
+        assert result.recommended_tasks[0].affected_qids == ["Q0"]
+        assert "triggered by qubit_frequency (Q0) change" in result.recommended_tasks[0].reason
+        assert "e.g., rabi_amplitude (Q0) at depth=2" in result.recommended_tasks[0].reason
+
+    def test_get_recalibration_recommendations_handles_missing_source_entity(
+        self, service, mock_repos
+    ):
+        """Recommendations still build when the source entity is unavailable."""
+        mock_repos["parameter_version"].get_by_entity_id.return_value = None
+        mock_repos["provenance_relation"].get_impact.return_value = {
+            "nodes": [
+                {
+                    "id": "task-rabi",
+                    "type": "activity",
+                    "metadata": {"task_name": "CheckRabi", "qid": "Q0"},
+                },
+                {
+                    "id": "entity-rabi",
+                    "type": "entity",
+                    "metadata": {
+                        "task_name": "CheckRabi",
+                        "parameter_name": "rabi_amplitude",
+                        "qid": "Q0",
+                    },
+                },
+            ],
+            "edges": [
+                {"relation_type": "used", "source": "task-rabi", "target": "source"},
+                {"relation_type": "generated", "source": "entity-rabi", "target": "task-rabi"},
+            ],
+        }
+
+        result = service.get_recalibration_recommendations("proj", "source")
+
+        assert result.source_parameter_name == ""
+        assert result.source_qid == ""
+        assert result.recommended_tasks[0].task_name == "CheckRabi"
+        assert "triggered by" not in result.recommended_tasks[0].reason
 
     def test_get_lineage_returns_response(self, service, mock_repos):
         """Test get_lineage returns LineageResponse."""
@@ -211,6 +312,102 @@ class TestProvenanceService:
         assert isinstance(result, ExecutionComparisonResponse)
         assert result.execution_id_before == "exec-001"
         assert result.execution_id_after == "exec-002"
+        assert result.changed_parameters[0].delta == pytest.approx(0.1)
+        assert result.changed_parameters[0].delta_percent == pytest.approx(2.0)
+        assert result.added_parameters[0].delta is None
+
+    def test_compare_executions_ignores_non_numeric_delta(self, service, mock_repos):
+        """Changed parameters without numeric values keep delta fields empty."""
+        mock_repos["provenance_relation"].compare_executions.return_value = [
+            {
+                "change_type": "changed",
+                "parameter_name": "label",
+                "qid": "Q0",
+                "before": {"value": "idle"},
+                "after": {"value": "active"},
+            }
+        ]
+
+        result = service.compare_executions("test_project", "exec-001", "exec-002")
+
+        assert result.changed_parameters[0].delta is None
+        assert result.changed_parameters[0].delta_percent is None
+
+    def test_get_recent_changes_builds_delta_from_previous_version(self, service, mock_repos):
+        """Recent changes include delta metadata from the previous version."""
+        current = MagicMock()
+        current.entity_id = "param:Q0:e2:t2"
+        current.parameter_name = "t1"
+        current.qid = "Q0"
+        current.value = 8.0
+        current.unit = "us"
+        current.error = 0.2
+        current.version = 2
+        current.valid_from = datetime(2025, 1, 2, 10, 0, 0)
+        current.task_name = "CheckT1"
+        current.execution_id = "exec-002"
+
+        previous = MagicMock()
+        previous.value = 10.0
+        previous.error = 0.1
+
+        mock_repos["parameter_version"].get_recent.return_value = [current]
+        mock_repos["parameter_version"].get_version.return_value = previous
+
+        result = service.get_recent_changes("test_project", limit=5)
+
+        assert isinstance(result, RecentChangesResponse)
+        assert result.total_count == 1
+        change = result.changes[0]
+        assert change.parameter_name == "t1"
+        assert change.delta == pytest.approx(-2.0)
+        assert change.delta_percent == pytest.approx(-20.0)
+        assert change.previous_value == 10.0
+        assert change.previous_error == pytest.approx(0.1)
+
+    def test_get_recent_changes_filters_and_skips_version_one(self, service, mock_repos):
+        """Parameter filters apply before diffing, and version 1 documents are ignored."""
+        skipped = MagicMock()
+        skipped.parameter_name = "t1"
+        skipped.version = 1
+
+        filtered = MagicMock()
+        filtered.parameter_name = "qubit_frequency"
+        filtered.version = 3
+
+        kept = MagicMock()
+        kept.entity_id = "param:Q0:e3:t3"
+        kept.parameter_name = "t1"
+        kept.qid = "Q0"
+        kept.value = 4.0
+        kept.unit = "us"
+        kept.error = 0.0
+        kept.version = 3
+        kept.valid_from = datetime(2025, 1, 3, 10, 0, 0)
+        kept.task_name = "CheckT1"
+        kept.execution_id = "exec-003"
+
+        previous = MagicMock()
+        previous.value = 2.0
+        previous.error = 0.0
+
+        mock_repos["parameter_version"].get_recent.return_value = [skipped, filtered, kept]
+        mock_repos["parameter_version"].get_version.return_value = previous
+
+        result = service.get_recent_changes(
+            "test_project",
+            limit=5,
+            parameter_names=["t1"],
+        )
+
+        assert result.total_count == 1
+        assert result.changes[0].entity_id == "param:Q0:e3:t3"
+        mock_repos["parameter_version"].get_version.assert_called_once_with(
+            project_id="test_project",
+            parameter_name="t1",
+            qid="Q0",
+            version=2,
+        )
 
     def test_get_policy_violations_empty_when_no_rules(self, service, monkeypatch, mock_repos):
         """Returns empty list when policy has no rules."""
