@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from pydantic import BaseModel, Field, field_serializer
-from qdash.common.datetime_utils import now
+from qdash.common.datetime_utils import format_iso, now
 
 
 class SystemInfoModel(BaseModel):
@@ -27,7 +27,7 @@ class SystemInfoModel(BaseModel):
     @classmethod
     def _serialize_datetime(cls, v: datetime | None) -> str | None:
         """Serialize datetime to ISO format for JSON compatibility."""
-        return v.isoformat() if v else None
+        return format_iso(v)
 
     def update_time(self) -> None:
         """Update the time when the system information was updated."""

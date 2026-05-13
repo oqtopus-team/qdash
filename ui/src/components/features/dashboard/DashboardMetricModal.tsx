@@ -7,6 +7,7 @@ import Link from "next/link";
 
 import { CouplingMetricHistoryModal } from "@/components/features/metrics/CouplingMetricHistoryModal";
 import { QubitMetricHistoryModal } from "@/components/features/metrics/QubitMetricHistoryModal";
+import { formatDateTime } from "@/lib/utils/datetime";
 
 import {
   ChipNoteEditor,
@@ -99,7 +100,7 @@ export function DashboardMetricModal({
                   {chipNote?.username && (
                     <span className="font-normal text-base-content/50">
                       · {chipNote.username} ·{" "}
-                      {new Date(chipNote.updatedAt).toLocaleString()}
+                      {formatDateTime(chipNote.updatedAt)}
                     </span>
                   )}
                 </div>

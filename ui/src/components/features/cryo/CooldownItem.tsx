@@ -10,6 +10,7 @@ import {
   useUnassignChipFromCooldown,
   useUpdateCooldown,
 } from "@/client/cooldown/cooldown";
+import { formatDate, toIsoSeconds } from "@/lib/utils/datetime";
 
 import { CooldownWiringSection } from "./CooldownWiringSection";
 
@@ -34,22 +35,22 @@ interface CooldownItemProps {
 
 function isoToDateInput(iso: string | null | undefined): string {
   if (!iso) return "";
-  return new Date(iso).toISOString().slice(0, 10);
+  return formatDate(iso);
 }
 
 function dateInputToIso(value: string, endOfDay = false): string | null {
   if (!value) return null;
   const time = endOfDay ? "T23:59:59" : "T12:00:00";
-  return new Date(`${value}${time}`).toISOString();
+  return toIsoSeconds(`${value}${time.slice(0, 6)}`);
 }
 
 function formatDateRange(
   startedAt: string,
   endedAt: string | null | undefined,
 ): string {
-  const start = new Date(startedAt).toLocaleDateString();
+  const start = formatDate(startedAt);
   if (!endedAt) return `${start} → now`;
-  return `${start} → ${new Date(endedAt).toLocaleDateString()}`;
+  return `${start} → ${formatDate(endedAt)}`;
 }
 
 export const CooldownItem = forwardRef<HTMLDivElement, CooldownItemProps>(

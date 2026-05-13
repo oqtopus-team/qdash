@@ -5,7 +5,6 @@ from __future__ import annotations
 import csv
 import logging
 import secrets
-from datetime import datetime, timezone
 from io import StringIO
 from typing import TYPE_CHECKING
 
@@ -23,6 +22,7 @@ from qdash.api.schemas.admin import (
     UserListResponse,
 )
 from qdash.api.services.auth_service import generate_temporary_password
+from qdash.common.datetime_utils import now
 from qdash.datamodel.system_info import SystemInfoModel
 from qdash.datamodel.user import (
     USERNAME_PATTERN_DESCRIPTION,
@@ -300,7 +300,7 @@ class AdminService:
             user.system_role = system_role
 
         if user.system_info:
-            user.system_info.updated_at = datetime.now(timezone.utc).isoformat()
+            user.system_info.updated_at = now()
 
         user.save()
         return self._user_to_detail(user)
@@ -534,7 +534,7 @@ class AdminService:
         if existing_project:
             user.default_project_id = existing_project.project_id
             if user.system_info:
-                user.system_info.updated_at = datetime.now(timezone.utc).isoformat()
+                user.system_info.updated_at = now()
             user.save()
             logger.info(f"Linked existing project to user {username}")
             return self._user_to_detail(user)
@@ -553,7 +553,7 @@ class AdminService:
 
         user.default_project_id = project.project_id
         if user.system_info:
-            user.system_info.updated_at = datetime.now(timezone.utc).isoformat()
+            user.system_info.updated_at = now()
         user.save()
 
         return self._user_to_detail(user)

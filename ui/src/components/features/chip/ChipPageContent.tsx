@@ -6,7 +6,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import { keepPreviousData } from "@tanstack/react-query";
 import { Bot } from "lucide-react";
 
-import { formatDateTime } from "@/lib/utils/datetime";
+import { dateToDateInput, formatDateTime } from "@/lib/utils/datetime";
 
 import { CouplingGrid } from "./CouplingGrid";
 import { TaskResultGrid } from "./TaskResultGrid";
@@ -465,7 +465,7 @@ export function ChipPageContent() {
                     const target = cd.ended_at
                       ? new Date(cd.ended_at)
                       : new Date();
-                    setSelectedDate(target.toISOString().slice(0, 10));
+                    setSelectedDate(dateToDateInput(target));
                   }}
                 />
               </PageFiltersBar.Item>

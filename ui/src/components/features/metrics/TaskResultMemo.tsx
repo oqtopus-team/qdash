@@ -14,6 +14,7 @@ import {
   useUpsertTaskNote,
 } from "@/client/note/note";
 import { MarkdownContent } from "@/components/ui/MarkdownContent";
+import { formatDateTime } from "@/lib/utils/datetime";
 
 interface TaskResultMemoProps {
   taskId: string;
@@ -117,9 +118,7 @@ export function TaskResultMemo({
           {note?.updated_by && (
             <span className="text-xs font-normal text-base-content/60">
               · last edit by {note.updated_by}
-              {note.updated_at && (
-                <> · {new Date(note.updated_at).toLocaleString()}</>
-              )}
+              {note.updated_at && <> · {formatDateTime(note.updated_at)}</>}
             </span>
           )}
         </h3>

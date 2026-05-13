@@ -12,6 +12,7 @@ import {
   useUpsertCouplingMetricNote,
   useUpsertQubitMetricNote,
 } from "@/client/note/note";
+import { formatDateTime } from "@/lib/utils/datetime";
 
 export interface NoteEntry {
   targetId: string;
@@ -177,8 +178,7 @@ export function ChipNoteEditor({
                   <div className="flex items-center justify-between gap-2">
                     <span className="font-semibold">{note.metricTitle}</span>
                     <span className="text-base-content/50">
-                      {note.username} ·{" "}
-                      {new Date(note.updatedAt).toLocaleString()}
+                      {note.username} · {formatDateTime(note.updatedAt)}
                     </span>
                   </div>
                   <p className="whitespace-pre-wrap break-words text-base-content/80">

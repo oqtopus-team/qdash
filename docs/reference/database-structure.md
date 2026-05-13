@@ -41,8 +41,8 @@ Base model for common system information.
 
 ```python
 class SystemInfoModel(BaseModel):
-    created_at: str  # ISO8601 timestamp (Asia/Tokyo)
-    updated_at: str  # ISO8601 timestamp (Asia/Tokyo)
+    created_at: str  # ISO8601 timestamp (UTC)
+    updated_at: str  # ISO8601 timestamp (UTC)
 ```
 
 ---
@@ -987,10 +987,11 @@ To avoid MongoDB's 16MB document limit with large qubit counts:
 
 ---
 
-## Timezone
+## Datetime
 
-All timestamps are managed in **Asia/Tokyo (JST)** timezone.
+Persisted timestamps are managed in **UTC**. Client display converts API UTC
+timestamps to the configured timezone, currently Asia/Tokyo.
 
 - `created_at`, `updated_at`: ISO8601 format
-- `recorded_date`: YYYYMMDD format
+- `recorded_date`: YYYYMMDD format in the configured calendar timezone
 - `calibrated_at`: ISO8601 format

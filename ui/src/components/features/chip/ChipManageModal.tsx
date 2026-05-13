@@ -14,6 +14,7 @@ import {
   useGetChipDeletionImpact,
   useUpdateChip,
 } from "@/client/chip/chip";
+import { formatDateTime } from "@/lib/utils/datetime";
 
 interface ChipManageModalProps {
   chipId: string;
@@ -109,9 +110,7 @@ export function ChipManageModal({
               </div>
               <div>
                 <span className="opacity-60">Installed:</span>{" "}
-                {chip.installed_at
-                  ? new Date(chip.installed_at).toLocaleString()
-                  : "—"}
+                {formatDateTime(chip.installed_at)}
               </div>
               <div className="col-span-2">
                 <span className="opacity-60">Current cool-down:</span>{" "}
@@ -148,7 +147,7 @@ export function ChipManageModal({
                     {chip.note.updated_at && (
                       <>
                         {" · "}
-                        {new Date(chip.note.updated_at).toLocaleString()}
+                        {formatDateTime(chip.note.updated_at)}
                       </>
                     )}
                   </p>

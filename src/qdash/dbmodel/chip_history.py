@@ -6,7 +6,7 @@ from bunnet import Document
 from pydantic import ConfigDict, Field
 from pymongo import ASCENDING, DESCENDING, IndexModel
 from pymongo.errors import DuplicateKeyError
-from qdash.common.datetime_utils import now
+from qdash.common.datetime_utils import local_now
 from qdash.datamodel.system_info import SystemInfoModel
 from qdash.dbmodel.chip import ChipDocument
 
@@ -39,7 +39,7 @@ class ChipHistoryDocument(Document):
     installed_at: datetime = Field(..., description="The time when the chip was installed")
     system_info: SystemInfoModel = Field(..., description="The system information")
     recorded_date: str = Field(
-        default_factory=lambda: now().strftime("%Y%m%d"),
+        default_factory=lambda: local_now().strftime("%Y%m%d"),
         description="The date when this history record was created",
     )
 
@@ -90,7 +90,7 @@ class ChipHistoryDocument(Document):
             Yesterday's history record if it exists, None otherwise
 
         """
-        yesterday = (now() - timedelta(days=1)).strftime("%Y%m%d")
+        yesterday = (local_now() - timedelta(days=1)).strftime("%Y%m%d")
         return cls.find_one(
             {
                 "project_id": project_id,
@@ -117,7 +117,7 @@ class ChipHistoryDocument(Document):
         Raises:
             Exception: If database operation fails
         """
-        today = now().strftime("%Y%m%d")
+        today = local_now().strftime("%Y%m%d")
 
         try:
             # Try to insert a new document

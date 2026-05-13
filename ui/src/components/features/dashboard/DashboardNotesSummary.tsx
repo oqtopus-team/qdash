@@ -5,6 +5,8 @@ import { useMemo } from "react";
 import Link from "next/link";
 import { ExternalLink, StickyNote } from "lucide-react";
 
+import { formatDate } from "@/lib/utils/datetime";
+
 import type { NoteEntryWithMetric } from "./ChipNoteEditor";
 
 interface TaskNoteEntry {
@@ -121,8 +123,7 @@ export function DashboardNotesSummary({
                               {n.metricTitle}
                             </span>
                             <span className="text-base-content/50 truncate">
-                              {n.username} ·{" "}
-                              {new Date(n.updatedAt).toLocaleDateString()}
+                              {n.username} · {formatDate(n.updatedAt)}
                             </span>
                           </div>
                           <p className="text-xs text-base-content/80 line-clamp-2 break-words mt-0.5">
@@ -171,8 +172,7 @@ export function DashboardNotesSummary({
                       </span>
                     </div>
                     <span className="text-base-content/50 flex items-center gap-1 flex-shrink-0">
-                      {n.username} ·{" "}
-                      {new Date(n.updatedAt).toLocaleDateString()}
+                      {n.username} · {formatDate(n.updatedAt)}
                       <ExternalLink className="h-3 w-3" />
                     </span>
                   </div>

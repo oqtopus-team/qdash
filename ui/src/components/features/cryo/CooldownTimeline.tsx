@@ -2,6 +2,8 @@
 
 import { useMemo } from "react";
 
+import { formatDate, formatDateTime } from "@/lib/utils/datetime";
+
 interface TimelineCooldown {
   cooldown_id: string;
   started_at: string;
@@ -111,10 +113,7 @@ export function CooldownTimeline({
       const date = new Date(t);
       return {
         pct: f * 100,
-        label: date.toLocaleDateString(undefined, {
-          year: "numeric",
-          month: "short",
-        }),
+        label: formatDateTime(date.toISOString(), "yyyy MMM"),
       };
     });
 
@@ -159,10 +158,8 @@ export function CooldownTimeline({
                 top: `${top}px`,
                 height: `${BAR_HEIGHT}px`,
               }}
-              title={`${cd.cooldown_id} (${new Date(
-                cd.started_at,
-              ).toLocaleDateString()} → ${
-                cd.ended_at ? new Date(cd.ended_at).toLocaleDateString() : "now"
+              title={`${cd.cooldown_id} (${formatDate(cd.started_at)} → ${
+                cd.ended_at ? formatDate(cd.ended_at) : "now"
               })`}
             >
               <span className="text-[9px] font-bold text-white px-1 truncate block leading-[14px]">

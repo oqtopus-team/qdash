@@ -15,6 +15,7 @@ import {
   useCompareExecutions,
   useGetRecentExecutions,
 } from "@/client/provenance/provenance";
+import { formatDateTime } from "@/lib/utils/datetime";
 
 export function ExecutionComparisonPanel() {
   const [executionBefore, setExecutionBefore] = useState("");
@@ -92,13 +93,7 @@ export function ExecutionComparisonPanel() {
   }) => {
     const id = exec.execution_id;
     if (exec.valid_from) {
-      const date = new Date(exec.valid_from);
-      const timeStr = date.toLocaleString("ja-JP", {
-        month: "2-digit",
-        day: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit",
-      });
+      const timeStr = formatDateTime(exec.valid_from, "MM/dd HH:mm");
       return `${id} (${timeStr})`;
     }
     return id;
