@@ -31,7 +31,10 @@ export function CryoPageContent() {
   const { data: chipsData } = useListChips();
 
   const cryostats = cryostatsData?.data?.cryostats ?? [];
-  const cooldowns = cooldownsData?.data?.cooldowns ?? [];
+  const cooldowns = useMemo(
+    () => cooldownsData?.data?.cooldowns ?? [],
+    [cooldownsData],
+  );
   const chips = chipsData?.data?.chips ?? [];
 
   const cooldownsByCryo = useMemo(() => {

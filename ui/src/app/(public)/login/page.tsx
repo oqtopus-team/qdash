@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useCallback, useState, useEffect } from "react";
 
@@ -55,9 +56,12 @@ export default function LoginPage() {
         {/* Left side - Logo and description */}
         <div className="text-center lg:text-left max-w-lg">
           <div className="floating-logo inline-block mb-8">
-            <img
+            <Image
               src="/oqtopus_logo.svg"
               alt="Oqtopus Logo"
+              width={208}
+              height={208}
+              priority
               className="w-40 h-40 lg:w-52 lg:h-52 object-contain"
             />
           </div>

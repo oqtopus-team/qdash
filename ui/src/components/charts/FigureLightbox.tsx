@@ -156,6 +156,7 @@ export function FigureLightbox({
               justifyContent: "center",
             }}
           >
+            {/* eslint-disable-next-line @next/next/no-img-element -- pan/zoom relies on native image sizing */}
             <img
               src={src}
               alt={alt || "Figure"}

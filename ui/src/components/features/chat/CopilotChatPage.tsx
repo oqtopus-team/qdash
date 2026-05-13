@@ -160,6 +160,7 @@ function ImageSentBadge({
                 onClick={() => openPreview(src)}
                 className="flex-shrink-0 rounded-lg border border-base-300 overflow-hidden hover:border-primary/50 hover:shadow-md transition-all cursor-pointer"
               >
+                {/* eslint-disable-next-line @next/next/no-img-element -- runtime-generated API preview */}
                 <img
                   src={src}
                   alt="実験結果"
@@ -177,6 +178,7 @@ function ImageSentBadge({
               onClick={() => openPreview(src)}
               className="flex-shrink-0 rounded-lg border border-base-300 overflow-hidden hover:border-primary/50 hover:shadow-md transition-all cursor-pointer"
             >
+              {/* eslint-disable-next-line @next/next/no-img-element -- runtime-generated API preview */}
               <img
                 src={src}
                 alt={img.alt_text}
@@ -190,7 +192,10 @@ function ImageSentBadge({
       <dialog ref={modalRef} className="modal">
         <div className="modal-box max-w-3xl p-4">
           {previewSrc && (
-            <img src={previewSrc} alt="Preview" className="w-full h-auto" />
+            <>
+              {/* eslint-disable-next-line @next/next/no-img-element -- modal preview uses arbitrary remote/API dimensions */}
+              <img src={previewSrc} alt="Preview" className="w-full h-auto" />
+            </>
           )}
         </div>
         <form method="dialog" className="modal-backdrop">

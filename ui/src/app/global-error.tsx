@@ -1,5 +1,7 @@
 "use client";
 
+import Image from "next/image";
+
 export default function GlobalError({
   reset,
 }: {
@@ -12,9 +14,12 @@ export default function GlobalError({
         <div className="min-h-screen flex items-center justify-center bg-gray-100">
           <div className="text-center px-4">
             <div className="mb-6 opacity-60">
-              <img
+              <Image
                 src="/oqtopus_logo.svg"
                 alt="Oqtopus Logo"
+                width={128}
+                height={128}
+                priority
                 className="w-32 h-32 mx-auto"
               />
             </div>
