@@ -2,12 +2,8 @@
 
 from __future__ import annotations
 
-import base64
 import logging
-from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast
-
-from bunnet import SortDirection
+from typing import TYPE_CHECKING, Any
 
 from qdash.common.copilot.formatters.compact import (
     compact_number as _compact_number,
@@ -20,15 +16,14 @@ from qdash.common.copilot.formatters.compact import (
 )
 from qdash.common.copilot.services.analysis_context_service import AnalysisContextBuilder
 from qdash.common.copilot.services.chip_overview_service import ChipOverviewLoader
-from qdash.common.copilot.services.heatmap_service import (
-    ChipHeatmapLoader,
-    TaskResultHistoryRepositoryProtocol,
-)
+from qdash.common.copilot.services.data_access import CopilotDataAccess
+from qdash.common.copilot.services.heatmap_service import ChipHeatmapLoader
 from qdash.common.copilot.services.history_service import CopilotHistoryLoader
 from qdash.common.copilot.services.provenance_context_service import (
     ProvenanceLineageGraphLoader,
     ProvenanceServiceProtocol,
 )
+from qdash.common.copilot.services.support_service import CopilotSupportService
 from qdash.common.copilot.services.topology_context_service import TopologyContextLoader
 from qdash.common.copilot.tooling.registry import ToolExecutorRegistryBuilder
 from qdash.common.json_utils import sanitize_for_json
@@ -36,13 +31,6 @@ from qdash.common.json_utils import sanitize_for_json
 if TYPE_CHECKING:
     from qdash.common.copilot.analysis_models import AnalysisContextResult
     from qdash.common.copilot.settings import CopilotConfig
-    from qdash.dbmodel.calibration_note import CalibrationNoteDocument
-    from qdash.dbmodel.chip import ChipDocument
-    from qdash.dbmodel.coupling import CouplingDocument
-    from qdash.dbmodel.execution_history import ExecutionHistoryDocument
-    from qdash.dbmodel.provenance import ParameterVersionDocument
-    from qdash.dbmodel.qubit import QubitDocument
-    from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
 
 logger = logging.getLogger(__name__)
 
@@ -50,232 +38,16 @@ MAX_FIGURE_SIZE = 5 * 1024 * 1024  # 5MB
 FALLBACK_QUERY_LIMIT = 500  # Max documents to scan for manual aggregation fallback
 
 
-class _CopilotDataAccess:
-    """Centralized data-access adapter for shared Copilot helpers."""
-
-    def load_latest_installed_chip(self) -> ChipDocument | None:
-        from qdash.dbmodel.chip import ChipDocument
-
-        return ChipDocument.find_one({}, sort=[("installed_at", -1)]).run()
-
-    def load_chip(self, chip_id: str) -> ChipDocument | None:
-        from qdash.dbmodel.chip import ChipDocument
-
-        return ChipDocument.find_one({"chip_id": chip_id}).run()
-
-    def load_qubit(self, chip_id: str, qid: str) -> QubitDocument | None:
-        from qdash.dbmodel.qubit import QubitDocument
-
-        return QubitDocument.find_one({"chip_id": chip_id, "qid": qid}).run()
-
-    def load_coupling(self, chip_id: str, coupling_id: str) -> CouplingDocument | None:
-        from qdash.dbmodel.coupling import CouplingDocument
-
-        return CouplingDocument.find_one({"chip_id": chip_id, "qid": coupling_id}).run()
-
-    def load_task_result(self, task_id: str) -> TaskResultHistoryDocument | None:
-        from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
-
-        return TaskResultHistoryDocument.find_one({"task_id": task_id}).run()
-
-    def load_completed_task_history(
-        self, task_name: str, chip_id: str, qid: str, last_n: int
-    ) -> list[TaskResultHistoryDocument]:
-        from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
-
-        return cast(
-            "list[TaskResultHistoryDocument]",
-            TaskResultHistoryDocument.find(
-                {"chip_id": chip_id, "name": task_name, "qid": qid, "status": "completed"}
-            )
-            .sort([("start_at", SortDirection.DESCENDING)])
-            .limit(last_n)
-            .run(),
-        )
-
-    def load_parameter_versions(
-        self, parameter_name: str, qid: str, chip_id: str, last_n: int
-    ) -> list[ParameterVersionDocument]:
-        from qdash.dbmodel.provenance import ParameterVersionDocument
-
-        return cast(
-            "list[ParameterVersionDocument]",
-            ParameterVersionDocument.find(
-                {"parameter_name": parameter_name, "qid": qid, "chip_id": chip_id}
-            )
-            .sort([("version", SortDirection.DESCENDING)])
-            .limit(last_n)
-            .run(),
-        )
-
-    def build_provenance_service(self) -> ProvenanceServiceProtocol:
-        from qdash.repository.provenance import (
-            MongoParameterVersionRepository,
-            MongoProvenanceRelationRepository,
-        )
-
-        class _ProvenanceAdapter:
-            def __init__(self) -> None:
-                self.parameter_version_repo = MongoParameterVersionRepository()
-                self.provenance_relation_repo = MongoProvenanceRelationRepository()
-
-            def get_lineage(self, *, project_id: str, entity_id: str, max_depth: int) -> Any:
-                return self.provenance_relation_repo.get_lineage(
-                    project_id=project_id,
-                    entity_id=entity_id,
-                    max_depth=max_depth,
-                )
-
-        return cast("ProvenanceServiceProtocol", _ProvenanceAdapter())
-
-    def create_task_result_history_repository(self) -> TaskResultHistoryRepositoryProtocol:
-        from qdash.repository.task_result_history import MongoTaskResultHistoryRepository
-
-        return cast("TaskResultHistoryRepositoryProtocol", MongoTaskResultHistoryRepository())
-
-    def load_parameter_timeseries_docs(
-        self, parameter_name: str, chip_id: str, qid: str, last_n: int
-    ) -> list[TaskResultHistoryDocument]:
-        from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
-
-        return cast(
-            "list[TaskResultHistoryDocument]",
-            TaskResultHistoryDocument.find(
-                {
-                    "chip_id": chip_id,
-                    "qid": qid,
-                    "status": "completed",
-                    "output_parameter_names": parameter_name,
-                }
-            )
-            .sort([("start_at", SortDirection.DESCENDING)])
-            .limit(last_n)
-            .run(),
-        )
-
-    def load_chip_parameter_timeseries_docs(
-        self, parameter_name: str, chip_id: str, last_n: int, qids: list[str] | None
-    ) -> list[TaskResultHistoryDocument]:
-        from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
-
-        query: dict[str, Any] = {
-            "chip_id": chip_id,
-            "status": "completed",
-            "output_parameter_names": parameter_name,
-        }
-        if qids:
-            query["qid"] = {"$in": qids}
-
-        return cast(
-            "list[TaskResultHistoryDocument]",
-            TaskResultHistoryDocument.find(query)
-            .sort([("start_at", SortDirection.DESCENDING)])
-            .limit(last_n * (len(qids) if qids else 200))
-            .run(),
-        )
-
-    def load_qubits_for_chip(self, chip_id: str) -> list[QubitDocument]:
-        from qdash.dbmodel.qubit import QubitDocument
-
-        return cast("list[QubitDocument]", QubitDocument.find({"chip_id": chip_id}).run())
-
-    def load_execution_history_docs(
-        self, chip_id: str, status: str | None, tags: list[str] | None, last_n: int
-    ) -> list[ExecutionHistoryDocument]:
-        from qdash.dbmodel.execution_history import ExecutionHistoryDocument
-
-        query: dict[str, Any] = {"chip_id": chip_id}
-        if status:
-            query["status"] = status
-        if tags:
-            query["tags"] = {"$all": tags}
-
-        return cast(
-            "list[ExecutionHistoryDocument]",
-            ExecutionHistoryDocument.find(query)
-            .sort([("start_at", SortDirection.DESCENDING)])
-            .limit(last_n)
-            .run(),
-        )
-
-    def load_task_results(
-        self,
-        chip_id: str,
-        task_name: str | None,
-        qid: str | None,
-        status: str | None,
-        execution_id: str | None,
-        last_n: int,
-    ) -> list[TaskResultHistoryDocument]:
-        from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
-
-        query: dict[str, Any] = {"chip_id": chip_id}
-        if task_name:
-            query["name"] = task_name
-        if qid:
-            query["qid"] = qid
-        if status:
-            query["status"] = status
-        if execution_id:
-            query["execution_id"] = execution_id
-
-        return cast(
-            "list[TaskResultHistoryDocument]",
-            TaskResultHistoryDocument.find(query)
-            .sort([("start_at", SortDirection.DESCENDING)])
-            .limit(last_n)
-            .run(),
-        )
-
-    def load_calibration_notes(
-        self, chip_id: str, execution_id: str | None, task_id: str | None, last_n: int
-    ) -> list[CalibrationNoteDocument]:
-        from qdash.dbmodel.calibration_note import CalibrationNoteDocument
-
-        query: dict[str, Any] = {"chip_id": chip_id}
-        if execution_id:
-            query["execution_id"] = execution_id
-        if task_id:
-            query["task_id"] = task_id
-
-        return cast(
-            "list[CalibrationNoteDocument]",
-            CalibrationNoteDocument.find(query)
-            .sort([("timestamp", SortDirection.DESCENDING)])
-            .limit(last_n)
-            .run(),
-        )
-
-    def load_distinct_output_parameter_names(
-        self, chip_id: str, qid: str | None
-    ) -> list[str] | None:
-        from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
-
-        query: dict[str, Any] = {"chip_id": chip_id, "status": "completed"}
-        if qid:
-            query["qid"] = qid
-        collection = TaskResultHistoryDocument.get_motor_collection()
-        return cast("list[str] | None", collection.distinct("output_parameter_names", query))
-
-    def load_output_parameter_name_fallback_docs(
-        self, chip_id: str, qid: str | None
-    ) -> list[TaskResultHistoryDocument]:
-        from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
-
-        query: dict[str, Any] = {"chip_id": chip_id, "status": "completed"}
-        if qid:
-            query["qid"] = qid
-        return cast(
-            "list[TaskResultHistoryDocument]",
-            TaskResultHistoryDocument.find(query).limit(FALLBACK_QUERY_LIMIT).run(),
-        )
-
-
 class CopilotDataFacade:
     """Facade for loading data used by the Copilot AI assistant."""
 
-    def __init__(self, data_access: _CopilotDataAccess | None = None) -> None:
-        self._data_access = data_access or _CopilotDataAccess()
+    def __init__(self, data_access: CopilotDataAccess | None = None) -> None:
+        self._data_access = data_access or CopilotDataAccess(FALLBACK_QUERY_LIMIT)
+        self._support_service = CopilotSupportService(
+            data_access=self._data_access,
+            logger=logger,
+            max_figure_size=MAX_FIGURE_SIZE,
+        )
         self._analysis_context_builder = AnalysisContextBuilder(
             load_qubit_params=self._analysis_load_qubit_params,
             load_task_result=self._analysis_load_task_result,
@@ -370,41 +142,19 @@ class CopilotDataFacade:
 
     def load_default_chip_id(self) -> str | None:
         """Load the most recently installed chip_id from DB."""
-        doc = self._data_access.load_latest_installed_chip()
-        if doc is None:
-            return None
-        return str(doc.chip_id)
+        return self._support_service.load_default_chip_id()
 
     def load_qubit_params(self, chip_id: str, qid: str) -> dict[str, Any]:
         """Load current qubit parameters from DB."""
-        doc = self._data_access.load_qubit(chip_id, qid)
-        if doc is None:
-            return {}
-        result: dict[str, Any] = sanitize_for_json(dict(doc.data))
-        return result
+        return self._support_service.load_qubit_params(chip_id, qid)
 
     def load_task_result(self, task_id: str) -> dict[str, Any] | None:
         """Load task result from DB."""
-        doc = self._data_access.load_task_result(task_id)
-        if doc is None:
-            return None
-        return {
-            "input_parameters": doc.input_parameters or {},
-            "output_parameters": doc.output_parameters or {},
-            "run_parameters": getattr(doc, "run_parameters", {}) or {},
-            "figure_path": getattr(doc, "figure_path", []) or [],
-        }
+        return self._support_service.load_task_result(task_id)
 
     def load_figure_as_base64(self, figure_paths: list[str]) -> str | None:
         """Read the first existing PNG file from figure_paths and return base64."""
-        for fp in figure_paths:
-            p = Path(fp)
-            if p.is_file() and p.suffix.lower() == ".png":
-                if p.stat().st_size > MAX_FIGURE_SIZE:
-                    logger.warning("Figure %s exceeds 5MB size limit, skipping", fp)
-                    continue
-                return base64.b64encode(p.read_bytes()).decode("ascii")
-        return None
+        return self._support_service.load_figure_as_base64(figure_paths)
 
     def collect_expected_images(
         self,
@@ -416,16 +166,7 @@ class CopilotDataFacade:
         Returns list of (base64_data, alt_text) for images with embedded data.
         Includes both task-level images and case-level images.
         """
-        if knowledge is None:
-            return []
-        result = [(img.base64_data, img.alt_text) for img in knowledge.images if img.base64_data]
-        for case in knowledge.cases:
-            for img in case.images:
-                if img.base64_data:
-                    result.append((img.base64_data, f"[Case: {case.title}] {img.alt_text}"))
-        if max_images is not None and max_images >= 0:
-            return result[:max_images]
-        return result
+        return self._support_service.collect_expected_images(knowledge, max_images=max_images)
 
     def load_task_history(
         self, task_name: str, chip_id: str, qid: str, last_n: int = 5
@@ -657,30 +398,7 @@ class CopilotDataFacade:
         qid: str | None = None,
     ) -> dict[str, Any]:
         """List distinct output parameter names recorded for a chip."""
-        try:
-            names = self._data_access.load_distinct_output_parameter_names(chip_id, qid)
-        except (AttributeError, TypeError) as e:
-            # Fallback: manual aggregation when distinct() is unavailable
-            logger.warning("distinct() failed for output_parameter_names: %s", e)
-            docs = self._data_access.load_output_parameter_name_fallback_docs(chip_id, qid)
-            name_set: set[str] = set()
-            for doc in docs:
-                if doc.output_parameter_names:
-                    name_set.update(doc.output_parameter_names)
-            names = sorted(name_set)
-
-        if not names:
-            return {
-                "error": f"No output parameters found for chip_id={chip_id}"
-                + (f", qid={qid}" if qid else "")
-            }
-
-        return {
-            "chip_id": chip_id,
-            "qid": qid,
-            "parameter_names": sorted(names),
-            "count": len(names),
-        }
+        return self._support_service.load_available_parameters(chip_id, qid=qid)
 
     def build_analysis_context(
         self,
@@ -714,14 +432,12 @@ class CopilotDataFacade:
         task_name: str,
     ) -> dict[str, Any]:
         """Build the ``images_sent`` metadata dict for analysis responses."""
-        return {
-            "experiment_figure": bool(image_base64),
-            "experiment_figure_paths": figure_paths if image_base64 else [],
-            "expected_images": [
-                {"alt_text": alt, "index": i} for i, (_, alt) in enumerate(expected_images)
-            ],
-            "task_name": task_name,
-        }
+        return CopilotSupportService.build_images_sent_metadata(
+            image_base64=image_base64,
+            figure_paths=figure_paths,
+            expected_images=expected_images,
+            task_name=task_name,
+        )
 
     def build_tool_executors(self) -> dict[str, Any]:
         """Build the tool executor mapping for LLM function calling.
