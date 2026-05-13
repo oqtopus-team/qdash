@@ -157,19 +157,19 @@ exclude_lines = [
 api = [
     "fastapi",
     "uvicorn[standard]",
-    "gunicorn==22.0.0",
+    "gunicorn==26.0.0",
     "python-dotenv>=1.2.2",
     "pymongo==4.17.0",
     "bunnet==1.3.0",
     "passlib[bcrypt]==1.7.4",
-    "pyyaml==6.0.1",
+    "pyyaml==6.0.3",
     "python-multipart>=0.0.27",
     "numpy>=1.26.0,<2.5.0",
     "scipy",
     "matplotlib>=3.8.0",
     "networkx>=3.4.2",
     "httpx>=0.27.0",  # For deployment service communication
-    "ruff==0.5.5",  # For auto-formatting saved flows
+    "ruff==0.15.12",  # For auto-formatting saved flows
     "gitpython>=3.1.50",  # For Git operations in file router
     "pendulum>=3.1.0",  # For timestamp formatting in Git commits
     "pydantic-settings>=2.0.0",  # For Settings configuration
@@ -187,11 +187,11 @@ workflow = [
     "prefect[dask]>=3,<4",
    "pymongo==4.17.0",
     "bunnet==1.3.0",
-    "slack-sdk==3.36.0",
+    "slack-sdk==3.41.0",
     "python-dotenv>=1.2.2",
     "numpy>=1.26.0,<2.5.0",
     "matplotlib>=3.8.0,<4.0.0",
-    "pyyaml==6.0.1",
+    "pyyaml==6.0.3",
     "qubex[backend]",
     "filelock>=3.17.0",
     "gitpython>=3.1.50",
@@ -206,16 +206,16 @@ workflow = [
 
     ]
 dev = [
-    "ruff==0.5.5",
-    "pytest==8.3.2",
-    "pytest-cov==5.0.0",
-    "pytest-env==1.1.3",
-    "pytest-mypy==0.10.3",
-    "pytest-asyncio==0.24.0",
-    "pytest-mock==3.14.1",
-    "mongomock==4.1.2",
+    "ruff==0.15.12",
+    "pytest==9.0.3",
+    "pytest-cov==7.1.0",
+    "pytest-env==1.6.0",
+    "pytest-mypy==1.0.1",
+    "pytest-asyncio==1.3.0",
+    "pytest-mock==3.15.1",
+    "mongomock==4.3.0",
     "go-task-bin>=3.41.0",
-    "pyyaml==6.0.1",
+    "pyyaml==6.0.3",
     "types-pyyaml>=6.0.12.20250809",
     "types-python-dateutil>=2.9.0.20250809",
     "types-croniter>=6.0.0.20250809",
