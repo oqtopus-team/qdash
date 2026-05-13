@@ -1,7 +1,4 @@
-"""Copilot data service for QDash API.
-
-Provides data loading and tool execution for the Copilot AI assistant.
-"""
+"""Shared Copilot data loading and tool execution helpers."""
 
 from __future__ import annotations
 
@@ -9,8 +6,9 @@ import base64
 import logging
 import math
 import statistics as stats_mod
+from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from bunnet import SortDirection
 
@@ -24,6 +22,16 @@ logger = logging.getLogger(__name__)
 
 MAX_FIGURE_SIZE = 5 * 1024 * 1024  # 5MB
 FALLBACK_QUERY_LIMIT = 500  # Max documents to scan for manual aggregation fallback
+
+
+@dataclass
+class _MetricValue:
+    """Minimal metric payload for shared chart helpers."""
+
+    value: float | None = None
+    task_id: str | None = None
+    execution_id: str | None = None
+    stddev: float | None = None
 
 
 def _compact_number(value: Any) -> Any:
@@ -77,23 +85,241 @@ def _compact_output_parameters(params: dict[str, Any]) -> dict[str, Any]:
     return result
 
 
+class _CopilotDataAccess:
+    """Centralized data-access adapter for shared Copilot helpers."""
+
+    def load_latest_installed_chip(self) -> Any | None:
+        from qdash.dbmodel.chip import ChipDocument
+
+        return ChipDocument.find_one({}, sort=[("installed_at", -1)]).run()
+
+    def load_chip(self, chip_id: str) -> Any | None:
+        from qdash.dbmodel.chip import ChipDocument
+
+        return ChipDocument.find_one({"chip_id": chip_id}).run()
+
+    def load_qubit(self, chip_id: str, qid: str) -> Any | None:
+        from qdash.dbmodel.qubit import QubitDocument
+
+        return QubitDocument.find_one({"chip_id": chip_id, "qid": qid}).run()
+
+    def load_coupling(self, chip_id: str, coupling_id: str) -> Any | None:
+        from qdash.dbmodel.coupling import CouplingDocument
+
+        return CouplingDocument.find_one({"chip_id": chip_id, "qid": coupling_id}).run()
+
+    def load_task_result(self, task_id: str) -> Any | None:
+        from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
+
+        return TaskResultHistoryDocument.find_one({"task_id": task_id}).run()
+
+    def load_completed_task_history(
+        self, task_name: str, chip_id: str, qid: str, last_n: int
+    ) -> list[Any]:
+        from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
+
+        return cast(
+            "list[Any]",
+            TaskResultHistoryDocument.find(
+                {"chip_id": chip_id, "name": task_name, "qid": qid, "status": "completed"}
+            )
+            .sort([("start_at", SortDirection.DESCENDING)])
+            .limit(last_n)
+            .run(),
+        )
+
+    def load_parameter_versions(
+        self, parameter_name: str, qid: str, chip_id: str, last_n: int
+    ) -> list[Any]:
+        from qdash.dbmodel.provenance import ParameterVersionDocument
+
+        return cast(
+            "list[Any]",
+            ParameterVersionDocument.find(
+                {"parameter_name": parameter_name, "qid": qid, "chip_id": chip_id}
+            )
+            .sort([("version", SortDirection.DESCENDING)])
+            .limit(last_n)
+            .run(),
+        )
+
+    def build_provenance_service(self) -> Any:
+        from qdash.repository.provenance import (
+            MongoParameterVersionRepository,
+            MongoProvenanceRelationRepository,
+        )
+
+        class _ProvenanceAdapter:
+            def __init__(self) -> None:
+                self.parameter_version_repo = MongoParameterVersionRepository()
+                self.provenance_relation_repo = MongoProvenanceRelationRepository()
+
+            def get_lineage(self, *, project_id: str, entity_id: str, max_depth: int) -> Any:
+                return self.provenance_relation_repo.get_lineage(
+                    project_id=project_id,
+                    entity_id=entity_id,
+                    max_depth=max_depth,
+                )
+
+        return _ProvenanceAdapter()
+
+    def create_task_result_history_repository(self) -> Any:
+        from qdash.repository.task_result_history import MongoTaskResultHistoryRepository
+
+        return MongoTaskResultHistoryRepository()
+
+    def load_parameter_timeseries_docs(
+        self, parameter_name: str, chip_id: str, qid: str, last_n: int
+    ) -> list[Any]:
+        from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
+
+        return cast(
+            "list[Any]",
+            TaskResultHistoryDocument.find(
+                {
+                    "chip_id": chip_id,
+                    "qid": qid,
+                    "status": "completed",
+                    "output_parameter_names": parameter_name,
+                }
+            )
+            .sort([("start_at", SortDirection.DESCENDING)])
+            .limit(last_n)
+            .run(),
+        )
+
+    def load_chip_parameter_timeseries_docs(
+        self, parameter_name: str, chip_id: str, last_n: int, qids: list[str] | None
+    ) -> list[Any]:
+        from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
+
+        query: dict[str, Any] = {
+            "chip_id": chip_id,
+            "status": "completed",
+            "output_parameter_names": parameter_name,
+        }
+        if qids:
+            query["qid"] = {"$in": qids}
+
+        return cast(
+            "list[Any]",
+            TaskResultHistoryDocument.find(query)
+            .sort([("start_at", SortDirection.DESCENDING)])
+            .limit(last_n * (len(qids) if qids else 200))
+            .run(),
+        )
+
+    def load_qubits_for_chip(self, chip_id: str) -> list[Any]:
+        from qdash.dbmodel.qubit import QubitDocument
+
+        return cast("list[Any]", QubitDocument.find({"chip_id": chip_id}).run())
+
+    def load_execution_history_docs(
+        self, chip_id: str, status: str | None, tags: list[str] | None, last_n: int
+    ) -> list[Any]:
+        from qdash.dbmodel.execution_history import ExecutionHistoryDocument
+
+        query: dict[str, Any] = {"chip_id": chip_id}
+        if status:
+            query["status"] = status
+        if tags:
+            query["tags"] = {"$all": tags}
+
+        return cast(
+            "list[Any]",
+            ExecutionHistoryDocument.find(query)
+            .sort([("start_at", SortDirection.DESCENDING)])
+            .limit(last_n)
+            .run(),
+        )
+
+    def load_task_results(
+        self,
+        chip_id: str,
+        task_name: str | None,
+        qid: str | None,
+        status: str | None,
+        execution_id: str | None,
+        last_n: int,
+    ) -> list[Any]:
+        from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
+
+        query: dict[str, Any] = {"chip_id": chip_id}
+        if task_name:
+            query["name"] = task_name
+        if qid:
+            query["qid"] = qid
+        if status:
+            query["status"] = status
+        if execution_id:
+            query["execution_id"] = execution_id
+
+        return cast(
+            "list[Any]",
+            TaskResultHistoryDocument.find(query)
+            .sort([("start_at", SortDirection.DESCENDING)])
+            .limit(last_n)
+            .run(),
+        )
+
+    def load_calibration_notes(
+        self, chip_id: str, execution_id: str | None, task_id: str | None, last_n: int
+    ) -> list[Any]:
+        from qdash.dbmodel.calibration_note import CalibrationNoteDocument
+
+        query: dict[str, Any] = {"chip_id": chip_id}
+        if execution_id:
+            query["execution_id"] = execution_id
+        if task_id:
+            query["task_id"] = task_id
+
+        return cast(
+            "list[Any]",
+            CalibrationNoteDocument.find(query)
+            .sort([("timestamp", SortDirection.DESCENDING)])
+            .limit(last_n)
+            .run(),
+        )
+
+    def load_distinct_output_parameter_names(
+        self, chip_id: str, qid: str | None
+    ) -> list[str] | None:
+        from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
+
+        query: dict[str, Any] = {"chip_id": chip_id, "status": "completed"}
+        if qid:
+            query["qid"] = qid
+        collection = TaskResultHistoryDocument.get_motor_collection()
+        return cast("list[str] | None", collection.distinct("output_parameter_names", query))
+
+    def load_output_parameter_name_fallback_docs(self, chip_id: str, qid: str | None) -> list[Any]:
+        from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
+
+        query: dict[str, Any] = {"chip_id": chip_id, "status": "completed"}
+        if qid:
+            query["qid"] = qid
+        return cast(
+            "list[Any]",
+            TaskResultHistoryDocument.find(query).limit(FALLBACK_QUERY_LIMIT).run(),
+        )
+
+
 class CopilotDataService:
     """Service for loading data used by the Copilot AI assistant."""
 
+    def __init__(self, data_access: _CopilotDataAccess | None = None) -> None:
+        self._data_access = data_access or _CopilotDataAccess()
+
     def load_default_chip_id(self) -> str | None:
         """Load the most recently installed chip_id from DB."""
-        from qdash.dbmodel.chip import ChipDocument
-
-        doc = ChipDocument.find_one({}, sort=[("installed_at", -1)]).run()
+        doc = self._data_access.load_latest_installed_chip()
         if doc is None:
             return None
         return str(doc.chip_id)
 
     def load_qubit_params(self, chip_id: str, qid: str) -> dict[str, Any]:
         """Load current qubit parameters from DB."""
-        from qdash.dbmodel.qubit import QubitDocument
-
-        doc = QubitDocument.find_one({"chip_id": chip_id, "qid": qid}).run()
+        doc = self._data_access.load_qubit(chip_id, qid)
         if doc is None:
             return {}
         result: dict[str, Any] = sanitize_for_json(dict(doc.data))
@@ -101,9 +327,7 @@ class CopilotDataService:
 
     def load_task_result(self, task_id: str) -> dict[str, Any] | None:
         """Load task result from DB."""
-        from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
-
-        doc = TaskResultHistoryDocument.find_one({"task_id": task_id}).run()
+        doc = self._data_access.load_task_result(task_id)
         if doc is None:
             return None
         return {
@@ -149,16 +373,7 @@ class CopilotDataService:
         self, task_name: str, chip_id: str, qid: str, last_n: int = 5
     ) -> list[dict[str, Any]]:
         """Load recent completed results for the same task+qubit."""
-        from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
-
-        docs = (
-            TaskResultHistoryDocument.find(
-                {"chip_id": chip_id, "name": task_name, "qid": qid, "status": "completed"}
-            )
-            .sort([("start_at", SortDirection.DESCENDING)])
-            .limit(last_n)
-            .run()
-        )
+        docs = self._data_access.load_completed_task_history(task_name, chip_id, qid, last_n)
         results: list[dict[str, Any]] = []
         for doc in docs:
             results.append(
@@ -176,10 +391,7 @@ class CopilotDataService:
         self, chip_id: str, qid: str, param_names: list[str]
     ) -> dict[str, dict[str, Any]]:
         """Load specified parameters from neighboring qubits via topology."""
-        from qdash.dbmodel.chip import ChipDocument
-        from qdash.dbmodel.qubit import QubitDocument
-
-        chip = ChipDocument.find_one({"chip_id": chip_id}).run()
+        chip = self._data_access.load_chip(chip_id)
         if chip is None or chip.topology_id is None:
             return {}
 
@@ -203,7 +415,7 @@ class CopilotDataService:
         result: dict[str, dict[str, Any]] = {}
         for neighbor_id in sorted(neighbors):
             neighbor_qid = str(neighbor_id)
-            doc = QubitDocument.find_one({"chip_id": chip_id, "qid": neighbor_qid}).run()
+            doc = self._data_access.load_qubit(chip_id, neighbor_qid)
             if doc is None:
                 continue
             params: dict[str, Any] = {}
@@ -218,16 +430,12 @@ class CopilotDataService:
         self, chip_id: str, qid: str, param_names: list[str]
     ) -> dict[str, dict[str, Any]]:
         """Load specified parameters from couplings related to the target qubit."""
-        from qdash.dbmodel.coupling import CouplingDocument
-
         # If qid contains "-", it's already a coupling ID
         if "-" in qid:
             coupling_ids = [qid]
         else:
             # Find related couplings via topology
-            from qdash.dbmodel.chip import ChipDocument
-
-            chip = ChipDocument.find_one({"chip_id": chip_id}).run()
+            chip = self._data_access.load_chip(chip_id)
             if chip is None or chip.topology_id is None:
                 return {}
 
@@ -247,7 +455,7 @@ class CopilotDataService:
 
         result: dict[str, dict[str, Any]] = {}
         for coupling_id in coupling_ids:
-            doc = CouplingDocument.find_one({"chip_id": chip_id, "qid": coupling_id}).run()
+            doc = self._data_access.load_coupling(chip_id, coupling_id)
             if doc is None:
                 continue
             params: dict[str, Any] = {}
@@ -272,20 +480,8 @@ class CopilotDataService:
         which is indexed and allows parameter-name-based lookups
         regardless of task name.
         """
-        from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
-
-        docs = (
-            TaskResultHistoryDocument.find(
-                {
-                    "chip_id": chip_id,
-                    "qid": qid,
-                    "status": "completed",
-                    "output_parameter_names": parameter_name,
-                }
-            )
-            .sort([("start_at", SortDirection.DESCENDING)])
-            .limit(last_n)
-            .run()
+        docs = self._data_access.load_parameter_timeseries_docs(
+            parameter_name, chip_id, qid, last_n
         )
 
         results: list[dict[str, Any]] = []
@@ -331,21 +527,8 @@ class CopilotDataService:
         """
         from collections import defaultdict
 
-        from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
-
-        query: dict[str, Any] = {
-            "chip_id": chip_id,
-            "status": "completed",
-            "output_parameter_names": parameter_name,
-        }
-        if qids:
-            query["qid"] = {"$in": qids}
-
-        docs = (
-            TaskResultHistoryDocument.find(query)
-            .sort([("start_at", SortDirection.DESCENDING)])
-            .limit(last_n * (len(qids) if qids else 200))
-            .run()
+        docs = self._data_access.load_chip_parameter_timeseries_docs(
+            parameter_name, chip_id, last_n, qids
         )
 
         # Group by qid
@@ -453,9 +636,7 @@ class CopilotDataService:
         Returns statistics (always included) and a list-of-dicts ``qubits``
         table.
         """
-        from qdash.dbmodel.qubit import QubitDocument
-
-        docs = QubitDocument.find({"chip_id": chip_id}).run()
+        docs = self._data_access.load_qubits_for_chip(chip_id)
         if not docs:
             return {"error": f"No qubits found for chip_id={chip_id}"}
 
@@ -520,14 +701,10 @@ class CopilotDataService:
         param_names: list[str] | None = None,
     ) -> dict[str, Any] | list[dict[str, Any]]:
         """Load coupling parameters by coupling_id or qubit_id."""
-        from qdash.dbmodel.coupling import CouplingDocument
-
         if coupling_id:
             coupling_ids = [coupling_id]
         elif qubit_id:
-            from qdash.dbmodel.chip import ChipDocument
-
-            chip = ChipDocument.find_one({"chip_id": chip_id}).run()
+            chip = self._data_access.load_chip(chip_id)
             if chip is None or chip.topology_id is None:
                 return {"error": f"Chip {chip_id} not found or has no topology"}
 
@@ -548,7 +725,7 @@ class CopilotDataService:
 
         results: list[dict[str, Any]] = []
         for cid in coupling_ids:
-            doc = CouplingDocument.find_one({"chip_id": chip_id, "qid": cid}).run()
+            doc = self._data_access.load_coupling(chip_id, cid)
             if doc is None:
                 continue
             data = dict(doc.data)
@@ -568,20 +745,7 @@ class CopilotDataService:
         last_n: int = 10,
     ) -> list[dict[str, Any]]:
         """Load recent execution history for a chip."""
-        from qdash.dbmodel.execution_history import ExecutionHistoryDocument
-
-        query: dict[str, Any] = {"chip_id": chip_id}
-        if status:
-            query["status"] = status
-        if tags:
-            query["tags"] = {"$all": tags}
-
-        docs = (
-            ExecutionHistoryDocument.find(query)
-            .sort([("start_at", SortDirection.DESCENDING)])
-            .limit(last_n)
-            .run()
-        )
+        docs = self._data_access.load_execution_history_docs(chip_id, status, tags, last_n)
 
         results: list[dict[str, Any]] = []
         for doc in docs:
@@ -612,11 +776,9 @@ class CopilotDataService:
 
         Returns compact {qid: {param: value}} with values only (no unit/description).
         """
-        from qdash.dbmodel.qubit import QubitDocument
-
         comparison: dict[str, dict[str, Any]] = {}
         for qid in qids:
-            doc = QubitDocument.find_one({"chip_id": chip_id, "qid": qid}).run()
+            doc = self._data_access.load_qubit(chip_id, qid)
             if doc is None:
                 comparison[qid] = {"error": f"Qubit {qid} not found"}
                 continue
@@ -634,9 +796,7 @@ class CopilotDataService:
 
     def load_chip_topology(self, chip_id: str) -> dict[str, Any]:
         """Load chip topology information."""
-        from qdash.dbmodel.chip import ChipDocument
-
-        chip = ChipDocument.find_one({"chip_id": chip_id}).run()
+        chip = self._data_access.load_chip(chip_id)
         if chip is None:
             return {"error": f"Chip {chip_id} not found"}
         if chip.topology_id is None:
@@ -671,23 +831,8 @@ class CopilotDataService:
         last_n: int = 10,
     ) -> list[dict[str, Any]]:
         """Search task result history with flexible filters."""
-        from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
-
-        query: dict[str, Any] = {"chip_id": chip_id}
-        if task_name:
-            query["name"] = task_name
-        if qid:
-            query["qid"] = qid
-        if status:
-            query["status"] = status
-        if execution_id:
-            query["execution_id"] = execution_id
-
-        docs = (
-            TaskResultHistoryDocument.find(query)
-            .sort([("start_at", SortDirection.DESCENDING)])
-            .limit(last_n)
-            .run()
+        docs = self._data_access.load_task_results(
+            chip_id, task_name, qid, status, execution_id, last_n
         )
 
         results: list[dict[str, Any]] = []
@@ -721,20 +866,7 @@ class CopilotDataService:
         last_n: int = 10,
     ) -> list[dict[str, Any]]:
         """Load calibration notes for a chip."""
-        from qdash.dbmodel.calibration_note import CalibrationNoteDocument
-
-        query: dict[str, Any] = {"chip_id": chip_id}
-        if execution_id:
-            query["execution_id"] = execution_id
-        if task_id:
-            query["task_id"] = task_id
-
-        docs = (
-            CalibrationNoteDocument.find(query)
-            .sort([("timestamp", SortDirection.DESCENDING)])
-            .limit(last_n)
-            .run()
-        )
+        docs = self._data_access.load_calibration_notes(chip_id, execution_id, task_id, last_n)
 
         results: list[dict[str, Any]] = []
         for doc in docs:
@@ -753,9 +885,7 @@ class CopilotDataService:
 
     def _resolve_project_id(self, chip_id: str) -> str | None:
         """Resolve project_id from chip_id via ChipDocument."""
-        from qdash.dbmodel.chip import ChipDocument
-
-        doc = ChipDocument.find_one({"chip_id": chip_id}).run()
+        doc = self._data_access.load_chip(chip_id)
         if doc is None:
             return None
         return str(doc.project_id)
@@ -793,24 +923,7 @@ class CopilotDataService:
 
     def _get_provenance_service(self) -> Any:
         """Build a lightweight provenance adapter for lineage lookups."""
-        from qdash.repository.provenance import (
-            MongoParameterVersionRepository,
-            MongoProvenanceRelationRepository,
-        )
-
-        class _ProvenanceAdapter:
-            def __init__(self) -> None:
-                self.parameter_version_repo = MongoParameterVersionRepository()
-                self.provenance_relation_repo = MongoProvenanceRelationRepository()
-
-            def get_lineage(self, *, project_id: str, entity_id: str, max_depth: int) -> Any:
-                return self.provenance_relation_repo.get_lineage(
-                    project_id=project_id,
-                    entity_id=entity_id,
-                    max_depth=max_depth,
-                )
-
-        return _ProvenanceAdapter()
+        return self._data_access.build_provenance_service()
 
     def load_provenance_lineage_graph(
         self, entity_id: str, chip_id: str, max_depth: int = 5
@@ -984,16 +1097,7 @@ class CopilotDataService:
         self, parameter_name: str, qid: str, chip_id: str, last_n: int = 10
     ) -> list[dict[str, Any]]:
         """Load version history for a specific parameter."""
-        from qdash.dbmodel.provenance import ParameterVersionDocument
-
-        docs = (
-            ParameterVersionDocument.find(
-                {"parameter_name": parameter_name, "qid": qid, "chip_id": chip_id}
-            )
-            .sort([("version", SortDirection.DESCENDING)])
-            .limit(last_n)
-            .run()
-        )
+        docs = self._data_access.load_parameter_versions(parameter_name, qid, chip_id, last_n)
 
         results: list[dict[str, Any]] = []
         for doc in docs:
@@ -1046,8 +1150,6 @@ class CopilotDataService:
         )
         from qdash.common.metrics_config import get_qubit_metric_metadata, load_metrics_config
         from qdash.common.topology_config import load_topology
-        from qdash.dbmodel.chip import ChipDocument
-        from qdash.repository.task_result_history import MongoTaskResultHistoryRepository
 
         # Validate metric name
         meta = get_qubit_metric_metadata(metric_name)
@@ -1062,7 +1164,7 @@ class CopilotDataService:
             }
 
         # Resolve chip
-        chip = ChipDocument.find_one({"chip_id": chip_id}).run()
+        chip = self._data_access.load_chip(chip_id)
         if chip is None:
             return {"error": f"Chip '{chip_id}' not found"}
         project_id = str(chip.project_id)
@@ -1088,7 +1190,7 @@ class CopilotDataService:
             cutoff_time = now() - timedelta(hours=within_hours)
 
         # Aggregate metrics
-        repo = MongoTaskResultHistoryRepository()
+        repo = self._data_access.create_task_result_history_repository()
         valid_keys = {metric_name}
 
         try:
@@ -1130,12 +1232,9 @@ class CopilotDataService:
             logger.warning("Metrics aggregation failed for %s/%s: %s", chip_id, metric_name, e)
             return {"error": f"Failed to aggregate metrics: {e}"}
 
-        # Build MetricValue-like objects for the chart helper
-        from qdash.api.schemas.metrics import MetricValue
-
-        metric_data: dict[str, MetricValue] = {}
+        metric_data: dict[str, _MetricValue] = {}
         for entity_id, result in agg.get(metric_name, {}).items():
-            metric_data[entity_id] = MetricValue(
+            metric_data[entity_id] = _MetricValue(
                 value=result["value"],
                 task_id=result.get("task_id"),
                 execution_id=result["execution_id"],
@@ -1183,20 +1282,12 @@ class CopilotDataService:
         qid: str | None = None,
     ) -> dict[str, Any]:
         """List distinct output parameter names recorded for a chip."""
-        from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
-
-        query: dict[str, Any] = {"chip_id": chip_id, "status": "completed"}
-        if qid:
-            query["qid"] = qid
-
-        # Use MongoDB distinct on the output_parameter_names array field
-        collection = TaskResultHistoryDocument.get_motor_collection()
         try:
-            names = collection.distinct("output_parameter_names", query)
+            names = self._data_access.load_distinct_output_parameter_names(chip_id, qid)
         except (AttributeError, TypeError) as e:
             # Fallback: manual aggregation when distinct() is unavailable
             logger.warning("distinct() failed for output_parameter_names: %s", e)
-            docs = TaskResultHistoryDocument.find(query).limit(FALLBACK_QUERY_LIMIT).run()
+            docs = self._data_access.load_output_parameter_name_fallback_docs(chip_id, qid)
             name_set: set[str] = set()
             for doc in docs:
                 if doc.output_parameter_names:
