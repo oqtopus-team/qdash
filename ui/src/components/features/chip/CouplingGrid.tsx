@@ -200,7 +200,14 @@ export function CouplingGrid({
   const selectedModel = resolveAnalysisModelOption(modelOptions, selectedModelKey);
 
   // View mode state: 'pan-zoom' for DOM with pan/zoom, 'region' for region zoom
-  const [viewMode, setViewMode] = useState<"pan-zoom" | "region">("pan-zoom");
+  const [viewMode, setViewMode] = useState<"pan-zoom" | "region">("region");
+
+  // Region tab is only available for square grids; fall back to pan-zoom otherwise.
+  useEffect(() => {
+    if (!isSquareGrid && viewMode === "region") {
+      setViewMode("pan-zoom");
+    }
+  }, [isSquareGrid, viewMode]);
 
   // Region selection state
   const [regionSelectionEnabled, setRegionSelectionEnabled] = useState(false);
@@ -305,12 +312,7 @@ export function CouplingGrid({
     }, 100);
   }, []);
 
-  // Calculate initial scale for TransformWrapper (must be before early returns)
-  const MIN_FIGURE_CELL_SIZE = 60;
-  const initialScale = useMemo(() => {
-    if (viewMode !== "pan-zoom" || cellSize >= MIN_FIGURE_CELL_SIZE) return 1;
-    return Math.max(0.3, cellSize / MIN_FIGURE_CELL_SIZE);
-  }, [viewMode, cellSize]);
+  const initialScale = 1;
 
   const normalizedResultMap: Record<string, ExtendedTask[]> = {};
   if (taskResponse?.data?.result) {
@@ -335,11 +337,8 @@ export function CouplingGrid({
       </div>
     );
 
-  // In pan-zoom mode, ensure cells are large enough for figures to be readable.
   const effectiveGridSize = gridSize;
-  const baseCellSize =
-    viewMode === "pan-zoom" ? Math.max(cellSize, MIN_FIGURE_CELL_SIZE) : cellSize;
-  const displayCellSize = zoomMode === "region" ? baseCellSize * 0.8 : baseCellSize;
+  const displayCellSize = zoomMode === "region" ? cellSize * 0.8 : cellSize;
   const displayGridSize = zoomMode === "region" ? regionSize : gridSize;
   const displayGridStart = selectedRegion
     ? {
@@ -927,6 +926,15 @@ export function CouplingGrid({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <div className="tabs tabs-boxed bg-base-200 w-fit">
+            {isSquareGrid && (
+              <button
+                className={`tab gap-2 ${viewMode === "region" ? "tab-active" : ""}`}
+                onClick={() => setViewMode("region")}
+              >
+                <Maximize2 className="h-4 w-4" />
+                <span className="hidden sm:inline">Region</span>
+              </button>
+            )}
             <button
               className={`tab gap-2 ${viewMode === "pan-zoom" ? "tab-active" : ""}`}
               onClick={() => {
@@ -939,15 +947,6 @@ export function CouplingGrid({
               <Move className="h-4 w-4" />
               <span className="hidden sm:inline">DOM</span>
             </button>
-            {isSquareGrid && (
-              <button
-                className={`tab gap-2 ${viewMode === "region" ? "tab-active" : ""}`}
-                onClick={() => setViewMode("region")}
-              >
-                <Maximize2 className="h-4 w-4" />
-                <span className="hidden sm:inline">Region</span>
-              </button>
-            )}
           </div>
 
           {viewMode === "region" &&
