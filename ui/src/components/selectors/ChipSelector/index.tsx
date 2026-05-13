@@ -23,10 +23,7 @@ interface ChipSelectorProps {
 
 const PLACEHOLDER = "Select a chip";
 
-export function ChipSelector({
-  selectedChip,
-  onChipSelect,
-}: ChipSelectorProps) {
+export function ChipSelector({ selectedChip, onChipSelect }: ChipSelectorProps) {
   // Use lightweight endpoint (~0.2KB vs ~300KB with embedded data)
   const { data: chips, isLoading, isError } = useListChips();
 

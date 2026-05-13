@@ -19,10 +19,7 @@ interface DashboardChipNoteModalProps {
   onClose: () => void;
 }
 
-export function DashboardChipNoteModal({
-  chipId,
-  onClose,
-}: DashboardChipNoteModalProps) {
+export function DashboardChipNoteModal({ chipId, onClose }: DashboardChipNoteModalProps) {
   const queryClient = useQueryClient();
   const { data: chipData } = useGetChip(chipId);
   const updateChip = useUpdateChip();
@@ -85,12 +82,10 @@ export function DashboardChipNoteModal({
                   <span className="opacity-60">Size:</span> {chip.size} qubits
                 </div>
                 <div>
-                  <span className="opacity-60">Topology:</span>{" "}
-                  {chip.topology_id ?? "default"}
+                  <span className="opacity-60">Topology:</span> {chip.topology_id ?? "default"}
                 </div>
                 <div>
-                  <span className="opacity-60">Cooldown:</span>{" "}
-                  {chip.current_cooldown_id ?? "none"}
+                  <span className="opacity-60">Cooldown:</span> {chip.current_cooldown_id ?? "none"}
                 </div>
               </div>
 
@@ -108,9 +103,7 @@ export function DashboardChipNoteModal({
                 {chip.note?.updated_by && (
                   <span>
                     Last edited by {chip.note.updated_by}
-                    {chip.note.updated_at && (
-                      <> · {formatDateTime(chip.note.updated_at)}</>
-                    )}
+                    {chip.note.updated_at && <> · {formatDateTime(chip.note.updated_at)}</>}
                   </span>
                 )}
               </div>
@@ -119,11 +112,7 @@ export function DashboardChipNoteModal({
         </div>
 
         <div className="px-5 py-4 border-t border-base-300 flex justify-end gap-2">
-          <button
-            className="btn btn-sm btn-ghost"
-            onClick={onClose}
-            type="button"
-          >
+          <button className="btn btn-sm btn-ghost" onClick={onClose} type="button">
             Cancel
           </button>
           <button

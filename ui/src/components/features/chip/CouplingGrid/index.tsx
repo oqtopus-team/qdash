@@ -13,20 +13,13 @@ import {
 } from "lucide-react";
 import { useState, useMemo, useRef, useCallback, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import {
-  TransformWrapper,
-  TransformComponent,
-  useControls,
-} from "react-zoom-pan-pinch";
+import { TransformWrapper, TransformComponent, useControls } from "react-zoom-pan-pinch";
 
 import type { Task } from "@/schemas";
 
 import { getGetChipNotesSummaryQueryKey } from "@/client/note/note";
 import { useGetCopilotConfig } from "@/client/copilot/copilot";
-import {
-  downloadFiguresAsZip,
-  requestBulkAiTriageReview,
-} from "@/client/task-result/task-result";
+import { downloadFiguresAsZip, requestBulkAiTriageReview } from "@/client/task-result/task-result";
 import { AiTriageConfirmModal } from "@/components/features/chip/AiTriageConfirmModal";
 import type { AiTriageBadgeState } from "@/components/features/chip/aiTriageBadge";
 import {
@@ -46,10 +39,7 @@ import {
   resolveAnalysisModelOption,
   setStoredAnalysisModelKey,
 } from "@/lib/copilotModels";
-import {
-  getQubitGridPosition,
-  type TopologyLayoutParams,
-} from "@/lib/utils/grid-position";
+import { getQubitGridPosition, type TopologyLayoutParams } from "@/lib/utils/grid-position";
 import { calculateGridDimension } from "@/lib/utils/grid-layout";
 
 interface CouplingGridProps {
@@ -89,9 +79,7 @@ function toPathList(paths: string[] | string | null | undefined): string[] {
   return Array.isArray(paths) ? paths : [paths];
 }
 
-function isAiTriageReviewPending(
-  task: TaskWithAiTriage | null | undefined,
-): boolean {
+function isAiTriageReviewPending(task: TaskWithAiTriage | null | undefined): boolean {
   const status = task?.ai_triage?.status;
   return status === "requested" || status === "running";
 }
@@ -189,43 +177,27 @@ export function CouplingGrid({
     [hasMux, muxSize, gridSize, layoutType],
   );
 
-  const [selectedTaskInfo, setSelectedTaskInfo] =
-    useState<SelectedTaskInfo | null>(null);
+  const [selectedTaskInfo, setSelectedTaskInfo] = useState<SelectedTaskInfo | null>(null);
 
   // Download selection mode state
-  const [downloadSelectionEnabled, setDownloadSelectionEnabled] =
-    useState(false);
-  const [selectedForDownload, setSelectedForDownload] = useState<Set<string>>(
-    new Set(),
-  );
+  const [downloadSelectionEnabled, setDownloadSelectionEnabled] = useState(false);
+  const [selectedForDownload, setSelectedForDownload] = useState<Set<string>>(new Set());
   const [isDownloading, setIsDownloading] = useState(false);
   const [isDownloadConfirmOpen, setIsDownloadConfirmOpen] = useState(false);
-  const [downloadOptions, setDownloadOptions] = useState<DownloadOptions>(
-    DEFAULT_DOWNLOAD_OPTIONS,
-  );
-  const [aiTriageSelectionEnabled, setAiTriageSelectionEnabled] =
-    useState(false);
-  const [selectedForAiTriage, setSelectedForAiTriage] = useState<Set<string>>(
-    new Set(),
-  );
-  const [pendingAiTriageTaskIds, setPendingAiTriageTaskIds] = useState<
-    Set<string>
-  >(new Set());
+  const [downloadOptions, setDownloadOptions] = useState<DownloadOptions>(DEFAULT_DOWNLOAD_OPTIONS);
+  const [aiTriageSelectionEnabled, setAiTriageSelectionEnabled] = useState(false);
+  const [selectedForAiTriage, setSelectedForAiTriage] = useState<Set<string>>(new Set());
+  const [pendingAiTriageTaskIds, setPendingAiTriageTaskIds] = useState<Set<string>>(new Set());
   const [isRequestingAiTriage, setIsRequestingAiTriage] = useState(false);
   const [isAiTriageConfirmOpen, setIsAiTriageConfirmOpen] = useState(false);
   const [aiTriageStatus, setAiTriageStatus] = useState<string | null>(null);
-  const [selectedModelKey, setSelectedModelKey] = useState(
-    getStoredAnalysisModelKey,
-  );
+  const [selectedModelKey, setSelectedModelKey] = useState(getStoredAnalysisModelKey);
   const { data: copilotConfigResponse } = useGetCopilotConfig();
   const modelOptions = useMemo(
     () => buildAnalysisModelOptions(copilotConfigResponse?.data ?? null),
     [copilotConfigResponse?.data],
   );
-  const selectedModel = resolveAnalysisModelOption(
-    modelOptions,
-    selectedModelKey,
-  );
+  const selectedModel = resolveAnalysisModelOption(modelOptions, selectedModelKey);
 
   // View mode state: 'pan-zoom' for DOM with pan/zoom, 'region' for region zoom
   const [viewMode, setViewMode] = useState<"pan-zoom" | "region">("pan-zoom");
@@ -313,29 +285,25 @@ export function CouplingGrid({
   // Use grid layout hook for responsive sizing
   const displayCols = zoomMode === "region" ? regionSize : gridCols;
   const displayRows = zoomMode === "region" ? regionSize : gridRows;
-  const { containerRef, cellSize, isMobile, viewportHeight, gap, padding } =
-    useGridLayout({
-      cols: displayCols,
-      rows: displayRows,
-      reservedHeight: { mobile: 300, desktop: 350 },
-      deps: [taskResponse?.data],
-    });
+  const { containerRef, cellSize, isMobile, viewportHeight, gap, padding } = useGridLayout({
+    cols: displayCols,
+    rows: displayRows,
+    reservedHeight: { mobile: 300, desktop: 350 },
+    deps: [taskResponse?.data],
+  });
 
   // Debounced scale update to avoid excessive re-renders during zoom
-  const handleTransform = useCallback(
-    (_: unknown, state: { scale: number }) => {
-      if (lodTimeoutRef.current) {
-        clearTimeout(lodTimeoutRef.current);
-      }
-      lodTimeoutRef.current = setTimeout(() => {
-        setCurrentScale((prev) => {
-          if (prev === null) return state.scale;
-          return Math.abs(prev - state.scale) > 0.05 ? state.scale : prev;
-        });
-      }, 100);
-    },
-    [],
-  );
+  const handleTransform = useCallback((_: unknown, state: { scale: number }) => {
+    if (lodTimeoutRef.current) {
+      clearTimeout(lodTimeoutRef.current);
+    }
+    lodTimeoutRef.current = setTimeout(() => {
+      setCurrentScale((prev) => {
+        if (prev === null) return state.scale;
+        return Math.abs(prev - state.scale) > 0.05 ? state.scale : prev;
+      });
+    }, 100);
+  }, []);
 
   // Calculate initial scale for TransformWrapper (must be before early returns)
   const MIN_FIGURE_CELL_SIZE = 60;
@@ -370,11 +338,8 @@ export function CouplingGrid({
   // In pan-zoom mode, ensure cells are large enough for figures to be readable.
   const effectiveGridSize = gridSize;
   const baseCellSize =
-    viewMode === "pan-zoom"
-      ? Math.max(cellSize, MIN_FIGURE_CELL_SIZE)
-      : cellSize;
-  const displayCellSize =
-    zoomMode === "region" ? baseCellSize * 0.8 : baseCellSize;
+    viewMode === "pan-zoom" ? Math.max(cellSize, MIN_FIGURE_CELL_SIZE) : cellSize;
+  const displayCellSize = zoomMode === "region" ? baseCellSize * 0.8 : baseCellSize;
   const displayGridSize = zoomMode === "region" ? regionSize : gridSize;
   const displayGridStart = selectedRegion
     ? {
@@ -385,8 +350,7 @@ export function CouplingGrid({
 
   // LOD flags: compute from effective pixel size (cellSize * zoom scale)
   const activeScale = currentScale ?? initialScale;
-  const effectiveCellSize =
-    displayCellSize * (viewMode === "pan-zoom" ? activeScale : 1);
+  const effectiveCellSize = displayCellSize * (viewMode === "pan-zoom" ? activeScale : 1);
   const showLabels = effectiveCellSize >= 20 || zoomMode === "region";
   const showFigures = effectiveCellSize >= 50 || zoomMode === "region";
 
@@ -509,12 +473,12 @@ export function CouplingGrid({
     return hasDownloadableArtifacts(task);
   };
 
-  const availableForDownloadCount = Object.entries(
-    taskResponse?.data?.result || {},
-  ).filter(([, task]) => hasDownloadableArtifacts(task)).length;
-  const availableForAiTriageCount = Object.values(
-    taskResponse?.data?.result || {},
-  ).filter((task) => task.task_id).length;
+  const availableForDownloadCount = Object.entries(taskResponse?.data?.result || {}).filter(
+    ([, task]) => hasDownloadableArtifacts(task),
+  ).length;
+  const availableForAiTriageCount = Object.values(taskResponse?.data?.result || {}).filter(
+    (task) => task.task_id,
+  ).length;
   const copilotConfig = copilotConfigResponse?.data as
     | {
         enabled?: boolean;
@@ -532,10 +496,7 @@ export function CouplingGrid({
   };
 
   const canAiTriageCoupling = (couplingId: string): boolean =>
-    Boolean(
-      isAiTriageTaskConfigured &&
-      taskResponse?.data?.result?.[couplingId]?.task_id,
-    );
+    Boolean(isAiTriageTaskConfigured && taskResponse?.data?.result?.[couplingId]?.task_id);
 
   const toggleAiTriageSelection = (couplingId: string) => {
     setSelectedForAiTriage((prev) => {
@@ -604,18 +565,8 @@ export function CouplingGrid({
     <div
       className="relative flex-shrink-0"
       style={{
-        width: calculateGridDimension(
-          displayGridSize,
-          displayCellSize,
-          isMobile,
-          viewportHeight,
-        ),
-        height: calculateGridDimension(
-          displayGridSize,
-          displayCellSize,
-          isMobile,
-          viewportHeight,
-        ),
+        width: calculateGridDimension(displayGridSize, displayCellSize, isMobile, viewportHeight),
+        height: calculateGridDimension(displayGridSize, displayCellSize, isMobile, viewportHeight),
         maxWidth: viewMode === "pan-zoom" ? "none" : "100%",
       }}
     >
@@ -660,11 +611,7 @@ export function CouplingGrid({
                 }}
               >
                 {showLabels && (
-                  <span
-                    className={zoomMode === "full" ? "hidden md:inline" : ""}
-                  >
-                    {qid}
-                  </span>
+                  <span className={zoomMode === "full" ? "hidden md:inline" : ""}>{qid}</span>
                 )}
               </div>
             );
@@ -681,20 +628,14 @@ export function CouplingGrid({
             const muxLocalRow = Math.floor(idx / numMuxCols);
             const muxLocalCol = idx % numMuxCols;
 
-            const muxActualRow =
-              Math.floor(displayGridStart.row / muxSize) + muxLocalRow;
-            const muxActualCol =
-              Math.floor(displayGridStart.col / muxSize) + muxLocalCol;
-            const muxIndex =
-              muxActualRow * Math.floor(effectiveGridSize / muxSize) +
-              muxActualCol;
+            const muxActualRow = Math.floor(displayGridStart.row / muxSize) + muxLocalRow;
+            const muxActualCol = Math.floor(displayGridStart.col / muxSize) + muxLocalCol;
+            const muxIndex = muxActualRow * Math.floor(effectiveGridSize / muxSize) + muxActualCol;
 
             const muxCenterX =
-              (muxLocalCol * muxSize + muxSize / 2) * (displayCellSize + gap) -
-              gap / 2;
+              (muxLocalCol * muxSize + muxSize / 2) * (displayCellSize + gap) - gap / 2;
             const muxCenterY =
-              (muxLocalRow * muxSize + muxSize / 2) * (displayCellSize + gap) -
-              gap / 2;
+              (muxLocalRow * muxSize + muxSize / 2) * (displayCellSize + gap) - gap / 2;
 
             return (
               <div
@@ -741,24 +682,17 @@ export function CouplingGrid({
           const displayRow2 = row2 - displayGridStart.row;
           const displayCol2 = col2 - displayGridStart.col;
           const centerX =
-            ((displayCol1 + displayCol2) / 2) * (displayCellSize + gap) +
-            displayCellSize / 2;
+            ((displayCol1 + displayCol2) / 2) * (displayCellSize + gap) + displayCellSize / 2;
           const centerY =
-            ((displayRow1 + displayRow2) / 2) * (displayCellSize + gap) +
-            displayCellSize / 2;
+            ((displayRow1 + displayRow2) / 2) * (displayCellSize + gap) + displayCellSize / 2;
 
-          const isSelectedForDownload = selectedForDownload.has(
-            task.couplingId,
-          );
+          const isSelectedForDownload = selectedForDownload.has(task.couplingId);
           const canBeDownloaded = hasJsonFigures(task.couplingId);
-          const isSelectedForAiTriage = selectedForAiTriage.has(
-            task.couplingId,
-          );
+          const isSelectedForAiTriage = selectedForAiTriage.has(task.couplingId);
           const canBeAiTriaged = canAiTriageCoupling(task.couplingId);
           const isAiTriagePending = Boolean(
             task.task_id &&
-            (pendingAiTriageTaskIds.has(task.task_id) ||
-              isAiTriageReviewPending(task)),
+            (pendingAiTriageTaskIds.has(task.task_id) || isAiTriageReviewPending(task)),
           );
           const aiTriageBadge = task.task_id
             ? (aiTriageBadgesByTaskId?.get(task.task_id) ?? null)
@@ -778,8 +712,7 @@ export function CouplingGrid({
                 key={normKey}
                 onClick={() => {
                   if (downloadSelectionEnabled) {
-                    if (canBeDownloaded)
-                      toggleDownloadSelection(task.couplingId);
+                    if (canBeDownloaded) toggleDownloadSelection(task.couplingId);
                   } else if (aiTriageSelectionEnabled) {
                     if (canBeAiTriaged) {
                       toggleAiTriageSelection(task.couplingId);
@@ -869,13 +802,9 @@ export function CouplingGrid({
                   ? "ring-2 ring-primary ring-offset-2"
                   : ""
               } ${
-                downloadSelectionEnabled && !canBeDownloaded
-                  ? "opacity-40 cursor-not-allowed"
-                  : ""
+                downloadSelectionEnabled && !canBeDownloaded ? "opacity-40 cursor-not-allowed" : ""
               } ${
-                aiTriageSelectionEnabled && !canBeAiTriaged
-                  ? "opacity-40 cursor-not-allowed"
-                  : ""
+                aiTriageSelectionEnabled && !canBeAiTriaged ? "opacity-40 cursor-not-allowed" : ""
               }`}
             >
               {figurePath && (
@@ -939,58 +868,51 @@ export function CouplingGrid({
         })}
 
       {/* Region selection overlay - only for square grids */}
-      {zoomMode === "full" &&
-        regionSelectionEnabled &&
-        isSquareGrid &&
-        viewMode === "region" && (
-          <>
-            {Array.from({ length: numRegions * numRegions }).map((_, index) => {
-              const regionRow = Math.floor(index / numRegions);
-              const regionCol = index % numRegions;
-              const isHovered =
-                hoveredRegion?.row === regionRow &&
-                hoveredRegion?.col === regionCol;
+      {zoomMode === "full" && regionSelectionEnabled && isSquareGrid && viewMode === "region" && (
+        <>
+          {Array.from({ length: numRegions * numRegions }).map((_, index) => {
+            const regionRow = Math.floor(index / numRegions);
+            const regionCol = index % numRegions;
+            const isHovered = hoveredRegion?.row === regionRow && hoveredRegion?.col === regionCol;
 
-              const regionX = regionCol * regionSize * (displayCellSize + gap);
-              const regionY = regionRow * regionSize * (displayCellSize + gap);
-              const regionWidth = regionSize * (displayCellSize + gap) - gap;
-              const regionHeight = regionSize * (displayCellSize + gap) - gap;
+            const regionX = regionCol * regionSize * (displayCellSize + gap);
+            const regionY = regionRow * regionSize * (displayCellSize + gap);
+            const regionWidth = regionSize * (displayCellSize + gap) - gap;
+            const regionHeight = regionSize * (displayCellSize + gap) - gap;
 
-              return (
-                <button
-                  key={index}
-                  className={`absolute transition-colors duration-200 rounded-lg flex items-center justify-center z-20 ${
-                    isHovered
-                      ? "bg-primary/30 border-2 border-primary shadow-lg"
-                      : "bg-primary/5 border-2 border-primary/20 hover:border-primary/40 hover:bg-primary/10"
-                  }`}
-                  style={{
-                    top: regionY,
-                    left: regionX,
-                    width: regionWidth,
-                    height: regionHeight,
-                  }}
-                  onMouseEnter={() =>
-                    setHoveredRegion({ row: regionRow, col: regionCol })
-                  }
-                  onMouseLeave={() => setHoveredRegion(null)}
-                  onClick={() => {
-                    setSelectedRegion({
-                      row: regionRow,
-                      col: regionCol,
-                    });
-                    setZoomMode("region");
-                  }}
-                  title={`Zoom to region (${regionRow + 1}, ${regionCol + 1})`}
-                >
-                  <span className="text-xs font-bold text-white bg-black/50 px-2 py-1 rounded">
-                    {regionRow},{regionCol}
-                  </span>
-                </button>
-              );
-            })}
-          </>
-        )}
+            return (
+              <button
+                key={index}
+                className={`absolute transition-colors duration-200 rounded-lg flex items-center justify-center z-20 ${
+                  isHovered
+                    ? "bg-primary/30 border-2 border-primary shadow-lg"
+                    : "bg-primary/5 border-2 border-primary/20 hover:border-primary/40 hover:bg-primary/10"
+                }`}
+                style={{
+                  top: regionY,
+                  left: regionX,
+                  width: regionWidth,
+                  height: regionHeight,
+                }}
+                onMouseEnter={() => setHoveredRegion({ row: regionRow, col: regionCol })}
+                onMouseLeave={() => setHoveredRegion(null)}
+                onClick={() => {
+                  setSelectedRegion({
+                    row: regionRow,
+                    col: regionCol,
+                  });
+                  setZoomMode("region");
+                }}
+                title={`Zoom to region (${regionRow + 1}, ${regionCol + 1})`}
+              >
+                <span className="text-xs font-bold text-white bg-black/50 px-2 py-1 rounded">
+                  {regionRow},{regionCol}
+                </span>
+              </button>
+            );
+          })}
+        </>
+      )}
     </div>
   );
 
@@ -1045,8 +967,7 @@ export function CouplingGrid({
             {downloadSelectionEnabled ? (
               <div className="flex items-center gap-2">
                 <span className="text-sm text-base-content/70">
-                  {selectedForDownload.size} / {availableForDownloadCount}{" "}
-                  selected
+                  {selectedForDownload.size} / {availableForDownloadCount} selected
                 </span>
                 <button
                   className="btn btn-xs btn-ghost"
@@ -1088,8 +1009,7 @@ export function CouplingGrid({
             ) : aiTriageSelectionEnabled ? (
               <div className="flex items-center gap-2">
                 <span className="text-sm text-base-content/70">
-                  {selectedForAiTriage.size} / {availableForAiTriageCount}{" "}
-                  selected
+                  {selectedForAiTriage.size} / {availableForAiTriageCount} selected
                 </span>
                 <button
                   className="btn btn-xs btn-ghost"
@@ -1108,9 +1028,7 @@ export function CouplingGrid({
                 <button
                   className="btn btn-sm btn-primary gap-1"
                   onClick={() => setIsAiTriageConfirmOpen(true)}
-                  disabled={
-                    selectedForAiTriage.size === 0 || isRequestingAiTriage
-                  }
+                  disabled={selectedForAiTriage.size === 0 || isRequestingAiTriage}
                 >
                   {isRequestingAiTriage ? (
                     <span className="loading loading-spinner loading-xs" />
@@ -1141,9 +1059,7 @@ export function CouplingGrid({
                     selectAllForAiTriage();
                   }}
                   title="Request AI triage review for the displayed task results"
-                  disabled={
-                    availableForAiTriageCount === 0 || !isAiTriageTaskConfigured
-                  }
+                  disabled={availableForAiTriageCount === 0 || !isAiTriageTaskConfigured}
                 >
                   <Bot size={16} />
                   AI Triage

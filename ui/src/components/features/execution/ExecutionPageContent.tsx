@@ -59,19 +59,14 @@ function PaginationControls({
 
 export function ExecutionPageContent() {
   // URL state management
-  const { selectedChip, setSelectedChip, isInitialized } =
-    useExecutionUrlState();
+  const { selectedChip, setSelectedChip, isInitialized } = useExecutionUrlState();
 
   // Add date state for navigation
   const [selectedDate, setSelectedDate] = useState<string>("latest");
 
-  const [selectedExecutionId, setSelectedExecutionId] = useState<string | null>(
-    null,
-  );
+  const [selectedExecutionId, setSelectedExecutionId] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [expandedTaskIndex, setExpandedTaskIndex] = useState<number | null>(
-    null,
-  );
+  const [expandedTaskIndex, setExpandedTaskIndex] = useState<number | null>(null);
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
 
   // Pagination state
@@ -170,8 +165,7 @@ export function ExecutionPageContent() {
   if (isError) return <div>Error</div>;
 
   // Generate unique key for execution
-  const getExecutionKey = (execution: ExecutionResponseSummary) =>
-    `${execution.execution_id}`;
+  const getExecutionKey = (execution: ExecutionResponseSummary) => `${execution.execution_id}`;
 
   const handleCardClick = (execution: ExecutionResponseSummary) => {
     setSelectedExecutionId(execution.execution_id);
@@ -209,22 +203,15 @@ export function ExecutionPageContent() {
   };
 
   const hasMorePages =
-    !!executionData?.data?.executions &&
-    executionData.data.executions.length >= itemsPerPage;
+    !!executionData?.data?.executions && executionData.data.executions.length >= itemsPerPage;
 
   return (
     <PageContainer>
-      <PageHeader
-        title="Execution History"
-        description="Monitor workflow runs and task results"
-      />
+      <PageHeader title="Execution History" description="Monitor workflow runs and task results" />
       <PageFiltersBar className="mb-4 sm:mb-6">
         <PageFiltersBar.Group>
           <PageFiltersBar.Item>
-            <ChipSelector
-              selectedChip={selectedChip || ""}
-              onChipSelect={handleChipChange}
-            />
+            <ChipSelector selectedChip={selectedChip || ""} onChipSelect={handleChipChange} />
           </PageFiltersBar.Item>
           <PageFiltersBar.Item>
             <DateSelector
@@ -275,9 +262,7 @@ export function ExecutionPageContent() {
               )}
               <div className="relative z-10 w-full">
                 <div className="flex items-center justify-between gap-2">
-                  <h2 className="text-sm sm:text-xl font-semibold truncate">
-                    {execution.name}
-                  </h2>
+                  <h2 className="text-sm sm:text-xl font-semibold truncate">{execution.name}</h2>
                   <span
                     className={`text-xs sm:text-sm font-semibold flex-shrink-0 ${
                       execution.status === "running"
@@ -305,9 +290,7 @@ export function ExecutionPageContent() {
                 <div className="flex flex-wrap items-center gap-x-2 sm:gap-x-3 gap-y-0.5 mt-0.5 sm:mt-1 text-xs sm:text-sm text-base-content/60">
                   <span>{formatDateTime(execution.start_at)}</span>
                   {execution.elapsed_time && (
-                    <span className="hidden sm:inline">
-                      Duration: {execution.elapsed_time}
-                    </span>
+                    <span className="hidden sm:inline">Duration: {execution.elapsed_time}</span>
                   )}
                   {execution.elapsed_time && (
                     <span className="sm:hidden">{execution.elapsed_time}</span>
@@ -327,9 +310,7 @@ export function ExecutionPageContent() {
       {/* Sidebar */}
       <div
         className={`fixed right-0 top-0 w-full sm:w-3/4 lg:w-2/5 h-full bg-base-100 shadow-xl border-l overflow-y-auto p-4 sm:p-6 transition-transform duration-300 z-50 ${
-          isSidebarOpen
-            ? "transform translate-x-0"
-            : "transform translate-x-full"
+          isSidebarOpen ? "transform translate-x-0" : "transform translate-x-full"
         }`}
       >
         <button
@@ -343,11 +324,7 @@ export function ExecutionPageContent() {
           <>
             <div className="p-2 sm:p-4 bg-base-100 mb-4 sm:mb-6">
               <h2 className="text-lg sm:text-2xl font-bold pr-8">
-                {
-                  cardData.find(
-                    (exec) => getExecutionKey(exec) === selectedExecutionId,
-                  )?.name
-                }
+                {cardData.find((exec) => getExecutionKey(exec) === selectedExecutionId)?.name}
               </h2>
               <div className="mt-3 sm:mt-4 flex flex-wrap gap-2">
                 <a
@@ -361,8 +338,9 @@ export function ExecutionPageContent() {
                   const selectedExec = cardData.find(
                     (exec) => getExecutionKey(exec) === selectedExecutionId,
                   );
-                  const detailFlowRunId = executionDetailData?.data?.note
-                    ?.flow_run_id as string | undefined;
+                  const detailFlowRunId = executionDetailData?.data?.note?.flow_run_id as
+                    | string
+                    | undefined;
                   const isCancellable =
                     !!detailFlowRunId &&
                     (selectedExec?.status === "running" ||
@@ -390,17 +368,13 @@ export function ExecutionPageContent() {
               </div>
             </div>
             <div>
-              <h3 className="text-base sm:text-xl font-bold mb-3 sm:mb-4">
-                Execution Details
-              </h3>
+              <h3 className="text-base sm:text-xl font-bold mb-3 sm:mb-4">Execution Details</h3>
               {isDetailLoading && <div>Loading details...</div>}
               {isDetailError && <div>Error loading details.</div>}
               {executionDetailData &&
                 executionDetailData.data.task &&
                 executionDetailData.data.task.map((detailTask, idx) => {
-                  const taskBorderStyle = getStatusBorderStyle(
-                    detailTask.status ?? "unknown",
-                  );
+                  const taskBorderStyle = getStatusBorderStyle(detailTask.status ?? "unknown");
 
                   return (
                     <div
@@ -453,14 +427,10 @@ export function ExecutionPageContent() {
                       </div>
                       <div className="text-xs sm:text-sm text-base-content/60 mt-1">
                         <span>
-                          {detailTask.start_at
-                            ? formatDateTime(detailTask.start_at)
-                            : "N/A"}
+                          {detailTask.start_at ? formatDateTime(detailTask.start_at) : "N/A"}
                         </span>
                         {detailTask.elapsed_time && (
-                          <span className="ml-2 sm:ml-3">
-                            {detailTask.elapsed_time}
-                          </span>
+                          <span className="ml-2 sm:ml-3">{detailTask.elapsed_time}</span>
                         )}
                       </div>
                       {expandedTaskIndex === idx && (

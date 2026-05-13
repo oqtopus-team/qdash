@@ -24,9 +24,7 @@ function fileToDataUrl(file: File): Promise<string> {
 
 async function uploadAsDataUrl(file: File): Promise<string> {
   if (file.size > MAX_IMAGE_BYTES) {
-    throw new Error(
-      `Image is too large (${(file.size / 1024 / 1024).toFixed(1)} MB). Max 5 MB.`,
-    );
+    throw new Error(`Image is too large (${(file.size / 1024 / 1024).toFixed(1)} MB). Max 5 MB.`);
   }
   return fileToDataUrl(file);
 }
@@ -88,13 +86,10 @@ export function WiringBlockEditor({
       onChange={
         onChange
           ? () => {
-              const blocks = editor.document as unknown as Record<
-                string,
-                unknown
-              >[];
-              void Promise.resolve(
-                editor.blocksToMarkdownLossy(editor.document),
-              ).then((md) => onChange(blocks, md));
+              const blocks = editor.document as unknown as Record<string, unknown>[];
+              void Promise.resolve(editor.blocksToMarkdownLossy(editor.document)).then((md) =>
+                onChange(blocks, md),
+              );
             }
           : undefined
       }

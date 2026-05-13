@@ -3,16 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import {
-  ArrowLeft,
-  Brain,
-  Lock,
-  Unlock,
-  Trash2,
-  MessageSquare,
-  Pencil,
-  Bot,
-} from "lucide-react";
+import { ArrowLeft, Brain, Lock, Unlock, Trash2, MessageSquare, Pencil, Bot } from "lucide-react";
 import { useGetTaskResult } from "@/client/task/task";
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { ParametersTable } from "@/components/features/metrics/ParametersTable";
@@ -37,9 +28,7 @@ import { useExtractKnowledge } from "@/hooks/useIssueKnowledge";
 
 function getCurrentUsername(): string {
   if (typeof document === "undefined") return "";
-  const match = document.cookie
-    .split("; ")
-    .find((row) => row.startsWith("username="));
+  const match = document.cookie.split("; ").find((row) => row.startsWith("username="));
   return match ? decodeURIComponent(match.split("=")[1]) : "";
 }
 
@@ -56,10 +45,7 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 function isEdited(createdAt: string, updatedAt: string): boolean {
-  return (
-    Math.abs(new Date(updatedAt).getTime() - new Date(createdAt).getTime()) >
-    1000
-  );
+  return Math.abs(new Date(updatedAt).getTime() - new Date(createdAt).getTime()) > 1000;
 }
 
 export function IssueDetailPage({ issueId }: { issueId: string }) {
@@ -79,17 +65,18 @@ export function IssueDetailPage({ issueId }: { issueId: string }) {
   });
 
   // Fetch issue
-  const { data: issueResponse, isLoading: issueLoading } = useGetIssue(
-    issueId,
-    { query: { staleTime: 30_000 } },
-  );
+  const { data: issueResponse, isLoading: issueLoading } = useGetIssue(issueId, {
+    query: { staleTime: 30_000 },
+  });
   const issue = issueResponse?.data ?? null;
 
   // Fetch task result (only when we have a task_id)
-  const { data: taskResultResponse, isLoading: taskResultLoading } =
-    useGetTaskResult(issue?.task_id ?? "", {
+  const { data: taskResultResponse, isLoading: taskResultLoading } = useGetTaskResult(
+    issue?.task_id ?? "",
+    {
       query: { enabled: !!issue?.task_id },
-    });
+    },
+  );
   const taskResult = taskResultResponse?.data;
 
   // Fetch replies
@@ -235,10 +222,7 @@ export function IssueDetailPage({ issueId }: { issueId: string }) {
     <div className="max-w-4xl mx-auto">
       {/* Back navigation + header */}
       <div className="flex items-center gap-3 mb-6">
-        <button
-          onClick={() => router.push("/issues")}
-          className="btn btn-sm btn-ghost btn-square"
-        >
+        <button onClick={() => router.push("/issues")} className="btn btn-sm btn-ghost btn-square">
           <ArrowLeft className="h-4 w-4" />
         </button>
         <div className="flex flex-col gap-1 flex-1 min-w-0">
@@ -252,10 +236,7 @@ export function IssueDetailPage({ issueId }: { issueId: string }) {
                   onChange={(e) => setEditIssueTitle(e.target.value)}
                   placeholder="Title"
                 />
-                <button
-                  className="btn btn-sm btn-ghost"
-                  onClick={() => setEditingIssue(false)}
-                >
+                <button className="btn btn-sm btn-ghost" onClick={() => setEditingIssue(false)}>
                   Cancel
                 </button>
                 <button
@@ -290,15 +271,11 @@ export function IssueDetailPage({ issueId }: { issueId: string }) {
             <div className="flex items-center gap-1.5">
               {taskResult && (
                 <>
-                  <span className="badge badge-sm badge-neutral">
-                    {taskResult.qid}
-                  </span>
+                  <span className="badge badge-sm badge-neutral">{taskResult.qid}</span>
                   <StatusBadge status={taskResult.status} />
                 </>
               )}
-              {issue.is_closed && (
-                <span className="badge badge-sm badge-ghost">Closed</span>
-              )}
+              {issue.is_closed && <span className="badge badge-sm badge-ghost">Closed</span>}
             </div>
           </div>
         </div>
@@ -354,16 +331,11 @@ export function IssueDetailPage({ issueId }: { issueId: string }) {
           <div className="space-y-4 mb-6">
             {/* Task info */}
             <div className="bg-base-200/50 rounded-lg p-4">
-              <h2 className="text-sm font-semibold mb-2">
-                {taskResult.task_name}
-              </h2>
+              <h2 className="text-sm font-semibold mb-2">{taskResult.task_name}</h2>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
                 <div>
                   <span className="text-base-content/50">Execution ID</span>
-                  <p
-                    className="font-mono truncate"
-                    title={taskResult.execution_id}
-                  >
+                  <p className="font-mono truncate" title={taskResult.execution_id}>
                     {taskResult.execution_id}
                   </p>
                 </div>
@@ -387,19 +359,14 @@ export function IssueDetailPage({ issueId }: { issueId: string }) {
                 </div>
                 <div>
                   <span className="text-base-content/50">Elapsed</span>
-                  <p>
-                    {taskResult.elapsed_time != null
-                      ? `${taskResult.elapsed_time}s`
-                      : "-"}
-                  </p>
+                  <p>{taskResult.elapsed_time != null ? `${taskResult.elapsed_time}s` : "-"}</p>
                 </div>
               </div>
             </div>
 
             {/* Figure */}
             {((taskResult.figure_path && taskResult.figure_path.length > 0) ||
-              (taskResult.json_figure_path &&
-                taskResult.json_figure_path.length > 0)) && (
+              (taskResult.json_figure_path && taskResult.json_figure_path.length > 0)) && (
               <div className="h-[220px] overflow-x-auto flex gap-2">
                 <TaskFigure
                   taskId={issue.task_id}
@@ -410,37 +377,29 @@ export function IssueDetailPage({ issueId }: { issueId: string }) {
             )}
 
             {/* Input Parameters */}
-            {taskResult.input_parameters &&
-              Object.keys(taskResult.input_parameters).length > 0 && (
-                <ParametersTable
-                  title="Input Parameters"
-                  parameters={
-                    taskResult.input_parameters as Record<string, unknown>
-                  }
-                />
-              )}
+            {taskResult.input_parameters && Object.keys(taskResult.input_parameters).length > 0 && (
+              <ParametersTable
+                title="Input Parameters"
+                parameters={taskResult.input_parameters as Record<string, unknown>}
+              />
+            )}
 
             {/* Output Parameters */}
             {taskResult.output_parameters &&
               Object.keys(taskResult.output_parameters).length > 0 && (
                 <ParametersTable
                   title="Output Parameters"
-                  parameters={
-                    taskResult.output_parameters as Record<string, unknown>
-                  }
+                  parameters={taskResult.output_parameters as Record<string, unknown>}
                 />
               )}
 
             {/* Run Parameters */}
-            {taskResult.run_parameters &&
-              Object.keys(taskResult.run_parameters).length > 0 && (
-                <ParametersTable
-                  title="Run Parameters"
-                  parameters={
-                    taskResult.run_parameters as Record<string, unknown>
-                  }
-                />
-              )}
+            {taskResult.run_parameters && Object.keys(taskResult.run_parameters).length > 0 && (
+              <ParametersTable
+                title="Run Parameters"
+                parameters={taskResult.run_parameters as Record<string, unknown>}
+              />
+            )}
           </div>
         )
       )}
@@ -454,19 +413,13 @@ export function IssueDetailPage({ issueId }: { issueId: string }) {
       {/* Root issue */}
       <div className="bg-base-100 rounded-lg border border-base-300 p-4 mb-4">
         <div className="flex items-center gap-2 mb-2">
-          <UserAvatar
-            username={issue.username}
-            avatarKey={issue.avatar_key}
-            size={24}
-          />
+          <UserAvatar username={issue.username} avatarKey={issue.avatar_key} size={24} />
           <span className="badge badge-sm badge-neutral">{issue.username}</span>
           <span className="text-xs text-base-content/40">
             {formatRelativeTime(issue.created_at)}
           </span>
           {isEdited(issue.created_at, issue.updated_at) && (
-            <span className="text-xs text-base-content/30 italic">
-              (edited)
-            </span>
+            <span className="text-xs text-base-content/30 italic">(edited)</span>
           )}
         </div>
         {editingIssue ? (
@@ -479,10 +432,7 @@ export function IssueDetailPage({ issueId }: { issueId: string }) {
             onImageUpload={uploadImage}
           />
         ) : (
-          <MarkdownContent
-            content={issue.content}
-            className="text-sm text-base-content/80"
-          />
+          <MarkdownContent content={issue.content} className="text-sm text-base-content/80" />
         )}
       </div>
 
@@ -509,9 +459,7 @@ export function IssueDetailPage({ issueId }: { issueId: string }) {
                     {isAi ? (
                       <>
                         <QdashBotAvatar size={20} />
-                        <span className="badge badge-xs badge-primary">
-                          {reply.username}
-                        </span>
+                        <span className="badge badge-xs badge-primary">{reply.username}</span>
                       </>
                     ) : (
                       <>
@@ -520,39 +468,34 @@ export function IssueDetailPage({ issueId }: { issueId: string }) {
                           avatarKey={reply.avatar_key}
                           size={20}
                         />
-                        <span className="badge badge-xs badge-neutral">
-                          {reply.username}
-                        </span>
+                        <span className="badge badge-xs badge-neutral">{reply.username}</span>
                       </>
                     )}
                     <span className="text-xs text-base-content/40">
                       {formatRelativeTime(reply.created_at)}
                     </span>
                     {isEdited(reply.created_at, reply.updated_at) && (
-                      <span className="text-xs text-base-content/30 italic">
-                        (edited)
-                      </span>
+                      <span className="text-xs text-base-content/30 italic">(edited)</span>
                     )}
                   </div>
-                  {currentUser === reply.username &&
-                    editingReplyId !== reply.id && (
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => handleStartEditReply(reply)}
-                          className="btn btn-ghost btn-xs p-0 h-auto min-h-0 text-base-content/30 hover:text-primary"
-                          title="Edit reply"
-                        >
-                          <Pencil className="h-3 w-3" />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteReply(reply.id)}
-                          className="btn btn-ghost btn-xs p-0 h-auto min-h-0 text-base-content/30 hover:text-error"
-                          title="Delete reply"
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </button>
-                      </div>
-                    )}
+                  {currentUser === reply.username && editingReplyId !== reply.id && (
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => handleStartEditReply(reply)}
+                        className="btn btn-ghost btn-xs p-0 h-auto min-h-0 text-base-content/30 hover:text-primary"
+                        title="Edit reply"
+                      >
+                        <Pencil className="h-3 w-3" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteReply(reply.id)}
+                        className="btn btn-ghost btn-xs p-0 h-auto min-h-0 text-base-content/30 hover:text-error"
+                        title="Delete reply"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </button>
+                    </div>
+                  )}
                 </div>
                 {editingReplyId === reply.id ? (
                   <div className="space-y-2">
@@ -581,10 +524,7 @@ export function IssueDetailPage({ issueId }: { issueId: string }) {
                     </div>
                   </div>
                 ) : (
-                  <MarkdownContent
-                    content={reply.content}
-                    className="text-base-content/80"
-                  />
+                  <MarkdownContent content={reply.content} className="text-base-content/80" />
                 )}
               </div>
             );
@@ -606,9 +546,7 @@ export function IssueDetailPage({ issueId }: { issueId: string }) {
           </div>
         )}
         {/* AI error */}
-        {aiError && (
-          <div className="text-xs text-error px-2 py-1">{aiError}</div>
-        )}
+        {aiError && <div className="text-xs text-error px-2 py-1">{aiError}</div>}
       </div>
 
       {/* Reply input */}

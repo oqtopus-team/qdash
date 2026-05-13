@@ -39,18 +39,14 @@ import { formatDate } from "@/lib/utils/datetime";
 export function AdminPageContent() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<"users" | "projects" | "system">(
-    "users",
-  );
+  const [activeTab, setActiveTab] = useState<"users" | "projects" | "system">("users");
   const [selectedUser, setSelectedUser] = useState<UserListItem | null>(null);
-  const [selectedProject, setSelectedProject] =
-    useState<ProjectListItem | null>(null);
+  const [selectedProject, setSelectedProject] = useState<ProjectListItem | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isBulkImportModalOpen, setIsBulkImportModalOpen] = useState(false);
-  const [isDeleteProjectModalOpen, setIsDeleteProjectModalOpen] =
-    useState(false);
+  const [isDeleteProjectModalOpen, setIsDeleteProjectModalOpen] = useState(false);
   const [isMembersModalOpen, setIsMembersModalOpen] = useState(false);
 
   const { data: usersData, isLoading, error } = useListAllUsers();
@@ -154,9 +150,7 @@ export function AdminPageContent() {
     }
   };
 
-  const handleBulkImportUsers = async (
-    file: File,
-  ): Promise<BulkUserImportResponse> => {
+  const handleBulkImportUsers = async (file: File): Promise<BulkUserImportResponse> => {
     const response = await bulkImportMutation.mutateAsync({
       data: { file },
     });
@@ -230,9 +224,7 @@ export function AdminPageContent() {
         <div className="alert alert-error">
           <span>
             Failed to load data:{" "}
-            {(error as Error)?.message ||
-              (projectsError as Error)?.message ||
-              "Unknown error"}
+            {(error as Error)?.message || (projectsError as Error)?.message || "Unknown error"}
           </span>
         </div>
       </PageContainer>
@@ -241,10 +233,7 @@ export function AdminPageContent() {
 
   return (
     <PageContainer>
-      <PageHeader
-        title="Admin Panel"
-        description="Manage users, projects, and system settings"
-      />
+      <PageHeader title="Admin Panel" description="Manage users, projects, and system settings" />
 
       {/* Tabs */}
       <div className="tabs tabs-boxed mb-4 sm:mb-6 w-full sm:w-fit">
@@ -308,16 +297,11 @@ export function AdminPageContent() {
             {/* Mobile card view */}
             <div className="sm:hidden space-y-3">
               {usersData?.data?.users.map((userItem: UserListItem) => (
-                <div
-                  key={userItem.username}
-                  className="card bg-base-100 shadow-sm"
-                >
+                <div key={userItem.username} className="card bg-base-100 shadow-sm">
                   <div className="card-body p-4">
                     <div className="flex justify-between items-start">
                       <div>
-                        <h3 className="font-mono font-medium">
-                          {userItem.username}
-                        </h3>
+                        <h3 className="font-mono font-medium">{userItem.username}</h3>
                         <p className="text-sm text-base-content/60">
                           {userItem.display_name || "-"}
                         </p>
@@ -328,9 +312,7 @@ export function AdminPageContent() {
                       <div className="flex flex-col gap-1 items-end">
                         <span
                           className={`badge badge-sm ${
-                            userItem.system_role === "admin"
-                              ? "badge-primary"
-                              : "badge-ghost"
+                            userItem.system_role === "admin" ? "badge-primary" : "badge-ghost"
                           }`}
                         >
                           {userItem.system_role}
@@ -347,15 +329,11 @@ export function AdminPageContent() {
                     <div className="flex justify-between items-center mt-2 pt-2 border-t border-base-300">
                       <div>
                         {userItem.default_project_id ? (
-                          <span className="badge badge-success badge-sm">
-                            Default Project
-                          </span>
+                          <span className="badge badge-success badge-sm">Default Project</span>
                         ) : (
                           <button
                             className="btn btn-xs btn-primary"
-                            onClick={() =>
-                              handleCreateProject(userItem.username)
-                            }
+                            onClick={() => handleCreateProject(userItem.username)}
                             disabled={createProjectMutation.isPending}
                           >
                             {createProjectMutation.isPending ? (
@@ -410,9 +388,7 @@ export function AdminPageContent() {
                       <td>
                         <span
                           className={`badge ${
-                            userItem.system_role === "admin"
-                              ? "badge-primary"
-                              : "badge-ghost"
+                            userItem.system_role === "admin" ? "badge-primary" : "badge-ghost"
                           }`}
                         >
                           {userItem.system_role}
@@ -420,15 +396,11 @@ export function AdminPageContent() {
                       </td>
                       <td>
                         {userItem.default_project_id ? (
-                          <span className="badge badge-success badge-sm">
-                            Default Project
-                          </span>
+                          <span className="badge badge-success badge-sm">Default Project</span>
                         ) : (
                           <button
                             className="btn btn-xs btn-primary"
-                            onClick={() =>
-                              handleCreateProject(userItem.username)
-                            }
+                            onClick={() => handleCreateProject(userItem.username)}
                             disabled={createProjectMutation.isPending}
                           >
                             {createProjectMutation.isPending ? (
@@ -441,9 +413,7 @@ export function AdminPageContent() {
                       </td>
                       <td>
                         <span
-                          className={`badge ${
-                            userItem.disabled ? "badge-error" : "badge-success"
-                          }`}
+                          className={`badge ${userItem.disabled ? "badge-error" : "badge-success"}`}
                         >
                           {userItem.disabled ? "Disabled" : "Active"}
                         </span>
@@ -485,18 +455,13 @@ export function AdminPageContent() {
             {/* Mobile card view */}
             <div className="sm:hidden space-y-3">
               {projectsData?.data?.projects.map((project: ProjectListItem) => (
-                <div
-                  key={project.project_id}
-                  className="card bg-base-100 shadow-sm"
-                >
+                <div key={project.project_id} className="card bg-base-100 shadow-sm">
                   <div className="card-body p-4">
                     <div className="flex justify-between items-start">
                       <div>
                         <h3 className="font-medium">{project.name}</h3>
                         {project.description && (
-                          <p className="text-xs text-base-content/60">
-                            {project.description}
-                          </p>
+                          <p className="text-xs text-base-content/60">{project.description}</p>
                         )}
                       </div>
                       <span className="badge badge-ghost badge-sm">
@@ -504,13 +469,9 @@ export function AdminPageContent() {
                       </span>
                     </div>
                     <div className="text-sm text-base-content/60 mt-1">
-                      <span className="font-mono">
-                        {project.owner_username}
-                      </span>
+                      <span className="font-mono">{project.owner_username}</span>
                       {project.created_at && (
-                        <span className="ml-2">
-                          · {formatDate(project.created_at)}
-                        </span>
+                        <span className="ml-2">· {formatDate(project.created_at)}</span>
                       )}
                     </div>
                     <div className="flex justify-end gap-1 mt-2 pt-2 border-t border-base-300">
@@ -554,56 +515,52 @@ export function AdminPageContent() {
                   </tr>
                 </thead>
                 <tbody>
-                  {projectsData?.data?.projects.map(
-                    (project: ProjectListItem) => (
-                      <tr key={project.project_id}>
-                        <td>
-                          <div>
-                            <div className="font-medium">{project.name}</div>
-                            {project.description && (
-                              <div className="text-xs text-base-content/60">
-                                {project.description}
-                              </div>
-                            )}
-                          </div>
-                        </td>
-                        <td className="font-mono">{project.owner_username}</td>
-                        <td>
-                          <span className="badge badge-ghost">
-                            {project.member_count}
-                          </span>
-                        </td>
-                        <td className="text-sm text-base-content/60">
-                          {formatDate(project.created_at)}
-                        </td>
-                        <td>
-                          <div className="flex gap-2">
-                            <button
-                              className="btn btn-sm btn-ghost"
-                              onClick={() => handleManageMembers(project)}
+                  {projectsData?.data?.projects.map((project: ProjectListItem) => (
+                    <tr key={project.project_id}>
+                      <td>
+                        <div>
+                          <div className="font-medium">{project.name}</div>
+                          {project.description && (
+                            <div className="text-xs text-base-content/60">
+                              {project.description}
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                      <td className="font-mono">{project.owner_username}</td>
+                      <td>
+                        <span className="badge badge-ghost">{project.member_count}</span>
+                      </td>
+                      <td className="text-sm text-base-content/60">
+                        {formatDate(project.created_at)}
+                      </td>
+                      <td>
+                        <div className="flex gap-2">
+                          <button
+                            className="btn btn-sm btn-ghost"
+                            onClick={() => handleManageMembers(project)}
+                          >
+                            Members
+                          </button>
+                          {project.owner_username === user?.username ? (
+                            <span
+                              className="btn btn-sm btn-ghost btn-disabled opacity-50"
+                              title="Cannot delete your own project"
                             >
-                              Members
+                              Delete
+                            </span>
+                          ) : (
+                            <button
+                              className="btn btn-sm btn-error btn-ghost"
+                              onClick={() => handleDeleteProject(project)}
+                            >
+                              Delete
                             </button>
-                            {project.owner_username === user?.username ? (
-                              <span
-                                className="btn btn-sm btn-ghost btn-disabled opacity-50"
-                                title="Cannot delete your own project"
-                              >
-                                Delete
-                              </span>
-                            ) : (
-                              <button
-                                className="btn btn-sm btn-error btn-ghost"
-                                onClick={() => handleDeleteProject(project)}
-                              >
-                                Delete
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ),
-                  )}
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
@@ -635,8 +592,8 @@ export function AdminPageContent() {
             <h3 className="font-bold text-lg">Confirm Delete</h3>
             <p className="py-4">
               Are you sure you want to delete user{" "}
-              <span className="font-bold">{selectedUser.username}</span>? This
-              action cannot be undone.
+              <span className="font-bold">{selectedUser.username}</span>? This action cannot be
+              undone.
             </p>
             <div className="modal-action">
               <button
@@ -703,8 +660,7 @@ export function AdminPageContent() {
               <span className="font-bold">{selectedProject.name}</span>?
             </p>
             <p className="text-sm text-base-content/60">
-              This will also remove all project memberships. This action cannot
-              be undone.
+              This will also remove all project memberships. This action cannot be undone.
             </p>
             <div className="modal-action">
               <button
@@ -782,9 +738,7 @@ function EditUserModal({
 }) {
   const [organization, setOrganization] = useState(user.organization ?? "");
   const [disabled, setDisabled] = useState(user.disabled ?? false);
-  const [systemRole, setSystemRole] = useState<SystemRole>(
-    user.system_role ?? "user",
-  );
+  const [systemRole, setSystemRole] = useState<SystemRole>(user.system_role ?? "user");
   const isSelf = user.username === currentUsername;
   const [showPasswordReset, setShowPasswordReset] = useState(false);
   const [newPassword, setNewPassword] = useState("");
@@ -862,9 +816,7 @@ function EditUserModal({
               />
               <span className="label-text">
                 Account Disabled
-                {disabled && (
-                  <span className="text-error ml-2">(User cannot login)</span>
-                )}
+                {disabled && <span className="text-error ml-2">(User cannot login)</span>}
               </span>
             </label>
           </div>
@@ -975,11 +927,7 @@ function EditUserModal({
           <button className="btn" onClick={onClose}>
             Cancel
           </button>
-          <button
-            className="btn btn-primary"
-            onClick={handleSave}
-            disabled={isLoading}
-          >
+          <button className="btn btn-primary" onClick={handleSave} disabled={isLoading}>
             {isLoading ? (
               <span className="loading loading-spinner loading-sm"></span>
             ) : (
@@ -1017,9 +965,7 @@ function CreateUserModal({
   const [organization, setOrganization] = useState("");
   const [createDefaultProject, setCreateDefaultProject] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
-  const [temporaryPassword, setTemporaryPassword] = useState<string | null>(
-    null,
-  );
+  const [temporaryPassword, setTemporaryPassword] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
   const handleSave = async () => {
@@ -1051,8 +997,7 @@ function CreateUserModal({
   };
 
   const displayError =
-    localError ||
-    (error ? "Failed to create user. Username may already exist." : null);
+    localError || (error ? "Failed to create user. Username may already exist." : null);
 
   return (
     <dialog className="modal modal-open">
@@ -1069,15 +1014,13 @@ function CreateUserModal({
           <div className="space-y-4">
             <div className="alert alert-success">
               <span>
-                User <span className="font-mono font-semibold">{username}</span>{" "}
-                was created. Share this temporary password securely.
+                User <span className="font-mono font-semibold">{username}</span> was created. Share
+                this temporary password securely.
               </span>
             </div>
             <div className="form-control">
               <label className="label">
-                <span className="label-text font-medium">
-                  Temporary Password
-                </span>
+                <span className="label-text font-medium">Temporary Password</span>
               </label>
               <div className="join w-full">
                 <input
@@ -1095,8 +1038,7 @@ function CreateUserModal({
               </div>
               <label className="label">
                 <span className="label-text-alt text-base-content/60">
-                  This password is shown only once. The user must change it
-                  after signing in.
+                  This password is shown only once. The user must change it after signing in.
                 </span>
               </label>
             </div>
@@ -1152,15 +1094,12 @@ function CreateUserModal({
                   type="checkbox"
                   className="checkbox checkbox-primary mt-1"
                   checked={createDefaultProject}
-                  onChange={(event) =>
-                    setCreateDefaultProject(event.target.checked)
-                  }
+                  onChange={(event) => setCreateDefaultProject(event.target.checked)}
                 />
                 <div>
                   <div className="font-medium">Create default project</div>
                   <div className="text-sm text-base-content/60">
-                    Provision a personal project for this user and set it as
-                    their default project.
+                    Provision a personal project for this user and set it as their default project.
                   </div>
                 </div>
               </div>
@@ -1173,11 +1112,7 @@ function CreateUserModal({
             {temporaryPassword ? "Close" : "Cancel"}
           </button>
           {!temporaryPassword && (
-            <button
-              className="btn btn-primary"
-              onClick={handleSave}
-              disabled={isLoading}
-            >
+            <button className="btn btn-primary" onClick={handleSave} disabled={isLoading}>
               {isLoading ? (
                 <span className="loading loading-spinner loading-sm"></span>
               ) : (
@@ -1273,8 +1208,7 @@ function BulkImportUsersModal({
     }
   };
 
-  const displayError =
-    localError || (error ? "Failed to import users from CSV." : null);
+  const displayError = localError || (error ? "Failed to import users from CSV." : null);
 
   return (
     <dialog className="modal modal-open">
@@ -1336,9 +1270,7 @@ function BulkImportUsersModal({
                           {row.status}
                         </span>
                       </td>
-                      <td className="max-w-xs truncate">
-                        {row.message || "-"}
-                      </td>
+                      <td className="max-w-xs truncate">{row.message || "-"}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -1347,8 +1279,8 @@ function BulkImportUsersModal({
 
             <div className="alert alert-info">
               <span>
-                Download the result CSV now. Generated passwords are not stored
-                in plain text and cannot be shown again later.
+                Download the result CSV now. Generated passwords are not stored in plain text and
+                cannot be shown again later.
               </span>
             </div>
           </div>
@@ -1376,8 +1308,7 @@ function BulkImportUsersModal({
                 bob,Bob Tanaka,Operations,admin
               </pre>
               <p className="mt-2 text-xs text-base-content/60">
-                Add users to projects from the Projects tab after importing
-                accounts.
+                Add users to projects from the Projects tab after importing accounts.
               </p>
             </div>
           </div>
@@ -1388,10 +1319,7 @@ function BulkImportUsersModal({
             {result ? "Close" : "Cancel"}
           </button>
           {result ? (
-            <button
-              className="btn btn-primary"
-              onClick={() => downloadBulkImportResult(result)}
-            >
+            <button className="btn btn-primary" onClick={() => downloadBulkImportResult(result)}>
               <Download className="h-4 w-4" />
               Download CSV
             </button>
@@ -1514,10 +1442,7 @@ function MembersModal({
               <span className="text-sm text-base-content/60">
                 {members.length} member{members.length !== 1 ? "s" : ""}
               </span>
-              <button
-                className="btn btn-primary btn-sm"
-                onClick={() => setIsAddModalOpen(true)}
-              >
+              <button className="btn btn-primary btn-sm" onClick={() => setIsAddModalOpen(true)}>
                 Add Member
               </button>
             </div>
@@ -1540,9 +1465,7 @@ function MembersModal({
                       <td>{member.display_name || "-"}</td>
                       <td>{member.organization || "-"}</td>
                       <td>
-                        <span
-                          className={`badge ${getRoleBadgeClass(member.role)}`}
-                        >
+                        <span className={`badge ${getRoleBadgeClass(member.role)}`}>
                           {member.role}
                         </span>
                       </td>
@@ -1551,32 +1474,23 @@ function MembersModal({
                           <button
                             className="btn btn-sm btn-error btn-ghost"
                             onClick={() => handleRemoveMember(member.username)}
-                            disabled={
-                              isRemovingMember &&
-                              removingUsername === member.username
-                            }
+                            disabled={isRemovingMember && removingUsername === member.username}
                           >
-                            {isRemovingMember &&
-                            removingUsername === member.username ? (
+                            {isRemovingMember && removingUsername === member.username ? (
                               <span className="loading loading-spinner loading-xs"></span>
                             ) : (
                               "Remove"
                             )}
                           </button>
                         ) : (
-                          <span className="text-xs text-base-content/60">
-                            Owner
-                          </span>
+                          <span className="text-xs text-base-content/60">Owner</span>
                         )}
                       </td>
                     </tr>
                   ))}
                   {members.length === 0 && (
                     <tr>
-                      <td
-                        colSpan={5}
-                        className="text-center text-base-content/60"
-                      >
+                      <td colSpan={5} className="text-center text-base-content/60">
                         No members found
                       </td>
                     </tr>
@@ -1602,9 +1516,7 @@ function MembersModal({
               {(localError || !!addMemberError) && (
                 <div className="alert alert-error mb-4">
                   <span>
-                    {localError ||
-                      (addMemberError as Error)?.message ||
-                      "Failed to add member"}
+                    {localError || (addMemberError as Error)?.message || "Failed to add member"}
                   </span>
                 </div>
               )}
@@ -1637,9 +1549,7 @@ function MembersModal({
                   <select
                     className="select select-bordered ml-2"
                     value={selectedRole}
-                    onChange={(e) =>
-                      setSelectedRole(e.target.value as ProjectRole)
-                    }
+                    onChange={(e) => setSelectedRole(e.target.value as ProjectRole)}
                   >
                     <option value="viewer">Viewer</option>
                     <option value="editor">Editor</option>
@@ -1661,17 +1571,14 @@ function MembersModal({
                     ></path>
                   </svg>
                   <span className="text-sm">
-                    Viewers can read project data. Editors can also operate
-                    workflows, notes, chips, and calibration data.
+                    Viewers can read project data. Editors can also operate workflows, notes, chips,
+                    and calibration data.
                   </span>
                 </div>
               </div>
 
               <div className="modal-action">
-                <button
-                  className="btn"
-                  onClick={() => setIsAddModalOpen(false)}
-                >
+                <button className="btn" onClick={() => setIsAddModalOpen(false)}>
                   Cancel
                 </button>
                 <button

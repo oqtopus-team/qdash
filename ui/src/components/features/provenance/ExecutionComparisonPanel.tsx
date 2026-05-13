@@ -2,19 +2,9 @@
 
 import { useState, useEffect, useMemo } from "react";
 
-import {
-  GitCompare,
-  Plus,
-  Minus,
-  ArrowRight,
-  TrendingUp,
-  TrendingDown,
-} from "lucide-react";
+import { GitCompare, Plus, Minus, ArrowRight, TrendingUp, TrendingDown } from "lucide-react";
 
-import {
-  useCompareExecutions,
-  useGetRecentExecutions,
-} from "@/client/provenance/provenance";
+import { useCompareExecutions, useGetRecentExecutions } from "@/client/provenance/provenance";
 import { formatDateTime } from "@/lib/utils/datetime";
 
 export function ExecutionComparisonPanel() {
@@ -24,8 +14,9 @@ export function ExecutionComparisonPanel() {
   const [initialized, setInitialized] = useState(false);
 
   // Fetch unique execution IDs directly using MongoDB aggregation
-  const { data: executionsResponse, isLoading: isLoadingExecutionList } =
-    useGetRecentExecutions({ limit: 20 });
+  const { data: executionsResponse, isLoading: isLoadingExecutionList } = useGetRecentExecutions({
+    limit: 20,
+  });
 
   // Memoize the list of executions to prevent useEffect dependency issues
   const recentExecutions = useMemo(
@@ -87,10 +78,7 @@ export function ExecutionComparisonPanel() {
   };
 
   // Format execution option label with ID and timestamp
-  const formatExecutionLabel = (exec: {
-    execution_id: string;
-    valid_from?: string | null;
-  }) => {
+  const formatExecutionLabel = (exec: { execution_id: string; valid_from?: string | null }) => {
     const id = exec.execution_id;
     if (exec.valid_from) {
       const timeStr = formatDateTime(exec.valid_from, "MM/dd HH:mm");
@@ -106,15 +94,12 @@ export function ExecutionComparisonPanel() {
         <div className="card-body">
           <h3 className="card-title text-lg">Compare Executions</h3>
           <p className="text-sm text-base-content/70 mb-4">
-            Compare parameter values between two calibration executions to see
-            what changed.
+            Compare parameter values between two calibration executions to see what changed.
           </p>
           {isLoadingExecutionList ? (
             <div className="flex items-center gap-2 py-4">
               <span className="loading loading-spinner loading-sm"></span>
-              <span className="text-sm text-base-content/60">
-                Loading executions...
-              </span>
+              <span className="text-sm text-base-content/60">Loading executions...</span>
             </div>
           ) : recentExecutions.length < 2 ? (
             <div className="text-sm text-base-content/60 py-4">
@@ -209,18 +194,14 @@ export function ExecutionComparisonPanel() {
                 <Plus className="h-6 w-6" />
               </div>
               <div className="stat-title">Added</div>
-              <div className="stat-value text-success text-2xl">
-                {data.added_parameters.length}
-              </div>
+              <div className="stat-value text-success text-2xl">{data.added_parameters.length}</div>
             </div>
             <div className="stat bg-error/10 rounded-lg border border-error/20">
               <div className="stat-figure text-error">
                 <Minus className="h-6 w-6" />
               </div>
               <div className="stat-title">Removed</div>
-              <div className="stat-value text-error text-2xl">
-                {data.removed_parameters.length}
-              </div>
+              <div className="stat-value text-error text-2xl">{data.removed_parameters.length}</div>
             </div>
             <div className="stat bg-warning/10 rounded-lg border border-warning/20">
               <div className="stat-figure text-warning">
@@ -259,34 +240,27 @@ export function ExecutionComparisonPanel() {
                     <tbody>
                       {data.changed_parameters.map((param, index) => (
                         <tr key={index}>
-                          <td className="font-medium">
-                            {param.parameter_name}
-                          </td>
+                          <td className="font-medium">{param.parameter_name}</td>
                           <td>{param.qid}</td>
-                          <td className="font-mono">
-                            {formatValue(param.value_before)}
-                          </td>
-                          <td className="font-mono">
-                            {formatValue(param.value_after)}
-                          </td>
+                          <td className="font-mono">{formatValue(param.value_before)}</td>
+                          <td className="font-mono">{formatValue(param.value_after)}</td>
                           <td>
                             <div className="flex items-center gap-1">
-                              {param.delta !== null &&
-                                param.delta !== undefined && (
-                                  <>
-                                    {param.delta > 0 ? (
-                                      <TrendingUp className="h-4 w-4 text-success" />
-                                    ) : (
-                                      <TrendingDown className="h-4 w-4 text-error" />
-                                    )}
-                                    <span
-                                      className={`font-mono text-sm ${param.delta > 0 ? "text-success" : "text-error"}`}
-                                    >
-                                      {formatDelta(param.delta)}{" "}
-                                      {formatDeltaPercent(param.delta_percent)}
-                                    </span>
-                                  </>
-                                )}
+                              {param.delta !== null && param.delta !== undefined && (
+                                <>
+                                  {param.delta > 0 ? (
+                                    <TrendingUp className="h-4 w-4 text-success" />
+                                  ) : (
+                                    <TrendingDown className="h-4 w-4 text-error" />
+                                  )}
+                                  <span
+                                    className={`font-mono text-sm ${param.delta > 0 ? "text-success" : "text-error"}`}
+                                  >
+                                    {formatDelta(param.delta)}{" "}
+                                    {formatDeltaPercent(param.delta_percent)}
+                                  </span>
+                                </>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -318,13 +292,9 @@ export function ExecutionComparisonPanel() {
                     <tbody>
                       {data.added_parameters.map((param, index) => (
                         <tr key={index}>
-                          <td className="font-medium">
-                            {param.parameter_name}
-                          </td>
+                          <td className="font-medium">{param.parameter_name}</td>
                           <td>{param.qid}</td>
-                          <td className="font-mono">
-                            {formatValue(param.value_after)}
-                          </td>
+                          <td className="font-mono">{formatValue(param.value_after)}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -354,13 +324,9 @@ export function ExecutionComparisonPanel() {
                     <tbody>
                       {data.removed_parameters.map((param, index) => (
                         <tr key={index}>
-                          <td className="font-medium">
-                            {param.parameter_name}
-                          </td>
+                          <td className="font-medium">{param.parameter_name}</td>
                           <td>{param.qid}</td>
-                          <td className="font-mono">
-                            {formatValue(param.value_before)}
-                          </td>
+                          <td className="font-mono">{formatValue(param.value_before)}</td>
                         </tr>
                       ))}
                     </tbody>

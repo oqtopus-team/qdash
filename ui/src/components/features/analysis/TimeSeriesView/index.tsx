@@ -63,8 +63,7 @@ export function TimeSeriesView() {
   } = useAnalysisUrlState();
 
   // Secondary axis state (derived from URL state)
-  const secondaryParameter =
-    selectedParameters.length > 0 ? selectedParameters[0] : null;
+  const secondaryParameter = selectedParameters.length > 0 ? selectedParameters[0] : null;
   const showSecondaryAxis = secondaryParameter !== null;
   // Time range management with manual refresh
   const {
@@ -253,22 +252,20 @@ export function TimeSeriesView() {
 
     // Table data processing
     const tableRows: TimeSeriesTableRow[] = [];
-    Object.entries(timeseriesResponse.data.data).forEach(
-      ([qid, dataPoints]) => {
-        if (Array.isArray(dataPoints)) {
-          (dataPoints as TimeSeriesDataPoint[]).forEach((point) => {
-            tableRows.push({
-              qid,
-              time: formatDateTime(point.calibrated_at),
-              parameter: selectedParameter,
-              value: typeof point.value === "number" ? point.value : 0,
-              error: point.error,
-              unit: point.unit || "a.u.",
-            });
+    Object.entries(timeseriesResponse.data.data).forEach(([qid, dataPoints]) => {
+      if (Array.isArray(dataPoints)) {
+        (dataPoints as TimeSeriesDataPoint[]).forEach((point) => {
+          tableRows.push({
+            qid,
+            time: formatDateTime(point.calibrated_at),
+            parameter: selectedParameter,
+            value: typeof point.value === "number" ? point.value : 0,
+            error: point.error,
+            unit: point.unit || "a.u.",
           });
-        }
-      },
-    );
+        });
+      }
+    });
 
     // Sort by QID and time
     const sortedTableData = tableRows.sort((a, b) => {
@@ -278,37 +275,28 @@ export function TimeSeriesView() {
     });
 
     // Plot data processing
-    const qidData: Record<
-      string,
-      { x: string[]; y: number[]; error: number[] }
-    > = {};
+    const qidData: Record<string, { x: string[]; y: number[]; error: number[] }> = {};
 
-    Object.entries(timeseriesResponse.data.data).forEach(
-      ([qid, dataPoints]) => {
-        if (Array.isArray(dataPoints)) {
-          const typedPoints = dataPoints as TimeSeriesDataPoint[];
-          qidData[qid] = {
-            x: typedPoints.map(
-              (point) =>
-                formatDateTime(point.calibrated_at, "yyyy-MM-dd'T'HH:mm:ss") ||
-                "",
-            ),
-            y: typedPoints.map((point) => {
-              const value = point.value;
-              if (typeof value === "number") return value;
-              if (typeof value === "string") return Number(value) || 0;
-              return 0;
-            }),
-            error: typedPoints.map((point) => point.error || 0),
-          };
-        }
-      },
-    );
+    Object.entries(timeseriesResponse.data.data).forEach(([qid, dataPoints]) => {
+      if (Array.isArray(dataPoints)) {
+        const typedPoints = dataPoints as TimeSeriesDataPoint[];
+        qidData[qid] = {
+          x: typedPoints.map(
+            (point) => formatDateTime(point.calibrated_at, "yyyy-MM-dd'T'HH:mm:ss") || "",
+          ),
+          y: typedPoints.map((point) => {
+            const value = point.value;
+            if (typeof value === "number") return value;
+            if (typeof value === "string") return Number(value) || 0;
+            return 0;
+          }),
+          error: typedPoints.map((point) => point.error || 0),
+        };
+      }
+    });
 
     // Sort QIDs numerically and create traces
-    const sortedQids = Object.keys(qidData).sort(
-      (a, b) => parseInt(a) - parseInt(b),
-    );
+    const sortedQids = Object.keys(qidData).sort((a, b) => parseInt(a) - parseInt(b));
     const traces = sortedQids.map((qid) => ({
       x: qidData[qid].x,
       y: qidData[qid].y,
@@ -336,11 +324,7 @@ export function TimeSeriesView() {
     // Extract metadata
     const firstEntry = Object.entries(timeseriesResponse.data.data)[0];
     let metaInfo = { unit: "a.u.", description: "" };
-    if (
-      firstEntry &&
-      Array.isArray(firstEntry[1]) &&
-      firstEntry[1].length > 0
-    ) {
+    if (firstEntry && Array.isArray(firstEntry[1]) && firstEntry[1].length > 0) {
       const firstPoint = firstEntry[1][0] as TimeSeriesDataPoint;
       metaInfo = {
         unit: firstPoint.unit || "a.u.",
@@ -356,137 +340,113 @@ export function TimeSeriesView() {
   }, [timeseriesResponse, selectedParameter, currentMetricConfig]);
 
   // Process secondary data
-  const { secondaryTableData, secondaryTraces, secondaryMetadata } =
-    useMemo(() => {
-      if (!secondaryTimeseriesResponse?.data?.data || !secondaryParameter) {
-        return {
-          secondaryTableData: [],
-          secondaryTraces: [],
-          secondaryMetadata: { unit: "a.u.", description: "" },
-        };
-      }
-
-      // Table data processing
-      const tableRows: TimeSeriesTableRow[] = [];
-      Object.entries(secondaryTimeseriesResponse.data.data).forEach(
-        ([qid, dataPoints]) => {
-          if (Array.isArray(dataPoints)) {
-            (dataPoints as TimeSeriesDataPoint[]).forEach((point) => {
-              tableRows.push({
-                qid,
-                time: formatDateTime(point.calibrated_at),
-                parameter: secondaryParameter,
-                value: typeof point.value === "number" ? point.value : 0,
-                error: point.error,
-                unit: point.unit || "a.u.",
-              });
-            });
-          }
-        },
-      );
-
-      // Sort by QID and time
-      const sortedTableData = tableRows.sort((a, b) => {
-        const qidCompare = parseInt(a.qid) - parseInt(b.qid);
-        if (qidCompare !== 0) return qidCompare;
-        return a.time.localeCompare(b.time);
-      });
-
-      // Plot data processing
-      const qidData: Record<
-        string,
-        { x: string[]; y: number[]; error: number[] }
-      > = {};
-
-      Object.entries(secondaryTimeseriesResponse.data.data).forEach(
-        ([qid, dataPoints]) => {
-          if (Array.isArray(dataPoints)) {
-            const typedPoints = dataPoints as TimeSeriesDataPoint[];
-            qidData[qid] = {
-              x: typedPoints.map(
-                (point) =>
-                  formatDateTime(
-                    point.calibrated_at,
-                    "yyyy-MM-dd'T'HH:mm:ss",
-                  ) || "",
-              ),
-              y: typedPoints.map((point) => {
-                const value = point.value;
-                if (typeof value === "number") return value;
-                if (typeof value === "string") return Number(value) || 0;
-                return 0;
-              }),
-              error: typedPoints.map((point) => point.error || 0),
-            };
-          }
-        },
-      );
-
-      // Sort QIDs numerically and create traces for secondary axis
-      const sortedQids = Object.keys(qidData).sort(
-        (a, b) => parseInt(a) - parseInt(b),
-      );
-      const traces = sortedQids.map((qid, index) => ({
-        x: qidData[qid].x,
-        y: qidData[qid].y,
-        error_y: {
-          type: "data" as const,
-          array: qidData[qid].error as Plotly.Datum[],
-          visible: true,
-          color: SECONDARY_AXIS_COLORS[index % SECONDARY_AXIS_COLORS.length],
-        },
-        type: "scatter" as const,
-        mode: "lines+markers" as const,
-        name: `${secondaryMetricConfig?.title || secondaryParameter} Q${qid}`,
-        legendgroup: "secondary",
-        yaxis: "y2",
-        line: {
-          shape: "linear" as const,
-          width: 2,
-          dash: "dash" as const,
-          color: SECONDARY_AXIS_COLORS[index % SECONDARY_AXIS_COLORS.length],
-        },
-        marker: {
-          size: 8,
-          symbol: "diamond",
-          color: SECONDARY_AXIS_COLORS[index % SECONDARY_AXIS_COLORS.length],
-        },
-        hovertemplate:
-          `<b>${secondaryMetricConfig?.title || secondaryParameter}</b><br>` +
-          "Time: %{x}<br>Value: %{y:.6g}" +
-          (qidData[qid].error[0] ? "<br>Error: ±%{error_y.array:.6g}" : "") +
-          "<br>QID: " +
-          qid +
-          "<extra></extra>",
-      }));
-
-      // Extract metadata
-      const firstEntry = Object.entries(
-        secondaryTimeseriesResponse.data.data,
-      )[0];
-      let metaInfo = { unit: "a.u.", description: "" };
-      if (
-        firstEntry &&
-        Array.isArray(firstEntry[1]) &&
-        firstEntry[1].length > 0
-      ) {
-        const firstPoint = firstEntry[1][0] as TimeSeriesDataPoint;
-        metaInfo = {
-          unit: firstPoint.unit || "a.u.",
-          description: firstPoint.description || "",
-        };
-      }
-
+  const { secondaryTableData, secondaryTraces, secondaryMetadata } = useMemo(() => {
+    if (!secondaryTimeseriesResponse?.data?.data || !secondaryParameter) {
       return {
-        secondaryTableData: sortedTableData,
-        secondaryTraces: traces,
-        secondaryMetadata: metaInfo,
+        secondaryTableData: [],
+        secondaryTraces: [],
+        secondaryMetadata: { unit: "a.u.", description: "" },
       };
-    }, [
-      secondaryTimeseriesResponse,
-      secondaryParameter,
-      secondaryMetricConfig,
-    ]);
+    }
+
+    // Table data processing
+    const tableRows: TimeSeriesTableRow[] = [];
+    Object.entries(secondaryTimeseriesResponse.data.data).forEach(([qid, dataPoints]) => {
+      if (Array.isArray(dataPoints)) {
+        (dataPoints as TimeSeriesDataPoint[]).forEach((point) => {
+          tableRows.push({
+            qid,
+            time: formatDateTime(point.calibrated_at),
+            parameter: secondaryParameter,
+            value: typeof point.value === "number" ? point.value : 0,
+            error: point.error,
+            unit: point.unit || "a.u.",
+          });
+        });
+      }
+    });
+
+    // Sort by QID and time
+    const sortedTableData = tableRows.sort((a, b) => {
+      const qidCompare = parseInt(a.qid) - parseInt(b.qid);
+      if (qidCompare !== 0) return qidCompare;
+      return a.time.localeCompare(b.time);
+    });
+
+    // Plot data processing
+    const qidData: Record<string, { x: string[]; y: number[]; error: number[] }> = {};
+
+    Object.entries(secondaryTimeseriesResponse.data.data).forEach(([qid, dataPoints]) => {
+      if (Array.isArray(dataPoints)) {
+        const typedPoints = dataPoints as TimeSeriesDataPoint[];
+        qidData[qid] = {
+          x: typedPoints.map(
+            (point) => formatDateTime(point.calibrated_at, "yyyy-MM-dd'T'HH:mm:ss") || "",
+          ),
+          y: typedPoints.map((point) => {
+            const value = point.value;
+            if (typeof value === "number") return value;
+            if (typeof value === "string") return Number(value) || 0;
+            return 0;
+          }),
+          error: typedPoints.map((point) => point.error || 0),
+        };
+      }
+    });
+
+    // Sort QIDs numerically and create traces for secondary axis
+    const sortedQids = Object.keys(qidData).sort((a, b) => parseInt(a) - parseInt(b));
+    const traces = sortedQids.map((qid, index) => ({
+      x: qidData[qid].x,
+      y: qidData[qid].y,
+      error_y: {
+        type: "data" as const,
+        array: qidData[qid].error as Plotly.Datum[],
+        visible: true,
+        color: SECONDARY_AXIS_COLORS[index % SECONDARY_AXIS_COLORS.length],
+      },
+      type: "scatter" as const,
+      mode: "lines+markers" as const,
+      name: `${secondaryMetricConfig?.title || secondaryParameter} Q${qid}`,
+      legendgroup: "secondary",
+      yaxis: "y2",
+      line: {
+        shape: "linear" as const,
+        width: 2,
+        dash: "dash" as const,
+        color: SECONDARY_AXIS_COLORS[index % SECONDARY_AXIS_COLORS.length],
+      },
+      marker: {
+        size: 8,
+        symbol: "diamond",
+        color: SECONDARY_AXIS_COLORS[index % SECONDARY_AXIS_COLORS.length],
+      },
+      hovertemplate:
+        `<b>${secondaryMetricConfig?.title || secondaryParameter}</b><br>` +
+        "Time: %{x}<br>Value: %{y:.6g}" +
+        (qidData[qid].error[0] ? "<br>Error: ±%{error_y.array:.6g}" : "") +
+        "<br>QID: " +
+        qid +
+        "<extra></extra>",
+    }));
+
+    // Extract metadata
+    const firstEntry = Object.entries(secondaryTimeseriesResponse.data.data)[0];
+    let metaInfo = { unit: "a.u.", description: "" };
+    if (firstEntry && Array.isArray(firstEntry[1]) && firstEntry[1].length > 0) {
+      const firstPoint = firstEntry[1][0] as TimeSeriesDataPoint;
+      metaInfo = {
+        unit: firstPoint.unit || "a.u.",
+        description: firstPoint.description || "",
+      };
+    }
+
+    return {
+      secondaryTableData: sortedTableData,
+      secondaryTraces: traces,
+      secondaryMetadata: metaInfo,
+    };
+  }, [secondaryTimeseriesResponse, secondaryParameter, secondaryMetricConfig]);
 
   // Combined plot data
   const plotData = useMemo(() => {
@@ -631,8 +591,7 @@ export function TimeSeriesView() {
         label: "Value",
         sortable: false,
         className: "text-center",
-        render: (value: unknown) =>
-          typeof value === "number" ? value.toFixed(4) : String(value),
+        render: (value: unknown) => (typeof value === "number" ? value.toFixed(4) : String(value)),
       },
       {
         key: "error",
@@ -673,10 +632,7 @@ export function TimeSeriesView() {
     return (
       <ErrorCard
         title="Secondary Axis Data Error"
-        message={
-          (secondaryError as Error)?.message ||
-          "Failed to load secondary parameter data"
-        }
+        message={(secondaryError as Error)?.message || "Failed to load secondary parameter data"}
         onRetry={() => window.location.reload()}
       />
     );
@@ -736,19 +692,11 @@ export function TimeSeriesView() {
             Refresh
           </button>
         </div>
-        <div
-          className="flex flex-col sm:flex-row w-full gap-4 sm:gap-6"
-          role="group"
-        >
+        <div className="flex flex-col sm:flex-row w-full gap-4 sm:gap-6" role="group">
           <div className="flex-1">
-            <label className="text-sm font-medium text-base-content/70">
-              Chip
-            </label>
+            <label className="text-sm font-medium text-base-content/70">Chip</label>
             <div>
-              <ChipSelector
-                selectedChip={selectedChip}
-                onChipSelect={setSelectedChip}
-              />
+              <ChipSelector selectedChip={selectedChip} onChipSelect={setSelectedChip} />
             </div>
           </div>
           <div className="flex-1">
@@ -800,9 +748,7 @@ export function TimeSeriesView() {
             </div>
           </div>
           <div className="flex-1">
-            <label className="text-sm font-medium text-base-content/70">
-              Tag
-            </label>
+            <label className="text-sm font-medium text-base-content/70">Tag</label>
             <div>
               <TagSelector
                 tags={tags}
@@ -952,11 +898,7 @@ export function TimeSeriesView() {
                   timeRange.isStartAtLocked ? "btn-primary" : "btn-ghost"
                 }`}
                 onClick={toggleStartAtLock}
-                title={
-                  timeRange.isStartAtLocked
-                    ? "Unlock start time"
-                    : "Lock start time"
-                }
+                title={timeRange.isStartAtLocked ? "Unlock start time" : "Lock start time"}
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
@@ -997,9 +939,7 @@ export function TimeSeriesView() {
                   timeRange.isEndAtLocked ? "btn-primary" : "btn-ghost"
                 }`}
                 onClick={toggleEndAtLock}
-                title={
-                  timeRange.isEndAtLocked ? "Unlock end time" : "Lock end time"
-                }
+                title={timeRange.isEndAtLocked ? "Unlock end time" : "Lock end time"}
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
@@ -1067,9 +1007,7 @@ export function TimeSeriesView() {
           </svg>
         }
         isLoading={isLoadingTimeseries || isLoadingSecondary}
-        hasData={Boolean(
-          selectedChip && selectedParameter && plotData.length > 0,
-        )}
+        hasData={Boolean(selectedChip && selectedParameter && plotData.length > 0)}
         emptyStateMessage={
           !selectedChip || !selectedParameter
             ? "Select chip and parameters to visualize data"
@@ -1102,9 +1040,7 @@ export function TimeSeriesView() {
           <button
             className="btn btn-sm btn-outline gap-2"
             onClick={handleDownloadCSV}
-            disabled={
-              (showSecondaryAxis ? combinedTableData : tableData).length === 0
-            }
+            disabled={(showSecondaryAxis ? combinedTableData : tableData).length === 0}
             title="Download all data as CSV"
           >
             <svg

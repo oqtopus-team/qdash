@@ -20,15 +20,9 @@ export function useAnalysisUrlState(): UseAnalysisUrlStateResult {
   const [isInitialized, setIsInitialized] = useState(false);
 
   // URL state management for analysis pages
-  const [selectedChip, setSelectedChipState] = useQueryState(
-    "chip",
-    parseAsString,
-  );
+  const [selectedChip, setSelectedChipState] = useQueryState("chip", parseAsString);
 
-  const [selectedParameter, setSelectedParameterState] = useQueryState(
-    "parameter",
-    parseAsString,
-  );
+  const [selectedParameter, setSelectedParameterState] = useQueryState("parameter", parseAsString);
 
   // Multiple parameters for dual-axis timeseries
   const [selectedParameters, setSelectedParametersState] = useQueryState(
@@ -36,15 +30,9 @@ export function useAnalysisUrlState(): UseAnalysisUrlStateResult {
     parseAsArrayOf(parseAsString),
   );
 
-  const [selectedTag, setSelectedTagState] = useQueryState(
-    "tag",
-    parseAsString,
-  );
+  const [selectedTag, setSelectedTagState] = useQueryState("tag", parseAsString);
 
-  const [analysisViewType, setAnalysisViewTypeState] = useQueryState(
-    "aview",
-    parseAsString,
-  );
+  const [analysisViewType, setAnalysisViewTypeState] = useQueryState("aview", parseAsString);
 
   // Mark as initialized after first render
   useEffect(() => {

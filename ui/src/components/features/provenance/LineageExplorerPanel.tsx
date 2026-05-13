@@ -13,10 +13,7 @@ import {
   X,
 } from "lucide-react";
 
-import {
-  useGetProvenanceLineage,
-  useGetParameterHistory,
-} from "@/client/provenance/provenance";
+import { useGetProvenanceLineage, useGetParameterHistory } from "@/client/provenance/provenance";
 import { formatDate } from "@/lib/utils/datetime";
 
 import { LineagePathComparison } from "./LineagePathComparison";
@@ -48,21 +45,15 @@ export function LineageExplorerPanel({
 
   // Fetch parameter history when parameter and qid are provided via URL
   // This enables navigation from Metrics page with ?parameter=t1&qid=5&tab=lineage
-  const shouldFetchHistory = !!(
-    initialParameter &&
-    initialQid &&
-    !initialEntityId &&
-    !entityId
+  const shouldFetchHistory = !!(initialParameter && initialQid && !initialEntityId && !entityId);
+  const { data: historyResponse, isLoading: isHistoryLoading } = useGetParameterHistory(
+    {
+      parameter_name: initialParameter || "",
+      qid: initialQid || "",
+      limit: 1,
+    },
+    { query: { enabled: shouldFetchHistory } },
   );
-  const { data: historyResponse, isLoading: isHistoryLoading } =
-    useGetParameterHistory(
-      {
-        parameter_name: initialParameter || "",
-        qid: initialQid || "",
-        limit: 1,
-      },
-      { query: { enabled: shouldFetchHistory } },
-    );
 
   // Sync with URL state when initialEntityId changes
   useEffect(() => {
@@ -73,11 +64,7 @@ export function LineageExplorerPanel({
 
   // Auto-select entity from parameter history when fetched
   useEffect(() => {
-    if (
-      historyResponse?.data?.versions &&
-      historyResponse.data.versions.length > 0 &&
-      !entityId
-    ) {
+    if (historyResponse?.data?.versions && historyResponse.data.versions.length > 0 && !entityId) {
       const latestVersion = historyResponse.data.versions[0];
       setEntityId(latestVersion.entity_id);
       onEntityChange?.(latestVersion.entity_id);
@@ -282,9 +269,7 @@ export function LineageExplorerPanel({
                         .map((v) => (
                           <option key={v.entity_id} value={v.entity_id}>
                             v{v.version}
-                            {v.valid_from
-                              ? ` — ${formatDate(v.valid_from)}`
-                              : ""}
+                            {v.valid_from ? ` — ${formatDate(v.valid_from)}` : ""}
                           </option>
                         ))}
                     </select>
@@ -326,9 +311,7 @@ export function LineageExplorerPanel({
               {!compareEntityId && (
                 <div className="text-center py-8 text-base-content/50">
                   <GitCompare className="h-10 w-10 mx-auto mb-3 opacity-50" />
-                  <p className="text-sm">
-                    Select a version to compare lineage paths and figures
-                  </p>
+                  <p className="text-sm">Select a version to compare lineage paths and figures</p>
                 </div>
               )}
             </div>
@@ -336,11 +319,7 @@ export function LineageExplorerPanel({
 
           {/* Graph View - full width for maximum visibility */}
           {viewMode === "graph" && (
-            <ProvenanceGraph
-              nodes={data.nodes}
-              edges={data.edges}
-              originId={entityId}
-            />
+            <ProvenanceGraph nodes={data.nodes} edges={data.edges} originId={entityId} />
           )}
 
           {/* List View */}
@@ -351,15 +330,11 @@ export function LineageExplorerPanel({
                 <div className="card-body p-4 sm:p-6">
                   <h3 className="card-title text-base sm:text-lg">
                     Nodes
-                    <span className="badge badge-primary badge-sm ml-2">
-                      {data.nodes.length}
-                    </span>
+                    <span className="badge badge-primary badge-sm ml-2">{data.nodes.length}</span>
                   </h3>
                   <div className="space-y-2 max-h-80 overflow-y-auto">
                     {data.nodes.length === 0 ? (
-                      <div className="text-center py-8 text-base-content/50">
-                        No nodes found
-                      </div>
+                      <div className="text-center py-8 text-base-content/50">No nodes found</div>
                     ) : (
                       data.nodes.map((node) => (
                         <div
@@ -382,9 +357,7 @@ export function LineageExplorerPanel({
                             </div>
                             <span
                               className={`badge badge-xs ${
-                                node.node_type === "entity"
-                                  ? "badge-primary"
-                                  : "badge-secondary"
+                                node.node_type === "entity" ? "badge-primary" : "badge-secondary"
                               }`}
                             >
                               {node.node_type === "entity" ? "param" : "task"}
@@ -402,9 +375,7 @@ export function LineageExplorerPanel({
                 <div className="card-body p-4 sm:p-6">
                   <h3 className="card-title text-base sm:text-lg">
                     Relations
-                    <span className="badge badge-accent badge-sm ml-2">
-                      {data.edges.length}
-                    </span>
+                    <span className="badge badge-accent badge-sm ml-2">{data.edges.length}</span>
                   </h3>
                   <div className="space-y-2 max-h-80 overflow-y-auto">
                     {data.edges.length === 0 ? (

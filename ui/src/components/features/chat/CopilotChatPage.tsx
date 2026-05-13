@@ -1,12 +1,6 @@
 "use client";
 
-import React, {
-  useState,
-  useRef,
-  useEffect,
-  useCallback,
-  useMemo,
-} from "react";
+import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import {
   Send,
   Bot,
@@ -27,11 +21,7 @@ import {
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import {
-  useCopilotChat,
-  type CopilotMessage,
-  type CopilotSession,
-} from "@/hooks/useCopilotChat";
+import { useCopilotChat, type CopilotMessage, type CopilotSession } from "@/hooks/useCopilotChat";
 import { ChatPlotlyChart } from "@/components/features/chat/ChatPlotlyChart";
 import { CodeBlock } from "@/components/features/chat/CodeBlock";
 import { useGetCopilotConfig } from "@/client/copilot/copilot";
@@ -60,10 +50,7 @@ const markdownComponents = {
       return <CodeBlock language={match[1]}>{codeString}</CodeBlock>;
     }
     return (
-      <code
-        className="bg-base-200 px-1.5 py-0.5 rounded-md text-sm font-mono"
-        {...props}
-      >
+      <code className="bg-base-200 px-1.5 py-0.5 rounded-md text-sm font-mono" {...props}>
         {children}
       </code>
     );
@@ -115,11 +102,7 @@ function AssessmentBadge({ assessment }: { assessment: string | null }) {
   return null;
 }
 
-function ImageSentBadge({
-  imagesSent,
-}: {
-  imagesSent: BlocksResult["images_sent"];
-}) {
+function ImageSentBadge({ imagesSent }: { imagesSent: BlocksResult["images_sent"] }) {
   const [previewSrc, setPreviewSrc] = useState<string | null>(null);
   const modalRef = useRef<HTMLDialogElement>(null);
 
@@ -129,18 +112,12 @@ function ImageSentBadge({
   }, []);
 
   if (!imagesSent) return null;
-  const {
-    experiment_figure,
-    experiment_figure_paths,
-    expected_images,
-    task_name,
-  } = imagesSent;
+  const { experiment_figure, experiment_figure_paths, expected_images, task_name } = imagesSent;
   if (!experiment_figure && expected_images.length === 0) return null;
 
   const parts: string[] = [];
   if (experiment_figure) parts.push("実験結果画像");
-  if (expected_images.length > 0)
-    parts.push(`参照画像${expected_images.length}枚`);
+  if (expected_images.length > 0) parts.push(`参照画像${expected_images.length}枚`);
 
   const baseURL = process.env.NEXT_PUBLIC_API_URL || "/api";
 
@@ -219,10 +196,7 @@ function BlocksContent({ blocks }: { blocks: BlocksResult }) {
         if (block.type === "text" && block.content) {
           return (
             <div key={i} className="prose prose-sm max-w-none mt-1">
-              <ReactMarkdown
-                remarkPlugins={[remarkGfm]}
-                components={markdownComponents}
-              >
+              <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
                 {block.content}
               </ReactMarkdown>
             </div>
@@ -243,18 +217,10 @@ function BlocksContent({ blocks }: { blocks: BlocksResult }) {
   );
 }
 
-function MessageBubble({
-  message,
-  isLatest,
-}: {
-  message: CopilotMessage;
-  isLatest: boolean;
-}) {
+function MessageBubble({ message, isLatest }: { message: CopilotMessage; isLatest: boolean }) {
   if (message.role === "user") {
     return (
-      <div
-        className={`flex justify-end ${isLatest ? "animate-fade-in-up" : ""}`}
-      >
+      <div className={`flex justify-end ${isLatest ? "animate-fade-in-up" : ""}`}>
         <div className="chat-bubble-user rounded-2xl rounded-br-sm px-4 py-2.5 max-w-[75%] text-sm whitespace-pre-wrap shadow-sm">
           {message.content}
         </div>
@@ -274,10 +240,7 @@ function MessageBubble({
           <BlocksContent blocks={blocksResult} />
         ) : (
           <div className="prose prose-sm max-w-none">
-            <ReactMarkdown
-              remarkPlugins={[remarkGfm]}
-              components={markdownComponents}
-            >
+            <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
               {message.content}
             </ReactMarkdown>
           </div>
@@ -326,9 +289,7 @@ function SessionListItem({
           <div className="text-sm font-medium truncate">{session.title}</div>
           <div className="flex items-center gap-2 mt-1 text-xs text-base-content/50">
             <span>{session.messages.length} msgs</span>
-            <span className="text-base-content/30">
-              {formatTime(session.updatedAt)}
-            </span>
+            <span className="text-base-content/30">{formatTime(session.updatedAt)}</span>
           </div>
         </div>
         <button
@@ -374,9 +335,7 @@ const SUGGESTED_QUESTIONS = [
 // ---------------------------------------------------------------------------
 
 export function CopilotChatPage() {
-  const [selectedModelKey, setSelectedModelKey] = useState(
-    getStoredChatModelKey,
-  );
+  const [selectedModelKey, setSelectedModelKey] = useState(getStoredChatModelKey);
   const { data: copilotConfigResponse } = useGetCopilotConfig();
   const modelOptions = useMemo(
     () => buildChatModelOptions(copilotConfigResponse?.data ?? null),
@@ -415,10 +374,7 @@ export function CopilotChatPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  const messages = useMemo(
-    () => activeSession?.messages ?? [],
-    [activeSession?.messages],
-  );
+  const messages = useMemo(() => activeSession?.messages ?? [], [activeSession?.messages]);
 
   // Auto-scroll to bottom
   useEffect(() => {
@@ -467,10 +423,7 @@ export function CopilotChatPage() {
 
           {/* New Session Button */}
           <div className="px-3 py-3">
-            <button
-              onClick={createSession}
-              className="btn btn-primary btn-sm w-full gap-1.5"
-            >
+            <button onClick={createSession} className="btn btn-primary btn-sm w-full gap-1.5">
               <Plus className="w-4 h-4" />
               New Chat
             </button>
@@ -488,9 +441,7 @@ export function CopilotChatPage() {
               />
             ))}
             {sessions.length === 0 && (
-              <div className="text-center py-8 text-xs text-base-content/30">
-                No sessions yet
-              </div>
+              <div className="text-center py-8 text-xs text-base-content/30">No sessions yet</div>
             )}
           </div>
         </div>
@@ -513,9 +464,7 @@ export function CopilotChatPage() {
             <div className="w-6 h-6 rounded-lg chat-avatar-bot flex items-center justify-center">
               <Bot className="w-3.5 h-3.5 text-primary" />
             </div>
-            <h2 className="text-sm font-bold truncate">
-              {activeSession?.title || "AI Chat"}
-            </h2>
+            <h2 className="text-sm font-bold truncate">{activeSession?.title || "AI Chat"}</h2>
           </div>
           {modelOptions.length > 1 && (
             <label className="flex items-center gap-1 mr-1" title="Chat model">
@@ -557,8 +506,8 @@ export function CopilotChatPage() {
                 </div>
                 <h3 className="text-xl font-bold mb-2">AI Chat</h3>
                 <p className="text-sm text-base-content/50 mb-8 leading-relaxed">
-                  Ask questions about qubit calibration data. I can fetch
-                  parameters, show trends, and create visualizations.
+                  Ask questions about qubit calibration data. I can fetch parameters, show trends,
+                  and create visualizations.
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                   {SUGGESTED_QUESTIONS.map((q) => (
@@ -572,9 +521,7 @@ export function CopilotChatPage() {
                       }}
                       className="chat-suggestion-card group"
                     >
-                      <span className="text-xs text-left leading-relaxed flex-1">
-                        {q.text}
-                      </span>
+                      <span className="text-xs text-left leading-relaxed flex-1">{q.text}</span>
                       <ArrowRight className="w-3.5 h-3.5 text-base-content/20 group-hover:text-primary group-hover:translate-x-0.5 transition-all flex-shrink-0" />
                     </button>
                   ))}
@@ -585,11 +532,7 @@ export function CopilotChatPage() {
             /* Message List */
             <div className="max-w-3xl mx-auto px-4 py-6 space-y-6">
               {messages.map((msg, idx) => (
-                <MessageBubble
-                  key={idx}
-                  message={msg}
-                  isLatest={idx === messages.length - 1}
-                />
+                <MessageBubble key={idx} message={msg} isLatest={idx === messages.length - 1} />
               ))}
 
               {isLoading && (

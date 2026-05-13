@@ -18,10 +18,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { useGetTaskResult, getGetTaskResultQueryKey } from "@/client/task/task";
-import {
-  useCreateIssue,
-  getGetTaskResultIssuesQueryKey,
-} from "@/client/issue/issue";
+import { useCreateIssue, getGetTaskResultIssuesQueryKey } from "@/client/issue/issue";
 import { useQueryClient } from "@tanstack/react-query";
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { ParametersTable } from "@/components/features/metrics/ParametersTable";
@@ -41,18 +38,11 @@ import { useProject } from "@/contexts/ProjectContext";
 import { formatDateTime, formatRelativeTime } from "@/lib/utils/datetime";
 import { useToast } from "@/components/ui/Toast";
 
-const REANALYZABLE_TASKS = new Set([
-  "CheckResonatorSpectroscopy",
-  "CheckQubitSpectroscopy",
-]);
+const REANALYZABLE_TASKS = new Set(["CheckResonatorSpectroscopy", "CheckQubitSpectroscopy"]);
 
 /** Extract the display value from a parameter entry (may be a dict with `value` key or a plain value). */
 function extractParamValue(entry: unknown): string {
-  if (
-    entry != null &&
-    typeof entry === "object" &&
-    "value" in (entry as Record<string, unknown>)
-  ) {
+  if (entry != null && typeof entry === "object" && "value" in (entry as Record<string, unknown>)) {
     return String((entry as Record<string, unknown>).value ?? "");
   }
   return String(entry ?? "");
@@ -60,20 +50,14 @@ function extractParamValue(entry: unknown): string {
 
 /** Extract the unit from a parameter entry. */
 function extractParamUnit(entry: unknown): string {
-  if (
-    entry != null &&
-    typeof entry === "object" &&
-    "unit" in (entry as Record<string, unknown>)
-  ) {
+  if (entry != null && typeof entry === "object" && "unit" in (entry as Record<string, unknown>)) {
     return String((entry as Record<string, unknown>).unit ?? "");
   }
   return "";
 }
 
 /** Build initial form values from a parameters dict. */
-function buildFormValues(
-  params: Record<string, unknown> | undefined,
-): Record<string, string> {
+function buildFormValues(params: Record<string, unknown> | undefined): Record<string, string> {
   if (!params) return {};
   const result: Record<string, string> = {};
   for (const [key, entry] of Object.entries(params)) {
@@ -126,9 +110,7 @@ function ParameterOverrideSection({
   const keys = Object.keys(parameters);
   if (keys.length === 0) return null;
 
-  const modifiedCount = keys.filter(
-    (k) => formValues[k] !== originalValues[k],
-  ).length;
+  const modifiedCount = keys.filter((k) => formValues[k] !== originalValues[k]).length;
 
   return (
     <div className="border border-base-300 rounded-lg">
@@ -137,16 +119,10 @@ function ParameterOverrideSection({
         className="flex items-center gap-2 w-full p-3 text-sm font-semibold hover:bg-base-200/50 transition-colors"
         onClick={() => setOpen(!open)}
       >
-        {open ? (
-          <ChevronDown className="h-3.5 w-3.5" />
-        ) : (
-          <ChevronRight className="h-3.5 w-3.5" />
-        )}
+        {open ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
         {title}
         {modifiedCount > 0 && (
-          <span className="badge badge-sm badge-primary">
-            {modifiedCount} modified
-          </span>
+          <span className="badge badge-sm badge-primary">{modifiedCount} modified</span>
         )}
       </button>
       {open && (
@@ -168,9 +144,7 @@ function ParameterOverrideSection({
                     <td className="font-mono text-xs">
                       {key}
                       {isModified && (
-                        <span className="badge badge-xs badge-primary ml-1.5">
-                          edited
-                        </span>
+                        <span className="badge badge-xs badge-primary ml-1.5">edited</span>
                       )}
                     </td>
                     <td>
@@ -209,9 +183,7 @@ function ParameterOverrideSection({
 
 function getCurrentUsername(): string {
   if (typeof document === "undefined") return "";
-  const match = document.cookie
-    .split("; ")
-    .find((row) => row.startsWith("username="));
+  const match = document.cookie.split("; ").find((row) => row.startsWith("username="));
   return match ? decodeURIComponent(match.split("=")[1]) : "";
 }
 
@@ -248,25 +220,18 @@ function IssueCard({
       <div className="p-4">
         <div className="flex items-center gap-3 mb-2 flex-wrap">
           <div className="flex items-center gap-1.5">
-            <span className="badge badge-sm badge-neutral">
-              {issue.username}
-            </span>
+            <span className="badge badge-sm badge-neutral">{issue.username}</span>
             <span className="text-xs text-base-content/40">
               {formatRelativeTime(issue.created_at)}
             </span>
-            {issue.is_closed === true && (
-              <span className="badge badge-sm badge-ghost">Closed</span>
-            )}
+            {issue.is_closed === true && <span className="badge badge-sm badge-ghost">Closed</span>}
           </div>
           <span className="text-xs text-base-content/50 flex items-center gap-1 ml-auto">
             <MessageSquare className="h-3 w-3" />
-            {issue.reply_count ?? 0}{" "}
-            {issue.reply_count === 1 ? "reply" : "replies"}
+            {issue.reply_count ?? 0} {issue.reply_count === 1 ? "reply" : "replies"}
           </span>
         </div>
-        {issue.title && (
-          <h3 className="text-sm font-semibold mb-1">{issue.title}</h3>
-        )}
+        {issue.title && <h3 className="text-sm font-semibold mb-1">{issue.title}</h3>}
         <div className="text-sm text-base-content/80 mb-3 line-clamp-3">
           <MarkdownContent content={issue.content} preview />
         </div>
@@ -321,24 +286,15 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
   const [reconfigure, setReconfigure] = useState(false);
 
   // Parameter override form state
-  const [runParamValues, setRunParamValues] = useState<Record<string, string>>(
-    {},
-  );
-  const [inputParamValues, setInputParamValues] = useState<
-    Record<string, string>
-  >({});
-  const [originalRunValues, setOriginalRunValues] = useState<
-    Record<string, string>
-  >({});
-  const [originalInputValues, setOriginalInputValues] = useState<
-    Record<string, string>
-  >({});
+  const [runParamValues, setRunParamValues] = useState<Record<string, string>>({});
+  const [inputParamValues, setInputParamValues] = useState<Record<string, string>>({});
+  const [originalRunValues, setOriginalRunValues] = useState<Record<string, string>>({});
+  const [originalInputValues, setOriginalInputValues] = useState<Record<string, string>>({});
 
   // Task result
-  const { data: taskResultResponse, isLoading: taskResultLoading } =
-    useGetTaskResult(taskId, {
-      query: { enabled: !!taskId },
-    });
+  const { data: taskResultResponse, isLoading: taskResultLoading } = useGetTaskResult(taskId, {
+    query: { enabled: !!taskId },
+  });
   const taskResult = taskResultResponse?.data;
 
   // Initialize parameter form values when modal opens
@@ -430,13 +386,9 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
     try {
       // Build parameter_overrides only with changed values
       const runOverrides = computeOverrides(originalRunValues, runParamValues);
-      const inputOverrides = computeOverrides(
-        originalInputValues,
-        inputParamValues,
-      );
+      const inputOverrides = computeOverrides(originalInputValues, inputParamValues);
       const hasOverrides =
-        Object.keys(runOverrides).length > 0 ||
-        Object.keys(inputOverrides).length > 0;
+        Object.keys(runOverrides).length > 0 || Object.keys(inputOverrides).length > 0;
 
       const body: Record<string, unknown> = {
         update_params: updateParams,
@@ -444,21 +396,14 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
         ...(hasOverrides
           ? {
               parameter_overrides: {
-                ...(Object.keys(runOverrides).length > 0
-                  ? { run: runOverrides }
-                  : {}),
-                ...(Object.keys(inputOverrides).length > 0
-                  ? { input: inputOverrides }
-                  : {}),
+                ...(Object.keys(runOverrides).length > 0 ? { run: runOverrides } : {}),
+                ...(Object.keys(inputOverrides).length > 0 ? { input: inputOverrides } : {}),
               },
             }
           : {}),
       };
 
-      const response = await AXIOS_INSTANCE.post(
-        `/task-results/${taskId}/re-execute`,
-        body,
-      );
+      const response = await AXIOS_INSTANCE.post(`/task-results/${taskId}/re-execute`, body);
       const newExecutionId = response.data.execution_id;
       setShowReExecuteModal(false);
       setReExecuteSuccess(newExecutionId);
@@ -467,11 +412,9 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
         queryKey: getGetTaskResultQueryKey(taskId),
       });
     } catch (err: unknown) {
-      const axiosDetail = (err as { response?: { data?: { detail?: string } } })
-        ?.response?.data?.detail;
-      const message =
-        axiosDetail ??
-        (err instanceof Error ? err.message : "Failed to re-execute");
+      const axiosDetail = (err as { response?: { data?: { detail?: string } } })?.response?.data
+        ?.detail;
+      const message = axiosDetail ?? (err instanceof Error ? err.message : "Failed to re-execute");
       setReExecuteError(message);
     } finally {
       setReExecuteLoading(false);
@@ -495,10 +438,7 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
         description="The requested task result does not exist or has been removed."
         emoji="magnifying-glass"
         action={
-          <button
-            onClick={() => router.back()}
-            className="btn btn-sm btn-ghost gap-1"
-          >
+          <button onClick={() => router.back()} className="btn btn-sm btn-ghost gap-1">
             <ArrowLeft className="h-4 w-4" />
             Go back
           </button>
@@ -511,16 +451,11 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
     <div className="max-w-4xl mx-auto">
       {/* Header */}
       <div className="flex items-center gap-3 mb-6">
-        <button
-          onClick={() => router.back()}
-          className="btn btn-sm btn-ghost btn-square"
-        >
+        <button onClick={() => router.back()} className="btn btn-sm btn-ghost btn-square">
           <ArrowLeft className="h-4 w-4" />
         </button>
         <div className="flex items-center gap-3 flex-wrap flex-1 min-w-0">
-          <span className="font-mono text-sm font-semibold truncate">
-            {taskId}
-          </span>
+          <span className="font-mono text-sm font-semibold truncate">{taskId}</span>
           <span className="badge badge-sm badge-neutral">{taskResult.qid}</span>
           <StatusBadge status={taskResult.status} />
           {canReExecute && (
@@ -548,28 +483,18 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
           <div>
             <span className="text-base-content/50">Start</span>
             <p>
-              {formatDateTime(
-                taskResult.start_at as string | null | undefined,
-                "MM/dd HH:mm:ss",
-              )}
+              {formatDateTime(taskResult.start_at as string | null | undefined, "MM/dd HH:mm:ss")}
             </p>
           </div>
           <div>
             <span className="text-base-content/50">End</span>
             <p>
-              {formatDateTime(
-                taskResult.end_at as string | null | undefined,
-                "MM/dd HH:mm:ss",
-              )}
+              {formatDateTime(taskResult.end_at as string | null | undefined, "MM/dd HH:mm:ss")}
             </p>
           </div>
           <div>
             <span className="text-base-content/50">Elapsed</span>
-            <p>
-              {taskResult.elapsed_time != null
-                ? `${taskResult.elapsed_time}s`
-                : "-"}
-            </p>
+            <p>{taskResult.elapsed_time != null ? `${taskResult.elapsed_time}s` : "-"}</p>
           </div>
         </div>
       </div>
@@ -595,10 +520,7 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
               <span className="loading loading-spinner loading-xs" />
             </>
           )}
-          <button
-            className="btn btn-ghost btn-xs"
-            onClick={() => setReExecuteSuccess(null)}
-          >
+          <button className="btn btn-ghost btn-xs" onClick={() => setReExecuteSuccess(null)}>
             <XCircle className="h-3 w-3" />
           </button>
         </div>
@@ -635,14 +557,10 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
                     href={`/task-results/${re.task_id}`}
                     className="flex items-center gap-2 text-xs p-2 rounded hover:bg-base-200 transition-colors"
                   >
-                    <span className="font-mono text-primary">
-                      {re.task_id.slice(0, 8)}...
-                    </span>
+                    <span className="font-mono text-primary">{re.task_id.slice(0, 8)}...</span>
                     <StatusBadge status={re.status} />
                     <span className="text-base-content/40">
-                      {re.start_at
-                        ? formatRelativeTime(re.start_at as string)
-                        : ""}
+                      {re.start_at ? formatRelativeTime(re.start_at as string) : ""}
                     </span>
                     <ExternalLink className="h-3 w-3 text-base-content/30 ml-auto" />
                   </a>
@@ -655,8 +573,7 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
 
       {/* Figure */}
       {((taskResult.figure_path && taskResult.figure_path.length > 0) ||
-        (taskResult.json_figure_path &&
-          taskResult.json_figure_path.length > 0)) && (
+        (taskResult.json_figure_path && taskResult.json_figure_path.length > 0)) && (
         <div className="h-[280px] overflow-x-auto overflow-y-hidden flex items-center justify-start gap-3 mb-4">
           {(taskResult.figure_path ?? []).map((fig, i) => (
             <TaskFigure
@@ -684,33 +601,26 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
 
       {/* Parameters */}
       <div className="space-y-4 mb-6">
-        {taskResult.input_parameters &&
-          Object.keys(taskResult.input_parameters).length > 0 && (
-            <ParametersTable
-              title="Input Parameters"
-              parameters={
-                taskResult.input_parameters as Record<string, unknown>
-              }
-            />
-          )}
+        {taskResult.input_parameters && Object.keys(taskResult.input_parameters).length > 0 && (
+          <ParametersTable
+            title="Input Parameters"
+            parameters={taskResult.input_parameters as Record<string, unknown>}
+          />
+        )}
 
-        {taskResult.output_parameters &&
-          Object.keys(taskResult.output_parameters).length > 0 && (
-            <ParametersTable
-              title="Output Parameters"
-              parameters={
-                taskResult.output_parameters as Record<string, unknown>
-              }
-            />
-          )}
+        {taskResult.output_parameters && Object.keys(taskResult.output_parameters).length > 0 && (
+          <ParametersTable
+            title="Output Parameters"
+            parameters={taskResult.output_parameters as Record<string, unknown>}
+          />
+        )}
 
-        {taskResult.run_parameters &&
-          Object.keys(taskResult.run_parameters).length > 0 && (
-            <ParametersTable
-              title="Run Parameters"
-              parameters={taskResult.run_parameters as Record<string, unknown>}
-            />
-          )}
+        {taskResult.run_parameters && Object.keys(taskResult.run_parameters).length > 0 && (
+          <ParametersTable
+            title="Run Parameters"
+            parameters={taskResult.run_parameters as Record<string, unknown>}
+          />
+        )}
 
         {taskResult.status === "failed" && taskResult.message && (
           <div className="border border-error/40 rounded-lg overflow-hidden">
@@ -729,9 +639,7 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
                     className="btn btn-ghost btn-xs"
                     onClick={async () => {
                       try {
-                        await navigator.clipboard.writeText(
-                          taskResult.stack_trace ?? "",
-                        );
+                        await navigator.clipboard.writeText(taskResult.stack_trace ?? "");
                         toast.success("Copied to clipboard");
                       } catch {
                         toast.error("Failed to copy to clipboard");
@@ -771,10 +679,7 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
             </button>
           ))}
         </div>
-        <button
-          className="btn btn-sm btn-primary gap-1"
-          onClick={() => setShowEditor(!showEditor)}
-        >
+        <button className="btn btn-sm btn-primary gap-1" onClick={() => setShowEditor(!showEditor)}>
           <Plus className="h-3.5 w-3.5" />
           New Issue
         </button>
@@ -841,55 +746,44 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
             <h3 className="font-bold text-lg">Re-execute Task</h3>
             <div className="py-4 space-y-3">
               <p className="text-sm text-base-content/70">
-                Re-execute task{" "}
-                <span className="font-semibold">{taskResult.task_name}</span>{" "}
-                for qubit{" "}
-                <span className="font-semibold">{taskResult.qid}</span>. You can
-                edit parameters below before re-executing.
+                Re-execute task <span className="font-semibold">{taskResult.task_name}</span> for
+                qubit <span className="font-semibold">{taskResult.qid}</span>. You can edit
+                parameters below before re-executing.
               </p>
               <div className="bg-base-200 rounded-lg p-3 text-sm">
                 <div>
-                  <span className="font-medium">Task:</span>{" "}
-                  {taskResult.task_name}
+                  <span className="font-medium">Task:</span> {taskResult.task_name}
                 </div>
                 <div>
                   <span className="font-medium">Qubit:</span> {taskResult.qid}
                 </div>
                 <div>
-                  <span className="font-medium">Source Execution:</span>{" "}
-                  {taskResult.execution_id}
+                  <span className="font-medium">Source Execution:</span> {taskResult.execution_id}
                 </div>
               </div>
 
               {/* Parameter override sections */}
-              {taskResult.run_parameters &&
-                Object.keys(taskResult.run_parameters).length > 0 && (
-                  <ParameterOverrideSection
-                    title="Run Parameters"
-                    parameters={
-                      taskResult.run_parameters as Record<string, unknown>
-                    }
-                    formValues={runParamValues}
-                    originalValues={originalRunValues}
-                    onChange={(key, val) =>
-                      setRunParamValues((prev) => ({ ...prev, [key]: val }))
-                    }
-                    onReset={(key) =>
-                      setRunParamValues((prev) => ({
-                        ...prev,
-                        [key]: originalRunValues[key],
-                      }))
-                    }
-                    defaultOpen={true}
-                  />
-                )}
+              {taskResult.run_parameters && Object.keys(taskResult.run_parameters).length > 0 && (
+                <ParameterOverrideSection
+                  title="Run Parameters"
+                  parameters={taskResult.run_parameters as Record<string, unknown>}
+                  formValues={runParamValues}
+                  originalValues={originalRunValues}
+                  onChange={(key, val) => setRunParamValues((prev) => ({ ...prev, [key]: val }))}
+                  onReset={(key) =>
+                    setRunParamValues((prev) => ({
+                      ...prev,
+                      [key]: originalRunValues[key],
+                    }))
+                  }
+                  defaultOpen={true}
+                />
+              )}
               {taskResult.input_parameters &&
                 Object.keys(taskResult.input_parameters).length > 0 && (
                   <ParameterOverrideSection
                     title="Input Parameters"
-                    parameters={
-                      taskResult.input_parameters as Record<string, unknown>
-                    }
+                    parameters={taskResult.input_parameters as Record<string, unknown>}
                     formValues={inputParamValues}
                     originalValues={originalInputValues}
                     onChange={(key, val) =>
@@ -914,12 +808,9 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
                     onChange={(e) => setReconfigure(e.target.checked)}
                   />
                   <div>
-                    <span className="label-text font-medium">
-                      Reconfigure hardware
-                    </span>
+                    <span className="label-text font-medium">Reconfigure hardware</span>
                     <p className="label-text-alt text-base-content/50">
-                      Run Configure (system_manager load + push) before
-                      executing the task
+                      Run Configure (system_manager load + push) before executing the task
                     </p>
                   </div>
                 </label>
@@ -934,9 +825,7 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
                     onChange={(e) => setUpdateParams(e.target.checked)}
                   />
                   <div>
-                    <span className="label-text font-medium">
-                      Update backend params
-                    </span>
+                    <span className="label-text font-medium">Update backend params</span>
                     <p className="label-text-alt text-base-content/50">
                       Write output parameters back to qubex YAML files
                     </p>

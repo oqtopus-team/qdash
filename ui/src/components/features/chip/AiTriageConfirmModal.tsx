@@ -36,8 +36,7 @@ export function AiTriageConfirmModal({
   if (!isOpen) return null;
 
   const selectedModel =
-    modelOptions.find((option) => option.key === selectedModelKey) ??
-    modelOptions[0];
+    modelOptions.find((option) => option.key === selectedModelKey) ?? modelOptions[0];
   const modelName = selectedModel?.model
     ? `${selectedModel.model.provider}/${selectedModel.model.name}`
     : selectedModel?.label || "Configured model";

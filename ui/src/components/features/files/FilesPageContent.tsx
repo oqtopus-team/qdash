@@ -47,9 +47,7 @@ import { useToast } from "@/components/ui/Toast";
 const Editor = dynamic(() => import("@monaco-editor/react"), { ssr: false });
 
 // Helper to check if file is a params YAML that can be imported
-function parseParamsFilePath(
-  path: string,
-): { chipId: string; paramName: string } | null {
+function parseParamsFilePath(path: string): { chipId: string; paramName: string } | null {
   // Match pattern: config/qubex/{chip_id}/params/{param_name}.yaml
   const match = path.match(/^config\/qubex\/([^/]+)\/params\/([^/]+)\.ya?ml$/);
   if (match) {
@@ -98,9 +96,7 @@ export function FilesPageContent() {
   const [commitMessage, setCommitMessage] = useState("");
   const [isEditorLocked, setIsEditorLocked] = useState(true);
   const [isSidebarVisible, setIsSidebarVisible] = useState(true);
-  const [importResult, setImportResult] = useState<SeedImportResponse | null>(
-    null,
-  );
+  const [importResult, setImportResult] = useState<SeedImportResponse | null>(null);
   const [prResult, setPrResult] = useState<{
     pr_url: string;
     pr_number: number;
@@ -119,8 +115,7 @@ export function FilesPageContent() {
     error: treeError,
   } = useQuery({
     queryKey: ["fileTree"],
-    queryFn: () =>
-      getFileTree().then((res: AxiosResponse<FileTreeNode[]>) => res.data),
+    queryFn: () => getFileTree().then((res: AxiosResponse<FileTreeNode[]>) => res.data),
   });
 
   const { data: fileContentData, isLoading: isContentLoading } = useQuery({
@@ -134,16 +129,13 @@ export function FilesPageContent() {
 
   const { data: gitStatusData, refetch: refetchGitStatus } = useQuery({
     queryKey: ["gitStatus"],
-    queryFn: () =>
-      getGitStatus().then((res: AxiosResponse<GetGitStatus200>) => res.data),
+    queryFn: () => getGitStatus().then((res: AxiosResponse<GetGitStatus200>) => res.data),
     refetchInterval: 10000, // Refresh every 10 seconds
   });
 
   const saveMutation = useMutation({
     mutationFn: (request: SaveFileRequest) =>
-      saveFileContent(request).then(
-        (res: AxiosResponse<SaveFileContent200>) => res.data,
-      ),
+      saveFileContent(request).then((res: AxiosResponse<SaveFileContent200>) => res.data),
     onSuccess: () => {
       setHasUnsavedChanges(false);
       toast.success("File saved successfully!");
@@ -158,8 +150,7 @@ export function FilesPageContent() {
   });
 
   const pullMutation = useMutation({
-    mutationFn: () =>
-      gitPullConfig().then((res: AxiosResponse<GitPullConfig200>) => res.data),
+    mutationFn: () => gitPullConfig().then((res: AxiosResponse<GitPullConfig200>) => res.data),
     onSuccess: (data: GitPullConfig200) => {
       toast.success(
         `Git pull successful! Updated to commit: ${(data.commit as string) || "unknown"}`,
@@ -202,13 +193,7 @@ export function FilesPageContent() {
 
   // Seed import mutation
   const importMutation = useMutation({
-    mutationFn: async ({
-      chipId,
-      paramName,
-    }: {
-      chipId: string;
-      paramName: string;
-    }) => {
+    mutationFn: async ({ chipId, paramName }: { chipId: string; paramName: string }) => {
       const response = await fetch("/api/calibrations/seed-import", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -220,9 +205,7 @@ export function FilesPageContent() {
       });
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(
-          errorData.detail || `Import failed: ${response.status}`,
-        );
+        throw new Error(errorData.detail || `Import failed: ${response.status}`);
       }
       return response.json() as Promise<SeedImportResponse>;
     },
@@ -236,10 +219,7 @@ export function FilesPageContent() {
   });
 
   useEffect(() => {
-    if (
-      fileContentData?.content !== undefined &&
-      fileContentData?.content !== null
-    ) {
+    if (fileContentData?.content !== undefined && fileContentData?.content !== null) {
       setFileContent(String(fileContentData.content));
       setHasUnsavedChanges(false);
     }
@@ -248,9 +228,7 @@ export function FilesPageContent() {
   const handleFileSelect = (path: string) => {
     if (hasUnsavedChanges) {
       if (
-        !confirm(
-          "You have unsaved changes. Do you want to discard them and open another file?",
-        )
+        !confirm("You have unsaved changes. Do you want to discard them and open another file?")
       ) {
         return;
       }
@@ -287,11 +265,7 @@ export function FilesPageContent() {
 
   const handlePull = () => {
     if (hasUnsavedChanges) {
-      if (
-        !confirm(
-          "You have unsaved changes. Git pull will overwrite them. Continue?",
-        )
-      ) {
+      if (!confirm("You have unsaved changes. Git pull will overwrite them. Continue?")) {
         return;
       }
     }
@@ -326,9 +300,7 @@ export function FilesPageContent() {
 
     // File type specific icons
     if (node.name.endsWith(".json")) {
-      return (
-        <FileJson className="inline-block mr-1 text-yellow-500" size={14} />
-      );
+      return <FileJson className="inline-block mr-1 text-yellow-500" size={14} />;
     }
     if (node.name.endsWith(".yaml") || node.name.endsWith(".yml")) {
       return <File className="inline-block mr-1 text-red-400" size={14} />;
@@ -349,9 +321,7 @@ export function FilesPageContent() {
               className="text-sm text-base-content/80 hover:bg-base-200 px-2 py-0.5 cursor-pointer select-none flex items-center list-none"
               style={{ paddingLeft: `${level * 12 + 8}px` }}
             >
-              <span className="mr-1 transition-transform group-open:rotate-90">
-                ▸
-              </span>
+              <span className="mr-1 transition-transform group-open:rotate-90">▸</span>
               {getFileIcon(node, true)}
               <span className="truncate">{node.name}</span>
             </summary>
@@ -410,18 +380,12 @@ export function FilesPageContent() {
               </span>
               {selectedFile && (
                 <>
-                  <span className="text-base-content/50 hidden sm:inline">
-                    /
-                  </span>
-                  <span className="text-sm text-base-content/70 truncate">
-                    {selectedFile}
-                  </span>
+                  <span className="text-base-content/50 hidden sm:inline">/</span>
+                  <span className="text-sm text-base-content/70 truncate">{selectedFile}</span>
                 </>
               )}
             </div>
-            {hasUnsavedChanges && (
-              <span className="text-xs text-warning flex-shrink-0">●</span>
-            )}
+            {hasUnsavedChanges && <span className="text-xs text-warning flex-shrink-0">●</span>}
           </div>
           <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0 overflow-x-auto">
             <button
@@ -430,20 +394,16 @@ export function FilesPageContent() {
               title={isEditorLocked ? "Click to edit" : "Currently editing"}
             >
               <Pencil size={16} />
-              <span className="ml-1">
-                {isEditorLocked ? "Edit" : "Editing"}
-              </span>
+              <span className="ml-1">{isEditorLocked ? "Edit" : "Editing"}</span>
             </button>
             {(gitStatusData as GitStatusExtended | undefined)?.is_git_repo && (
               <div className="hidden md:flex items-center gap-2 px-2 sm:px-3 py-1 text-xs bg-base-100 border border-base-300 rounded">
                 <span className="text-base-content/70">
-                  {(gitStatusData as GitStatusExtended | undefined)?.branch ||
-                    "main"}
+                  {(gitStatusData as GitStatusExtended | undefined)?.branch || "main"}
                 </span>
                 <span className="text-base-content/50">@</span>
                 <span className="text-info">
-                  {(gitStatusData as GitStatusExtended | undefined)?.commit ||
-                    "unknown"}
+                  {(gitStatusData as GitStatusExtended | undefined)?.commit || "unknown"}
                 </span>
                 {(gitStatusData as GitStatusExtended | undefined)?.is_dirty && (
                   <span className="text-warning">●</span>
@@ -455,8 +415,7 @@ export function FilesPageContent() {
               className={`btn btn-sm hidden sm:flex ${(gitStatusData as GitStatusExtended | undefined)?.has_remote_updates ? "btn-warning" : "btn-info"}`}
               disabled={pullMutation.isPending}
               title={
-                (gitStatusData as GitStatusExtended | undefined)
-                  ?.has_remote_updates
+                (gitStatusData as GitStatusExtended | undefined)?.has_remote_updates
                   ? "Remote has new changes - click to pull"
                   : "Pull latest changes from Git repository"
               }
@@ -467,8 +426,7 @@ export function FilesPageContent() {
                 <ArrowDown size={16} />
               )}
               <span className="ml-1">Pull</span>
-              {(gitStatusData as GitStatusExtended | undefined)
-                ?.has_remote_updates && (
+              {(gitStatusData as GitStatusExtended | undefined)?.has_remote_updates && (
                 <span className="inline-flex h-2 w-2 rounded-full bg-warning-content animate-ping"></span>
               )}
             </button>
@@ -489,10 +447,7 @@ export function FilesPageContent() {
               onClick={handleSave}
               className={`btn btn-sm hidden sm:flex ${isEditorLocked ? "btn-outline" : "btn-success"}`}
               disabled={
-                !selectedFile ||
-                !hasUnsavedChanges ||
-                saveMutation.isPending ||
-                isEditorLocked
+                !selectedFile || !hasUnsavedChanges || saveMutation.isPending || isEditorLocked
               }
             >
               {saveMutation.isPending ? (
@@ -531,8 +486,8 @@ export function FilesPageContent() {
             <div className="flex items-center gap-2 text-sm">
               <GitPullRequestArrow size={16} className="text-secondary" />
               <span>
-                Pull request <strong>#{prResult.pr_number}</strong> created on
-                branch <strong>{prResult.branch}</strong>
+                Pull request <strong>#{prResult.pr_number}</strong> created on branch{" "}
+                <strong>{prResult.branch}</strong>
               </span>
             </div>
             <div className="flex items-center gap-2">
@@ -544,10 +499,7 @@ export function FilesPageContent() {
               >
                 Open PR <ExternalLink size={12} />
               </a>
-              <button
-                onClick={() => setPrResult(null)}
-                className="btn btn-xs btn-ghost"
-              >
+              <button onClick={() => setPrResult(null)} className="btn btn-xs btn-ghost">
                 ✕
               </button>
             </div>
@@ -569,10 +521,7 @@ export function FilesPageContent() {
               <Link href="/provenance" className="btn btn-xs btn-ghost">
                 View in Provenance →
               </Link>
-              <button
-                onClick={() => setImportResult(null)}
-                className="btn btn-xs btn-ghost"
-              >
+              <button onClick={() => setImportResult(null)} className="btn btn-xs btn-ghost">
                 ✕
               </button>
             </div>
@@ -616,14 +565,11 @@ export function FilesPageContent() {
                         });
                       });
 
-                      editor.addCommand(
-                        monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS,
-                        () => {
-                          if (!isEditorLocked) {
-                            handleSave();
-                          }
-                        },
-                      );
+                      editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
+                        if (!isEditorLocked) {
+                          handleSave();
+                        }
+                      });
                     }}
                     options={{
                       minimap: { enabled: true },
@@ -667,19 +613,13 @@ export function FilesPageContent() {
             )}
           </div>
           <div className="flex items-center gap-4">
-            {selectedFile && (
-              <span>{fileContent.split("\n").length} lines</span>
-            )}
+            {selectedFile && <span>{fileContent.split("\n").length} lines</span>}
           </div>
         </div>
 
         {/* Mobile FAB */}
         <div className="fab fixed bottom-20 right-4 z-30 sm:hidden">
-          <div
-            tabIndex={0}
-            role="button"
-            className="btn btn-circle btn-primary shadow-lg"
-          >
+          <div tabIndex={0} role="button" className="btn btn-circle btn-primary shadow-lg">
             <Plus size={20} />
           </div>
           <div className="flex items-center gap-2">
@@ -705,9 +645,7 @@ export function FilesPageContent() {
             </button>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-sm font-medium bg-base-100 px-2 py-1 rounded shadow">
-              Pull
-            </span>
+            <span className="text-sm font-medium bg-base-100 px-2 py-1 rounded shadow">Pull</span>
             <button
               onClick={handlePull}
               className={`btn btn-circle shadow-lg ${(gitStatusData as GitStatusExtended | undefined)?.has_remote_updates ? "btn-warning" : "btn-info"}`}
@@ -737,17 +675,12 @@ export function FilesPageContent() {
             </button>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-sm font-medium bg-base-100 px-2 py-1 rounded shadow">
-              Save
-            </span>
+            <span className="text-sm font-medium bg-base-100 px-2 py-1 rounded shadow">Save</span>
             <button
               onClick={handleSave}
               className={`btn btn-circle shadow-lg ${isEditorLocked ? "btn-outline bg-base-100" : "btn-success"}`}
               disabled={
-                !selectedFile ||
-                !hasUnsavedChanges ||
-                saveMutation.isPending ||
-                isEditorLocked
+                !selectedFile || !hasUnsavedChanges || saveMutation.isPending || isEditorLocked
               }
             >
               {saveMutation.isPending ? (

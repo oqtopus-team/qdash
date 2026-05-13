@@ -41,8 +41,7 @@ export function getQubitGridPosition(
   qid: string | number,
   params: TopologyLayoutParams,
 ): GridPosition {
-  const qidNum =
-    typeof qid === "string" ? parseInt(qid.replace(/\D/g, "")) : qid;
+  const qidNum = typeof qid === "string" ? parseInt(qid.replace(/\D/g, "")) : qid;
 
   // Linear layout: single row
   if (params.layoutType === "linear") {

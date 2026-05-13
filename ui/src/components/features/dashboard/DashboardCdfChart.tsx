@@ -24,9 +24,7 @@ interface CdfPoint {
   n: number;
 }
 
-function calculateCdf(
-  data: { [key: string]: MetricDataItem } | null,
-): CdfPoint | null {
+function calculateCdf(data: { [key: string]: MetricDataItem } | null): CdfPoint | null {
   if (!data) return null;
   const values = Object.values(data)
     .map((item) => item.value)
@@ -82,8 +80,7 @@ export function DashboardCdfChart({
       style={{ minHeight: height }}
     >
       <div className="px-1 pb-1 text-xs font-semibold text-base-content/80">
-        CDF · {title}{" "}
-        <span className="text-base-content/50 font-normal">(n={cdf.n})</span>
+        CDF · {title} <span className="text-base-content/50 font-normal">(n={cdf.n})</span>
       </div>
       <Plot
         data={[

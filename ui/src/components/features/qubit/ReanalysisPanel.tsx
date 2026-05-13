@@ -33,33 +33,16 @@ interface ReanalysisPanelProps {
 const RESONATOR_TASK = "CheckResonatorSpectroscopy";
 const QUBIT_TASK = "CheckQubitSpectroscopy";
 
-export function ReanalysisPanel({
-  chipId,
-  qubitId,
-  taskName,
-  sourceTaskId,
-}: ReanalysisPanelProps) {
+export function ReanalysisPanel({ chipId, qubitId, taskName, sourceTaskId }: ReanalysisPanelProps) {
   const kind: ReanalyzeKind | null =
-    taskName === RESONATOR_TASK
-      ? "resonator"
-      : taskName === QUBIT_TASK
-        ? "qubit"
-        : null;
+    taskName === RESONATOR_TASK ? "resonator" : taskName === QUBIT_TASK ? "qubit" : null;
 
   if (!kind) return null;
 
   return kind === "resonator" ? (
-    <ResonatorReanalysis
-      chipId={chipId}
-      qubitId={qubitId}
-      sourceTaskId={sourceTaskId}
-    />
+    <ResonatorReanalysis chipId={chipId} qubitId={qubitId} sourceTaskId={sourceTaskId} />
   ) : (
-    <QubitReanalysis
-      chipId={chipId}
-      qubitId={qubitId}
-      sourceTaskId={sourceTaskId}
-    />
+    <QubitReanalysis chipId={chipId} qubitId={qubitId} sourceTaskId={sourceTaskId} />
   );
 }
 
@@ -92,19 +75,14 @@ function ResonatorReanalysis({
   const [form, setForm] = useState<ResonatorParamForm>(DEFAULT_RESONATOR_FORM);
   const mutation = useReanalyzeResonatorSpectroscopy();
 
-  const usingAutoBoundary =
-    form.bare_shift_estimator_type === "high_frequency_strength";
+  const usingAutoBoundary = form.bare_shift_estimator_type === "high_frequency_strength";
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const params: ReanalyzeResonatorSpectroscopyParams = {
       num_resonators: parseInt(form.num_resonators) || null,
-      high_power_min: usingAutoBoundary
-        ? null
-        : parseFloatOrNull(form.high_power_min),
-      high_power_max: usingAutoBoundary
-        ? null
-        : parseFloatOrNull(form.high_power_max),
+      high_power_min: usingAutoBoundary ? null : parseFloatOrNull(form.high_power_min),
+      high_power_max: usingAutoBoundary ? null : parseFloatOrNull(form.high_power_max),
       low_power: usingAutoBoundary ? null : parseFloatOrNull(form.low_power),
       bare_shift_estimator_type:
         (form.bare_shift_estimator_type as ReanalyzeResonatorSpectroscopyParamsBareShiftEstimatorType) ||
@@ -147,8 +125,7 @@ function ResonatorReanalysis({
         onChange={(v) =>
           setForm({
             ...form,
-            bare_shift_estimator_type:
-              v as ResonatorParamForm["bare_shift_estimator_type"],
+            bare_shift_estimator_type: v as ResonatorParamForm["bare_shift_estimator_type"],
           })
         }
         options={[
@@ -230,12 +207,8 @@ function QubitReanalysis({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const params: ReanalyzeQubitSpectroscopyParams = {
-      binarize_threshold_sigma_plus: parseFloatOrNull(
-        form.binarize_threshold_sigma_plus,
-      ),
-      binarize_threshold_sigma_minus: parseFloatOrNull(
-        form.binarize_threshold_sigma_minus,
-      ),
+      binarize_threshold_sigma_plus: parseFloatOrNull(form.binarize_threshold_sigma_plus),
+      binarize_threshold_sigma_minus: parseFloatOrNull(form.binarize_threshold_sigma_minus),
       top_power: parseFloatOrNull(form.top_power),
       f01_height_min: parseFloatOrNull(form.f01_height_min),
       f12_distance_min: parseFloatOrNull(form.f12_distance_min),
@@ -275,9 +248,7 @@ function QubitReanalysis({
         label="binarize_threshold_sigma_minus"
         value={form.binarize_threshold_sigma_minus}
         placeholder="-2.0"
-        onChange={(v) =>
-          setForm({ ...form, binarize_threshold_sigma_minus: v })
-        }
+        onChange={(v) => setForm({ ...form, binarize_threshold_sigma_minus: v })}
       />
       <NumberField
         label="top_power (dB)"
@@ -343,13 +314,7 @@ interface PanelShellProps {
   onReset: () => void;
 }
 
-function PanelShell({
-  title,
-  children,
-  mutation,
-  onSubmit,
-  onReset,
-}: PanelShellProps) {
+function PanelShell({ title, children, mutation, onSubmit, onReset }: PanelShellProps) {
   return (
     <div className="card bg-base-100 shadow-md border border-base-300">
       <div className="card-body p-4">
@@ -361,15 +326,12 @@ function PanelShell({
           <span className="badge badge-ghost badge-sm">Preview only</span>
         </div>
         <p className="text-xs text-base-content/60 mb-3">
-          Re-runs the analysis on the stored spectroscopy figure with the given
-          overrides. Empty fields fall back to the original task&apos;s
-          parameters. The DB is not modified.
+          Re-runs the analysis on the stored spectroscopy figure with the given overrides. Empty
+          fields fall back to the original task&apos;s parameters. The DB is not modified.
         </p>
 
         <form onSubmit={onSubmit} className="space-y-3">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {children}
-          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">{children}</div>
           <div className="flex justify-end gap-2 pt-2">
             <button
               type="button"
@@ -380,11 +342,7 @@ function PanelShell({
               <RotateCcw size={14} />
               Reset
             </button>
-            <button
-              type="submit"
-              className="btn btn-sm btn-primary"
-              disabled={mutation.isPending}
-            >
+            <button type="submit" className="btn btn-sm btn-primary" disabled={mutation.isPending}>
               {mutation.isPending ? (
                 <span className="loading loading-spinner loading-xs" />
               ) : (
@@ -396,16 +354,11 @@ function PanelShell({
 
         {mutation.isError && (
           <div className="alert alert-error mt-3 text-sm">
-            <span>
-              Reanalysis failed:{" "}
-              {(mutation.error as Error)?.message ?? "unknown"}
-            </span>
+            <span>Reanalysis failed: {(mutation.error as Error)?.message ?? "unknown"}</span>
           </div>
         )}
 
-        {mutation.data?.data && (
-          <ReanalysisResult result={mutation.data.data} />
-        )}
+        {mutation.data?.data && <ReanalysisResult result={mutation.data.data} />}
       </div>
     </div>
   );
@@ -435,8 +388,7 @@ function ReanalysisResult({ result }: ReanalysisResultProps) {
     <div className="mt-4 space-y-3">
       <div>
         <div className="text-xs text-base-content/60 mb-1">
-          source_task_id:{" "}
-          <span className="font-mono">{result.source_task_id.slice(-12)}</span>
+          source_task_id: <span className="font-mono">{result.source_task_id.slice(-12)}</span>
         </div>
       </div>
 
@@ -452,17 +404,13 @@ function ReanalysisResult({ result }: ReanalysisResultProps) {
           />
         </div>
       ) : (
-        <div className="text-sm text-base-content/60">
-          No figure returned from the server.
-        </div>
+        <div className="text-sm text-base-content/60">No figure returned from the server.</div>
       )}
 
       <div>
         <div className="text-xs font-semibold mb-1">Re-estimated outputs</div>
         {result.output_parameters.length === 0 ? (
-          <div className="text-xs text-base-content/60">
-            No outputs (e.g. no f01 detected).
-          </div>
+          <div className="text-xs text-base-content/60">No outputs (e.g. no f01 detected).</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="table table-zebra table-xs">
@@ -502,13 +450,7 @@ interface NumberFieldProps {
   onChange: (v: string) => void;
 }
 
-function NumberField({
-  label,
-  value,
-  placeholder,
-  disabled,
-  onChange,
-}: NumberFieldProps) {
+function NumberField({ label, value, placeholder, disabled, onChange }: NumberFieldProps) {
   return (
     <label className="form-control">
       <span className="label-text text-xs font-mono">{label}</span>

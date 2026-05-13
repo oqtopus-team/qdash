@@ -4,15 +4,7 @@ import Link from "next/link";
 
 import { useQuery } from "@tanstack/react-query";
 import type React from "react";
-import {
-  CalendarClock,
-  Cpu,
-  Plus,
-  Tags,
-  User,
-  Users,
-  Workflow,
-} from "lucide-react";
+import { CalendarClock, Cpu, Plus, Tags, User, Users, Workflow } from "lucide-react";
 
 import type { FlowSummary } from "@/schemas";
 
@@ -37,9 +29,7 @@ function FlowMetaItem({
     <div className="flex min-w-0 items-center gap-2 text-xs text-base-content/70">
       <span className="text-base-content/45">{icon}</span>
       <span className="shrink-0">{label}</span>
-      <span className="min-w-0 truncate font-medium text-base-content">
-        {value}
-      </span>
+      <span className="min-w-0 truncate font-medium text-base-content">{value}</span>
     </div>
   );
 }
@@ -61,11 +51,7 @@ function FlowCard({ flow }: { flow: FlowSummary }) {
           label="Creator"
           value={flow.created_by}
         />
-        <FlowMetaItem
-          icon={<Cpu className="h-3.5 w-3.5" />}
-          label="Chip"
-          value={flow.chip_id}
-        />
+        <FlowMetaItem icon={<Cpu className="h-3.5 w-3.5" />} label="Chip" value={flow.chip_id} />
         <FlowMetaItem
           icon={<CalendarClock className="h-3.5 w-3.5" />}
           label="Updated"
@@ -121,9 +107,7 @@ function FlowTable({ flows }: { flows: FlowSummary[] }) {
                   {flow.name}
                 </Link>
                 {flow.description && (
-                  <div className="truncate text-xs text-base-content/60">
-                    {flow.description}
-                  </div>
+                  <div className="truncate text-xs text-base-content/60">{flow.description}</div>
                 )}
               </td>
               <td className="whitespace-nowrap">{flow.created_by}</td>
@@ -199,9 +183,7 @@ export function WorkflowPageContent() {
               <Workflow className="h-6 w-6 sm:h-8 sm:w-8" />
             </div>
             <div className="stat-title text-xs sm:text-sm">Workflows</div>
-            <div className="stat-value text-lg sm:text-2xl text-primary">
-              {flows.length}
-            </div>
+            <div className="stat-value text-lg sm:text-2xl text-primary">{flows.length}</div>
             <div className="stat-desc text-xs">Defined for this project</div>
           </div>
           <div className="stat bg-base-200 rounded-box p-4">
@@ -209,9 +191,7 @@ export function WorkflowPageContent() {
               <Users className="h-6 w-6 sm:h-8 sm:w-8" />
             </div>
             <div className="stat-title text-xs sm:text-sm">Creators</div>
-            <div className="stat-value text-lg sm:text-2xl text-secondary">
-              {creatorCount}
-            </div>
+            <div className="stat-value text-lg sm:text-2xl text-secondary">{creatorCount}</div>
             <div className="stat-desc text-xs">Distinct authors</div>
           </div>
           <div className="stat bg-base-200 rounded-box p-4">
@@ -219,9 +199,7 @@ export function WorkflowPageContent() {
               <Tags className="h-6 w-6 sm:h-8 sm:w-8" />
             </div>
             <div className="stat-title text-xs sm:text-sm">Tags</div>
-            <div className="stat-value text-lg sm:text-2xl text-accent">
-              {tagCount}
-            </div>
+            <div className="stat-value text-lg sm:text-2xl text-accent">{tagCount}</div>
             <div className="stat-desc text-xs">Unique labels in use</div>
           </div>
         </div>

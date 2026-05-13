@@ -12,18 +12,12 @@ function ForumPageSkeleton() {
         <div className="h-4 w-96 max-w-full bg-base-300 rounded animate-pulse mb-6" />
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5 mb-4">
           {[1, 2, 3, 4, 5].map((item) => (
-            <div
-              key={item}
-              className="h-24 bg-base-300 rounded-lg animate-pulse"
-            />
+            <div key={item} className="h-24 bg-base-300 rounded-lg animate-pulse" />
           ))}
         </div>
         <div className="space-y-3">
           {[1, 2, 3].map((item) => (
-            <div
-              key={item}
-              className="h-32 bg-base-300 rounded-lg animate-pulse"
-            />
+            <div key={item} className="h-32 bg-base-300 rounded-lg animate-pulse" />
           ))}
         </div>
       </div>

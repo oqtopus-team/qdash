@@ -3,11 +3,6 @@
   "entry": ["src/app/**/*.{ts,tsx}"],
   "project": ["src/**/*.{ts,tsx,js,jsx}"],
   "ignore": [
-    "**/*.d.ts",
-    "**/node_modules/**",
-    "**/.next/**",
-    "**/build/**",
-    "**/dist/**",
     "src/client/**/*.ts",
     "src/schemas/**/*.ts"
   ],
@@ -27,7 +22,7 @@
       "src/app/**/loading.tsx",
       "src/app/**/not-found.tsx",
       "src/app/**/route.ts",
-      "src/middleware.ts"
+      "src/proxy.ts"
     ]
   },
   "vitest": {

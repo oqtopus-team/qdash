@@ -14,10 +14,7 @@ import {
 } from "@/client/note/note";
 import type { GetChipNotesSummaryParams } from "@/schemas";
 import { MarkdownContent } from "@/components/ui/MarkdownContent";
-import {
-  MarkdownEditor,
-  type MentionCandidate,
-} from "@/components/ui/MarkdownEditor";
+import { MarkdownEditor, type MentionCandidate } from "@/components/ui/MarkdownEditor";
 import { formatDateTime } from "@/lib/utils/datetime";
 
 export interface NoteEntry {
@@ -84,12 +81,8 @@ export function MetricNotePanel({
   const deleteQubit = useDeleteQubitMetricNote();
   const upsertCoupling = useUpsertCouplingMetricNote();
   const deleteCoupling = useDeleteCouplingMetricNote();
-  const upsertPending = isCoupling
-    ? upsertCoupling.isPending
-    : upsertQubit.isPending;
-  const deletePending = isCoupling
-    ? deleteCoupling.isPending
-    : deleteQubit.isPending;
+  const upsertPending = isCoupling ? upsertCoupling.isPending : upsertQubit.isPending;
+  const deletePending = isCoupling ? deleteCoupling.isPending : deleteQubit.isPending;
 
   useEffect(() => {
     setDraft(existing?.content ?? "");
@@ -179,8 +172,8 @@ export function MetricNotePanel({
         </div>
         <div className="mt-0.5 text-xs text-base-content/60">{scopeLabel}</div>
         <div className="mt-1 text-xs text-base-content/50">
-          For {formatTarget(targetId)} · {metricTitle}. Saved to the active
-          operational scope, not as a permanent chip-wide note.
+          For {formatTarget(targetId)} · {metricTitle}. Saved to the active operational scope, not
+          as a permanent chip-wide note.
         </div>
       </div>
 
@@ -212,20 +205,13 @@ export function MetricNotePanel({
             <summary className="px-3 py-2 cursor-pointer text-xs font-semibold flex items-center justify-between">
               <span>
                 Other notes for {formatTarget(targetId)}
-                <span className="ml-1 text-base-content/60 font-normal">
-                  ({otherNotes.length})
-                </span>
+                <span className="ml-1 text-base-content/60 font-normal">({otherNotes.length})</span>
               </span>
-              <span className="text-base-content/40 font-normal">
-                read-only
-              </span>
+              <span className="text-base-content/40 font-normal">read-only</span>
             </summary>
             <ul className="px-3 pb-3 pt-1 space-y-2 text-xs">
               {otherNotes.map((note) => (
-                <li
-                  key={note.metricKey}
-                  className="border-l-2 border-base-300 pl-2"
-                >
+                <li key={note.metricKey} className="border-l-2 border-base-300 pl-2">
                   <div className="flex items-center justify-between gap-2">
                     <span className="font-semibold">{note.metricTitle}</span>
                     <span className="text-base-content/50">
@@ -265,11 +251,7 @@ function ViewState({
         <div className="text-sm text-base-content/70">
           No note for this metric on the current view yet.
         </div>
-        <button
-          className="btn btn-sm btn-primary gap-1"
-          onClick={onEdit}
-          type="button"
-        >
+        <button className="btn btn-sm btn-primary gap-1" onClick={onEdit} type="button">
           <Pencil className="h-3.5 w-3.5" />
           Add note
         </button>
@@ -285,20 +267,12 @@ function ViewState({
       <div className="text-[11px] text-base-content/60 flex flex-wrap gap-x-2">
         <span>
           Last edited by{" "}
-          <span className="font-medium text-base-content/80">
-            {existing.username || "—"}
-          </span>
+          <span className="font-medium text-base-content/80">{existing.username || "—"}</span>
         </span>
-        {existing.updatedAt && (
-          <span>· {formatDateTime(existing.updatedAt)}</span>
-        )}
+        {existing.updatedAt && <span>· {formatDateTime(existing.updatedAt)}</span>}
       </div>
       <div className="flex gap-2 pt-1">
-        <button
-          className="btn btn-sm btn-primary gap-1"
-          onClick={onEdit}
-          type="button"
-        >
+        <button className="btn btn-sm btn-primary gap-1" onClick={onEdit} type="button">
           <Pencil className="h-3.5 w-3.5" />
           Edit
         </button>
@@ -351,13 +325,10 @@ function EditState({
         mentionCandidates={mentionCandidates}
       />
       <div className="flex items-center justify-between text-[11px] text-base-content/50">
-        <span className={isTooLong ? "text-error" : undefined}>
-          {draft.length} / 5000
-        </span>
+        <span className={isTooLong ? "text-error" : undefined}>{draft.length} / 5000</span>
         {existing?.updatedAt && (
           <span>
-            Last edited {formatDateTime(existing.updatedAt)} by{" "}
-            {existing.username || "—"}
+            Last edited {formatDateTime(existing.updatedAt)} by {existing.username || "—"}
           </span>
         )}
       </div>
@@ -373,11 +344,7 @@ function EditState({
           Delete
         </button>
         <div className="flex gap-2 ml-auto">
-          <button
-            className="btn btn-sm btn-ghost gap-1"
-            onClick={onCancel}
-            type="button"
-          >
+          <button className="btn btn-sm btn-ghost gap-1" onClick={onCancel} type="button">
             <X className="h-3.5 w-3.5" />
             Cancel
           </button>

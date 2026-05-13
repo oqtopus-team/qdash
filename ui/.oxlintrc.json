@@ -1,0 +1,26 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "ignorePatterns": ["node_modules/**", ".next/**", "src/schemas/**", "src/client/**"],
+  "options": {
+    "maxWarnings": 15
+  },
+  "plugins": ["typescript", "react", "nextjs"],
+  "rules": {
+    "react/rules-of-hooks": "error",
+    "react/exhaustive-deps": "warn",
+    "typescript/no-explicit-any": "warn",
+    "typescript/no-unused-vars": [
+      "warn",
+      {
+        "argsIgnorePattern": "^_",
+        "varsIgnorePattern": "^_"
+      }
+    ],
+    "nextjs/no-img-element": "warn"
+  },
+  "settings": {
+    "next": {
+      "rootDir": ["."]
+    }
+  }
+}

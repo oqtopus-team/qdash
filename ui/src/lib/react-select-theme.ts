@@ -13,9 +13,7 @@ export function getDaisySelectStyles<
     control: (provided, state) => ({
       ...provided,
       backgroundColor: "oklch(var(--b1))",
-      borderColor: state.isFocused
-        ? "oklch(var(--p))"
-        : "oklch(var(--bc) / 0.2)",
+      borderColor: state.isFocused ? "oklch(var(--p))" : "oklch(var(--bc) / 0.2)",
       borderRadius: "var(--rounded-btn, 0.5rem)",
       minHeight: "2.5rem",
       height: "2.5rem",
@@ -71,8 +69,7 @@ export function getDaisySelectStyles<
       backgroundColor: "oklch(var(--b1))",
       borderRadius: "var(--rounded-box, 0.5rem)",
       border: "1px solid oklch(var(--bc) / 0.2)",
-      boxShadow:
-        "0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)",
+      boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)",
       zIndex: 50,
       overflow: "hidden",
     }),
@@ -92,9 +89,7 @@ export function getDaisySelectStyles<
       padding: "0.5rem 0.75rem",
       cursor: "pointer",
       "&:active": {
-        backgroundColor: state.isSelected
-          ? "oklch(var(--p))"
-          : "oklch(var(--b3))",
+        backgroundColor: state.isSelected ? "oklch(var(--p))" : "oklch(var(--b3))",
       },
     }),
     group: (provided) => ({
@@ -154,9 +149,7 @@ export function getDaisySelectStylesSm<
     control: (provided, state) => ({
       ...provided,
       backgroundColor: "oklch(var(--b1))",
-      borderColor: state.isFocused
-        ? "oklch(var(--p))"
-        : "oklch(var(--bc) / 0.2)",
+      borderColor: state.isFocused ? "oklch(var(--p))" : "oklch(var(--bc) / 0.2)",
       borderRadius: "var(--rounded-btn, 0.5rem)",
       minHeight: "2rem",
       height: "2rem",
@@ -213,8 +206,7 @@ export function getDaisySelectStylesSm<
       backgroundColor: "oklch(var(--b1))",
       borderRadius: "var(--rounded-box, 0.5rem)",
       border: "1px solid oklch(var(--bc) / 0.2)",
-      boxShadow:
-        "0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)",
+      boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)",
       zIndex: 50,
       overflow: "hidden",
     }),
@@ -235,9 +227,7 @@ export function getDaisySelectStylesSm<
       fontSize: "0.875rem",
       cursor: "pointer",
       "&:active": {
-        backgroundColor: state.isSelected
-          ? "oklch(var(--p))"
-          : "oklch(var(--b3))",
+        backgroundColor: state.isSelected ? "oklch(var(--p))" : "oklch(var(--b3))",
       },
     }),
     group: (provided) => ({

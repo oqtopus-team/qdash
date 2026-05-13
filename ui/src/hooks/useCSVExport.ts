@@ -1,10 +1,6 @@
 import { useCallback } from "react";
 
-import type {
-  TimeSeriesDataPoint,
-  CorrelationDataPoint,
-  CSVExportOptions,
-} from "@/types/analysis";
+import type { TimeSeriesDataPoint, CorrelationDataPoint, CSVExportOptions } from "@/types/analysis";
 
 /**
  * Custom hook for CSV export functionality
@@ -24,9 +20,7 @@ export function useCSVExport() {
             // Handle numbers, strings, and special characters
             const cellStr = String(cell);
             // Wrap in quotes if contains comma, newline, or quote
-            return cellStr.includes(",") ||
-              cellStr.includes("\n") ||
-              cellStr.includes('"')
+            return cellStr.includes(",") || cellStr.includes("\n") || cellStr.includes('"')
               ? `"${cellStr.replace(/"/g, '""')}"`
               : cellStr;
           })
@@ -46,12 +40,7 @@ export function useCSVExport() {
 
   // Export time series data
   const exportTimeSeriesCSV = useCallback(
-    (
-      data: TimeSeriesDataPoint[],
-      parameter: string,
-      chipId?: string,
-      tag?: string,
-    ) => {
+    (data: TimeSeriesDataPoint[], parameter: string, chipId?: string, tag?: string) => {
       if (!data || data.length === 0) return;
 
       const headers = ["QID", "Time", "Parameter", "Value", "Error", "Unit"];
@@ -71,10 +60,7 @@ export function useCSVExport() {
         return a[1].localeCompare(b[1]);
       });
 
-      const timestamp = new Date()
-        .toISOString()
-        .slice(0, 19)
-        .replace(/[:-]/g, "");
+      const timestamp = new Date().toISOString().slice(0, 19).replace(/[:-]/g, "");
       const filename = `timeseries_${chipId || "unknown"}_${parameter}_${tag || "data"}_${timestamp}.csv`;
 
       exportToCSV({ filename, headers, data: rows });
@@ -111,10 +97,7 @@ export function useCSVExport() {
         point.yUnit,
       ]);
 
-      const timestamp = new Date()
-        .toISOString()
-        .slice(0, 19)
-        .replace(/[:-]/g, "");
+      const timestamp = new Date().toISOString().slice(0, 19).replace(/[:-]/g, "");
       const filename = `correlation_${chipId || "unknown"}_${qubitId || "multi"}_${xParameter}_vs_${yParameter}_${timestamp}.csv`;
 
       exportToCSV({ filename, headers, data: rows });

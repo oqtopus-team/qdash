@@ -42,8 +42,7 @@ export function MetricsStatsCards({
       .map((item) => item.value)
       .filter((v): v is number => v !== null && !isNaN(v));
 
-    const total =
-      metricType === "qubit" ? gridSize * gridSize : gridSize * gridSize * 2; // Approximate coupling count
+    const total = metricType === "qubit" ? gridSize * gridSize : gridSize * gridSize * 2; // Approximate coupling count
 
     const withData = values.length;
     const coverage = total > 0 ? (withData / total) * 100 : 0;
@@ -95,11 +94,7 @@ export function MetricsStatsCards({
         <div className="stat py-3 px-4">
           <div className="stat-title text-xs">Average {title}</div>
           <div className="stat-value text-xl text-primary">
-            <AnimatedCounter
-              value={stats.avg}
-              duration={800}
-              decimals={getDecimals(stats.avg)}
-            />
+            <AnimatedCounter value={stats.avg} duration={800} decimals={getDecimals(stats.avg)} />
           </div>
           <div className="stat-desc text-xs">{unit}</div>
         </div>
@@ -125,11 +120,7 @@ export function MetricsStatsCards({
         <div className="stat py-3 px-4">
           <div className="stat-title text-xs">Minimum</div>
           <div className="stat-value text-xl text-info">
-            <AnimatedCounter
-              value={stats.min}
-              duration={800}
-              decimals={getDecimals(stats.min)}
-            />
+            <AnimatedCounter value={stats.min} duration={800} decimals={getDecimals(stats.min)} />
           </div>
           <div className="stat-desc text-xs">{unit}</div>
         </div>
@@ -140,11 +131,7 @@ export function MetricsStatsCards({
         <div className="stat py-3 px-4">
           <div className="stat-title text-xs">Maximum</div>
           <div className="stat-value text-xl text-success">
-            <AnimatedCounter
-              value={stats.max}
-              duration={800}
-              decimals={getDecimals(stats.max)}
-            />
+            <AnimatedCounter value={stats.max} duration={800} decimals={getDecimals(stats.max)} />
           </div>
           <div className="stat-desc text-xs">{unit}</div>
         </div>
@@ -168,8 +155,7 @@ export function useMetricStats(
       .map((item) => item.value)
       .filter((v): v is number => v !== null && !isNaN(v));
 
-    const total =
-      metricType === "qubit" ? gridSize * gridSize : gridSize * gridSize * 2;
+    const total = metricType === "qubit" ? gridSize * gridSize : gridSize * gridSize * 2;
     const withData = values.length;
     const coverage = total > 0 ? (withData / total) * 100 : 0;
 

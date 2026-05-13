@@ -40,10 +40,7 @@ export function CooldownSelector({
     { chip_id: chipId || undefined },
     { query: { enabled: !!chipId, staleTime: 30_000 } },
   );
-  const cooldowns = useMemo(
-    () => data?.data?.cooldowns ?? [],
-    [data?.data?.cooldowns],
-  );
+  const cooldowns = useMemo(() => data?.data?.cooldowns ?? [], [data?.data?.cooldowns]);
 
   const options = useMemo<CooldownOption[]>(
     () =>
@@ -58,8 +55,7 @@ export function CooldownSelector({
     labels: options.map((o) => o.label),
     placeholder,
   });
-  const selectedOption =
-    options.find((option) => option.value === selectedCooldownId) ?? null;
+  const selectedOption = options.find((option) => option.value === selectedCooldownId) ?? null;
 
   if (!chipId) return null;
   if (isLoading) {

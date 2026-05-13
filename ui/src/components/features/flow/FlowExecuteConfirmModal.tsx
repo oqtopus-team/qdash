@@ -83,10 +83,7 @@ export function FlowExecuteConfirmModal({
                 <h3 className="font-medium mb-2">Tags</h3>
                 <div className="flex flex-wrap gap-2">
                   {tagList.map((tag, index) => (
-                    <span
-                      key={index}
-                      className="px-2 py-1 bg-base-200 rounded text-sm"
-                    >
+                    <span key={index} className="px-2 py-1 bg-base-200 rounded text-sm">
                       {tag}
                     </span>
                   ))}
@@ -98,8 +95,8 @@ export function FlowExecuteConfirmModal({
               <div className="alert alert-warning">
                 <Lock className="h-5 w-5" />
                 <span>
-                  Execution is locked. Another calibration is currently running.
-                  Please wait until it completes.
+                  Execution is locked. Another calibration is currently running. Please wait until
+                  it completes.
                 </span>
               </div>
             )}

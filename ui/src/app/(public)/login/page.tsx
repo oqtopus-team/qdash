@@ -65,15 +65,12 @@ export default function LoginPage() {
               className="w-40 h-40 lg:w-52 lg:h-52 object-contain"
             />
           </div>
-          <h1 className="text-5xl lg:text-6xl font-bold login-title-gradient">
-            QDash
-          </h1>
+          <h1 className="text-5xl lg:text-6xl font-bold login-title-gradient">QDash</h1>
           <div className="mt-4">
             <EnvironmentBadge className="badge-lg" />
           </div>
           <p className="py-6 text-base-content/70 text-xl lg:text-2xl">
-            Quantum Calibration Dashboard for managing and monitoring qubit
-            calibration workflows.
+            Quantum Calibration Dashboard for managing and monitoring qubit calibration workflows.
           </p>
           <div className="hidden lg:flex gap-3 flex-wrap">
             <span className="badge badge-outline badge-lg">Calibration</span>

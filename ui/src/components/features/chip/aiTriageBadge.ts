@@ -6,9 +6,7 @@ export type AiTriageBadgeState = {
   tooltip: string;
 };
 
-export function getAiTriageBadgeState(
-  content: string,
-): AiTriageBadgeState | null {
+export function getAiTriageBadgeState(content: string): AiTriageBadgeState | null {
   if (!content.includes("## AI triage")) return null;
 
   const decision = extractAiTriageDecision(content);
@@ -29,9 +27,7 @@ export function getAiTriageBadgeState(
 }
 
 function extractAiTriageDecision(content: string): string | null {
-  const match = content.match(
-    /(?:^|\n)\s*(?:-?\s*)?(?:Decision|判定)\s*:\s*`?([A-Z_]+)`?/i,
-  );
+  const match = content.match(/(?:^|\n)\s*(?:-?\s*)?(?:Decision|判定)\s*:\s*`?([A-Z_]+)`?/i);
   return match?.[1]?.toUpperCase() ?? null;
 }
 
@@ -41,13 +37,8 @@ function hasAiTriageNeedsReview(content: string): boolean {
   );
   if (!needsReviewMatch) return false;
 
-  const needsReview = needsReviewMatch[1]
-    .replace(/[`*]/g, "")
-    .trim()
-    .toLowerCase();
-  return Boolean(
-    needsReview && needsReview !== "none" && needsReview !== "なし",
-  );
+  const needsReview = needsReviewMatch[1].replace(/[`*]/g, "").trim().toLowerCase();
+  return Boolean(needsReview && needsReview !== "none" && needsReview !== "なし");
 }
 
 const reviewRequiredBadge: AiTriageBadgeState = {

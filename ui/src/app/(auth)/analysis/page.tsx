@@ -17,8 +17,7 @@ type AnalyzeView = "timeseries" | "histogram" | "cdf" | "correlation";
 
 function AnalyzePageContent() {
   // URL state management for view type
-  const { analysisViewType, setAnalysisViewType, isInitialized } =
-    useAnalysisUrlState();
+  const { analysisViewType, setAnalysisViewType, isInitialized } = useAnalysisUrlState();
   const currentView = (analysisViewType || "timeseries") as AnalyzeView;
   const setCurrentView = (view: string) => {
     setAnalysisViewType(view);
@@ -37,10 +36,7 @@ function AnalyzePageContent() {
     <PageContainer maxWidth>
       <div className="space-y-4 sm:space-y-8">
         {/* Header Section */}
-        <PageHeader
-          title="Chip Analysis"
-          description="Analyze and visualize chip parameters"
-        />
+        <PageHeader title="Chip Analysis" description="Analyze and visualize chip parameters" />
 
         {/* View Selection Tabs */}
         <div className="tabs tabs-boxed w-full sm:w-fit gap-1 sm:gap-2 p-1 sm:p-2 overflow-x-auto flex-nowrap">

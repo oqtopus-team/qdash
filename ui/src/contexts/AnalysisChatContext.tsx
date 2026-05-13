@@ -1,13 +1,6 @@
 "use client";
 
-import React, {
-  createContext,
-  useContext,
-  useState,
-  useCallback,
-  useEffect,
-  useRef,
-} from "react";
+import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from "react";
 import type { AnalysisContext, ChatMessage } from "@/hooks/useAnalysisChat";
 
 // ---------------------------------------------------------------------------
@@ -86,9 +79,7 @@ function loadSessions(): ChatSession[] {
       for (const s of old) {
         merged.push({
           ...s,
-          title: s.context
-            ? `${s.context.taskName} / ${s.context.qid}`
-            : "General Chat",
+          title: s.context ? `${s.context.taskName} / ${s.context.qid}` : "General Chat",
         });
       }
     }
@@ -152,11 +143,7 @@ function contextKey(ctx: AnalysisContext | null): string {
 
 const AnalysisChatCtx = createContext<AnalysisChatContextValue | null>(null);
 
-export function AnalysisChatProvider({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export function AnalysisChatProvider({ children }: { children: React.ReactNode }) {
   const [isOpen, setIsOpen] = useState(false);
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
@@ -214,9 +201,7 @@ export function AnalysisChatProvider({
 
   const openGeneralChat = useCallback(() => {
     // Find existing general session (no context)
-    const existing = sessions.find(
-      (s) => contextKey(s.context) === GENERAL_CHAT_KEY,
-    );
+    const existing = sessions.find((s) => contextKey(s.context) === GENERAL_CHAT_KEY);
     if (existing) {
       setActiveSessionId(existing.id);
     } else {
@@ -282,24 +267,21 @@ export function AnalysisChatProvider({
     setActiveSessionId(sessionId);
   }, []);
 
-  const createNewSession = useCallback(
-    (ctx: AnalysisContext | null): string => {
-      const id = generateId();
-      const now = Date.now();
-      const session: ChatSession = {
-        id,
-        title: ctx ? `${ctx.taskName} / ${ctx.qid}` : "New Chat",
-        context: ctx,
-        messages: [],
-        createdAt: now,
-        updatedAt: now,
-      };
-      setSessions((prev) => [session, ...prev]);
-      setActiveSessionId(id);
-      return id;
-    },
-    [],
-  );
+  const createNewSession = useCallback((ctx: AnalysisContext | null): string => {
+    const id = generateId();
+    const now = Date.now();
+    const session: ChatSession = {
+      id,
+      title: ctx ? `${ctx.taskName} / ${ctx.qid}` : "New Chat",
+      context: ctx,
+      messages: [],
+      createdAt: now,
+      updatedAt: now,
+    };
+    setSessions((prev) => [session, ...prev]);
+    setActiveSessionId(id);
+    return id;
+  }, []);
 
   const deleteSession = useCallback(
     (sessionId: string) => {
@@ -315,9 +297,7 @@ export function AnalysisChatProvider({
     if (!activeSessionId) return;
     setSessions((prev) =>
       prev.map((s) =>
-        s.id === activeSessionId
-          ? { ...s, messages: [], updatedAt: Date.now() }
-          : s,
+        s.id === activeSessionId ? { ...s, messages: [], updatedAt: Date.now() } : s,
       ),
     );
   }, [activeSessionId]);
@@ -335,39 +315,27 @@ export function AnalysisChatProvider({
     (_ctx: AnalysisContext, messages: ChatMessage[]) => {
       if (!activeSessionId) return;
       setSessions((prev) =>
-        prev.map((s) =>
-          s.id === activeSessionId
-            ? { ...s, messages, updatedAt: Date.now() }
-            : s,
-        ),
+        prev.map((s) => (s.id === activeSessionId ? { ...s, messages, updatedAt: Date.now() } : s)),
       );
     },
     [activeSessionId],
   );
 
-  const updateSessionMessages = useCallback(
-    (sessionId: string, messages: ChatMessage[]) => {
-      setSessions((prev) =>
-        prev.map((s) =>
-          s.id === sessionId ? { ...s, messages, updatedAt: Date.now() } : s,
-        ),
-      );
-    },
-    [],
-  );
+  const updateSessionMessages = useCallback((sessionId: string, messages: ChatMessage[]) => {
+    setSessions((prev) =>
+      prev.map((s) => (s.id === sessionId ? { ...s, messages, updatedAt: Date.now() } : s)),
+    );
+  }, []);
 
-  const autoTitleSession = useCallback(
-    (sessionId: string, firstMessage: string) => {
-      setSessions((prev) =>
-        prev.map((s) =>
-          s.id === sessionId && s.title === "New Chat"
-            ? { ...s, title: firstMessage.slice(0, 50) }
-            : s,
-        ),
-      );
-    },
-    [],
-  );
+  const autoTitleSession = useCallback((sessionId: string, firstMessage: string) => {
+    setSessions((prev) =>
+      prev.map((s) =>
+        s.id === sessionId && s.title === "New Chat"
+          ? { ...s, title: firstMessage.slice(0, 50) }
+          : s,
+      ),
+    );
+  }, []);
 
   return (
     <AnalysisChatCtx.Provider
@@ -401,9 +369,7 @@ export function AnalysisChatProvider({
 export function useAnalysisChatContext() {
   const ctx = useContext(AnalysisChatCtx);
   if (!ctx) {
-    throw new Error(
-      "useAnalysisChatContext must be used within AnalysisChatProvider",
-    );
+    throw new Error("useAnalysisChatContext must be used within AnalysisChatProvider");
   }
   return ctx;
 }

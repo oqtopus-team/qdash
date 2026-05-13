@@ -73,9 +73,7 @@ export function LinearGauge({
 
   return (
     <div className={`flex items-center gap-3 ${className}`}>
-      <span className="text-xs text-base-content/60 whitespace-nowrap">
-        {label}
-      </span>
+      <span className="text-xs text-base-content/60 whitespace-nowrap">{label}</span>
 
       {/* Gauge bar */}
       <div className="flex-1 h-2 bg-base-300 rounded-full overflow-hidden min-w-24 max-w-32">
@@ -86,9 +84,7 @@ export function LinearGauge({
       </div>
 
       {/* Percentage and count */}
-      <span
-        className={`text-sm font-bold whitespace-nowrap ${getTextColor(animatedValue)}`}
-      >
+      <span className={`text-sm font-bold whitespace-nowrap ${getTextColor(animatedValue)}`}>
         {animatedValue.toFixed(1)}%
       </span>
       <span className="text-xs text-base-content/50 whitespace-nowrap">
@@ -97,9 +93,7 @@ export function LinearGauge({
 
       {/* Badge or remaining */}
       {current === 0 ? (
-        <span className="text-xs text-base-content/40 whitespace-nowrap">
-          No data
-        </span>
+        <span className="text-xs text-base-content/40 whitespace-nowrap">No data</span>
       ) : badge ? (
         <span className="flex items-center gap-1">
           <FluentEmoji name={badge.emoji} size={16} />

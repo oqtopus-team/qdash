@@ -16,9 +16,7 @@ export function RegionZoomToggle({ enabled, onToggle }: RegionZoomToggleProps) {
       onClick={() => onToggle(!enabled)}
     >
       <div
-        className={`p-2 rounded-lg ${
-          enabled ? "bg-primary text-primary-content" : "bg-base-300"
-        }`}
+        className={`p-2 rounded-lg ${enabled ? "bg-primary text-primary-content" : "bg-base-300"}`}
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -40,9 +38,7 @@ export function RegionZoomToggle({ enabled, onToggle }: RegionZoomToggleProps) {
       <div className="flex-1">
         <div className="flex items-center gap-2">
           <span className="font-medium text-sm">Region Zoom</span>
-          {enabled && (
-            <span className="badge badge-primary badge-xs">Active</span>
-          )}
+          {enabled && <span className="badge badge-primary badge-xs">Active</span>}
         </div>
         <p className="text-xs text-base-content/60">
           {enabled

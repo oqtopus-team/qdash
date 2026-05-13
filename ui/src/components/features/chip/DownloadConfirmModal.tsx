@@ -57,8 +57,7 @@ export function DownloadConfirmModal({
           <div>
             <h3 className="font-semibold text-lg">Download task artifacts</h3>
             <p className="text-sm text-base-content/70 mt-1">
-              {selectedCount} task result{selectedCount === 1 ? "" : "s"}{" "}
-              selected
+              {selectedCount} task result{selectedCount === 1 ? "" : "s"} selected
             </p>
           </div>
           <button
@@ -103,11 +102,7 @@ export function DownloadConfirmModal({
         </div>
 
         <div className="modal-action">
-          <button
-            className="btn btn-ghost"
-            onClick={onClose}
-            disabled={isSubmitting}
-          >
+          <button className="btn btn-ghost" onClick={onClose} disabled={isSubmitting}>
             Cancel
           </button>
           <button
@@ -115,17 +110,12 @@ export function DownloadConfirmModal({
             onClick={onConfirm}
             disabled={isSubmitting || selectedItemCount === 0}
           >
-            {isSubmitting ? (
-              <span className="loading loading-spinner loading-xs" />
-            ) : null}
+            {isSubmitting ? <span className="loading loading-spinner loading-xs" /> : null}
             Download
           </button>
         </div>
       </div>
-      <button
-        className="modal-backdrop"
-        onClick={isSubmitting ? undefined : onClose}
-      >
+      <button className="modal-backdrop" onClick={isSubmitting ? undefined : onClose}>
         close
       </button>
     </div>

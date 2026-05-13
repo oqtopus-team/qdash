@@ -1,11 +1,6 @@
 import { useCallback, useState, useEffect } from "react";
 
-import {
-  useQueryState,
-  parseAsString,
-  parseAsBoolean,
-  parseAsFloat,
-} from "nuqs";
+import { useQueryState, parseAsString, parseAsBoolean, parseAsFloat } from "nuqs";
 
 import { URL_DEFAULTS, type TimeRange, type SelectionMode } from "./types";
 
@@ -29,32 +24,17 @@ export function useHistogramUrlState(): UseHistogramUrlStateResult {
   const [isInitialized, setIsInitialized] = useState(false);
 
   // URL state management
-  const [selectedChip, setSelectedChipState] = useQueryState(
-    "chip",
-    parseAsString,
-  );
+  const [selectedChip, setSelectedChipState] = useQueryState("chip", parseAsString);
 
   const [timeRange, setTimeRangeState] = useQueryState("range", parseAsString);
 
-  const [selectionMode, setSelectionModeState] = useQueryState(
-    "mode",
-    parseAsString,
-  );
+  const [selectionMode, setSelectionModeState] = useQueryState("mode", parseAsString);
 
-  const [selectedParameter, setSelectedParameterState] = useQueryState(
-    "param",
-    parseAsString,
-  );
+  const [selectedParameter, setSelectedParameterState] = useQueryState("param", parseAsString);
 
-  const [showAsErrorRate, setShowAsErrorRateState] = useQueryState(
-    "errorRate",
-    parseAsBoolean,
-  );
+  const [showAsErrorRate, setShowAsErrorRateState] = useQueryState("errorRate", parseAsBoolean);
 
-  const [customThreshold, setCustomThresholdState] = useQueryState(
-    "threshold",
-    parseAsFloat,
-  );
+  const [customThreshold, setCustomThresholdState] = useQueryState("threshold", parseAsFloat);
 
   // Initialize state on mount
   useEffect(() => {
@@ -93,9 +73,7 @@ export function useHistogramUrlState(): UseHistogramUrlStateResult {
 
   const setShowAsErrorRate = useCallback(
     (show: boolean) => {
-      setShowAsErrorRateState(
-        show === URL_DEFAULTS.SHOW_ERROR_RATE ? null : show,
-      );
+      setShowAsErrorRateState(show === URL_DEFAULTS.SHOW_ERROR_RATE ? null : show);
     },
     [setShowAsErrorRateState],
   );

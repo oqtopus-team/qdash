@@ -128,10 +128,7 @@ export function useCopilotChat(options?: UseCopilotChatOptions) {
             if (evt.event === "status") {
               const payload = JSON.parse(evt.data);
               setStatusMessage(payload.message);
-              if (
-                payload.completed_tools &&
-                Array.isArray(payload.completed_tools)
-              ) {
+              if (payload.completed_tools && Array.isArray(payload.completed_tools)) {
                 setCompletedTools(payload.completed_tools);
               }
             } else if (evt.event === "result") {
@@ -164,11 +161,7 @@ export function useCopilotChat(options?: UseCopilotChatOptions) {
           content: `Error: ${errorMsg}`,
         };
         // Re-read messages from context to get latest state
-        updateSessionMessages(sessionId!, [
-          ...currentMessages,
-          userMsg,
-          errorAssistant,
-        ]);
+        updateSessionMessages(sessionId!, [...currentMessages, userMsg, errorAssistant]);
       } finally {
         setIsLoading(false);
         setStatusMessage(null);

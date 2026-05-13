@@ -13,10 +13,7 @@ import { useToast } from "@/components/ui/Toast";
 
 import { useGetCurrentUser } from "@/client/auth/auth";
 import { useListChips } from "@/client/chip/chip";
-import {
-  useGetExecutionLockStatus,
-  useCancelExecution,
-} from "@/client/execution/execution";
+import { useGetExecutionLockStatus, useCancelExecution } from "@/client/execution/execution";
 import {
   getFlow,
   saveFlow,
@@ -76,12 +73,11 @@ export default function EditFlowPage() {
   const { data: chipsData } = useListChips();
 
   // Fetch execution lock status (refresh every 5 seconds)
-  const { data: lockStatus, isLoading: isLockStatusLoading } =
-    useGetExecutionLockStatus({
-      query: {
-        refetchInterval: 5000,
-      },
-    });
+  const { data: lockStatus, isLoading: isLockStatusLoading } = useGetExecutionLockStatus({
+    query: {
+      refetchInterval: 5000,
+    },
+  });
 
   // Fetch schedules for this flow
   const { data: schedulesData } = useQuery({
@@ -123,9 +119,7 @@ export default function EditFlowPage() {
       onSuccess: (response: AxiosResponse<ExecuteFlowResponse>) => {
         const execId = response.data.execution_id || null;
         setLastExecutionId(execId);
-        toast.success(
-          `Flow execution started! Execution ID: ${execId || "N/A"}`,
-        );
+        toast.success(`Flow execution started! Execution ID: ${execId || "N/A"}`);
       },
     },
   });
@@ -138,8 +132,8 @@ export default function EditFlowPage() {
       },
       onError: (error: unknown) => {
         const detail =
-          (error as { response?: { data?: { detail?: string } } })?.response
-            ?.data?.detail || "Failed to cancel execution";
+          (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail ||
+          "Failed to cancel execution";
         toast.error(detail);
       },
     },
@@ -166,9 +160,7 @@ export default function EditFlowPage() {
         | Record<string, { value?: string | number }>
         | undefined;
       setDefaultInterval(
-        runParams?.interval?.value != null
-          ? String(runParams.interval.value)
-          : "",
+        runParams?.interval?.value != null ? String(runParams.interval.value) : "",
       );
     }
   }, [data, userData, chipsData]);
@@ -182,12 +174,7 @@ export default function EditFlowPage() {
 
   // Set default chip_id if not set by flow data
   useEffect(() => {
-    if (
-      chipsData?.data?.chips &&
-      chipsData.data.chips.length > 0 &&
-      !chipId &&
-      !data?.data
-    ) {
+    if (chipsData?.data?.chips && chipsData.data.chips.length > 0 && !chipId && !data?.data) {
       // Get the latest chip (sort by installed_at descending)
       const sortedChips = [...chipsData.data.chips].sort((a, b) => {
         const dateA = a.installed_at ? new Date(a.installed_at).getTime() : 0;
@@ -246,10 +233,7 @@ export default function EditFlowPage() {
         <div className="alert alert-error">
           <span>Failed to load flow: {(error as Error)?.message}</span>
         </div>
-        <button
-          onClick={() => router.push("/workflow")}
-          className="btn btn-ghost mt-4"
-        >
+        <button onClick={() => router.push("/workflow")} className="btn btn-ghost mt-4">
           ← Back to Flows
         </button>
       </div>
@@ -271,9 +255,7 @@ export default function EditFlowPage() {
             </button>
             <div className="flex items-center gap-2 min-w-0">
               <span className="text-sm text-base-content/50">●</span>
-              <span className="text-sm font-medium text-base-content truncate">
-                {name}.py
-              </span>
+              <span className="text-sm font-medium text-base-content truncate">{name}.py</span>
               {activeSchedules.length > 0 && (
                 <span
                   className="badge badge-sm badge-info gap-1"
@@ -305,15 +287,11 @@ export default function EditFlowPage() {
               title={isEditorLocked ? "Click to edit" : "Currently editing"}
             >
               <Pencil size={16} />
-              <span className="ml-1">
-                {isEditorLocked ? "Edit" : "Editing"}
-              </span>
+              <span className="ml-1">{isEditorLocked ? "Edit" : "Editing"}</span>
             </button>
             <button
               onClick={() => setShowExecuteConfirm(true)}
-              className={`btn btn-sm ${
-                lockStatus?.data.lock ? "btn-disabled" : "btn-success"
-              }`}
+              className={`btn btn-sm ${lockStatus?.data.lock ? "btn-disabled" : "btn-success"}`}
               disabled={
                 saveMutation.isPending ||
                 deleteMutation.isPending ||
@@ -333,15 +311,12 @@ export default function EditFlowPage() {
               ) : (
                 <Play size={16} />
               )}
-              <span className="ml-1">
-                {lockStatus?.data.lock ? "Locked" : "Execute"}
-              </span>
+              <span className="ml-1">{lockStatus?.data.lock ? "Locked" : "Execute"}</span>
             </button>
             {canCancel && (
               <button
                 onClick={() =>
-                  lastExecutionId &&
-                  cancelMutation.mutate({ flowRunId: lastExecutionId })
+                  lastExecutionId && cancelMutation.mutate({ flowRunId: lastExecutionId })
                 }
                 className="btn btn-sm btn-error btn-outline"
                 disabled={cancelMutation.isPending}
@@ -366,11 +341,7 @@ export default function EditFlowPage() {
             <button
               onClick={handleSave}
               className={`btn btn-sm ${isEditorLocked ? "btn-outline" : "btn-success"}`}
-              disabled={
-                saveMutation.isPending ||
-                deleteMutation.isPending ||
-                isEditorLocked
-              }
+              disabled={saveMutation.isPending || deleteMutation.isPending || isEditorLocked}
             >
               {saveMutation.isPending ? (
                 <span className="loading loading-spinner loading-xs"></span>
@@ -387,8 +358,7 @@ export default function EditFlowPage() {
         {saveMutation.isError && (
           <div className="alert alert-error mx-4 mt-2">
             <span>
-              Failed to save flow:{" "}
-              {(saveMutation.error as Error)?.message || "Unknown error"}
+              Failed to save flow: {(saveMutation.error as Error)?.message || "Unknown error"}
             </span>
           </div>
         )}
@@ -396,8 +366,7 @@ export default function EditFlowPage() {
         {deleteMutation.isError && (
           <div className="alert alert-error mx-4 mt-2">
             <span>
-              Failed to delete flow:{" "}
-              {(deleteMutation.error as Error)?.message || "Unknown error"}
+              Failed to delete flow: {(deleteMutation.error as Error)?.message || "Unknown error"}
             </span>
           </div>
         )}
@@ -405,8 +374,7 @@ export default function EditFlowPage() {
         {executeMutation.isError && (
           <div className="alert alert-error mx-4 mt-2">
             <span>
-              Failed to execute flow:{" "}
-              {(executeMutation.error as Error)?.message || "Unknown error"}
+              Failed to execute flow: {(executeMutation.error as Error)?.message || "Unknown error"}
             </span>
           </div>
         )}
@@ -509,11 +477,7 @@ export default function EditFlowPage() {
 
         {/* Mobile FAB / Speed Dial - only visible on mobile */}
         <div className="fab fixed bottom-20 right-4 z-30 sm:hidden">
-          <div
-            tabIndex={0}
-            role="button"
-            className="btn btn-circle btn-primary shadow-lg"
-          >
+          <div tabIndex={0} role="button" className="btn btn-circle btn-primary shadow-lg">
             <Plus size={20} />
           </div>
           {/* Properties Button */}
@@ -574,8 +538,7 @@ export default function EditFlowPage() {
               </span>
               <button
                 onClick={() =>
-                  lastExecutionId &&
-                  cancelMutation.mutate({ flowRunId: lastExecutionId })
+                  lastExecutionId && cancelMutation.mutate({ flowRunId: lastExecutionId })
                 }
                 className="btn btn-circle btn-error btn-outline shadow-lg"
                 disabled={cancelMutation.isPending}
@@ -590,17 +553,11 @@ export default function EditFlowPage() {
           )}
           {/* Save Button */}
           <div className="flex items-center gap-2">
-            <span className="text-sm font-medium bg-base-100 px-2 py-1 rounded shadow">
-              Save
-            </span>
+            <span className="text-sm font-medium bg-base-100 px-2 py-1 rounded shadow">Save</span>
             <button
               onClick={handleSave}
               className={`btn btn-circle shadow-lg ${isEditorLocked ? "btn-outline bg-base-100" : "btn-success"}`}
-              disabled={
-                saveMutation.isPending ||
-                deleteMutation.isPending ||
-                isEditorLocked
-              }
+              disabled={saveMutation.isPending || deleteMutation.isPending || isEditorLocked}
             >
               {saveMutation.isPending ? (
                 <span className="loading loading-spinner loading-sm"></span>
@@ -611,9 +568,7 @@ export default function EditFlowPage() {
           </div>
           {/* Delete Button */}
           <div className="flex items-center gap-2">
-            <span className="text-sm font-medium bg-base-100 px-2 py-1 rounded shadow">
-              Delete
-            </span>
+            <span className="text-sm font-medium bg-base-100 px-2 py-1 rounded shadow">Delete</span>
             <button
               onClick={() => setShowDeleteConfirm(true)}
               className="btn btn-circle btn-error shadow-lg"
@@ -627,10 +582,7 @@ export default function EditFlowPage() {
         {/* Properties Modal */}
         {showPropertiesModal && (
           <div className="modal modal-open">
-            <div
-              className="modal-backdrop"
-              onClick={() => setShowPropertiesModal(false)}
-            />
+            <div className="modal-backdrop" onClick={() => setShowPropertiesModal(false)} />
             <div className="modal-box max-w-md max-h-[calc(100vh-8rem)]">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="font-bold text-lg">Properties</h3>
@@ -655,9 +607,7 @@ export default function EditFlowPage() {
                     disabled
                   />
                   <label className="label">
-                    <span className="label-text-alt text-xs">
-                      Cannot be changed
-                    </span>
+                    <span className="label-text-alt text-xs">Cannot be changed</span>
                   </label>
                 </div>
 
@@ -677,9 +627,7 @@ export default function EditFlowPage() {
 
                 <div className="form-control flex flex-col gap-1">
                   <label htmlFor="flow-entrypoint" className="label">
-                    <span className="label-text text-xs">
-                      Entrypoint Function
-                    </span>
+                    <span className="label-text text-xs">Entrypoint Function</span>
                   </label>
                   <input
                     id="flow-entrypoint"
@@ -737,17 +685,13 @@ export default function EditFlowPage() {
                     onChange={(e) => setTags(e.target.value)}
                   />
                   <label className="label">
-                    <span className="label-text-alt text-xs">
-                      Comma-separated
-                    </span>
+                    <span className="label-text-alt text-xs">Comma-separated</span>
                   </label>
                 </div>
 
                 <div className="form-control flex flex-col gap-1">
                   <label htmlFor="flow-interval" className="label">
-                    <span className="label-text text-xs">
-                      Default Interval (ns)
-                    </span>
+                    <span className="label-text text-xs">Default Interval (ns)</span>
                   </label>
                   <input
                     id="flow-interval"
@@ -759,8 +703,7 @@ export default function EditFlowPage() {
                   />
                   <label className="label">
                     <span className="label-text-alt text-xs">
-                      Default: 150 * 1024 (153600 ns). Expression format
-                      supported.
+                      Default: 150 * 1024 (153600 ns). Expression format supported.
                     </span>
                   </label>
                 </div>
@@ -786,10 +729,7 @@ export default function EditFlowPage() {
               </div>
 
               <div className="modal-action">
-                <button
-                  onClick={() => setShowPropertiesModal(false)}
-                  className="btn"
-                >
+                <button onClick={() => setShowPropertiesModal(false)} className="btn">
                   Close
                 </button>
               </div>
@@ -803,8 +743,8 @@ export default function EditFlowPage() {
             <div className="modal-box">
               <h3 className="font-bold text-lg">Delete Flow</h3>
               <p className="py-4">
-                Are you sure you want to delete <strong>{name}</strong>? This
-                action cannot be undone.
+                Are you sure you want to delete <strong>{name}</strong>? This action cannot be
+                undone.
               </p>
               <div className="modal-action">
                 <button

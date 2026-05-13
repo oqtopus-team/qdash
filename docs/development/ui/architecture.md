@@ -186,16 +186,16 @@ queryClient.invalidateQueries({ queryKey: ["chips", chipId] });
 
 ### Authentication Flow
 
-The authentication flow (User visit → middleware.ts → AuthProvider → API Requests with X-Username header) is shown in the UI Architecture diagram above.
+The authentication flow (User visit → proxy.ts → AuthProvider → API Requests with X-Username header) is shown in the UI Architecture diagram above.
 
-### Middleware Implementation
+### Proxy Implementation
 
 ```tsx
-// src/middleware.ts
+// src/proxy.ts
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const username = request.cookies.get("username");
   const isPublicRoute = request.nextUrl.pathname.startsWith("/login");
 
@@ -438,4 +438,3 @@ export function ChipSelector({ value, onChange, disabled }: ChipSelectorProps) {
   );
 }
 ```
-

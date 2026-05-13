@@ -13,10 +13,7 @@ import { TaskGridView } from "@/components/features/chip/TaskGridView";
 import { ReanalysisPanel } from "@/components/features/qubit/ReanalysisPanel";
 import { formatDate, formatTime } from "@/lib/utils/datetime";
 
-const REANALYZABLE_TASKS = new Set([
-  "CheckResonatorSpectroscopy",
-  "CheckQubitSpectroscopy",
-]);
+const REANALYZABLE_TASKS = new Set(["CheckResonatorSpectroscopy", "CheckQubitSpectroscopy"]);
 
 interface TaskHistoryViewerProps {
   chipId: string;
@@ -28,18 +25,10 @@ interface TaskHistoryItem extends Task {
   taskId: string;
 }
 
-export function TaskHistoryViewer({
-  chipId,
-  qubitId,
-  taskName,
-}: TaskHistoryViewerProps) {
+export function TaskHistoryViewer({ chipId, qubitId, taskName }: TaskHistoryViewerProps) {
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
-  const [historyViewMode, setHistoryViewMode] = useState<"list" | "grid">(
-    "list",
-  );
-  const [expandedFigureIdx, setExpandedFigureIdx] = useState<number | null>(
-    null,
-  );
+  const [historyViewMode, setHistoryViewMode] = useState<"list" | "grid">("list");
+  const [expandedFigureIdx, setExpandedFigureIdx] = useState<number | null>(null);
   const [viewMode, setViewMode] = useState<"static" | "interactive">("static");
   const figureModalRef = useRef<HTMLDialogElement>(null);
 
@@ -91,8 +80,7 @@ export function TaskHistoryViewer({
   }, [taskHistory, selectedTaskId]);
 
   const selectedTask = useMemo(
-    (): TaskHistoryItem | undefined =>
-      taskHistory.find((t) => t.taskId === selectedTaskId),
+    (): TaskHistoryItem | undefined => taskHistory.find((t) => t.taskId === selectedTaskId),
     [taskHistory, selectedTaskId],
   );
 
@@ -150,9 +138,7 @@ export function TaskHistoryViewer({
     return (
       <>
         <div className="font-medium">{formatDate(dateStr)}</div>
-        <div className="text-xs text-base-content/60">
-          {formatTime(dateStr)}
-        </div>
+        <div className="text-xs text-base-content/60">{formatTime(dateStr)}</div>
       </>
     );
   };
@@ -167,9 +153,7 @@ export function TaskHistoryViewer({
         </h3>
         <div className="join">
           <button
-            className={`join-item btn btn-sm ${
-              historyViewMode === "list" ? "btn-primary" : ""
-            }`}
+            className={`join-item btn btn-sm ${historyViewMode === "list" ? "btn-primary" : ""}`}
             onClick={() => setHistoryViewMode("list")}
             title="List View"
           >
@@ -177,9 +161,7 @@ export function TaskHistoryViewer({
             <span className="ml-2">List</span>
           </button>
           <button
-            className={`join-item btn btn-sm ${
-              historyViewMode === "grid" ? "btn-primary" : ""
-            }`}
+            className={`join-item btn btn-sm ${historyViewMode === "grid" ? "btn-primary" : ""}`}
             onClick={() => setHistoryViewMode("grid")}
             title="Grid View"
           >
@@ -212,9 +194,7 @@ export function TaskHistoryViewer({
                         {/* Timeline connector */}
                         <div className="flex items-start gap-3">
                           <div className="flex flex-col items-center">
-                            <div className="text-xl">
-                              {getStatusIcon(task.status)}
-                            </div>
+                            <div className="text-xl">{getStatusIcon(task.status)}</div>
                             {index < taskHistory.length - 1 && (
                               <div className="w-0.5 h-8 bg-base-300 my-1"></div>
                             )}
@@ -228,9 +208,7 @@ export function TaskHistoryViewer({
                               {getStatusBadge(task.status)}
                             </div>
 
-                            <div className="text-sm">
-                              {formatDateTime(task.start_at)}
-                            </div>
+                            <div className="text-sm">{formatDateTime(task.start_at)}</div>
 
                             {task.elapsed_time && (
                               <div className="text-xs text-base-content/60 mt-1">
@@ -266,97 +244,73 @@ export function TaskHistoryViewer({
                   {/* Task Information */}
                   <div className="grid grid-cols-2 gap-4 mb-6">
                     <div>
-                      <div className="text-sm text-base-content/60 mb-1">
-                        Task ID
-                      </div>
-                      <div className="font-mono text-sm break-all">
-                        {selectedTask.taskId}
-                      </div>
+                      <div className="text-sm text-base-content/60 mb-1">Task ID</div>
+                      <div className="font-mono text-sm break-all">{selectedTask.taskId}</div>
                     </div>
 
                     <div>
-                      <div className="text-sm text-base-content/60 mb-1">
-                        Task Name
-                      </div>
+                      <div className="text-sm text-base-content/60 mb-1">Task Name</div>
                       <div className="font-medium">{selectedTask.name}</div>
                     </div>
 
                     <div>
-                      <div className="text-sm text-base-content/60 mb-1">
-                        Start Time
-                      </div>
-                      <div className="text-sm">
-                        {formatDateTime(selectedTask.start_at)}
-                      </div>
+                      <div className="text-sm text-base-content/60 mb-1">Start Time</div>
+                      <div className="text-sm">{formatDateTime(selectedTask.start_at)}</div>
                     </div>
 
                     <div>
-                      <div className="text-sm text-base-content/60 mb-1">
-                        End Time
-                      </div>
-                      <div className="text-sm">
-                        {formatDateTime(selectedTask.end_at)}
-                      </div>
+                      <div className="text-sm text-base-content/60 mb-1">End Time</div>
+                      <div className="text-sm">{formatDateTime(selectedTask.end_at)}</div>
                     </div>
 
                     {selectedTask.elapsed_time && (
                       <div>
-                        <div className="text-sm text-base-content/60 mb-1">
-                          Duration
-                        </div>
-                        <div className="font-medium">
-                          {selectedTask.elapsed_time}
-                        </div>
+                        <div className="text-sm text-base-content/60 mb-1">Duration</div>
+                        <div className="font-medium">{selectedTask.elapsed_time}</div>
                       </div>
                     )}
                   </div>
 
                   {/* Figures */}
-                  {selectedTask.figure_path &&
-                    selectedTask.figure_path.length > 0 && (
-                      <div className="mb-6">
-                        <h4 className="text-lg font-semibold mb-3">
-                          Figures ({selectedTask.figure_path.length})
-                        </h4>
-                        <div className="space-y-4">
-                          {selectedTask.figure_path.map((path, idx) => (
-                            <div
-                              key={idx}
-                              className="bg-base-200 rounded-lg p-4 overflow-hidden"
-                            >
-                              <div className="text-sm text-base-content/60 mb-2">
-                                Figure {idx + 1}
-                              </div>
-                              <div className="bg-white rounded-lg p-2">
-                                <TaskFigure
-                                  path={path}
-                                  qid={qubitId}
-                                  className="w-full h-auto max-h-[500px] object-contain"
-                                />
-                              </div>
-                              {selectedTask.json_figure_path &&
-                                selectedTask.json_figure_path[idx] && (
-                                  <div className="mt-2 flex justify-center">
-                                    <button
-                                      className="btn btn-sm btn-primary"
-                                      onClick={() => setExpandedFigureIdx(idx)}
-                                    >
-                                      Interactive View
-                                    </button>
-                                  </div>
-                                )}
+                  {selectedTask.figure_path && selectedTask.figure_path.length > 0 && (
+                    <div className="mb-6">
+                      <h4 className="text-lg font-semibold mb-3">
+                        Figures ({selectedTask.figure_path.length})
+                      </h4>
+                      <div className="space-y-4">
+                        {selectedTask.figure_path.map((path, idx) => (
+                          <div key={idx} className="bg-base-200 rounded-lg p-4 overflow-hidden">
+                            <div className="text-sm text-base-content/60 mb-2">
+                              Figure {idx + 1}
                             </div>
-                          ))}
-                        </div>
+                            <div className="bg-white rounded-lg p-2">
+                              <TaskFigure
+                                path={path}
+                                qid={qubitId}
+                                className="w-full h-auto max-h-[500px] object-contain"
+                              />
+                            </div>
+                            {selectedTask.json_figure_path &&
+                              selectedTask.json_figure_path[idx] && (
+                                <div className="mt-2 flex justify-center">
+                                  <button
+                                    className="btn btn-sm btn-primary"
+                                    onClick={() => setExpandedFigureIdx(idx)}
+                                  >
+                                    Interactive View
+                                  </button>
+                                </div>
+                              )}
+                          </div>
+                        ))}
                       </div>
-                    )}
+                    </div>
+                  )}
 
                   {/* Output Parameters */}
                   {selectedTask.output_parameters && (
                     <div className="mb-6">
-                      <h4 className="text-lg font-semibold mb-3">
-                        Output Parameters
-                      </h4>
+                      <h4 className="text-lg font-semibold mb-3">Output Parameters</h4>
                       <div className="overflow-x-auto">
                         <table className="table table-zebra table-sm">
                           <thead>
@@ -367,31 +321,27 @@ export function TaskHistoryViewer({
                             </tr>
                           </thead>
                           <tbody>
-                            {Object.entries(selectedTask.output_parameters).map(
-                              ([key, value]) => {
-                                const paramValue = (
-                                  typeof value === "object" &&
-                                  value !== null &&
-                                  "value" in value
-                                    ? value
-                                    : { value }
-                                ) as {
-                                  value: number | string;
-                                  unit?: string;
-                                };
-                                return (
-                                  <tr key={key}>
-                                    <td className="font-medium">{key}</td>
-                                    <td className="font-mono">
-                                      {typeof paramValue.value === "number"
-                                        ? paramValue.value.toFixed(6)
-                                        : String(paramValue.value)}
-                                    </td>
-                                    <td>{paramValue.unit || "-"}</td>
-                                  </tr>
-                                );
-                              },
-                            )}
+                            {Object.entries(selectedTask.output_parameters).map(([key, value]) => {
+                              const paramValue = (
+                                typeof value === "object" && value !== null && "value" in value
+                                  ? value
+                                  : { value }
+                              ) as {
+                                value: number | string;
+                                unit?: string;
+                              };
+                              return (
+                                <tr key={key}>
+                                  <td className="font-medium">{key}</td>
+                                  <td className="font-mono">
+                                    {typeof paramValue.value === "number"
+                                      ? paramValue.value.toFixed(6)
+                                      : String(paramValue.value)}
+                                  </td>
+                                  <td>{paramValue.unit || "-"}</td>
+                                </tr>
+                              );
+                            })}
                           </tbody>
                         </table>
                       </div>
@@ -413,9 +363,7 @@ export function TaskHistoryViewer({
                   {/* Input Parameters */}
                   {selectedTask.input_parameters && (
                     <div className="mb-6">
-                      <h4 className="text-lg font-semibold mb-3">
-                        Input Parameters
-                      </h4>
+                      <h4 className="text-lg font-semibold mb-3">Input Parameters</h4>
                       <div className="overflow-x-auto">
                         <table className="table table-zebra table-sm">
                           <thead>
@@ -426,33 +374,29 @@ export function TaskHistoryViewer({
                             </tr>
                           </thead>
                           <tbody>
-                            {Object.entries(selectedTask.input_parameters).map(
-                              ([key, value]) => {
-                                const paramValue = (
-                                  typeof value === "object" &&
-                                  value !== null &&
-                                  "value" in value
-                                    ? value
-                                    : { value }
-                                ) as {
-                                  value: number | string | object;
-                                  unit?: string;
-                                };
-                                return (
-                                  <tr key={key}>
-                                    <td className="font-medium">{key}</td>
-                                    <td className="font-mono">
-                                      {typeof paramValue.value === "number"
-                                        ? paramValue.value.toFixed(6)
-                                        : typeof paramValue.value === "object"
-                                          ? JSON.stringify(paramValue.value)
-                                          : String(paramValue.value)}
-                                    </td>
-                                    <td>{paramValue.unit || "-"}</td>
-                                  </tr>
-                                );
-                              },
-                            )}
+                            {Object.entries(selectedTask.input_parameters).map(([key, value]) => {
+                              const paramValue = (
+                                typeof value === "object" && value !== null && "value" in value
+                                  ? value
+                                  : { value }
+                              ) as {
+                                value: number | string | object;
+                                unit?: string;
+                              };
+                              return (
+                                <tr key={key}>
+                                  <td className="font-medium">{key}</td>
+                                  <td className="font-mono">
+                                    {typeof paramValue.value === "number"
+                                      ? paramValue.value.toFixed(6)
+                                      : typeof paramValue.value === "object"
+                                        ? JSON.stringify(paramValue.value)
+                                        : String(paramValue.value)}
+                                  </td>
+                                  <td>{paramValue.unit || "-"}</td>
+                                </tr>
+                              );
+                            })}
                           </tbody>
                         </table>
                       </div>
@@ -500,95 +444,82 @@ export function TaskHistoryViewer({
         }}
       >
         <div className="modal-box max-w-5xl w-full sm:w-11/12 max-h-[90vh] p-4 sm:p-6">
-          {expandedFigureIdx !== null &&
-            selectedTask &&
-            selectedTask.figure_path && (
-              <>
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="font-bold text-lg">
-                    Figure {expandedFigureIdx + 1} of{" "}
-                    {selectedTask.figure_path.length}
-                  </h3>
-                  <div className="flex items-center gap-2">
-                    {expandedFigureIdx > 0 && (
-                      <button
-                        onClick={() =>
-                          setExpandedFigureIdx(expandedFigureIdx - 1)
-                        }
-                        className="btn btn-sm btn-circle"
-                      >
-                        ←
-                      </button>
-                    )}
-                    {expandedFigureIdx <
-                      selectedTask.figure_path.length - 1 && (
-                      <button
-                        onClick={() =>
-                          setExpandedFigureIdx(expandedFigureIdx + 1)
-                        }
-                        className="btn btn-sm btn-circle"
-                      >
-                        →
-                      </button>
-                    )}
+          {expandedFigureIdx !== null && selectedTask && selectedTask.figure_path && (
+            <>
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="font-bold text-lg">
+                  Figure {expandedFigureIdx + 1} of {selectedTask.figure_path.length}
+                </h3>
+                <div className="flex items-center gap-2">
+                  {expandedFigureIdx > 0 && (
                     <button
-                      onClick={() => setExpandedFigureIdx(null)}
-                      className="btn btn-sm btn-circle btn-ghost"
+                      onClick={() => setExpandedFigureIdx(expandedFigureIdx - 1)}
+                      className="btn btn-sm btn-circle"
                     >
-                      ✕
+                      ←
                     </button>
-                  </div>
+                  )}
+                  {expandedFigureIdx < selectedTask.figure_path.length - 1 && (
+                    <button
+                      onClick={() => setExpandedFigureIdx(expandedFigureIdx + 1)}
+                      className="btn btn-sm btn-circle"
+                    >
+                      →
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setExpandedFigureIdx(null)}
+                    className="btn btn-sm btn-circle btn-ghost"
+                  >
+                    ✕
+                  </button>
                 </div>
+              </div>
 
-                {viewMode === "static" ? (
-                  <>
-                    <div className="bg-white rounded-lg p-4 flex items-center justify-center max-h-[75vh]">
-                      <TaskFigure
-                        path={selectedTask.figure_path[expandedFigureIdx]}
-                        qid={qubitId}
-                        className="w-full h-full object-contain max-h-[70vh]"
-                      />
-                    </div>
-                    {selectedTask.json_figure_path &&
-                      selectedTask.json_figure_path[expandedFigureIdx] && (
-                        <div className="mt-4 flex justify-center">
-                          <button
-                            className="btn btn-sm btn-primary"
-                            onClick={() => setViewMode("interactive")}
-                          >
-                            Interactive View
-                          </button>
-                        </div>
-                      )}
-                  </>
-                ) : (
-                  <>
-                    <div className="w-full h-[70vh] bg-base-200 rounded-xl p-4 shadow flex justify-center items-center">
-                      <div className="w-full h-full flex justify-center items-center">
-                        <div className="w-fit h-fit m-auto">
-                          <PlotlyRenderer
-                            className="w-full h-full"
-                            fullPath={`/api/executions/figure?path=${encodeURIComponent(
-                              selectedTask.json_figure_path?.[
-                                expandedFigureIdx
-                              ] || "",
-                            )}`}
-                          />
-                        </div>
+              {viewMode === "static" ? (
+                <>
+                  <div className="bg-white rounded-lg p-4 flex items-center justify-center max-h-[75vh]">
+                    <TaskFigure
+                      path={selectedTask.figure_path[expandedFigureIdx]}
+                      qid={qubitId}
+                      className="w-full h-full object-contain max-h-[70vh]"
+                    />
+                  </div>
+                  {selectedTask.json_figure_path &&
+                    selectedTask.json_figure_path[expandedFigureIdx] && (
+                      <div className="mt-4 flex justify-center">
+                        <button
+                          className="btn btn-sm btn-primary"
+                          onClick={() => setViewMode("interactive")}
+                        >
+                          Interactive View
+                        </button>
+                      </div>
+                    )}
+                </>
+              ) : (
+                <>
+                  <div className="w-full h-[70vh] bg-base-200 rounded-xl p-4 shadow flex justify-center items-center">
+                    <div className="w-full h-full flex justify-center items-center">
+                      <div className="w-fit h-fit m-auto">
+                        <PlotlyRenderer
+                          className="w-full h-full"
+                          fullPath={`/api/executions/figure?path=${encodeURIComponent(
+                            selectedTask.json_figure_path?.[expandedFigureIdx] || "",
+                          )}`}
+                        />
                       </div>
                     </div>
-                    <div className="mt-4 flex justify-center">
-                      <button
-                        className="btn btn-sm"
-                        onClick={() => setViewMode("static")}
-                      >
-                        Back to Static View
-                      </button>
-                    </div>
-                  </>
-                )}
-              </>
-            )}
+                  </div>
+                  <div className="mt-4 flex justify-center">
+                    <button className="btn btn-sm" onClick={() => setViewMode("static")}>
+                      Back to Static View
+                    </button>
+                  </div>
+                </>
+              )}
+            </>
+          )}
         </div>
         <form method="dialog" className="modal-backdrop">
           <button>close</button>

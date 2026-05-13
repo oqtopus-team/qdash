@@ -44,8 +44,7 @@ function layoutBars(
   now: number,
 ): { bars: LaidOutBar[]; rowCount: number } {
   const sorted = [...cooldowns].sort(
-    (a, b) =>
-      new Date(a.started_at).getTime() - new Date(b.started_at).getTime(),
+    (a, b) => new Date(a.started_at).getTime() - new Date(b.started_at).getTime(),
   );
 
   const rowEndsPx: number[] = [];
@@ -82,20 +81,12 @@ function layoutBars(
   return { bars, rowCount: Math.max(1, rowEndsPx.length) };
 }
 
-export function CooldownTimeline({
-  cooldowns,
-  selectedId,
-  onSelect,
-}: CooldownTimelineProps) {
+export function CooldownTimeline({ cooldowns, selectedId, onSelect }: CooldownTimelineProps) {
   const { bars, rowCount, ticks } = useMemo(() => {
     const now = Date.now();
-    const tMin = Math.min(
-      ...cooldowns.map((c) => new Date(c.started_at).getTime()),
-    );
+    const tMin = Math.min(...cooldowns.map((c) => new Date(c.started_at).getTime()));
     const tMax = Math.max(
-      ...cooldowns.map((c) =>
-        c.ended_at ? new Date(c.ended_at).getTime() : now,
-      ),
+      ...cooldowns.map((c) => (c.ended_at ? new Date(c.ended_at).getTime() : now)),
     );
     const range = Math.max(1, tMax - tMin);
     const padding = range * 0.05;
@@ -144,14 +135,8 @@ export function CooldownTimeline({
               key={cd.cooldown_id}
               onClick={() => onSelect(cd.cooldown_id)}
               className={`absolute rounded transition-all hover:brightness-110 ${
-                isActive
-                  ? "bg-success/85 hover:bg-success"
-                  : "bg-info/60 hover:bg-info/80"
-              } ${
-                isSelected
-                  ? "ring-2 ring-primary ring-offset-1 ring-offset-base-100 z-10"
-                  : ""
-              }`}
+                isActive ? "bg-success/85 hover:bg-success" : "bg-info/60 hover:bg-info/80"
+              } ${isSelected ? "ring-2 ring-primary ring-offset-1 ring-offset-base-100 z-10" : ""}`}
               style={{
                 left: `${bar.left}%`,
                 width: `${bar.width}%`,

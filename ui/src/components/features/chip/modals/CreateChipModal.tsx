@@ -19,29 +19,22 @@ interface CreateChipModalProps {
   onSuccess?: (chipId: string) => void;
 }
 
-export function CreateChipModal({
-  isOpen,
-  onClose,
-  onSuccess,
-}: CreateChipModalProps) {
+export function CreateChipModal({ isOpen, onClose, onSuccess }: CreateChipModalProps) {
   const [chipId, setChipId] = useState("");
   const [selectedTopologyId, setSelectedTopologyId] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Fetch available topologies
-  const { data: topologiesData, isLoading: isLoadingTopologies } =
-    useListTopologies(undefined, {
-      query: {
-        staleTime: Infinity,
-      },
-    });
+  const { data: topologiesData, isLoading: isLoadingTopologies } = useListTopologies(undefined, {
+    query: {
+      staleTime: Infinity,
+    },
+  });
 
   // Parse topologies from API response (Axios wraps in .data)
   const topologies = useMemo(() => {
-    const axiosResponse = topologiesData as
-      | { data?: { topologies?: TopologyItem[] } }
-      | undefined;
+    const axiosResponse = topologiesData as { data?: { topologies?: TopologyItem[] } } | undefined;
     return axiosResponse?.data?.topologies ?? [];
   }, [topologiesData]);
 
@@ -197,9 +190,7 @@ export function CreateChipModal({
             {isLoadingTopologies ? (
               <div className="flex items-center gap-2 h-12">
                 <span className="loading loading-spinner loading-sm"></span>
-                <span className="text-sm text-base-content/60">
-                  Loading templates...
-                </span>
+                <span className="text-sm text-base-content/60">Loading templates...</span>
               </div>
             ) : (
               <select
@@ -267,10 +258,7 @@ export function CreateChipModal({
             >
               {createChipMutation.isPending ? (
                 <>
-                  <span
-                    className="loading loading-spinner loading-sm"
-                    aria-hidden="true"
-                  ></span>
+                  <span className="loading loading-spinner loading-sm" aria-hidden="true"></span>
                   Creating...
                 </>
               ) : (
@@ -280,11 +268,7 @@ export function CreateChipModal({
           </div>
         </form>
       </div>
-      <div
-        className="modal-backdrop"
-        onClick={handleClose}
-        aria-label="Close modal"
-      ></div>
+      <div className="modal-backdrop" onClick={handleClose} aria-label="Close modal"></div>
     </div>
   );
 }

@@ -53,19 +53,14 @@ export function DashboardNotesSummary({
   );
 
   const totalChipNotes = useMemo(
-    () =>
-      sortedTargets.reduce(
-        (sum, t) => sum + (notesByTarget[t]?.length ?? 0),
-        0,
-      ),
+    () => sortedTargets.reduce((sum, t) => sum + (notesByTarget[t]?.length ?? 0), 0),
     [sortedTargets, notesByTarget],
   );
 
   const sortedTaskNotes = useMemo(
     () =>
       [...taskNotes].sort(
-        (a, b) =>
-          new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+        (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
       ),
     [taskNotes],
   );
@@ -74,8 +69,7 @@ export function DashboardNotesSummary({
     return (
       <div className="text-sm text-base-content/60 italic flex items-center gap-2">
         <StickyNote className="h-4 w-4" />
-        No notes yet. Click any cell on a metric below — or open a task result —
-        to leave one.
+        No notes yet. Click any cell on a metric below — or open a task result — to leave one.
       </div>
     );
   }
@@ -103,9 +97,7 @@ export function DashboardNotesSummary({
                   className="rounded-lg border border-base-300 bg-base-200/40 p-3 space-y-2"
                 >
                   <div className="flex items-center justify-between">
-                    <h5 className="font-semibold text-sm">
-                      {formatTarget(targetId)}
-                    </h5>
+                    <h5 className="font-semibold text-sm">{formatTarget(targetId)}</h5>
                     <span className="badge badge-warning badge-sm">
                       {notes.length} note{notes.length > 1 ? "s" : ""}
                     </span>
@@ -119,9 +111,7 @@ export function DashboardNotesSummary({
                           title={`Open ${formatTarget(targetId)} · ${n.metricTitle}`}
                         >
                           <div className="flex items-center justify-between gap-2 text-xs">
-                            <span className="font-semibold">
-                              {n.metricTitle}
-                            </span>
+                            <span className="font-semibold">{n.metricTitle}</span>
                             <span className="text-base-content/50 truncate">
                               {n.username} · {formatDate(n.updatedAt)}
                             </span>
@@ -147,16 +137,12 @@ export function DashboardNotesSummary({
             <h4 className="text-sm font-semibold">Per-experiment notes</h4>
             <span className="text-xs text-base-content/60">
               {sortedTaskNotes.length} note
-              {sortedTaskNotes.length > 1 ? "s" : ""} — opens the task result
-              detail page.
+              {sortedTaskNotes.length > 1 ? "s" : ""} — opens the task result detail page.
             </span>
           </div>
           <ul className="space-y-2">
             {sortedTaskNotes.map((n) => (
-              <li
-                key={n.taskId}
-                className="rounded-lg border border-base-300 bg-base-200/40"
-              >
+              <li key={n.taskId} className="rounded-lg border border-base-300 bg-base-200/40">
                 <Link
                   href={`/task-results/${n.taskId}`}
                   className="block px-3 py-2 hover:bg-base-300/40 transition-colors rounded-lg"
@@ -167,9 +153,7 @@ export function DashboardNotesSummary({
                       <span className="badge badge-sm badge-outline">
                         {n.qid ? `Q${n.qid}` : "—"}
                       </span>
-                      <span className="font-mono text-base-content/60 truncate">
-                        {n.taskId}
-                      </span>
+                      <span className="font-mono text-base-content/60 truncate">{n.taskId}</span>
                     </div>
                     <span className="text-base-content/50 flex items-center gap-1 flex-shrink-0">
                       {n.username} · {formatDate(n.updatedAt)}

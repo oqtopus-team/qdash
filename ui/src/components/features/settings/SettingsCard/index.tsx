@@ -83,20 +83,13 @@ export function SettingsCard() {
                     </svg>
                   </button>
                 </div>
-                <div className="font-mono text-sm bg-base-200 p-2 rounded break-all">
-                  {value}
-                </div>
+                <div className="font-mono text-sm bg-base-200 p-2 rounded break-all">{value}</div>
               </div>
             ))}
           </div>
         )}
       </div>
-      {showToast && (
-        <Toast
-          message="Copied to clipboard!"
-          onClose={() => setShowToast(false)}
-        />
-      )}
+      {showToast && <Toast message="Copied to clipboard!" onClose={() => setShowToast(false)} />}
     </div>
   );
 }

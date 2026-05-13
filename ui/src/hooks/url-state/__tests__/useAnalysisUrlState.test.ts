@@ -20,8 +20,7 @@ describe("useAnalysisUrlState", () => {
   it("reads initial values from URL params", () => {
     const { result } = renderHook(() => useAnalysisUrlState(), {
       wrapper: withNuqsTestingAdapter({
-        searchParams:
-          "chip=CHIP01&parameter=t2_echo&tag=weekly&aview=correlation",
+        searchParams: "chip=CHIP01&parameter=t2_echo&tag=weekly&aview=correlation",
       }),
     });
 

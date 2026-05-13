@@ -27,11 +27,6 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": [
-    "src",
-    ".next/types/**/*.ts",
-    "next-env.d.ts",
-    ".next/dev/types/**/*.ts"
-  ],
+  "include": ["src", ".next/types/**/*.ts", "next-env.d.ts", ".next/dev/types/**/*.ts"],
   "exclude": ["node_modules"]
 }

@@ -23,8 +23,8 @@ tasks:
       - docker compose -f ../compose.yaml restart api && sleep 2
       - curl http://api:$API_PORT/openapi.json | jq > ../docs/oas/openapi.json
       - bunx orval@7.14.0 --config ./orval.config.cjs
-      - bunx prettier . --write --log-level error
-      - bunx eslint . --fix -c eslint.config.mjs --quiet
+      - bun run fmt
+      - bun run lint:fix
     desc: Generate the TypeScript client
 
   knowledge:
@@ -167,8 +167,8 @@ tasks:
     dir: ui
     desc: Run UI linting and formatting (auto-fix)
     cmds:
-      - bunx prettier . --write --log-level error
-      - bunx eslint . --fix -c eslint.config.mjs --quiet
+      - bun run fmt
+      - bun run lint:fix
 
   # =============================================================================
   # Secret Scanning
@@ -257,8 +257,8 @@ tasks:
     cmds:
       - bun run test:run
       - bunx tsc --noEmit
-      - bunx eslint . -c eslint.config.mjs
-      - bunx prettier . --check
+      - bun run lint
+      - bun run fmt:check
       - bun run knip
       - bun audit
 

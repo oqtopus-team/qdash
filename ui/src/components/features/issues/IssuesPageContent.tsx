@@ -16,9 +16,7 @@ import type { IssueResponse } from "@/schemas";
 
 function getCurrentUsername(): string {
   if (typeof document === "undefined") return "";
-  const match = document.cookie
-    .split("; ")
-    .find((row) => row.startsWith("username="));
+  const match = document.cookie.split("; ").find((row) => row.startsWith("username="));
   return match ? decodeURIComponent(match.split("=")[1]) : "";
 }
 
@@ -46,11 +44,7 @@ function IssueThread({
     >
       <div className="p-4">
         <div className="flex items-center gap-3 mb-2 flex-wrap">
-          <UserAvatar
-            username={issue.username}
-            avatarKey={issue.avatar_key}
-            size={28}
-          />
+          <UserAvatar username={issue.username} avatarKey={issue.avatar_key} size={28} />
           <Link
             href={`/task-results/${issue.task_id}`}
             onClick={(e) => e.stopPropagation()}
@@ -59,28 +53,21 @@ function IssueThread({
             {issue.task_id}
           </Link>
           <div className="flex items-center gap-1.5">
-            <span className="badge badge-sm badge-neutral">
-              {issue.username}
-            </span>
+            <span className="badge badge-sm badge-neutral">{issue.username}</span>
             <span className="text-xs text-base-content/40">
               {formatRelativeTime(issue.created_at)}
             </span>
-            {issue.is_closed === true && (
-              <span className="badge badge-sm badge-ghost">Closed</span>
-            )}
+            {issue.is_closed === true && <span className="badge badge-sm badge-ghost">Closed</span>}
           </div>
         </div>
-        {issue.title && (
-          <h3 className="text-sm font-semibold mb-1">{issue.title}</h3>
-        )}
+        {issue.title && <h3 className="text-sm font-semibold mb-1">{issue.title}</h3>}
         <div className="text-sm text-base-content/80 mb-3 line-clamp-3">
           <MarkdownContent content={issue.content} preview />
         </div>
         <div className="flex items-center gap-3">
           <span className="text-xs text-base-content/50 flex items-center gap-1">
             <MessageSquare className="h-3 w-3" />
-            {issue.reply_count ?? 0}{" "}
-            {issue.reply_count === 1 ? "reply" : "replies"}
+            {issue.reply_count ?? 0} {issue.reply_count === 1 ? "reply" : "replies"}
           </span>
           {canManage &&
             (issue.is_closed === true ? (
@@ -146,10 +133,7 @@ export function IssuesPageContent() {
 
   return (
     <PageContainer maxWidth>
-      <PageHeader
-        title="Issues"
-        description="Track and discuss issues on task results"
-      />
+      <PageHeader title="Issues" description="Track and discuss issues on task results" />
 
       {/* Status tabs */}
       <div className="mb-4">
@@ -193,13 +177,8 @@ export function IssuesPageContent() {
           </button>
           {taskIdFilter && (
             <div className="flex items-center gap-1">
-              <span className="badge badge-sm badge-outline">
-                task: {taskIdFilter}
-              </span>
-              <button
-                onClick={clearFilter}
-                className="btn btn-ghost btn-xs p-0 h-auto min-h-0"
-              >
+              <span className="badge badge-sm badge-outline">task: {taskIdFilter}</span>
+              <button onClick={clearFilter} className="btn btn-ghost btn-xs p-0 h-auto min-h-0">
                 <X className="h-3 w-3" />
               </button>
             </div>

@@ -74,8 +74,7 @@ export function CryostatCard({
   const sortedCooldowns = useMemo(
     () =>
       [...cooldowns].sort(
-        (a, b) =>
-          new Date(b.started_at).getTime() - new Date(a.started_at).getTime(),
+        (a, b) => new Date(b.started_at).getTime() - new Date(a.started_at).getTime(),
       ),
     [cooldowns],
   );
@@ -101,9 +100,7 @@ export function CryostatCard({
   // Accordion: only one cool-down expanded at a time. Defaults to active,
   // or the most recent one if no active cool-down exists.
   const [expandedId, setExpandedId] = useState<string | null>(() => {
-    return (
-      activeCooldown?.cooldown_id ?? sortedCooldowns[0]?.cooldown_id ?? null
-    );
+    return activeCooldown?.cooldown_id ?? sortedCooldowns[0]?.cooldown_id ?? null;
   });
 
   const itemRefs = useRef<Map<string, HTMLDivElement>>(new Map());
@@ -126,11 +123,7 @@ export function CryostatCard({
   }, [activeCooldown, expandedId]);
 
   const handleDelete = async () => {
-    if (
-      !confirm(
-        `Delete cryostat ${cryo.cryo_id}? Existing cool-downs are not affected.`,
-      )
-    ) {
+    if (!confirm(`Delete cryostat ${cryo.cryo_id}? Existing cool-downs are not affected.`)) {
       return;
     }
     await deleteCryostat.mutateAsync({ cryoId: cryo.cryo_id });
@@ -143,13 +136,9 @@ export function CryostatCard({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-bold text-xl tracking-tight">
-              {cryo.cryo_id}
-            </span>
+            <span className="font-bold text-xl tracking-tight">{cryo.cryo_id}</span>
             {cryo.name && (
-              <span className="text-base-content/70 text-sm truncate">
-                {cryo.name}
-              </span>
+              <span className="text-base-content/70 text-sm truncate">{cryo.name}</span>
             )}
             <span
               className={`badge badge-sm ${
@@ -193,9 +182,7 @@ export function CryostatCard({
           <ActiveCooldownBanner
             cooldown={activeCooldown}
             isSelected={expandedId === activeCooldown.cooldown_id}
-            onSelect={() =>
-              handleSelectFromTimeline(activeCooldown.cooldown_id)
-            }
+            onSelect={() => handleSelectFromTimeline(activeCooldown.cooldown_id)}
           />
         )}
 
@@ -236,9 +223,7 @@ export function CryostatCard({
                 allChips={allChips}
                 expanded={expandedId === cd.cooldown_id}
                 onToggle={() =>
-                  setExpandedId((cur) =>
-                    cur === cd.cooldown_id ? null : cd.cooldown_id,
-                  )
+                  setExpandedId((cur) => (cur === cd.cooldown_id ? null : cd.cooldown_id))
                 }
                 onChange={onChange}
               />
@@ -265,9 +250,7 @@ function ActiveCooldownBanner({
     <button
       onClick={onSelect}
       className={`group w-full text-left rounded-xl border bg-success/8 px-4 py-3 transition-all hover:bg-success/12 ${
-        isSelected
-          ? "border-success/60 ring-2 ring-success/30"
-          : "border-success/30"
+        isSelected ? "border-success/60 ring-2 ring-success/30" : "border-success/30"
       }`}
     >
       <div className="flex items-center gap-3">
@@ -278,9 +261,7 @@ function ActiveCooldownBanner({
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="font-semibold text-sm">Currently cooling</span>
-            <span className="font-mono font-bold text-sm">
-              {cooldown.cooldown_id}
-            </span>
+            <span className="font-mono font-bold text-sm">{cooldown.cooldown_id}</span>
             <span className="text-xs text-base-content/60 tabular-nums">
               · {formatRelativeDays(days)} ({formatDate(cooldown.started_at)})
             </span>

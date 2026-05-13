@@ -65,9 +65,7 @@ export function ProvenancePageContent() {
               <div className="stat-figure text-primary">
                 <History className="h-6 w-6 sm:h-8 sm:w-8" />
               </div>
-              <div className="stat-title text-xs sm:text-sm">
-                Parameter Versions
-              </div>
+              <div className="stat-title text-xs sm:text-sm">Parameter Versions</div>
               <div className="stat-value text-lg sm:text-2xl text-primary">
                 {stats.total_entities.toLocaleString()}
               </div>
@@ -101,12 +99,10 @@ export function ProvenancePageContent() {
           <div className="card bg-base-200">
             <div className="card-body text-center py-12">
               <GitBranch className="h-12 w-12 sm:h-16 sm:w-16 mx-auto text-base-content/30 mb-4" />
-              <h3 className="text-base sm:text-lg font-medium">
-                No Provenance Data Yet
-              </h3>
+              <h3 className="text-base sm:text-lg font-medium">No Provenance Data Yet</h3>
               <p className="text-sm text-base-content/70 max-w-md mx-auto">
-                Provenance tracking is enabled. Run a calibration workflow to
-                start tracking parameter lineage and history.
+                Provenance tracking is enabled. Run a calibration workflow to start tracking
+                parameter lineage and history.
               </p>
             </div>
           </div>

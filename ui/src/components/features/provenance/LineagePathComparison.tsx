@@ -40,10 +40,7 @@ interface LineagePathComparisonProps {
   labelAfter: string;
 }
 
-function valuesEqual(
-  a: number | string | undefined,
-  b: number | string | undefined,
-): boolean {
+function valuesEqual(a: number | string | undefined, b: number | string | undefined): boolean {
   if (a === undefined && b === undefined) return true;
   if (a === undefined || b === undefined) return false;
   if (typeof a === "number" && typeof b === "number") {
@@ -84,9 +81,7 @@ export function LineagePathComparison({
 
     type EntityInfo = { name: string; value: number | string; unit?: string };
 
-    const buildOutputMap = (
-      lineage: LineageResponse,
-    ): Map<string, EntityInfo> => {
+    const buildOutputMap = (lineage: LineageResponse): Map<string, EntityInfo> => {
       const map = new Map<string, EntityInfo>();
       const entityMap = new Map(
         lineage.nodes
@@ -117,9 +112,7 @@ export function LineagePathComparison({
     for (const a of beforeActivities) {
       const key = `${a.taskName}:${a.qid}`;
       if (!beforeMap.has(key)) {
-        const nodeId = lineageBefore.nodes.find(
-          (n) => n.activity?.task_id === a.taskId,
-        )?.node_id;
+        const nodeId = lineageBefore.nodes.find((n) => n.activity?.task_id === a.taskId)?.node_id;
         beforeMap.set(key, {
           ...a,
           output: nodeId ? beforeOutputs.get(nodeId) : undefined,
@@ -131,9 +124,7 @@ export function LineagePathComparison({
     for (const a of afterActivities) {
       const key = `${a.taskName}:${a.qid}`;
       if (!afterMap.has(key)) {
-        const nodeId = lineageAfter.nodes.find(
-          (n) => n.activity?.task_id === a.taskId,
-        )?.node_id;
+        const nodeId = lineageAfter.nodes.find((n) => n.activity?.task_id === a.taskId)?.node_id;
         afterMap.set(key, {
           ...a,
           output: nodeId ? afterOutputs.get(nodeId) : undefined,
@@ -274,11 +265,7 @@ export function LineagePathComparison({
               className="badge badge-ghost badge-sm gap-1 cursor-pointer hover:badge-outline transition-colors"
               onClick={() => setShowUnchanged((v) => !v)}
             >
-              {showUnchanged ? (
-                <EyeOff className="h-3 w-3" />
-              ) : (
-                <Eye className="h-3 w-3" />
-              )}
+              {showUnchanged ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
               {counts.unchanged} unchanged
             </button>
           )}
@@ -294,8 +281,7 @@ export function LineagePathComparison({
         if (isUnchanged && !showUnchanged) {
           // Show a collapsed placeholder for consecutive unchanged steps
           const prevStep = idx > 0 ? matchedSteps[idx - 1] : null;
-          const isPrevHidden =
-            prevStep?.status === "unchanged" && !showUnchanged;
+          const isPrevHidden = prevStep?.status === "unchanged" && !showUnchanged;
           if (isPrevHidden) return null; // Only show one placeholder per group
 
           // Count consecutive unchanged steps from here
@@ -317,8 +303,7 @@ export function LineagePathComparison({
                 onClick={() => setShowUnchanged(true)}
               >
                 <Check className="h-3 w-3" />
-                {count} unchanged experiment{count !== 1 && "s"} — click to
-                expand
+                {count} unchanged experiment{count !== 1 && "s"} — click to expand
               </button>
             </div>
           );
@@ -341,18 +326,12 @@ export function LineagePathComparison({
                   <div className="flex items-center gap-2">
                     <StatusIcon className="h-3.5 w-3.5" />
                     <h4 className="font-medium text-sm">{step.taskName}</h4>
-                    <span className="badge badge-outline badge-xs font-mono">
-                      {step.qid}
-                    </span>
+                    <span className="badge badge-outline badge-xs font-mono">{step.qid}</span>
                     {step.depthBefore !== null && (
-                      <span className="text-xs text-base-content/40">
-                        depth {step.depthBefore}
-                      </span>
+                      <span className="text-xs text-base-content/40">depth {step.depthBefore}</span>
                     )}
                   </div>
-                  <span className={`badge ${config.badge} badge-sm`}>
-                    {config.label}
-                  </span>
+                  <span className={`badge ${config.badge} badge-sm`}>{config.label}</span>
                 </div>
 
                 {/* Parameter output comparison */}
@@ -364,15 +343,11 @@ export function LineagePathComparison({
                     {step.paramBefore && (
                       <span
                         className={`font-mono ${
-                          step.status === "changed"
-                            ? "text-error line-through opacity-70"
-                            : ""
+                          step.status === "changed" ? "text-error line-through opacity-70" : ""
                         }`}
                       >
                         {formatValue(step.paramBefore.value)}
-                        {step.paramBefore.unit
-                          ? ` ${step.paramBefore.unit}`
-                          : ""}
+                        {step.paramBefore.unit ? ` ${step.paramBefore.unit}` : ""}
                       </span>
                     )}
                     {step.paramBefore && step.paramAfter && (
@@ -381,9 +356,7 @@ export function LineagePathComparison({
                     {step.paramAfter && (
                       <span
                         className={`font-mono ${
-                          step.status === "changed"
-                            ? "text-success font-semibold"
-                            : ""
+                          step.status === "changed" ? "text-success font-semibold" : ""
                         }`}
                       >
                         {formatValue(step.paramAfter.value)}
@@ -405,8 +378,7 @@ export function LineagePathComparison({
                       }
                     >
                       <div className="text-xs text-base-content/60 mb-1 flex items-center gap-1">
-                        {(step.status === "removed" ||
-                          step.status === "changed") && (
+                        {(step.status === "removed" || step.status === "changed") && (
                           <Minus className="h-3 w-3 text-error" />
                         )}
                         {labelBefore}
@@ -427,9 +399,7 @@ export function LineagePathComparison({
                       ) : (
                         <div className="flex flex-col items-center justify-center h-32 bg-base-300/50 rounded-lg">
                           <ImageOff className="h-6 w-6 text-base-content/20 mb-1" />
-                          <span className="text-xs text-base-content/30">
-                            Not in this path
-                          </span>
+                          <span className="text-xs text-base-content/30">Not in this path</span>
                         </div>
                       )}
                     </div>
@@ -443,8 +413,7 @@ export function LineagePathComparison({
                       }
                     >
                       <div className="text-xs text-base-content/60 mb-1 flex items-center gap-1">
-                        {(step.status === "added" ||
-                          step.status === "changed") && (
+                        {(step.status === "added" || step.status === "changed") && (
                           <Plus className="h-3 w-3 text-success" />
                         )}
                         {labelAfter}
@@ -465,9 +434,7 @@ export function LineagePathComparison({
                       ) : (
                         <div className="flex flex-col items-center justify-center h-32 bg-base-300/50 rounded-lg">
                           <ImageOff className="h-6 w-6 text-base-content/20 mb-1" />
-                          <span className="text-xs text-base-content/30">
-                            Not in this path
-                          </span>
+                          <span className="text-xs text-base-content/30">Not in this path</span>
                         </div>
                       )}
                     </div>

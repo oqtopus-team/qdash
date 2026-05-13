@@ -1,8 +1,7 @@
 import { formatInTimeZone } from "date-fns-tz";
 
 const DEFAULT_TIMEZONE = process.env.NEXT_PUBLIC_TIMEZONE || "Asia/Tokyo";
-const ISO_DATETIME_WITHOUT_TIMEZONE =
-  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?$/;
+const ISO_DATETIME_WITHOUT_TIMEZONE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?$/;
 
 function normalizeUtcInput(utcString: string): string {
   if (ISO_DATETIME_WITHOUT_TIMEZONE.test(utcString)) {
@@ -15,17 +14,11 @@ function parseUtcDate(utcString: string): Date {
   return new Date(normalizeUtcInput(utcString));
 }
 
-export function dateToDateTimeLocal(
-  date: Date,
-  timezone: string = DEFAULT_TIMEZONE,
-): string {
+export function dateToDateTimeLocal(date: Date, timezone: string = DEFAULT_TIMEZONE): string {
   return formatInTimeZone(date, timezone, "yyyy-MM-dd'T'HH:mm");
 }
 
-export function dateToDateInput(
-  date: Date,
-  timezone: string = DEFAULT_TIMEZONE,
-): string {
+export function dateToDateInput(date: Date, timezone: string = DEFAULT_TIMEZONE): string {
   return formatInTimeZone(date, timezone, "yyyy-MM-dd");
 }
 
@@ -35,21 +28,13 @@ export function toDateTimeLocal(
 ): string {
   if (!isoString) return "";
   if (isoString.includes("T")) {
-    return formatInTimeZone(
-      normalizeUtcInput(isoString),
-      timezone,
-      "yyyy-MM-dd'T'HH:mm",
-    );
+    return formatInTimeZone(normalizeUtcInput(isoString), timezone, "yyyy-MM-dd'T'HH:mm");
   }
   return `${isoString}T00:00`;
 }
 
-export function toIsoSeconds(
-  dt: string,
-  timezone: string = DEFAULT_TIMEZONE,
-): string {
-  if (dt.length === 16)
-    return `${dt}:00${getTimezoneOffsetString(timezone, dt)}`;
+export function toIsoSeconds(dt: string, timezone: string = DEFAULT_TIMEZONE): string {
+  if (dt.length === 16) return `${dt}:00${getTimezoneOffsetString(timezone, dt)}`;
   return dt;
 }
 
@@ -61,9 +46,7 @@ export function getTimezoneOffsetString(
     timeZone: timezone,
     timeZoneName: "longOffset",
   });
-  const part = fmt
-    .formatToParts(new Date(referenceDate))
-    .find((p) => p.type === "timeZoneName");
+  const part = fmt.formatToParts(new Date(referenceDate)).find((p) => p.type === "timeZoneName");
   const raw = part?.value ?? "GMT";
   if (raw === "GMT") return "+00:00";
   return raw.replace("GMT", "");

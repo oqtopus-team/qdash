@@ -95,10 +95,7 @@ export function DataTable({
 
   // Pagination
   const totalPages = Math.ceil(processedData.length / pageSize);
-  const paginatedData = processedData.slice(
-    (currentPage - 1) * pageSize,
-    currentPage * pageSize,
-  );
+  const paginatedData = processedData.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   const handleFilterChange = (value: string) => {
     setFilter(value);
@@ -130,24 +127,17 @@ export function DataTable({
             </div>
           )}
           <div className="text-xs sm:text-sm text-base-content/70 whitespace-nowrap">
-            {filter
-              ? `${processedData.length} filtered`
-              : `${data.length} total`}
+            {filter ? `${processedData.length} filtered` : `${data.length} total`}
           </div>
         </div>
       </div>
 
       {/* Table */}
-      <div
-        className="overflow-x-auto -mx-4 sm:mx-0"
-        style={{ minHeight: "300px" }}
-      >
+      <div className="overflow-x-auto -mx-4 sm:mx-0" style={{ minHeight: "300px" }}>
         {processedData.length === 0 ? (
           <EmptyState
             title={filter ? "No results found" : emptyMessage}
-            description={
-              filter ? "Try adjusting your search criteria." : undefined
-            }
+            description={filter ? "Try adjusting your search criteria." : undefined}
             emoji={filter ? "magnifying-glass" : "empty"}
             size="sm"
           />
@@ -160,16 +150,12 @@ export function DataTable({
                     <th
                       key={column.key}
                       className={`${column.className || "text-center"} text-xs sm:text-sm px-2 sm:px-4 ${
-                        column.sortable
-                          ? "cursor-pointer hover:bg-base-300"
-                          : ""
+                        column.sortable ? "cursor-pointer hover:bg-base-300" : ""
                       }`}
                       onClick={() => column.sortable && handleSort(column.key)}
                     >
                       <div className="flex items-center gap-1 justify-center">
-                        <span className="truncate max-w-[80px] sm:max-w-none">
-                          {column.label}
-                        </span>
+                        <span className="truncate max-w-[80px] sm:max-w-none">{column.label}</span>
                         {column.sortable && sortField === column.key && (
                           <svg
                             xmlns="http://www.w3.org/2000/svg"
@@ -193,10 +179,7 @@ export function DataTable({
               </thead>
               <tbody>
                 {paginatedData.map((row, index) => (
-                  <tr
-                    key={index}
-                    className="transition-colors hover:bg-base-200/80"
-                  >
+                  <tr key={index} className="transition-colors hover:bg-base-200/80">
                     {columns.map((column) => (
                       <td
                         key={column.key}
@@ -216,8 +199,7 @@ export function DataTable({
             {totalPages > 1 && (
               <div className="flex flex-col sm:flex-row justify-between items-center gap-2 mt-4 px-4 sm:px-0">
                 <div className="text-xs sm:text-sm text-base-content/70">
-                  {Math.min(pageSize, processedData.length)} /{" "}
-                  {processedData.length}
+                  {Math.min(pageSize, processedData.length)} / {processedData.length}
                 </div>
                 <div className="join">
                   <button
@@ -232,9 +214,7 @@ export function DataTable({
                   </button>
                   <button
                     className="join-item btn btn-xs sm:btn-sm"
-                    onClick={() =>
-                      setCurrentPage((p) => Math.min(totalPages, p + 1))
-                    }
+                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                     disabled={currentPage === totalPages}
                   >
                     Next

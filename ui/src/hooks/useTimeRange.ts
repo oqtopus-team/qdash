@@ -20,9 +20,7 @@ export function useTimeRange(options: UseTimeRangeOptions = {}) {
 
   const [timeRange, setTimeRange] = useState<TimeRangeState>(() => ({
     endAt: formatJSTDate(new Date()),
-    startAt: formatJSTDate(
-      new Date(Date.now() - initialDays * 24 * 60 * 60 * 1000),
-    ),
+    startAt: formatJSTDate(new Date(Date.now() - initialDays * 24 * 60 * 60 * 1000)),
     isStartAtLocked: false,
     isEndAtLocked: false,
   }));
@@ -35,9 +33,7 @@ export function useTimeRange(options: UseTimeRangeOptions = {}) {
       startAt:
         prev.isStartAtLocked || prev.isEndAtLocked
           ? prev.startAt
-          : formatJSTDate(
-              new Date(Date.now() - initialDays * 24 * 60 * 60 * 1000),
-            ),
+          : formatJSTDate(new Date(Date.now() - initialDays * 24 * 60 * 60 * 1000)),
     }));
   }, [formatJSTDate, initialDays]);
 

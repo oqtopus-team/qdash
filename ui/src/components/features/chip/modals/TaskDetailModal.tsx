@@ -2,13 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useEffect, useRef, useCallback } from "react";
-import {
-  CheckCircle,
-  AlertTriangle,
-  Clock,
-  HelpCircle,
-  GitBranch,
-} from "lucide-react";
+import { CheckCircle, AlertTriangle, Clock, HelpCircle, GitBranch } from "lucide-react";
 
 import type { Task } from "@/schemas";
 
@@ -23,10 +17,7 @@ import {
   formatDateTime as formatDateTimeUtil,
 } from "@/lib/utils/datetime";
 
-const REANALYZABLE_TASKS = new Set([
-  "CheckResonatorSpectroscopy",
-  "CheckQubitSpectroscopy",
-]);
+const REANALYZABLE_TASKS = new Set(["CheckResonatorSpectroscopy", "CheckQubitSpectroscopy"]);
 
 interface TaskDetailModalProps {
   isOpen: boolean;
@@ -71,8 +62,7 @@ export function TaskDetailModal({
   const closeButtonRef = useRef<HTMLButtonElement>(null);
 
   const resolveQid = (taskQid: string, qidRole?: string): string => {
-    if (!qidRole || qidRole === "self" || qidRole === "coupling")
-      return taskQid;
+    if (!qidRole || qidRole === "self" || qidRole === "coupling") return taskQid;
     const match = taskQid.match(/^(\d+)-(\d+)$/);
     if (!match) return taskQid;
     const [, control, target] = match;
@@ -179,8 +169,7 @@ export function TaskDetailModal({
 
   if (!task) return null;
 
-  const showDateNavigation =
-    selectedDate && onNavigatePrevious && onNavigateNext && formatDate;
+  const showDateNavigation = selectedDate && onNavigatePrevious && onNavigateNext && formatDate;
   const showDetailView = chipId;
 
   const formatDateTimeLocal = (dateStr?: string | null) => {
@@ -188,9 +177,7 @@ export function TaskDetailModal({
     return (
       <>
         <div className="font-medium">{formatDateUtil(dateStr)}</div>
-        <div className="text-xs text-base-content/60">
-          {formatTimeUtil(dateStr)}
-        </div>
+        <div className="text-xs text-base-content/60">{formatTimeUtil(dateStr)}</div>
       </>
     );
   };
@@ -224,9 +211,7 @@ export function TaskDetailModal({
   const noteTaskId = task.task_id || taskId;
 
   const modalTitle =
-    variant === "detailed" && taskName
-      ? `Task Details - ${taskName}`
-      : `Result for QID ${qid}`;
+    variant === "detailed" && taskName ? `Task Details - ${taskName}` : `Result for QID ${qid}`;
 
   return (
     <dialog
@@ -300,37 +285,25 @@ export function TaskDetailModal({
             )}
             {taskName && (
               <div>
-                <div className="text-sm text-base-content/60 mb-1">
-                  Task Name
-                </div>
+                <div className="text-sm text-base-content/60 mb-1">Task Name</div>
                 <div className="font-medium">{taskName}</div>
               </div>
             )}
             {task.start_at && (
               <div>
-                <div className="text-sm text-base-content/60 mb-1">
-                  Start Time
-                </div>
-                <div className="text-sm">
-                  {formatDateTimeLocal(task.start_at)}
-                </div>
+                <div className="text-sm text-base-content/60 mb-1">Start Time</div>
+                <div className="text-sm">{formatDateTimeLocal(task.start_at)}</div>
               </div>
             )}
             {task.end_at && (
               <div>
-                <div className="text-sm text-base-content/60 mb-1">
-                  End Time
-                </div>
-                <div className="text-sm">
-                  {formatDateTimeLocal(task.end_at)}
-                </div>
+                <div className="text-sm text-base-content/60 mb-1">End Time</div>
+                <div className="text-sm">{formatDateTimeLocal(task.end_at)}</div>
               </div>
             )}
             {task.elapsed_time && (
               <div>
-                <div className="text-sm text-base-content/60 mb-1">
-                  Duration
-                </div>
+                <div className="text-sm text-base-content/60 mb-1">Duration</div>
                 <div className="font-medium">{task.elapsed_time}</div>
               </div>
             )}
@@ -342,20 +315,13 @@ export function TaskDetailModal({
             {/* Figures */}
             {figures.length > 0 && (
               <div className="mb-6">
-                <h4 className="text-lg font-semibold mb-3">
-                  Figures ({figures.length})
-                </h4>
+                <h4 className="text-lg font-semibold mb-3">Figures ({figures.length})</h4>
                 {variant === "detailed" ? (
                   /* Detailed view: 2-column grid */
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {figures.map((path, idx) => (
-                      <div
-                        key={idx}
-                        className="bg-base-200 rounded-lg p-4 overflow-hidden"
-                      >
-                        <div className="text-sm text-base-content/60 mb-2">
-                          Figure {idx + 1}
-                        </div>
+                      <div key={idx} className="bg-base-200 rounded-lg p-4 overflow-hidden">
+                        <div className="text-sm text-base-content/60 mb-2">Figure {idx + 1}</div>
                         <div className="bg-white rounded-lg p-2">
                           <TaskFigure
                             path={path}
@@ -397,10 +363,7 @@ export function TaskDetailModal({
                           <button
                             className="btn btn-xs"
                             onClick={() =>
-                              setSubIndex(
-                                (subIndex - 1 + figures.length) %
-                                  figures.length,
-                              )
+                              setSubIndex((subIndex - 1 + figures.length) % figures.length)
                             }
                           >
                             ◀
@@ -410,9 +373,7 @@ export function TaskDetailModal({
                           </span>
                           <button
                             className="btn btn-xs"
-                            onClick={() =>
-                              setSubIndex((subIndex + 1) % figures.length)
-                            }
+                            onClick={() => setSubIndex((subIndex + 1) % figures.length)}
                           >
                             ▶
                           </button>
@@ -446,96 +407,70 @@ export function TaskDetailModal({
                       {task.end_at && (
                         <div className="card bg-base-200 p-4 rounded-xl">
                           <h4 className="font-medium mb-2">Calibrated At</h4>
-                          <p className="text-sm">
-                            {formatDateTimeUtil(task.end_at)}
-                          </p>
+                          <p className="text-sm">{formatDateTimeUtil(task.end_at)}</p>
                         </div>
                       )}
                       {task.output_parameters && (
                         <div className="card bg-base-200 p-4 rounded-xl">
                           <h4 className="font-medium mb-2">Parameters</h4>
                           <div className="space-y-2">
-                            {Object.entries(task.output_parameters).map(
-                              ([key, value]) => {
-                                const paramValue = (
-                                  typeof value === "object" &&
-                                  value !== null &&
-                                  "value" in value
-                                    ? value
-                                    : { value }
-                                ) as { value: number | string; unit?: string };
-                                return (
-                                  <div
-                                    key={key}
-                                    className="flex justify-between"
-                                  >
-                                    <span className="font-medium">{key}:</span>
-                                    <span>
-                                      {typeof paramValue.value === "number"
-                                        ? paramValue.value.toFixed(precision)
-                                        : String(paramValue.value)}
-                                      {paramValue.unit
-                                        ? ` ${paramValue.unit}`
-                                        : ""}
-                                    </span>
-                                  </div>
-                                );
-                              },
-                            )}
+                            {Object.entries(task.output_parameters).map(([key, value]) => {
+                              const paramValue = (
+                                typeof value === "object" && value !== null && "value" in value
+                                  ? value
+                                  : { value }
+                              ) as { value: number | string; unit?: string };
+                              return (
+                                <div key={key} className="flex justify-between">
+                                  <span className="font-medium">{key}:</span>
+                                  <span>
+                                    {typeof paramValue.value === "number"
+                                      ? paramValue.value.toFixed(precision)
+                                      : String(paramValue.value)}
+                                    {paramValue.unit ? ` ${paramValue.unit}` : ""}
+                                  </span>
+                                </div>
+                              );
+                            })}
                           </div>
                         </div>
                       )}
-                      {task.run_parameters &&
-                        Object.keys(task.run_parameters).length > 0 && (
-                          <div className="collapse collapse-arrow bg-base-200 rounded-xl">
-                            <input type="checkbox" />
-                            <div className="collapse-title font-medium text-sm py-3">
-                              Run Parameters
-                            </div>
-                            <div className="collapse-content">
-                              <div className="space-y-1">
-                                {Object.entries(task.run_parameters).map(
-                                  ([key, value]) => {
-                                    const paramValue = (
-                                      typeof value === "object" &&
-                                      value !== null &&
-                                      "value" in value
-                                        ? value
-                                        : { value }
-                                    ) as {
-                                      value: number | string | number[] | null;
-                                      unit?: string;
-                                    };
-                                    const displayValue = Array.isArray(
-                                      paramValue.value,
-                                    )
-                                      ? paramValue.value.join(", ")
-                                      : paramValue.value !== null &&
-                                          paramValue.value !== undefined
-                                        ? String(paramValue.value)
-                                        : "-";
-                                    return (
-                                      <div
-                                        key={key}
-                                        className="flex justify-between text-sm"
-                                      >
-                                        <span className="font-medium">
-                                          {key}:
-                                        </span>
-                                        <span className="font-mono">
-                                          {displayValue}
-                                          {paramValue.unit
-                                            ? ` ${paramValue.unit}`
-                                            : ""}
-                                        </span>
-                                      </div>
-                                    );
-                                  },
-                                )}
-                              </div>
+                      {task.run_parameters && Object.keys(task.run_parameters).length > 0 && (
+                        <div className="collapse collapse-arrow bg-base-200 rounded-xl">
+                          <input type="checkbox" />
+                          <div className="collapse-title font-medium text-sm py-3">
+                            Run Parameters
+                          </div>
+                          <div className="collapse-content">
+                            <div className="space-y-1">
+                              {Object.entries(task.run_parameters).map(([key, value]) => {
+                                const paramValue = (
+                                  typeof value === "object" && value !== null && "value" in value
+                                    ? value
+                                    : { value }
+                                ) as {
+                                  value: number | string | number[] | null;
+                                  unit?: string;
+                                };
+                                const displayValue = Array.isArray(paramValue.value)
+                                  ? paramValue.value.join(", ")
+                                  : paramValue.value !== null && paramValue.value !== undefined
+                                    ? String(paramValue.value)
+                                    : "-";
+                                return (
+                                  <div key={key} className="flex justify-between text-sm">
+                                    <span className="font-medium">{key}:</span>
+                                    <span className="font-mono">
+                                      {displayValue}
+                                      {paramValue.unit ? ` ${paramValue.unit}` : ""}
+                                    </span>
+                                  </div>
+                                );
+                              })}
                             </div>
                           </div>
-                        )}
+                        </div>
+                      )}
                       {task.message && (
                         <div className="card bg-base-200 p-4 rounded-xl">
                           <h4 className="font-medium mb-2">Message</h4>
@@ -548,13 +483,7 @@ export function TaskDetailModal({
               </div>
             )}
 
-            {noteTaskId && (
-              <TaskResultMemo
-                taskId={noteTaskId}
-                chipId={chipId}
-                hideWhenEmpty
-              />
-            )}
+            {noteTaskId && <TaskResultMemo taskId={noteTaskId} chipId={chipId} hideWhenEmpty />}
 
             {/* Parameters Tables (detailed variant only) */}
             {variant === "detailed" && (
@@ -562,9 +491,7 @@ export function TaskDetailModal({
                 {/* Output Parameters */}
                 {task.output_parameters && (
                   <div className="mb-6">
-                    <h4 className="text-lg font-semibold mb-3">
-                      Output Parameters
-                    </h4>
+                    <h4 className="text-lg font-semibold mb-3">Output Parameters</h4>
                     <div className="overflow-x-auto">
                       <table className="table table-zebra table-sm">
                         <thead>
@@ -576,42 +503,34 @@ export function TaskDetailModal({
                           </tr>
                         </thead>
                         <tbody>
-                          {Object.entries(task.output_parameters).map(
-                            ([key, value]) => {
-                              const paramValue = (
-                                typeof value === "object" &&
-                                value !== null &&
-                                "value" in value
-                                  ? value
-                                  : { value }
-                              ) as {
-                                value: number | string;
-                                unit?: string;
-                                error?: number;
-                                description?: string;
-                              };
-                              return (
-                                <tr
-                                  key={key}
-                                  title={paramValue.description || undefined}
-                                >
-                                  <td className="font-medium">{key}</td>
-                                  <td className="font-mono">
-                                    {typeof paramValue.value === "number"
-                                      ? paramValue.value.toFixed(precision)
-                                      : String(paramValue.value)}
-                                  </td>
-                                  <td className="font-mono text-base-content/70">
-                                    {paramValue.error !== undefined &&
-                                    paramValue.error !== 0
-                                      ? `±${paramValue.error.toFixed(precision)}`
-                                      : "-"}
-                                  </td>
-                                  <td>{paramValue.unit || "-"}</td>
-                                </tr>
-                              );
-                            },
-                          )}
+                          {Object.entries(task.output_parameters).map(([key, value]) => {
+                            const paramValue = (
+                              typeof value === "object" && value !== null && "value" in value
+                                ? value
+                                : { value }
+                            ) as {
+                              value: number | string;
+                              unit?: string;
+                              error?: number;
+                              description?: string;
+                            };
+                            return (
+                              <tr key={key} title={paramValue.description || undefined}>
+                                <td className="font-medium">{key}</td>
+                                <td className="font-mono">
+                                  {typeof paramValue.value === "number"
+                                    ? paramValue.value.toFixed(precision)
+                                    : String(paramValue.value)}
+                                </td>
+                                <td className="font-mono text-base-content/70">
+                                  {paramValue.error !== undefined && paramValue.error !== 0
+                                    ? `±${paramValue.error.toFixed(precision)}`
+                                    : "-"}
+                                </td>
+                                <td>{paramValue.unit || "-"}</td>
+                              </tr>
+                            );
+                          })}
                         </tbody>
                       </table>
                     </div>
@@ -619,356 +538,283 @@ export function TaskDetailModal({
                 )}
 
                 {/* Run Parameters (Experiment Configuration) */}
-                {task.run_parameters &&
-                  Object.keys(task.run_parameters).length > 0 && (
-                    <div className="mb-6">
-                      <h4 className="text-lg font-semibold mb-3">
-                        Run Parameters
-                      </h4>
-                      <div className="overflow-x-auto">
-                        <table className="table table-zebra table-sm">
-                          <thead>
-                            <tr>
-                              <th>Parameter</th>
-                              <th>Value</th>
-                              <th>Unit</th>
-                              <th>Description</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {Object.entries(task.run_parameters).map(
-                              ([key, value]) => {
-                                const paramValue = (
-                                  typeof value === "object" &&
-                                  value !== null &&
-                                  "value" in value
-                                    ? value
-                                    : { value }
-                                ) as {
-                                  value: number | string | number[] | null;
-                                  unit?: string;
-                                  value_type?: string;
-                                  description?: string;
-                                };
-                                const displayValue = Array.isArray(
-                                  paramValue.value,
-                                )
-                                  ? paramValue.value.join(", ")
-                                  : paramValue.value !== null &&
-                                      paramValue.value !== undefined
-                                    ? String(paramValue.value)
-                                    : "-";
-                                return (
-                                  <tr key={key}>
-                                    <td className="font-medium">{key}</td>
-                                    <td className="font-mono">
-                                      {displayValue}
-                                    </td>
-                                    <td>{paramValue.unit || "-"}</td>
-                                    <td className="text-base-content/70 text-xs">
-                                      {paramValue.description || "-"}
-                                    </td>
-                                  </tr>
-                                );
-                              },
-                            )}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  )}
-
-                {/* Re-analysis Panel (preview-only re-run for spectroscopy tasks) */}
-                {chipId &&
-                  task.name &&
-                  REANALYZABLE_TASKS.has(task.name) &&
-                  task.task_id && (
-                    <div className="mb-6">
-                      <ReanalysisPanel
-                        chipId={chipId}
-                        qubitId={qid}
-                        taskName={task.name}
-                        sourceTaskId={task.task_id}
-                      />
-                    </div>
-                  )}
-
-                {/* Input Parameters (Calibration Dependencies) - Card View */}
-                {task.input_parameters &&
-                  Object.keys(task.input_parameters).length > 0 && (
-                    <div className="mb-6">
-                      <h4 className="text-lg font-semibold mb-3">
-                        Calibration Inputs
-                      </h4>
-                      <div className="space-y-2">
-                        {Object.entries(task.input_parameters).map(
-                          ([key, value]) => {
+                {task.run_parameters && Object.keys(task.run_parameters).length > 0 && (
+                  <div className="mb-6">
+                    <h4 className="text-lg font-semibold mb-3">Run Parameters</h4>
+                    <div className="overflow-x-auto">
+                      <table className="table table-zebra table-sm">
+                        <thead>
+                          <tr>
+                            <th>Parameter</th>
+                            <th>Value</th>
+                            <th>Unit</th>
+                            <th>Description</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {Object.entries(task.run_parameters).map(([key, value]) => {
                             const paramValue = (
-                              typeof value === "object" &&
-                              value !== null &&
-                              "value" in value
+                              typeof value === "object" && value !== null && "value" in value
                                 ? value
                                 : { value }
                             ) as {
-                              value: number | string | object;
+                              value: number | string | number[] | null;
                               unit?: string;
-                              error?: number;
+                              value_type?: string;
                               description?: string;
-                              execution_id?: string;
-                              calibrated_at?: string;
-                              task_name?: string;
                             };
-
-                            // Calculate freshness status
-                            const getFreshnessStatus = () => {
-                              if (!paramValue.calibrated_at) {
-                                return {
-                                  status: "unknown",
-                                  icon: <HelpCircle size={16} />,
-                                  label: "Unknown",
-                                  className: "text-base-content/50",
-                                };
-                              }
-                              const calibratedDate = new Date(
-                                paramValue.calibrated_at,
-                              );
-                              const now = new Date();
-                              const hoursDiff =
-                                (now.getTime() - calibratedDate.getTime()) /
-                                (1000 * 60 * 60);
-
-                              if (hoursDiff < 24) {
-                                return {
-                                  status: "fresh",
-                                  icon: <CheckCircle size={16} />,
-                                  label: "Fresh",
-                                  className: "text-success",
-                                };
-                              } else if (hoursDiff < 72) {
-                                return {
-                                  status: "recent",
-                                  icon: <Clock size={16} />,
-                                  label: "Recent",
-                                  className: "text-warning",
-                                };
-                              } else {
-                                return {
-                                  status: "stale",
-                                  icon: <AlertTriangle size={16} />,
-                                  label: "Stale",
-                                  className: "text-error",
-                                };
-                              }
-                            };
-
-                            const freshness = getFreshnessStatus();
-
-                            // Format relative time
-                            const getRelativeTime = () => {
-                              if (!paramValue.calibrated_at) return null;
-                              const calibratedDate = new Date(
-                                paramValue.calibrated_at,
-                              );
-                              const now = new Date();
-                              const diffMs =
-                                now.getTime() - calibratedDate.getTime();
-                              const diffMins = Math.floor(diffMs / (1000 * 60));
-                              const diffHours = Math.floor(
-                                diffMs / (1000 * 60 * 60),
-                              );
-                              const diffDays = Math.floor(
-                                diffMs / (1000 * 60 * 60 * 24),
-                              );
-
-                              if (diffMins < 60) return `${diffMins}m ago`;
-                              if (diffHours < 24) return `${diffHours}h ago`;
-                              return `${diffDays}d ago`;
-                            };
-
-                            const relativeTime = getRelativeTime();
-
+                            const displayValue = Array.isArray(paramValue.value)
+                              ? paramValue.value.join(", ")
+                              : paramValue.value !== null && paramValue.value !== undefined
+                                ? String(paramValue.value)
+                                : "-";
                             return (
-                              <div
-                                key={key}
-                                className="card card-compact bg-base-200 hover:bg-base-300 transition-colors"
-                              >
-                                <div className="card-body py-3 px-4">
-                                  <div className="flex items-center justify-between">
-                                    {/* Left: Parameter info */}
-                                    <div className="flex items-center gap-3">
-                                      <span
-                                        className={freshness.className}
-                                        title={freshness.label}
-                                      >
-                                        {freshness.icon}
-                                      </span>
-                                      <div>
-                                        <div className="font-semibold text-sm">
-                                          {key}
-                                        </div>
-                                        <div className="text-xs text-base-content/60">
-                                          {paramValue.description ||
-                                            "Calibration parameter"}
-                                        </div>
-                                      </div>
-                                    </div>
+                              <tr key={key}>
+                                <td className="font-medium">{key}</td>
+                                <td className="font-mono">{displayValue}</td>
+                                <td>{paramValue.unit || "-"}</td>
+                                <td className="text-base-content/70 text-xs">
+                                  {paramValue.description || "-"}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
 
-                                    {/* Right: Value */}
-                                    <div className="text-right">
-                                      <div className="font-mono font-semibold">
-                                        {typeof paramValue.value === "number"
-                                          ? paramValue.value.toFixed(precision)
-                                          : typeof paramValue.value === "object"
-                                            ? JSON.stringify(paramValue.value)
-                                            : String(paramValue.value)}{" "}
-                                        <span className="text-base-content/70 font-normal">
-                                          {paramValue.unit || ""}
-                                        </span>
-                                      </div>
-                                      {paramValue.error !== undefined &&
-                                        paramValue.error !== 0 && (
-                                          <div className="text-xs text-base-content/50 font-mono">
-                                            ±
-                                            {paramValue.error.toFixed(
-                                              precision,
-                                            )}
-                                          </div>
-                                        )}
+                {/* Re-analysis Panel (preview-only re-run for spectroscopy tasks) */}
+                {chipId && task.name && REANALYZABLE_TASKS.has(task.name) && task.task_id && (
+                  <div className="mb-6">
+                    <ReanalysisPanel
+                      chipId={chipId}
+                      qubitId={qid}
+                      taskName={task.name}
+                      sourceTaskId={task.task_id}
+                    />
+                  </div>
+                )}
+
+                {/* Input Parameters (Calibration Dependencies) - Card View */}
+                {task.input_parameters && Object.keys(task.input_parameters).length > 0 && (
+                  <div className="mb-6">
+                    <h4 className="text-lg font-semibold mb-3">Calibration Inputs</h4>
+                    <div className="space-y-2">
+                      {Object.entries(task.input_parameters).map(([key, value]) => {
+                        const paramValue = (
+                          typeof value === "object" && value !== null && "value" in value
+                            ? value
+                            : { value }
+                        ) as {
+                          value: number | string | object;
+                          unit?: string;
+                          error?: number;
+                          description?: string;
+                          execution_id?: string;
+                          calibrated_at?: string;
+                          task_name?: string;
+                        };
+
+                        // Calculate freshness status
+                        const getFreshnessStatus = () => {
+                          if (!paramValue.calibrated_at) {
+                            return {
+                              status: "unknown",
+                              icon: <HelpCircle size={16} />,
+                              label: "Unknown",
+                              className: "text-base-content/50",
+                            };
+                          }
+                          const calibratedDate = new Date(paramValue.calibrated_at);
+                          const now = new Date();
+                          const hoursDiff =
+                            (now.getTime() - calibratedDate.getTime()) / (1000 * 60 * 60);
+
+                          if (hoursDiff < 24) {
+                            return {
+                              status: "fresh",
+                              icon: <CheckCircle size={16} />,
+                              label: "Fresh",
+                              className: "text-success",
+                            };
+                          } else if (hoursDiff < 72) {
+                            return {
+                              status: "recent",
+                              icon: <Clock size={16} />,
+                              label: "Recent",
+                              className: "text-warning",
+                            };
+                          } else {
+                            return {
+                              status: "stale",
+                              icon: <AlertTriangle size={16} />,
+                              label: "Stale",
+                              className: "text-error",
+                            };
+                          }
+                        };
+
+                        const freshness = getFreshnessStatus();
+
+                        // Format relative time
+                        const getRelativeTime = () => {
+                          if (!paramValue.calibrated_at) return null;
+                          const calibratedDate = new Date(paramValue.calibrated_at);
+                          const now = new Date();
+                          const diffMs = now.getTime() - calibratedDate.getTime();
+                          const diffMins = Math.floor(diffMs / (1000 * 60));
+                          const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+                          const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+                          if (diffMins < 60) return `${diffMins}m ago`;
+                          if (diffHours < 24) return `${diffHours}h ago`;
+                          return `${diffDays}d ago`;
+                        };
+
+                        const relativeTime = getRelativeTime();
+
+                        return (
+                          <div
+                            key={key}
+                            className="card card-compact bg-base-200 hover:bg-base-300 transition-colors"
+                          >
+                            <div className="card-body py-3 px-4">
+                              <div className="flex items-center justify-between">
+                                {/* Left: Parameter info */}
+                                <div className="flex items-center gap-3">
+                                  <span className={freshness.className} title={freshness.label}>
+                                    {freshness.icon}
+                                  </span>
+                                  <div>
+                                    <div className="font-semibold text-sm">{key}</div>
+                                    <div className="text-xs text-base-content/60">
+                                      {paramValue.description || "Calibration parameter"}
                                     </div>
                                   </div>
+                                </div>
 
-                                  {/* Source info */}
-                                  {(paramValue.execution_id ||
-                                    relativeTime) && (
-                                    <div className="flex items-center justify-between mt-2 pt-2 border-t border-base-300">
-                                      <div className="flex items-center gap-2 text-xs text-base-content/60">
-                                        <span>↳ from</span>
-                                        {paramValue.execution_id ? (
-                                          <div className="dropdown dropdown-top">
-                                            <button
-                                              tabIndex={0}
-                                              className="link link-primary"
-                                            >
-                                              {paramValue.task_name ||
-                                                `Execution ${paramValue.execution_id.slice(0, 8)}`}
-                                            </button>
-                                            <ul
-                                              tabIndex={0}
-                                              className="dropdown-content z-[1] menu p-2 shadow-lg bg-base-100 rounded-box w-48 border border-base-300"
-                                            >
-                                              <li>
-                                                <button
-                                                  onClick={() => {
-                                                    router.push(
-                                                      `/executions/${paramValue.execution_id}`,
-                                                    );
-                                                  }}
-                                                >
-                                                  View Execution
-                                                </button>
-                                              </li>
-                                              <li>
-                                                <button
-                                                  onClick={() => {
-                                                    const pv =
-                                                      paramValue as Record<
-                                                        string,
-                                                        unknown
-                                                      >;
-                                                    const parameterName =
-                                                      (pv?.parameter_name as
-                                                        | string
-                                                        | undefined) || key;
-                                                    const resolvedQid =
-                                                      resolveQid(
-                                                        qid,
-                                                        pv?.qid_role as
-                                                          | string
-                                                          | undefined,
-                                                      );
-                                                    router.push(
-                                                      buildProvenanceUrl(
-                                                        parameterName,
-                                                        resolvedQid,
-                                                      ),
-                                                    );
-                                                    onClose();
-                                                  }}
-                                                >
-                                                  View Lineage
-                                                </button>
-                                              </li>
-                                            </ul>
-                                          </div>
-                                        ) : (
-                                          <span>Unknown source</span>
-                                        )}
-                                      </div>
-                                      {relativeTime && (
-                                        <span
-                                          className={`text-xs ${freshness.className}`}
-                                        >
-                                          {relativeTime}
-                                        </span>
-                                      )}
+                                {/* Right: Value */}
+                                <div className="text-right">
+                                  <div className="font-mono font-semibold">
+                                    {typeof paramValue.value === "number"
+                                      ? paramValue.value.toFixed(precision)
+                                      : typeof paramValue.value === "object"
+                                        ? JSON.stringify(paramValue.value)
+                                        : String(paramValue.value)}{" "}
+                                    <span className="text-base-content/70 font-normal">
+                                      {paramValue.unit || ""}
+                                    </span>
+                                  </div>
+                                  {paramValue.error !== undefined && paramValue.error !== 0 && (
+                                    <div className="text-xs text-base-content/50 font-mono">
+                                      ±{paramValue.error.toFixed(precision)}
                                     </div>
                                   )}
                                 </div>
                               </div>
-                            );
-                          },
-                        )}
-                      </div>
 
-                      {/* Lineage Graph Button */}
-                      <div className="mt-4 text-center">
-                        <button
-                          className="btn btn-ghost btn-sm gap-2 hover:btn-primary"
-                          onClick={() => {
-                            const outputs =
-                              task?.output_parameters &&
-                              typeof task.output_parameters === "object"
-                                ? Object.entries(task.output_parameters)
-                                : [];
-                            const inputs =
-                              task?.input_parameters &&
-                              typeof task.input_parameters === "object"
-                                ? Object.entries(task.input_parameters)
-                                : [];
-
-                            const [key, paramValue] =
-                              (outputs[0] as
-                                | [string, Record<string, unknown>]
-                                | undefined) ??
-                              (inputs[0] as
-                                | [string, Record<string, unknown>]
-                                | undefined) ??
-                              [];
-
-                            if (key && paramValue) {
-                              const pv = paramValue as Record<string, unknown>;
-                              const parameterName =
-                                (pv?.parameter_name as string | undefined) ||
-                                key;
-                              const resolvedQid = resolveQid(
-                                qid,
-                                pv?.qid_role as string | undefined,
-                              );
-                              router.push(
-                                buildProvenanceUrl(parameterName, resolvedQid),
-                              );
-                            } else {
-                              router.push("/provenance");
-                            }
-                            onClose();
-                          }}
-                        >
-                          <GitBranch size={16} />
-                          Explore Provenance
-                        </button>
-                      </div>
+                              {/* Source info */}
+                              {(paramValue.execution_id || relativeTime) && (
+                                <div className="flex items-center justify-between mt-2 pt-2 border-t border-base-300">
+                                  <div className="flex items-center gap-2 text-xs text-base-content/60">
+                                    <span>↳ from</span>
+                                    {paramValue.execution_id ? (
+                                      <div className="dropdown dropdown-top">
+                                        <button tabIndex={0} className="link link-primary">
+                                          {paramValue.task_name ||
+                                            `Execution ${paramValue.execution_id.slice(0, 8)}`}
+                                        </button>
+                                        <ul
+                                          tabIndex={0}
+                                          className="dropdown-content z-[1] menu p-2 shadow-lg bg-base-100 rounded-box w-48 border border-base-300"
+                                        >
+                                          <li>
+                                            <button
+                                              onClick={() => {
+                                                router.push(
+                                                  `/executions/${paramValue.execution_id}`,
+                                                );
+                                              }}
+                                            >
+                                              View Execution
+                                            </button>
+                                          </li>
+                                          <li>
+                                            <button
+                                              onClick={() => {
+                                                const pv = paramValue as Record<string, unknown>;
+                                                const parameterName =
+                                                  (pv?.parameter_name as string | undefined) || key;
+                                                const resolvedQid = resolveQid(
+                                                  qid,
+                                                  pv?.qid_role as string | undefined,
+                                                );
+                                                router.push(
+                                                  buildProvenanceUrl(parameterName, resolvedQid),
+                                                );
+                                                onClose();
+                                              }}
+                                            >
+                                              View Lineage
+                                            </button>
+                                          </li>
+                                        </ul>
+                                      </div>
+                                    ) : (
+                                      <span>Unknown source</span>
+                                    )}
+                                  </div>
+                                  {relativeTime && (
+                                    <span className={`text-xs ${freshness.className}`}>
+                                      {relativeTime}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
-                  )}
+
+                    {/* Lineage Graph Button */}
+                    <div className="mt-4 text-center">
+                      <button
+                        className="btn btn-ghost btn-sm gap-2 hover:btn-primary"
+                        onClick={() => {
+                          const outputs =
+                            task?.output_parameters && typeof task.output_parameters === "object"
+                              ? Object.entries(task.output_parameters)
+                              : [];
+                          const inputs =
+                            task?.input_parameters && typeof task.input_parameters === "object"
+                              ? Object.entries(task.input_parameters)
+                              : [];
+
+                          const [key, paramValue] =
+                            (outputs[0] as [string, Record<string, unknown>] | undefined) ??
+                            (inputs[0] as [string, Record<string, unknown>] | undefined) ??
+                            [];
+
+                          if (key && paramValue) {
+                            const pv = paramValue as Record<string, unknown>;
+                            const parameterName = (pv?.parameter_name as string | undefined) || key;
+                            const resolvedQid = resolveQid(qid, pv?.qid_role as string | undefined);
+                            router.push(buildProvenanceUrl(parameterName, resolvedQid));
+                          } else {
+                            router.push("/provenance");
+                          }
+                          onClose();
+                        }}
+                      >
+                        <GitBranch size={16} />
+                        Explore Provenance
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 {/* Message */}
                 {task.message && (
@@ -990,22 +836,15 @@ export function TaskDetailModal({
             figureIndex={subIndex}
             totalFigures={jsonFigures.length}
             onNavigatePrevious={() =>
-              setSubIndex(
-                (subIndex - 1 + jsonFigures.length) % jsonFigures.length,
-              )
+              setSubIndex((subIndex - 1 + jsonFigures.length) % jsonFigures.length)
             }
-            onNavigateNext={() =>
-              setSubIndex((subIndex + 1) % jsonFigures.length)
-            }
+            onNavigateNext={() => setSubIndex((subIndex + 1) % jsonFigures.length)}
           />
         )}
 
         <div className="mt-6 flex justify-end gap-2">
           {viewMode === "interactive" && (
-            <button
-              className="btn btn-sm"
-              onClick={() => setViewMode("static")}
-            >
+            <button className="btn btn-sm" onClick={() => setViewMode("static")}>
               Back to Summary
             </button>
           )}

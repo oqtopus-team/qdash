@@ -22,27 +22,15 @@ export function useCorrelationUrlState(): UseCorrelationUrlStateResult {
   const [isInitialized, setIsInitialized] = useState(false);
 
   // URL state management for correlation view
-  const [selectedChip, setSelectedChipState] = useQueryState(
-    "chip",
-    parseAsString,
-  );
+  const [selectedChip, setSelectedChipState] = useQueryState("chip", parseAsString);
 
   const [timeRange, setTimeRangeState] = useQueryState("range", parseAsString);
 
-  const [selectionMode, setSelectionModeState] = useQueryState(
-    "mode",
-    parseAsString,
-  );
+  const [selectionMode, setSelectionModeState] = useQueryState("mode", parseAsString);
 
-  const [xParameter, setXParameterState] = useQueryState(
-    "xParam",
-    parseAsString,
-  );
+  const [xParameter, setXParameterState] = useQueryState("xParam", parseAsString);
 
-  const [yParameter, setYParameterState] = useQueryState(
-    "yParam",
-    parseAsString,
-  );
+  const [yParameter, setYParameterState] = useQueryState("yParam", parseAsString);
 
   // Mark as initialized after first render
   useEffect(() => {

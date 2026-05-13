@@ -1,12 +1,6 @@
 "use client";
 
-import React, {
-  useState,
-  useRef,
-  useEffect,
-  useMemo,
-  useCallback,
-} from "react";
+import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import {
   Send,
   X,
@@ -31,10 +25,7 @@ import {
   type ChatMessage,
   type BlocksResult,
 } from "@/hooks/useAnalysisChat";
-import {
-  useAnalysisChatContext,
-  type ChatSession,
-} from "@/contexts/AnalysisChatContext";
+import { useAnalysisChatContext, type ChatSession } from "@/contexts/AnalysisChatContext";
 import { ChatPlotlyChart } from "@/components/features/chat/ChatPlotlyChart";
 import { CodeBlock } from "@/components/features/chat/CodeBlock";
 import { useGetCopilotConfig } from "@/client/copilot/copilot";
@@ -83,11 +74,7 @@ const markdownComponents = {
 // Sub-components
 // ---------------------------------------------------------------------------
 
-function AssessmentBadgeFromValue({
-  assessment,
-}: {
-  assessment: string | null;
-}) {
+function AssessmentBadgeFromValue({ assessment }: { assessment: string | null }) {
   if (assessment === "good") {
     return (
       <span className="badge badge-success badge-sm gap-1">
@@ -145,11 +132,7 @@ function parseBlocksContent(content: string): BlocksResult | null {
   return null;
 }
 
-function ImageSentBadge({
-  imagesSent,
-}: {
-  imagesSent: BlocksResult["images_sent"];
-}) {
+function ImageSentBadge({ imagesSent }: { imagesSent: BlocksResult["images_sent"] }) {
   const [previewSrc, setPreviewSrc] = useState<string | null>(null);
   const modalRef = useRef<HTMLDialogElement>(null);
 
@@ -159,18 +142,12 @@ function ImageSentBadge({
   }, []);
 
   if (!imagesSent) return null;
-  const {
-    experiment_figure,
-    experiment_figure_paths,
-    expected_images,
-    task_name,
-  } = imagesSent;
+  const { experiment_figure, experiment_figure_paths, expected_images, task_name } = imagesSent;
   if (!experiment_figure && expected_images.length === 0) return null;
 
   const parts: string[] = [];
   if (experiment_figure) parts.push("実験結果画像");
-  if (expected_images.length > 0)
-    parts.push(`参照画像${expected_images.length}枚`);
+  if (expected_images.length > 0) parts.push(`参照画像${expected_images.length}枚`);
 
   const baseURL = process.env.NEXT_PUBLIC_API_URL || "/api";
 
@@ -240,17 +217,12 @@ function BlocksContent({ blocks }: { blocks: BlocksResult }) {
   return (
     <>
       <ImageSentBadge imagesSent={blocks.images_sent} />
-      {blocks.assessment && (
-        <AssessmentBadgeFromValue assessment={blocks.assessment} />
-      )}
+      {blocks.assessment && <AssessmentBadgeFromValue assessment={blocks.assessment} />}
       {blocks.blocks.map((block, i) => {
         if (block.type === "text" && block.content) {
           return (
             <div key={i} className="prose prose-sm max-w-none text-sm mt-1">
-              <ReactMarkdown
-                remarkPlugins={[remarkGfm]}
-                components={markdownComponents}
-              >
+              <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
                 {block.content}
               </ReactMarkdown>
             </div>
@@ -302,10 +274,7 @@ function MessageBubble({ message }: { message: ChatMessage }) {
           <>
             <AssessmentBadge content={message.content} />
             <div className="prose prose-sm max-w-none text-sm mt-1">
-              <ReactMarkdown
-                remarkPlugins={[remarkGfm]}
-                components={markdownComponents}
-              >
+              <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
                 {message.content
                   .replace(/\*\*\[Good\]\*\*\s*/, "")
                   .replace(/\*\*\[Warning\]\*\*\s*/, "")
@@ -352,9 +321,7 @@ function SessionItem({
     >
       <div className="flex items-start justify-between gap-1">
         <div className="min-w-0 flex-1">
-          <div className="font-semibold truncate">
-            {session.title || "Untitled"}
-          </div>
+          <div className="font-semibold truncate">{session.title || "Untitled"}</div>
           <div className="text-base-content/50 truncate">
             {session.context ? session.context.qid : "General"}
           </div>
@@ -400,10 +367,7 @@ const GENERAL_SUGGESTED_QUESTIONS = [
 // Main component
 // ---------------------------------------------------------------------------
 
-export function AnalysisChatPanel({
-  context,
-  onClose,
-}: AnalysisChatPanelProps) {
+export function AnalysisChatPanel({ context, onClose }: AnalysisChatPanelProps) {
   const {
     closeAnalysisChat,
     sessions,
@@ -418,9 +382,7 @@ export function AnalysisChatPanel({
   } = useAnalysisChatContext();
 
   const [showSessions, setShowSessions] = useState(false);
-  const [selectedModelKey, setSelectedModelKey] = useState(
-    getStoredAnalysisModelKey,
-  );
+  const [selectedModelKey, setSelectedModelKey] = useState(getStoredAnalysisModelKey);
 
   // The context to use for the chat: prefer active session's context
   const effectiveContext = activeSession?.context ?? context;
@@ -431,13 +393,8 @@ export function AnalysisChatPanel({
     () => buildAnalysisModelOptions(copilotConfigResponse?.data ?? null),
     [copilotConfigResponse?.data],
   );
-  const selectedModel = resolveAnalysisModelOption(
-    modelOptions,
-    selectedModelKey,
-  );
-  const modelOverride = effectiveContext
-    ? (selectedModel?.model ?? null)
-    : null;
+  const selectedModel = resolveAnalysisModelOption(modelOptions, selectedModelKey);
+  const modelOverride = effectiveContext ? (selectedModel?.model ?? null) : null;
   const effectiveModelName =
     selectedModel?.model?.name ??
     selectedModel?.label.replace(/^Configured:\s*/, "") ??
@@ -451,9 +408,7 @@ export function AnalysisChatPanel({
   // Restore messages from active session
   const initialMessages = useMemo(
     () =>
-      effectiveContext
-        ? getSessionMessages(effectiveContext)
-        : (activeSession?.messages ?? []),
+      effectiveContext ? getSessionMessages(effectiveContext) : (activeSession?.messages ?? []),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [activeSessionId],
   );
@@ -534,23 +489,17 @@ export function AnalysisChatPanel({
         <div className="flex items-center gap-2 min-w-0">
           <Bot className="w-4 h-4 text-primary flex-shrink-0" />
           <div className="min-w-0">
-            <h3 className="text-sm font-bold truncate">
-              {isGeneralMode ? "AI Chat" : "Ask AI"}
-            </h3>
+            <h3 className="text-sm font-bold truncate">{isGeneralMode ? "AI Chat" : "Ask AI"}</h3>
             {effectiveContext && (
               <p className="text-xs text-base-content/50 truncate">
-                {effectiveContext.taskName} / {effectiveContext.qid} /{" "}
-                {effectiveModelName}
+                {effectiveContext.taskName} / {effectiveContext.qid} / {effectiveModelName}
               </p>
             )}
           </div>
         </div>
         <div className="flex items-center gap-0.5">
           {effectiveContext && modelOptions.length > 1 && (
-            <label
-              className="flex items-center gap-1 mr-1"
-              title="Analysis model"
-            >
+            <label className="flex items-center gap-1 mr-1" title="Analysis model">
               <Cpu className="w-3.5 h-3.5 text-base-content/40" />
               <select
                 className="select select-bordered select-xs w-36 text-xs"
@@ -589,10 +538,7 @@ export function AnalysisChatPanel({
           >
             <Maximize2 className="w-3.5 h-3.5" />
           </button>
-          <button
-            onClick={handleClose}
-            className="btn btn-ghost btn-xs btn-square"
-          >
+          <button onClick={handleClose} className="btn btn-ghost btn-xs btn-square">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -643,10 +589,7 @@ export function AnalysisChatPanel({
                 : "Ask about this calibration result"}
             </p>
             <div className="flex flex-col gap-2">
-              {(isGeneralMode
-                ? GENERAL_SUGGESTED_QUESTIONS
-                : SUGGESTED_QUESTIONS
-              ).map((q) => (
+              {(isGeneralMode ? GENERAL_SUGGESTED_QUESTIONS : SUGGESTED_QUESTIONS).map((q) => (
                 <button
                   key={q}
                   onClick={() => {
@@ -661,9 +604,7 @@ export function AnalysisChatPanel({
             {/* Show past sessions when in general mode with no active session */}
             {isGeneralMode && sessions.length > 0 && !activeSessionId && (
               <div className="mt-6 w-full">
-                <p className="text-xs text-base-content/40 mb-2">
-                  Or resume a previous session:
-                </p>
+                <p className="text-xs text-base-content/40 mb-2">Or resume a previous session:</p>
                 <div className="space-y-1 max-h-40 overflow-y-auto">
                   {sessions.slice(0, 5).map((session) => (
                     <SessionItem
@@ -689,9 +630,7 @@ export function AnalysisChatPanel({
             </div>
             <div className="flex items-center gap-1.5 py-2">
               {statusMessage ? (
-                <span className="text-xs text-base-content/60">
-                  {statusMessage}
-                </span>
+                <span className="text-xs text-base-content/60">{statusMessage}</span>
               ) : (
                 <>
                   <span
@@ -721,11 +660,7 @@ export function AnalysisChatPanel({
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder={
-            isGeneralMode
-              ? "Ask about calibration..."
-              : "Ask about this result..."
-          }
+          placeholder={isGeneralMode ? "Ask about calibration..." : "Ask about this result..."}
           rows={1}
           className="textarea textarea-bordered flex-1 min-h-[40px] max-h-24 resize-none text-sm py-2"
           disabled={isLoading}

@@ -48,10 +48,7 @@ describe("useCSVExport", () => {
       const blob = createObjectURLMock.mock.calls[0][0] as Blob;
       expect(blob.type).toBe("text/csv;charset=utf-8;");
 
-      expect(mockLink.setAttribute).toHaveBeenCalledWith(
-        "download",
-        "test.csv",
-      );
+      expect(mockLink.setAttribute).toHaveBeenCalledWith("download", "test.csv");
       expect(mockLink.click).toHaveBeenCalledOnce();
     });
 

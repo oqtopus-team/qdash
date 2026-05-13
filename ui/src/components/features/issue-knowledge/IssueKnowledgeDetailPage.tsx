@@ -24,18 +24,12 @@ function SeverityBadge({ severity }: { severity?: string }) {
       : severity === "warning"
         ? "badge-warning"
         : "badge-info";
-  return (
-    <span className={`badge badge-sm ${color}`}>{severity ?? "info"}</span>
-  );
+  return <span className={`badge badge-sm ${color}`}>{severity ?? "info"}</span>;
 }
 
 function StatusBadge({ status }: { status: string }) {
   const color =
-    status === "approved"
-      ? "badge-success"
-      : status === "rejected"
-        ? "badge-error"
-        : "badge-ghost";
+    status === "approved" ? "badge-success" : status === "rejected" ? "badge-error" : "badge-ghost";
   return <span className={`badge badge-sm ${color}`}>{status}</span>;
 }
 
@@ -55,9 +49,7 @@ function EditableField({
   if (isEditing) {
     return (
       <div>
-        <label className="text-xs font-semibold text-base-content/60 mb-1 block">
-          {label}
-        </label>
+        <label className="text-xs font-semibold text-base-content/60 mb-1 block">{label}</label>
         {multiline ? (
           <textarea
             className="textarea textarea-bordered w-full text-sm"
@@ -79,9 +71,7 @@ function EditableField({
 
   return (
     <div>
-      <label className="text-xs font-semibold text-base-content/60 mb-1 block">
-        {label}
-      </label>
+      <label className="text-xs font-semibold text-base-content/60 mb-1 block">{label}</label>
       <p className="text-sm text-base-content/80 whitespace-pre-wrap">
         {value || <span className="italic text-base-content/30">Empty</span>}
       </p>
@@ -89,11 +79,7 @@ function EditableField({
   );
 }
 
-export function IssueKnowledgeDetailPage({
-  knowledgeId,
-}: {
-  knowledgeId: string;
-}) {
+export function IssueKnowledgeDetailPage({ knowledgeId }: { knowledgeId: string }) {
   const router = useRouter();
   const { knowledge, isLoading, isUpdating, update, approve, reject } =
     useIssueKnowledgeDetail(knowledgeId);
@@ -126,11 +112,7 @@ export function IssueKnowledgeDetailPage({
   }
 
   if (!knowledge) {
-    return (
-      <div className="text-center py-16 text-base-content/50">
-        Knowledge case not found.
-      </div>
-    );
+    return <div className="text-center py-16 text-base-content/50">Knowledge case not found.</div>;
   }
 
   const isDraft = knowledge.status === "draft";
@@ -184,14 +166,10 @@ export function IssueKnowledgeDetailPage({
               )}
             </h1>
             <StatusBadge status={knowledge.status} />
-            <SeverityBadge
-              severity={isEditing ? editSeverity : knowledge.severity}
-            />
+            <SeverityBadge severity={isEditing ? editSeverity : knowledge.severity} />
           </div>
           <div className="flex items-center gap-3 mt-1 text-xs text-base-content/50">
-            <span className="font-mono text-primary">
-              {knowledge.task_name}
-            </span>
+            <span className="font-mono text-primary">{knowledge.task_name}</span>
             {knowledge.chip_id && <span>{knowledge.chip_id}</span>}
             {knowledge.qid && <span>{knowledge.qid}</span>}
             <span>{knowledge.date}</span>
@@ -215,13 +193,9 @@ export function IssueKnowledgeDetailPage({
           <ExternalLink className="h-3 w-3" />
           Task Result
         </Link>
-        <span className="text-base-content/40">
-          Created {formatDateTime(knowledge.created_at)}
-        </span>
+        <span className="text-base-content/40">Created {formatDateTime(knowledge.created_at)}</span>
         {knowledge.reviewed_by && (
-          <span className="text-base-content/40">
-            Reviewed by {String(knowledge.reviewed_by)}
-          </span>
+          <span className="text-base-content/40">Reviewed by {String(knowledge.reviewed_by)}</span>
         )}
         {knowledge.pr_url && (
           <a
@@ -253,34 +227,22 @@ export function IssueKnowledgeDetailPage({
                 )}
                 Save
               </button>
-              <button
-                onClick={() => setIsEditing(false)}
-                className="btn btn-ghost btn-sm gap-1"
-              >
+              <button onClick={() => setIsEditing(false)} className="btn btn-ghost btn-sm gap-1">
                 <X className="h-3 w-3" />
                 Cancel
               </button>
             </>
           ) : (
             <>
-              <button
-                onClick={() => setIsEditing(true)}
-                className="btn btn-ghost btn-sm gap-1"
-              >
+              <button onClick={() => setIsEditing(true)} className="btn btn-ghost btn-sm gap-1">
                 <Pencil className="h-3 w-3" />
                 Edit
               </button>
-              <button
-                onClick={handleApprove}
-                className="btn btn-success btn-sm gap-1"
-              >
+              <button onClick={handleApprove} className="btn btn-success btn-sm gap-1">
                 <GitPullRequest className="h-3 w-3" />
                 Create PR
               </button>
-              <button
-                onClick={handleReject}
-                className="btn btn-ghost btn-sm gap-1"
-              >
+              <button onClick={handleReject} className="btn btn-ghost btn-sm gap-1">
                 <XCircle className="h-3 w-3" />
                 Reject
               </button>
@@ -292,9 +254,7 @@ export function IssueKnowledgeDetailPage({
       {/* Severity selector (editing mode) */}
       {isEditing && (
         <div className="mb-4">
-          <label className="text-xs font-semibold text-base-content/60 mb-1 block">
-            Severity
-          </label>
+          <label className="text-xs font-semibold text-base-content/60 mb-1 block">Severity</label>
           <select
             className="select select-bordered select-sm"
             value={editSeverity}
@@ -357,8 +317,7 @@ export function IssueKnowledgeDetailPage({
               <label className="text-xs font-semibold text-base-content/60 mb-1 block">
                 Lessons Learned
               </label>
-              {knowledge.lesson_learned &&
-              knowledge.lesson_learned.length > 0 ? (
+              {knowledge.lesson_learned && knowledge.lesson_learned.length > 0 ? (
                 <ul className="list-disc list-inside space-y-1">
                   {knowledge.lesson_learned.map((lesson, i) => (
                     <li key={i} className="text-sm text-base-content/80">
@@ -367,9 +326,7 @@ export function IssueKnowledgeDetailPage({
                   ))}
                 </ul>
               ) : (
-                <p className="text-sm italic text-base-content/30">
-                  No lessons recorded
-                </p>
+                <p className="text-sm italic text-base-content/30">No lessons recorded</p>
               )}
             </div>
           )}
@@ -377,8 +334,7 @@ export function IssueKnowledgeDetailPage({
 
         {/* Images section */}
         {((knowledge.figure_paths && knowledge.figure_paths.length > 0) ||
-          (knowledge.thread_image_urls &&
-            knowledge.thread_image_urls.length > 0)) && (
+          (knowledge.thread_image_urls && knowledge.thread_image_urls.length > 0)) && (
           <div className="bg-base-200/50 rounded-lg p-4">
             <label className="text-xs font-semibold text-base-content/60 mb-3 block flex items-center gap-1">
               <Image className="h-3 w-3" />
@@ -387,9 +343,7 @@ export function IssueKnowledgeDetailPage({
 
             {knowledge.figure_paths && knowledge.figure_paths.length > 0 && (
               <div className="mb-4">
-                <p className="text-xs text-base-content/50 mb-2">
-                  Task Result Figures
-                </p>
+                <p className="text-xs text-base-content/50 mb-2">Task Result Figures</p>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                   {knowledge.figure_paths.map((path, i) => (
                     <a
@@ -411,32 +365,25 @@ export function IssueKnowledgeDetailPage({
               </div>
             )}
 
-            {knowledge.thread_image_urls &&
-              knowledge.thread_image_urls.length > 0 && (
-                <div>
-                  <p className="text-xs text-base-content/50 mb-2">
-                    Thread Images
-                  </p>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                    {knowledge.thread_image_urls.map((url, i) => (
-                      <a
-                        key={i}
-                        href={url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="block border border-base-300 rounded overflow-hidden hover:border-primary transition-colors"
-                      >
-                        {/* eslint-disable-next-line @next/next/no-img-element -- thread images may be remote or API-backed */}
-                        <img
-                          src={url}
-                          alt={`Thread image ${i + 1}`}
-                          className="w-full h-auto"
-                        />
-                      </a>
-                    ))}
-                  </div>
+            {knowledge.thread_image_urls && knowledge.thread_image_urls.length > 0 && (
+              <div>
+                <p className="text-xs text-base-content/50 mb-2">Thread Images</p>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                  {knowledge.thread_image_urls.map((url, i) => (
+                    <a
+                      key={i}
+                      href={url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block border border-base-300 rounded overflow-hidden hover:border-primary transition-colors"
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element -- thread images may be remote or API-backed */}
+                      <img src={url} alt={`Thread image ${i + 1}`} className="w-full h-auto" />
+                    </a>
+                  ))}
                 </div>
-              )}
+              </div>
+            )}
           </div>
         )}
       </div>

@@ -11,12 +11,7 @@ interface DateTimePickerProps {
   disabled?: boolean;
 }
 
-export function DateTimePicker({
-  label,
-  value,
-  onChange,
-  disabled = false,
-}: DateTimePickerProps) {
+export function DateTimePicker({ label, value, onChange, disabled = false }: DateTimePickerProps) {
   const [localValue, setLocalValue] = useState(toDateTimeLocal(value));
 
   useEffect(() => {

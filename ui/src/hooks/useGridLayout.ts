@@ -1,12 +1,6 @@
 "use client";
 
-import {
-  useState,
-  useEffect,
-  useCallback,
-  useRef,
-  type RefObject,
-} from "react";
+import { useState, useEffect, useCallback, useRef, type RefObject } from "react";
 
 import {
   calculateCellSize,
@@ -63,10 +57,8 @@ function getDynamicReservedHeight(
   base: { mobile: number; desktop: number },
 ): number {
   if (isMobile) return base.mobile;
-  if (viewportHeight < VIEWPORT_HEIGHT_BREAKPOINTS.SMALL)
-    return Math.min(base.desktop, 220);
-  if (viewportHeight < VIEWPORT_HEIGHT_BREAKPOINTS.MEDIUM)
-    return Math.min(base.desktop, 280);
+  if (viewportHeight < VIEWPORT_HEIGHT_BREAKPOINTS.SMALL) return Math.min(base.desktop, 220);
+  if (viewportHeight < VIEWPORT_HEIGHT_BREAKPOINTS.MEDIUM) return Math.min(base.desktop, 280);
   return base.desktop;
 }
 
@@ -99,19 +91,13 @@ export function useGridLayout({
     setViewportHeight(vh);
 
     const containerPadding = mobile ? 16 : 32;
-    const containerWidth =
-      Math.min(container.offsetWidth, viewportWidth) - containerPadding * 2;
-    const dynamicReserved = getDynamicReservedHeight(
-      vh,
-      mobile,
-      reservedHeight,
-    );
+    const containerWidth = Math.min(container.offsetWidth, viewportWidth) - containerPadding * 2;
+    const dynamicReserved = getDynamicReservedHeight(vh, mobile, reservedHeight);
     const availableHeight = vh - dynamicReserved;
 
     // Use adaptive minimum cell size for larger grids (e.g., 144Q)
     const gridSize = Math.max(cols, rows);
-    const adaptiveMinSize =
-      minCellSize ?? getAdaptiveMinCellSize(gridSize, mobile, vh);
+    const adaptiveMinSize = minCellSize ?? getAdaptiveMinCellSize(gridSize, mobile, vh);
 
     const newCellSize = calculateCellSize({
       containerWidth,
@@ -146,14 +132,12 @@ export function useGridLayout({
   const padding = getGridPadding(isMobile, viewportHeight);
 
   const getGridDimension = useCallback(
-    (count: number) =>
-      calculateGridDimension(count, cellSize, isMobile, viewportHeight),
+    (count: number) => calculateGridDimension(count, cellSize, isMobile, viewportHeight),
     [cellSize, isMobile, viewportHeight],
   );
 
   const getContainerWidth = useCallback(
-    (colCount: number) =>
-      calculateGridContainerWidth(colCount, cellSize, isMobile, viewportHeight),
+    (colCount: number) => calculateGridContainerWidth(colCount, cellSize, isMobile, viewportHeight),
     [cellSize, isMobile, viewportHeight],
   );
 

@@ -15,10 +15,7 @@ import { TimeRangeSelector } from "@/components/ui/TimeRangeSelector";
 import { useCSVExport } from "@/hooks/useCSVExport";
 import { useMetricsConfig } from "@/hooks/useMetricsConfig";
 import { useMetricsQueryParams } from "@/hooks/useMetricsQueryParams";
-import {
-  useCorrelationUrlState,
-  useRangeModeUrlState,
-} from "@/hooks/useUrlState";
+import { useCorrelationUrlState, useRangeModeUrlState } from "@/hooks/useUrlState";
 
 type MetricOption = {
   value: string;
@@ -39,10 +36,7 @@ function isPercentageMetric(unit: string | undefined): boolean {
 }
 
 // Calculate Pearson correlation coefficient
-function calculatePearsonCorrelation(
-  x: number[],
-  y: number[],
-): { r: number; n: number } {
+function calculatePearsonCorrelation(x: number[], y: number[]): { r: number; n: number } {
   if (x.length !== y.length || x.length < 2) {
     return { r: 0, n: x.length };
   }
@@ -83,8 +77,7 @@ export function CorrelationView() {
     isInitialized,
   } = useCorrelationUrlState();
 
-  const { startDate, endDate, setStartDate, setEndDate, setQuickRange } =
-    useRangeModeUrlState();
+  const { startDate, endDate, setStartDate, setEndDate, setQuickRange } = useRangeModeUrlState();
 
   // Load metrics configuration from backend
   const {
@@ -122,8 +115,7 @@ export function CorrelationView() {
   );
 
   // Select appropriate metrics options based on type
-  const metricOptions =
-    metricType === "qubit" ? qubitMetricOptions : couplingMetricOptions;
+  const metricOptions = metricType === "qubit" ? qubitMetricOptions : couplingMetricOptions;
 
   // Get current metric configurations
   const xMetricConfig = useMemo(() => {
@@ -195,29 +187,16 @@ export function CorrelationView() {
     const isYValid = allMetrics.some((m) => m.key === yParameter);
     if (!isYValid && qubitMetrics.length > 1) {
       const t2Metric = qubitMetrics.find((m) => m.key === "t2_echo");
-      setYParameter(
-        t2Metric?.key || qubitMetrics[1]?.key || qubitMetrics[0].key,
-      );
+      setYParameter(t2Metric?.key || qubitMetrics[1]?.key || qubitMetrics[0].key);
     }
-  }, [
-    qubitMetrics,
-    couplingMetrics,
-    xParameter,
-    yParameter,
-    setXParameter,
-    setYParameter,
-  ]);
+  }, [qubitMetrics, couplingMetrics, xParameter, yParameter, setXParameter, setYParameter]);
 
   // Fetch chips data (lightweight summary)
   const { data: chipsResponse } = useListChips();
 
   // Set default chip on mount
   useEffect(() => {
-    if (
-      !selectedChip &&
-      chipsResponse?.data?.chips &&
-      chipsResponse.data.chips.length > 0
-    ) {
+    if (!selectedChip && chipsResponse?.data?.chips && chipsResponse.data.chips.length > 0) {
       const sortedChips = [...chipsResponse.data.chips].sort((a, b) => {
         const dateA = a.installed_at ? new Date(a.installed_at).getTime() : 0;
         const dateB = b.installed_at ? new Date(b.installed_at).getTime() : 0;
@@ -275,18 +254,11 @@ export function CorrelationView() {
 
     // Collect data points where both X and Y values exist
     const dataPoints: CorrelationDataPoint[] = [];
-    const entityIds = new Set([
-      ...Object.keys(xRawData),
-      ...Object.keys(yRawData),
-    ]);
+    const entityIds = new Set([...Object.keys(xRawData), ...Object.keys(yRawData)]);
 
     entityIds.forEach((entityId) => {
-      const xMetric = (xRawData as Record<string, { value?: unknown }>)[
-        entityId
-      ];
-      const yMetric = (yRawData as Record<string, { value?: unknown }>)[
-        entityId
-      ];
+      const xMetric = (xRawData as Record<string, { value?: unknown }>)[entityId];
+      const yMetric = (yRawData as Record<string, { value?: unknown }>)[entityId];
 
       const xValue = xMetric?.value;
       const yValue = yMetric?.value;
@@ -350,14 +322,7 @@ export function CorrelationView() {
     };
 
     return { correlationData: dataPoints, statistics };
-  }, [
-    metricsData,
-    xParameter,
-    yParameter,
-    xMetricConfig,
-    yMetricConfig,
-    metricType,
-  ]);
+  }, [metricsData, xParameter, yParameter, xMetricConfig, yMetricConfig, metricType]);
 
   // Generate scatter plot data
   const plotData = useMemo(() => {
@@ -579,10 +544,7 @@ export function CorrelationView() {
               </div>
 
               <div className="w-28 sm:w-48">
-                <ChipSelector
-                  selectedChip={selectedChip}
-                  onChipSelect={setSelectedChip}
-                />
+                <ChipSelector selectedChip={selectedChip} onChipSelect={setSelectedChip} />
               </div>
 
               {/* X Parameter Selection - inline */}
@@ -592,11 +554,7 @@ export function CorrelationView() {
                   className="text-base-content"
                   classNamePrefix="react-select"
                   options={metricOptions}
-                  value={
-                    metricOptions.find(
-                      (option) => option.value === xParameter,
-                    ) ?? null
-                  }
+                  value={metricOptions.find((option) => option.value === xParameter) ?? null}
                   onChange={(option: SingleValue<MetricOption>) => {
                     if (option) {
                       setXParameter(option.value);
@@ -615,11 +573,7 @@ export function CorrelationView() {
                   className="text-base-content"
                   classNamePrefix="react-select"
                   options={metricOptions}
-                  value={
-                    metricOptions.find(
-                      (option) => option.value === yParameter,
-                    ) ?? null
-                  }
+                  value={metricOptions.find((option) => option.value === yParameter) ?? null}
                   onChange={(option: SingleValue<MetricOption>) => {
                     if (option) {
                       setYParameter(option.value);
@@ -654,11 +608,7 @@ export function CorrelationView() {
                   className={`join-item btn btn-xs sm:btn-sm h-full ${selectionMode === "best" ? "btn-primary" : ""} ${!isBestModeSupported ? "btn-disabled" : ""}`}
                   onClick={() => setSelectionMode("best")}
                   disabled={!isBestModeSupported}
-                  title={
-                    !isBestModeSupported
-                      ? "Best mode not available"
-                      : "Show best values"
-                  }
+                  title={!isBestModeSupported ? "Best mode not available" : "Show best values"}
                 >
                   Best
                 </button>
@@ -709,17 +659,11 @@ export function CorrelationView() {
               {/* Mobile: Grid layout */}
               <div className="grid grid-cols-2 gap-2 sm:hidden">
                 <div className="bg-base-200 rounded-lg p-2 text-center">
-                  <div className="text-xs text-base-content/60">
-                    Sample Size
-                  </div>
-                  <div className="text-sm font-bold text-primary">
-                    {statistics.sampleSize}
-                  </div>
+                  <div className="text-xs text-base-content/60">Sample Size</div>
+                  <div className="text-sm font-bold text-primary">{statistics.sampleSize}</div>
                 </div>
                 <div className="bg-base-200 rounded-lg p-2 text-center">
-                  <div className="text-xs text-base-content/60">
-                    Correlation (r)
-                  </div>
+                  <div className="text-xs text-base-content/60">Correlation (r)</div>
                   <div
                     className={`text-sm font-bold ${
                       statistics.correlation >= 0.7
@@ -758,9 +702,7 @@ export function CorrelationView() {
                   <div className="text-xs text-base-content/60 truncate">
                     {yMetricConfig?.title || yParameter}
                   </div>
-                  <div className="text-sm font-bold text-accent">
-                    {statistics.yMean.toFixed(2)}
-                  </div>
+                  <div className="text-sm font-bold text-accent">{statistics.yMean.toFixed(2)}</div>
                   <div className="text-xs text-base-content/60">
                     {statistics.yMin.toFixed(1)}-{statistics.yMax.toFixed(1)}
                   </div>
@@ -770,9 +712,7 @@ export function CorrelationView() {
               <div className="stats stats-horizontal shadow w-full hidden sm:inline-grid">
                 <div className="stat py-2">
                   <div className="stat-title text-xs">Sample Size</div>
-                  <div className="stat-value text-primary text-lg">
-                    {statistics.sampleSize}
-                  </div>
+                  <div className="stat-value text-primary text-lg">{statistics.sampleSize}</div>
                 </div>
                 <div className="stat py-2">
                   <div className="stat-title text-xs">Correlation (r)</div>
@@ -807,8 +747,7 @@ export function CorrelationView() {
                     {statistics.xMean.toFixed(2)}
                   </div>
                   <div className="stat-desc text-xs">
-                    Range: {statistics.xMin.toFixed(2)} -{" "}
-                    {statistics.xMax.toFixed(2)}
+                    Range: {statistics.xMin.toFixed(2)} - {statistics.xMax.toFixed(2)}
                   </div>
                 </div>
                 <div className="stat py-2">
@@ -819,8 +758,7 @@ export function CorrelationView() {
                     {statistics.yMean.toFixed(2)}
                   </div>
                   <div className="stat-desc text-xs">
-                    Range: {statistics.yMin.toFixed(2)} -{" "}
-                    {statistics.yMax.toFixed(2)}
+                    Range: {statistics.yMin.toFixed(2)} - {statistics.yMax.toFixed(2)}
                   </div>
                 </div>
               </div>
@@ -861,9 +799,7 @@ export function CorrelationView() {
                 {
                   key: "xValue",
                   label: `${xMetricConfig?.title || xParameter} (${
-                    isPercentageMetric(xMetricConfig?.unit)
-                      ? "%"
-                      : xMetricConfig?.unit || ""
+                    isPercentageMetric(xMetricConfig?.unit) ? "%" : xMetricConfig?.unit || ""
                   })`,
                   sortable: true,
                   render: (v: number) => v.toFixed(4),
@@ -871,9 +807,7 @@ export function CorrelationView() {
                 {
                   key: "yValue",
                   label: `${yMetricConfig?.title || yParameter} (${
-                    isPercentageMetric(yMetricConfig?.unit)
-                      ? "%"
-                      : yMetricConfig?.unit || ""
+                    isPercentageMetric(yMetricConfig?.unit) ? "%" : yMetricConfig?.unit || ""
                   })`,
                   sortable: true,
                   render: (v: number) => v.toFixed(4),

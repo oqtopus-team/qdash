@@ -109,40 +109,40 @@ export function useMetricsConfig() {
 
     // Transform qubit metrics to array
     // Note: Object.entries() preserves insertion order in modern JS (ES2015+)
-    const qubitMetrics: MetricConfig[] = Object.entries(
-      config.qubit_metrics || {},
-    ).map(([key, metadata]) => ({
-      key,
-      title: metadata.title,
-      unit: metadata.unit,
-      scale: metadata.scale,
-      description: metadata.description,
-      evaluationMode: metadata.evaluation?.mode || "none",
-      threshold: metadata.threshold
-        ? {
-            value: metadata.threshold.value,
-            range: metadata.threshold.range,
-          }
-        : undefined,
-    }));
+    const qubitMetrics: MetricConfig[] = Object.entries(config.qubit_metrics || {}).map(
+      ([key, metadata]) => ({
+        key,
+        title: metadata.title,
+        unit: metadata.unit,
+        scale: metadata.scale,
+        description: metadata.description,
+        evaluationMode: metadata.evaluation?.mode || "none",
+        threshold: metadata.threshold
+          ? {
+              value: metadata.threshold.value,
+              range: metadata.threshold.range,
+            }
+          : undefined,
+      }),
+    );
 
     // Transform coupling metrics to array
-    const couplingMetrics: MetricConfig[] = Object.entries(
-      config.coupling_metrics || {},
-    ).map(([key, metadata]) => ({
-      key,
-      title: metadata.title,
-      unit: metadata.unit,
-      scale: metadata.scale,
-      description: metadata.description,
-      evaluationMode: metadata.evaluation?.mode || "none",
-      threshold: metadata.threshold
-        ? {
-            value: metadata.threshold.value,
-            range: metadata.threshold.range,
-          }
-        : undefined,
-    }));
+    const couplingMetrics: MetricConfig[] = Object.entries(config.coupling_metrics || {}).map(
+      ([key, metadata]) => ({
+        key,
+        title: metadata.title,
+        unit: metadata.unit,
+        scale: metadata.scale,
+        description: metadata.description,
+        evaluationMode: metadata.evaluation?.mode || "none",
+        threshold: metadata.threshold
+          ? {
+              value: metadata.threshold.value,
+              range: metadata.threshold.range,
+            }
+          : undefined,
+      }),
+    );
 
     // Combined metrics for histogram view (all metrics with thresholds)
     const allMetrics = [...qubitMetrics, ...couplingMetrics];

@@ -20,8 +20,7 @@
 .menu li > button,
 .dropdown-content,
 .alert {
-  transition-property:
-    background-color, border-color, color, box-shadow, transform;
+  transition-property: background-color, border-color, color, box-shadow, transform;
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   transition-duration: 200ms;
 }
@@ -102,8 +101,7 @@ select,
   box-shadow:
     0 4px 6px -1px rgb(0 0 0 / 0.1),
     0 2px 4px -2px rgb(0 0 0 / 0.1);
-  border: 1px solid
-    color-mix(in oklch, var(--color-base-content) 8%, transparent);
+  border: 1px solid color-mix(in oklch, var(--color-base-content) 8%, transparent);
 }
 
 /* Interactive cards get lift effect with glow */
@@ -201,11 +199,7 @@ a.card:hover {
 .btn-ghost:hover:not(:disabled) {
   box-shadow: none;
   transform: none;
-  background-color: color-mix(
-    in oklch,
-    var(--color-base-content) 10%,
-    transparent
-  );
+  background-color: color-mix(in oklch, var(--color-base-content) 10%, transparent);
 }
 
 /* Small buttons - proportional effects */
@@ -239,11 +233,7 @@ a.card:hover {
 .input:hover,
 .select:hover,
 .textarea:hover {
-  border-color: color-mix(
-    in oklch,
-    var(--color-primary) 50%,
-    var(--color-base-300)
-  );
+  border-color: color-mix(in oklch, var(--color-primary) 50%, var(--color-base-300));
 }
 
 .input:focus,
@@ -302,11 +292,7 @@ a.card:hover {
 }
 
 .tabs-boxed .tab:hover:not(.tab-active) {
-  background-color: color-mix(
-    in oklch,
-    var(--color-base-content) 5%,
-    transparent
-  );
+  background-color: color-mix(in oklch, var(--color-base-content) 5%, transparent);
 }
 
 .tabs-boxed .tab-active {
@@ -324,8 +310,7 @@ a.card:hover {
 .modal-box {
   border-radius: 1.5rem;
   box-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.25);
-  border: 1px solid
-    color-mix(in oklch, var(--color-base-content) 10%, transparent);
+  border: 1px solid color-mix(in oklch, var(--color-base-content) 10%, transparent);
   will-change: transform, opacity;
   contain: layout style paint;
 }
@@ -441,8 +426,7 @@ a.card:hover {
   box-shadow:
     0 10px 25px -5px rgb(0 0 0 / 0.2),
     0 8px 10px -6px rgb(0 0 0 / 0.1);
-  border: 1px solid
-    color-mix(in oklch, var(--color-base-content) 10%, transparent);
+  border: 1px solid color-mix(in oklch, var(--color-base-content) 10%, transparent);
   animation: dropdownFadeIn 0.2s ease-out;
 }
 
@@ -475,8 +459,7 @@ a.card:hover {
   );
   color: var(--color-primary-content);
   font-weight: 600;
-  box-shadow: 0 2px 8px -2px
-    color-mix(in oklch, var(--color-primary) 50%, transparent);
+  box-shadow: 0 2px 8px -2px color-mix(in oklch, var(--color-primary) 50%, transparent);
 }
 
 /* ----------------------------------------
@@ -507,11 +490,7 @@ a.card:hover {
    ---------------------------------------- */
 
 .loading {
-  background: linear-gradient(
-    135deg,
-    var(--color-primary),
-    var(--color-secondary)
-  );
+  background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
   -webkit-background-clip: text;
   background-clip: text;
 }
@@ -681,13 +660,7 @@ html[data-theme="dev-dark"],
 
 /* Login page background gradient - Light mode */
 .login-page-bg {
-  background: linear-gradient(
-    135deg,
-    #f8f9ff 0%,
-    #f0f1ff 25%,
-    #fff5f6 75%,
-    #fff 100%
-  );
+  background: linear-gradient(135deg, #f8f9ff 0%, #f0f1ff 25%, #fff5f6 75%, #fff 100%);
   position: relative;
 }
 
@@ -699,42 +672,20 @@ html[data-theme="dev-dark"],
   right: 0;
   bottom: 0;
   background:
-    radial-gradient(
-      ellipse at 20% 30%,
-      rgba(31, 31, 221, 0.08) 0%,
-      transparent 50%
-    ),
-    radial-gradient(
-      ellipse at 80% 70%,
-      rgba(226, 19, 49, 0.06) 0%,
-      transparent 50%
-    );
+    radial-gradient(ellipse at 20% 30%, rgba(31, 31, 221, 0.08) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 70%, rgba(226, 19, 49, 0.06) 0%, transparent 50%);
   pointer-events: none;
 }
 
 /* Login page background gradient - Dark mode */
 [data-theme="dark"] .login-page-bg {
-  background: linear-gradient(
-    135deg,
-    #1b1b1f 0%,
-    #1e1e24 25%,
-    #1f1a1b 75%,
-    #1b1b1f 100%
-  );
+  background: linear-gradient(135deg, #1b1b1f 0%, #1e1e24 25%, #1f1a1b 75%, #1b1b1f 100%);
 }
 
 [data-theme="dark"] .login-page-bg::before {
   background:
-    radial-gradient(
-      ellipse at 20% 30%,
-      rgba(85, 85, 240, 0.12) 0%,
-      transparent 50%
-    ),
-    radial-gradient(
-      ellipse at 80% 70%,
-      rgba(246, 111, 129, 0.08) 0%,
-      transparent 50%
-    );
+    radial-gradient(ellipse at 20% 30%, rgba(85, 85, 240, 0.12) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 70%, rgba(246, 111, 129, 0.08) 0%, transparent 50%);
 }
 
 /* Login title gradient text - Light mode */
@@ -755,27 +706,13 @@ html[data-theme="dev-dark"],
 
 /* Login page background gradient - Dev Light mode */
 [data-theme="dev-light"] .login-page-bg {
-  background: linear-gradient(
-    135deg,
-    #f5f0ff 0%,
-    #ebe0ff 25%,
-    #fce7f3 75%,
-    #f5f0ff 100%
-  );
+  background: linear-gradient(135deg, #f5f0ff 0%, #ebe0ff 25%, #fce7f3 75%, #f5f0ff 100%);
 }
 
 [data-theme="dev-light"] .login-page-bg::before {
   background:
-    radial-gradient(
-      ellipse at 20% 30%,
-      rgba(124, 58, 237, 0.15) 0%,
-      transparent 50%
-    ),
-    radial-gradient(
-      ellipse at 80% 70%,
-      rgba(219, 39, 119, 0.12) 0%,
-      transparent 50%
-    );
+    radial-gradient(ellipse at 20% 30%, rgba(124, 58, 237, 0.15) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 70%, rgba(219, 39, 119, 0.12) 0%, transparent 50%);
 }
 
 /* Login title gradient text - Dev Light mode */
@@ -788,27 +725,13 @@ html[data-theme="dev-dark"],
 
 /* Login page background gradient - Dev Dark mode */
 [data-theme="dev-dark"] .login-page-bg {
-  background: linear-gradient(
-    135deg,
-    #1e1033 0%,
-    #2d1b4e 25%,
-    #2a1f3d 75%,
-    #1e1033 100%
-  );
+  background: linear-gradient(135deg, #1e1033 0%, #2d1b4e 25%, #2a1f3d 75%, #1e1033 100%);
 }
 
 [data-theme="dev-dark"] .login-page-bg::before {
   background:
-    radial-gradient(
-      ellipse at 20% 30%,
-      rgba(167, 139, 250, 0.2) 0%,
-      transparent 50%
-    ),
-    radial-gradient(
-      ellipse at 80% 70%,
-      rgba(244, 114, 182, 0.15) 0%,
-      transparent 50%
-    );
+    radial-gradient(ellipse at 20% 30%, rgba(167, 139, 250, 0.2) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 70%, rgba(244, 114, 182, 0.15) 0%, transparent 50%);
 }
 
 /* Login title gradient text - Dev Dark mode */
@@ -825,11 +748,7 @@ html[data-theme="dev-dark"],
 
 /* Subtle gradient for page titles - Light mode */
 .title-gradient {
-  background: linear-gradient(
-    135deg,
-    var(--color-base-content) 0%,
-    var(--color-primary) 100%
-  );
+  background: linear-gradient(135deg, var(--color-base-content) 0%, var(--color-primary) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -841,11 +760,7 @@ html[data-theme="dev-dark"],
 [data-theme="dracula"] .title-gradient,
 [data-theme="dim"] .title-gradient,
 [data-theme="abyss"] .title-gradient {
-  background: linear-gradient(
-    135deg,
-    rgba(255, 255, 255, 0.95) 0%,
-    var(--color-primary) 100%
-  );
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, var(--color-primary) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -1672,11 +1587,7 @@ html[data-theme="dev-dark"],
   width: 16px;
   height: 16px;
   margin: -8px 0 0 -8px;
-  background: linear-gradient(
-    135deg,
-    var(--color-primary),
-    var(--color-secondary)
-  );
+  background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
   border-radius: 50%;
   animation: quantum-core-pulse 2s ease-in-out infinite;
 }
@@ -1724,11 +1635,7 @@ html[data-theme="dev-dark"],
 }
 
 .quantum-loader-ring:nth-child(2) {
-  border-top-color: color-mix(
-    in oklch,
-    var(--color-secondary) 30%,
-    transparent
-  );
+  border-top-color: color-mix(in oklch, var(--color-secondary) 30%, transparent);
   animation-duration: 2.5s;
   animation-direction: reverse;
 }
@@ -1761,8 +1668,7 @@ html[data-theme="dev-dark"],
 .chat-session-active {
   background: color-mix(in oklch, var(--color-primary) 8%, transparent);
   border: 1px solid color-mix(in oklch, var(--color-primary) 20%, transparent);
-  box-shadow: 0 0 0 1px
-    color-mix(in oklch, var(--color-primary) 5%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in oklch, var(--color-primary) 5%, transparent);
 }
 
 /* Input card container */
@@ -1790,8 +1696,7 @@ html[data-theme="dev-dark"],
   gap: 0.75rem;
   padding: 0.75rem 1rem;
   border-radius: 0.75rem;
-  border: 1px solid
-    color-mix(in oklch, var(--color-base-content) 10%, transparent);
+  border: 1px solid color-mix(in oklch, var(--color-base-content) 10%, transparent);
   background: var(--color-base-100);
   text-align: left;
   cursor: pointer;
@@ -1801,11 +1706,7 @@ html[data-theme="dev-dark"],
 
 .chat-suggestion-card:hover {
   border-color: color-mix(in oklch, var(--color-primary) 30%, transparent);
-  background: color-mix(
-    in oklch,
-    var(--color-primary) 3%,
-    var(--color-base-100)
-  );
+  background: color-mix(in oklch, var(--color-primary) 3%, var(--color-base-100));
   box-shadow:
     0 4px 6px -1px rgb(0 0 0 / 0.07),
     0 0 0 1px color-mix(in oklch, var(--color-primary) 10%, transparent);

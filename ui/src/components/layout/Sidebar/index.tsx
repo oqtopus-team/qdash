@@ -46,8 +46,7 @@ import { useSidebar } from "@/contexts/SidebarContext";
 import { useUnreadNotificationCount } from "@/hooks/useNotifications";
 import { DARK_THEMES } from "@/constants/themes";
 
-const PREFECT_URL =
-  process.env.NEXT_PUBLIC_PREFECT_URL || "http://127.0.0.1:4200";
+const PREFECT_URL = process.env.NEXT_PUBLIC_PREFECT_URL || "http://127.0.0.1:4200";
 
 type NavItem = {
   href: string;
@@ -72,13 +71,7 @@ type NavSection = {
   items: NavItem[];
 };
 
-function SectionHeader({
-  label,
-  visible,
-}: {
-  label: string;
-  visible: boolean;
-}) {
+function SectionHeader({ label, visible }: { label: string; visible: boolean }) {
   if (!visible) return null;
   return (
     <li className="menu-title text-xs font-semibold text-base-content/50 uppercase tracking-wider px-3 pt-3 pb-1">
@@ -105,10 +98,7 @@ function SidebarNavItem({
   onClick: () => void;
 }) {
   const Icon = item.icon;
-  const active =
-    item.match === "prefix"
-      ? pathname.startsWith(item.href)
-      : pathname === item.href;
+  const active = item.match === "prefix" ? pathname.startsWith(item.href) : pathname === item.href;
   const showLabel = isOpen || isMobileOpen;
   const badge = item.badge ?? 0;
 
@@ -123,9 +113,7 @@ function SidebarNavItem({
         <Icon size={18} />
         {showLabel && <span className="ml-2">{item.label}</span>}
         {badge > 0 && (
-          <span className="badge badge-primary badge-xs ml-auto">
-            {badge > 99 ? "99+" : badge}
-          </span>
+          <span className="badge badge-primary badge-xs ml-auto">{badge > 99 ? "99+" : badge}</span>
         )}
       </Link>
     </li>
@@ -170,18 +158,14 @@ export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const modalRef = useRef<HTMLDialogElement>(null);
-  const { isOpen, isMobileOpen, toggleSidebar, setMobileSidebarOpen } =
-    useSidebar();
+  const { isOpen, isMobileOpen, toggleSidebar, setMobileSidebarOpen } = useSidebar();
   const { canEdit } = useProject();
   const { user, logout: authLogout } = useAuth();
   const { theme, setTheme } = useTheme();
   const { data: unreadNotificationsResponse } = useUnreadNotificationCount();
-  const unreadNotifications =
-    unreadNotificationsResponse?.data.unread_count ?? 0;
+  const unreadNotifications = unreadNotificationsResponse?.data.unread_count ?? 0;
   const isAdmin = user?.system_role === "admin";
-  const isDarkTheme = DARK_THEMES.includes(
-    theme as (typeof DARK_THEMES)[number],
-  );
+  const isDarkTheme = DARK_THEMES.includes(theme as (typeof DARK_THEMES)[number]);
 
   const logoutMutation = useLogout();
   const handleLogout = useCallback(async () => {
@@ -227,17 +211,13 @@ export function Sidebar() {
   // Mobile sidebar style
   const linkClass = (active: boolean) =>
     `py-2.5 px-3 mx-1 my-0.5 text-sm font-medium flex items-center rounded-lg transition-colors ${
-      active
-        ? "bg-neutral text-neutral-content"
-        : "text-base-content hover:bg-base-300"
+      active ? "bg-neutral text-neutral-content" : "text-base-content hover:bg-base-300"
     }`;
 
   // Desktop sidebar style
   const desktopLinkClass = (active: boolean) =>
     `py-2.5 ${isOpen ? "px-3 mx-1" : "px-2 mx-1 justify-center"} my-0.5 text-sm font-medium flex items-center rounded-lg transition-colors ${
-      active
-        ? "bg-neutral text-neutral-content"
-        : "text-base-content hover:bg-base-300"
+      active ? "bg-neutral text-neutral-content" : "text-base-content hover:bg-base-300"
     }`;
 
   const sectionHeaderVisible = isOpen || isMobileOpen;
@@ -354,11 +334,7 @@ export function Sidebar() {
       <ul className="menu p-2 py-0">
         {(isOpen || isMobileOpen) && (
           <div className="flex justify-center items-center p-3">
-            <Link
-              href="/"
-              className="flex items-center"
-              onClick={handleLinkClick}
-            >
+            <Link href="/" className="flex items-center" onClick={handleLinkClick}>
               <Image
                 src="/oqtopus_logo.png"
                 alt="Oqtopus Logo"
@@ -372,17 +348,12 @@ export function Sidebar() {
         )}
 
         {navSections.map((section) => {
-          const visibleItems = section.items.filter(
-            (item) => item.visible !== false,
-          );
+          const visibleItems = section.items.filter((item) => item.visible !== false);
           if (visibleItems.length === 0) return null;
 
           return (
             <Fragment key={section.label}>
-              <SectionHeader
-                visible={sectionHeaderVisible}
-                label={section.label}
-              />
+              <SectionHeader visible={sectionHeaderVisible} label={section.label} />
               {visibleItems.map((item) => (
                 <SidebarNavItem
                   key={item.href}
@@ -434,12 +405,8 @@ export function Sidebar() {
         </div>
         {(isOpen || isMobileOpen) && (
           <div className="flex-1 text-left min-w-0">
-            <div className="text-sm font-medium truncate">
-              {user?.username || "User"}
-            </div>
-            <div className="text-xs opacity-60 truncate">
-              {user?.display_name || ""}
-            </div>
+            <div className="text-sm font-medium truncate">{user?.username || "User"}</div>
+            <div className="text-xs opacity-60 truncate">{user?.display_name || ""}</div>
             {user?.system_role && (
               <div className="mt-0.5">
                 <span
@@ -461,11 +428,7 @@ export function Sidebar() {
         {/* Profile Section */}
         <div className="flex flex-col items-center py-4 border-b border-base-300">
           <div className="mb-3">
-            <UserAvatar
-              username={user?.username || ""}
-              avatarKey={user?.avatar_key}
-              size={64}
-            />
+            <UserAvatar username={user?.username || ""} avatarKey={user?.avatar_key} size={64} />
           </div>
           <h2 className="text-lg font-bold">{user?.username}</h2>
           {user?.display_name && (

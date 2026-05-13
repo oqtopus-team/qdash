@@ -24,9 +24,7 @@ export default function GlobalError({
               />
             </div>
 
-            <h1 className="text-3xl font-bold text-gray-800 mb-4">
-              Something went wrong
-            </h1>
+            <h1 className="text-3xl font-bold text-gray-800 mb-4">Something went wrong</h1>
 
             <p className="text-gray-600 text-lg max-w-md mx-auto mb-8">
               An unexpected error occurred. Please try again.

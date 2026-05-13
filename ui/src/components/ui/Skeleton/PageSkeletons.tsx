@@ -291,10 +291,7 @@ export function EditorPageSkeleton() {
             {Array.from({ length: 8 }).map((_, i) => (
               <div key={i} className="flex items-center gap-2">
                 <div className="skeleton h-4 w-4" />
-                <div
-                  className="skeleton h-4"
-                  style={{ width: `${60 + Math.random() * 40}%` }}
-                />
+                <div className="skeleton h-4" style={{ width: `${60 + Math.random() * 40}%` }} />
               </div>
             ))}
           </div>

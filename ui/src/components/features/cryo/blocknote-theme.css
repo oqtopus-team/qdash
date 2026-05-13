@@ -18,36 +18,20 @@
   --bn-colors-tooltip-text: var(--color-base-content);
   --bn-colors-tooltip-background: var(--color-base-200);
   --bn-colors-hovered-text: var(--color-base-content);
-  --bn-colors-hovered-background: color-mix(
-    in oklch,
-    var(--color-primary) 8%,
-    transparent
-  );
+  --bn-colors-hovered-background: color-mix(in oklch, var(--color-primary) 8%, transparent);
   --bn-colors-selected-text: var(--color-primary-content);
   --bn-colors-selected-background: var(--color-primary);
-  --bn-colors-disabled-text: color-mix(
-    in oklch,
-    var(--color-base-content) 40%,
-    transparent
-  );
+  --bn-colors-disabled-text: color-mix(in oklch, var(--color-base-content) 40%, transparent);
   --bn-colors-disabled-background: var(--color-base-200);
 
-  --bn-colors-shadow: color-mix(
-    in oklch,
-    var(--color-base-content) 14%,
-    transparent
-  );
+  --bn-colors-shadow: color-mix(in oklch, var(--color-base-content) 14%, transparent);
   --bn-colors-border: var(--color-base-300);
-  --bn-colors-side-menu: color-mix(
-    in oklch,
-    var(--color-base-content) 35%,
-    transparent
-  );
+  --bn-colors-side-menu: color-mix(in oklch, var(--color-base-content) 35%, transparent);
 
   --bn-border-radius: 0.625rem;
   --bn-font-family:
-    "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen,
-    Ubuntu, Cantarell, sans-serif;
+    "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell,
+    sans-serif;
 }
 
 /* Outer chrome — border + bg on the *container*, not on .bn-editor */
@@ -64,8 +48,7 @@
 
 .wiring-blocknote .bn-container:focus-within {
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 4px
-    color-mix(in oklch, var(--color-primary) 18%, transparent);
+  box-shadow: 0 0 0 4px color-mix(in oklch, var(--color-primary) 18%, transparent);
 }
 
 /* Inner editor — preserve BlockNote's own padding for the side menu and the
@@ -147,11 +130,7 @@
 
 /* Code block: monospace + subtle inset background */
 .wiring-blocknote pre {
-  background-color: color-mix(
-    in oklch,
-    var(--color-base-200) 70%,
-    transparent
-  ) !important;
+  background-color: color-mix(in oklch, var(--color-base-200) 70%, transparent) !important;
   border: 1px solid var(--color-base-300) !important;
   border-radius: 0.5rem !important;
 }

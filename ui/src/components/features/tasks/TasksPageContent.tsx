@@ -64,10 +64,7 @@ export function TasksPageContent() {
   // Fetch settings (including default backend)
   const { data: settingsData } = useQuery({
     queryKey: ["taskFileSettings"],
-    queryFn: () =>
-      getTaskFileSettings().then(
-        (res: AxiosResponse<TaskFileSettings>) => res.data,
-      ),
+    queryFn: () => getTaskFileSettings().then((res: AxiosResponse<TaskFileSettings>) => res.data),
   });
 
   // Fetch available backends
@@ -78,9 +75,7 @@ export function TasksPageContent() {
   } = useQuery({
     queryKey: ["taskFileBackends"],
     queryFn: () =>
-      listTaskFileBackends().then(
-        (res: AxiosResponse<ListTaskFileBackendsResponse>) => res.data,
-      ),
+      listTaskFileBackends().then((res: AxiosResponse<ListTaskFileBackendsResponse>) => res.data),
   });
 
   // Set default view mode when settings are loaded
@@ -97,11 +92,7 @@ export function TasksPageContent() {
 
   // Set default backend when loaded (from settings or first available)
   useEffect(() => {
-    if (
-      backendsData?.backends &&
-      backendsData.backends.length > 0 &&
-      !selectedBackend
-    ) {
+    if (backendsData?.backends && backendsData.backends.length > 0 && !selectedBackend) {
       // Use default from settings if available and exists in backends list
       const defaultBackend = settingsData?.default_backend;
       const backendExists = backendsData.backends.some(
@@ -153,9 +144,7 @@ export function TasksPageContent() {
   // Save mutation
   const saveMutation = useMutation({
     mutationFn: (request: SaveTaskFileRequest) =>
-      saveTaskFileContent(request).then(
-        (res: AxiosResponse<SaveTaskFileContent200>) => res.data,
-      ),
+      saveTaskFileContent(request).then((res: AxiosResponse<SaveTaskFileContent200>) => res.data),
     onSuccess: () => {
       setHasUnsavedChanges(false);
       toast.success("File saved successfully!");
@@ -170,10 +159,7 @@ export function TasksPageContent() {
 
   // Update file content when loaded
   useEffect(() => {
-    if (
-      fileContentData?.content !== undefined &&
-      fileContentData?.content !== null
-    ) {
+    if (fileContentData?.content !== undefined && fileContentData?.content !== null) {
       setFileContent(String(fileContentData.content));
       setHasUnsavedChanges(false);
     }
@@ -181,11 +167,7 @@ export function TasksPageContent() {
 
   const handleBackendChange = (backend: string) => {
     if (hasUnsavedChanges) {
-      if (
-        !confirm(
-          "You have unsaved changes. Do you want to discard them and switch backends?",
-        )
-      ) {
+      if (!confirm("You have unsaved changes. Do you want to discard them and switch backends?")) {
         return;
       }
     }
@@ -199,9 +181,7 @@ export function TasksPageContent() {
   const handleFileSelect = (path: string) => {
     if (hasUnsavedChanges) {
       if (
-        !confirm(
-          "You have unsaved changes. Do you want to discard them and open another file?",
-        )
+        !confirm("You have unsaved changes. Do you want to discard them and open another file?")
       ) {
         return;
       }
@@ -263,20 +243,13 @@ export function TasksPageContent() {
 
     // Python files
     if (node.name.endsWith(".py")) {
-      return (
-        <FileCode2 className="inline-block mr-1 text-blue-400" size={14} />
-      );
+      return <FileCode2 className="inline-block mr-1 text-blue-400" size={14} />;
     }
 
-    return (
-      <File className="inline-block mr-1 text-base-content/50" size={14} />
-    );
+    return <File className="inline-block mr-1 text-base-content/50" size={14} />;
   };
 
-  const renderFileTree = (
-    nodes: TaskFileTreeNode[],
-    level = 0,
-  ): ReactElement[] => {
+  const renderFileTree = (nodes: TaskFileTreeNode[], level = 0): ReactElement[] => {
     return nodes.map((node) => (
       <div key={node.path}>
         {node.type === "directory" ? (
@@ -285,9 +258,7 @@ export function TasksPageContent() {
               className="text-sm text-base-content/80 hover:bg-base-200 px-2 py-0.5 cursor-pointer select-none flex items-center list-none"
               style={{ paddingLeft: `${level * 12 + 8}px` }}
             >
-              <span className="mr-1 transition-transform group-open:rotate-90">
-                ▸
-              </span>
+              <span className="mr-1 transition-transform group-open:rotate-90">▸</span>
               {getFileIcon(node, true)}
               <span className="truncate">{node.name}</span>
             </summary>
@@ -314,17 +285,14 @@ export function TasksPageContent() {
   // Group tasks by task_type
   const groupedTasks = useMemo(() => {
     if (!taskListData?.tasks) return {};
-    return taskListData.tasks.reduce(
-      (acc: Record<string, TaskInfo[]>, task: TaskInfo) => {
-        const type = task.task_type || "other";
-        if (!acc[type]) {
-          acc[type] = [];
-        }
-        acc[type].push(task);
-        return acc;
-      },
-      {},
-    );
+    return taskListData.tasks.reduce((acc: Record<string, TaskInfo[]>, task: TaskInfo) => {
+      const type = task.task_type || "other";
+      if (!acc[type]) {
+        acc[type] = [];
+      }
+      acc[type].push(task);
+      return acc;
+    }, {});
   }, [taskListData]);
 
   const renderTaskList = () => {
@@ -337,11 +305,7 @@ export function TasksPageContent() {
     }
 
     if (!taskListData?.tasks || taskListData.tasks.length === 0) {
-      return (
-        <div className="text-xs text-base-content/50 px-3 py-2">
-          No tasks found
-        </div>
-      );
+      return <div className="text-xs text-base-content/50 px-3 py-2">No tasks found</div>;
     }
 
     return (
@@ -349,13 +313,9 @@ export function TasksPageContent() {
         {Object.entries(groupedTasks).map(([taskType, tasks]) => (
           <details key={taskType} className="group" open>
             <summary className="text-xs font-semibold text-base-content/60 px-3 py-1 cursor-pointer select-none hover:bg-base-200 uppercase tracking-wider flex items-center">
-              <span className="mr-1 transition-transform group-open:rotate-90">
-                ▸
-              </span>
+              <span className="mr-1 transition-transform group-open:rotate-90">▸</span>
               {taskType}
-              <span className="ml-2 text-base-content/40">
-                ({tasks.length})
-              </span>
+              <span className="ml-2 text-base-content/40">({tasks.length})</span>
             </summary>
             <div className="space-y-0.5">
               {tasks.map((task: TaskInfo) => (
@@ -365,13 +325,8 @@ export function TasksPageContent() {
                   onClick={() => handleTaskClick(task)}
                 >
                   <div className="flex items-center gap-2 min-w-0 flex-1">
-                    <Braces
-                      className="text-purple-400 flex-shrink-0"
-                      size={14}
-                    />
-                    <span className="text-sm text-base-content/80 truncate">
-                      {task.name}
-                    </span>
+                    <Braces className="text-purple-400 flex-shrink-0" size={14} />
+                    <span className="text-sm text-base-content/80 truncate">{task.name}</span>
                   </div>
                   <button
                     onClick={(e) => {
@@ -381,10 +336,7 @@ export function TasksPageContent() {
                     className="opacity-0 group-hover/item:opacity-100 p-1 hover:bg-base-300 rounded transition-opacity"
                     title="Copy task name"
                   >
-                    <Copy
-                      className="text-base-content/50 hover:text-base-content"
-                      size={14}
-                    />
+                    <Copy className="text-base-content/50 hover:text-base-content" size={14} />
                   </button>
                 </div>
               ))}
@@ -408,9 +360,7 @@ export function TasksPageContent() {
     return (
       <div className="container mx-auto p-6">
         <div className="alert alert-error">
-          <span>
-            Failed to load backends: {(backendsError as Error)?.message}
-          </span>
+          <span>Failed to load backends: {(backendsError as Error)?.message}</span>
         </div>
         <button onClick={() => router.push("/")} className="btn btn-ghost mt-4">
           ← Back to Home
@@ -433,17 +383,11 @@ export function TasksPageContent() {
               <PanelLeft size={16} />
             </button>
             <div className="flex items-center gap-1 sm:gap-2 min-w-0 overflow-hidden">
-              <span className="text-sm font-medium flex-shrink-0 hidden sm:inline">
-                Task Files
-              </span>
+              <span className="text-sm font-medium flex-shrink-0 hidden sm:inline">Task Files</span>
               {selectedBackend && (
                 <>
-                  <span className="text-base-content/50 hidden sm:inline">
-                    /
-                  </span>
-                  <span className="text-sm text-info flex-shrink-0">
-                    {selectedBackend}
-                  </span>
+                  <span className="text-base-content/50 hidden sm:inline">/</span>
+                  <span className="text-sm text-info flex-shrink-0">{selectedBackend}</span>
                 </>
               )}
               {selectedFile && (
@@ -455,9 +399,7 @@ export function TasksPageContent() {
                 </>
               )}
             </div>
-            {hasUnsavedChanges && (
-              <span className="text-xs text-warning flex-shrink-0">●</span>
-            )}
+            {hasUnsavedChanges && <span className="text-xs text-warning flex-shrink-0">●</span>}
           </div>
           <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
             {/* Backend selector */}
@@ -478,18 +420,13 @@ export function TasksPageContent() {
               title={isEditorLocked ? "Click to edit" : "Currently editing"}
             >
               <Pencil size={16} />
-              <span className="ml-1">
-                {isEditorLocked ? "Edit" : "Editing"}
-              </span>
+              <span className="ml-1">{isEditorLocked ? "Edit" : "Editing"}</span>
             </button>
             <button
               onClick={handleSave}
               className={`btn btn-sm hidden sm:flex ${isEditorLocked ? "btn-outline" : "btn-success"}`}
               disabled={
-                !selectedFile ||
-                !hasUnsavedChanges ||
-                saveMutation.isPending ||
-                isEditorLocked
+                !selectedFile || !hasUnsavedChanges || saveMutation.isPending || isEditorLocked
               }
             >
               {saveMutation.isPending ? (
@@ -548,18 +485,14 @@ export function TasksPageContent() {
                     EXPLORER
                   </h2>
                   <div className="text-xs text-base-content/50 px-3 mb-2 uppercase tracking-wide">
-                    {selectedBackend
-                      ? `${selectedBackend} Tasks`
-                      : "Select Backend"}
+                    {selectedBackend ? `${selectedBackend} Tasks` : "Select Backend"}
                   </div>
                   {isTreeLoading ? (
                     <div className="flex items-center justify-center py-4">
                       <span className="loading loading-spinner loading-sm"></span>
                     </div>
                   ) : treeError ? (
-                    <div className="text-xs text-red-400 px-3">
-                      Error loading tree
-                    </div>
+                    <div className="text-xs text-red-400 px-3">Error loading tree</div>
                   ) : (
                     fileTreeData && renderFileTree(fileTreeData)
                   )}
@@ -601,14 +534,11 @@ export function TasksPageContent() {
                         });
                       });
 
-                      editor.addCommand(
-                        monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS,
-                        () => {
-                          if (!isEditorLocked) {
-                            handleSave();
-                          }
-                        },
-                      );
+                      editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
+                        if (!isEditorLocked) {
+                          handleSave();
+                        }
+                      });
                     }}
                     options={{
                       minimap: { enabled: true },
@@ -631,14 +561,9 @@ export function TasksPageContent() {
             ) : (
               <div className="flex items-center justify-center h-full text-base-content/50">
                 <div className="text-center">
-                  <FileCode2
-                    className="mx-auto mb-4 text-blue-400/50"
-                    size={64}
-                  />
+                  <FileCode2 className="mx-auto mb-4 text-blue-400/50" size={64} />
                   <p className="text-lg mb-2">No file selected</p>
-                  <p className="text-sm">
-                    Select a Python file from the tree to view or edit
-                  </p>
+                  <p className="text-sm">Select a Python file from the tree to view or edit</p>
                 </div>
               </div>
             )}
@@ -665,11 +590,7 @@ export function TasksPageContent() {
 
         {/* Mobile FAB */}
         <div className="fab fixed bottom-20 right-4 z-30 sm:hidden">
-          <div
-            tabIndex={0}
-            role="button"
-            className="btn btn-circle btn-primary shadow-lg"
-          >
+          <div tabIndex={0} role="button" className="btn btn-circle btn-primary shadow-lg">
             <Plus size={20} />
           </div>
           <div className="flex items-center gap-2">
@@ -695,17 +616,12 @@ export function TasksPageContent() {
             </button>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-sm font-medium bg-base-100 px-2 py-1 rounded shadow">
-              Save
-            </span>
+            <span className="text-sm font-medium bg-base-100 px-2 py-1 rounded shadow">Save</span>
             <button
               onClick={handleSave}
               className={`btn btn-circle shadow-lg ${isEditorLocked ? "btn-outline bg-base-100" : "btn-success"}`}
               disabled={
-                !selectedFile ||
-                !hasUnsavedChanges ||
-                saveMutation.isPending ||
-                isEditorLocked
+                !selectedFile || !hasUnsavedChanges || saveMutation.isPending || isEditorLocked
               }
             >
               {saveMutation.isPending ? (
