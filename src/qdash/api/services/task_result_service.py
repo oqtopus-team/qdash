@@ -10,6 +10,7 @@ import io
 import logging
 import zipfile
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
 from threading import Lock
@@ -69,6 +70,16 @@ _AI_TRIAGE_EXECUTOR = ThreadPoolExecutor(
 )
 _AI_TRIAGE_IN_FLIGHT_TASK_IDS: set[str] = set()
 _AI_TRIAGE_IN_FLIGHT_LOCK = Lock()
+
+
+@dataclass(frozen=True)
+class _BulkAiTriageSelection:
+    """Resolved target entities and repository filter for a bulk AI triage request."""
+
+    qids: list[str]
+    query_filter: dict[str, Any]
+    response_date: str | None
+    requested_task_ids: set[str]
 
 
 def _document_to_task_result(doc: TaskResultHistoryDocument) -> TaskResult:
@@ -386,60 +397,117 @@ class TaskResultService:
         if model_override is not None:
             triage_config = config.model_copy(update={"analysis_model": model_override})
         selected_model = self._select_analysis_model(triage_config)
-
-        is_latest = date is None or date == "latest"
-        if is_latest:
-            qids = self._get_entity_ids(project_id, chip_id, entity_type)
-            query_filter: dict[str, Any] = {
-                "project_id": project_id,
-                "chip_id": chip_id,
-                "name": task,
-                "qid": {"$in": qids},
-                "status": {"$in": ["completed", "failed"]},
-            }
-        else:
-            historical_date = date or ""
-            qids = self._get_historical_entity_ids(
-                project_id, chip_id, entity_type, historical_date
-            )
-            parsed_date = parse_date(historical_date, "YYYYMMDD")
-            query_filter = {
-                "project_id": project_id,
-                "chip_id": chip_id,
-                "name": task,
-                "qid": {"$in": qids},
-                "status": {"$in": ["completed", "failed"]},
-                "start_at": {"$gte": start_of_day(parsed_date), "$lt": end_of_day(parsed_date)},
-            }
-        if task_ids:
-            query_filter["task_id"] = {"$in": task_ids}
-
-        all_results = self._task_result_repo.find(
-            query_filter,
-            sort=[("end_at", SortDirection.DESCENDING)],
+        selection = self._resolve_bulk_ai_triage_selection(
+            project_id=project_id,
+            chip_id=chip_id,
+            task=task,
+            entity_type=entity_type,
+            date=date,
+            task_ids=task_ids,
         )
-        latest_results = self._organize_by_qid(all_results)
-        requested_task_ids = set(task_ids or [])
-
-        enqueued_task_ids: list[str] = []
-        for qid in qids:
-            doc = latest_results.get(qid)
-            if doc is None:
-                continue
-            if requested_task_ids and doc.task_id not in requested_task_ids:
-                continue
-            self._mark_ai_triage_requested(doc, requested_by, selected_model)
-            self._enqueue_ai_triage_for_document(doc, model_override)
-            enqueued_task_ids.append(doc.task_id)
+        enqueued_task_ids = self._enqueue_bulk_ai_triage(
+            selection=selection,
+            requested_by=requested_by,
+            selected_model=selected_model,
+            model_override=model_override,
+        )
 
         return BulkAiTriageResponse(
             chip_id=chip_id,
             task=task,
             entity_type=entity_type,
-            date=None if is_latest else date,
+            date=selection.response_date,
             requested_count=len(enqueued_task_ids),
             task_ids=enqueued_task_ids,
         )
+
+    def _resolve_bulk_ai_triage_selection(
+        self,
+        *,
+        project_id: str,
+        chip_id: str,
+        task: str,
+        entity_type: str,
+        date: str | None,
+        task_ids: list[str] | None,
+    ) -> _BulkAiTriageSelection:
+        """Resolve the entity set and repository query for a bulk AI triage request."""
+        is_latest = date is None or date == "latest"
+        qids = (
+            self._get_entity_ids(project_id, chip_id, entity_type)
+            if is_latest
+            else self._get_historical_entity_ids(project_id, chip_id, entity_type, date or "")
+        )
+
+        query_filter = self._build_bulk_ai_triage_query_filter(
+            project_id=project_id,
+            chip_id=chip_id,
+            task=task,
+            qids=qids,
+            date=None if is_latest else (date or ""),
+            task_ids=task_ids,
+        )
+        return _BulkAiTriageSelection(
+            qids=qids,
+            query_filter=query_filter,
+            response_date=None if is_latest else date,
+            requested_task_ids=set(task_ids or []),
+        )
+
+    @staticmethod
+    def _build_bulk_ai_triage_query_filter(
+        *,
+        project_id: str,
+        chip_id: str,
+        task: str,
+        qids: list[str],
+        date: str | None,
+        task_ids: list[str] | None,
+    ) -> dict[str, Any]:
+        """Build the repository query for bulk AI triage candidate results."""
+        query_filter: dict[str, Any] = {
+            "project_id": project_id,
+            "chip_id": chip_id,
+            "name": task,
+            "qid": {"$in": qids},
+            "status": {"$in": ["completed", "failed"]},
+        }
+        if date is not None:
+            parsed_date = parse_date(date, "YYYYMMDD")
+            query_filter["start_at"] = {
+                "$gte": start_of_day(parsed_date),
+                "$lt": end_of_day(parsed_date),
+            }
+        if task_ids:
+            query_filter["task_id"] = {"$in": task_ids}
+        return query_filter
+
+    def _enqueue_bulk_ai_triage(
+        self,
+        *,
+        selection: _BulkAiTriageSelection,
+        requested_by: str,
+        selected_model: Any,
+        model_override: Any | None,
+    ) -> list[str]:
+        """Mark and enqueue the latest triage candidate for each requested entity."""
+        all_results = self._task_result_repo.find(
+            selection.query_filter,
+            sort=[("end_at", SortDirection.DESCENDING)],
+        )
+        latest_results = self._organize_by_qid(all_results)
+
+        enqueued_task_ids: list[str] = []
+        for qid in selection.qids:
+            doc = latest_results.get(qid)
+            if doc is None:
+                continue
+            if selection.requested_task_ids and doc.task_id not in selection.requested_task_ids:
+                continue
+            self._mark_ai_triage_requested(doc, requested_by, selected_model)
+            self._enqueue_ai_triage_for_document(doc, model_override)
+            enqueued_task_ids.append(doc.task_id)
+        return enqueued_task_ids
 
     def _get_entity_ids(self, project_id: str, chip_id: str, entity_type: str) -> list[str]:
         """Get entity IDs for a chip."""
@@ -550,64 +618,27 @@ class TaskResultService:
     ) -> None:
         """Run AI triage in the API process and upsert the dashboard note."""
         try:
-            import asyncio
-
-            from qdash.api.lib.copilot_agent import blocks_to_markdown, run_analysis
-            from qdash.api.lib.copilot_config import load_copilot_config
-            from qdash.api.services.copilot_data_service import CopilotDataService
-
-            config = load_copilot_config()
-            if model_override is not None:
-                config = config.model_copy(update={"analysis_model": model_override})
-            config = TaskResultService._ai_triage_config(config)
-            selected_model = TaskResultService._select_analysis_model(config)
             TaskResultService._set_ai_triage_status(project_id, task_id, "running")
-            ctx = CopilotDataService().build_analysis_context(
+            config = TaskResultService._load_ai_triage_runtime_config(model_override)
+            selected_model = TaskResultService._select_analysis_model(config)
+            context_bundle = TaskResultService._build_ai_triage_context(
                 task_name=task_name,
                 chip_id=chip_id,
                 qid=qid,
                 task_id=task_id,
-                image_base64=None,
                 config=config,
             )
-            ctx.context = ctx.context.model_copy(
-                update={"recent_values": [], "history_results": []}
+            markdown = TaskResultService._render_ai_triage_markdown(
+                task_name=task_name,
+                config=config,
+                context_bundle=context_bundle,
             )
-            if forced := TaskResultService._forced_ai_triage_markdown(
-                task_name,
-                ctx.context.output_parameters,
-            ):
-                markdown = forced
-            else:
-                result = asyncio.run(
-                    run_analysis(
-                        context=ctx.context,
-                        user_message=(
-                            f"{config.analysis.ai_triage_message}\n\n{AI_TRIAGE_FORMAT_REMINDER}"
-                        ),
-                        config=config,
-                        image_base64=ctx.image_base64,
-                        expected_images=ctx.expected_images,
-                        conversation_history=[],
-                        tool_executors=None,
-                    )
-                )
-                markdown = blocks_to_markdown(result).strip()
-            if markdown:
-                model_label = f"{selected_model.provider}/{selected_model.name}"
-                TaskResultService._upsert_ai_triage_note(
-                    project_id,
-                    task_id,
-                    markdown,
-                    model_label,
-                )
-            else:
-                TaskResultService._set_ai_triage_status(
-                    project_id,
-                    task_id,
-                    "failed",
-                    error="AI triage returned empty content",
-                )
+            TaskResultService._persist_ai_triage_markdown(
+                project_id=project_id,
+                task_id=task_id,
+                markdown=markdown,
+                selected_model=selected_model,
+            )
         except Exception as exc:
             logger.warning("AI triage failed for task result %s: %s", task_id, exc)
             TaskResultService._set_ai_triage_status(
@@ -619,6 +650,98 @@ class TaskResultService:
         finally:
             with _AI_TRIAGE_IN_FLIGHT_LOCK:
                 _AI_TRIAGE_IN_FLIGHT_TASK_IDS.discard(task_id)
+
+    @staticmethod
+    def _load_ai_triage_runtime_config(model_override: Any | None) -> Any:
+        """Load Copilot config and apply AI-triage-specific defaults."""
+        from qdash.api.lib.copilot_config import load_copilot_config
+
+        config = load_copilot_config()
+        if model_override is not None:
+            config = config.model_copy(update={"analysis_model": model_override})
+        return TaskResultService._ai_triage_config(config)
+
+    @staticmethod
+    def _build_ai_triage_context(
+        *,
+        task_name: str,
+        chip_id: str,
+        qid: str,
+        task_id: str,
+        config: Any,
+    ) -> Any:
+        """Build the compact context passed to AI triage analysis."""
+        from qdash.api.services.copilot_data_service import CopilotDataService
+
+        context_bundle = CopilotDataService().build_analysis_context(
+            task_name=task_name,
+            chip_id=chip_id,
+            qid=qid,
+            task_id=task_id,
+            image_base64=None,
+            config=config,
+        )
+        context_bundle.context = context_bundle.context.model_copy(
+            update={"recent_values": [], "history_results": []}
+        )
+        return context_bundle
+
+    @staticmethod
+    def _render_ai_triage_markdown(
+        *,
+        task_name: str,
+        config: Any,
+        context_bundle: Any,
+    ) -> str:
+        """Render markdown for a triage run, using deterministic guards when possible."""
+        import asyncio
+
+        from qdash.api.lib.copilot_agent import blocks_to_markdown, run_analysis
+
+        if forced := TaskResultService._forced_ai_triage_markdown(
+            task_name,
+            context_bundle.context.output_parameters,
+        ):
+            return forced
+
+        result = asyncio.run(
+            run_analysis(
+                context=context_bundle.context,
+                user_message=f"{config.analysis.ai_triage_message}\n\n{AI_TRIAGE_FORMAT_REMINDER}",
+                config=config,
+                image_base64=context_bundle.image_base64,
+                expected_images=context_bundle.expected_images,
+                conversation_history=[],
+                tool_executors=None,
+            )
+        )
+        return blocks_to_markdown(result).strip()
+
+    @staticmethod
+    def _persist_ai_triage_markdown(
+        *,
+        project_id: str | None,
+        task_id: str,
+        markdown: str,
+        selected_model: Any,
+    ) -> None:
+        """Persist a successful triage note or mark the run as failed."""
+        if not markdown:
+            TaskResultService._set_ai_triage_status(
+                project_id,
+                task_id,
+                "failed",
+                error="AI triage returned empty content",
+            )
+            return
+
+        model_label = f"{selected_model.provider}/{selected_model.name}"
+        TaskResultService._upsert_ai_triage_note(
+            project_id,
+            task_id,
+            markdown,
+            model_label,
+        )
 
     @staticmethod
     def _set_ai_triage_status(
