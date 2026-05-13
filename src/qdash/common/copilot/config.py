@@ -89,6 +89,9 @@ class CopilotConfig(BaseModel):
     # is used as the default when `analysis_model` is unset. `analysis_model`
     # remains for backward compatibility with existing copilot.yaml files.
     analysis_models: list[ModelConfig] = []
+    # Optional list of selectable models for general chat. The first entry is
+    # used as the default. When unset, the configured `model` above is used.
+    chat_models: list[ModelConfig] = []
     evaluation_metrics: EvaluationMetrics = EvaluationMetrics()
     scoring: dict[str, ScoringThreshold] = {}
     system_prompt: str = ""

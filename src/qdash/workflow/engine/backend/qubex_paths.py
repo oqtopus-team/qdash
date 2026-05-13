@@ -77,10 +77,6 @@ class QubexPaths:
         """Get the box configuration file path."""
         return self.config_dir(chip_id) / "box.yaml"
 
-    def skew_yaml(self, chip_id: str) -> Path:
-        """Get the skew configuration file path."""
-        return self.config_dir(chip_id) / "skew.yaml"
-
     # -------------------------------------------------------------------------
     # Parameter files
     # -------------------------------------------------------------------------

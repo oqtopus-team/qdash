@@ -281,7 +281,7 @@ class CalibService:
             enable_github_pull: Whether to pull latest config from GitHub before starting
             enable_github: Enable GitHub integration (default: True). Sets both pull and push.
             github_push_config: Configuration for GitHub push operations
-            muxes: List of MUX IDs for system-level tasks like CheckSkew (default: None)
+            muxes: List of MUX IDs for system-level tasks (default: None)
             project_id: Project ID for multi-tenancy support. If None, auto-resolved
                 from username's default_project_id.
             skip_execution: Skip Execution document creation (for wrapper/parent sessions
@@ -1187,8 +1187,6 @@ class CalibService:
             results["one_qubit_fine_tune"] = ctx.one_qubit_fine_tune
         if ctx.two_qubit is not None:
             results["two_qubit"] = ctx.two_qubit
-        if ctx.skew_check is not None:
-            results["skew_check"] = ctx.skew_check
         if ctx.filters:
             results["filters"] = ctx.filters
         if ctx.metadata:

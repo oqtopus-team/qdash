@@ -2,42 +2,13 @@
  * Shared SSE (Server-Sent Events) utilities used by copilot chat and issue AI reply.
  */
 
-const PROJECT_STORAGE_KEY = "qdash_current_project_id";
+import { buildAuthHeaders } from "@/lib/auth/session";
 
 /**
  * Build request headers including auth tokens and project context.
  */
 export function buildHeaders(): Record<string, string> {
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-  };
-
-  const accessToken = document.cookie
-    .split("; ")
-    .find((row) => row.startsWith("access_token="))
-    ?.split("=")[1];
-  if (accessToken) {
-    headers["Authorization"] = `Bearer ${decodeURIComponent(accessToken)}`;
-  }
-
-  const token = document.cookie
-    .split("; ")
-    .find((row) => row.startsWith("token="))
-    ?.split("=")[1];
-  if (token) {
-    const decoded = decodeURIComponent(token);
-    if (!headers["Authorization"]) {
-      headers["Authorization"] = `Bearer ${decoded}`;
-    }
-    headers["X-Username"] = decoded;
-  }
-
-  const projectId = localStorage.getItem(PROJECT_STORAGE_KEY);
-  if (projectId) {
-    headers["X-Project-Id"] = projectId;
-  }
-
-  return headers;
+  return buildAuthHeaders();
 }
 
 interface SSEEvent {

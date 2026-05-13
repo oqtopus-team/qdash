@@ -209,18 +209,3 @@ class FilterResult:
         if not self.input_qids:
             return 0.0
         return len(self.output_qids) / len(self.input_qids)
-
-
-@dataclass
-class SkewCheckResult:
-    """Result from skew check step.
-
-    Attributes:
-        mux_skews: Mapping from MUX ID to skew value
-        passed: Whether skew is within acceptable range
-        raw: Raw backend-specific results
-    """
-
-    mux_skews: dict[int, float] = field(default_factory=dict)
-    passed: bool = True
-    raw: dict[str, Any] = field(default_factory=dict)

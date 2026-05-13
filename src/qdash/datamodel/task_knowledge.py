@@ -420,13 +420,6 @@ _CATEGORIES: list[tuple[str, str, list[str]]] = [
         ],
     ),
     (
-        "System",
-        "system",
-        [
-            "CheckSkew",
-        ],
-    ),
-    (
         "CW Characterization",
         "cw-characterization",
         [

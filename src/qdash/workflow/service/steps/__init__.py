@@ -68,7 +68,6 @@ from qdash.workflow.service.steps.pipeline import (
 
 # 2-Qubit and system steps
 from qdash.workflow.service.steps.two_qubit import (
-    CheckSkew,
     CustomTwoQubit,
     GenerateCRSchedule,
     SetCRSchedule,
@@ -79,8 +78,6 @@ __all__ = [
     # MUX-level bring-up steps
     "BringUp",
     "CalibrationStep",
-    # System steps
-    "CheckSkew",
     # Box setup steps
     "ConfigureAll",
     # 1-Qubit steps

@@ -16,10 +16,10 @@ export default function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(() => new QueryClient());
 
   return (
-    <AxiosProvider>
-      <QueryClientProvider client={queryClient}>
-        <NuqsAdapter>
-          <AuthProvider>
+    <QueryClientProvider client={queryClient}>
+      <NuqsAdapter>
+        <AuthProvider>
+          <AxiosProvider>
             <ProjectProvider>
               <ThemeProvider>
                 <ToastProvider>
@@ -28,9 +28,9 @@ export default function Providers({ children }: { children: React.ReactNode }) {
                 </ToastProvider>
               </ThemeProvider>
             </ProjectProvider>
-          </AuthProvider>
-        </NuqsAdapter>
-      </QueryClientProvider>
-    </AxiosProvider>
+          </AxiosProvider>
+        </AuthProvider>
+      </NuqsAdapter>
+    </QueryClientProvider>
   );
 }

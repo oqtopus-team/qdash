@@ -21,16 +21,11 @@ import {
   useCloseIssue,
   useReopenIssue,
 } from "@/client/issue/issue";
+import { useAuth } from "@/contexts/AuthContext";
 import { useProject } from "@/contexts/ProjectContext";
 import { useListProjectMembers } from "@/client/projects/projects";
 import { useQueryClient } from "@tanstack/react-query";
 import { useExtractKnowledge } from "@/hooks/useIssueKnowledge";
-
-function getCurrentUsername(): string {
-  if (typeof document === "undefined") return "";
-  const match = document.cookie.split("; ").find((row) => row.startsWith("username="));
-  return match ? decodeURIComponent(match.split("=")[1]) : "";
-}
 
 function StatusBadge({ status }: { status: string }) {
   const color =
@@ -52,7 +47,7 @@ export function IssueDetailPage({ issueId }: { issueId: string }) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { isOwner, projectId } = useProject();
-  const currentUser = getCurrentUsername();
+  const { username: currentUser } = useAuth();
   const [replyText, setReplyText] = useState("");
   const [editingIssue, setEditingIssue] = useState(false);
   const [editIssueTitle, setEditIssueTitle] = useState("");

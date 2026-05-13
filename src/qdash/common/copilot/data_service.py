@@ -760,20 +760,57 @@ class CopilotDataService:
             return None
         return str(doc.project_id)
 
+    @staticmethod
+    def _compute_graph_depths(
+        *,
+        origin_id: str,
+        edges: list[dict[str, str]],
+        reverse: bool,
+    ) -> dict[str, int]:
+        """Compute shortest-path depths from origin using graph edges."""
+        from collections import defaultdict, deque
+
+        adjacency: dict[str, list[str]] = defaultdict(list)
+        for edge in edges:
+            if reverse:
+                adjacency[edge["target"]].append(edge["source"])
+            else:
+                adjacency[edge["source"]].append(edge["target"])
+
+        depths: dict[str, int] = {origin_id: 0}
+        queue: deque[str] = deque([origin_id])
+
+        while queue:
+            current = queue.popleft()
+            current_depth = depths[current]
+            for nxt in adjacency.get(current, []):
+                if nxt in depths:
+                    continue
+                depths[nxt] = current_depth + 1
+                queue.append(nxt)
+
+        return depths
+
     def _get_provenance_service(self) -> Any:
-        """Build a ProvenanceService instance (same pattern as provenance router)."""
-        from qdash.api.services.provenance_service import ProvenanceService
+        """Build a lightweight provenance adapter for lineage lookups."""
         from qdash.repository.provenance import (
-            MongoActivityRepository,
             MongoParameterVersionRepository,
             MongoProvenanceRelationRepository,
         )
 
-        return ProvenanceService(
-            parameter_version_repo=MongoParameterVersionRepository(),
-            provenance_relation_repo=MongoProvenanceRelationRepository(),
-            activity_repo=MongoActivityRepository(),
-        )
+        class _ProvenanceAdapter:
+            def __init__(self) -> None:
+                self.parameter_version_repo = MongoParameterVersionRepository()
+                self.provenance_relation_repo = MongoProvenanceRelationRepository()
+
+            def get_lineage(self, *, project_id: str, entity_id: str, max_depth: int) -> Any:
+                return self.provenance_relation_repo.get_lineage(
+                    project_id=project_id,
+                    entity_id=entity_id,
+                    max_depth=max_depth,
+                )
+
+        return _ProvenanceAdapter()
 
     def load_provenance_lineage_graph(
         self, entity_id: str, chip_id: str, max_depth: int = 5
@@ -801,15 +838,54 @@ class CopilotDataService:
             }
 
         service = self._get_provenance_service()
-        lineage = service.get_lineage(
+        lineage_data = service.get_lineage(
             project_id=project_id,
             entity_id=entity_id,
             max_depth=max_depth,
         )
+        parameter_version_repo = service.parameter_version_repo
+        if not isinstance(lineage_data, dict):
+            lineage_data = {
+                "nodes": [
+                    {
+                        "id": getattr(node, "node_id", ""),
+                        "type": getattr(node, "node_type", "entity"),
+                        "metadata": {
+                            "parameter_name": getattr(
+                                getattr(node, "entity", None), "parameter_name", None
+                            ),
+                            "qid": getattr(getattr(node, "entity", None), "qid", None),
+                            "value": getattr(getattr(node, "entity", None), "value", None),
+                            "unit": getattr(getattr(node, "entity", None), "unit", None),
+                            "version": getattr(getattr(node, "entity", None), "version", None),
+                            "task_name": getattr(getattr(node, "entity", None), "task_name", None)
+                            or getattr(getattr(node, "activity", None), "task_name", None),
+                            "execution_id": getattr(
+                                getattr(node, "entity", None), "execution_id", None
+                            )
+                            or getattr(getattr(node, "activity", None), "execution_id", None),
+                            "valid_from": getattr(
+                                getattr(node, "entity", None), "valid_from", None
+                            ),
+                            "status": getattr(getattr(node, "activity", None), "status", None),
+                            "latest_version": getattr(node, "latest_version", None),
+                        },
+                    }
+                    for node in getattr(lineage_data, "nodes", [])
+                ],
+                "edges": [
+                    {
+                        "source": getattr(edge, "source_id", ""),
+                        "target": getattr(edge, "target_id", ""),
+                        "relation_type": getattr(edge, "relation_type", ""),
+                    }
+                    for edge in getattr(lineage_data, "edges", [])
+                ],
+            }
 
         # Build uniform node dicts (all nodes share the same keys)
         nodes: list[dict[str, Any]] = []
-        for n in lineage.nodes:
+        for node_dict in lineage_data.get("nodes", []):
             param = None
             qid_val = None
             value = None
@@ -819,29 +895,32 @@ class CopilotDataService:
             exec_id = None
             valid_from = None
             status = None
-            if n.entity:
-                param = n.entity.parameter_name or None
-                qid_val = n.entity.qid or None
-                value = _compact_number(n.entity.value) if n.entity.value is not None else None
-                unit = n.entity.unit or None
-                ver = n.entity.version
-                task = n.entity.task_name or None
-                exec_id = n.entity.execution_id or None
-                if n.entity.valid_from:
-                    valid_from = _compact_timestamp(n.entity.valid_from.isoformat())
-            if n.activity:
-                task = n.activity.task_name or None
-                qid_val = n.activity.qid or None
-                exec_id = n.activity.execution_id or None
-                status = n.activity.status or None
-            lv = n.latest_version
-            if lv is not None:
-                ver = f"{ver}/{lv}" if ver is not None else str(lv)
+            metadata = node_dict.get("metadata", {})
+            node_type = node_dict.get("type", "entity")
+            if node_type == "entity":
+                param = metadata.get("parameter_name") or None
+                qid_val = metadata.get("qid") or None
+                raw_value = metadata.get("value")
+                value = _compact_number(raw_value) if raw_value is not None else None
+                unit = metadata.get("unit") or None
+                ver = metadata.get("version")
+                task = metadata.get("task_name") or None
+                exec_id = metadata.get("execution_id") or None
+                if metadata.get("valid_from"):
+                    valid_from = _compact_timestamp(str(metadata["valid_from"]))
+                latest_version = metadata.get("latest_version")
+                if latest_version is not None and ver is not None:
+                    ver = f"{ver}/{latest_version}"
+            elif node_type == "activity":
+                task = metadata.get("task_name") or None
+                qid_val = metadata.get("qid") or None
+                exec_id = metadata.get("execution_id") or None
+                status = metadata.get("status") or None
             nodes.append(
                 {
-                    "type": n.node_type,
-                    "id": n.node_id,
-                    "depth": n.depth,
+                    "type": node_type,
+                    "id": str(node_dict.get("id", "")),
+                    "depth": 0,
                     "param": param,
                     "qid": qid_val,
                     "value": value,
@@ -855,20 +934,48 @@ class CopilotDataService:
             )
 
         edges: list[dict[str, str]] = []
-        for e in lineage.edges:
+        for edge_dict in lineage_data.get("edges", []):
             edges.append(
                 {
-                    "relation": e.relation_type,
-                    "source": e.source_id,
-                    "target": e.target_id,
+                    "relation": str(edge_dict.get("relation_type", "")),
+                    "source": str(edge_dict.get("source", "")),
+                    "target": str(edge_dict.get("target", "")),
                 }
             )
 
+        depths = self._compute_graph_depths(origin_id=entity_id, edges=edges, reverse=False)
+        for node in nodes:
+            node["depth"] = depths.get(node["id"], 0)
+
+        entity_keys = sorted(
+            {
+                (str(node["param"]), str(node["qid"]))
+                for node in nodes
+                if node["type"] == "entity" and node["param"] and node["qid"]
+            }
+        )
+        current_versions = parameter_version_repo.get_current_many(project_id, keys=entity_keys)
+        current_version_map = {
+            (doc.parameter_name, getattr(doc, "qid", "")): getattr(doc, "version", 1)
+            for doc in current_versions
+        }
+        for node in nodes:
+            if node["type"] != "entity" or node["param"] is None or node["qid"] is None:
+                continue
+            current_ver = current_version_map.get((str(node["param"]), str(node["qid"])))
+            current_node_ver = node["ver"]
+            if (
+                current_ver is not None
+                and isinstance(current_node_ver, int)
+                and current_ver > current_node_ver
+            ):
+                node["ver"] = f"{current_node_ver}/{current_ver}"
+
         return {
-            "origin": lineage.origin.node_id,
-            "num_nodes": len(lineage.nodes),
-            "num_edges": len(lineage.edges),
-            "max_depth": lineage.max_depth,
+            "origin": entity_id,
+            "num_nodes": len(nodes),
+            "num_edges": len(edges),
+            "max_depth": max_depth,
             "nodes": nodes,
             "edges": edges,
         }
@@ -932,12 +1039,12 @@ class CopilotDataService:
         """
         from datetime import timedelta
 
-        from qdash.api.lib.metrics_chart import (
+        from qdash.common.metrics_chart import (
             build_chip_geometry,
             chip_geometry_from_topology,
             create_qubit_heatmap,
         )
-        from qdash.api.lib.metrics_config import get_qubit_metric_metadata, load_metrics_config
+        from qdash.common.metrics_config import get_qubit_metric_metadata, load_metrics_config
         from qdash.common.topology_config import load_topology
         from qdash.dbmodel.chip import ChipDocument
         from qdash.repository.task_result_history import MongoTaskResultHistoryRepository

@@ -15,7 +15,6 @@ if TYPE_CHECKING:
     from qdash.workflow.service.results import (
         FilterResult,
         OneQubitResult,
-        SkewCheckResult,
         TwoQubitResult,
     )
     from qdash.workflow.service.steps.base import Step
@@ -33,7 +32,6 @@ class StepContext:
         one_qubit_fine_tune: Result from OneQubitFineTune step
         two_qubit: Result from TwoQubitCalibration step
         filters: List of filter results applied
-        skew_check: Result from CheckSkew step
         candidate_qids: Current list of candidate qubit IDs (can be filtered)
         candidate_couplings: Current list of candidate coupling IDs
         metadata: Additional metadata for the pipeline run
@@ -44,7 +42,6 @@ class StepContext:
     one_qubit_fine_tune: OneQubitResult | None = None
     two_qubit: TwoQubitResult | None = None
     filters: list[FilterResult] = field(default_factory=list)
-    skew_check: SkewCheckResult | None = None
 
     # Candidate tracking
     candidate_qids: list[str] = field(default_factory=list)

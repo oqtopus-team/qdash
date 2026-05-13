@@ -111,35 +111,9 @@ Keep the triage fields internally consistent:
 - Use `PASS_WITH_NOTE` only when all output parameters that would be updated are
   acceptable without human intervention, but there is a minor caveat or optional
   follow-up. Put non-blocking caveats in `Optional note`, not in `Needs review`.
-- For `CheckQubitSpectroscopy`, a weak or missing f12 is not automatically
-  review-blocking when f01 is clearly supported, the f12/anharmonicity value is
-  plausible if present, and there is no clearly stronger competing transition. Prefer
-  `PASS_WITH_NOTE` for this weak-f12-only boundary. Shallow anharmonicity around
-  -0.16 to -0.18 GHz is a caveat, not a review blocker, when f01 is clear.
-  A close f01-region doublet or multiple nearby peaks with similar length,
-  strength, and shape is not review-blocking by itself when the marked f01 is
-  still one of the strongest visible candidates, is aligned with a spectroscopy
-  response, and the selected f01/f12 values are physically plausible. Prefer
-  `PASS_WITH_NOTE` for this close-candidate boundary and put the ambiguity in
-  `Optional note`, not `Needs review`.
-  Use `REVIEW` when f01 itself is absent, off-marker, or too weak to support an
-  update, when a clearly stronger competing f01-like feature would materially
-  change the selected f01, or when both f01 and f12 are only plausible from
-  history/physics rather than supported by the current image.
-  Treat the "Ambiguous f01/f12 support missed by VLM" case as a pattern-level
-  boundary case, not as a qid-specific rule. Do not use it as a blanket reason
-  to review every close f01-region doublet. If the marked f01 remains visually
-  supported and plausible, return `PASS_WITH_NOTE`; reserve `REVIEW` for cases
-  with no visible f01 support, off-marker assignment, or a clearly stronger
-  competing f01 candidate.
-  Do not claim that marked lines are absent when task output parameters include
-  f01/f12 values or a marked image is provided; assess support at the supplied
-  frequencies instead.
 - Use `REVIEW` when any important output parameter should not be auto-accepted without a
-  human check. If you use labels such as `ambiguous_doublet` or `frequency_offset`
-  for a parameter that affects acceptance, prefer `REVIEW`. Do not make
-  `weak_signal` or `boundary_case` alone review-blocking when the detailed
-  explanation says the result is acceptable for automatic use.
+  human check. If you use labels such as `weak_signal`, `boundary_case`, `ambiguous_doublet`,
+  or `frequency_offset` for a parameter that affects acceptance, prefer `REVIEW`.
 - If the detailed explanation says a parameter should be treated cautiously, maintained
   from history, not overwritten, rechecked before update, or used only as a reference value,
   then that parameter MUST appear in `Needs review` and the decision MUST be `REVIEW`.
@@ -658,9 +632,37 @@ BLOCKS_RESPONSE_SCHEMA: dict[str, Any] = {
             "enum": ["good", "warning", "bad", None],
         },
     },
-    "required": ["blocks"],
+    # `assessment` is listed alongside `blocks` so the schema is strict-mode
+    # compliant (all declared properties must appear in `required`). It may
+    # still be null when the answer is informational rather than evaluative.
+    "required": ["blocks", "assessment"],
     "additionalProperties": False,
 }
+
+CHAT_COMPLETIONS_STRICT_EMULATION = """\
+
+## STRICT OUTPUT CONTRACT (provider does not enforce response_format)
+
+The HTTP client parses your reply with JSON.parse() directly. Any non-JSON byte
+will cause a parse error and the user will see a fallback rendering instead of
+the structured response.
+
+Hard rules — no exceptions:
+
+- After every tool call resolves and you are ready to answer, your reply must
+  be a SINGLE JSON object matching the `blocks` schema above. Nothing else.
+- Do not include conversational filler such as "Sure, here is", "Let me",
+  "Here is the answer", "I hope this helps", or any sign-off line.
+- Do not wrap the JSON in markdown code fences (no triple backticks).
+- Do not emit text before the opening `{` or after the closing `}`.
+- Newlines inside JSON strings must be escaped as `\\n`.
+- If you need to think, do it in the JSON's text block content, never as
+  pre-text outside the JSON. (Native thinking-mode reasoning is stripped server
+  side and does not need to be in the JSON.)
+
+Self-check: the very first character of your final reply must be `{` and the
+very last character must be `}`.
+"""
 
 CHART_SYSTEM_PROMPT = """\
 
@@ -723,7 +725,15 @@ Rules:
 
 
 def _build_client(config: CopilotConfig) -> AsyncOpenAI:
-    """Build an AsyncOpenAI client based on provider configuration."""
+    """Build an AsyncOpenAI client based on provider configuration.
+
+    The ``provider`` field selects which SDK invocation style to use, not the
+    upstream vendor. ``openai`` covers both the official OpenAI API and any
+    OpenAI-compatible gateway (DeepSeek, vLLM, custom hosts) via ``base_url``.
+    ``ollama`` adds Ollama-specific defaults (localhost fallback, ``/v1``
+    suffix, dummy api_key). To pick which endpoint on that client is called
+    (``/v1/responses`` vs ``/v1/chat/completions``), see ``ModelConfig.api_style``.
+    """
     provider = config.model.provider
     base_url = _resolve_model_config_value(config.model.base_url, field_name="base_url")
     api_key_env = config.model.api_key_env
@@ -846,18 +856,14 @@ def _build_system_prompt(
         img_instructions = ["\n## Image analysis"]
         if has_expected_images and has_experiment_image:
             img_instructions.append(
-                "Reference images and past-case images are provided along with the "
-                "actual experimental result image. Use the image labels and task "
-                "knowledge to distinguish good expected examples from warning or "
-                "failure cases. Compare the actual result with these references to "
-                "identify deviations, anomalies, boundary cases, or repeated model "
-                "failure patterns."
+                "Reference images showing expected results are provided along with "
+                "the actual experimental result image. Compare the actual result with "
+                "these references to identify deviations, anomalies, or quality issues."
             )
         elif has_expected_images:
             img_instructions.append(
-                "Reference images and past-case images are provided. Use the image "
-                "labels and task knowledge to distinguish good expected examples "
-                "from warning or failure cases."
+                "Reference images showing expected results are provided. "
+                "Use them to understand what a good result looks like for this task."
             )
         elif has_experiment_image:
             img_instructions.append(
@@ -1415,23 +1421,87 @@ def _legacy_to_blocks(
     }
 
 
+def _extract_first_json_object(text: str) -> dict[str, Any] | None:
+    """Scan ``text`` for the first balanced ``{...}`` block and json.loads it.
+
+    Used when a model can't be forced via ``response_format`` and wraps the
+    structured payload in conversational filler (DeepSeek's ds4-server today
+    behaves like this). Brace counting is string-aware so braces inside strings
+    don't break the match.
+    """
+    start = text.find("{")
+    while start != -1:
+        depth = 0
+        in_string = False
+        escape = False
+        for i in range(start, len(text)):
+            ch = text[i]
+            if escape:
+                escape = False
+                continue
+            if ch == "\\":
+                escape = True
+                continue
+            if ch == '"':
+                in_string = not in_string
+                continue
+            if in_string:
+                continue
+            if ch == "{":
+                depth += 1
+            elif ch == "}":
+                depth -= 1
+                if depth == 0:
+                    try:
+                        parsed = json.loads(text[start : i + 1])
+                    except json.JSONDecodeError:
+                        break
+                    if isinstance(parsed, dict):
+                        return parsed
+                    break
+        start = text.find("{", start + 1)
+    return None
+
+
+def _has_real_blocks(parsed: dict[str, Any]) -> bool:
+    """Return True when the parsed BLOCKS payload came from real JSON output.
+
+    A single text block with assessment=None matches the plain-text fallback
+    branch of ``_parse_blocks_response``. Multi-block payloads or any explicit
+    assessment value imply the model actually emitted JSON.
+    """
+    blocks = parsed.get("blocks") if isinstance(parsed, dict) else None
+    if not isinstance(blocks, list):
+        return False
+    if len(blocks) != 1:
+        return True
+    return parsed.get("assessment") is not None
+
+
 def _parse_blocks_response(content: str, config: CopilotConfig | None = None) -> dict[str, Any]:
     """Parse LLM response into blocks format dict, with fallback to legacy."""
     text = _strip_code_fences(content)
 
     try:
         data = json.loads(text)
+    except (json.JSONDecodeError, ValueError):
+        data = _extract_first_json_object(text)
+
+    if isinstance(data, dict):
         if "blocks" in data and isinstance(data["blocks"], list):
             return dict(data)
         # Legacy format returned — convert
-        response = AnalysisResponse(**data)
-        return _legacy_to_blocks(response, config)
-    except (json.JSONDecodeError, ValueError):
-        # Plain text fallback
-        return {
-            "blocks": [{"type": "text", "content": content, "chart": None}],
-            "assessment": None,
-        }
+        try:
+            response = AnalysisResponse(**data)
+            return _legacy_to_blocks(response, config)
+        except ValueError:
+            pass
+
+    # Plain text fallback
+    return {
+        "blocks": [{"type": "text", "content": content, "chart": None}],
+        "assessment": None,
+    }
 
 
 _STORED_TOOLS: dict[str, Any] = {
@@ -1803,6 +1873,247 @@ async def _run_responses_api(
                 )
                 output = ""
     return str(output)
+
+
+def _agent_tools_for_chat_completions() -> list[dict[str, Any]]:
+    """Convert AGENT_TOOLS (Responses API shape) into Chat Completions tool format.
+
+    Responses API uses a flat ``{type, name, description, parameters}`` per tool,
+    while Chat Completions wraps the function spec under a ``function`` key.
+    """
+    converted: list[dict[str, Any]] = []
+    for tool in AGENT_TOOLS:
+        if tool.get("type") != "function":
+            continue
+        converted.append(
+            {
+                "type": "function",
+                "function": {
+                    "name": tool["name"],
+                    "description": tool.get("description", ""),
+                    "parameters": tool.get("parameters", {}),
+                },
+            }
+        )
+    return converted
+
+
+async def _run_chat_completions_with_tools(
+    client: AsyncOpenAI,
+    messages: list[dict[str, Any]],
+    config: CopilotConfig,
+    tool_executors: ToolExecutors,
+    *,
+    response_schema: dict[str, Any] | None = None,
+    strict_schema: bool = True,
+    schema_name: str = "analysis_response",
+    on_tool_call: OnToolCallHook = None,
+    on_status: OnStatusHook = None,
+) -> str:
+    """Tool-calling loop using the Chat Completions API.
+
+    Used for providers that expose ``/v1/chat/completions`` but not
+    ``/v1/responses`` (e.g. DeepSeek). Mirrors ``_run_responses_api``: sends
+    ``tools``, dispatches each ``tool_call`` to the matching executor, feeds
+    results back as ``role: "tool"`` messages, and re-asks the model until it
+    stops calling tools (or ``MAX_TOOL_ROUNDS`` is hit). Returns the final
+    assistant text content.
+
+    When ``response_schema`` is provided, the request includes
+    ``response_format: json_schema`` so the final assistant text is structured.
+    Providers that don't accept that field (or that don't support ``strict``)
+    fall back gracefully.
+    """
+    chat_tools = _agent_tools_for_chat_completions()
+
+    extra_body: dict[str, Any] = {}
+    if config.model.provider == "ollama":
+        options: dict[str, Any] = {}
+        if config.model.keep_alive:
+            extra_body["keep_alive"] = config.model.keep_alive
+        if config.model.num_ctx is not None:
+            options["num_ctx"] = config.model.num_ctx
+        if config.model.top_k is not None:
+            options["top_k"] = config.model.top_k
+        if options:
+            extra_body["options"] = options
+
+    base_kwargs: dict[str, Any] = {
+        "model": config.model.name,
+        "max_tokens": config.model.max_output_tokens,
+        "tools": chat_tools,
+        "tool_choice": "auto",
+    }
+    if response_schema is not None:
+        base_kwargs["response_format"] = {
+            "type": "json_schema",
+            "json_schema": {
+                "name": schema_name,
+                "strict": strict_schema,
+                "schema": response_schema,
+            },
+        }
+    if extra_body:
+        base_kwargs["extra_body"] = extra_body
+    if config.model.temperature is not None:
+        base_kwargs["temperature"] = config.model.temperature
+    if config.model.top_p is not None:
+        base_kwargs["top_p"] = config.model.top_p
+    if config.model.reasoning_effort:
+        base_kwargs["reasoning_effort"] = config.model.reasoning_effort
+
+    msgs: list[dict[str, Any]] = list(messages)
+
+    async def _create(**kw: Any) -> Any:
+        try:
+            return await client.chat.completions.create(**kw)
+        except BadRequestError as exc:
+            msg = str(exc)
+            if "temperature" in msg and "temperature" in kw:
+                logger.info("Model does not support temperature, retrying without it")
+                kw.pop("temperature")
+                return await client.chat.completions.create(**kw)
+            if "top_p" in msg and "top_p" in kw:
+                logger.info("Model does not support top_p, retrying without it")
+                kw.pop("top_p")
+                return await client.chat.completions.create(**kw)
+            if "reasoning_effort" in msg and "reasoning_effort" in kw:
+                logger.info("Model does not support reasoning_effort, retrying without it")
+                kw.pop("reasoning_effort")
+                return await client.chat.completions.create(**kw)
+            if (
+                "response_format" in msg or "json_schema" in msg or "strict" in msg
+            ) and "response_format" in kw:
+                logger.info(
+                    "Model does not support response_format json_schema (or strict), "
+                    "retrying with type=json_object"
+                )
+                kw["response_format"] = {"type": "json_object"}
+                try:
+                    return await client.chat.completions.create(**kw)
+                except BadRequestError:
+                    logger.info("Model also rejects json_object, dropping response_format")
+                    kw.pop("response_format", None)
+                    return await client.chat.completions.create(**kw)
+            raise
+
+    if on_status:
+        await on_status("thinking")
+
+    last_message: Any = None
+    for _round in range(MAX_TOOL_ROUNDS):
+        response = await _create(messages=msgs, **base_kwargs)
+        choice = response.choices[0]
+        msg = choice.message
+        last_message = msg
+        tool_calls = getattr(msg, "tool_calls", None) or []
+
+        if not tool_calls:
+            break
+
+        logger.info(
+            "Chat-completions tool round %d/%d: %d call(s) — %s",
+            _round + 1,
+            MAX_TOOL_ROUNDS,
+            len(tool_calls),
+            ", ".join(tc.function.name for tc in tool_calls),
+        )
+
+        assistant_msg: dict[str, Any] = {
+            "role": "assistant",
+            "content": msg.content or None,
+            "tool_calls": [
+                {
+                    "id": tc.id,
+                    "type": "function",
+                    "function": {
+                        "name": tc.function.name,
+                        "arguments": tc.function.arguments,
+                    },
+                }
+                for tc in tool_calls
+            ],
+        }
+        # DeepSeek thinking mode: when an assistant turn contained tool_calls,
+        # the model's reasoning_content from that turn MUST be sent back on the
+        # next request — otherwise the server rejects the conversation.
+        reasoning_content = getattr(msg, "reasoning_content", None)
+        if isinstance(reasoning_content, str) and reasoning_content:
+            assistant_msg["reasoning_content"] = reasoning_content
+        msgs.append(assistant_msg)
+
+        for tc in tool_calls:
+            try:
+                args = json.loads(tc.function.arguments)
+            except (json.JSONDecodeError, TypeError):
+                args = {}
+
+            logger.info("Tool call: %s(%s)", tc.function.name, json.dumps(args, ensure_ascii=False))
+            if on_tool_call:
+                await on_tool_call(tc.function.name, args)
+
+            executor = tool_executors.get(tc.function.name)
+            if executor is None:
+                tool_result: Any = {"error": f"Unknown tool: {tc.function.name}"}
+            else:
+                try:
+                    tool_result = executor(args)
+                except KeyError as e:
+                    logger.warning("Tool %s missing required argument: %s", tc.function.name, e)
+                    tool_result = {
+                        "error": (
+                            f"Missing required argument: {e}. "
+                            "Please provide all required parameters."
+                        )
+                    }
+                except Exception as e:
+                    logger.warning("Tool %s execution failed: %s", tc.function.name, e)
+                    tool_result = {"error": str(e)}
+
+            output_str = json.dumps(_sanitize_nan(tool_result), default=str, ensure_ascii=False)
+            if len(output_str) > MAX_TOOL_RESULT_CHARS:
+                logger.warning(
+                    "Tool %s result truncated: %d -> %d chars",
+                    tc.function.name,
+                    len(output_str),
+                    MAX_TOOL_RESULT_CHARS,
+                )
+                output_str = (
+                    output_str[:MAX_TOOL_RESULT_CHARS] + "... [TRUNCATED - result too large]"
+                )
+
+            msgs.append(
+                {
+                    "role": "tool",
+                    "tool_call_id": tc.id,
+                    "content": output_str,
+                }
+            )
+
+        if on_status:
+            await on_status("thinking")
+    else:
+        # MAX_TOOL_ROUNDS exhausted. Force a final non-tool response.
+        logger.warning(
+            "Chat-completions tool rounds exhausted (%d). Retrying without tools.",
+            MAX_TOOL_ROUNDS,
+        )
+        final_kwargs = {k: v for k, v in base_kwargs.items() if k not in ("tools", "tool_choice")}
+        response = await _create(messages=msgs, **final_kwargs)
+        last_message = response.choices[0].message
+
+    content = (getattr(last_message, "content", None) or "") if last_message is not None else ""
+    if content:
+        return content
+    for field in ("reasoning", "reasoning_content", "thinking"):
+        value = getattr(last_message, field, None) if last_message is not None else None
+        if isinstance(value, str) and value.strip():
+            logger.warning(
+                "Chat-completions with tools returned empty content; using message.%s fallback",
+                field,
+            )
+            return value
+    return ""
 
 
 async def _run_chat_completions(
@@ -2251,7 +2562,6 @@ async def run_chat(
 
     """
     client = _build_client(config)
-    provider = config.model.provider
 
     system_prompt = _build_chat_system_prompt(
         config=config,
@@ -2260,37 +2570,61 @@ async def run_chat(
         qubit_params=qubit_params,
     )
 
-    if provider == "ollama":
+    if tool_executors:
+        data_store: dict[str, Any] = {}
+        rate_limited = _wrap_rate_limited_executors(tool_executors)
+        wrapped_executors, collected_charts = _wrap_tool_executors(rate_limited, data_store)
+    else:
+        wrapped_executors, collected_charts = None, []
+
+    # OpenAI and Ollama 0.13.3+ expose /v1/responses (tool-call, json_schema,
+    # reasoning-item preservation). Providers that only ship /v1/chat/completions
+    # (e.g. DeepSeek) opt in via `api_style: chat_completions` in copilot.yaml.
+    if config.model.api_style == "chat_completions":
+        # ds4-server and similar providers expose tools and chat completions
+        # but reject `response_format: json_schema` / strict mode. Reinforce
+        # the BLOCKS contract in the system prompt so the model still emits a
+        # parseable JSON object on its own.
+        chat_system_prompt = system_prompt + CHAT_COMPLETIONS_STRICT_EMULATION
         messages = _build_messages(
-            system_prompt + RESPONSE_FORMAT_INSTRUCTION,
+            chat_system_prompt,
             user_message,
             image_base64,
             conversation_history,
         )
-        content = await _run_chat_completions(client, messages, config)
-        response = _parse_response(content)
-        return _legacy_to_blocks(response, config)
-    else:
-        input_items = _build_input(user_message, image_base64, conversation_history)
-
-        # Wrap tools: data store + chart collection + rate limiting
-        if tool_executors:
-            wrapped_executors: ToolExecutors | None = None
-            data_store: dict[str, Any] = {}
-            rate_limited = _wrap_rate_limited_executors(tool_executors)
-            wrapped_executors, collected_charts = _wrap_tool_executors(rate_limited, data_store)
+        if wrapped_executors:
+            content = await _run_chat_completions_with_tools(
+                client,
+                messages,
+                config,
+                wrapped_executors,
+                response_schema=BLOCKS_RESPONSE_SCHEMA,
+                strict_schema=True,
+                schema_name="blocks_response",
+                on_tool_call=on_tool_call,
+                on_status=on_status,
+            )
         else:
-            wrapped_executors, collected_charts = None, []
+            content = await _run_chat_completions(client, messages, config)
+        parsed = _parse_blocks_response(content, config)
+        if not _has_real_blocks(parsed):
+            logger.warning(
+                "chat_completions: BLOCKS parse fell back to single text block "
+                "(model emitted free text). content_chars=%d",
+                len(content or ""),
+            )
+        return _inject_collected_charts(parsed, collected_charts)
 
-        content = await _run_responses_api(
-            client,
-            system_prompt,
-            input_items,
-            config,
-            wrapped_executors,
-            response_schema=BLOCKS_RESPONSE_SCHEMA,
-            strict_schema=False,
-            on_tool_call=on_tool_call,
-            on_status=on_status,
-        )
-        return _inject_collected_charts(_parse_blocks_response(content, config), collected_charts)
+    input_items = _build_input(user_message, image_base64, conversation_history)
+    content = await _run_responses_api(
+        client,
+        system_prompt,
+        input_items,
+        config,
+        wrapped_executors,
+        response_schema=BLOCKS_RESPONSE_SCHEMA,
+        strict_schema=False,
+        on_tool_call=on_tool_call,
+        on_status=on_status,
+    )
+    return _inject_collected_charts(_parse_blocks_response(content, config), collected_charts)

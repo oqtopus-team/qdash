@@ -6,6 +6,7 @@ import { createContext, useCallback, useContext, useState, useEffect } from "rea
 import type { User } from "@/schemas";
 
 import { useGetCurrentUser, useLogin, useLogout } from "@/client/auth/auth";
+import { getAccessToken } from "@/lib/auth/session";
 
 interface AuthContextType {
   user: User | null;
@@ -27,22 +28,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Save authentication info
   const saveAuth = useCallback((token: string, user: string) => {
     const maxAge = 365 * 24 * 60 * 60; // 1 year (long-term token)
-    // Save access token and username cookies
-    document.cookie = `access_token=${encodeURIComponent(
-      token,
-    )}; path=/; max-age=${maxAge}; SameSite=Lax`;
-    document.cookie = `username=${encodeURIComponent(
-      user,
-    )}; path=/; max-age=${maxAge}; SameSite=Lax`;
+    document.cookie = `access_token=${encodeURIComponent(token)}; path=/; max-age=${maxAge}; SameSite=Lax`;
     setAccessToken(token);
     setUsername(user);
   }, []);
 
   // Remove authentication info
   const removeAuth = useCallback(() => {
-    // Remove access token and username cookies
     document.cookie = "access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax";
-    document.cookie = "username=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax";
     setAccessToken(null);
     setUsername(null);
   }, []);
@@ -65,6 +58,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (userData?.data) {
       setUser(userData.data);
+      setUsername(userData.data.username);
     }
   }, [userData]);
 
@@ -79,26 +73,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Initialization
   useEffect(() => {
-    const token = document.cookie
-      .split("; ")
-      .find((row) => row.startsWith("access_token="))
-      ?.split("=")[1];
+    const token = getAccessToken();
 
-    const user = document.cookie
-      .split("; ")
-      .find((row) => row.startsWith("username="))
-      ?.split("=")[1];
-
-    if (token && user) {
-      try {
-        const decodedToken = decodeURIComponent(token);
-        const decodedUser = decodeURIComponent(user);
-        setAccessToken(decodedToken);
-        setUsername(decodedUser);
-      } catch (error) {
-        console.error("Failed to decode token:", error);
-        removeAuth();
-      }
+    if (token) {
+      setAccessToken(token);
     }
     setLoading(false);
   }, [removeAuth]);
