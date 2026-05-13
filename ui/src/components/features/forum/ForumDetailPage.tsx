@@ -217,6 +217,11 @@ export function ForumDetailPage({ postId }: { postId: string }) {
   const mentionCandidates = useMemo(
     () => [
       { id: "qdash", label: "QDash" },
+      {
+        id: "project",
+        label: "Project",
+        secondaryLabel: "Notify all project members",
+      },
       ...(membersResponse?.data.members
         ?.filter((member) => member.username !== currentUsername)
         .map((member) => ({

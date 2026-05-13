@@ -22,7 +22,8 @@ if TYPE_CHECKING:
     from collections.abc import Iterable
 
 MENTION_RE = re.compile(r"(?<![\w.-])@([A-Za-z0-9_.-]+)\b")
-RESERVED_MENTIONS = {"qdash"}
+PROJECT_MENTION = "project"
+RESERVED_MENTIONS = {"qdash", PROJECT_MENTION}
 EXCERPT_LIMIT = 180
 
 
@@ -42,6 +43,13 @@ class NotificationService:
             seen.add(key)
             usernames.append(username)
         return usernames
+
+    @staticmethod
+    def has_project_mention(content: str) -> bool:
+        """Return true when content includes the project-wide mention."""
+        return any(
+            match.group(1).lower() == PROJECT_MENTION for match in MENTION_RE.finditer(content)
+        )
 
     @staticmethod
     def _excerpt(content: str) -> str:
@@ -94,6 +102,37 @@ class NotificationService:
         ).to_list()
         return sorted(users, key=lambda u: u.username)
 
+    def _active_project_members(self, project_id: str, actor_username: str) -> list[UserDocument]:
+        memberships = ProjectMembershipDocument.find(
+            {"project_id": project_id, "status": "active", "username": {"$ne": actor_username}}
+        ).to_list()
+        active_usernames = {m.username for m in memberships}
+        if not active_usernames:
+            return []
+
+        users = UserDocument.find(
+            {"username": {"$in": list(active_usernames)}, "disabled": {"$ne": True}}
+        ).to_list()
+        return sorted(users, key=lambda u: u.username)
+
+    def _mentioned_project_recipients(
+        self, project_id: str, content: str, actor_username: str
+    ) -> list[UserDocument]:
+        recipients = {
+            user.username: user
+            for user in self._active_project_recipients(
+                project_id, self.extract_mentions(content), actor_username
+            )
+        }
+        if self.has_project_mention(content):
+            recipients.update(
+                {
+                    user.username: user
+                    for user in self._active_project_members(project_id, actor_username)
+                }
+            )
+        return sorted(recipients.values(), key=lambda u: u.username)
+
     def create_notification(
         self,
         *,
@@ -144,9 +183,7 @@ class NotificationService:
         """Create mention and reply notifications for an issue or reply."""
         target_url = f"/issues/{root_issue_id}"
         issue_title = title or f"Issue on {task_id}"
-        mentioned = self._active_project_recipients(
-            project_id, self.extract_mentions(content), actor_username
-        )
+        mentioned = self._mentioned_project_recipients(project_id, content, actor_username)
 
         for recipient in mentioned:
             self.create_notification(
@@ -192,9 +229,7 @@ class NotificationService:
         title: str,
     ) -> None:
         """Create mention notifications for a note event."""
-        recipients = self._active_project_recipients(
-            project_id, self.extract_mentions(content), actor_username
-        )
+        recipients = self._mentioned_project_recipients(project_id, content, actor_username)
         for recipient in recipients:
             self.create_notification(
                 project_id=project_id,
@@ -222,9 +257,7 @@ class NotificationService:
     ) -> None:
         """Create mention and reply notifications for a forum thread."""
         target_url = f"/forum/{root_post_id}"
-        mentioned = self._active_project_recipients(
-            project_id, self.extract_mentions(content), actor_username
-        )
+        mentioned = self._mentioned_project_recipients(project_id, content, actor_username)
 
         for recipient in mentioned:
             self.create_notification(

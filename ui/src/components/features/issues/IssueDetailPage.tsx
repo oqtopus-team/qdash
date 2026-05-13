@@ -129,7 +129,15 @@ export function IssueDetailPage({ issueId }: { issueId: string }) {
           secondaryLabel: member.organization ?? undefined,
           avatarKey: member.avatar_key,
         })) ?? [];
-    return [{ id: "qdash", label: "QDash" }, ...members];
+    return [
+      { id: "qdash", label: "QDash" },
+      {
+        id: "project",
+        label: "Project",
+        secondaryLabel: "Notify all project members",
+      },
+      ...members,
+    ];
   }, [currentUser, membersResponse?.data.members]);
 
   const handleClose = () => {

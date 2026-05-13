@@ -11,6 +11,7 @@ import {
   List,
   ListOrdered,
   ImageIcon,
+  Users,
 } from "lucide-react";
 import { MarkdownContent } from "./MarkdownContent";
 import { QdashBotAvatar, UserAvatar } from "./UserAvatar";
@@ -475,6 +476,10 @@ export function MarkdownEditor({
                     {candidate.icon ??
                       (candidate.id === "qdash" ? (
                         <QdashBotAvatar size={20} />
+                      ) : candidate.id === "project" ? (
+                        <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-primary/10 text-primary">
+                          <Users className="h-3.5 w-3.5" />
+                        </span>
                       ) : (
                         <UserAvatar
                           username={candidate.id}
