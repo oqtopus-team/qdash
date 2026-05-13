@@ -539,7 +539,7 @@ pyparsing==3.2.3
     #   typedunits
 pyserial==3.5
     # via qubex
-pytest==8.3.2
+pytest==9.0.3
     # via
     #   pytest-asyncio
     #   pytest-cov
