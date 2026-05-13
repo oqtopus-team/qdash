@@ -149,52 +149,13 @@ class ProvenanceService:
             entity_id=entity_id,
             max_depth=max_depth,
         )
-
-        nodes: list[LineageNodeResponse] = []
-        edges: list[LineageEdgeResponse] = []
-
-        # Convert nodes from LineageGraph format
-        for node_item in lineage_data.get("nodes", []):
-            node_dict = dict(node_item)  # Convert TypedDict to regular dict
-            node = LineageNodeResponse(
-                node_type=str(node_dict.get("type", "entity")),
-                node_id=str(node_dict.get("id", "")),
-                depth=0,
-                entity=self._build_version_from_metadata(node_dict)
-                if node_dict.get("type") == "entity"
-                else None,
-                activity=self._build_activity_from_metadata(node_dict)
-                if node_dict.get("type") == "activity"
-                else None,
-            )
-            nodes.append(node)
-
-        # Convert edges
-        for edge_item in lineage_data.get("edges", []):
-            edge_dict = dict(edge_item)  # Convert TypedDict to regular dict
-            edges.append(
-                LineageEdgeResponse(
-                    relation_type=str(edge_dict.get("relation_type", "")),
-                    source_id=str(edge_dict.get("source", "")),
-                    target_id=str(edge_dict.get("target", "")),
-                )
-            )
-
-        depths = self._compute_graph_depths(origin_id=entity_id, edges=edges, reverse=False)
-        for node in nodes:
-            node.depth = depths.get(node.node_id, 0)
+        nodes, edges = self._build_graph_responses(lineage_data, origin_id=entity_id, reverse=False)
 
         # Enrich entity nodes with latest version info (staleness check)
         self._enrich_nodes_with_latest_version(project_id, nodes)
 
-        # Find or create origin node
-        origin = next(
-            (n for n in nodes if n.node_id == entity_id),
-            LineageNodeResponse(node_type="entity", node_id=entity_id, depth=0),
-        )
-
         return LineageResponse(
-            origin=origin,
+            origin=self._find_graph_origin(nodes, entity_id),
             nodes=nodes,
             edges=edges,
             max_depth=max_depth,
@@ -229,52 +190,51 @@ class ProvenanceService:
             entity_id=entity_id,
             max_depth=max_depth,
         )
-
-        nodes: list[LineageNodeResponse] = []
-        edges: list[LineageEdgeResponse] = []
-
-        # Convert nodes from LineageGraph format
-        for node_item in impact_data.get("nodes", []):
-            node_dict = dict(node_item)  # Convert TypedDict to regular dict
-            node = LineageNodeResponse(
-                node_type=str(node_dict.get("type", "entity")),
-                node_id=str(node_dict.get("id", "")),
-                depth=0,
-                entity=self._build_version_from_metadata(node_dict)
-                if node_dict.get("type") == "entity"
-                else None,
-                activity=self._build_activity_from_metadata(node_dict)
-                if node_dict.get("type") == "activity"
-                else None,
-            )
-            nodes.append(node)
-
-        # Convert edges
-        for edge_item in impact_data.get("edges", []):
-            edge_dict = dict(edge_item)  # Convert TypedDict to regular dict
-            edges.append(
-                LineageEdgeResponse(
-                    relation_type=str(edge_dict.get("relation_type", "")),
-                    source_id=str(edge_dict.get("source", "")),
-                    target_id=str(edge_dict.get("target", "")),
-                )
-            )
-
-        depths = self._compute_graph_depths(origin_id=entity_id, edges=edges, reverse=True)
-        for node in nodes:
-            node.depth = depths.get(node.node_id, 0)
-
-        # Find or create origin node
-        origin = next(
-            (n for n in nodes if n.node_id == entity_id),
-            LineageNodeResponse(node_type="entity", node_id=entity_id, depth=0),
-        )
+        nodes, edges = self._build_graph_responses(impact_data, origin_id=entity_id, reverse=True)
 
         return ImpactResponse(
-            origin=origin,
+            origin=self._find_graph_origin(nodes, entity_id),
             nodes=nodes,
             edges=edges,
             max_depth=max_depth,
+        )
+
+    def _build_graph_responses(
+        self,
+        graph_data: Any,
+        *,
+        origin_id: str,
+        reverse: bool,
+    ) -> tuple[list[LineageNodeResponse], list[LineageEdgeResponse]]:
+        """Convert raw graph data into schema nodes and edges with computed depths."""
+        nodes = [self._build_graph_node(node_item) for node_item in graph_data.get("nodes", [])]
+        edges = self._build_lineage_edges(graph_data.get("edges", []))
+        depths = self._compute_graph_depths(origin_id=origin_id, edges=edges, reverse=reverse)
+        for node in nodes:
+            node.depth = depths.get(node.node_id, 0)
+        return nodes, edges
+
+    def _build_graph_node(self, node_item: Any) -> LineageNodeResponse:
+        """Convert one raw graph node into the shared response schema."""
+        node_dict = dict(node_item)
+        node_type = str(node_dict.get("type", "entity"))
+        return LineageNodeResponse(
+            node_type=node_type,
+            node_id=str(node_dict.get("id", "")),
+            depth=0,
+            entity=self._build_version_from_metadata(node_dict) if node_type == "entity" else None,
+            activity=self._build_activity_from_metadata(node_dict) if node_type == "activity" else None,
+        )
+
+    @staticmethod
+    def _find_graph_origin(
+        nodes: list[LineageNodeResponse],
+        entity_id: str,
+    ) -> LineageNodeResponse:
+        """Return the origin node if present, or a placeholder entity node otherwise."""
+        return next(
+            (node for node in nodes if node.node_id == entity_id),
+            LineageNodeResponse(node_type="entity", node_id=entity_id, depth=0),
         )
 
     @staticmethod
