@@ -312,6 +312,26 @@ class TestProvenanceService:
         assert isinstance(result, ExecutionComparisonResponse)
         assert result.execution_id_before == "exec-001"
         assert result.execution_id_after == "exec-002"
+        assert result.changed_parameters[0].delta == pytest.approx(0.1)
+        assert result.changed_parameters[0].delta_percent == pytest.approx(2.0)
+        assert result.added_parameters[0].delta is None
+
+    def test_compare_executions_ignores_non_numeric_delta(self, service, mock_repos):
+        """Changed parameters without numeric values keep delta fields empty."""
+        mock_repos["provenance_relation"].compare_executions.return_value = [
+            {
+                "change_type": "changed",
+                "parameter_name": "label",
+                "qid": "Q0",
+                "before": {"value": "idle"},
+                "after": {"value": "active"},
+            }
+        ]
+
+        result = service.compare_executions("test_project", "exec-001", "exec-002")
+
+        assert result.changed_parameters[0].delta is None
+        assert result.changed_parameters[0].delta_percent is None
 
     def test_get_recent_changes_builds_delta_from_previous_version(self, service, mock_repos):
         """Recent changes include delta metadata from the previous version."""

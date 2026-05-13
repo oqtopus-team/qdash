@@ -355,46 +355,7 @@ class ProvenanceService:
             execution_id_2=execution_id_after,
         )
 
-        added: list[ParameterDiffResponse] = []
-        removed: list[ParameterDiffResponse] = []
-        changed: list[ParameterDiffResponse] = []
-        unchanged_count = 0
-
-        for diff in diffs:
-            change_type = diff.get("change_type", "")
-            before_data = diff.get("before")
-            after_data = diff.get("after")
-
-            value_before = before_data.get("value") if before_data else None
-            value_after = after_data.get("value") if after_data else None
-
-            # Calculate delta for numeric values
-            delta = None
-            delta_percent = None
-            if (
-                change_type == "changed"
-                and isinstance(value_before, (int, float))
-                and isinstance(value_after, (int, float))
-            ):
-                delta = value_after - value_before
-                if value_before != 0:
-                    delta_percent = (delta / value_before) * 100
-
-            param_diff = ParameterDiffResponse(
-                parameter_name=diff.get("parameter_name", ""),
-                qid=diff.get("qid", ""),
-                value_before=value_before,
-                value_after=value_after,
-                delta=delta,
-                delta_percent=delta_percent,
-            )
-
-            if change_type == "added":
-                added.append(param_diff)
-            elif change_type == "removed":
-                removed.append(param_diff)
-            elif change_type == "changed":
-                changed.append(param_diff)
+        added, removed, changed = self._partition_execution_diffs(diffs)
 
         return ExecutionComparisonResponse(
             execution_id_before=execution_id_before,
@@ -402,8 +363,72 @@ class ProvenanceService:
             added_parameters=added,
             removed_parameters=removed,
             changed_parameters=changed,
-            unchanged_count=unchanged_count,
+            unchanged_count=0,
         )
+
+    def _partition_execution_diffs(
+        self,
+        diffs: list[Any],
+    ) -> tuple[
+        list[ParameterDiffResponse],
+        list[ParameterDiffResponse],
+        list[ParameterDiffResponse],
+    ]:
+        """Split raw execution diffs into added, removed, and changed response lists."""
+        added: list[ParameterDiffResponse] = []
+        removed: list[ParameterDiffResponse] = []
+        changed: list[ParameterDiffResponse] = []
+
+        for diff in diffs:
+            param_diff = self._build_execution_diff(diff)
+            change_type = diff.get("change_type", "")
+            if change_type == "added":
+                added.append(param_diff)
+            elif change_type == "removed":
+                removed.append(param_diff)
+            elif change_type == "changed":
+                changed.append(param_diff)
+
+        return added, removed, changed
+
+    def _build_execution_diff(self, diff: Any) -> ParameterDiffResponse:
+        """Convert one raw repository diff into the API response schema."""
+        before_data = diff.get("before")
+        after_data = diff.get("after")
+        value_before = before_data.get("value") if before_data else None
+        value_after = after_data.get("value") if after_data else None
+        delta, delta_percent = self._calculate_execution_diff_delta(
+            change_type=diff.get("change_type", ""),
+            value_before=value_before,
+            value_after=value_after,
+        )
+        return ParameterDiffResponse(
+            parameter_name=diff.get("parameter_name", ""),
+            qid=diff.get("qid", ""),
+            value_before=value_before,
+            value_after=value_after,
+            delta=delta,
+            delta_percent=delta_percent,
+        )
+
+    @staticmethod
+    def _calculate_execution_diff_delta(
+        *,
+        change_type: str,
+        value_before: Any,
+        value_after: Any,
+    ) -> tuple[float | None, float | None]:
+        """Calculate numeric deltas for changed parameters only."""
+        if (
+            change_type != "changed"
+            or not isinstance(value_before, (int, float))
+            or not isinstance(value_after, (int, float))
+        ):
+            return None, None
+        delta = float(value_after) - float(value_before)
+        if value_before == 0:
+            return delta, None
+        return delta, (delta / float(value_before)) * 100
 
     def get_parameter_history(
         self,
