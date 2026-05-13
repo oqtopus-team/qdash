@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useRef, useCallback, memo } from "react";
+import { useMemo, useState, useRef, useCallback, useEffect, memo } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { TransformWrapper, TransformComponent, useControls } from "react-zoom-pan-pinch";
@@ -288,7 +288,7 @@ export function QubitMetricsGrid({
   );
 
   // View mode state: 'pan-zoom' for DOM with pan/zoom, 'region' for region zoom
-  const [viewMode, setViewMode] = useState<"pan-zoom" | "region">("pan-zoom");
+  const [viewMode, setViewMode] = useState<"pan-zoom" | "region">("region");
   const [regionSelectionEnabled, setRegionSelectionEnabled] = useState(false);
   const [zoomMode, setZoomMode] = useState<"full" | "region">("full");
   const [selectedRegion, setSelectedRegion] = useState<{
@@ -320,6 +320,13 @@ export function QubitMetricsGrid({
 
   const numRegions = Math.floor(effectiveGridSize / regionSize);
   const isSquareGrid = gridRows === gridCols;
+
+  // Region tab is only available for square grids; fall back to pan-zoom otherwise.
+  useEffect(() => {
+    if (!isSquareGrid && viewMode === "region") {
+      setViewMode("pan-zoom");
+    }
+  }, [isSquareGrid, viewMode]);
 
   // Debounced LOD update to avoid excessive re-renders during zoom
   const handleTransform = useCallback((_: unknown, state: { scale: number }) => {
@@ -663,6 +670,15 @@ export function QubitMetricsGrid({
       {/* View Mode Toggle */}
       <div className="flex items-center gap-4">
         <div className="tabs tabs-boxed bg-base-200 w-fit">
+          {isSquareGrid && (
+            <button
+              className={`tab gap-2 ${viewMode === "region" ? "tab-active" : ""}`}
+              onClick={() => setViewMode("region")}
+            >
+              <Maximize2 className="h-4 w-4" />
+              <span className="hidden sm:inline">Region</span>
+            </button>
+          )}
           <button
             className={`tab gap-2 ${viewMode === "pan-zoom" ? "tab-active" : ""}`}
             onClick={() => {
@@ -675,15 +691,6 @@ export function QubitMetricsGrid({
             <Move className="h-4 w-4" />
             <span className="hidden sm:inline">DOM</span>
           </button>
-          {isSquareGrid && (
-            <button
-              className={`tab gap-2 ${viewMode === "region" ? "tab-active" : ""}`}
-              onClick={() => setViewMode("region")}
-            >
-              <Maximize2 className="h-4 w-4" />
-              <span className="hidden sm:inline">Region</span>
-            </button>
-          )}
         </div>
 
         {viewMode === "region" && zoomMode === "full" && isSquareGrid && (
@@ -735,6 +742,7 @@ export function QubitMetricsGrid({
             doubleClick={{ mode: "zoomIn", step: 0.7 }}
             panning={{ velocityDisabled: false }}
             smooth={true}
+            centerOnInit={true}
             onTransform={handleTransform}
           >
             <ZoomControls />

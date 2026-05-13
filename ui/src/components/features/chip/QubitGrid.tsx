@@ -42,7 +42,7 @@ import {
 import { getQubitGridPosition, type TopologyLayoutParams } from "@/lib/utils/grid-position";
 import { calculateGridContainerWidth } from "@/lib/utils/grid-layout";
 
-interface TaskResultGridProps {
+interface QubitGridProps {
   chipId: string;
   topologyId: string;
   selectedTask: string;
@@ -295,14 +295,14 @@ const GridCell = memo(function GridCell({
   );
 });
 
-export function TaskResultGrid({
+export function QubitGrid({
   chipId,
   topologyId,
   selectedTask,
   selectedDate,
   gridSize: defaultGridSize,
   aiTriageBadgesByTaskId,
-}: TaskResultGridProps) {
+}: QubitGridProps) {
   const queryClient = useQueryClient();
   // Get topology configuration
   const {
@@ -432,7 +432,7 @@ export function TaskResultGrid({
   }, [chipId, queryClient, refetchTaskResults, visiblePendingAiTriageCount]);
 
   // View mode state: 'pan-zoom' for DOM with pan/zoom, 'region' for region zoom
-  const [viewMode, setViewMode] = useState<"pan-zoom" | "region">("pan-zoom");
+  const [viewMode, setViewMode] = useState<"pan-zoom" | "region">("region");
   const [regionSelectionEnabled, setRegionSelectionEnabled] = useState(false);
   const [zoomMode, setZoomMode] = useState<"full" | "region">("full");
   const [selectedRegion, setSelectedRegion] = useState<{
@@ -451,6 +451,13 @@ export function TaskResultGrid({
 
   const numRegions = Math.floor(gridSize / regionSize);
   const isSquareGrid = gridRows === gridCols;
+
+  // Region tab is only available for square grids; fall back to pan-zoom otherwise.
+  useEffect(() => {
+    if (!isSquareGrid && viewMode === "region") {
+      setViewMode("pan-zoom");
+    }
+  }, [isSquareGrid, viewMode]);
 
   // Calculate displayed grid size based on zoom mode
   const displayCols = zoomMode === "region" ? regionSize : gridCols;
@@ -477,12 +484,7 @@ export function TaskResultGrid({
     }, 100);
   }, []);
 
-  // Calculate initial scale for TransformWrapper (must be before early returns)
-  const MIN_FIGURE_CELL_SIZE = 60;
-  const initialScale = useMemo(() => {
-    if (viewMode !== "pan-zoom" || cellSize >= MIN_FIGURE_CELL_SIZE) return 1;
-    return Math.max(0.3, cellSize / MIN_FIGURE_CELL_SIZE);
-  }, [viewMode, cellSize]);
+  const initialScale = 1;
 
   if (isLoadingTask)
     return (
@@ -691,12 +693,7 @@ export function TaskResultGrid({
       }
     : { row: 0, col: 0 };
 
-  // In pan-zoom mode, ensure cells are large enough for figures to be readable.
-  // For large grids (e.g., 144Q) the calculated cellSize may be very small,
-  // but TransformWrapper handles panning/zooming the oversized grid.
-  const baseCellSize =
-    viewMode === "pan-zoom" ? Math.max(cellSize, MIN_FIGURE_CELL_SIZE) : cellSize;
-  const displayCellSize = zoomMode === "region" ? baseCellSize * 0.9 : baseCellSize;
+  const displayCellSize = zoomMode === "region" ? cellSize * 0.9 : cellSize;
 
   // LOD flags: compute from effective pixel size (cellSize * zoom scale)
   const activeScale = currentScale ?? initialScale;
@@ -906,6 +903,15 @@ export function TaskResultGrid({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <div className="tabs tabs-boxed bg-base-200 w-fit">
+            {isSquareGrid && (
+              <button
+                className={`tab gap-2 ${viewMode === "region" ? "tab-active" : ""}`}
+                onClick={() => setViewMode("region")}
+              >
+                <Maximize2 className="h-4 w-4" />
+                <span className="hidden sm:inline">Region</span>
+              </button>
+            )}
             <button
               className={`tab gap-2 ${viewMode === "pan-zoom" ? "tab-active" : ""}`}
               onClick={() => {
@@ -918,15 +924,6 @@ export function TaskResultGrid({
               <Move className="h-4 w-4" />
               <span className="hidden sm:inline">DOM</span>
             </button>
-            {isSquareGrid && (
-              <button
-                className={`tab gap-2 ${viewMode === "region" ? "tab-active" : ""}`}
-                onClick={() => setViewMode("region")}
-              >
-                <Maximize2 className="h-4 w-4" />
-                <span className="hidden sm:inline">Region</span>
-              </button>
-            )}
           </div>
 
           {viewMode === "region" &&

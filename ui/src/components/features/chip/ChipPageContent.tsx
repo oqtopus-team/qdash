@@ -9,7 +9,7 @@ import { Bot } from "lucide-react";
 import { dateToDateInput, formatDateTime } from "@/lib/utils/datetime";
 
 import { CouplingGrid } from "./CouplingGrid";
-import { TaskResultGrid } from "./TaskResultGrid";
+import { QubitGrid } from "./QubitGrid";
 import { ChipManageModal } from "./ChipManageModal";
 import { getAiTriageBadgeState, type AiTriageBadgeState } from "./aiTriageBadge";
 import { CreateChipModal } from "./modals/CreateChipModal";
@@ -483,7 +483,7 @@ export function ChipPageContent() {
               <span>Select a chip to view data</span>
             </div>
           ) : viewMode === "1q" ? (
-            <TaskResultGrid
+            <QubitGrid
               chipId={selectedChip}
               topologyId={
                 chipData?.data?.topology_id ?? `square-lattice-mux-${chipData?.data?.size ?? 64}`
