@@ -223,7 +223,9 @@ class ProvenanceService:
             node_id=str(node_dict.get("id", "")),
             depth=0,
             entity=self._build_version_from_metadata(node_dict) if node_type == "entity" else None,
-            activity=self._build_activity_from_metadata(node_dict) if node_type == "activity" else None,
+            activity=self._build_activity_from_metadata(node_dict)
+            if node_type == "activity"
+            else None,
         )
 
     @staticmethod
@@ -691,7 +693,9 @@ class ProvenanceService:
         previous_value: Any,
     ) -> tuple[float | None, float | None]:
         """Calculate absolute and percent delta between numeric version values."""
-        if not isinstance(current_value, (int, float)) or not isinstance(previous_value, (int, float)):
+        if not isinstance(current_value, (int, float)) or not isinstance(
+            previous_value, (int, float)
+        ):
             return None, None
         delta = float(current_value) - float(previous_value)
         if previous_value == 0:

@@ -49,6 +49,14 @@ class _ParameterTimeseriesEntry:
     start_at: str | None
 
 
+@dataclass(frozen=True)
+class _LineageGraphData:
+    """Normalized lineage graph payload used for LLM-friendly provenance summaries."""
+
+    nodes: list[dict[str, Any]]
+    edges: list[dict[str, Any]]
+
+
 class _TaskResultHistoryRepositoryProtocol(Protocol):
     def aggregate_best_metrics(
         self,
@@ -651,9 +659,11 @@ class CopilotDataService:
             key=lambda item: int(item[0]) if item[0].isdigit() else item[0],
         ):
             recent_entries = entries[:last_n]
-            qubit_summary, qid_timeseries, latest_value = self._summarize_qubit_parameter_timeseries(
-                qid=qid,
-                entries=recent_entries,
+            qubit_summary, qid_timeseries, latest_value = (
+                self._summarize_qubit_parameter_timeseries(
+                    qid=qid,
+                    entries=recent_entries,
+                )
             )
             qubits.append(qubit_summary)
             timeseries.extend(qid_timeseries)
@@ -673,7 +683,9 @@ class CopilotDataService:
         chronological_entries = list(reversed(entries))
         values = [entry.value for entry in entries]
         latest = values[0]
-        latest_value = float(latest) if isinstance(latest, (int, float)) and math.isfinite(latest) else None
+        latest_value = (
+            float(latest) if isinstance(latest, (int, float)) and math.isfinite(latest) else None
+        )
 
         qubit_summary: dict[str, Any] = {
             "qid": qid,
@@ -684,7 +696,9 @@ class CopilotDataService:
             "mean": None,
             "trend": None,
         }
-        numeric_values = [value for value in values if isinstance(value, (int, float)) and math.isfinite(value)]
+        numeric_values = [
+            value for value in values if isinstance(value, (int, float)) and math.isfinite(value)
+        ]
         if len(numeric_values) >= 2:
             qubit_summary["min"] = _compact_number(min(numeric_values))
             qubit_summary["max"] = _compact_number(max(numeric_values))
@@ -759,7 +773,9 @@ class CopilotDataService:
 
             compact: dict[str, Any] = {}
             for key, value in data.items():
-                raw_value = value.get("value") if isinstance(value, dict) and "value" in value else value
+                raw_value = (
+                    value.get("value") if isinstance(value, dict) and "value" in value else value
+                )
                 compact[key] = raw_value
                 if isinstance(raw_value, (int, float)) and math.isfinite(raw_value):
                     numeric_values.setdefault(key, []).append(float(raw_value))
@@ -1070,109 +1086,168 @@ class CopilotDataService:
             max_depth=max_depth,
         )
         parameter_version_repo = service.parameter_version_repo
-        if not isinstance(lineage_data, dict):
-            lineage_data = {
-                "nodes": [
-                    {
-                        "id": getattr(node, "node_id", ""),
-                        "type": getattr(node, "node_type", "entity"),
-                        "metadata": {
-                            "parameter_name": getattr(
-                                getattr(node, "entity", None), "parameter_name", None
-                            ),
-                            "qid": getattr(getattr(node, "entity", None), "qid", None),
-                            "value": getattr(getattr(node, "entity", None), "value", None),
-                            "unit": getattr(getattr(node, "entity", None), "unit", None),
-                            "version": getattr(getattr(node, "entity", None), "version", None),
-                            "task_name": getattr(getattr(node, "entity", None), "task_name", None)
-                            or getattr(getattr(node, "activity", None), "task_name", None),
-                            "execution_id": getattr(
-                                getattr(node, "entity", None), "execution_id", None
-                            )
-                            or getattr(getattr(node, "activity", None), "execution_id", None),
-                            "valid_from": getattr(
-                                getattr(node, "entity", None), "valid_from", None
-                            ),
-                            "status": getattr(getattr(node, "activity", None), "status", None),
-                            "latest_version": getattr(node, "latest_version", None),
-                        },
-                    }
-                    for node in getattr(lineage_data, "nodes", [])
-                ],
-                "edges": [
-                    {
-                        "source": getattr(edge, "source_id", ""),
-                        "target": getattr(edge, "target_id", ""),
-                        "relation_type": getattr(edge, "relation_type", ""),
-                    }
-                    for edge in getattr(lineage_data, "edges", [])
-                ],
-            }
+        normalized_graph = self._normalize_lineage_graph_data(lineage_data)
+        nodes = self._build_lineage_graph_nodes(normalized_graph.nodes)
+        edges = self._build_lineage_graph_edges(normalized_graph.edges)
+        depths = self._compute_graph_depths(origin_id=entity_id, edges=edges, reverse=False)
+        for node in nodes:
+            node["depth"] = depths.get(node["id"], 0)
 
-        # Build uniform node dicts (all nodes share the same keys)
+        self._enrich_lineage_graph_node_versions(nodes, parameter_version_repo, project_id)
+
+        return {
+            "origin": entity_id,
+            "num_nodes": len(nodes),
+            "num_edges": len(edges),
+            "max_depth": max_depth,
+            "nodes": nodes,
+            "edges": edges,
+        }
+
+    def _normalize_lineage_graph_data(self, lineage_data: Any) -> _LineageGraphData:
+        """Convert lineage service output into a uniform dict-backed graph payload."""
+        if isinstance(lineage_data, dict):
+            return _LineageGraphData(
+                nodes=list(lineage_data.get("nodes", [])),
+                edges=list(lineage_data.get("edges", [])),
+            )
+
+        return _LineageGraphData(
+            nodes=[
+                {
+                    "id": getattr(node, "node_id", ""),
+                    "type": getattr(node, "node_type", "entity"),
+                    "metadata": self._build_lineage_node_metadata(node),
+                }
+                for node in getattr(lineage_data, "nodes", [])
+            ],
+            edges=[
+                {
+                    "source": getattr(edge, "source_id", ""),
+                    "target": getattr(edge, "target_id", ""),
+                    "relation_type": getattr(edge, "relation_type", ""),
+                }
+                for edge in getattr(lineage_data, "edges", [])
+            ],
+        )
+
+    @staticmethod
+    def _build_lineage_node_metadata(node: Any) -> dict[str, Any]:
+        """Build a metadata dict from a lineage node object."""
+        entity = getattr(node, "entity", None)
+        activity = getattr(node, "activity", None)
+        return {
+            "parameter_name": getattr(entity, "parameter_name", None),
+            "qid": getattr(entity, "qid", None),
+            "value": getattr(entity, "value", None),
+            "unit": getattr(entity, "unit", None),
+            "version": getattr(entity, "version", None),
+            "task_name": getattr(entity, "task_name", None) or getattr(activity, "task_name", None),
+            "execution_id": getattr(entity, "execution_id", None)
+            or getattr(activity, "execution_id", None),
+            "valid_from": getattr(entity, "valid_from", None),
+            "status": getattr(activity, "status", None),
+            "latest_version": getattr(node, "latest_version", None),
+        }
+
+    def _build_lineage_graph_nodes(self, raw_nodes: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """Convert normalized lineage nodes into uniform LLM-friendly node dicts."""
         nodes: list[dict[str, Any]] = []
-        for node_dict in lineage_data.get("nodes", []):
-            param = None
-            qid_val = None
-            value = None
-            unit = None
-            ver = None
-            task = None
-            exec_id = None
-            valid_from = None
-            status = None
+        for node_dict in raw_nodes:
             metadata = node_dict.get("metadata", {})
             node_type = node_dict.get("type", "entity")
-            if node_type == "entity":
-                param = metadata.get("parameter_name") or None
-                qid_val = metadata.get("qid") or None
-                raw_value = metadata.get("value")
-                value = _compact_number(raw_value) if raw_value is not None else None
-                unit = metadata.get("unit") or None
-                ver = metadata.get("version")
-                task = metadata.get("task_name") or None
-                exec_id = metadata.get("execution_id") or None
-                if metadata.get("valid_from"):
-                    valid_from = _compact_timestamp(str(metadata["valid_from"]))
-                latest_version = metadata.get("latest_version")
-                if latest_version is not None and ver is not None:
-                    ver = f"{ver}/{latest_version}"
-            elif node_type == "activity":
-                task = metadata.get("task_name") or None
-                qid_val = metadata.get("qid") or None
-                exec_id = metadata.get("execution_id") or None
-                status = metadata.get("status") or None
             nodes.append(
                 {
                     "type": node_type,
                     "id": str(node_dict.get("id", "")),
                     "depth": 0,
-                    "param": param,
-                    "qid": qid_val,
-                    "value": value,
-                    "unit": unit,
-                    "ver": ver,
-                    "task": task,
-                    "exec_id": exec_id,
-                    "valid_from": valid_from,
-                    "status": status,
+                    "param": self._extract_lineage_node_param(metadata, node_type),
+                    "qid": self._extract_lineage_node_qid(metadata, node_type),
+                    "value": self._extract_lineage_node_value(metadata, node_type),
+                    "unit": self._extract_lineage_node_unit(metadata, node_type),
+                    "ver": self._extract_lineage_node_version(metadata, node_type),
+                    "task": self._extract_lineage_node_task(metadata, node_type),
+                    "exec_id": self._extract_lineage_node_execution_id(metadata, node_type),
+                    "valid_from": self._extract_lineage_node_valid_from(metadata, node_type),
+                    "status": self._extract_lineage_node_status(metadata, node_type),
                 }
             )
+        return nodes
 
-        edges: list[dict[str, str]] = []
-        for edge_dict in lineage_data.get("edges", []):
-            edges.append(
-                {
-                    "relation": str(edge_dict.get("relation_type", "")),
-                    "source": str(edge_dict.get("source", "")),
-                    "target": str(edge_dict.get("target", "")),
-                }
-            )
+    @staticmethod
+    def _build_lineage_graph_edges(raw_edges: list[dict[str, Any]]) -> list[dict[str, str]]:
+        """Convert normalized lineage edges into the compact graph representation."""
+        return [
+            {
+                "relation": str(edge.get("relation_type", "")),
+                "source": str(edge.get("source", "")),
+                "target": str(edge.get("target", "")),
+            }
+            for edge in raw_edges
+        ]
 
-        depths = self._compute_graph_depths(origin_id=entity_id, edges=edges, reverse=False)
-        for node in nodes:
-            node["depth"] = depths.get(node["id"], 0)
+    @staticmethod
+    def _extract_lineage_node_param(metadata: dict[str, Any], node_type: str) -> str | None:
+        return metadata.get("parameter_name") or None if node_type == "entity" else None
 
+    @staticmethod
+    def _extract_lineage_node_qid(metadata: dict[str, Any], node_type: str) -> str | None:
+        if node_type not in {"entity", "activity"}:
+            return None
+        return metadata.get("qid") or None
+
+    @staticmethod
+    def _extract_lineage_node_value(metadata: dict[str, Any], node_type: str) -> Any:
+        if node_type != "entity":
+            return None
+        raw_value = metadata.get("value")
+        return _compact_number(raw_value) if raw_value is not None else None
+
+    @staticmethod
+    def _extract_lineage_node_unit(metadata: dict[str, Any], node_type: str) -> str | None:
+        return metadata.get("unit") or None if node_type == "entity" else None
+
+    @staticmethod
+    def _extract_lineage_node_version(metadata: dict[str, Any], node_type: str) -> int | str | None:
+        if node_type != "entity":
+            return None
+        version = metadata.get("version")
+        latest_version = metadata.get("latest_version")
+        if latest_version is not None and version is not None:
+            return f"{version}/{latest_version}"
+        return version
+
+    @staticmethod
+    def _extract_lineage_node_task(metadata: dict[str, Any], node_type: str) -> str | None:
+        return metadata.get("task_name") or None if node_type in {"entity", "activity"} else None
+
+    @staticmethod
+    def _extract_lineage_node_execution_id(
+        metadata: dict[str, Any],
+        node_type: str,
+    ) -> str | None:
+        return metadata.get("execution_id") or None if node_type in {"entity", "activity"} else None
+
+    @staticmethod
+    def _extract_lineage_node_valid_from(
+        metadata: dict[str, Any],
+        node_type: str,
+    ) -> str | None:
+        if node_type != "entity" or not metadata.get("valid_from"):
+            return None
+        return _compact_timestamp(str(metadata["valid_from"]))
+
+    @staticmethod
+    def _extract_lineage_node_status(metadata: dict[str, Any], node_type: str) -> str | None:
+        return metadata.get("status") or None if node_type == "activity" else None
+
+    def _enrich_lineage_graph_node_versions(
+        self,
+        nodes: list[dict[str, Any]],
+        parameter_version_repo: _ParameterVersionRepositoryProtocol,
+        project_id: str,
+    ) -> None:
+        """Append current versions to stale entity nodes in the lineage graph."""
         entity_keys = sorted(
             {
                 (str(node["param"]), str(node["qid"]))
@@ -1196,15 +1271,6 @@ class CopilotDataService:
                 and current_ver > current_node_ver
             ):
                 node["ver"] = f"{current_node_ver}/{current_ver}"
-
-        return {
-            "origin": entity_id,
-            "num_nodes": len(nodes),
-            "num_edges": len(edges),
-            "max_depth": max_depth,
-            "nodes": nodes,
-            "edges": edges,
-        }
 
     def load_parameter_lineage(
         self, parameter_name: str, qid: str, chip_id: str, last_n: int = 10
@@ -1441,42 +1507,28 @@ class CopilotDataService:
         )
         from qdash.datamodel.task_knowledge import get_task_knowledge
 
-        # Resolve task knowledge
         knowledge = get_task_knowledge(task_name)
-        knowledge_prompt = knowledge.to_prompt() if knowledge else f"Task: {task_name}"
-
-        # Load qubit parameters
+        knowledge_prompt = self._build_task_knowledge_prompt(task_name, knowledge)
         qubit_params = self.load_qubit_params(chip_id, qid)
-
-        # Load task result parameters
         task_result = self.load_task_result(task_id)
-        input_params = task_result.get("input_parameters", {}) if task_result else {}
-        output_params = task_result.get("output_parameters", {}) if task_result else {}
-        run_params = task_result.get("run_parameters", {}) if task_result else {}
-
-        # Load dynamic context from TaskKnowledge.related_context
-        history_results: list[dict[str, Any]] = []
-        neighbor_qubit_params: dict[str, dict[str, Any]] = {}
-        coupling_params: dict[str, dict[str, Any]] = {}
-        if knowledge and knowledge.related_context:
-            for rc in knowledge.related_context:
-                if rc.type == "history":
-                    history_results = self.load_task_history(task_name, chip_id, qid, rc.last_n)
-                elif rc.type == "neighbor_qubits":
-                    neighbor_qubit_params = self.load_neighbor_qubit_params(chip_id, qid, rc.params)
-                elif rc.type == "coupling":
-                    coupling_params = self.load_coupling_params(chip_id, qid, rc.params)
-
-        # Auto-load experiment figure if not provided and multimodal is enabled
-        expected_images: list[tuple[str, str]] = []
-        figure_paths: list[str] = task_result.get("figure_path", []) if task_result else []
-        if config.analysis.multimodal:
-            if not image_base64 and task_result:
-                image_base64 = self.load_figure_as_base64(figure_paths)
-            expected_images = self.collect_expected_images(
-                knowledge,
-                max_images=config.analysis.max_expected_images,
+        input_params, output_params, run_params, figure_paths = self._extract_task_result_payload(
+            task_result
+        )
+        history_results, neighbor_qubit_params, coupling_params = (
+            self._load_related_analysis_context(
+                task_name=task_name,
+                chip_id=chip_id,
+                qid=qid,
+                knowledge=knowledge,
             )
+        )
+        image_base64, expected_images = self._resolve_analysis_images(
+            knowledge=knowledge,
+            task_result=task_result,
+            figure_paths=figure_paths,
+            image_base64=image_base64,
+            config=config,
+        )
 
         context = TaskAnalysisContext(
             task_knowledge_prompt=knowledge_prompt,
@@ -1497,6 +1549,76 @@ class CopilotDataService:
             expected_images=expected_images,
             figure_paths=figure_paths,
         )
+
+    @staticmethod
+    def _build_task_knowledge_prompt(task_name: str, knowledge: Any) -> str:
+        """Build the prompt prefix from task knowledge or fall back to the task name."""
+        return knowledge.to_prompt() if knowledge else f"Task: {task_name}"
+
+    @staticmethod
+    def _extract_task_result_payload(
+        task_result: dict[str, Any] | None,
+    ) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any], list[str]]:
+        """Extract task-result fields used by analysis context assembly."""
+        if not task_result:
+            return {}, {}, {}, []
+        return (
+            task_result.get("input_parameters", {}),
+            task_result.get("output_parameters", {}),
+            task_result.get("run_parameters", {}),
+            task_result.get("figure_path", []),
+        )
+
+    def _load_related_analysis_context(
+        self,
+        *,
+        task_name: str,
+        chip_id: str,
+        qid: str,
+        knowledge: Any,
+    ) -> tuple[list[dict[str, Any]], dict[str, dict[str, Any]], dict[str, dict[str, Any]]]:
+        """Load history and neighborhood context declared by task knowledge."""
+        history_results: list[dict[str, Any]] = []
+        neighbor_qubit_params: dict[str, dict[str, Any]] = {}
+        coupling_params: dict[str, dict[str, Any]] = {}
+        if not knowledge or not knowledge.related_context:
+            return history_results, neighbor_qubit_params, coupling_params
+
+        for related_context in knowledge.related_context:
+            if related_context.type == "history":
+                history_results = self.load_task_history(
+                    task_name, chip_id, qid, related_context.last_n
+                )
+            elif related_context.type == "neighbor_qubits":
+                neighbor_qubit_params = self.load_neighbor_qubit_params(
+                    chip_id, qid, related_context.params
+                )
+            elif related_context.type == "coupling":
+                coupling_params = self.load_coupling_params(chip_id, qid, related_context.params)
+
+        return history_results, neighbor_qubit_params, coupling_params
+
+    def _resolve_analysis_images(
+        self,
+        *,
+        knowledge: Any,
+        task_result: dict[str, Any] | None,
+        figure_paths: list[str],
+        image_base64: str | None,
+        config: CopilotConfig,
+    ) -> tuple[str | None, list[tuple[str, str]]]:
+        """Resolve experiment and expected images for multimodal analysis."""
+        expected_images: list[tuple[str, str]] = []
+        if not config.analysis.multimodal:
+            return image_base64, expected_images
+
+        if not image_base64 and task_result:
+            image_base64 = self.load_figure_as_base64(figure_paths)
+        expected_images = self.collect_expected_images(
+            knowledge,
+            max_images=config.analysis.max_expected_images,
+        )
+        return image_base64, expected_images
 
     @staticmethod
     def build_images_sent_metadata(

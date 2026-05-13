@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 from unittest.mock import MagicMock, patch
 
+from qdash.api.lib.copilot_config import AnalysisConfig, CopilotConfig, ModelConfig
 from qdash.api.services.copilot_data_service import FALLBACK_QUERY_LIMIT, CopilotDataService
 
 
@@ -357,3 +358,103 @@ class TestLoadChipSummary:
             }
         }
         assert result["qubits"] == [{"qid": "0", "t2": 7.0}]
+
+
+class TestBuildAnalysisContext:
+    """Tests for analysis context assembly."""
+
+    def _config(self, *, multimodal: bool) -> CopilotConfig:
+        return CopilotConfig(
+            enabled=True,
+            model=ModelConfig(provider="openai", name="gpt-4.1"),
+            analysis=AnalysisConfig(enabled=True, multimodal=multimodal, max_expected_images=2),
+        )
+
+    def test_builds_context_with_related_knowledge(self):
+        service = CopilotDataService(data_access=MagicMock())
+        knowledge = MagicMock()
+        knowledge.to_prompt.return_value = "Prompt body"
+        history_context = MagicMock(type="history", last_n=3)
+        neighbor_context = MagicMock(type="neighbor_qubits", params=["t1"])
+        coupling_context = MagicMock(type="coupling", params=["g"])
+        knowledge.related_context = [history_context, neighbor_context, coupling_context]
+
+        with (
+            patch.object(service, "load_qubit_params", return_value={"f01": 5.0}),
+            patch.object(
+                service,
+                "load_task_result",
+                return_value={
+                    "input_parameters": {"drive_amp": 0.1},
+                    "output_parameters": {"t1": {"value": 12.0}},
+                    "run_parameters": {"shots": 1024},
+                    "figure_path": ["/tmp/figure.png"],
+                },
+            ),
+            patch.object(service, "load_task_history", return_value=[{"task_id": "older"}]),
+            patch.object(service, "load_neighbor_qubit_params", return_value={"1": {"t1": 9.0}}),
+            patch.object(service, "load_coupling_params", return_value={"0-1": {"g": 0.02}}),
+            patch("qdash.datamodel.task_knowledge.get_task_knowledge", return_value=knowledge),
+        ):
+            result = service.build_analysis_context(
+                task_name="CheckT1",
+                chip_id="chip-1",
+                qid="0",
+                task_id="task-1",
+                image_base64=None,
+                config=self._config(multimodal=False),
+            )
+
+        assert result.context.task_knowledge_prompt == "Prompt body"
+        assert result.context.qubit_params == {"f01": 5.0}
+        assert result.context.input_parameters == {"drive_amp": 0.1}
+        assert result.context.output_parameters == {"t1": {"value": 12.0}}
+        assert result.context.run_parameters == {"shots": 1024}
+        assert result.context.history_results == [{"task_id": "older"}]
+        assert result.context.neighbor_qubit_params == {"1": {"t1": 9.0}}
+        assert result.context.coupling_params == {"0-1": {"g": 0.02}}
+        assert result.figure_paths == ["/tmp/figure.png"]
+        assert result.image_base64 is None
+        assert result.expected_images == []
+
+    def test_multimodal_context_loads_missing_figure_and_expected_images(self):
+        service = CopilotDataService(data_access=MagicMock())
+        knowledge = MagicMock()
+        knowledge.to_prompt.return_value = "Prompt body"
+        knowledge.related_context = []
+
+        with (
+            patch.object(service, "load_qubit_params", return_value={}),
+            patch.object(
+                service,
+                "load_task_result",
+                return_value={
+                    "input_parameters": {},
+                    "output_parameters": {},
+                    "run_parameters": {},
+                    "figure_path": ["/tmp/figure.png"],
+                },
+            ),
+            patch.object(
+                service, "load_figure_as_base64", return_value="encoded-image"
+            ) as load_fig,
+            patch.object(
+                service,
+                "collect_expected_images",
+                return_value=[("img-1", "expected alt")],
+            ) as collect_expected,
+            patch("qdash.datamodel.task_knowledge.get_task_knowledge", return_value=knowledge),
+        ):
+            result = service.build_analysis_context(
+                task_name="CheckT1",
+                chip_id="chip-1",
+                qid="0",
+                task_id="task-1",
+                image_base64=None,
+                config=self._config(multimodal=True),
+            )
+
+        load_fig.assert_called_once_with(["/tmp/figure.png"])
+        collect_expected.assert_called_once_with(knowledge, max_images=2)
+        assert result.image_base64 == "encoded-image"
+        assert result.expected_images == [("img-1", "expected alt")]
