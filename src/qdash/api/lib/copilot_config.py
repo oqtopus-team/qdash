@@ -1,6 +1,6 @@
 """Compatibility wrapper for shared copilot configuration."""
 
-from qdash.common.copilot import config as _config
+from qdash.common.copilot import settings as _config
 
 AnalysisConfig = _config.AnalysisConfig
 CopilotConfig = _config.CopilotConfig

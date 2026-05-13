@@ -123,7 +123,7 @@ class ToolExecutorRegistryBuilder:
 
     def build_tool_executors(self) -> dict[str, Any]:
         """Build the tool executor mapping for LLM function calling."""
-        from qdash.common.copilot.sandbox import execute_python_analysis
+        from qdash.common.copilot.python_sandbox import execute_python_analysis
 
         return (
             self._build_qubit_analysis_tool_executors()

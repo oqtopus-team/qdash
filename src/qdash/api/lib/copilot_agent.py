@@ -1,6 +1,6 @@
 """Compatibility wrapper for the shared copilot agent implementation."""
 
-from qdash.common.copilot import agent as _agent
+from qdash.common.copilot import llm_agent as _agent
 
 AGENT_TOOLS = _agent.AGENT_TOOLS
 blocks_to_markdown = _agent.blocks_to_markdown

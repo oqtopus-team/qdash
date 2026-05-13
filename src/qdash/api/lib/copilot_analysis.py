@@ -1,6 +1,6 @@
 """Compatibility wrapper for shared copilot analysis models."""
 
-from qdash.common.copilot import analysis as _analysis
+from qdash.common.copilot import analysis_models as _analysis
 
 AnalysisContextResult = _analysis.AnalysisContextResult
 AnalysisResponse = _analysis.AnalysisResponse

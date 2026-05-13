@@ -10,7 +10,7 @@ from threading import Lock
 from typing import TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
-    from qdash.common.copilot.config import CopilotConfig, ModelConfig
+    from qdash.common.copilot.settings import CopilotConfig, ModelConfig
     from qdash.datamodel.execution import ExecutionModel
     from qdash.datamodel.task import BaseTaskResultModel
 
@@ -54,7 +54,7 @@ def enqueue_ai_triage_note(
 ) -> None:
     """Schedule AI triage note attachment without blocking calibration progress."""
     try:
-        from qdash.common.copilot.config import load_copilot_config
+        from qdash.common.copilot.settings import load_copilot_config
 
         config = load_copilot_config()
         if not config.enabled or not config.analysis.enabled:
@@ -154,7 +154,7 @@ def maybe_attach_ai_triage_note(
     This is a best-effort side effect. It must never fail calibration execution.
     """
     try:
-        from qdash.common.copilot.config import load_copilot_config
+        from qdash.common.copilot.settings import load_copilot_config
 
         config = load_copilot_config()
         if not config.enabled or not config.analysis.enabled:
@@ -347,8 +347,8 @@ def _run_ai_triage(
     config: CopilotConfig,
 ) -> str | None:
     """Run Copilot analysis and return markdown content."""
-    from qdash.common.copilot.agent import blocks_to_markdown, run_analysis
-    from qdash.common.copilot.data_service import CopilotDataService
+    from qdash.common.copilot.data_facade import CopilotDataService
+    from qdash.common.copilot.llm_agent import blocks_to_markdown, run_analysis
 
     config = _ai_triage_config(config)
     service = CopilotDataService()
