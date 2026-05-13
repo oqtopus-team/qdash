@@ -17,6 +17,7 @@ from qdash.common.copilot.heatmap_service import (
     ChipHeatmapLoader,
     TaskResultHistoryRepositoryProtocol,
 )
+from qdash.common.copilot.tooling.registry import ToolExecutorRegistryBuilder
 from qdash.common.json_utils import sanitize_for_json
 
 if TYPE_CHECKING:
@@ -352,6 +353,7 @@ class CopilotDataService:
             data_access=self._data_access,
             compact_number=_compact_number,
         )
+        self._tool_executor_registry_builder = ToolExecutorRegistryBuilder(self)
 
     def _analysis_load_qubit_params(self, chip_id: str, qid: str) -> dict[str, Any]:
         """Forward qubit-param lookup for analysis context assembly."""
@@ -1429,87 +1431,4 @@ class CopilotDataService:
         Note: ``execute_python_analysis`` is overridden by ``_wrap_tool_executors``
         in ``copilot_agent.py`` to auto-inject the data_store.
         """
-        from qdash.common.copilot.sandbox import execute_python_analysis
-
-        return (
-            self._build_qubit_analysis_tool_executors()
-            | self._build_chip_overview_tool_executors()
-            | self._build_history_and_provenance_tool_executors()
-            | {"execute_python_analysis": lambda args: execute_python_analysis(args["code"])}
-        )
-
-    def _build_qubit_analysis_tool_executors(self) -> dict[str, Any]:
-        """Build tool executors for task-result and qubit-level analysis lookups."""
-        return {
-            "get_qubit_params": lambda args: self.load_qubit_params(args["chip_id"], args["qid"]),
-            "get_latest_task_result": lambda args: self.load_latest_task_result(
-                args["task_name"], args["chip_id"], args["qid"]
-            ),
-            "get_task_history": lambda args: self.load_task_history(
-                args["task_name"], args["chip_id"], args["qid"], args.get("last_n", 5)
-            ),
-            "get_parameter_timeseries": lambda args: self.load_parameter_timeseries(
-                args["parameter_name"], args["chip_id"], args["qid"], args.get("last_n", 10)
-            ),
-            "compare_qubits": lambda args: self.load_compare_qubits(
-                args["chip_id"], args["qids"], args.get("param_names")
-            ),
-            "get_coupling_params": lambda args: self.load_coupling_params_tool(
-                args["chip_id"],
-                args.get("coupling_id"),
-                args.get("qubit_id"),
-                args.get("param_names"),
-            ),
-        }
-
-    def _build_chip_overview_tool_executors(self) -> dict[str, Any]:
-        """Build tool executors for chip summaries, topology, and metric overviews."""
-        return {
-            "get_chip_summary": lambda args: self.load_chip_summary(
-                args["chip_id"], args.get("param_names")
-            ),
-            "get_chip_topology": lambda args: self.load_chip_topology(args["chip_id"]),
-            "generate_chip_heatmap": lambda args: self.load_chip_heatmap(
-                args["chip_id"],
-                args["metric_name"],
-                args.get("selection_mode", "latest"),
-                args.get("within_hours"),
-            ),
-            "list_available_parameters": lambda args: self.load_available_parameters(
-                args["chip_id"], args.get("qid")
-            ),
-            "get_chip_parameter_timeseries": lambda args: self.load_chip_parameter_timeseries(
-                args["parameter_name"],
-                args["chip_id"],
-                args.get("last_n", 10),
-                args.get("qids"),
-            ),
-        }
-
-    def _build_history_and_provenance_tool_executors(self) -> dict[str, Any]:
-        """Build tool executors for execution history, notes, and provenance lookups."""
-        return {
-            "get_execution_history": lambda args: self.load_execution_history(
-                args["chip_id"], args.get("status"), args.get("tags"), args.get("last_n", 10)
-            ),
-            "search_task_results": lambda args: self.load_search_task_results(
-                args["chip_id"],
-                args.get("task_name"),
-                args.get("qid"),
-                args.get("status"),
-                args.get("execution_id"),
-                args.get("last_n", 10),
-            ),
-            "get_calibration_notes": lambda args: self.load_calibration_notes(
-                args["chip_id"],
-                args.get("execution_id"),
-                args.get("task_id"),
-                args.get("last_n", 10),
-            ),
-            "get_parameter_lineage": lambda args: self.load_parameter_lineage(
-                args["parameter_name"], args["qid"], args["chip_id"], args.get("last_n", 10)
-            ),
-            "get_provenance_lineage_graph": lambda args: self.load_provenance_lineage_graph(
-                args["entity_id"], args["chip_id"], args.get("max_depth", 5)
-            ),
-        }
+        return self._tool_executor_registry_builder.build_tool_executors()
