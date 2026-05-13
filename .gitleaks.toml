@@ -14,7 +14,7 @@ title = "QDash Gitleaks Configuration"
   ]
   regexTarget = "match"
   regexes = [
-    '''mongodb://root:example@mongo:27017''',
+    '''^mongodb://root:example@mongo:27017(/.*)?$''',
   ]
 
 [[allowlists]]
