@@ -696,7 +696,7 @@ class TaskResultService:
         """Render markdown for a triage run, using deterministic guards when possible."""
         import asyncio
 
-        from qdash.common.copilot.llm_agent import blocks_to_markdown, run_analysis
+        from qdash.common.copilot.agent import blocks_to_markdown, run_analysis
 
         if forced := TaskResultService._forced_ai_triage_markdown(
             task_name,

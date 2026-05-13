@@ -317,7 +317,7 @@ class IssueKnowledgeService:
         )
 
         try:
-            from qdash.common.copilot.llm_agent import _build_client
+            from qdash.common.copilot.agent import _build_client
 
             client = _build_client(config)
             response = await client.chat.completions.create(

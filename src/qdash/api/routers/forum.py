@@ -297,7 +297,7 @@ async def forum_ai_reply_stream(
         )
 
         try:
-            from qdash.common.copilot.llm_agent import run_chat
+            from qdash.common.copilot.agent import run_chat
 
             coro = partial(
                 run_chat,

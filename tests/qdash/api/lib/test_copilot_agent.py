@@ -5,12 +5,13 @@ from typing import Any
 
 import pytest
 
-from qdash.common.copilot.llm_agent import _parse_response, _run_chat_completions
+from qdash.common.copilot.agent import _run_chat_completions
+from qdash.common.copilot.agent_runtime.parsing import parse_response
 from qdash.common.copilot.settings import CopilotConfig, ModelConfig
 
 
 def test_parse_response_accepts_review_triage_markdown_without_json() -> None:
-    response = _parse_response(
+    response = parse_response(
         "\n".join(
             [
                 "**Review triage**",
@@ -35,7 +36,7 @@ def test_parse_response_accepts_review_triage_markdown_without_json() -> None:
 
 
 def test_parse_response_converts_missing_triage_json_to_safe_review() -> None:
-    response = _parse_response(
+    response = parse_response(
         '{"summary":"解析完了","assessment":"warning","explanation":"解析完了"}'
     )
 
@@ -47,7 +48,7 @@ def test_parse_response_converts_missing_triage_json_to_safe_review() -> None:
 
 
 def test_parse_response_converts_plain_missing_triage_text_to_safe_review() -> None:
-    response = _parse_response("解析完了")
+    response = parse_response("解析完了")
 
     assert response.assessment == "warning"
     assert response.summary == "AI triage response did not include the required review block."

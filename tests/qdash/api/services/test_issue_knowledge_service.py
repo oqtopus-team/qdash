@@ -871,7 +871,7 @@ class TestCallLlmExtract:
 
         with (
             patch("qdash.common.copilot.settings.load_copilot_config", return_value=mock_config),
-            patch("qdash.common.copilot.llm_agent._build_client", return_value=mock_client),
+            patch("qdash.common.copilot.agent._build_client", return_value=mock_client),
         ):
             result = await IssueKnowledgeService._call_llm_extract(
                 "CheckT1", "chip-A", "Q0", "T1 issue", "Thread"
@@ -892,7 +892,7 @@ class TestCallLlmExtract:
 
         with (
             patch("qdash.common.copilot.settings.load_copilot_config", return_value=mock_config),
-            patch("qdash.common.copilot.llm_agent._build_client", return_value=mock_client),
+            patch("qdash.common.copilot.agent._build_client", return_value=mock_client),
         ):
             result = await IssueKnowledgeService._call_llm_extract(
                 "CheckT1", "chip-A", "Q0", "Title", "Thread"
@@ -911,7 +911,7 @@ class TestCallLlmExtract:
 
         with (
             patch("qdash.common.copilot.settings.load_copilot_config", return_value=mock_config),
-            patch("qdash.common.copilot.llm_agent._build_client", return_value=mock_client),
+            patch("qdash.common.copilot.agent._build_client", return_value=mock_client),
         ):
             result = await IssueKnowledgeService._call_llm_extract(
                 "CheckT1", "chip-A", "Q0", "Title", "Thread"
@@ -927,7 +927,7 @@ class TestCallLlmExtract:
 
         with (
             patch("qdash.common.copilot.settings.load_copilot_config", return_value=mock_config),
-            patch("qdash.common.copilot.llm_agent._build_client", return_value=mock_client),
+            patch("qdash.common.copilot.agent._build_client", return_value=mock_client),
         ):
             result = await IssueKnowledgeService._call_llm_extract(
                 "CheckT1", "chip-A", "Q0", "Title", "Thread"
@@ -945,7 +945,7 @@ class TestCallLlmExtract:
 
         with (
             patch("qdash.common.copilot.settings.load_copilot_config", return_value=mock_config),
-            patch("qdash.common.copilot.llm_agent._build_client", return_value=mock_client),
+            patch("qdash.common.copilot.agent._build_client", return_value=mock_client),
         ):
             result = await IssueKnowledgeService._call_llm_extract(
                 "CheckT1", "chip-A", "Q0", "Title", "Thread"
@@ -966,7 +966,7 @@ class TestCallLlmExtract:
 
         with (
             patch("qdash.common.copilot.settings.load_copilot_config", return_value=mock_config),
-            patch("qdash.common.copilot.llm_agent._build_client", return_value=mock_client),
+            patch("qdash.common.copilot.agent._build_client", return_value=mock_client),
         ):
             result = await IssueKnowledgeService._call_llm_extract(
                 "CheckT1", "chip-A", "Q0", "Title", "Thread"
@@ -984,7 +984,7 @@ class TestCallLlmExtract:
 
         with (
             patch("qdash.common.copilot.settings.load_copilot_config", return_value=mock_config),
-            patch("qdash.common.copilot.llm_agent._build_client", return_value=mock_client),
+            patch("qdash.common.copilot.agent._build_client", return_value=mock_client),
         ):
             result = await IssueKnowledgeService._call_llm_extract(
                 "CheckT1", "chip-A", "Q0", "Title", "Thread"

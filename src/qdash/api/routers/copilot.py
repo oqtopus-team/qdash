@@ -160,7 +160,7 @@ async def analyze_task_result(
 
     # Run the analysis agent
     try:
-        from qdash.common.copilot.llm_agent import run_analysis
+        from qdash.common.copilot.agent import run_analysis
 
         result = await run_analysis(
             context=ctx.context,
@@ -241,7 +241,7 @@ async def analyze_task_result_stream(
         bridge = SSETaskBridge(tool_labels=TOOL_LABELS, status_labels=STATUS_LABELS)
 
         try:
-            from qdash.common.copilot.llm_agent import run_analysis
+            from qdash.common.copilot.agent import run_analysis
 
             coro = partial(
                 run_analysis,
@@ -337,7 +337,7 @@ async def chat_stream(
         bridge = SSETaskBridge(tool_labels=TOOL_LABELS, status_labels=STATUS_LABELS)
 
         try:
-            from qdash.common.copilot.llm_agent import run_chat
+            from qdash.common.copilot.agent import run_chat
 
             coro = partial(
                 run_chat,

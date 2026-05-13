@@ -7,12 +7,11 @@ from typing import TYPE_CHECKING, Any
 from unittest.mock import MagicMock, patch
 
 from qdash.api.lib.ai_labels import TOOL_LABELS
-from qdash.common.copilot.analysis_models import AnalysisResponse
-from qdash.common.copilot.llm_agent import (
-    _build_llm_summary,
-    _legacy_to_blocks,
+from qdash.common.copilot.agent import (
     _wrap_tool_executors,
 )
+from qdash.common.copilot.agent_runtime.rendering import build_llm_summary, legacy_to_blocks
+from qdash.common.copilot.analysis_models import AnalysisResponse
 from qdash.common.copilot.runtime import CopilotRuntime
 from qdash.common.copilot.tooling.schemas import AGENT_TOOLS
 
@@ -38,7 +37,7 @@ class TestAnalysisRendering:
             recommendations=[],
         )
 
-        result = _legacy_to_blocks(response)
+        result = legacy_to_blocks(response)
 
         assert result["blocks"][0]["content"].startswith("**Review triage**")
         assert "評価" in result["blocks"][1]["content"]
@@ -57,7 +56,7 @@ class TestAnalysisRendering:
             recommendations=[],
         )
 
-        result = _legacy_to_blocks(response)
+        result = legacy_to_blocks(response)
 
         assert result["blocks"][0]["content"].startswith("レビューのトリアージ")
         assert "評価" in result["blocks"][1]["content"]
@@ -242,7 +241,7 @@ class TestToolRegistration:
 
 
 class TestBuildLlmSummary:
-    """Tests for _build_llm_summary."""
+    """Tests for build_llm_summary."""
 
     def test_list_of_dicts_replaced_with_schema(self):
         full = {
@@ -252,7 +251,7 @@ class TestBuildLlmSummary:
                 {"qid": "1", "latest": 4.98},
             ],
         }
-        summary = _build_llm_summary(full, "t1")
+        summary = build_llm_summary(full, "t1")
         assert summary["chip_id"] == "chip-1"
         assert summary["qubits"]["_schema"] == ["qid", "latest"]
         assert summary["qubits"]["_rows"] == 2
@@ -261,20 +260,20 @@ class TestBuildLlmSummary:
 
     def test_plain_list_replaced_with_row_count(self):
         full = {"values": [1, 2, 3]}
-        summary = _build_llm_summary(full, "key")
+        summary = build_llm_summary(full, "key")
         assert summary["values"]["_rows"] == 3
         assert "_schema" not in summary["values"]
 
     def test_scalar_values_preserved(self):
         full = {"chip_id": "chip-1", "num_qubits": 10, "unit": "GHz"}
-        summary = _build_llm_summary(full, "key")
+        summary = build_llm_summary(full, "key")
         assert summary["chip_id"] == "chip-1"
         assert summary["num_qubits"] == 10
         assert summary["unit"] == "GHz"
 
     def test_empty_list_replaced(self):
         full: dict[str, Any] = {"items": []}
-        summary = _build_llm_summary(full, "key")
+        summary = build_llm_summary(full, "key")
         assert summary["items"]["_rows"] == 0
 
 
