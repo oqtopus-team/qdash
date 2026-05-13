@@ -30,16 +30,6 @@
     ]
   },
   {
-    "text": "System",
-    "collapsed": true,
-    "items": [
-      {
-        "text": "CheckSkew",
-        "link": "/task-knowledge/system/CheckSkew"
-      }
-    ]
-  },
-  {
     "text": "CW Characterization",
     "collapsed": true,
     "items": [

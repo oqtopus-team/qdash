@@ -36,9 +36,6 @@ backends:
       - DumpBox
       - ReadoutConfigure
 
-      # System Level
-      - CheckSkew
-
       # CW (Continuous Wave) Measurements
       - CheckReflectionCoefficient
       - CheckResonatorSpectroscopy
@@ -118,9 +115,6 @@ categories:
     - CheckNoise
     - DumpBox
     - ReadoutConfigure
-
-  "System":
-    - CheckSkew
 
   "CW Measurements":
     - CheckReflectionCoefficient
