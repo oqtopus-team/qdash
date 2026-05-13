@@ -328,9 +328,9 @@ async def issue_ai_reply_stream(
         await asyncio.sleep(0)
 
         # Build tool executors
-        from qdash.common.copilot.data_facade import CopilotDataFacade
+        from qdash.common.copilot.runtime import CopilotRuntime
 
-        copilot_data_svc = CopilotDataFacade()
+        copilot_data_svc = CopilotRuntime()
         tool_executors = copilot_data_svc.build_tool_executors()
 
         # Strip @qdash mention from user message before sending to LLM

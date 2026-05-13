@@ -187,9 +187,7 @@ class ChipOverviewLoader:
         chip_stats: dict[str, Any] = {
             "count": len(latest_values),
             "mean": self._compact_number(stats_mod.mean(latest_values)) if latest_values else 0,
-            "median": self._compact_number(stats_mod.median(latest_values))
-            if latest_values
-            else 0,
+            "median": self._compact_number(stats_mod.median(latest_values)) if latest_values else 0,
             "min": self._compact_number(min(latest_values)) if latest_values else 0,
             "max": self._compact_number(max(latest_values)) if latest_values else 0,
         }

@@ -8,13 +8,13 @@ from unittest.mock import MagicMock, patch
 
 from qdash.api.lib.ai_labels import TOOL_LABELS
 from qdash.common.copilot.analysis_models import AnalysisResponse
-from qdash.common.copilot.data_facade import CopilotDataFacade
 from qdash.common.copilot.llm_agent import (
     AGENT_TOOLS,
     _build_llm_summary,
     _legacy_to_blocks,
     _wrap_tool_executors,
 )
+from qdash.common.copilot.runtime import CopilotRuntime
 
 if TYPE_CHECKING:
     from qdash.api.schemas.provenance import LineageResponse
@@ -67,7 +67,7 @@ class TestProvenanceLineageGraphValidation:
     """Tests for entity_id format validation and max_depth bounds."""
 
     def setup_method(self):
-        self.service = CopilotDataFacade()
+        self.service = CopilotRuntime()
 
     def test_empty_entity_id_returns_error(self):
         result = self.service.load_provenance_lineage_graph("", "chip-1")
@@ -84,7 +84,7 @@ class TestProvenanceLineageGraphValidation:
         assert "error" in result
         assert "Invalid entity_id format" in result["error"]
 
-    @patch.object(CopilotDataFacade, "_resolve_project_id", return_value=None)
+    @patch.object(CopilotRuntime, "_resolve_project_id", return_value=None)
     def test_missing_chip_returns_descriptive_error(self, _mock_resolve):
         result = self.service.load_provenance_lineage_graph(
             "param:0:exec-1:task-1", "nonexistent-chip"
@@ -93,8 +93,8 @@ class TestProvenanceLineageGraphValidation:
         assert "nonexistent-chip" in result["error"]
         assert "may not exist" in result["error"]
 
-    @patch.object(CopilotDataFacade, "_resolve_project_id", return_value="proj-1")
-    @patch.object(CopilotDataFacade, "_get_provenance_service")
+    @patch.object(CopilotRuntime, "_resolve_project_id", return_value="proj-1")
+    @patch.object(CopilotRuntime, "_get_provenance_service")
     def test_max_depth_clamped_to_upper_bound(
         self, mock_get_service: MagicMock, _mock_resolve: MagicMock
     ):
@@ -109,8 +109,8 @@ class TestProvenanceLineageGraphValidation:
         _, kwargs = mock_service.get_lineage.call_args
         assert kwargs["max_depth"] == 20
 
-    @patch.object(CopilotDataFacade, "_resolve_project_id", return_value="proj-1")
-    @patch.object(CopilotDataFacade, "_get_provenance_service")
+    @patch.object(CopilotRuntime, "_resolve_project_id", return_value="proj-1")
+    @patch.object(CopilotRuntime, "_get_provenance_service")
     def test_max_depth_clamped_to_lower_bound(
         self, mock_get_service: MagicMock, _mock_resolve: MagicMock
     ):
@@ -130,10 +130,10 @@ class TestProvenanceLineageGraphOutput:
     """Tests for the LLM-friendly output structure."""
 
     def setup_method(self):
-        self.service = CopilotDataFacade()
+        self.service = CopilotRuntime()
 
-    @patch.object(CopilotDataFacade, "_resolve_project_id", return_value="proj-1")
-    @patch.object(CopilotDataFacade, "_get_provenance_service")
+    @patch.object(CopilotRuntime, "_resolve_project_id", return_value="proj-1")
+    @patch.object(CopilotRuntime, "_get_provenance_service")
     def test_successful_lineage_returns_expected_structure(
         self, mock_get_service: MagicMock, _mock_resolve: MagicMock
     ):
@@ -152,8 +152,8 @@ class TestProvenanceLineageGraphOutput:
         assert result["num_edges"] == len(result["edges"])
         assert "max_depth" in result
 
-    @patch.object(CopilotDataFacade, "_resolve_project_id", return_value="proj-1")
-    @patch.object(CopilotDataFacade, "_get_provenance_service")
+    @patch.object(CopilotRuntime, "_resolve_project_id", return_value="proj-1")
+    @patch.object(CopilotRuntime, "_get_provenance_service")
     def test_entity_node_has_parameter_fields(
         self, mock_get_service: MagicMock, _mock_resolve: MagicMock
     ):
@@ -173,8 +173,8 @@ class TestProvenanceLineageGraphOutput:
         assert node["ver"] is not None
         assert node["task"] is not None
 
-    @patch.object(CopilotDataFacade, "_resolve_project_id", return_value="proj-1")
-    @patch.object(CopilotDataFacade, "_get_provenance_service")
+    @patch.object(CopilotRuntime, "_resolve_project_id", return_value="proj-1")
+    @patch.object(CopilotRuntime, "_get_provenance_service")
     def test_activity_node_has_task_fields(
         self, mock_get_service: MagicMock, _mock_resolve: MagicMock
     ):
@@ -192,8 +192,8 @@ class TestProvenanceLineageGraphOutput:
         assert node["exec_id"] is not None
         assert node["status"] is not None
 
-    @patch.object(CopilotDataFacade, "_resolve_project_id", return_value="proj-1")
-    @patch.object(CopilotDataFacade, "_get_provenance_service")
+    @patch.object(CopilotRuntime, "_resolve_project_id", return_value="proj-1")
+    @patch.object(CopilotRuntime, "_get_provenance_service")
     def test_latest_version_included_when_present(
         self, mock_get_service: MagicMock, _mock_resolve: MagicMock
     ):
@@ -230,7 +230,7 @@ class TestToolRegistration:
         assert "get_provenance_lineage_graph" in TOOL_LABELS
 
     def test_tool_in_executors(self):
-        service = CopilotDataFacade()
+        service = CopilotRuntime()
         executors = service.build_tool_executors()
         assert "get_provenance_lineage_graph" in executors
 

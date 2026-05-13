@@ -1,4 +1,16 @@
-"""Shared Copilot data loading and tool execution helpers."""
+"""Shared Copilot runtime entrypoint.
+
+This module is the main navigation point for the Copilot package.
+
+- ``runtime.py`` wires together the package-level components and exposes
+  the public methods used by the API and workflow layers.
+- ``services/`` contains the feature-oriented loading and transformation logic.
+- ``formatters/`` contains LLM-facing compaction and presentation helpers.
+- ``tooling/`` contains tool-registry assembly for agent function calling.
+
+When reading the package, start here to see the high-level composition,
+then jump into ``services/`` for the actual behavior.
+"""
 
 from __future__ import annotations
 
@@ -38,8 +50,13 @@ MAX_FIGURE_SIZE = 5 * 1024 * 1024  # 5MB
 FALLBACK_QUERY_LIMIT = 500  # Max documents to scan for manual aggregation fallback
 
 
-class CopilotDataFacade:
-    """Facade for loading data used by the Copilot AI assistant."""
+class CopilotRuntime:
+    """Runtime entrypoint that composes shared Copilot services.
+
+    This class intentionally stays thin: it wires together data access,
+    service modules, and tool registration, then exposes a stable surface
+    for API routes and workflow tasks.
+    """
 
     def __init__(self, data_access: CopilotDataAccess | None = None) -> None:
         self._data_access = data_access or CopilotDataAccess(FALLBACK_QUERY_LIMIT)

@@ -280,9 +280,9 @@ async def forum_ai_reply_stream(
             body.user_message,
         )
 
-        from qdash.common.copilot.data_facade import CopilotDataFacade
+        from qdash.common.copilot.runtime import CopilotRuntime
 
-        copilot_data_svc = CopilotDataFacade()
+        copilot_data_svc = CopilotRuntime()
         tool_executors = copilot_data_svc.build_tool_executors()
 
         clean_message = ForumService.strip_mention(body.user_message)

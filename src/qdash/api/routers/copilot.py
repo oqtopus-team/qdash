@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 
 from qdash.api.dependencies import (
     get_copilot_chat_session_service,
-    get_copilot_data_facade,
+    get_copilot_runtime,
 )
 from qdash.api.lib.ai_labels import STATUS_LABELS, TOOL_LABELS
 from qdash.api.lib.auth import get_current_active_user
@@ -40,7 +40,7 @@ from qdash.common.copilot.analysis_models import (
     AnalyzeRequest,
     ChatRequest,
 )
-from qdash.common.copilot.data_facade import CopilotDataFacade
+from qdash.common.copilot.runtime import CopilotRuntime
 from qdash.common.copilot.settings import CopilotConfig, ModelConfig, load_copilot_config
 from qdash.datamodel.task_knowledge import get_task_knowledge
 
@@ -122,7 +122,7 @@ def get_expected_image(task_name: str, index: int) -> Response:
 )
 async def analyze_task_result(
     request: AnalyzeRequest,
-    copilot_data_facade: Annotated[CopilotDataFacade, Depends(get_copilot_data_facade)],
+    copilot_runtime: Annotated[CopilotRuntime, Depends(get_copilot_runtime)],
 ) -> dict[str, Any]:
     """Analyze a calibration task result using LLM.
 
@@ -146,7 +146,7 @@ async def analyze_task_result(
     analysis_config = _config_with_request_model(config, request)
 
     # Build analysis context (resolves knowledge, qubit params, images, etc.)
-    ctx = copilot_data_facade.build_analysis_context(
+    ctx = copilot_runtime.build_analysis_context(
         task_name=request.task_name,
         chip_id=request.chip_id,
         qid=request.qid,
@@ -156,7 +156,7 @@ async def analyze_task_result(
     )
 
     # Build tool executors for function calling
-    tool_executors = copilot_data_facade.build_tool_executors()
+    tool_executors = copilot_runtime.build_tool_executors()
 
     # Run the analysis agent
     try:
@@ -171,7 +171,7 @@ async def analyze_task_result(
             conversation_history=request.conversation_history,
             tool_executors=tool_executors,
         )
-        result["images_sent"] = CopilotDataFacade.build_images_sent_metadata(
+        result["images_sent"] = CopilotRuntime.build_images_sent_metadata(
             ctx.image_base64,
             ctx.figure_paths,
             ctx.expected_images,
@@ -191,7 +191,7 @@ async def analyze_task_result(
 @router.post("/analyze/stream", include_in_schema=False)
 async def analyze_task_result_stream(
     request: AnalyzeRequest,
-    copilot_data_facade: Annotated[CopilotDataFacade, Depends(get_copilot_data_facade)],
+    copilot_runtime: Annotated[CopilotRuntime, Depends(get_copilot_runtime)],
 ) -> StreamingResponse:
     """SSE streaming version of analyze_task_result.
 
@@ -211,7 +211,7 @@ async def analyze_task_result_stream(
             {"step": "build_context", "message": "分析コンテキストを構築中..."},
         )
         await asyncio.sleep(0)
-        ctx = copilot_data_facade.build_analysis_context(
+        ctx = copilot_runtime.build_analysis_context(
             task_name=request.task_name,
             chip_id=request.chip_id,
             qid=request.qid,
@@ -237,7 +237,7 @@ async def analyze_task_result_stream(
 
         # Run analysis with tool progress streaming
         yield sse_event("status", {"step": "run_analysis", "message": "AIが分析中..."})
-        tool_executors = copilot_data_facade.build_tool_executors()
+        tool_executors = copilot_runtime.build_tool_executors()
         bridge = SSETaskBridge(tool_labels=TOOL_LABELS, status_labels=STATUS_LABELS)
 
         try:
@@ -275,7 +275,7 @@ async def analyze_task_result_stream(
             return
 
         # Inject images_sent metadata
-        result["images_sent"] = CopilotDataFacade.build_images_sent_metadata(
+        result["images_sent"] = CopilotRuntime.build_images_sent_metadata(
             ctx.image_base64,
             ctx.figure_paths,
             ctx.expected_images,
@@ -296,7 +296,7 @@ async def analyze_task_result_stream(
 @router.post("/chat/stream", include_in_schema=False)
 async def chat_stream(
     request: ChatRequest,
-    copilot_data_facade: Annotated[CopilotDataFacade, Depends(get_copilot_data_facade)],
+    copilot_runtime: Annotated[CopilotRuntime, Depends(get_copilot_runtime)],
 ) -> StreamingResponse:
     """SSE streaming generic chat endpoint.
 
@@ -319,7 +319,7 @@ async def chat_stream(
 
         # Resolve default chip_id if not provided
         if not chip_id:
-            chip_id = copilot_data_facade.load_default_chip_id()
+            chip_id = copilot_runtime.load_default_chip_id()
 
         # Optionally load qubit params
         qubit_params: dict[str, Any] = {}
@@ -329,11 +329,11 @@ async def chat_stream(
                 {"step": "load_qubit_params", "message": "キュービットパラメータを取得中..."},
             )
             await asyncio.sleep(0)
-            qubit_params = copilot_data_facade.load_qubit_params(chip_id, qid)
+            qubit_params = copilot_runtime.load_qubit_params(chip_id, qid)
 
         # Run chat with tool progress streaming
         yield sse_event("status", {"step": "run_chat", "message": "AIが応答中..."})
-        tool_executors = copilot_data_facade.build_tool_executors()
+        tool_executors = copilot_runtime.build_tool_executors()
         bridge = SSETaskBridge(tool_labels=TOOL_LABELS, status_labels=STATUS_LABELS)
 
         try:

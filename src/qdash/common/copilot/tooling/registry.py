@@ -174,11 +174,13 @@ class ToolExecutorRegistryBuilder:
             "list_available_parameters": lambda args: self._service.load_available_parameters(
                 args["chip_id"], args.get("qid")
             ),
-            "get_chip_parameter_timeseries": lambda args: self._service.load_chip_parameter_timeseries(
-                args["parameter_name"],
-                args["chip_id"],
-                args.get("last_n", 10),
-                args.get("qids"),
+            "get_chip_parameter_timeseries": lambda args: (
+                self._service.load_chip_parameter_timeseries(
+                    args["parameter_name"],
+                    args["chip_id"],
+                    args.get("last_n", 10),
+                    args.get("qids"),
+                )
             ),
         }
 
@@ -205,7 +207,9 @@ class ToolExecutorRegistryBuilder:
             "get_parameter_lineage": lambda args: self._service.load_parameter_lineage(
                 args["parameter_name"], args["qid"], args["chip_id"], args.get("last_n", 10)
             ),
-            "get_provenance_lineage_graph": lambda args: self._service.load_provenance_lineage_graph(
-                args["entity_id"], args["chip_id"], args.get("max_depth", 5)
+            "get_provenance_lineage_graph": lambda args: (
+                self._service.load_provenance_lineage_graph(
+                    args["entity_id"], args["chip_id"], args.get("max_depth", 5)
+                )
             ),
         }

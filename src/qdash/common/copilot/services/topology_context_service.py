@@ -158,9 +158,13 @@ class TopologyContextLoader:
 
             compact: dict[str, Any] = {}
             for key, value in data.items():
-                raw_value = value.get("value") if isinstance(value, dict) and "value" in value else value
+                raw_value = (
+                    value.get("value") if isinstance(value, dict) and "value" in value else value
+                )
                 compact[key] = (
-                    self._compact_number(raw_value) if isinstance(raw_value, (int, float)) else raw_value
+                    self._compact_number(raw_value)
+                    if isinstance(raw_value, (int, float))
+                    else raw_value
                 )
             comparison[qid] = compact
 
@@ -212,11 +216,7 @@ class TopologyContextLoader:
         except ValueError:
             return invalid_qubit_error
 
-        return [
-            f"{q1}-{q2}"
-            for q1, q2 in topology.couplings
-            if q1 == qid_int or q2 == qid_int
-        ]
+        return [f"{q1}-{q2}" for q1, q2 in topology.couplings if q1 == qid_int or q2 == qid_int]
 
     @staticmethod
     def _load_topology(topology_id: str) -> Any:

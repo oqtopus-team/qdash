@@ -37,7 +37,7 @@ from qdash.api.services.seed_import_service import SeedImportService
 from qdash.api.services.task_file_service import TaskFileService
 from qdash.api.services.task_result_service import TaskResultService
 from qdash.api.services.task_service import TaskService
-from qdash.common.copilot.data_facade import CopilotDataFacade
+from qdash.common.copilot.runtime import CopilotRuntime
 from qdash.repository import (
     MongoChipRepository,
     MongoExecutionCounterRepository,
@@ -296,9 +296,9 @@ def get_issue_knowledge_service() -> IssueKnowledgeService:
 
 
 @lru_cache(maxsize=1)
-def get_copilot_data_facade() -> CopilotDataFacade:
-    """Get the copilot data facade instance."""
-    return CopilotDataFacade()
+def get_copilot_runtime() -> CopilotRuntime:
+    """Get the copilot runtime instance."""
+    return CopilotRuntime()
 
 
 @lru_cache(maxsize=1)

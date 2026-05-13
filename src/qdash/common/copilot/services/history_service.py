@@ -88,7 +88,9 @@ class CopilotHistoryLoader:
         return [
             {
                 "output_parameters": self._compact_output_parameters(doc.output_parameters or {}),
-                "start_at": self._compact_timestamp(doc.start_at.isoformat() if doc.start_at else None),
+                "start_at": self._compact_timestamp(
+                    doc.start_at.isoformat() if doc.start_at else None
+                ),
                 "execution_id": doc.execution_id,
             }
             for doc in docs
@@ -161,7 +163,9 @@ class CopilotHistoryLoader:
                 "status": doc.status,
                 "chip_id": doc.chip_id,
                 "tags": doc.tags,
-                "start_at": self._compact_timestamp(doc.start_at.isoformat() if doc.start_at else None),
+                "start_at": self._compact_timestamp(
+                    doc.start_at.isoformat() if doc.start_at else None
+                ),
                 "end_at": self._compact_timestamp(doc.end_at.isoformat() if doc.end_at else None),
                 "elapsed_time": self._compact_number(doc.elapsed_time),
                 "message": doc.message,
@@ -198,7 +202,9 @@ class CopilotHistoryLoader:
                 "qid": doc.qid,
                 "status": doc.status,
                 "execution_id": doc.execution_id,
-                "start_at": self._compact_timestamp(doc.start_at.isoformat() if doc.start_at else None),
+                "start_at": self._compact_timestamp(
+                    doc.start_at.isoformat() if doc.start_at else None
+                ),
                 "end_at": self._compact_timestamp(doc.end_at.isoformat() if doc.end_at else None),
                 "elapsed_time": self._compact_number(doc.elapsed_time),
                 "output_parameters": self._compact_output_parameters(doc.output_parameters or {}),
