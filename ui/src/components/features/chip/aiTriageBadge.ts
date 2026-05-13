@@ -41,10 +41,7 @@ function hasAiTriageNeedsReview(content: string): boolean {
 
   const needsReview = needsReviewMatch[1].replace(/[`*]/g, "").trim().toLowerCase();
   return Boolean(
-    needsReview &&
-      needsReview !== "none" &&
-      needsReview !== "なし" &&
-      needsReview !== "없음",
+    needsReview && needsReview !== "none" && needsReview !== "なし" && needsReview !== "없음",
   );
 }
 
