@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from qdash.common.config_loader import ConfigLoader
 
@@ -28,8 +28,8 @@ class ScoringThreshold(BaseModel):
 class EvaluationMetrics(BaseModel):
     """Metrics to include in evaluation."""
 
-    qubit: list[str] = []
-    coupling: list[str] = []
+    qubit: list[str] = Field(default_factory=list)
+    coupling: list[str] = Field(default_factory=list)
 
 
 class ModelConfig(BaseModel):
@@ -69,7 +69,7 @@ class AnalysisConfig(BaseModel):
     max_expected_images: int | None = None
     ai_triage_max_expected_images: int | None = None
     ai_triage_max_output_tokens: int | None = None
-    ai_triage_tasks: list[str] = []
+    ai_triage_tasks: list[str] = Field(default_factory=list)
     ai_triage_message: str = (
         "Review this completed calibration result and attach a concise operational triage note."
     )
@@ -81,23 +81,23 @@ class CopilotConfig(BaseModel):
     enabled: bool = False
     response_language: str = "en"
     thinking_language: str = "en"
-    model: ModelConfig = ModelConfig()
+    model: ModelConfig = Field(default_factory=ModelConfig)
     # Optional override used only for task result analysis (image/chevron etc.).
     # When unset, `model` is used for both chat and analysis.
     analysis_model: ModelConfig | None = None
     # Optional list of selectable task result analysis models. The first entry
     # is used as the default when `analysis_model` is unset. `analysis_model`
     # remains for backward compatibility with existing copilot.yaml files.
-    analysis_models: list[ModelConfig] = []
+    analysis_models: list[ModelConfig] = Field(default_factory=list)
     # Optional list of selectable models for general chat. The first entry is
     # used as the default. When unset, the configured `model` above is used.
-    chat_models: list[ModelConfig] = []
-    evaluation_metrics: EvaluationMetrics = EvaluationMetrics()
-    scoring: dict[str, ScoringThreshold] = {}
+    chat_models: list[ModelConfig] = Field(default_factory=list)
+    evaluation_metrics: EvaluationMetrics = Field(default_factory=EvaluationMetrics)
+    scoring: dict[str, ScoringThreshold] = Field(default_factory=dict)
     system_prompt: str = ""
     initial_message: str = ""
-    suggestions: list[Suggestion] = []
-    analysis: AnalysisConfig = AnalysisConfig()
+    suggestions: list[Suggestion] = Field(default_factory=list)
+    analysis: AnalysisConfig = Field(default_factory=AnalysisConfig)
 
 
 @lru_cache(maxsize=1)

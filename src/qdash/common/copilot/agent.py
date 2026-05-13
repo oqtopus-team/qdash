@@ -12,7 +12,7 @@ import math
 import os
 import re
 from collections.abc import Awaitable, Callable
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from openai import AsyncOpenAI, BadRequestError
 
@@ -137,7 +137,9 @@ Then continue with the detailed explanation. In the detailed explanation:
 MAX_TOOL_ROUNDS = 10
 MAX_TOOL_RESULT_CHARS = 30000
 
-ToolExecutors = dict[str, Any]
+ToolExecutor = Callable[[dict[str, Any]], Any]
+ToolExecutors = dict[str, ToolExecutor]
+StoredToolKey = str | Callable[[dict[str, Any]], str]
 OnToolCallHook = Callable[[str, dict[str, Any]], Awaitable[None]] | None
 OnStatusHook = Callable[[str], Awaitable[None]] | None
 
@@ -1504,7 +1506,7 @@ def _parse_blocks_response(content: str, config: CopilotConfig | None = None) ->
     }
 
 
-_STORED_TOOLS: dict[str, Any] = {
+_STORED_TOOLS: dict[str, StoredToolKey] = {
     "get_chip_parameter_timeseries": lambda args: args["parameter_name"],
     "get_chip_summary": lambda _args: "chip_summary",
 }
@@ -1552,11 +1554,12 @@ def _wrap_tool_executors(
     for tool_name, key_fn in _STORED_TOOLS.items():
         original = wrapped.get(tool_name)
         if original:
+            original_executor = cast("ToolExecutor", original)
 
             def stored_wrapper(
                 args: dict[str, Any],
-                _orig: Any = original,
-                _kfn: Any = key_fn,
+                _orig: ToolExecutor = original_executor,
+                _kfn: StoredToolKey = key_fn,
             ) -> Any:
                 result = _orig(args)
                 if isinstance(result, dict) and "error" not in result:
@@ -1570,8 +1573,11 @@ def _wrap_tool_executors(
     # Heatmap: chart collection
     original_heatmap = wrapped.get("generate_chip_heatmap")
     if original_heatmap:
+        original_heatmap_executor = cast("ToolExecutor", original_heatmap)
 
-        def heatmap_wrapper(args: dict[str, Any], _orig: Any = original_heatmap) -> Any:
+        def heatmap_wrapper(
+            args: dict[str, Any], _orig: ToolExecutor = original_heatmap_executor
+        ) -> Any:
             result = _orig(args)
             if isinstance(result, dict) and "chart" in result:
                 collected_charts.append(result["chart"])
@@ -1629,9 +1635,10 @@ def _wrap_rate_limited_executors(tool_executors: ToolExecutors) -> ToolExecutors
     if original_ts is None:
         return wrapped
 
+    original_ts_executor = cast("ToolExecutor", original_ts)
     call_count = 0
 
-    def timeseries_limiter(args: dict[str, Any], _orig: Any = original_ts) -> Any:
+    def timeseries_limiter(args: dict[str, Any], _orig: ToolExecutor = original_ts_executor) -> Any:
         nonlocal call_count
         call_count += 1
         if call_count > _TIMESERIES_CALL_LIMIT:
