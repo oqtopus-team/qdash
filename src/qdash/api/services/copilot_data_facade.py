@@ -2,5 +2,5 @@
 
 from qdash.common.copilot import data_facade as _data_service
 
-CopilotDataService = _data_service.CopilotDataService
+CopilotDataFacade = _data_service.CopilotDataFacade
 FALLBACK_QUERY_LIMIT = _data_service.FALLBACK_QUERY_LIMIT

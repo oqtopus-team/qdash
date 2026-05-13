@@ -19,7 +19,7 @@ from qdash.api.services.config_service import ConfigService
 from qdash.api.services.cooldown_service import CooldownService
 from qdash.api.services.cooldown_wiring_event_service import CooldownWiringEventService
 from qdash.api.services.copilot_chat_session_service import CopilotChatSessionService
-from qdash.api.services.copilot_data_service import CopilotDataService
+from qdash.api.services.copilot_data_facade import CopilotDataFacade
 from qdash.api.services.cryostat_service import CryostatService
 from qdash.api.services.device_topology_service import DeviceTopologyService
 from qdash.api.services.execution_service import ExecutionService
@@ -296,9 +296,9 @@ def get_issue_knowledge_service() -> IssueKnowledgeService:
 
 
 @lru_cache(maxsize=1)
-def get_copilot_data_service() -> CopilotDataService:
-    """Get the copilot data service instance."""
-    return CopilotDataService()
+def get_copilot_data_facade() -> CopilotDataFacade:
+    """Get the copilot data facade instance."""
+    return CopilotDataFacade()
 
 
 @lru_cache(maxsize=1)

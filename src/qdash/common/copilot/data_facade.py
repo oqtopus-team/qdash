@@ -271,8 +271,8 @@ class _CopilotDataAccess:
         )
 
 
-class CopilotDataService:
-    """Service for loading data used by the Copilot AI assistant."""
+class CopilotDataFacade:
+    """Facade for loading data used by the Copilot AI assistant."""
 
     def __init__(self, data_access: _CopilotDataAccess | None = None) -> None:
         self._data_access = data_access or _CopilotDataAccess()
@@ -727,6 +727,6 @@ class CopilotDataService:
         """Build the tool executor mapping for LLM function calling.
 
         Note: ``execute_python_analysis`` is overridden by ``_wrap_tool_executors``
-        in ``copilot_agent.py`` to auto-inject the data_store.
+        in ``llm_agent.py`` to auto-inject the data_store.
         """
         return self._tool_executor_registry_builder.build_tool_executors()

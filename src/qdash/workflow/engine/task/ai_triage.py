@@ -347,11 +347,11 @@ def _run_ai_triage(
     config: CopilotConfig,
 ) -> str | None:
     """Run Copilot analysis and return markdown content."""
-    from qdash.common.copilot.data_facade import CopilotDataService
+    from qdash.common.copilot.data_facade import CopilotDataFacade
     from qdash.common.copilot.llm_agent import blocks_to_markdown, run_analysis
 
     config = _ai_triage_config(config)
-    service = CopilotDataService()
+    service = CopilotDataFacade()
     ctx = service.build_analysis_context(
         task_name=task.name,
         chip_id=execution_model.chip_id,

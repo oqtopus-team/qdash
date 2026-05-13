@@ -6,14 +6,14 @@ import math
 from unittest.mock import MagicMock, patch
 
 from qdash.api.lib.copilot_config import AnalysisConfig, CopilotConfig, ModelConfig
-from qdash.api.services.copilot_data_service import FALLBACK_QUERY_LIMIT, CopilotDataService
+from qdash.api.services.copilot_data_facade import FALLBACK_QUERY_LIMIT, CopilotDataFacade
 
 
 class TestLoadChipHeatmapValidation:
     """Tests for load_chip_heatmap input validation and error handling."""
 
     def setup_method(self):
-        self.service = CopilotDataService()
+        self.service = CopilotDataFacade()
 
     @patch("qdash.api.lib.metrics_config.load_metrics_config")
     @patch("qdash.api.lib.metrics_config.get_qubit_metric_metadata", return_value=None)
@@ -115,7 +115,7 @@ class TestLoadChipHeatmapSuccess:
     """Tests for load_chip_heatmap successful execution paths."""
 
     def setup_method(self):
-        self.service = CopilotDataService()
+        self.service = CopilotDataFacade()
 
     @patch("qdash.repository.task_result_history.MongoTaskResultHistoryRepository")
     @patch("qdash.dbmodel.chip.ChipDocument")
@@ -158,7 +158,7 @@ class TestLoadAvailableParameters:
     """Tests for load_available_parameters method."""
 
     def setup_method(self):
-        self.service = CopilotDataService()
+        self.service = CopilotDataFacade()
 
     @patch("qdash.dbmodel.task_result_history.TaskResultHistoryDocument")
     def test_empty_results_returns_error(self, mock_doc):
@@ -226,7 +226,7 @@ class TestLoadChipParameterTimeseries:
     def test_returns_error_when_no_data_found(self):
         data_access = MagicMock()
         data_access.load_chip_parameter_timeseries_docs.return_value = []
-        service = CopilotDataService(data_access=data_access)
+        service = CopilotDataFacade(data_access=data_access)
 
         result = service.load_chip_parameter_timeseries("t1", "chip-1")
 
@@ -240,7 +240,7 @@ class TestLoadChipParameterTimeseries:
             self._doc("0", 8.0, "2025-01-01T09:00:00"),
             self._doc("1", 12.1, "2025-01-01T11:00:00"),
         ]
-        service = CopilotDataService(data_access=data_access)
+        service = CopilotDataFacade(data_access=data_access)
 
         result = service.load_chip_parameter_timeseries("t1", "chip-1", last_n=2)
 
@@ -273,7 +273,7 @@ class TestLoadChipParameterTimeseries:
         doc.start_at.isoformat.return_value = "2025-01-01T10:00:00"
         doc.output_parameters = {"t1": {"value": "bad", "unit": "us"}}
         data_access.load_chip_parameter_timeseries_docs.return_value = [doc]
-        service = CopilotDataService(data_access=data_access)
+        service = CopilotDataFacade(data_access=data_access)
 
         result = service.load_chip_parameter_timeseries("t1", "chip-1")
 
@@ -299,7 +299,7 @@ class TestLoadChipSummary:
     def test_returns_error_when_chip_has_no_qubits(self):
         data_access = MagicMock()
         data_access.load_qubits_for_chip.return_value = []
-        service = CopilotDataService(data_access=data_access)
+        service = CopilotDataFacade(data_access=data_access)
 
         result = service.load_chip_summary("chip-1")
 
@@ -311,7 +311,7 @@ class TestLoadChipSummary:
             self._doc("1", {"t1": {"value": 12.0}, "label": "good"}),
             self._doc("0", {"t1": {"value": 10.0}, "label": "best", "t2": {"value": 7.0}}),
         ]
-        service = CopilotDataService(data_access=data_access)
+        service = CopilotDataFacade(data_access=data_access)
 
         result = service.load_chip_summary("chip-1")
 
@@ -343,7 +343,7 @@ class TestLoadChipSummary:
         data_access.load_qubits_for_chip.return_value = [
             self._doc("0", {"t1": {"value": 10.0}, "t2": {"value": 7.0}}),
         ]
-        service = CopilotDataService(data_access=data_access)
+        service = CopilotDataFacade(data_access=data_access)
 
         result = service.load_chip_summary("chip-1", param_names=["t2"])
 
@@ -371,7 +371,7 @@ class TestBuildAnalysisContext:
         )
 
     def test_builds_context_with_related_knowledge(self):
-        service = CopilotDataService(data_access=MagicMock())
+        service = CopilotDataFacade(data_access=MagicMock())
         knowledge = MagicMock()
         knowledge.to_prompt.return_value = "Prompt body"
         history_context = MagicMock(type="history", last_n=3)
@@ -418,7 +418,7 @@ class TestBuildAnalysisContext:
         assert result.expected_images == []
 
     def test_multimodal_context_loads_missing_figure_and_expected_images(self):
-        service = CopilotDataService(data_access=MagicMock())
+        service = CopilotDataFacade(data_access=MagicMock())
         knowledge = MagicMock()
         knowledge.to_prompt.return_value = "Prompt body"
         knowledge.related_context = []

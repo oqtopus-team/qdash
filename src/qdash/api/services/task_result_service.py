@@ -671,9 +671,9 @@ class TaskResultService:
         config: Any,
     ) -> Any:
         """Build the compact context passed to AI triage analysis."""
-        from qdash.api.services.copilot_data_service import CopilotDataService
+        from qdash.api.services.copilot_data_facade import CopilotDataFacade
 
-        context_bundle = CopilotDataService().build_analysis_context(
+        context_bundle = CopilotDataFacade().build_analysis_context(
             task_name=task_name,
             chip_id=chip_id,
             qid=qid,
