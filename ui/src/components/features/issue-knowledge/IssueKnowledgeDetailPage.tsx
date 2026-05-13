@@ -399,6 +399,7 @@ export function IssueKnowledgeDetailPage({
                       rel="noopener noreferrer"
                       className="block border border-base-300 rounded overflow-hidden hover:border-primary transition-colors"
                     >
+                      {/* eslint-disable-next-line @next/next/no-img-element -- task-result figure is served dynamically from the API */}
                       <img
                         src={`/api/executions/figure?path=${encodeURIComponent(path)}`}
                         alt={`Figure ${i + 1}`}
@@ -425,6 +426,7 @@ export function IssueKnowledgeDetailPage({
                         rel="noopener noreferrer"
                         className="block border border-base-300 rounded overflow-hidden hover:border-primary transition-colors"
                       >
+                        {/* eslint-disable-next-line @next/next/no-img-element -- thread images may be remote or API-backed */}
                         <img
                           src={url}
                           alt={`Thread image ${i + 1}`}

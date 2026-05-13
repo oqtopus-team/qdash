@@ -42,6 +42,7 @@ function ExpandableImage({
 
   return (
     <div className="relative group inline-flex h-full min-w-0 min-h-0">
+      {/* eslint-disable-next-line @next/next/no-img-element -- dynamic API image with native sizing */}
       <img
         src={src}
         alt={alt}

@@ -37,7 +37,7 @@ function MermaidDiagram({ code }: { code: string }) {
         if (!cancelled && containerRef.current) {
           containerRef.current.innerHTML = svg;
         }
-      } catch (e) {
+      } catch {
         // Fallback: show as code block
         if (!cancelled && containerRef.current) {
           containerRef.current.textContent = code;
@@ -213,13 +213,16 @@ const markdownComponents: Record<string, React.ComponentType<any>> = {
   },
   img({ src, alt, ...props }: React.ComponentPropsWithoutRef<"img">) {
     return (
-      <img
-        src={src}
-        alt={alt ?? ""}
-        className="max-w-full h-auto rounded border border-base-300 my-2"
-        loading="lazy"
-        {...props}
-      />
+      <>
+        {/* eslint-disable-next-line @next/next/no-img-element -- markdown can include arbitrary remote/data URLs */}
+        <img
+          src={src}
+          alt={alt ?? ""}
+          className="max-w-full h-auto rounded border border-base-300 my-2"
+          loading="lazy"
+          {...props}
+        />
+      </>
     );
   },
   // Intercept paragraph nodes to highlight @mentions in text
