@@ -255,7 +255,7 @@ async def forum_ai_reply_stream(
     """SSE endpoint that generates an AI reply in a forum thread."""
 
     async def event_generator() -> AsyncGenerator[str, None]:
-        from qdash.api.lib.copilot_config import load_copilot_config
+        from qdash.common.copilot.settings import load_copilot_config
 
         config = load_copilot_config()
         if not config.enabled:
@@ -297,7 +297,7 @@ async def forum_ai_reply_stream(
         )
 
         try:
-            from qdash.api.lib.copilot_agent import run_chat
+            from qdash.common.copilot.llm_agent import run_chat
 
             coro = partial(
                 run_chat,

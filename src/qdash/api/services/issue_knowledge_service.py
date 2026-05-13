@@ -343,7 +343,7 @@ class IssueKnowledgeService:
         thread_text: str,
     ) -> dict[str, Any]:
         """Call LLM to extract structured knowledge from issue thread."""
-        from qdash.api.lib.copilot_config import load_copilot_config
+        from qdash.common.copilot.settings import load_copilot_config
 
         config = load_copilot_config()
         if not config.enabled:
@@ -359,7 +359,7 @@ class IssueKnowledgeService:
         )
 
         try:
-            from qdash.api.lib.copilot_agent import _build_client
+            from qdash.common.copilot.llm_agent import _build_client
 
             client = _build_client(config)
             response = await client.chat.completions.create(

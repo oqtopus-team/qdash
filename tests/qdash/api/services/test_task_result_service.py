@@ -6,8 +6,8 @@ from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import patch
 
-from qdash.api.lib.copilot_config import AnalysisConfig, CopilotConfig, ModelConfig
 from qdash.api.services.task_result_service import TaskResultService
+from qdash.common.copilot.settings import AnalysisConfig, CopilotConfig, ModelConfig
 from qdash.common.datetime_utils import end_of_day, parse_date, start_of_day
 from qdash.datamodel.note import AiTriageReviewModel
 from qdash.datamodel.system_info import SystemInfoModel

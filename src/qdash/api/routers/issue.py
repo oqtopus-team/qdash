@@ -284,7 +284,7 @@ async def issue_ai_reply_stream(
     """
 
     async def event_generator() -> AsyncGenerator[str, None]:
-        from qdash.api.lib.copilot_config import load_copilot_config
+        from qdash.common.copilot.settings import load_copilot_config
 
         config = load_copilot_config()
         if not config.enabled:
@@ -346,7 +346,7 @@ async def issue_ai_reply_stream(
         )
 
         try:
-            from qdash.api.lib.copilot_agent import run_chat
+            from qdash.common.copilot.llm_agent import run_chat
 
             coro = partial(
                 run_chat,

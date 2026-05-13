@@ -7,14 +7,14 @@ from typing import TYPE_CHECKING, Any
 from unittest.mock import MagicMock, patch
 
 from qdash.api.lib.ai_labels import TOOL_LABELS
-from qdash.api.lib.copilot_agent import (
+from qdash.api.services.copilot_data_facade import CopilotDataFacade
+from qdash.common.copilot.analysis_models import AnalysisResponse
+from qdash.common.copilot.llm_agent import (
     AGENT_TOOLS,
     _build_llm_summary,
     _legacy_to_blocks,
     _wrap_tool_executors,
 )
-from qdash.api.lib.copilot_analysis import AnalysisResponse
-from qdash.api.services.copilot_data_facade import CopilotDataFacade
 
 if TYPE_CHECKING:
     from qdash.api.schemas.provenance import LineageResponse

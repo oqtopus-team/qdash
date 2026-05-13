@@ -24,12 +24,6 @@ from qdash.api.dependencies import (
 )
 from qdash.api.lib.ai_labels import STATUS_LABELS, TOOL_LABELS
 from qdash.api.lib.auth import get_current_active_user
-from qdash.api.lib.copilot_analysis import (
-    AnalysisResponse,
-    AnalyzeRequest,
-    ChatRequest,
-)
-from qdash.api.lib.copilot_config import CopilotConfig, ModelConfig, load_copilot_config
 from qdash.api.lib.sse import SSETaskBridge, sse_event
 from qdash.api.schemas.auth import User
 from qdash.api.schemas.copilot_chat_session import (
@@ -42,6 +36,12 @@ from qdash.api.services.copilot_chat_session_service import (
     CopilotChatSessionService,
 )
 from qdash.api.services.copilot_data_facade import CopilotDataFacade
+from qdash.common.copilot.analysis_models import (
+    AnalysisResponse,
+    AnalyzeRequest,
+    ChatRequest,
+)
+from qdash.common.copilot.settings import CopilotConfig, ModelConfig, load_copilot_config
 from qdash.datamodel.task_knowledge import get_task_knowledge
 
 router = APIRouter()
@@ -160,7 +160,7 @@ async def analyze_task_result(
 
     # Run the analysis agent
     try:
-        from qdash.api.lib.copilot_agent import run_analysis
+        from qdash.common.copilot.llm_agent import run_analysis
 
         result = await run_analysis(
             context=ctx.context,
@@ -241,7 +241,7 @@ async def analyze_task_result_stream(
         bridge = SSETaskBridge(tool_labels=TOOL_LABELS, status_labels=STATUS_LABELS)
 
         try:
-            from qdash.api.lib.copilot_agent import run_analysis
+            from qdash.common.copilot.llm_agent import run_analysis
 
             coro = partial(
                 run_analysis,
@@ -337,7 +337,7 @@ async def chat_stream(
         bridge = SSETaskBridge(tool_labels=TOOL_LABELS, status_labels=STATUS_LABELS)
 
         try:
-            from qdash.api.lib.copilot_agent import run_chat
+            from qdash.common.copilot.llm_agent import run_chat
 
             coro = partial(
                 run_chat,
