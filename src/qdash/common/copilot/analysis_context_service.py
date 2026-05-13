@@ -20,7 +20,9 @@ class AnalysisContextBuilder:
         load_qubit_params: Callable[[str, str], dict[str, Any]],
         load_task_result: Callable[[str], dict[str, Any] | None],
         load_task_history: Callable[[str, str, str, int], list[dict[str, Any]]],
-        load_neighbor_qubit_params: Callable[[str, str, list[str] | None], dict[str, dict[str, Any]]],
+        load_neighbor_qubit_params: Callable[
+            [str, str, list[str] | None], dict[str, dict[str, Any]]
+        ],
         load_coupling_params: Callable[[str, str, list[str] | None], dict[str, dict[str, Any]]],
         load_figure_as_base64: Callable[[list[str]], str | None],
         collect_expected_images: Callable[[Any, int | None], list[tuple[str, str]]],
@@ -133,9 +135,7 @@ class AnalysisContextBuilder:
                     chip_id, qid, related_context.params
                 )
             elif related_context.type == "coupling":
-                coupling_params = self._load_coupling_params(
-                    chip_id, qid, related_context.params
-                )
+                coupling_params = self._load_coupling_params(chip_id, qid, related_context.params)
 
         return history_results, neighbor_qubit_params, coupling_params
 

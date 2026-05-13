@@ -151,8 +151,7 @@ class ChipHeatmapLoader:
         available = sorted(config.qubit_metrics.keys())
         return {
             "error": (
-                f"Unknown qubit metric '{metric_name}'. "
-                f"Available metrics: {', '.join(available)}"
+                f"Unknown qubit metric '{metric_name}'. Available metrics: {', '.join(available)}"
             )
         }
 
