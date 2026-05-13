@@ -6,13 +6,19 @@ import {
   type ChatSession,
 } from "@/contexts/AnalysisChatContext";
 import type { ChatMessage } from "@/hooks/useAnalysisChat";
+import type { ModelOverride } from "@/lib/copilotModels";
 import { buildHeaders, consumeSSEEvents } from "@/lib/sse-utils";
 
 // Re-export for backward compat
 export type CopilotMessage = ChatMessage;
 export type CopilotSession = ChatSession;
 
-export function useCopilotChat() {
+interface UseCopilotChatOptions {
+  modelOverride?: ModelOverride | null;
+}
+
+export function useCopilotChat(options?: UseCopilotChatOptions) {
+  const modelOverride = options?.modelOverride ?? null;
   const {
     sessions,
     activeSessionId,
@@ -91,6 +97,7 @@ export function useCopilotChat() {
               role: m.role,
               content: m.content,
             })),
+            model_override: modelOverride,
           }),
           signal: controller.signal,
         });
@@ -175,6 +182,7 @@ export function useCopilotChat() {
       createNewSession,
       updateSessionMessages,
       autoTitleSession,
+      modelOverride,
     ],
   );
 

@@ -234,6 +234,7 @@ tasks:
       - bun run test:run
       - bunx eslint . -c eslint.config.mjs
       - bunx prettier . --check
+      - bun run knip
 
   ci-ui-build:
     desc: Build UI for production

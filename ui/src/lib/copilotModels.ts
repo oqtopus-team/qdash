@@ -15,6 +15,7 @@ interface ModelOption {
 }
 
 const ANALYSIS_MODEL_STORAGE_KEY = "qdash_analysis_model_key";
+const CHAT_MODEL_STORAGE_KEY = "qdash_chat_model_key";
 
 function readModel(value: unknown): ModelOverride | null {
   if (!value || typeof value !== "object") return null;
@@ -117,6 +118,81 @@ export function setStoredAnalysisModelKey(key: string) {
 }
 
 export function resolveAnalysisModelOption(
+  options: ModelOption[],
+  key: string,
+): ModelOption {
+  return (
+    options.find((option) => option.key === key) ??
+    options.find((option) => option.isConfiguredDefault) ??
+    options[0]
+  );
+}
+
+export function buildChatModelOptions(
+  config: Record<string, unknown> | null,
+): ModelOption[] {
+  if (!config) {
+    return [
+      {
+        key: "default",
+        label: "Configured model",
+        model: null,
+        isConfiguredDefault: true,
+      },
+    ];
+  }
+
+  const chatModels = Array.isArray(config.chat_models)
+    ? config.chat_models
+    : [];
+  const configuredModel = readModel(chatModels[0]) ?? readModel(config.model);
+  const options: ModelOption[] = [
+    {
+      key: "default",
+      label: configuredModel
+        ? `Configured: ${configuredModel.name}`
+        : "Configured model",
+      model: null,
+      isConfiguredDefault: true,
+    },
+  ];
+  const seen = new Set<string>();
+  if (configuredModel) {
+    seen.add(modelIdentity(configuredModel));
+  }
+
+  const addOption = (key: string, label: string, value: unknown) => {
+    const model = readModel(value);
+    if (!model) return;
+    const identity = modelIdentity(model);
+    if (seen.has(identity)) return;
+    seen.add(identity);
+    options.push({
+      key,
+      label: `${label}: ${model.name}`,
+      model,
+    });
+  };
+
+  chatModels.forEach((model, index) => {
+    addOption(`chat-${index}`, `Chat ${index + 1}`, model);
+  });
+  addOption("general", "General", config.model);
+
+  return options;
+}
+
+export function getStoredChatModelKey(): string {
+  if (typeof window === "undefined") return "default";
+  return localStorage.getItem(CHAT_MODEL_STORAGE_KEY) || "default";
+}
+
+export function setStoredChatModelKey(key: string) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(CHAT_MODEL_STORAGE_KEY, key);
+}
+
+export function resolveChatModelOption(
   options: ModelOption[],
   key: string,
 ): ModelOption {

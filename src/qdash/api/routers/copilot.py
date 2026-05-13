@@ -25,7 +25,7 @@ from qdash.api.lib.copilot_analysis import (
     AnalyzeRequest,
     ChatRequest,
 )
-from qdash.api.lib.copilot_config import CopilotConfig, load_copilot_config
+from qdash.api.lib.copilot_config import CopilotConfig, ModelConfig, load_copilot_config
 from qdash.api.lib.sse import SSETaskBridge, sse_event
 from qdash.api.services.copilot_data_service import CopilotDataService
 from qdash.datamodel.task_knowledge import get_task_knowledge
@@ -40,6 +40,27 @@ def _config_with_request_model(config: CopilotConfig, request: AnalyzeRequest) -
     if request.analysis_model_override is None:
         return config
     return config.model_copy(update={"analysis_model": request.analysis_model_override})
+
+
+def _resolve_chat_model(config: CopilotConfig, override: ModelConfig | None) -> ModelConfig | None:
+    """Pick the chat model to use for a request.
+
+    Priority: per-request override > first entry of `chat_models` > None (caller
+    uses ``config.model`` as-is).
+    """
+    if override is not None:
+        return override
+    if config.chat_models:
+        return config.chat_models[0]
+    return None
+
+
+def _config_with_chat_model(config: CopilotConfig, request: ChatRequest) -> CopilotConfig:
+    """Apply the resolved chat model to ``config.model`` for this request."""
+    resolved = _resolve_chat_model(config, request.chat_model_override)
+    if resolved is None:
+        return config
+    return config.model_copy(update={"model": resolved})
 
 
 @router.get(
@@ -273,6 +294,7 @@ async def chat_stream(
         if not config.enabled:
             yield sse_event("error", {"step": "init", "detail": "Copilot is not enabled"})
             return
+        chat_config = _config_with_chat_model(config, request)
 
         # Load config and resolve default chip_id
         yield sse_event("status", {"step": "load_config", "message": "設定を読み込み中..."})
@@ -306,7 +328,7 @@ async def chat_stream(
             coro = partial(
                 run_chat,
                 user_message=request.message,
-                config=config,
+                config=chat_config,
                 chip_id=chip_id,
                 qid=qid,
                 qubit_params=qubit_params if qubit_params else None,
