@@ -26,20 +26,20 @@ from qdash.common.paths import (
 )
 
 __all__ = [
+    "CALIBTASKS_DIR",
     # Paths
     "CALIB_DATA_BASE",
-    "CALIBTASKS_DIR",
     "CONFIG_DIR",
     "QUBEX_CONFIG_BASE",
     "SERVICE_DIR",
     "TEMPLATES_DIR",
     "USER_FLOWS_DIR",
     "WORKFLOW_DIR",
-    # Config loader
-    "ConfigLoader",
     # Backend config
     "BackendConfig",
     "BackendDefinition",
+    # Config loader
+    "ConfigLoader",
     "clear_backend_cache",
     "get_available_backends",
     "get_default_backend",

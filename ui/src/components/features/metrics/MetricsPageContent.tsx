@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { SlidersHorizontal } from "lucide-react";
 import Select, { type GroupBase, type SingleValue } from "react-select";

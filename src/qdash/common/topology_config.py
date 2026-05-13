@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING
 
 import yaml
 from pydantic import BaseModel, Field
+
 from qdash.common.config_loader import ConfigLoader
 
 if TYPE_CHECKING:

@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING, NamedTuple, cast
 import numpy as np
 import numpy.typing as npt
 import scipy.ndimage
+
 from qdash.analysis.spectroscopy.representative_y import (
     FirstPointMeetingWidthFromTipStrategy,
     HorizontalRunLengthEstimator,
@@ -162,7 +163,7 @@ class QubitResponse:
             if idx_y > repr_y_min:
                 break
 
-            label = cast(int, self.zs_labeled[idx_y, idx_x])
+            label = cast("int", self.zs_labeled[idx_y, idx_x])
             if label != target_label:
                 continue
 
@@ -204,8 +205,8 @@ class QubitResponse:
         idx_max = np.argmax(np.abs(self.zs[idx_y, candidates]))
         idx_x = candidates[idx_max]
 
-        frequency = cast(float, self.xs[idx_x])
-        label = cast(int, self.zs_labeled[idx_y, idx_x])
+        frequency = cast("float", self.xs[idx_x])
+        label = cast("int", self.zs_labeled[idx_y, idx_x])
 
         repr_y = self.compute_representative_y(label)
         repr_db = (
@@ -248,7 +249,7 @@ class QubitResponse:
 
         idx_y = self.zs.shape[0] - peak.height
         idx_x = np.argmax(abs(self.zs[idx_y][peak.x_start : peak.x_end])) + peak.x_start
-        frequency = cast(float, self.xs[idx_x])
+        frequency = cast("float", self.xs[idx_x])
 
         return F12Result(
             idx_x=int(idx_x),
@@ -315,7 +316,7 @@ class QubitResponse:
             raise ValueError(f"zs must be 2D, got {self.zs.ndim}D")
         if self.zs.shape != (len(self.ys), len(self.xs)):
             raise ValueError(
-                f"shape mismatch: zs{self.zs.shape} vs (len(ys),len(xs))={(len(self.ys),len(self.xs))}"
+                f"shape mismatch: zs{self.zs.shape} vs (len(ys),len(xs))={(len(self.ys), len(self.xs))}"
             )
         if not np.all(np.isfinite(self.zs)):
             raise ValueError("zs contains NaN/Inf")
@@ -372,7 +373,7 @@ class QubitResponse:
     def remove_noise(zs: npt.NDArray[np.int32]) -> npt.NDArray[np.int32]:
         """Remove noise by keeping only regions connected to the bottom."""
         result = scipy.ndimage.label(zs)
-        labeled, _ = cast(tuple[npt.NDArray[np.int32], int], result)
+        labeled, _ = cast("tuple[npt.NDArray[np.int32], int]", result)
         objects = scipy.ndimage.find_objects(labeled)
         valid_labels = [
             i + 1 for i, obj in enumerate(objects) if obj is not None and obj[0].stop == zs.shape[0]

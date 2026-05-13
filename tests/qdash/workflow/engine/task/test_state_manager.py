@@ -1,6 +1,7 @@
 """Tests for TaskStateManager."""
 
 import pytest
+
 from qdash.datamodel.task import ParameterModel, TaskStatusModel
 from qdash.workflow.engine.task.state_manager import TaskStateManager
 

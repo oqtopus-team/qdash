@@ -1,5 +1,8 @@
 from typing import ClassVar
 
+from qubex.experiment.experiment_constants import CALIBRATION_SHOTS, HPI_DURATION
+from qubex.measurement.measurement_defaults import DEFAULT_INTERVAL, DEFAULT_READOUT_DURATION
+
 from qdash.datamodel.task import ParameterModel, RunParameterModel
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
@@ -7,8 +10,6 @@ from qdash.workflow.calibtasks.base import (
 )
 from qdash.workflow.calibtasks.qubex.base import QubexTask
 from qdash.workflow.engine.backend.qubex import QubexBackend
-from qubex.experiment.experiment_constants import CALIBRATION_SHOTS, HPI_DURATION
-from qubex.measurement.measurement_defaults import DEFAULT_INTERVAL, DEFAULT_READOUT_DURATION
 
 
 class CreateHPIPulse(QubexTask):

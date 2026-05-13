@@ -6,9 +6,10 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
-from qdash.workflow.engine.params_updater import _QubexParamsUpdater
 from ruamel.yaml import YAML
 from ruamel.yaml.comments import CommentedMap
+
+from qdash.workflow.engine.params_updater import _QubexParamsUpdater
 
 
 class TestParamsUpdaterNoneHandling:

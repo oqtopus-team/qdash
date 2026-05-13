@@ -27,6 +27,7 @@ from qdash.workflow.calibtasks.qubex.base import QubexTask
 
 if TYPE_CHECKING:
     import plotly.graph_objs as go
+
     from qdash.workflow.engine.backend.qubex import QubexBackend
 
 logger = logging.getLogger(__name__)

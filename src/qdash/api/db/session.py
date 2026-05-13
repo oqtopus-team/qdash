@@ -9,6 +9,7 @@ from bunnet import init_bunnet
 from fastapi import FastAPI
 from pymongo import MongoClient
 from pymongo.database import Database
+
 from qdash.dbmodel.document_models import document_models
 
 # Global client and database references
@@ -121,6 +122,7 @@ def create_initial_admin() -> None:
     import secrets
 
     from passlib.context import CryptContext
+
     from qdash.api.lib.project_service import ProjectService
     from qdash.datamodel.system_info import SystemInfoModel
     from qdash.datamodel.user import SystemRole, generate_user_id

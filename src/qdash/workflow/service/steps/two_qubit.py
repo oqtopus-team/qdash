@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 from prefect import get_run_logger
+
 from qdash.workflow.engine.backend.qubex_paths import get_qubex_paths
 from qdash.workflow.service.results import SkewCheckResult, TwoQubitResult
 from qdash.workflow.service.steps.base import CalibrationStep, TransformStep
@@ -109,8 +110,7 @@ class CustomTwoQubit(CalibrationStep):
         coupling_groups = [[f"{c}-{t}" for c, t in group] for group in parallel_groups]
         total_pairs = sum(len(g) for g in coupling_groups)
         logger.info(
-            f"[{self.name}] Executing {total_pairs} coupling pairs in "
-            f"{len(coupling_groups)} groups"
+            f"[{self.name}] Executing {total_pairs} coupling pairs in {len(coupling_groups)} groups"
         )
 
         # Execute
@@ -431,8 +431,7 @@ class TwoQubitCalibration(CalibrationStep):
         coupling_groups = [[f"{c}-{t}" for c, t in group] for group in parallel_groups]
         total_pairs = sum(len(g) for g in coupling_groups)
         logger.info(
-            f"[{self.name}] Executing {total_pairs} coupling pairs in "
-            f"{len(coupling_groups)} groups"
+            f"[{self.name}] Executing {total_pairs} coupling pairs in {len(coupling_groups)} groups"
         )
 
         # Execute

@@ -6,6 +6,7 @@ from typing import Any
 from bunnet import Document, SortDirection
 from pydantic import ConfigDict, Field
 from pymongo import ASCENDING, DESCENDING, IndexModel
+
 from qdash.common.datetime_utils import now
 
 

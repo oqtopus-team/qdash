@@ -7,16 +7,17 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends
 from fastapi.responses import FileResponse
-from qdash.api.dependencies import get_file_service  # noqa: TCH002
-from qdash.api.lib.auth import get_current_active_user  # noqa: TCH002
-from qdash.api.schemas.auth import User  # noqa: TCH002
+
+from qdash.api.dependencies import get_file_service
+from qdash.api.lib.auth import get_current_active_user
+from qdash.api.schemas.auth import User
 from qdash.api.schemas.file import (
     FileTreeNode,
     GitPushRequest,
     SaveFileRequest,
     ValidateFileRequest,
 )
-from qdash.api.services.file_service import FileService  # noqa: TCH002
+from qdash.api.services.file_service import FileService
 
 logger = logging.getLogger(__name__)
 

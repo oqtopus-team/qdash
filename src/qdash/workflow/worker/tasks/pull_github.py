@@ -7,6 +7,7 @@ from urllib.parse import urlparse, urlunparse
 from git import Repo
 from git.exc import GitCommandError
 from prefect import get_run_logger, task
+
 from qdash.common.paths import QUBEX_CONFIG_BASE
 
 

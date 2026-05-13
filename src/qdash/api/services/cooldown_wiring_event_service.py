@@ -15,11 +15,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from starlette.exceptions import HTTPException
+
 from qdash.api.schemas.cooldown_wiring_event import (
     CooldownWiringEventResponse,
     ListCooldownWiringEventsResponse,
 )
-from starlette.exceptions import HTTPException
 
 if TYPE_CHECKING:
     from qdash.dbmodel.cooldown import CooldownDocument

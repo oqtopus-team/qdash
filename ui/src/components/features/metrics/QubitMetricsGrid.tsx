@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState, useRef, useCallback, memo } from "react";
+import { useMemo, useState, useRef, useCallback, memo } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import {
@@ -780,12 +780,12 @@ export function QubitMetricsGrid({
             initialScale={1}
             minScale={0.3}
             maxScale={4}
-            wheel={{ step: 0.08, smoothStep: 0.004 }}
+            wheel={{ step: 0.08 }}
             pinch={{ step: 5 }}
             doubleClick={{ mode: "zoomIn", step: 0.7 }}
             panning={{ velocityDisabled: false }}
             smooth={true}
-            onTransformed={handleTransform}
+            onTransform={handleTransform}
           >
             <ZoomControls />
             <TransformComponent

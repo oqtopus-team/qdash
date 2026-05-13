@@ -3,6 +3,7 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
+
 from qdash.api.dependencies import get_notification_service
 from qdash.api.lib.auth import get_current_active_user
 from qdash.api.lib.project import get_project_id_from_header

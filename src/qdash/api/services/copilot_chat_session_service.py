@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from fastapi import HTTPException, status
 from pymongo.errors import DuplicateKeyError
+
 from qdash.api.schemas.copilot_chat_session import (
     CopilotChatMessageSchema,
     CopilotChatSessionResponse,

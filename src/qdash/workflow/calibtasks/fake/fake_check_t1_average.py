@@ -6,6 +6,7 @@ import numpy as np
 import numpy.typing as npt
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+
 from qdash.datamodel.task import ParameterModel, RunParameterModel
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
@@ -297,8 +298,7 @@ class FakeCheckT1Average(FakeTask):
         t1_cv = (t1_std / t1_mean * 100) if t1_mean > 0 else 0.0
         fig.update_layout(
             title_text=(
-                f"T1 Fluctuation - {qid} "
-                f"(Mean: {t1_mean:.1f}, Std: {t1_std:.1f}, CV: {t1_cv:.1f}%)"
+                f"T1 Fluctuation - {qid} (Mean: {t1_mean:.1f}, Std: {t1_std:.1f}, CV: {t1_cv:.1f}%)"
             ),
             showlegend=False,
             width=600,

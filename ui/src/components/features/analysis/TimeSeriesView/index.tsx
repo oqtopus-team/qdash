@@ -515,7 +515,7 @@ export function TimeSeriesView() {
         font: { size: 24 },
       },
       xaxis: {
-        title: "Time (JST)",
+        title: { text: "Time (JST)" },
         type: "date",
         tickformat: "%Y-%m-%d %H:%M",
         gridcolor: "#eee",
@@ -523,12 +523,14 @@ export function TimeSeriesView() {
         domain: showSecondaryAxis ? [0, 0.92] : [0, 1],
       },
       yaxis: {
-        title: `${currentMetricConfig?.title || metadata.description} [${currentMetricConfig?.unit || metadata.unit}]`,
         type: "linear",
         gridcolor: "#eee",
         zeroline: false,
         exponentformat: "e" as const,
-        titlefont: { color: "#1f77b4" },
+        title: {
+          text: `${currentMetricConfig?.title || metadata.description} [${currentMetricConfig?.unit || metadata.unit}]`,
+          font: { color: "#1f77b4" },
+        },
         tickfont: { color: "#1f77b4" },
       },
       showlegend: true,
@@ -549,14 +551,16 @@ export function TimeSeriesView() {
     // Add secondary y-axis if enabled
     if (showSecondaryAxis) {
       baseLayout.yaxis2 = {
-        title: `${secondaryMetricConfig?.title || secondaryMetadata.description} [${secondaryMetricConfig?.unit || secondaryMetadata.unit}]`,
         type: "linear",
         overlaying: "y",
         side: "right",
         gridcolor: "rgba(227, 119, 194, 0.2)",
         zeroline: false,
         exponentformat: "e" as const,
-        titlefont: { color: "#e377c2" },
+        title: {
+          text: `${secondaryMetricConfig?.title || secondaryMetadata.description} [${secondaryMetricConfig?.unit || secondaryMetadata.unit}]`,
+          font: { color: "#e377c2" },
+        },
         tickfont: { color: "#e377c2" },
       };
     }

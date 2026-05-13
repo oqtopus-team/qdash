@@ -20,9 +20,10 @@ if TYPE_CHECKING:
     import plotly.graph_objs as go
 
 import numpy as np
-from qdash.analysis.spectroscopy.bare_shift import BareShiftBoundary
 from scipy.ndimage import convolve1d
 from scipy.signal import find_peaks as scipy_find_peaks
+
+from qdash.analysis.spectroscopy.bare_shift import BareShiftBoundary
 
 
 class Peak(NamedTuple):

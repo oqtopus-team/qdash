@@ -135,7 +135,7 @@ class DefaultOrderingStrategy(MuxOrderingStrategy):
         context: OrderingContext,
     ) -> list[str]:
         """Return qubits in natural order."""
-        return sorted(qids, key=lambda x: int(x))
+        return sorted(qids, key=int)
 
     def get_metadata(self) -> dict[str, Any]:
         """Return strategy metadata."""

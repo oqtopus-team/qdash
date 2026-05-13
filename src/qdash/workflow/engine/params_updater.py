@@ -8,11 +8,12 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol, cast
 
 from filelock import FileLock
+from ruamel.yaml import YAML
+from ruamel.yaml.comments import CommentedMap
+
 from qdash.datamodel.task import ParameterModel
 from qdash.workflow.engine.backend.qubex_paths import get_qubex_paths
 from qdash.workflow.worker.flows.push_props.formatter import represent_none
-from ruamel.yaml import YAML
-from ruamel.yaml.comments import CommentedMap
 
 if TYPE_CHECKING:
     from qdash.workflow.engine.backend.base import BaseBackend
@@ -171,7 +172,7 @@ class _QubexParamsUpdater:
 
         get_label = getattr(experiment, "get_qubit_label", None)
         if callable(get_label):
-            return cast(str, get_label(index))
+            return cast("str", get_label(index))
         return None
 
     @staticmethod
@@ -210,6 +211,7 @@ class _QubexParamsUpdater:
             return
 
         lock_path = file_path.with_suffix(file_path.suffix + ".lock")
+        lock_path.touch(exist_ok=True)
 
         with FileLock(lock_path):
             # Read current data under lock
@@ -249,6 +251,8 @@ class _QubexParamsUpdater:
 
             # Atomic rename (overwrites target)
             os.replace(tmp_path, file_path)
+
+        lock_path.touch(exist_ok=True)
 
     @staticmethod
     def _values_equal(current: Any, new: Any) -> bool:

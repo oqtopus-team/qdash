@@ -2,6 +2,7 @@ import copy
 from unittest.mock import MagicMock, patch
 
 import plotly.graph_objs as go
+
 from qdash.analysis.spectroscopy.estimate_resonator_frequency import Peak, Resonance
 from qdash.workflow.calibtasks.base import RunResult
 from qdash.workflow.calibtasks.qubex.cw.check_resonator_spectroscopy import (
@@ -40,8 +41,7 @@ def test_postprocess_outputs_optimal_power_from_resonator_analysis() -> None:
             return_value=-40.0,
         ),
         patch(
-            "qdash.workflow.calibtasks.qubex.cw.check_resonator_spectroscopy."
-            "create_marked_figure",
+            "qdash.workflow.calibtasks.qubex.cw.check_resonator_spectroscopy.create_marked_figure",
             return_value=raw_fig,
         ),
     ):

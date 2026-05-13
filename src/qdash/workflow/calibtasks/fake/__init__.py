@@ -75,21 +75,21 @@ from qdash.workflow.calibtasks.fake.fake_randomized_benchmarking import (
 from qdash.workflow.calibtasks.fake.legacy_fake_chevron_pattern import FakeChevronPattern
 
 __all__ = [
-    # Base class
-    "FakeTask",
     # Tasks with provenance dependencies
     "FakeCheckFineChevron",
-    "FakeChevronPattern",  # legacy alias — UI selector only
-    "FakeCreateHPIPulse",
-    "FakeCheckRamsey",
     "FakeCheckRabi",
+    "FakeCheckRamsey",
     "FakeCheckT1",
     "FakeCheckT1Average",
     "FakeCheckT2Echo",
     "FakeCheckT2EchoAverage",
-    "FakeRandomizedBenchmarking",
+    "FakeChevronPattern",  # legacy alias — UI selector only
+    "FakeCreateHPIPulse",
     # Original fake task (simulator-based)
     "FakeRabi",
+    "FakeRandomizedBenchmarking",
+    # Base class
+    "FakeTask",
     # Utility
     "generate_task_instances",
 ]

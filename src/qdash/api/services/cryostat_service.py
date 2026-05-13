@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from starlette.exceptions import HTTPException
+
 from qdash.api.schemas.cryostat import (
     CryostatCreateRequest,
     CryostatResponse,
@@ -12,7 +14,6 @@ from qdash.api.schemas.cryostat import (
 )
 from qdash.api.schemas.success import SuccessResponse
 from qdash.dbmodel.cryostat import CryostatDocument
-from starlette.exceptions import HTTPException
 
 if TYPE_CHECKING:
     from qdash.repository.cryostat import MongoCryostatRepository

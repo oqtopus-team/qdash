@@ -1,6 +1,7 @@
 """Tests for TaskResultProcessor."""
 
 import pytest
+
 from qdash.datamodel.task import ParameterModel
 from qdash.workflow.engine.task.result_processor import (
     FidelityValidationError,

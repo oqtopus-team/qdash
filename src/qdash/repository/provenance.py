@@ -15,6 +15,7 @@ from datetime import datetime
 from typing import Any, Literal, TypedDict
 
 from bunnet import SortDirection
+
 from qdash.common.datetime_utils import now
 from qdash.dbmodel.provenance import (
     ActivityDocument,

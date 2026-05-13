@@ -35,9 +35,9 @@ from qdash.workflow.service import (
 __all__ = [
     # === High-level API ===
     "CalibService",
-    "generate_execution_id",
+    "ConfigFileType",
     # === GitHub Integration ===
     "GitHubIntegration",
     "GitHubPushConfig",
-    "ConfigFileType",
+    "generate_execution_id",
 ]

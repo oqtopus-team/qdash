@@ -1,10 +1,12 @@
 from types import SimpleNamespace
-from typing import cast
+from typing import TYPE_CHECKING, cast
 from unittest.mock import MagicMock, patch
 
 from qdash.datamodel.task import ParameterModel
-from qdash.workflow.engine.execution.service import ExecutionService
 from qdash.workflow.engine.task.backend_saver import BackendSaver
+
+if TYPE_CHECKING:
+    from qdash.workflow.engine.execution.service import ExecutionService
 
 
 def test_save_mux_qid_syncs_backend_params_for_distributed_outputs() -> None:
@@ -15,7 +17,7 @@ def test_save_mux_qid_syncs_backend_params_for_distributed_outputs() -> None:
     state_manager = MagicMock()
     state_manager.get_task.return_value = SimpleNamespace(output_parameters=output_parameters)
     execution_service = cast(
-        ExecutionService,
+        "ExecutionService",
         SimpleNamespace(
             chip_id="chip-1",
             project_id="proj-1",

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useRef, useState, useCallback } from "react";
+import { useMemo, useRef, useState, useCallback } from "react";
 import Link from "next/link";
 import {
   TransformWrapper,
@@ -738,12 +738,12 @@ export function CouplingMetricsGrid({
             initialScale={1}
             minScale={0.3}
             maxScale={4}
-            wheel={{ step: 0.08, smoothStep: 0.004 }}
+            wheel={{ step: 0.08 }}
             pinch={{ step: 5 }}
             doubleClick={{ mode: "zoomIn", step: 0.7 }}
             panning={{ velocityDisabled: false }}
             smooth={true}
-            onTransformed={handleTransform}
+            onTransform={handleTransform}
           >
             <ZoomControls />
             <TransformComponent

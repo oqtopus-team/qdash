@@ -3,6 +3,7 @@
 from collections.abc import Callable
 
 import pytest
+
 from qdash.datamodel.execution import (
     ExecutionModel,
     ExecutionStatusModel,

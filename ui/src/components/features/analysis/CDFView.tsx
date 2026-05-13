@@ -543,16 +543,18 @@ export function CDFView() {
         font: { size: 18 },
       },
       xaxis: {
-        title:
-          selectedParameters.length > 1
-            ? "Parameter Value"
-            : `${primaryConfig?.title || primaryParameter} (${
-                isPercentageMetric(primaryConfig?.unit)
-                  ? showAsErrorRate
-                    ? "Error Rate %"
-                    : "%"
-                  : primaryConfig?.unit || ""
-              })`,
+        title: {
+          text:
+            selectedParameters.length > 1
+              ? "Parameter Value"
+              : `${primaryConfig?.title || primaryParameter} (${
+                  isPercentageMetric(primaryConfig?.unit)
+                    ? showAsErrorRate
+                      ? "Error Rate %"
+                      : "%"
+                    : primaryConfig?.unit || ""
+                })`,
+        },
         gridcolor: "#e5e7eb",
         showgrid: true,
         zeroline: false,
@@ -563,7 +565,7 @@ export function CDFView() {
         tickformat: hasPercentageMetrics && showAsErrorRate ? ".1e" : undefined,
       },
       yaxis: {
-        title: "Cumulative Probability P(X ≤ value)",
+        title: { text: "Cumulative Probability P(X ≤ value)" },
         gridcolor: "#e5e7eb",
         showgrid: true,
         zeroline: false,

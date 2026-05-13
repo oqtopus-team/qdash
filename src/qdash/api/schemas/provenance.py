@@ -6,7 +6,7 @@ including parameter versions, provenance relations, and lineage queries.
 
 from __future__ import annotations
 
-from datetime import datetime  # noqa: TCH003
+from datetime import datetime  # noqa: TC003
 
 from pydantic import BaseModel, Field
 

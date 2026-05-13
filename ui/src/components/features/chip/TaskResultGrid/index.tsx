@@ -1233,13 +1233,13 @@ export function TaskResultGrid({
             initialScale={initialScale}
             minScale={Math.min(0.3, initialScale)}
             maxScale={4}
-            wheel={{ step: 0.08, smoothStep: 0.004 }}
+            wheel={{ step: 0.08 }}
             pinch={{ step: 5 }}
             doubleClick={{ mode: "zoomIn", step: 0.7 }}
             panning={{ velocityDisabled: false }}
             smooth={true}
             centerOnInit={true}
-            onTransformed={handleTransform}
+            onTransform={handleTransform}
           >
             <ZoomControls />
             <TransformComponent

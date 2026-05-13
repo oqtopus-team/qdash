@@ -6,6 +6,7 @@ from bunnet import init_bunnet
 from pymongo import MongoClient
 from pymongo.database import Database
 from pymongo.errors import OperationFailure
+
 from qdash.config import get_settings
 from qdash.dbmodel.document_models import document_models
 

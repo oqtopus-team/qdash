@@ -8,6 +8,7 @@ import secrets
 from typing import TYPE_CHECKING
 
 from fastapi import HTTPException, status
+
 from qdash.api.lib.auth import get_password_hash, get_user, verify_password
 from qdash.datamodel.system_info import SystemInfoModel
 from qdash.datamodel.user import SystemRole, generate_user_id

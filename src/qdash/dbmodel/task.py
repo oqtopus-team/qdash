@@ -4,6 +4,7 @@ from typing import Any, ClassVar
 from bunnet import Document
 from pydantic import ConfigDict, Field
 from pymongo import ASCENDING, IndexModel
+
 from qdash.datamodel.task import TaskModel
 from qdash.dbmodel.user import UserDocument
 

@@ -131,8 +131,7 @@ class TaskResultProcessor:
 
             if param.value > 1.0:
                 raise FidelityValidationError(
-                    f"Fidelity exceeds 100% for {task_name}.{param_name}: "
-                    f"{param.value * 100:.2f}%"
+                    f"Fidelity exceeds 100% for {task_name}.{param_name}: {param.value * 100:.2f}%"
                 )
 
         return True

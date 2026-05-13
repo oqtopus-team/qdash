@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from bunnet import SortDirection
+
 from qdash.common.json_utils import sanitize_for_json
 
 if TYPE_CHECKING:

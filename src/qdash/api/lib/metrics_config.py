@@ -12,6 +12,7 @@ from functools import lru_cache
 from typing import Any, Literal
 
 from pydantic import BaseModel
+
 from qdash.api.lib.config_loader import ConfigLoader
 
 

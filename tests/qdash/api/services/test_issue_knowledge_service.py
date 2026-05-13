@@ -5,13 +5,14 @@ from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from starlette.exceptions import HTTPException
+
 from qdash.api.schemas.issue_knowledge import (
     IssueKnowledgeResponse,
     ListIssueKnowledgeResponse,
 )
 from qdash.api.schemas.success import SuccessResponse
 from qdash.api.services.issue_knowledge_service import IssueKnowledgeService
-from starlette.exceptions import HTTPException
 
 # Valid 24-character hex strings for ObjectId
 VALID_OID = "6640a1b2c3d4e5f6a7b8c9d0"

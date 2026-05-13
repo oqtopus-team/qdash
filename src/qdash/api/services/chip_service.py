@@ -8,6 +8,8 @@ import logging
 from functools import lru_cache
 from typing import Any
 
+from starlette.exceptions import HTTPException
+
 from qdash.api.lib.metrics_config import load_metrics_config
 from qdash.api.schemas.chip import (
     ChipDeletionImpactResponse,
@@ -35,7 +37,6 @@ from qdash.repository.protocols import (
     ExecutionCounterRepository,
     TaskResultHistoryRepository,
 )
-from starlette.exceptions import HTTPException
 
 logger = logging.getLogger(__name__)
 

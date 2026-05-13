@@ -1,6 +1,7 @@
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.routing import APIRoute
+
 from qdash.api.db.session import lifespan
 from qdash.api.lib.auth import get_current_active_user
 from qdash.api.middleware.request_id import RequestIdMiddleware

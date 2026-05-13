@@ -7,8 +7,9 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Body, Depends, Query
 from fastapi.responses import StreamingResponse
-from qdash.api.dependencies import get_flow_service, get_task_result_service  # noqa: TCH002
-from qdash.api.lib.project import (  # noqa: TCH002
+
+from qdash.api.dependencies import get_flow_service, get_task_result_service
+from qdash.api.lib.project import (
     ProjectContext,
     get_project_context,
     get_project_context_editor,
@@ -24,7 +25,7 @@ from qdash.api.schemas.task_result import (
     TaskResultExcludeResponse,
     TimeSeriesData,
 )
-from qdash.api.services.flow_service import FlowService  # noqa: TCH002
+from qdash.api.services.flow_service import FlowService
 from qdash.api.services.task_result_service import TaskResultService
 
 router = APIRouter()
@@ -491,8 +492,9 @@ async def re_execute_task_result(
         Execution result with IDs and URLs
 
     """
-    from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
     from starlette.exceptions import HTTPException
+
+    from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
 
     doc = TaskResultHistoryDocument.find_one(
         {"project_id": ctx.project_id, "task_id": task_id}
@@ -547,9 +549,10 @@ def set_task_result_excluded(
     Excluded measurements are skipped when aggregating metrics for the
     dashboard / metrics screens. Raw data is preserved.
     """
+    from starlette.exceptions import HTTPException
+
     from qdash.common.datetime_utils import now
     from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
-    from starlette.exceptions import HTTPException
 
     doc = TaskResultHistoryDocument.find_one(
         {"project_id": ctx.project_id, "task_id": task_id}

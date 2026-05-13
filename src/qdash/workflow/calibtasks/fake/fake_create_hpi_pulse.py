@@ -4,6 +4,7 @@ from typing import ClassVar
 
 import numpy as np
 import plotly.graph_objects as go
+
 from qdash.datamodel.task import ParameterModel, RunParameterModel
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,

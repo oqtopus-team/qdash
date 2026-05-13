@@ -12,6 +12,7 @@ These tests verify the CRScheduler functionality including:
 from unittest.mock import MagicMock, patch
 
 import pytest
+
 from qdash.workflow.engine.scheduler.cr_scheduler import CRScheduler, CRScheduleResult
 from qdash.workflow.engine.scheduler.cr_utils import (
     build_mux_conflict_map,

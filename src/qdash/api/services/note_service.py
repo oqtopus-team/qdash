@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime  # noqa: TCH003
+from datetime import datetime  # noqa: TC003
 from typing import TYPE_CHECKING
+
+from starlette.exceptions import HTTPException
 
 from qdash.api.schemas.note import (
     ChipNotesSummaryResponse,
@@ -23,7 +25,6 @@ from qdash.dbmodel.metric_note import MetricNoteDocument
 from qdash.dbmodel.qubit import QubitDocument
 from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
 from qdash.repository.note_event import MongoNoteEventRepository
-from starlette.exceptions import HTTPException
 
 if TYPE_CHECKING:
     from qdash.api.services.notification_service import NotificationService

@@ -5,6 +5,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends
 from fastapi.responses import Response
+
 from qdash.api.dependencies import get_device_topology_service
 from qdash.api.lib.project import ProjectContext, get_project_context
 from qdash.api.schemas.device_topology import (

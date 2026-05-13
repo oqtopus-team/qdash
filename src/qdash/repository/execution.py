@@ -13,6 +13,7 @@ from typing import Any
 
 from pymongo import MongoClient, ReturnDocument
 from pymongo.collection import Collection
+
 from qdash.datamodel.execution import (
     ExecutionModel,
     ExecutionStatusModel,

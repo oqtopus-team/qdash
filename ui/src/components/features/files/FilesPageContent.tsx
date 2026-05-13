@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, type ReactElement } from "react";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -340,7 +340,7 @@ export function FilesPageContent() {
     return <File className="inline-block mr-1 text-gray-400" size={14} />;
   };
 
-  const renderFileTree = (nodes: FileTreeNode[], level = 0): JSX.Element[] => {
+  const renderFileTree = (nodes: FileTreeNode[], level = 0): ReactElement[] => {
     return nodes.map((node) => (
       <div key={node.path}>
         {node.type === "directory" ? (

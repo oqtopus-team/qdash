@@ -3,6 +3,7 @@
 from datetime import datetime, timedelta, timezone
 
 import pytest
+
 from qdash.api.schemas.task_result import TaskResult
 
 

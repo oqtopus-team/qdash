@@ -3,14 +3,16 @@ from __future__ import annotations
 import zipfile
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import patch
 
 from qdash.api.lib.copilot_config import AnalysisConfig, CopilotConfig, ModelConfig
 from qdash.api.services.task_result_service import TaskResultService
 from qdash.datamodel.note import AiTriageReviewModel
 from qdash.datamodel.system_info import SystemInfoModel
-from qdash.repository.protocols import ChipRepository, TaskResultHistoryRepository
+
+if TYPE_CHECKING:
+    from qdash.repository.protocols import ChipRepository, TaskResultHistoryRepository
 
 
 class _TaskResultDoc(SimpleNamespace):
@@ -85,8 +87,8 @@ def _ai_triage_config(tasks: list[str] | None = None) -> CopilotConfig:
 
 def _service(repo: _TaskResultRepo) -> TaskResultService:
     return TaskResultService(
-        chip_repository=cast(ChipRepository, _ChipRepo()),
-        task_result_repository=cast(TaskResultHistoryRepository, repo),
+        chip_repository=cast("ChipRepository", _ChipRepo()),
+        task_result_repository=cast("TaskResultHistoryRepository", repo),
     )
 
 

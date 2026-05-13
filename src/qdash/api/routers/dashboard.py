@@ -8,7 +8,8 @@ from datetime import datetime
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Query
-from qdash.api.lib.project import ProjectContext, get_project_context  # noqa: TCH002
+
+from qdash.api.lib.project import ProjectContext, get_project_context
 from qdash.api.schemas.dashboard import (
     DashboardAiInsightsResponse,
     DashboardInsight,
@@ -140,8 +141,7 @@ def _parse_triage_record(doc: TaskResultHistoryDocument) -> dict[str, Any]:
         "suggested_labels": labels,
         "recommended_action": _field(body, "Recommended action"),
         "is_missing_output": "No f01 output parameter" in body
-        or "no_signal" in labels.lower()
-        and "Deterministic safety guard" in body,
+        or ("no_signal" in labels.lower() and "Deterministic safety guard" in body),
         "is_format_error": decision == "FORMAT_ERROR" or "model_format_error" in body,
     }
 

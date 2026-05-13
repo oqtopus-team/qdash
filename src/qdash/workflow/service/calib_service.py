@@ -49,6 +49,7 @@ if TYPE_CHECKING:
     from qdash.workflow.service.targets import Target
 
 from prefect import get_run_logger
+
 from qdash.common.backend_config import get_default_backend
 from qdash.common.datetime_utils import now
 from qdash.workflow.engine import CalibConfig, CalibOrchestrator
@@ -182,12 +183,12 @@ def _cancel_executions_by_flow_run_id(
 
 __all__ = [
     "CalibService",
-    "on_flow_cancellation",
-    "generate_execution_id",
     # Re-exported for backward compatibility (used by strategy.py, two_qubit.py)
     "finish_calibration",
+    "generate_execution_id",
     "get_session",
     "init_calibration",
+    "on_flow_cancellation",
 ]
 
 

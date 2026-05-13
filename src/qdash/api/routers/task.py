@@ -7,8 +7,9 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import Response
-from qdash.api.dependencies import get_task_service  # noqa: TCH002
-from qdash.api.lib.project import (  # noqa: TCH002
+
+from qdash.api.dependencies import get_task_service
+from qdash.api.lib.project import (
     ProjectContext,
     get_project_context,
 )
@@ -18,7 +19,7 @@ from qdash.api.schemas.task import (
     TaskKnowledgeResponse,
     TaskResultResponse,
 )
-from qdash.api.services.task_service import TaskService  # noqa: TCH002
+from qdash.api.services.task_service import TaskService
 
 router = APIRouter()
 

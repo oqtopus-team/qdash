@@ -6,6 +6,7 @@ import logging
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
+
 from qdash.common.topology_config import (
     list_topologies,
     load_topology,

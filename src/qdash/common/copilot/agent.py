@@ -15,6 +15,7 @@ from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING, Any
 
 from openai import AsyncOpenAI, BadRequestError
+
 from qdash.common.copilot.analysis import AnalysisResponse, TaskAnalysisContext
 
 if TYPE_CHECKING:

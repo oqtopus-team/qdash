@@ -6,9 +6,10 @@ import logging
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends
-from qdash.api.dependencies import get_task_file_service  # noqa: TCH002
-from qdash.api.lib.auth import get_current_active_user  # noqa: TCH002
-from qdash.api.schemas.auth import User  # noqa: TCH002
+
+from qdash.api.dependencies import get_task_file_service
+from qdash.api.lib.auth import get_current_active_user
+from qdash.api.schemas.auth import User
 from qdash.api.schemas.task_file import (
     BackendConfigResponse,
     ListTaskFileBackendsResponse,
@@ -17,7 +18,7 @@ from qdash.api.schemas.task_file import (
     TaskFileSettings,
     TaskFileTreeNode,
 )
-from qdash.api.services.task_file_service import TaskFileService  # noqa: TCH002
+from qdash.api.services.task_file_service import TaskFileService
 
 logger = logging.getLogger(__name__)
 

@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import React from "react";
 
 import {
   ReactFlow,

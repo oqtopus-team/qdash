@@ -90,14 +90,14 @@ export function QubitTimeSeriesView({
         font: { size: 20 },
       },
       xaxis: {
-        title: "Time (JST)",
+        title: { text: "Time (JST)" },
         type: "date",
         tickformat: "%Y-%m-%d %H:%M",
         gridcolor: "#eee",
         zeroline: false,
       },
       yaxis: {
-        title: `${metadata.description} [${metadata.unit}]`,
+        title: { text: `${metadata.description} [${metadata.unit}]` },
         type: "linear",
         gridcolor: "#eee",
         zeroline: false,

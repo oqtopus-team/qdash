@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 from bson import ObjectId
 from fastapi import HTTPException, status
 from pymongo.errors import DuplicateKeyError
+
 from qdash.api.schemas.notification import (
     ListNotificationsResponse,
     NotificationResponse,
