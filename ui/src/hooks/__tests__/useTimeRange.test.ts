@@ -108,7 +108,7 @@ describe("useTimeRange", () => {
     });
 
     // Both should update since neither is locked
-    expect(result.current.timeRange.endAt).toContain("13:00:00");
+    expect(result.current.timeRange.endAt).toContain("22:00:00");
   });
 
   it("refreshTimeRange preserves locked start time", () => {

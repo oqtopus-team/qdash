@@ -202,7 +202,10 @@ def format_iso(dt: datetime | PendulumDateTime | None) -> str | None:
     """
     if dt is None:
         return None
-    return ensure_timezone(dt).isoformat()
+    normalized = ensure_timezone(dt)
+    if normalized is None:
+        return None
+    return normalized.isoformat()
 
 
 def calculate_elapsed_time(start: datetime, end: datetime) -> timedelta:
