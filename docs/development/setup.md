@@ -191,6 +191,32 @@ task build-docs
 task tbls-docs
 ```
 
+## Secret Scanning Tools
+
+DevContainer users are automatically set up with Gitleaks, Trufflehog, and Lefthook. For local development outside the DevContainer, install the tools manually:
+
+**macOS:**
+
+```shell
+brew install gitleaks trufflehog lefthook
+```
+
+**Linux:**
+
+Download binaries from GitHub Releases:
+
+- [Gitleaks Releases](https://github.com/gitleaks/gitleaks/releases)
+- [Trufflehog Releases](https://github.com/trufflesecurity/trufflehog/releases)
+- [Lefthook Releases](https://github.com/evilmartians/lefthook/releases)
+
+After installing the tools, enable the git hooks:
+
+```shell
+lefthook install
+```
+
+> Lefthook gracefully skips if the binary is not found, so environments without it (e.g., Windows without manual install) will not be blocked.
+
 ## Environment Variables
 
 Key environment variables are configured in `.env`. See `.env.example` for available options:

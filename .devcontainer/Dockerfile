@@ -64,6 +64,20 @@ RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
     && apt-get install -y --no-install-recommends gh \
     && rm -rf /var/lib/apt/lists/*
 
+# 3.2 Secret scanning tools (gitleaks + trufflehog) and git hooks manager (lefthook)
+# All three tools resolve to the upstream latest release at image build time:
+#   - trufflehog: official install.sh with no tag arg -> fetches /releases/latest
+#   - lefthook:   official Cloudsmith apt repository (apt picks latest)
+#   - gitleaks:   upstream multi-arch container `:latest` tag (BuildKit resolves arch)
+RUN curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh \
+      | sh -s -- -b /usr/local/bin
+
+RUN curl -1sLf 'https://dl.cloudsmith.io/public/evilmartians/lefthook/setup.deb.sh' | bash \
+    && apt-get install -y --no-install-recommends lefthook \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=ghcr.io/gitleaks/gitleaks:latest /usr/bin/gitleaks /usr/local/bin/gitleaks
+
 # 4. Editors and shells (Change frequency: Medium)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     vim \

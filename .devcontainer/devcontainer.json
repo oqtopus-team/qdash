@@ -65,7 +65,7 @@
   "shutdownAction": "none",
 
   // Run bun install after container creation
-  "postCreateCommand": "uv sync --all-groups && cd /workspace/qdash/ui && bun install --frozen-lockfile",
+  "postCreateCommand": "uv sync --all-groups && cd /workspace/qdash/ui && bun install --frozen-lockfile && cd /workspace/qdash && lefthook install",
 
   // Set umask to ensure files are readable by all users (for host-side Docker builds)
   "postStartCommand": "git config --global --add safe.directory /workspace/qdash; grep -q 'umask 022' ~/.bashrc || echo 'umask 022' >> ~/.bashrc; grep -q 'umask 022' ~/.zshrc || echo 'umask 022' >> ~/.zshrc",

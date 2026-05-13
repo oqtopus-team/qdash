@@ -1,0 +1,7 @@
+\.gitleaks\.toml
+docs/design/api-testing-guidelines\.md
+docs/development/api/testing\.md
+docs/development/credential-scan\.md
+poetry\.lock
+scripts/migrate_user_tokens\.py
+tests/conftest\.py

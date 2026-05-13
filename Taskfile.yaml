@@ -171,6 +171,30 @@ tasks:
       - bunx eslint . --fix -c eslint.config.mjs --quiet
 
   # =============================================================================
+  # Secret Scanning
+  # =============================================================================
+
+  scan-secrets:
+    desc: Run full secret scan with Trufflehog (git history + filesystem)
+    cmds:
+      - trufflehog git file://. --only-verified --fail --exclude-paths=.trufflehog-exclude-paths.txt
+
+  scan-secrets-all:
+    desc: Run Trufflehog scan including unverified findings
+    cmds:
+      - trufflehog git file://. --fail --exclude-paths=.trufflehog-exclude-paths.txt
+
+  scan-leaks:
+    desc: Run Gitleaks scan on current changes (pre-commit equivalent)
+    cmds:
+      - gitleaks detect --source . --verbose
+
+  scan-leaks-staged:
+    desc: Run Gitleaks on staged files only
+    cmds:
+      - gitleaks protect --staged --verbose
+
+  # =============================================================================
   # Local Check (run before push)
   # =============================================================================
 
@@ -181,6 +205,7 @@ tasks:
       - task: ci-typecheck
       - task: ci-test
       - task: ci-ui
+      - task: scan-leaks
 
   check-all:
     desc: Run all checks including UI production build
