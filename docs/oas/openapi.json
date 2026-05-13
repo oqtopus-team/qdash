@@ -9323,6 +9323,62 @@
             }
           },
           {
+            "name": "cooldown_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional explicit cool-down scope identifier",
+              "title": "Cooldown Id"
+            },
+            "description": "Optional explicit cool-down scope identifier"
+          },
+          {
+            "name": "start_at",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional time-range scope start",
+              "title": "Start At"
+            },
+            "description": "Optional time-range scope start"
+          },
+          {
+            "name": "end_at",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional time-range scope end",
+              "title": "End At"
+            },
+            "description": "Optional time-range scope end"
+          },
+          {
             "name": "X-Project-Id",
             "in": "header",
             "required": false,
@@ -9410,6 +9466,62 @@
               "type": "string",
               "title": "Metric Key"
             }
+          },
+          {
+            "name": "cooldown_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional explicit cool-down scope identifier",
+              "title": "Cooldown Id"
+            },
+            "description": "Optional explicit cool-down scope identifier"
+          },
+          {
+            "name": "start_at",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional time-range scope start",
+              "title": "Start At"
+            },
+            "description": "Optional time-range scope start"
+          },
+          {
+            "name": "end_at",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional time-range scope end",
+              "title": "End At"
+            },
+            "description": "Optional time-range scope end"
           },
           {
             "name": "X-Project-Id",
@@ -9645,6 +9757,62 @@
             }
           },
           {
+            "name": "cooldown_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional explicit cool-down scope identifier",
+              "title": "Cooldown Id"
+            },
+            "description": "Optional explicit cool-down scope identifier"
+          },
+          {
+            "name": "start_at",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional time-range scope start",
+              "title": "Start At"
+            },
+            "description": "Optional time-range scope start"
+          },
+          {
+            "name": "end_at",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional time-range scope end",
+              "title": "End At"
+            },
+            "description": "Optional time-range scope end"
+          },
+          {
             "name": "X-Project-Id",
             "in": "header",
             "required": false,
@@ -9732,6 +9900,62 @@
               "type": "string",
               "title": "Metric Key"
             }
+          },
+          {
+            "name": "cooldown_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional explicit cool-down scope identifier",
+              "title": "Cooldown Id"
+            },
+            "description": "Optional explicit cool-down scope identifier"
+          },
+          {
+            "name": "start_at",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional time-range scope start",
+              "title": "Start At"
+            },
+            "description": "Optional time-range scope start"
+          },
+          {
+            "name": "end_at",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional time-range scope end",
+              "title": "End At"
+            },
+            "description": "Optional time-range scope end"
           },
           {
             "name": "X-Project-Id",
@@ -9990,6 +10214,62 @@
               "type": "string",
               "title": "Chip Id"
             }
+          },
+          {
+            "name": "cooldown_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional explicit cool-down scope identifier",
+              "title": "Cooldown Id"
+            },
+            "description": "Optional explicit cool-down scope identifier"
+          },
+          {
+            "name": "start_at",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional time-range scope start",
+              "title": "Start At"
+            },
+            "description": "Optional time-range scope start"
+          },
+          {
+            "name": "end_at",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional time-range scope end",
+              "title": "End At"
+            },
+            "description": "Optional time-range scope end"
           },
           {
             "name": "X-Project-Id",

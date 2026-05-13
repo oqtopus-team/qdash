@@ -23,6 +23,9 @@ import type {
 
 import type {
   ChipNotesSummaryResponse,
+  DeleteCouplingMetricNoteParams,
+  DeleteQubitMetricNoteParams,
+  GetChipNotesSummaryParams,
   HTTPValidationError,
   ListChipNoteEventsParams,
   ListNoteEventsResponse,
@@ -31,6 +34,8 @@ import type {
   NoteUpsertRequest,
   SearchNoteEventsParams,
   SuccessResponse,
+  UpsertCouplingMetricNoteParams,
+  UpsertQubitMetricNoteParams,
 } from "../../schemas";
 
 import { customInstance } from "../../lib/custom-instance";
@@ -221,6 +226,7 @@ export const upsertQubitMetricNote = (
   qid: string,
   metricKey: string,
   noteUpsertRequest: NoteUpsertRequest,
+  params?: UpsertQubitMetricNoteParams,
   options?: SecondParameter<typeof customInstance>,
 ) => {
   return customInstance<NoteModel>(
@@ -229,6 +235,7 @@ export const upsertQubitMetricNote = (
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       data: noteUpsertRequest,
+      params,
     },
     options,
   );
@@ -241,14 +248,26 @@ export const getUpsertQubitMetricNoteMutationOptions = <
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof upsertQubitMetricNote>>,
     TError,
-    { chipId: string; qid: string; metricKey: string; data: NoteUpsertRequest },
+    {
+      chipId: string;
+      qid: string;
+      metricKey: string;
+      data: NoteUpsertRequest;
+      params?: UpsertQubitMetricNoteParams;
+    },
     TContext
   >;
   request?: SecondParameter<typeof customInstance>;
 }): UseMutationOptions<
   Awaited<ReturnType<typeof upsertQubitMetricNote>>,
   TError,
-  { chipId: string; qid: string; metricKey: string; data: NoteUpsertRequest },
+  {
+    chipId: string;
+    qid: string;
+    metricKey: string;
+    data: NoteUpsertRequest;
+    params?: UpsertQubitMetricNoteParams;
+  },
   TContext
 > => {
   const mutationKey = ["upsertQubitMetricNote"];
@@ -262,11 +281,24 @@ export const getUpsertQubitMetricNoteMutationOptions = <
 
   const mutationFn: MutationFunction<
     Awaited<ReturnType<typeof upsertQubitMetricNote>>,
-    { chipId: string; qid: string; metricKey: string; data: NoteUpsertRequest }
+    {
+      chipId: string;
+      qid: string;
+      metricKey: string;
+      data: NoteUpsertRequest;
+      params?: UpsertQubitMetricNoteParams;
+    }
   > = (props) => {
-    const { chipId, qid, metricKey, data } = props ?? {};
+    const { chipId, qid, metricKey, data, params } = props ?? {};
 
-    return upsertQubitMetricNote(chipId, qid, metricKey, data, requestOptions);
+    return upsertQubitMetricNote(
+      chipId,
+      qid,
+      metricKey,
+      data,
+      params,
+      requestOptions,
+    );
   };
 
   return { mutationFn, ...mutationOptions };
@@ -294,6 +326,7 @@ export const useUpsertQubitMetricNote = <
         qid: string;
         metricKey: string;
         data: NoteUpsertRequest;
+        params?: UpsertQubitMetricNoteParams;
       },
       TContext
     >;
@@ -303,7 +336,13 @@ export const useUpsertQubitMetricNote = <
 ): UseMutationResult<
   Awaited<ReturnType<typeof upsertQubitMetricNote>>,
   TError,
-  { chipId: string; qid: string; metricKey: string; data: NoteUpsertRequest },
+  {
+    chipId: string;
+    qid: string;
+    metricKey: string;
+    data: NoteUpsertRequest;
+    params?: UpsertQubitMetricNoteParams;
+  },
   TContext
 > => {
   const mutationOptions = getUpsertQubitMetricNoteMutationOptions(options);
@@ -317,12 +356,14 @@ export const deleteQubitMetricNote = (
   chipId: string,
   qid: string,
   metricKey: string,
+  params?: DeleteQubitMetricNoteParams,
   options?: SecondParameter<typeof customInstance>,
 ) => {
   return customInstance<SuccessResponse>(
     {
       url: `/chips/${chipId}/qubits/${qid}/metric-notes/${metricKey}`,
       method: "DELETE",
+      params,
     },
     options,
   );
@@ -335,14 +376,24 @@ export const getDeleteQubitMetricNoteMutationOptions = <
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof deleteQubitMetricNote>>,
     TError,
-    { chipId: string; qid: string; metricKey: string },
+    {
+      chipId: string;
+      qid: string;
+      metricKey: string;
+      params?: DeleteQubitMetricNoteParams;
+    },
     TContext
   >;
   request?: SecondParameter<typeof customInstance>;
 }): UseMutationOptions<
   Awaited<ReturnType<typeof deleteQubitMetricNote>>,
   TError,
-  { chipId: string; qid: string; metricKey: string },
+  {
+    chipId: string;
+    qid: string;
+    metricKey: string;
+    params?: DeleteQubitMetricNoteParams;
+  },
   TContext
 > => {
   const mutationKey = ["deleteQubitMetricNote"];
@@ -356,11 +407,22 @@ export const getDeleteQubitMetricNoteMutationOptions = <
 
   const mutationFn: MutationFunction<
     Awaited<ReturnType<typeof deleteQubitMetricNote>>,
-    { chipId: string; qid: string; metricKey: string }
+    {
+      chipId: string;
+      qid: string;
+      metricKey: string;
+      params?: DeleteQubitMetricNoteParams;
+    }
   > = (props) => {
-    const { chipId, qid, metricKey } = props ?? {};
+    const { chipId, qid, metricKey, params } = props ?? {};
 
-    return deleteQubitMetricNote(chipId, qid, metricKey, requestOptions);
+    return deleteQubitMetricNote(
+      chipId,
+      qid,
+      metricKey,
+      params,
+      requestOptions,
+    );
   };
 
   return { mutationFn, ...mutationOptions };
@@ -383,7 +445,12 @@ export const useDeleteQubitMetricNote = <
     mutation?: UseMutationOptions<
       Awaited<ReturnType<typeof deleteQubitMetricNote>>,
       TError,
-      { chipId: string; qid: string; metricKey: string },
+      {
+        chipId: string;
+        qid: string;
+        metricKey: string;
+        params?: DeleteQubitMetricNoteParams;
+      },
       TContext
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -392,7 +459,12 @@ export const useDeleteQubitMetricNote = <
 ): UseMutationResult<
   Awaited<ReturnType<typeof deleteQubitMetricNote>>,
   TError,
-  { chipId: string; qid: string; metricKey: string },
+  {
+    chipId: string;
+    qid: string;
+    metricKey: string;
+    params?: DeleteQubitMetricNoteParams;
+  },
   TContext
 > => {
   const mutationOptions = getDeleteQubitMetricNoteMutationOptions(options);
@@ -583,6 +655,7 @@ export const upsertCouplingMetricNote = (
   couplingId: string,
   metricKey: string,
   noteUpsertRequest: NoteUpsertRequest,
+  params?: UpsertCouplingMetricNoteParams,
   options?: SecondParameter<typeof customInstance>,
 ) => {
   return customInstance<NoteModel>(
@@ -591,6 +664,7 @@ export const upsertCouplingMetricNote = (
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       data: noteUpsertRequest,
+      params,
     },
     options,
   );
@@ -608,6 +682,7 @@ export const getUpsertCouplingMetricNoteMutationOptions = <
       couplingId: string;
       metricKey: string;
       data: NoteUpsertRequest;
+      params?: UpsertCouplingMetricNoteParams;
     },
     TContext
   >;
@@ -620,6 +695,7 @@ export const getUpsertCouplingMetricNoteMutationOptions = <
     couplingId: string;
     metricKey: string;
     data: NoteUpsertRequest;
+    params?: UpsertCouplingMetricNoteParams;
   },
   TContext
 > => {
@@ -639,15 +715,17 @@ export const getUpsertCouplingMetricNoteMutationOptions = <
       couplingId: string;
       metricKey: string;
       data: NoteUpsertRequest;
+      params?: UpsertCouplingMetricNoteParams;
     }
   > = (props) => {
-    const { chipId, couplingId, metricKey, data } = props ?? {};
+    const { chipId, couplingId, metricKey, data, params } = props ?? {};
 
     return upsertCouplingMetricNote(
       chipId,
       couplingId,
       metricKey,
       data,
+      params,
       requestOptions,
     );
   };
@@ -677,6 +755,7 @@ export const useUpsertCouplingMetricNote = <
         couplingId: string;
         metricKey: string;
         data: NoteUpsertRequest;
+        params?: UpsertCouplingMetricNoteParams;
       },
       TContext
     >;
@@ -691,6 +770,7 @@ export const useUpsertCouplingMetricNote = <
     couplingId: string;
     metricKey: string;
     data: NoteUpsertRequest;
+    params?: UpsertCouplingMetricNoteParams;
   },
   TContext
 > => {
@@ -705,12 +785,14 @@ export const deleteCouplingMetricNote = (
   chipId: string,
   couplingId: string,
   metricKey: string,
+  params?: DeleteCouplingMetricNoteParams,
   options?: SecondParameter<typeof customInstance>,
 ) => {
   return customInstance<SuccessResponse>(
     {
       url: `/chips/${chipId}/couplings/${couplingId}/metric-notes/${metricKey}`,
       method: "DELETE",
+      params,
     },
     options,
   );
@@ -723,14 +805,24 @@ export const getDeleteCouplingMetricNoteMutationOptions = <
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof deleteCouplingMetricNote>>,
     TError,
-    { chipId: string; couplingId: string; metricKey: string },
+    {
+      chipId: string;
+      couplingId: string;
+      metricKey: string;
+      params?: DeleteCouplingMetricNoteParams;
+    },
     TContext
   >;
   request?: SecondParameter<typeof customInstance>;
 }): UseMutationOptions<
   Awaited<ReturnType<typeof deleteCouplingMetricNote>>,
   TError,
-  { chipId: string; couplingId: string; metricKey: string },
+  {
+    chipId: string;
+    couplingId: string;
+    metricKey: string;
+    params?: DeleteCouplingMetricNoteParams;
+  },
   TContext
 > => {
   const mutationKey = ["deleteCouplingMetricNote"];
@@ -744,14 +836,20 @@ export const getDeleteCouplingMetricNoteMutationOptions = <
 
   const mutationFn: MutationFunction<
     Awaited<ReturnType<typeof deleteCouplingMetricNote>>,
-    { chipId: string; couplingId: string; metricKey: string }
+    {
+      chipId: string;
+      couplingId: string;
+      metricKey: string;
+      params?: DeleteCouplingMetricNoteParams;
+    }
   > = (props) => {
-    const { chipId, couplingId, metricKey } = props ?? {};
+    const { chipId, couplingId, metricKey, params } = props ?? {};
 
     return deleteCouplingMetricNote(
       chipId,
       couplingId,
       metricKey,
+      params,
       requestOptions,
     );
   };
@@ -776,7 +874,12 @@ export const useDeleteCouplingMetricNote = <
     mutation?: UseMutationOptions<
       Awaited<ReturnType<typeof deleteCouplingMetricNote>>,
       TError,
-      { chipId: string; couplingId: string; metricKey: string },
+      {
+        chipId: string;
+        couplingId: string;
+        metricKey: string;
+        params?: DeleteCouplingMetricNoteParams;
+      },
       TContext
     >;
     request?: SecondParameter<typeof customInstance>;
@@ -785,7 +888,12 @@ export const useDeleteCouplingMetricNote = <
 ): UseMutationResult<
   Awaited<ReturnType<typeof deleteCouplingMetricNote>>,
   TError,
-  { chipId: string; couplingId: string; metricKey: string },
+  {
+    chipId: string;
+    couplingId: string;
+    metricKey: string;
+    params?: DeleteCouplingMetricNoteParams;
+  },
   TContext
 > => {
   const mutationOptions = getDeleteCouplingMetricNoteMutationOptions(options);
@@ -1112,17 +1220,24 @@ export const useDeleteTaskNote = <
  */
 export const getChipNotesSummary = (
   chipId: string,
+  params?: GetChipNotesSummaryParams,
   options?: SecondParameter<typeof customInstance>,
   signal?: AbortSignal,
 ) => {
   return customInstance<ChipNotesSummaryResponse>(
-    { url: `/chips/${chipId}/notes-summary`, method: "GET", signal },
+    { url: `/chips/${chipId}/notes-summary`, method: "GET", params, signal },
     options,
   );
 };
 
-export const getGetChipNotesSummaryQueryKey = (chipId?: string) => {
-  return [`/chips/${chipId}/notes-summary`] as const;
+export const getGetChipNotesSummaryQueryKey = (
+  chipId?: string,
+  params?: GetChipNotesSummaryParams,
+) => {
+  return [
+    `/chips/${chipId}/notes-summary`,
+    ...(params ? [params] : []),
+  ] as const;
 };
 
 export const getGetChipNotesSummaryQueryOptions = <
@@ -1130,6 +1245,7 @@ export const getGetChipNotesSummaryQueryOptions = <
   TError = HTTPValidationError,
 >(
   chipId: string,
+  params?: GetChipNotesSummaryParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -1144,11 +1260,12 @@ export const getGetChipNotesSummaryQueryOptions = <
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
   const queryKey =
-    queryOptions?.queryKey ?? getGetChipNotesSummaryQueryKey(chipId);
+    queryOptions?.queryKey ?? getGetChipNotesSummaryQueryKey(chipId, params);
 
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof getChipNotesSummary>>
-  > = ({ signal }) => getChipNotesSummary(chipId, requestOptions, signal);
+  > = ({ signal }) =>
+    getChipNotesSummary(chipId, params, requestOptions, signal);
 
   return {
     queryKey,
@@ -1172,6 +1289,7 @@ export function useGetChipNotesSummary<
   TError = HTTPValidationError,
 >(
   chipId: string,
+  params: undefined | GetChipNotesSummaryParams,
   options: {
     query: Partial<
       UseQueryOptions<
@@ -1199,6 +1317,7 @@ export function useGetChipNotesSummary<
   TError = HTTPValidationError,
 >(
   chipId: string,
+  params?: GetChipNotesSummaryParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -1224,6 +1343,7 @@ export function useGetChipNotesSummary<
   TError = HTTPValidationError,
 >(
   chipId: string,
+  params?: GetChipNotesSummaryParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -1245,6 +1365,7 @@ export function useGetChipNotesSummary<
   TError = HTTPValidationError,
 >(
   chipId: string,
+  params?: GetChipNotesSummaryParams,
   options?: {
     query?: Partial<
       UseQueryOptions<
@@ -1257,7 +1378,11 @@ export function useGetChipNotesSummary<
   },
   queryClient?: QueryClient,
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
-  const queryOptions = getGetChipNotesSummaryQueryOptions(chipId, options);
+  const queryOptions = getGetChipNotesSummaryQueryOptions(
+    chipId,
+    params,
+    options,
+  );
 
   const query = useQuery(queryOptions, queryClient) as UseQueryResult<
     TData,

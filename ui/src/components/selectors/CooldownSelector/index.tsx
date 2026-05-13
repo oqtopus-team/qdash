@@ -16,6 +16,8 @@ interface CooldownOption {
 interface CooldownSelectorProps {
   /** Restrict to cool-downs that contain this chip. Required. */
   chipId: string;
+  /** Currently selected cool-down id, if any. */
+  selectedCooldownId?: string | null;
   /** Called with the picked cool-down. */
   onPick: (cooldown: CooldownResponse) => void;
   placeholder?: string;
@@ -30,6 +32,7 @@ const DEFAULT_PLACEHOLDER = "Filter by cool-down…";
  */
 export function CooldownSelector({
   chipId,
+  selectedCooldownId,
   onPick,
   placeholder = DEFAULT_PLACEHOLDER,
 }: CooldownSelectorProps) {
@@ -37,7 +40,10 @@ export function CooldownSelector({
     { chip_id: chipId || undefined },
     { query: { enabled: !!chipId, staleTime: 30_000 } },
   );
-  const cooldowns = data?.data?.cooldowns ?? [];
+  const cooldowns = useMemo(
+    () => data?.data?.cooldowns ?? [],
+    [data?.data?.cooldowns],
+  );
 
   const options = useMemo<CooldownOption[]>(
     () =>
@@ -52,6 +58,8 @@ export function CooldownSelector({
     labels: options.map((o) => o.label),
     placeholder,
   });
+  const selectedOption =
+    options.find((option) => option.value === selectedCooldownId) ?? null;
 
   if (!chipId) return null;
   if (isLoading) {
@@ -76,7 +84,7 @@ export function CooldownSelector({
   return (
     <Select<CooldownOption>
       options={options}
-      value={null}
+      value={selectedOption}
       onChange={handleChange}
       placeholder={placeholder}
       isClearable={false}

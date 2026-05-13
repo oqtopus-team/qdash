@@ -4,7 +4,7 @@ import { createPortal } from "react-dom";
 
 import { formatDateTime } from "@/lib/utils/datetime";
 
-import type { NoteEntryWithMetric } from "./ChipNoteEditor";
+import type { NoteEntryWithMetric } from "./MetricNotePanel";
 
 interface DashboardNoteTooltipProps {
   /** Anchor position in viewport coordinates (top-center of the source cell). */

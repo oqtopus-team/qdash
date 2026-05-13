@@ -7,7 +7,7 @@ import { StickyNote } from "lucide-react";
 import { useTopologyConfig } from "@/hooks/useTopologyConfig";
 import { getQubitGridPosition } from "@/lib/utils/grid-position";
 
-import type { NoteEntryWithMetric } from "./ChipNoteEditor";
+import type { NoteEntryWithMetric } from "./MetricNotePanel";
 import { DashboardNoteTooltip } from "./DashboardNoteTooltip";
 
 interface MetricValue {

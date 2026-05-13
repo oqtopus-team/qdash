@@ -123,9 +123,13 @@ export function ChipPageContent() {
   // Get task list from task-files API
   const { data: taskInfoData } = useListTaskInfo({ backend: defaultBackend });
 
-  const { data: notesSummaryData } = useGetChipNotesSummary(selectedChip, {
-    query: { enabled: !!selectedChip, staleTime: 30_000 },
-  });
+  const { data: notesSummaryData } = useGetChipNotesSummary(
+    selectedChip,
+    undefined,
+    {
+      query: { enabled: !!selectedChip, staleTime: 30_000 },
+    },
+  );
 
   const aiTriageBadgesByTaskId = useMemo(() => {
     const badges = new Map<string, AiTriageBadgeState>();

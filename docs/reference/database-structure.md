@@ -27,6 +27,7 @@ QDash uses MongoDB via the Bunnet ODM with a project-centric multi-tenant model.
 | `execution_counter`   | ExecutionCounterDocument  | Execution ID counter                            |
 | `calibration_note`    | CalibrationNoteDocument   | Calibration notes (workflow internal)           |
 | `flows`               | FlowDocument              | User-defined flows                              |
+| `metric_note`         | MetricNoteDocument        | Dashboard metric notes scoped by cooldown/range |
 | `note_event`          | NoteEventDocument         | Audit log for every note edit (write-through)   |
 | `cryostat`            | CryostatDocument          | Cryostat (dilution refrigerator) entity         |
 | `cooldown`            | CooldownDocument          | One cool-down cycle of one cryostat             |
@@ -411,7 +412,7 @@ class QubitDocument(Document):
     chip_id: str
     data: dict
     note: NoteModel = NoteModel()                  # Free-form per-qubit note
-    metric_notes: dict[str, NoteModel] = {}        # Per-metric notes (key = metric_key)
+    metric_notes: dict[str, NoteModel] = {}        # Legacy global per-metric notes
     system_info: SystemInfoModel
 ```
 
@@ -423,7 +424,7 @@ class QubitDocument(Document):
 **Note Fields:**
 
 - `note` - General free-form note about the qubit itself (e.g. "used in paper X", "replaced 2026-04-15"). Edited via `PUT /chips/{chip}/qubits/{qid}/note`.
-- `metric_notes[metric_key]` - Per-metric annotations (e.g. T1 specific notes). Edited via `PUT /chips/{chip}/qubits/{qid}/metric-notes/{metric_key}`.
+- `metric_notes[metric_key]` - Legacy global per-metric annotations. New dashboard metric notes are stored in `MetricNoteDocument` so they can be scoped by cool-down or time range. Edited via `PUT /chips/{chip}/qubits/{qid}/metric-notes/{metric_key}`.
 
 ---
 
@@ -445,14 +446,48 @@ class CouplingDocument(Document):
     chip_id: str
     data: dict
     note: NoteModel = NoteModel()                  # Free-form per-coupling note
-    metric_notes: dict[str, NoteModel] = {}        # Per-metric notes
+    metric_notes: dict[str, NoteModel] = {}        # Legacy global per-metric notes
     system_info: SystemInfoModel
 ```
 
 **Note Fields:**
 
 - `note` - General free-form note about the coupling. Edited via `PUT /chips/{chip}/couplings/{coupling_id}/note`.
-- `metric_notes[metric_key]` - Per-metric annotations. Edited via `PUT /chips/{chip}/couplings/{coupling_id}/metric-notes/{metric_key}`.
+- `metric_notes[metric_key]` - Legacy global per-metric annotations. New dashboard metric notes are stored in `MetricNoteDocument`. Edited via `PUT /chips/{chip}/couplings/{coupling_id}/metric-notes/{metric_key}`.
+
+---
+
+### MetricNoteDocument
+
+**Collection:** `metric_note`
+
+Stores the current dashboard metric note for one qubit/coupling metric in one operational scope. This collection supports both teams that manage explicit cool-down IDs and teams that only work from time ranges.
+
+**Indexes:**
+
+- `(project_id, chip_id, target_type, target_id, metric_key, scope_key)` - Unique current note per target metric and scope
+- `(project_id, chip_id, scope_key, target_type, target_id)` - Dashboard notes summary
+- `(project_id, chip_id, scope_started_at, scope_ended_at)` - Time-range fallback when cool-down docs are added later
+
+```python
+class MetricNoteDocument(Document):
+    project_id: str
+    chip_id: str
+    target_type: str                 # "qubit" | "coupling"
+    target_id: str                   # qid or coupling id
+    metric_key: str
+    note: NoteModel
+
+    scope_type: str                  # "cooldown" | "time_range" | "global"
+    scope_key: str                   # "cooldown:<id>", "time_range:<start>:<end>", or "global"
+    cooldown_id: str | None
+    scope_started_at: datetime | None
+    scope_ended_at: datetime | None
+    scope_source: str                # explicit_cooldown, current_cooldown, inferred_from_range, manual_time_range, legacy_global
+    system_info: SystemInfoModel
+```
+
+When a cool-down ID is known, the note stores both `cooldown_id` and the cool-down time bounds. When no cool-down document exists, the dashboard can save a `time_range` note. If a cool-down document is added later, summary reads include matching time-range notes inside that cool-down until they are edited into the explicit cool-down scope.
 
 ---
 
