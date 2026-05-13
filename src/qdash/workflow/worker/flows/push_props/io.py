@@ -1,8 +1,9 @@
 from pathlib import Path
 
-from qdash.workflow.worker.flows.push_props.formatter import represent_float, represent_none
 from ruamel.yaml import YAML
 from ruamel.yaml.comments import CommentedMap
+
+from qdash.workflow.worker.flows.push_props.formatter import represent_float, represent_none
 
 
 def create_yaml_loader(style: str = "rt") -> YAML:

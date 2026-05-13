@@ -9,6 +9,7 @@ from datetime import datetime
 from typing import Any, Literal, TypedDict
 
 from bunnet import SortDirection
+
 from qdash.datamodel.execution import ExecutionModel
 from qdash.datamodel.task import BaseTaskResultModel
 from qdash.dbmodel.task_result_history import TaskResultHistoryDocument

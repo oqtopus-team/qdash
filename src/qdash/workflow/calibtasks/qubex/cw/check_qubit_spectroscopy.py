@@ -223,8 +223,7 @@ class CheckQubitSpectroscopy(QubexTask):
                         )
             else:
                 print(
-                    f"[WARNING] Failed to detect qubit frequency for qid={qid}: "
-                    "no f01 peak found"
+                    f"[WARNING] Failed to detect qubit frequency for qid={qid}: no f01 peak found"
                 )
         except Exception:
             logger.warning(
@@ -265,8 +264,7 @@ class CheckQubitSpectroscopy(QubexTask):
         # We still return figures so they are saved before the task is marked failed.
         if estimated_frequency < 3.0:
             error_msg = (
-                f"Qubit frequency too low for qid={qid}: "
-                f"{estimated_frequency:.6f} GHz < 3.0 GHz"
+                f"Qubit frequency too low for qid={qid}: {estimated_frequency:.6f} GHz < 3.0 GHz"
             )
             print(f"[ERROR] {error_msg}")
             return PostProcessResult(

@@ -3,6 +3,7 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
+
 from qdash.datamodel.execution import ExecutionModel, ExecutionStatusModel
 from qdash.datamodel.system_info import SystemInfoModel
 from qdash.datamodel.task import (

@@ -8,6 +8,7 @@ from typing import Any
 
 import plotly.graph_objs as go
 from pydantic import BaseModel
+
 from qdash.datamodel.task import ParameterModel, RunParameterModel
 
 

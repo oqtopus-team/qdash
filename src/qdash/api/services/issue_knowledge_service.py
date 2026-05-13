@@ -16,6 +16,8 @@ if TYPE_CHECKING:
     from qdash.api.services.issue_service import IssueService
 
 from bunnet.exceptions import CollectionWasNotInitialized
+from starlette.exceptions import HTTPException
+
 from qdash.api.schemas.issue_knowledge import (
     IssueKnowledgeResponse,
     ListIssueKnowledgeResponse,
@@ -23,7 +25,6 @@ from qdash.api.schemas.issue_knowledge import (
 from qdash.api.schemas.success import SuccessResponse
 from qdash.dbmodel.issue_knowledge import IssueKnowledgeDocument
 from qdash.dbmodel.user import UserDocument
-from starlette.exceptions import HTTPException
 
 logger = logging.getLogger(__name__)
 

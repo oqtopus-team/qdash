@@ -85,8 +85,7 @@ def enqueue_ai_triage_note(
             return
         if _is_non_representative_mux_result(task):
             _log_info(
-                "AI triage enqueue skipped: task=%s task_id=%s qid=%s "
-                "non_representative_mux=true",
+                "AI triage enqueue skipped: task=%s task_id=%s qid=%s non_representative_mux=true",
                 task.name,
                 task.task_id,
                 getattr(task, "qid", ""),
@@ -228,7 +227,7 @@ def _prefect_logger() -> logging.Logger | None:
     try:
         from prefect import get_run_logger
 
-        return cast(logging.Logger, get_run_logger())
+        return cast("logging.Logger", get_run_logger())
     except Exception:
         return None
 
@@ -408,8 +407,7 @@ def _upsert_ai_triage_note(
     existing = _get_existing_task_note_content(task, execution_model)
 
     triage_section = (
-        f"{AI_TRIAGE_HEADER}\n\n{_format_review_metadata(model)}\n\n"
-        f"{_truncate_markdown(markdown)}"
+        f"{AI_TRIAGE_HEADER}\n\n{_format_review_metadata(model)}\n\n{_truncate_markdown(markdown)}"
     )
     if AI_TRIAGE_SECTION_RE.search(existing):
         remainder = AI_TRIAGE_SECTION_RE.sub("", existing).strip()

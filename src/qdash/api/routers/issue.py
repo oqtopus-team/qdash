@@ -9,10 +9,11 @@ from typing import TYPE_CHECKING, Annotated, Any
 
 from fastapi import APIRouter, Depends, Query, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
-from qdash.api.dependencies import get_issue_service  # noqa: TCH002
+
+from qdash.api.dependencies import get_issue_service
 from qdash.api.lib.ai_labels import STATUS_LABELS as _AI_STATUS_LABELS
 from qdash.api.lib.ai_labels import TOOL_LABELS as _AI_TOOL_LABELS
-from qdash.api.lib.project import (  # noqa: TCH002
+from qdash.api.lib.project import (
     ProjectContext,
     get_project_context,
 )

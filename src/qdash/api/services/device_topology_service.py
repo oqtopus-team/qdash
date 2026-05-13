@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING, Any
 import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 import networkx as nx
+
 from qdash.api.schemas.device_topology import (
     Coupling,
     CouplingGateDuration,
@@ -141,7 +142,7 @@ class DeviceTopologyService:
         coupling_models = self._chip_repo.get_all_coupling_models(project_id, chip_model.chip_id)
 
         topology = load_topology(chip_model.topology_id)
-        sorted_physical_ids = sorted(request.qubits, key=lambda x: int(x))
+        sorted_physical_ids = sorted(request.qubits, key=int)
         id_mapping = {pid: idx for idx, pid in enumerate(sorted_physical_ids)}
 
         qubits = self._build_qubits(
@@ -370,7 +371,7 @@ class DeviceTopologyService:
         nx.draw_networkx_edges(g, pos, width=3)
 
         labels = {
-            node: f"Q{g.nodes[node]['physical_id']}\n{g.nodes[node]['fidelity']*100:.2f}%"
+            node: f"Q{g.nodes[node]['physical_id']}\n{g.nodes[node]['fidelity'] * 100:.2f}%"
             for node in g.nodes
         }
         nx.draw_networkx_labels(

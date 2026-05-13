@@ -503,18 +503,20 @@ export function HistogramView() {
         font: { size: 18 },
       },
       xaxis: {
-        title: isCoupling ? "Coupling Pair" : "Qubit ID",
+        title: { text: isCoupling ? "Coupling Pair" : "Qubit ID" },
         gridcolor: "#e5e7eb",
         showgrid: false,
         tickangle: -45,
         automargin: true,
       },
       yaxis: {
-        title: !isPercent
-          ? `${currentMetricConfig?.title || selectedParameter} (${currentMetricConfig?.unit || ""})`
-          : showAsErrorRate
-            ? "Error Rate (%)"
-            : `${currentMetricConfig?.title || selectedParameter} (%)`,
+        title: {
+          text: !isPercent
+            ? `${currentMetricConfig?.title || selectedParameter} (${currentMetricConfig?.unit || ""})`
+            : showAsErrorRate
+              ? "Error Rate (%)"
+              : `${currentMetricConfig?.title || selectedParameter} (%)`,
+        },
         gridcolor: "#e5e7eb",
         showgrid: true,
         zeroline: false,

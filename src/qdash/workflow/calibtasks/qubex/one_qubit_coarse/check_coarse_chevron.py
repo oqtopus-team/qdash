@@ -3,6 +3,8 @@ from typing import ClassVar
 
 import numpy as np
 import plotly.graph_objects as go
+from qubex.measurement.measurement_defaults import DEFAULT_READOUT_DURATION
+
 from qdash.datamodel.task import ParameterModel, RunParameterModel
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
@@ -11,7 +13,6 @@ from qdash.workflow.calibtasks.base import (
 )
 from qdash.workflow.calibtasks.qubex.base import QubexTask
 from qdash.workflow.engine.backend.qubex import QubexBackend
-from qubex.measurement.measurement_defaults import DEFAULT_READOUT_DURATION
 
 DEFAULT_READOUT_AMPLITUDE = 0.2
 DEFAULT_CONTROL_AMPLITUDE = 0.0625
@@ -121,7 +122,7 @@ class CheckCoarseChevron(QubexTask):
 
         qubit_freq = self.output_parameters["qubit_frequency"].value
         if qubit_freq is not None and qubit_freq < 3.0:
-            error_msg = f"Qubit frequency too low for qid={qid}: " f"{qubit_freq:.6f} GHz < 3.0 GHz"
+            error_msg = f"Qubit frequency too low for qid={qid}: {qubit_freq:.6f} GHz < 3.0 GHz"
             print(f"[ERROR] {error_msg}")
             return PostProcessResult(
                 output_parameters=output_parameters,

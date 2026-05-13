@@ -4,6 +4,7 @@ from datetime import datetime
 from unittest.mock import MagicMock
 
 import pytest
+
 from qdash.api.schemas.provenance import (
     DegradationTrendsResponse,
     ExecutionComparisonResponse,
@@ -219,7 +220,7 @@ class TestProvenanceService:
 
         monkeypatch.setattr(
             "qdash.api.services.provenance_service.load_policy_config",
-            lambda: _Policy(),
+            _Policy,
         )
         mock_repos["parameter_version"].get_all_current.return_value = []
 
@@ -246,7 +247,7 @@ class TestProvenanceService:
 
         monkeypatch.setattr(
             "qdash.api.services.provenance_service.load_policy_config",
-            lambda: _Policy(),
+            _Policy,
         )
 
         doc = MagicMock()
@@ -284,7 +285,7 @@ class TestProvenanceService:
 
         monkeypatch.setattr(
             "qdash.api.services.provenance_service.load_policy_config",
-            lambda: _Policy(),
+            _Policy,
         )
 
         impact = ImpactResponse(
@@ -586,7 +587,7 @@ class TestGetDegradationTrends:
 
         monkeypatch.setattr(
             "qdash.api.services.provenance_service.load_metrics_config",
-            lambda: _Config(),
+            _Config,
         )
 
     def _make_versions(self, values, *, base_entity_id="param:Q0:exec", base_version=1):

@@ -11,6 +11,7 @@ from typing import ClassVar, Literal
 from bunnet import Document
 from pydantic import ConfigDict, Field
 from pymongo import ASCENDING, DESCENDING, IndexModel
+
 from qdash.datamodel.note import NoteModel
 from qdash.datamodel.system_info import SystemInfoModel
 

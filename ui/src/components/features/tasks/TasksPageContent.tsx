@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, type ReactElement } from "react";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -276,7 +276,7 @@ export function TasksPageContent() {
   const renderFileTree = (
     nodes: TaskFileTreeNode[],
     level = 0,
-  ): JSX.Element[] => {
+  ): ReactElement[] => {
     return nodes.map((node) => (
       <div key={node.path}>
         {node.type === "directory" ? (

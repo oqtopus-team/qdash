@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Ban, RotateCcw } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useSetTaskResultExcluded } from "@/client/task-result/task-result";

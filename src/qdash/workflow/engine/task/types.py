@@ -11,6 +11,7 @@ that need to reference TaskProtocol or TaskExecutionResult.
 from typing import Any, ClassVar, Protocol, runtime_checkable
 
 from pydantic import BaseModel, Field
+
 from qdash.datamodel.task import CalibDataModel, ParameterModel
 from qdash.workflow.calibtasks.results import PostProcessResult, PreProcessResult, RunResult
 

@@ -5,6 +5,7 @@ from typing import Any, ClassVar
 from bunnet import Document
 from pydantic import ConfigDict, Field, field_validator
 from pymongo import ASCENDING, DESCENDING, IndexModel
+
 from qdash.common.datetime_utils import ensure_timezone, parse_elapsed_time
 from qdash.datamodel.execution import ExecutionModel
 from qdash.datamodel.system_info import SystemInfoModel

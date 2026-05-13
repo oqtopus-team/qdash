@@ -58,7 +58,6 @@ lint.ignore = [
     "E501",  # line-too-long (handled by formatter)
     "B904",  # raise-without-from-inside-except (TODO: fix in exception handling task)
     "B008",  # function-call-in-default-argument (FastAPI Depends pattern)
-    "UP038", # non-pep604-isinstance (requires manual fix)
     "B007",  # unused-loop-control-variable (minor style issue)
     "B012",  # return-in-finally (intentional in specific cases)
     "B027",  # empty-method-without-abstract-decorator (intentional default impl)
@@ -69,6 +68,7 @@ lint.ignore = [
     "PERF401", # manual-list-comprehension (readability over micro-optimization)
     "PERF402", # manual-list-copy (readability over micro-optimization)
     "PLW0603", # global-statement (used for singletons/caching)
+    "PLC0415", # import-outside-top-level (intentional lazy imports for optional deps/circular refs)
     "RUF003",  # ambiguous-unicode-character-comment (Japanese comments)
     "RUF012",  # mutable-class-default (Pydantic models)
     "S101",    # assert (used for runtime checks)
@@ -77,7 +77,9 @@ lint.ignore = [
 [tool.ruff.lint.per-file-ignores]
 "src/qdash/workflow/service/calib_service.py" = ["E402"]  # Circular import avoidance
 "src/qdash/workflow/paths.py" = ["F401"]  # Re-exports for backward compatibility
+"src/qdash/api/routers/*.py" = ["TC001"]  # FastAPI dependency annotations need runtime imports
 "src/qdash/api/routers/auth.py" = ["S106"]  # "bearer" is standard token type
+"src/qdash/api/schemas/auth.py" = ["S105"]  # "bearer" is standard OAuth token type
 "src/qdash/api/services/flow_service.py" = ["S603", "S607"]  # ruff format subprocess call
 "src/qdash/api/lib/topology_config.py" = ["S112"]  # Skip invalid config files
 "tests/**" = [

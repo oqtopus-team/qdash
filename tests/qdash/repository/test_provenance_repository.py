@@ -4,6 +4,7 @@ from datetime import datetime
 from unittest.mock import ANY, MagicMock, patch
 
 import pytest
+
 from qdash.dbmodel.provenance import (
     ActivityDocument,
     ParameterVersionDocument,

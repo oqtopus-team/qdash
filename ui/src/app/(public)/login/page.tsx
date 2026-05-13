@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useState, useEffect } from "react";
 
-import { Book, Github, Moon, Sun } from "lucide-react";
+import { Book, GitBranch, Moon, Sun } from "lucide-react";
 
 import { useTheme } from "@/contexts/ThemeContext";
 import { EnvironmentBadge } from "@/components/ui/EnvironmentBadge";
@@ -92,7 +92,7 @@ export default function LoginPage() {
               rel="noopener noreferrer"
               className="btn btn-ghost btn-sm gap-2"
             >
-              <Github size={18} />
+              <GitBranch size={18} />
               GitHub
             </a>
             <button

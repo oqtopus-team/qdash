@@ -8,11 +8,11 @@ import os
 import re
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
-from uuid import UUID
 
 import httpx
 from fastapi import HTTPException
 from prefect.client.orchestration import get_client
+
 from qdash.api.schemas.flow import (
     ExecuteFlowRequest,
     ExecuteFlowResponse,
@@ -28,6 +28,8 @@ from qdash.common.paths import SERVICE_DIR, TEMPLATES_DIR, USER_FLOWS_DIR
 from qdash.config import get_settings
 
 if TYPE_CHECKING:
+    from uuid import UUID
+
     from qdash.repository import MongoFlowRepository
 
 logger = logging.getLogger("uvicorn.app")
@@ -288,7 +290,7 @@ class FlowService:
         # Delete Prefect deployment
         if flow.deployment_id:
             try:
-                deployment_id = cast(UUID, flow.deployment_id)
+                deployment_id = cast("UUID", flow.deployment_id)
                 async with get_client() as client:
                     await client.delete_deployment(deployment_id)
                     logger.info(f"Deleted Prefect deployment: {flow.deployment_id}")
@@ -374,7 +376,7 @@ class FlowService:
 
         try:
             async with get_client() as client:
-                deployment_id = cast(UUID, flow.deployment_id)
+                deployment_id = cast("UUID", flow.deployment_id)
                 flow_run = await client.create_flow_run_from_deployment(
                     deployment_id=deployment_id,
                     parameters=parameters,
@@ -464,7 +466,7 @@ class FlowService:
 
         try:
             async with get_client() as client:
-                deployment_id = cast(UUID, flow.deployment_id)
+                deployment_id = cast("UUID", flow.deployment_id)
                 flow_run = await client.create_flow_run_from_deployment(
                     deployment_id=deployment_id,
                     parameters=parameters,
@@ -541,7 +543,7 @@ class FlowService:
             logger.error(f"System deployment '{deployment_name}' not found")
             raise HTTPException(
                 status_code=503,
-                detail=("System deployment not available. " "The worker may not have started yet."),
+                detail=("System deployment not available. The worker may not have started yet."),
             )
 
         flow_name = f"re-execute:{task_name}"
@@ -574,7 +576,7 @@ class FlowService:
 
                 execution_id = str(flow_run.id)
                 flow_run_url = (
-                    f"http://localhost:{settings.prefect_port}" f"/runs/flow-run/{execution_id}"
+                    f"http://localhost:{settings.prefect_port}/runs/flow-run/{execution_id}"
                 )
                 qdash_ui_url = f"http://localhost:{settings.ui_port}/execution/{execution_id}"
 
@@ -761,14 +763,10 @@ class FlowService:
         for node in ast.walk(tree):
             if isinstance(node, ast.FunctionDef):
                 for decorator in node.decorator_list:
-                    if (
-                        isinstance(decorator, ast.Name)
-                        and decorator.id == "flow"
-                        or (
-                            isinstance(decorator, ast.Call)
-                            and isinstance(decorator.func, ast.Name)
-                            and decorator.func.id == "flow"
-                        )
+                    if (isinstance(decorator, ast.Name) and decorator.id == "flow") or (
+                        isinstance(decorator, ast.Call)
+                        and isinstance(decorator.func, ast.Name)
+                        and decorator.func.id == "flow"
                     ):
                         flow_functions.append(node.name)
 
@@ -850,8 +848,7 @@ class FlowService:
             raise HTTPException(
                 status_code=500,
                 detail=(
-                    f"Failed to register deployment:"
-                    f" {e.response.status_code}: {e.response.text}"
+                    f"Failed to register deployment: {e.response.status_code}: {e.response.text}"
                 ),
             )
         except httpx.HTTPError as e:

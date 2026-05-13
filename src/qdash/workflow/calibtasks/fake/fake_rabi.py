@@ -5,6 +5,9 @@ import numpy as np
 import numpy.typing as npt
 import plotly.graph_objects as go
 import qubex as qx
+from qubex.measurement.measurement_defaults import DEFAULT_INTERVAL, DEFAULT_SHOTS
+from qubex.simulator import Control, QuantumSimulator, QuantumSystem, SimulationResult, Transmon
+
 from qdash.datamodel.task import ParameterModel, RunParameterModel
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
@@ -13,8 +16,6 @@ from qdash.workflow.calibtasks.base import (
 )
 from qdash.workflow.calibtasks.fake.base import FakeTask
 from qdash.workflow.engine.backend.fake import FakeBackend
-from qubex.measurement.measurement_defaults import DEFAULT_INTERVAL, DEFAULT_SHOTS
-from qubex.simulator import Control, QuantumSimulator, QuantumSystem, SimulationResult, Transmon
 
 
 def downsample(

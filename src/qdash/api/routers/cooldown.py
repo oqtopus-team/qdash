@@ -6,8 +6,9 @@ import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
-from qdash.api.dependencies import get_cooldown_service  # noqa: TCH002
-from qdash.api.lib.project import (  # noqa: TCH002
+
+from qdash.api.dependencies import get_cooldown_service
+from qdash.api.lib.project import (
     ProjectContext,
     get_project_context,
     get_project_context_editor,
@@ -19,7 +20,7 @@ from qdash.api.schemas.cooldown import (
     ListCooldownsResponse,
 )
 from qdash.api.schemas.success import SuccessResponse
-from qdash.api.services.cooldown_service import CooldownService  # noqa: TCH002
+from qdash.api.services.cooldown_service import CooldownService
 
 router = APIRouter()
 logger = logging.getLogger(__name__)

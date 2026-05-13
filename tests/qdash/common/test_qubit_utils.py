@@ -3,6 +3,7 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
+
 from qdash.common.qubit_utils import (
     DEFAULT_NUM_QUBITS,
     _get_chip_size,

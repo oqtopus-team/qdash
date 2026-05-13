@@ -10,8 +10,9 @@ import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
-from qdash.api.dependencies import get_provenance_service  # noqa: TCH002
-from qdash.api.lib.project import (  # noqa: TCH002
+
+from qdash.api.dependencies import get_provenance_service
+from qdash.api.lib.project import (
     ProjectContext,
     get_project_context,
 )
@@ -28,7 +29,7 @@ from qdash.api.schemas.provenance import (
     RecentChangesResponse,
     RecentExecutionsResponse,
 )
-from qdash.api.services.provenance_service import ProvenanceService  # noqa: TCH002
+from qdash.api.services.provenance_service import ProvenanceService
 
 router = APIRouter()
 logger = logging.getLogger(__name__)

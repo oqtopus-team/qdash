@@ -4,6 +4,7 @@ from collections.abc import Iterator
 from typing import Any
 
 from pydantic import BaseModel
+
 from qdash.common.datetime_utils import now
 from qdash.datamodel.task import (
     BaseTaskResultModel,

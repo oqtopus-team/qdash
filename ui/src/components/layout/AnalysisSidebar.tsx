@@ -1,6 +1,5 @@
 "use client";
 
-import React from "react";
 import { Bot } from "lucide-react";
 import { useAnalysisChatContext } from "@/contexts/AnalysisChatContext";
 import { AnalysisChatPanel } from "@/components/features/metrics/AnalysisChatPanel";

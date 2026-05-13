@@ -3,6 +3,7 @@ from typing import Any, ClassVar
 from bunnet import Document
 from pydantic import ConfigDict, Field
 from pymongo import ASCENDING, IndexModel
+
 from qdash.datamodel.coupling import CouplingModel
 from qdash.datamodel.note import NoteModel
 from qdash.datamodel.system_info import SystemInfoModel

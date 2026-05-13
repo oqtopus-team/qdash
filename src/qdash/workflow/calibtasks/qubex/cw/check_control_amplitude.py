@@ -3,6 +3,9 @@ import logging
 from typing import TYPE_CHECKING, Any, ClassVar
 
 import numpy as np
+from qubex.experiment.experiment_constants import DEFAULT_RABI_FREQUENCY
+from qubex.measurement.measurement_defaults import DEFAULT_INTERVAL
+
 from qdash.datamodel.task import ParameterModel, RunParameterModel
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
@@ -10,8 +13,6 @@ from qdash.workflow.calibtasks.base import (
 )
 from qdash.workflow.calibtasks.qubex.base import QubexTask
 from qdash.workflow.engine.backend.qubex import QubexBackend
-from qubex.experiment.experiment_constants import DEFAULT_RABI_FREQUENCY
-from qubex.measurement.measurement_defaults import DEFAULT_INTERVAL
 
 if TYPE_CHECKING:
     import plotly.graph_objs as go

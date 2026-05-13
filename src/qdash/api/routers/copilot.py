@@ -19,11 +19,11 @@ if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
 from qdash.api.dependencies import (
-    get_copilot_chat_session_service,  # noqa: TCH002
-    get_copilot_data_service,  # noqa: TCH002
+    get_copilot_chat_session_service,
+    get_copilot_data_service,
 )
 from qdash.api.lib.ai_labels import STATUS_LABELS, TOOL_LABELS
-from qdash.api.lib.auth import get_current_active_user  # noqa: TCH002
+from qdash.api.lib.auth import get_current_active_user
 from qdash.api.lib.copilot_analysis import (
     AnalysisResponse,
     AnalyzeRequest,
@@ -31,7 +31,7 @@ from qdash.api.lib.copilot_analysis import (
 )
 from qdash.api.lib.copilot_config import CopilotConfig, ModelConfig, load_copilot_config
 from qdash.api.lib.sse import SSETaskBridge, sse_event
-from qdash.api.schemas.auth import User  # noqa: TCH002
+from qdash.api.schemas.auth import User
 from qdash.api.schemas.copilot_chat_session import (
     CopilotChatSessionResponse,
     CreateCopilotChatSessionRequest,
@@ -39,7 +39,7 @@ from qdash.api.schemas.copilot_chat_session import (
     UpdateCopilotChatSessionRequest,
 )
 from qdash.api.services.copilot_chat_session_service import (
-    CopilotChatSessionService,  # noqa: TCH002
+    CopilotChatSessionService,
 )
 from qdash.api.services.copilot_data_service import CopilotDataService
 from qdash.datamodel.task_knowledge import get_task_knowledge

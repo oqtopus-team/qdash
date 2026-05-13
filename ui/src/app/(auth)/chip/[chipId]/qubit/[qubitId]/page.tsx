@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import React, { useEffect, Suspense } from "react";
+import { useEffect, Suspense } from "react";
 
 import { ArrowLeft, Clock, Eye, TrendingUp } from "lucide-react";
 

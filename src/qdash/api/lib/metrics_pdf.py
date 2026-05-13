@@ -15,6 +15,11 @@ from typing import TYPE_CHECKING, Any, Literal
 import numpy as np
 import plotly.graph_objects as go
 from PIL import Image
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.utils import ImageReader
+from reportlab.pdfgen import canvas
+
 from qdash.api.lib.metrics_chart import (
     ChipGeometry,
     build_chip_geometry,
@@ -24,10 +29,6 @@ from qdash.api.lib.metrics_chart import (
 )
 from qdash.api.lib.metrics_config import load_metrics_config
 from qdash.common.topology_config import TopologyDefinition, load_topology
-from reportlab.lib import colors
-from reportlab.lib.pagesizes import A4
-from reportlab.lib.utils import ImageReader
-from reportlab.pdfgen import canvas
 
 if TYPE_CHECKING:
     from qdash.api.schemas.metrics import ChipMetricsResponse

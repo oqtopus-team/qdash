@@ -301,7 +301,7 @@ def _execute_mux_qubits_with_session(
                 # Skip MUX tasks for non-representative qubits
                 if _should_skip_task_for_qid(task_name, qid, backend_name):
                     logger.info(
-                        f"Skipping MUX task {task_name} for qid={qid} " "(not MUX representative)"
+                        f"Skipping MUX task {task_name} for qid={qid} (not MUX representative)"
                     )
                     result[task_name] = {"skipped": True, "reason": "not_mux_representative"}
                     continue
@@ -383,9 +383,7 @@ def _execute_single_qubit_with_session(
         for task_name in tasks:
             # Skip MUX tasks for non-representative qubits
             if _should_skip_task_for_qid(task_name, qid, backend_name):
-                logger.info(
-                    f"Skipping MUX task {task_name} for qid={qid} " "(not MUX representative)"
-                )
+                logger.info(f"Skipping MUX task {task_name} for qid={qid} (not MUX representative)")
                 result[task_name] = {"skipped": True, "reason": "not_mux_representative"}
                 continue
             task_result = session.execute_task(task_name, qid)

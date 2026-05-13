@@ -34,7 +34,7 @@ interface UseGridLayoutParams {
 
 interface UseGridLayoutResult {
   /** Reference to attach to the container element */
-  containerRef: RefObject<HTMLDivElement>;
+  containerRef: RefObject<HTMLDivElement | null>;
   /** Calculated cell size in pixels */
   cellSize: number;
   /** Whether the viewport is mobile width */

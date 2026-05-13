@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from prefect import get_run_logger, task
+
 from qdash.dbmodel.initialize import initialize
 
 CACHE_POLICY_NO_CACHE: Any = None
@@ -79,7 +80,7 @@ def execute_dynamic_task_by_qid_service(
 
     try:
         # Execute via TaskContext's executor
-        es, result = task_context.executor.execute(
+        es, _result = task_context.executor.execute(
             task=task_instance,
             backend=backend,
             execution_service=execution_service,
@@ -115,7 +116,7 @@ def execute_dynamic_task_batch_service(
     try:
         # Execute task for each qid
         for qid in qids:
-            es, result = task_context.executor.execute(
+            es, _result = task_context.executor.execute(
                 task=task_instance,
                 backend=backend,
                 execution_service=execution_service,

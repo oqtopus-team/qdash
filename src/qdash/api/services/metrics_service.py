@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, Any, Literal
 
 from bunnet import SortDirection
 from fastapi import HTTPException
+
 from qdash.api.lib.metrics_config import load_metrics_config
 from qdash.api.schemas.metrics import (
     ChipMetricsResponse,

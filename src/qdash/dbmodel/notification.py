@@ -6,6 +6,7 @@ from typing import ClassVar, Literal
 from bunnet import Document
 from pydantic import ConfigDict, Field
 from pymongo import ASCENDING, DESCENDING, IndexModel
+
 from qdash.common.datetime_utils import now
 
 NotificationKind = Literal["mention", "issue_reply", "note_mention", "forum_mention", "forum_reply"]

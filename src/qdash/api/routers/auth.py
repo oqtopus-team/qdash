@@ -4,6 +4,7 @@ import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Form, HTTPException, status
+
 from qdash.api.dependencies import get_auth_service
 from qdash.api.lib.auth import authenticate_user, get_current_active_user
 from qdash.api.schemas.auth import (

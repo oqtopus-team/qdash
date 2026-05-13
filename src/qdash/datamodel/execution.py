@@ -3,6 +3,7 @@ from enum import Enum
 from typing import Any
 
 from pydantic import BaseModel, Field, field_serializer, field_validator
+
 from qdash.common.datetime_utils import (
     ensure_timezone,
     format_elapsed_time,

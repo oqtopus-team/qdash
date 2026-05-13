@@ -6,6 +6,7 @@ import logging
 from typing import TYPE_CHECKING, Any, cast
 
 from fastapi import HTTPException, status
+
 from qdash.api.schemas.project import MemberResponse, ProjectResponse
 from qdash.datamodel.project import ProjectRole
 from qdash.dbmodel.project import ProjectDocument
@@ -159,7 +160,7 @@ class ProjectService:
                     role=ProjectRole.OWNER,
                     status="active",
                 )
-                return cast(ProjectDocument, existing)
+                return cast("ProjectDocument", existing)
             logger.warning(
                 "Default project %s missing for user %s, creating a new one",
                 user.default_project_id,

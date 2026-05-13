@@ -286,7 +286,7 @@ class ExecutionService:
     @property
     def project_id(self) -> str | None:
         """Get project ID."""
-        return cast(str | None, self.state_manager.project_id)
+        return cast("str | None", self.state_manager.project_id)
 
     @property
     def tags(self) -> list[str]:

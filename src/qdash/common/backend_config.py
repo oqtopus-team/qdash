@@ -12,6 +12,7 @@ import os
 from functools import lru_cache
 
 from pydantic import BaseModel, Field
+
 from qdash.common.config_loader import ConfigLoader
 
 

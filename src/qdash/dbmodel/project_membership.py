@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-from datetime import datetime  # noqa: TCH003
+from datetime import datetime  # noqa: TC003
 from typing import ClassVar, cast
 
 from bunnet import Document
 from pydantic import ConfigDict, Field
 from pymongo import ASCENDING, IndexModel
+
 from qdash.datamodel.project import ProjectRole
 from qdash.datamodel.system_info import SystemInfoModel
 

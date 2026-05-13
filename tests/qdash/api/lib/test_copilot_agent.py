@@ -4,6 +4,7 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
+
 from qdash.api.lib.copilot_agent import _parse_response, _run_chat_completions
 from qdash.api.lib.copilot_config import CopilotConfig, ModelConfig
 

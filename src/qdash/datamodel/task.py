@@ -7,6 +7,7 @@ from typing import Any, Final, Literal
 
 import numpy as np
 from pydantic import BaseModel, Field, field_serializer, field_validator
+
 from qdash.common.datetime_utils import format_elapsed_time, format_iso, now, parse_elapsed_time
 from qdash.datamodel.system_info import SystemInfoModel
 

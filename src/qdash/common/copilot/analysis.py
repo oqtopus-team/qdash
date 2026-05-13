@@ -6,10 +6,12 @@ Defines the structured context sent to the LLM and the expected response format.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, Field, field_validator
-from qdash.common.copilot.config import ModelConfig  # noqa: TCH002
+
+if TYPE_CHECKING:
+    from qdash.common.copilot.config import ModelConfig
 
 
 @dataclass

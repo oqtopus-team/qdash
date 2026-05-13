@@ -1,5 +1,7 @@
 from typing import Any, cast
 
+from ruamel.yaml.comments import CommentedMap
+
 from qdash.dbmodel.initialize import initialize
 from qdash.workflow.engine.backend.qubex import QubexBackend
 from qdash.workflow.worker.flows.push_props.formatter import format_number
@@ -10,7 +12,6 @@ from qdash.workflow.worker.flows.push_props.models import (
     QubitProperties,
 )
 from qdash.workflow.worker.flows.push_props.processor import _process_data
-from ruamel.yaml.comments import CommentedMap
 
 qubit_field_map = {
     "qubit_frequency": "qubit_frequency",
@@ -57,11 +58,8 @@ def merge_properties(
 
     for qid, qubit in chip_props.qubits.items():
         for field, value in qubit.model_dump(exclude_none=True).items():
-            if (
-                field == "x90_gate_fidelity"
-                and value > 1.0
-                or field == "x180_gate_fidelity"
-                and value > 1.0
+            if (field == "x90_gate_fidelity" and value > 1.0) or (
+                field == "x180_gate_fidelity" and value > 1.0
             ):
                 update_if_different(field, qid, None)
             # elif field == "qubit_frequency":
@@ -182,7 +180,7 @@ def create_chip_properties(
         },
     )
     props, _ = get_chip_properties(
-        qubit_models, coupling_models, within_24hrs=False, backend=cast(QubexBackend, backend)
+        qubit_models, coupling_models, within_24hrs=False, backend=cast("QubexBackend", backend)
     )
 
     handler = ChipPropertyYAMLHandler(source_path)

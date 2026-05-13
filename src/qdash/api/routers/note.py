@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime  # noqa: TCH003
+from datetime import datetime  # noqa: TC003
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from qdash.api.dependencies import get_note_service  # noqa: TCH002
-from qdash.api.lib.project import (  # noqa: TCH002
+
+from qdash.api.dependencies import get_note_service
+from qdash.api.lib.project import (
     ProjectContext,
     get_project_context,
     get_project_context_editor,
@@ -19,7 +20,7 @@ from qdash.api.schemas.note import (
     NoteUpsertRequest,
 )
 from qdash.api.schemas.success import SuccessResponse
-from qdash.api.services.note_service import NoteService  # noqa: TCH002
+from qdash.api.services.note_service import NoteService
 from qdash.datamodel.note import NoteModel
 
 router = APIRouter()

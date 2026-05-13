@@ -16,6 +16,7 @@ from threading import Lock
 from typing import TYPE_CHECKING, Any
 
 from bunnet import SortDirection
+
 from qdash.api.schemas.task_result import (
     BulkAiTriageResponse,
     LatestTaskResultResponse,
@@ -582,8 +583,7 @@ class TaskResultService:
                     run_analysis(
                         context=ctx.context,
                         user_message=(
-                            f"{config.analysis.ai_triage_message}\n\n"
-                            f"{AI_TRIAGE_FORMAT_REMINDER}"
+                            f"{config.analysis.ai_triage_message}\n\n{AI_TRIAGE_FORMAT_REMINDER}"
                         ),
                         config=config,
                         image_base64=ctx.image_base64,

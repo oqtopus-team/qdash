@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from bunnet import SortDirection
+
 from qdash.dbmodel.note_event import NoteEventDocument
 from qdash.dbmodel.user import UserDocument
 

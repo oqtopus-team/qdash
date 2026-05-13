@@ -1125,7 +1125,7 @@ class ProvenanceService:
         for node_item in impact_data.get("nodes", []):
             node_dict = dict(node_item)
             node_type = str(node_dict.get("type", ""))
-            metadata = cast(dict[str, Any], node_dict.get("metadata") or {})
+            metadata = cast("dict[str, Any]", node_dict.get("metadata") or {})
             node_id = str(node_dict.get("id", ""))
             node_depth = depths.get(node_id, 0)
             max_depth_reached = max(max_depth_reached, node_depth)

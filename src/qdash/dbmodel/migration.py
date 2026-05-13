@@ -237,7 +237,7 @@ def migrate_fix_invalid_fidelity(dry_run: bool = True) -> dict[str, Any]:
         logger.info(f"Found {len(invalid_docs)} documents with invalid fidelity values:")
         for doc_info in invalid_docs[:10]:  # Show first 10
             params_str = ", ".join(
-                f"{name}={value*100:.2f}%" for name, value in doc_info["invalid_params"]
+                f"{name}={value * 100:.2f}%" for name, value in doc_info["invalid_params"]
             )
             logger.info(f"  - {doc_info['name']} (qid={doc_info['qid']}): {params_str}")
             stats["details"].append(
@@ -246,7 +246,7 @@ def migrate_fix_invalid_fidelity(dry_run: bool = True) -> dict[str, Any]:
                     "name": doc_info["name"],
                     "qid": doc_info["qid"],
                     "invalid_params": {
-                        name: f"{value*100:.2f}%" for name, value in doc_info["invalid_params"]
+                        name: f"{value * 100:.2f}%" for name, value in doc_info["invalid_params"]
                     },
                 }
             )
@@ -257,7 +257,7 @@ def migrate_fix_invalid_fidelity(dry_run: bool = True) -> dict[str, Any]:
     if not dry_run and invalid_docs:
         for doc_info in invalid_docs:
             params_str = ", ".join(
-                f"{name}={value*100:.2f}%" for name, value in doc_info["invalid_params"]
+                f"{name}={value * 100:.2f}%" for name, value in doc_info["invalid_params"]
             )
             message = f"Fidelity exceeds 100%: {params_str}"
 
@@ -376,6 +376,7 @@ def migrate_slim_execution_history(dry_run: bool = True) -> dict[str, Any]:
         RuntimeError: If database is not properly initialized.
     """
     from pymongo.errors import ConnectionFailure, ServerSelectionTimeoutError
+
     from qdash.dbmodel.execution_history import ExecutionHistoryDocument
 
     stats: dict[str, Any] = {

@@ -151,7 +151,7 @@ class TaskKnowledge(BaseModel):
         description="Concise explanation of the physical principle, including pulse sequences"
     )
     expected_result: ExpectedResult = Field(
-        default_factory=lambda: ExpectedResult(),
+        default_factory=ExpectedResult,
         description="Expected shape and features of the result",
     )
     evaluation_criteria: str = Field(

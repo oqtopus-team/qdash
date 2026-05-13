@@ -103,7 +103,7 @@ def _safe_import(
     level: int = 0,
 ) -> Any:
     """Custom __import__ that only allows whitelisted modules."""
-    top_level = name.split(".")[0]
+    top_level = name.split(".", maxsplit=1)[0]
     if name not in ALLOWED_MODULES and top_level not in {m.split(".")[0] for m in ALLOWED_MODULES}:
         msg = f"Import of '{name}' is not allowed. Allowed modules: {', '.join(sorted(ALLOWED_MODULES))}"
         raise ImportError(msg)

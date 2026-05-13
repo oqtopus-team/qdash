@@ -405,13 +405,13 @@ export function CorrelationView() {
         font: { size: 18 },
       },
       xaxis: {
-        title: `${xMetricConfig?.title || xParameter} (${xUnit})`,
+        title: { text: `${xMetricConfig?.title || xParameter} (${xUnit})` },
         gridcolor: "#e5e7eb",
         showgrid: true,
         zeroline: false,
       },
       yaxis: {
-        title: `${yMetricConfig?.title || yParameter} (${yUnit})`,
+        title: { text: `${yMetricConfig?.title || yParameter} (${yUnit})` },
         gridcolor: "#e5e7eb",
         showgrid: true,
         zeroline: false,

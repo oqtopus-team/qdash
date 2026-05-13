@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 from typing import Any, cast
 
 from pydantic import BaseModel, field_validator
+
 from qdash.common.datetime_utils import calculate_elapsed_time, now
 from qdash.datamodel.execution import (
     ExecutionModel,
@@ -55,7 +56,7 @@ class ExecutionStateManager(BaseModel):
         """Convert dict to ExecutionNote for backward compatibility."""
         if isinstance(v, dict):
             return ExecutionNote.from_dict(v)
-        return cast(ExecutionNote, v)
+        return cast("ExecutionNote", v)
 
     def start(self) -> "ExecutionStateManager":
         """Set execution to started state.

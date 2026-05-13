@@ -1,4 +1,5 @@
 from pydantic import BaseModel, Field
+
 from qdash.datamodel.user import SystemRole, Username
 
 

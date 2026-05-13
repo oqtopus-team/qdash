@@ -8,6 +8,7 @@ import logging
 from typing import Any
 
 from bunnet import SortDirection
+
 from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
 
 logger = logging.getLogger(__name__)

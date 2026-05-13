@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from bunnet import SortDirection
+
 from qdash.dbmodel.cooldown import CooldownDocument
 
 if TYPE_CHECKING:
