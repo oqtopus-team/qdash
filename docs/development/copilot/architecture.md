@@ -54,8 +54,8 @@ model:
 analysis_models:
   - provider: ollama
     name: gemma4:26b
-    base_url: env:GEMMA_BASE_URL
-    api_key_env: GEMMA_API_KEY
+    base_url: env:OLLAMA_BASE_URL
+    api_key_env: OLLAMA_API_KEY
     keep_alive: 30m
     temperature: 1.0
     top_p: 0.95
@@ -65,8 +65,8 @@ analysis_models:
     max_output_tokens: 4096
   - provider: ollama
     name: gemma4:31b
-    base_url: env:GEMMA_BASE_URL
-    api_key_env: GEMMA_API_KEY
+    base_url: env:OLLAMA_BASE_URL
+    api_key_env: OLLAMA_API_KEY
     keep_alive: 30m
     temperature: 1.0
     top_p: 0.95
@@ -110,9 +110,10 @@ Configuration is loaded via `ConfigLoader` with local override support (`copilot
 | Variable | Purpose |
 |----------|---------|
 | `OPENAI_API_KEY` | OpenAI API authentication |
-| `OLLAMA_URL` | Ollama server URL (default: `http://localhost:11434`) |
-| `GEMMA_BASE_URL` | Optional OpenAI-compatible base URL for the Gemma analysis model |
-| `GEMMA_API_KEY` | Optional API key used with the Gemma analysis model |
+| `OLLAMA_BASE_URL` | Ollama / OpenAI-compatible server URL (default: `http://localhost:11434`) |
+| `OLLAMA_API_KEY` | Optional API key for the Ollama / OpenAI-compatible server |
+| `DS4_BASE_URL` | DeepSeek v4 OpenAI-compatible gateway base URL |
+| `DS4_API_KEY` | DeepSeek v4 API key |
 | `NEXT_PUBLIC_API_URL` | API base URL for frontend (default: `/api`) |
 
 ## Two Modes

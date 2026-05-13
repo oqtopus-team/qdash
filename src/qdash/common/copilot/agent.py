@@ -728,7 +728,7 @@ def _build_client(config: CopilotConfig) -> AsyncOpenAI:
     api_key_env = config.model.api_key_env
 
     if provider == "ollama":
-        default_endpoint = os.environ.get("OLLAMA_URL") or "http://localhost:11434"
+        default_endpoint = os.environ.get("OLLAMA_BASE_URL") or "http://localhost:11434"
         endpoint = (base_url or default_endpoint).rstrip("/")
         if not endpoint.endswith("/v1"):
             endpoint = f"{endpoint}/v1"

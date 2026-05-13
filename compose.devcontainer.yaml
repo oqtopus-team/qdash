@@ -13,7 +13,7 @@ services:
       - /workspace/qdash/ui/node_modules
     environment:
       - PYTHONPATH=/workspace/qdash/src
-      - OLLAMA_URL=${OLLAMA_URL:-}
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-}
       - OLLAMA_MODEL=${OLLAMA_MODEL:-}
     extra_hosts:
       - "host.docker.internal:host-gateway"

@@ -188,6 +188,20 @@ export function CopilotChatSessionProvider({
 
   // Sessions whose messages have already been fetched (or are in flight).
   const messagesFetched = useRef<Set<string>>(new Set());
+  // POST /sessions in-flight per id. PATCH/DELETE await this so we never
+  // hit a 404 from racing against the create.
+  const pendingCreates = useRef<Map<string, Promise<void>>>(new Map());
+
+  const awaitCreate = useCallback(async (sessionId: string) => {
+    const promise = pendingCreates.current.get(sessionId);
+    if (promise) {
+      try {
+        await promise;
+      } catch {
+        // create errored; rollback happens in createNewSession's catch
+      }
+    }
+  }, []);
 
   // ------- initial load -------
 
@@ -270,14 +284,21 @@ export function CopilotChatSessionProvider({
     messagesFetched.current.add(id);
     setSessions((prev) => [local, ...prev]);
     setActiveSessionId(id);
-    apiCreateSession(id, "New Chat").catch(() => {
-      // Roll back if the server refused (e.g. duplicate id).
-      setSessions((prev) => prev.filter((s) => s.id !== id));
-      messagesFetched.current.delete(id);
-      if (activeSessionId === id) setActiveSessionId(null);
-    });
+    const createPromise = apiCreateSession(id, "New Chat")
+      .then(() => {
+        pendingCreates.current.delete(id);
+      })
+      .catch((err) => {
+        pendingCreates.current.delete(id);
+        // Roll back if the server refused (e.g. duplicate id).
+        setSessions((prev) => prev.filter((s) => s.id !== id));
+        messagesFetched.current.delete(id);
+        setActiveSessionId((current) => (current === id ? null : current));
+        throw err;
+      });
+    pendingCreates.current.set(id, createPromise);
     return id;
-  }, [activeSessionId]);
+  }, []);
 
   const deleteSession = useCallback(
     (sessionId: string) => {
@@ -286,14 +307,19 @@ export function CopilotChatSessionProvider({
         setActiveSessionId(null);
       }
       messagesFetched.current.delete(sessionId);
-      apiDeleteSession(sessionId).catch(() => {
-        // If delete failed, the session may still exist server-side. Reload.
-        apiListSessions().then((list) => {
-          setSessions(list.map(summaryToSession));
-        });
-      });
+      (async () => {
+        try {
+          await awaitCreate(sessionId);
+          await apiDeleteSession(sessionId);
+        } catch {
+          // If delete failed, the session may still exist server-side. Reload.
+          apiListSessions().then((list) => {
+            setSessions(list.map(summaryToSession));
+          });
+        }
+      })();
     },
-    [activeSessionId],
+    [activeSessionId, awaitCreate],
   );
 
   const clearActiveSession = useCallback(() => {
@@ -304,52 +330,69 @@ export function CopilotChatSessionProvider({
         s.id === id ? { ...s, messages: [], updatedAt: Date.now() } : s,
       ),
     );
-    apiUpdateSession(id, { messages: [] }).catch(() => {
-      /* swallow — next update will re-sync */
-    });
-  }, [activeSessionId]);
+    (async () => {
+      await awaitCreate(id);
+      apiUpdateSession(id, { messages: [] }).catch(() => {
+        /* swallow — next update will re-sync */
+      });
+    })();
+  }, [activeSessionId, awaitCreate]);
 
   const updateSessionMessages = useCallback(
     (sessionId: string, messages: ChatMessage[]) => {
+      // Derive a sidebar title from the first user message when the session
+      // still has the default placeholder. Doing this inside the same setter
+      // (and bundling it into a single PATCH below) avoids a lost-update race
+      // between a separate title-only PATCH and this messages PATCH.
+      let derivedTitle: string | undefined;
       setSessions((prev) =>
-        prev.map((s) =>
-          s.id === sessionId
-            ? {
-                ...s,
-                messages,
-                updatedAt: Date.now(),
-                messagesLoaded: true,
-              }
-            : s,
-        ),
+        prev.map((s) => {
+          if (s.id !== sessionId) return s;
+          let nextTitle = s.title;
+          if (nextTitle === "New Chat") {
+            const firstUser = messages.find((m) => m.role === "user");
+            if (firstUser && firstUser.content) {
+              nextTitle = firstUser.content.slice(0, 50);
+              derivedTitle = nextTitle;
+            }
+          }
+          return {
+            ...s,
+            title: nextTitle,
+            messages,
+            updatedAt: Date.now(),
+            messagesLoaded: true,
+          };
+        }),
       );
-      apiUpdateSession(sessionId, {
+      const patch: { messages: ServerMessage[]; title?: string } = {
         messages: messages.map(localMessageToServer),
-      }).catch(() => {
-        /* swallow — local state is the source of truth until reload */
-      });
+      };
+      if (derivedTitle !== undefined) {
+        patch.title = derivedTitle;
+      }
+      (async () => {
+        await awaitCreate(sessionId);
+        apiUpdateSession(sessionId, patch).catch(() => {
+          /* swallow — local state is the source of truth until reload */
+        });
+      })();
     },
-    [],
+    [awaitCreate],
   );
 
+  // Kept for backward-compat with consumers; title derivation now happens
+  // inside `updateSessionMessages` so no separate PATCH is issued here.
   const autoTitleSession = useCallback(
     (sessionId: string, firstMessage: string) => {
       const newTitle = firstMessage.slice(0, 50);
-      let didChange = false;
       setSessions((prev) =>
-        prev.map((s) => {
-          if (s.id === sessionId && s.title === "New Chat") {
-            didChange = true;
-            return { ...s, title: newTitle };
-          }
-          return s;
-        }),
+        prev.map((s) =>
+          s.id === sessionId && s.title === "New Chat"
+            ? { ...s, title: newTitle }
+            : s,
+        ),
       );
-      if (didChange) {
-        apiUpdateSession(sessionId, { title: newTitle }).catch(() => {
-          /* swallow */
-        });
-      }
     },
     [],
   );

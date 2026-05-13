@@ -5,6 +5,8 @@ export interface ModelOverride {
   max_output_tokens?: number;
   base_url?: string | null;
   api_key_env?: string | null;
+  api_style?: string;
+  reasoning_effort?: string | null;
 }
 
 interface ModelOption {
@@ -41,6 +43,11 @@ function readModel(value: unknown): ModelOverride | null {
     api_key_env:
       typeof raw.api_key_env === "string" || raw.api_key_env === null
         ? raw.api_key_env
+        : undefined,
+    api_style: typeof raw.api_style === "string" ? raw.api_style : undefined,
+    reasoning_effort:
+      typeof raw.reasoning_effort === "string" || raw.reasoning_effort === null
+        ? raw.reasoning_effort
         : undefined,
   };
 }

@@ -46,6 +46,10 @@ class ModelConfig(BaseModel):
     top_k: int | None = None
     reasoning_effort: str | None = None
     disable_thinking_instruction: bool = False
+    # OpenAI-compatible servers vary in which endpoint they expose. Use
+    # "responses" for the /v1/responses API (OpenAI, Ollama 0.13.3+) and
+    # "chat_completions" for /v1/chat/completions only providers (e.g. DeepSeek).
+    api_style: str = "responses"
 
 
 class Suggestion(BaseModel):
