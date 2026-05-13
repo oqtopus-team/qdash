@@ -65,21 +65,18 @@ RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
     && rm -rf /var/lib/apt/lists/*
 
 # 3.2 Secret scanning tools (gitleaks + trufflehog) and git hooks manager (lefthook)
-# Each tool is installed via its upstream-recommended path:
-#   - trufflehog: official install.sh (auto-detects OS/arch, verifies checksums)
-#   - lefthook:   official Cloudsmith apt repository (no arch detection needed)
-#   - gitleaks:   copied from upstream multi-arch container image (BuildKit
-#                 resolves linux/amd64 vs linux/arm64 automatically — same
-#                 pattern used for `uv` below)
-RUN TRUFFLEHOG_VERSION="3.95.2" && \
-    curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh \
-      | sh -s -- -b /usr/local/bin "v${TRUFFLEHOG_VERSION}"
+# All three tools resolve to the upstream latest release at image build time:
+#   - trufflehog: official install.sh with no tag arg -> fetches /releases/latest
+#   - lefthook:   official Cloudsmith apt repository (apt picks latest)
+#   - gitleaks:   upstream multi-arch container `:latest` tag (BuildKit resolves arch)
+RUN curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh \
+      | sh -s -- -b /usr/local/bin
 
 RUN curl -1sLf 'https://dl.cloudsmith.io/public/evilmartians/lefthook/setup.deb.sh' | bash \
     && apt-get install -y --no-install-recommends lefthook \
     && rm -rf /var/lib/apt/lists/*
 
-COPY --from=ghcr.io/gitleaks/gitleaks:v8.30.1 /usr/bin/gitleaks /usr/local/bin/gitleaks
+COPY --from=ghcr.io/gitleaks/gitleaks:latest /usr/bin/gitleaks /usr/local/bin/gitleaks
 
 # 4. Editors and shells (Change frequency: Medium)
 RUN apt-get update && apt-get install -y --no-install-recommends \
