@@ -101,7 +101,7 @@ function ForumThreadCard({
               {post.title}
             </h2>
             <div className="line-clamp-2 text-sm text-base-content/75">
-              <MarkdownContent content={post.content} />
+              <MarkdownContent content={post.content} preview />
             </div>
             <div className="mt-3 flex items-center gap-3 text-xs text-base-content/50">
               <span className="flex items-center gap-1">
