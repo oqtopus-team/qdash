@@ -54,3 +54,35 @@ export function consumeSSEEvents(text: string): {
   }
   return { events, remainder };
 }
+
+/**
+ * Read a non-2xx HTTP response and extract the most useful error detail.
+ */
+export async function readErrorResponse(response: Response): Promise<string> {
+  const fallback = `HTTP ${response.status}: ${response.statusText}`;
+
+  try {
+    const contentType = response.headers.get("content-type") || "";
+    if (contentType.includes("application/json")) {
+      const payload = (await response.json()) as {
+        detail?: unknown;
+        error?: unknown;
+        message?: unknown;
+      };
+      const detail =
+        typeof payload.detail === "string"
+          ? payload.detail
+          : typeof payload.error === "string"
+            ? payload.error
+            : typeof payload.message === "string"
+              ? payload.message
+              : null;
+      return detail ? `HTTP ${response.status}: ${detail}` : fallback;
+    }
+
+    const text = (await response.text()).trim();
+    return text ? `HTTP ${response.status}: ${text}` : fallback;
+  } catch {
+    return fallback;
+  }
+}

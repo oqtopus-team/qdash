@@ -4,6 +4,7 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import { flushSync } from "react-dom";
 
 import { buildAuthHeaders } from "@/lib/auth/session";
+import { readErrorResponse } from "@/lib/sse-utils";
 import type { ModelOverride } from "@/lib/copilotModels";
 
 export interface ChatMessage {
@@ -200,7 +201,7 @@ export function useAnalysisChat(
         });
 
         if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          throw new Error(await readErrorResponse(response));
         }
 
         const reader = response.body?.getReader();

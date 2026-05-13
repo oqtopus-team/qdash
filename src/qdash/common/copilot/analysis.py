@@ -178,3 +178,11 @@ class ChatRequest(BaseModel):
             "When unset, the configured chat_models[0]/model selection is used."
         ),
     )
+def _rebuild_models() -> None:
+    from qdash.common.copilot.config import ModelConfig as _RuntimeModelConfig
+
+    AnalyzeRequest.model_rebuild(_types_namespace={"ModelConfig": _RuntimeModelConfig})
+    ChatRequest.model_rebuild(_types_namespace={"ModelConfig": _RuntimeModelConfig})
+
+
+_rebuild_models()
