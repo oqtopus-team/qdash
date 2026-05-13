@@ -18,8 +18,12 @@ from fastapi.responses import Response, StreamingResponse
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
-from qdash.api.dependencies import get_copilot_data_service  # noqa: TCH002
+from qdash.api.dependencies import (
+    get_copilot_chat_session_service,  # noqa: TCH002
+    get_copilot_data_service,  # noqa: TCH002
+)
 from qdash.api.lib.ai_labels import STATUS_LABELS, TOOL_LABELS
+from qdash.api.lib.auth import get_current_active_user  # noqa: TCH002
 from qdash.api.lib.copilot_analysis import (
     AnalysisResponse,
     AnalyzeRequest,
@@ -27,6 +31,16 @@ from qdash.api.lib.copilot_analysis import (
 )
 from qdash.api.lib.copilot_config import CopilotConfig, ModelConfig, load_copilot_config
 from qdash.api.lib.sse import SSETaskBridge, sse_event
+from qdash.api.schemas.auth import User  # noqa: TCH002
+from qdash.api.schemas.copilot_chat_session import (
+    CopilotChatSessionResponse,
+    CreateCopilotChatSessionRequest,
+    ListCopilotChatSessionsResponse,
+    UpdateCopilotChatSessionRequest,
+)
+from qdash.api.services.copilot_chat_session_service import (
+    CopilotChatSessionService,  # noqa: TCH002
+)
 from qdash.api.services.copilot_data_service import CopilotDataService
 from qdash.datamodel.task_knowledge import get_task_knowledge
 
@@ -366,3 +380,83 @@ async def chat_stream(
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+@router.get(
+    "/chat/sessions",
+    summary="List the current user's chat sessions",
+    operation_id="listCopilotChatSessions",
+    response_model=ListCopilotChatSessionsResponse,
+)
+def list_copilot_chat_sessions(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    service: Annotated[CopilotChatSessionService, Depends(get_copilot_chat_session_service)],
+) -> ListCopilotChatSessionsResponse:
+    """Return all persisted chat sessions owned by the current user."""
+    return service.list_sessions(username=current_user.username)
+
+
+@router.get(
+    "/chat/sessions/{session_id}",
+    summary="Get a chat session with messages",
+    operation_id="getCopilotChatSession",
+    response_model=CopilotChatSessionResponse,
+)
+def get_copilot_chat_session(
+    session_id: str,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    service: Annotated[CopilotChatSessionService, Depends(get_copilot_chat_session_service)],
+) -> CopilotChatSessionResponse:
+    """Return one chat session including the full message list."""
+    return service.get_session(username=current_user.username, session_id=session_id)
+
+
+@router.post(
+    "/chat/sessions",
+    summary="Create a new chat session",
+    operation_id="createCopilotChatSession",
+    response_model=CopilotChatSessionResponse,
+)
+def create_copilot_chat_session(
+    request: CreateCopilotChatSessionRequest,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    service: Annotated[CopilotChatSessionService, Depends(get_copilot_chat_session_service)],
+) -> CopilotChatSessionResponse:
+    """Create a new chat session owned by the current user."""
+    return service.create_session(username=current_user.username, request=request)
+
+
+@router.patch(
+    "/chat/sessions/{session_id}",
+    summary="Update a chat session",
+    operation_id="updateCopilotChatSession",
+    response_model=CopilotChatSessionResponse,
+)
+def update_copilot_chat_session(
+    session_id: str,
+    request: UpdateCopilotChatSessionRequest,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    service: Annotated[CopilotChatSessionService, Depends(get_copilot_chat_session_service)],
+) -> CopilotChatSessionResponse:
+    """Update title, context, or messages of an existing chat session."""
+    return service.update_session(
+        username=current_user.username,
+        session_id=session_id,
+        request=request,
+    )
+
+
+@router.delete(
+    "/chat/sessions/{session_id}",
+    summary="Delete a chat session",
+    operation_id="deleteCopilotChatSession",
+    response_model=dict[str, bool],
+)
+def delete_copilot_chat_session(
+    session_id: str,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    service: Annotated[CopilotChatSessionService, Depends(get_copilot_chat_session_service)],
+) -> dict[str, bool]:
+    """Delete a chat session owned by the current user."""
+    service.delete_session(username=current_user.username, session_id=session_id)
+    return {"deleted": True}

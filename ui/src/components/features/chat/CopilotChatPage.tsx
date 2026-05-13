@@ -320,11 +320,6 @@ function SessionListItem({
         <div className="min-w-0 flex-1">
           <div className="text-sm font-medium truncate">{session.title}</div>
           <div className="flex items-center gap-2 mt-1 text-xs text-base-content/50">
-            {session.context?.qid && (
-              <span className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-base-300/50 text-[10px] font-medium">
-                {session.context.qid}
-              </span>
-            )}
             <span>{session.messages.length} msgs</span>
             <span className="text-base-content/30">
               {formatTime(session.updatedAt)}
