@@ -43,10 +43,7 @@ import { UserAvatar } from "@/components/ui/UserAvatar";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProject } from "@/contexts/ProjectContext";
 import { useSidebar } from "@/contexts/SidebarContext";
-import {
-  useNotifications,
-  useUnreadNotificationCount,
-} from "@/hooks/useNotifications";
+import { useUnreadNotificationCount } from "@/hooks/useNotifications";
 import { DARK_THEMES } from "@/constants/themes";
 
 const PREFECT_URL =
@@ -179,15 +176,8 @@ export function Sidebar() {
   const { user, logout: authLogout } = useAuth();
   const { theme, setTheme } = useTheme();
   const { data: unreadNotificationsResponse } = useUnreadNotificationCount();
-  const { data: unreadForumNotificationsResponse } = useNotifications(true);
   const unreadNotifications =
     unreadNotificationsResponse?.data.unread_count ?? 0;
-  const unreadForumNotifications =
-    unreadForumNotificationsResponse?.data.notifications.filter(
-      (notification) =>
-        notification.kind === "forum_mention" ||
-        notification.kind === "forum_reply",
-    ).length ?? 0;
   const isAdmin = user?.system_role === "admin";
   const isDarkTheme = DARK_THEMES.includes(
     theme as (typeof DARK_THEMES)[number],
@@ -303,7 +293,6 @@ export function Sidebar() {
           label: "Forum",
           icon: MessagesSquare,
           match: "prefix",
-          badge: unreadForumNotifications,
         },
         {
           href: "/issue-knowledge",
