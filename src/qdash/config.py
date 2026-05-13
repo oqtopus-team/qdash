@@ -8,6 +8,7 @@ class Settings(BaseSettings):
 
     env: str
     client_url: str = ""
+    api_cors_origins: tuple[str, ...] = ()
     prefect_api_url: str
     slack_bot_token: str = ""
     slack_channel_id: str = ""
@@ -27,6 +28,20 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     # Timezone
     timezone: str = "Asia/Tokyo"
+
+
+def resolve_api_cors_origins(settings: Settings) -> list[str]:
+    """Resolve allowed CORS origins from explicit settings or local defaults."""
+    if settings.api_cors_origins:
+        return list(settings.api_cors_origins)
+    if settings.client_url:
+        return [settings.client_url]
+    if settings.env in {"local", "development", "dev"}:
+        return [
+            f"http://localhost:{settings.ui_port}",
+            f"http://127.0.0.1:{settings.ui_port}",
+        ]
+    return []
 
 
 @lru_cache(maxsize=1)

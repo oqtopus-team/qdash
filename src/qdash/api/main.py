@@ -35,6 +35,7 @@ from qdash.api.routers import (
     task_result,
     topology,
 )
+from qdash.config import get_settings, resolve_api_cors_origins
 
 
 def custom_generate_unique_id(route: APIRoute) -> str:
@@ -74,8 +75,8 @@ app = FastAPI(
     },
 )
 
-
-origins = ["*"]
+app_settings = get_settings()
+origins = resolve_api_cors_origins(app_settings)
 
 app.add_middleware(
     CORSMiddleware,

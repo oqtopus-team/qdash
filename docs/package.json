@@ -1,7 +1,7 @@
 {
   "devDependencies": {
     "markdown-it-emoji": "^3.0.0",
-    "mermaid": "^11.4.1",
+    "mermaid": "^11.15.0",
     "vitepress": "^1.5.0",
     "vitepress-plugin-mermaid": "^2.0.17"
   },
@@ -12,5 +12,17 @@
   },
   "dependencies": {
     "vitepress-openapi": "^0.0.3-alpha.50"
+  },
+  "overrides": {
+    "brace-expansion": "^2.0.3",
+    "defu": "^6.1.5",
+    "dompurify": "^3.4.0",
+    "glob": "^10.5.0",
+    "mdast-util-to-hast": "^13.2.1",
+    "mermaid": "^11.15.0",
+    "minimatch": "^9.0.7",
+    "picomatch": "^2.3.2",
+    "yaml": "^2.8.3",
+    "vite": "^6.4.2"
   }
 }
