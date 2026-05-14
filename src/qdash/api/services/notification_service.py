@@ -14,7 +14,7 @@ from qdash.api.schemas.notification import (
     NotificationResponse,
     UnreadNotificationCountResponse,
 )
-from qdash.common.datetime_utils import now
+from qdash.common.utils.datetime import now
 from qdash.dbmodel.notification import NotificationDocument
 from qdash.dbmodel.project_membership import ProjectMembershipDocument
 from qdash.dbmodel.user import UserDocument

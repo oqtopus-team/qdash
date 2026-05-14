@@ -1,10 +1,4 @@
-"""Metrics configuration loader.
-
-This module loads metrics metadata from YAML configuration file.
-The configuration provides display metadata (titles, units, scales) for metrics.
-
-Uses ConfigLoader for unified configuration loading with local override support.
-"""
+"""Metrics configuration loader."""
 
 from __future__ import annotations
 
@@ -13,7 +7,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel
 
-from qdash.common.config_loader import ConfigLoader
+from qdash.common.config.loader import ConfigLoader
 
 
 class EvaluationConfig(BaseModel):
@@ -75,22 +69,8 @@ class MetricsConfig(BaseModel):
 
 @lru_cache(maxsize=1)
 def load_metrics_config() -> MetricsConfig:
-    """Load metrics configuration from YAML file.
-
-    Uses ConfigLoader for unified loading with local override support.
-    Configuration is loaded from metrics.yaml with optional metrics.local.yaml overlay.
-
-    Returns
-    -------
-        MetricsConfig with all metric metadata
-
-    Raises
-    ------
-        ValueError: If config file is invalid
-
-    """
+    """Load metrics configuration from YAML file."""
     data = ConfigLoader.load_metrics()
-
     try:
         return MetricsConfig(**data)
     except Exception as e:
@@ -103,32 +83,10 @@ def clear_metrics_config_cache() -> None:
 
 
 def get_qubit_metric_metadata(metric_key: str) -> MetricMetadata | None:
-    """Get metadata for a qubit metric.
-
-    Args:
-    ----
-        metric_key: The metric key (e.g., 't1', 'qubit_frequency')
-
-    Returns:
-    -------
-        MetricMetadata if found, None otherwise
-
-    """
-    config = load_metrics_config()
-    return config.qubit_metrics.get(metric_key)
+    """Get metadata for a qubit metric."""
+    return load_metrics_config().qubit_metrics.get(metric_key)
 
 
 def get_coupling_metric_metadata(metric_key: str) -> MetricMetadata | None:
-    """Get metadata for a coupling metric.
-
-    Args:
-    ----
-        metric_key: The metric key (e.g., 'zx90_gate_fidelity')
-
-    Returns:
-    -------
-        MetricMetadata if found, None otherwise
-
-    """
-    config = load_metrics_config()
-    return config.coupling_metrics.get(metric_key)
+    """Get metadata for a coupling metric."""
+    return load_metrics_config().coupling_metrics.get(metric_key)

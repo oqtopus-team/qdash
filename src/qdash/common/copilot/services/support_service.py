@@ -6,7 +6,7 @@ import base64
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol, cast
 
-from qdash.common.json_utils import sanitize_for_json
+from qdash.common.utils.json import sanitize_for_json
 
 if TYPE_CHECKING:
     import logging

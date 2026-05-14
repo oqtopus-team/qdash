@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from qdash.api.lib.config_loader import ConfigLoader
+from qdash.common.config.loader import ConfigLoader
 
 logger = logging.getLogger(__name__)
 

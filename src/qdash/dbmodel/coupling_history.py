@@ -4,7 +4,7 @@ from bunnet import Document
 from pydantic import ConfigDict, Field
 from pymongo import ASCENDING, DESCENDING, IndexModel
 
-from qdash.common.datetime_utils import local_now
+from qdash.common.utils.datetime import local_now
 from qdash.datamodel.coupling import CouplingModel
 from qdash.datamodel.system_info import SystemInfoModel
 from qdash.dbmodel.user import UserDocument

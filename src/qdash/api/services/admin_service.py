@@ -23,7 +23,7 @@ from qdash.api.schemas.admin import (
     UserListResponse,
 )
 from qdash.api.services.auth_service import generate_temporary_password
-from qdash.common.datetime_utils import now
+from qdash.common.utils.datetime import now
 from qdash.datamodel.system_info import SystemInfoModel
 from qdash.datamodel.user import (
     USERNAME_PATTERN_DESCRIPTION,
@@ -63,6 +63,32 @@ class AdminService:
             return None
         user = UserDocument.find_one({"username": username}).run()
         return user.user_id if user else None
+
+    @staticmethod
+    def _find_membership_for_user(
+        project_id: str,
+        username: str,
+        user_id: str,
+        *,
+        status: str | None = None,
+    ) -> ProjectMembershipDocument | None:
+        """Find membership by current user_id, then repair stale rows by username."""
+        query: dict[str, str] = {"project_id": project_id, "user_id": user_id}
+        if status is not None:
+            query["status"] = status
+        membership = ProjectMembershipDocument.find_one(query).run()
+        if membership:
+            return membership
+
+        fallback_query: dict[str, str] = {"project_id": project_id, "username": username}
+        if status is not None:
+            fallback_query["status"] = status
+        membership = ProjectMembershipDocument.find_one(fallback_query).run()
+        if membership and membership.user_id != user_id:
+            membership.user_id = user_id
+            membership.system_info.update_time()
+            membership.save()
+        return membership
 
     @staticmethod
     def _user_to_detail(user: UserDocument) -> UserDetailResponse:
@@ -329,6 +355,31 @@ class AdminService:
                     detail="Cannot delete the last admin user",
                 )
 
+        owned_projects = list(
+            ProjectDocument.find(
+                {
+                    "$or": [
+                        {"owner_user_id": user.user_id},
+                        {"owner_username": username},
+                    ]
+                }
+            ).run()
+        )
+        for project in owned_projects:
+            ProjectMembershipDocument.find({"project_id": project.project_id}).delete().run()
+            UserDocument.find({"default_project_id": project.project_id}).update_many(
+                {"$set": {"default_project_id": None}}
+            ).run()
+            project.delete()
+
+        ProjectMembershipDocument.find(
+            {
+                "$or": [
+                    {"user_id": user.user_id},
+                    {"username": username},
+                ]
+            }
+        ).delete().run()
         user.delete()
         return {"message": f"User '{username}' deleted successfully"}
 
@@ -431,9 +482,11 @@ class AdminService:
                 detail=f"User '{username}' not found",
             )
 
-        existing = ProjectMembershipDocument.find_one(
-            {"project_id": project_id, "user_id": user.user_id}
-        ).run()
+        existing = self._find_membership_for_user(
+            project_id=project_id,
+            username=username,
+            user_id=user.user_id,
+        )
 
         if existing:
             if existing.status == "active":
@@ -504,9 +557,12 @@ class AdminService:
                 detail="Cannot remove the project owner",
             )
 
-        membership = ProjectMembershipDocument.find_one(
-            {"project_id": project_id, "user_id": user.user_id, "status": "active"}
-        ).run()
+        membership = self._find_membership_for_user(
+            project_id=project_id,
+            username=username,
+            user_id=user.user_id,
+            status="active",
+        )
 
         if not membership:
             raise HTTPException(

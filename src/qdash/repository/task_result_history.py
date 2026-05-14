@@ -231,7 +231,7 @@ class MongoTaskResultHistoryRepository:
             Number of tasks that were finalized
 
         """
-        from qdash.common.datetime_utils import now
+        from qdash.common.utils.datetime import now
 
         end_time = now()
 
@@ -287,7 +287,7 @@ class MongoTaskResultHistoryRepository:
             Number of tasks that were updated
 
         """
-        from qdash.common.datetime_utils import now
+        from qdash.common.utils.datetime import now
 
         end_time = now()
 

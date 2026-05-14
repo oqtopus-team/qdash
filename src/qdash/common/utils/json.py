@@ -7,19 +7,7 @@ from typing import Any
 
 
 def sanitize_for_json(obj: Any) -> Any:
-    """Replace NaN/Infinity float values with None for JSON safety.
-
-    Parameters
-    ----------
-    obj : Any
-        The object to sanitize (recursively handles dicts and lists)
-
-    Returns
-    -------
-    Any
-        Sanitized object with non-finite floats replaced by None
-
-    """
+    """Replace NaN/Infinity float values with None for JSON safety."""
     if isinstance(obj, float):
         return None if not math.isfinite(obj) else obj
     if isinstance(obj, dict):

@@ -26,9 +26,9 @@ from qdash.api.schemas.device_topology import (
     QubitGateDuration,
     QubitLifetime,
 )
-from qdash.common.datetime_utils import ensure_timezone, now, to_datetime
-from qdash.common.qubit_utils import qid_to_label
-from qdash.common.topology_config import load_topology
+from qdash.common.config.topology import load_topology
+from qdash.common.domain.qubit import qid_to_label
+from qdash.common.utils.datetime import ensure_timezone, now, to_datetime
 
 if TYPE_CHECKING:
     from qdash.repository.protocols import CalibrationNoteRepository, ChipRepository

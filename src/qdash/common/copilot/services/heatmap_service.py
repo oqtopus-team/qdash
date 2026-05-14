@@ -86,13 +86,13 @@ class ChipHeatmapLoader:
         """Generate a chip-wide heatmap for a qubit metric."""
         from datetime import timedelta
 
-        from qdash.common.metrics_chart import (
+        from qdash.common.config.metrics import get_qubit_metric_metadata, load_metrics_config
+        from qdash.common.config.topology import load_topology
+        from qdash.common.visualization.metrics_chart import (
             build_chip_geometry,
             chip_geometry_from_topology,
             create_qubit_heatmap,
         )
-        from qdash.common.metrics_config import get_qubit_metric_metadata, load_metrics_config
-        from qdash.common.topology_config import load_topology
 
         meta = get_qubit_metric_metadata(metric_name)
         if meta is None:
@@ -180,7 +180,7 @@ class ChipHeatmapLoader:
     def _build_heatmap_cutoff_time(within_hours: int | None, timedelta_type: Any) -> Any:
         if not within_hours:
             return None
-        from qdash.common.datetime_utils import now
+        from qdash.common.utils.datetime import now
 
         return now() - timedelta_type(hours=within_hours)
 

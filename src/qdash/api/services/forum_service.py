@@ -20,7 +20,7 @@ from qdash.api.schemas.forum import (
     ListForumPostsResponse,
 )
 from qdash.api.schemas.success import SuccessResponse
-from qdash.common.paths import CALIB_DATA_BASE
+from qdash.common.config.paths import CALIB_DATA_BASE
 from qdash.datamodel.project import ProjectRole
 from qdash.dbmodel.forum import ForumCategoryDocument, ForumPostDocument
 from qdash.dbmodel.user import UserDocument

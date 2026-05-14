@@ -4,7 +4,7 @@ from datetime import UTC, datetime, timedelta, timezone
 
 import pytest
 
-from qdash.common.datetime_utils import (
+from qdash.common.utils.datetime import (
     ensure_timezone,
     format_iso,
     local_now,

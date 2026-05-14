@@ -4,7 +4,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field, field_serializer, field_validator
 
-from qdash.common.datetime_utils import (
+from qdash.common.utils.datetime import (
     ensure_timezone,
     format_elapsed_time,
     format_iso,

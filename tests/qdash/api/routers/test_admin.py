@@ -177,6 +177,35 @@ class TestAdminUsersEndpoints:
         deleted_user = UserDocument.find_one({"username": "regularuser"}).run()
         assert deleted_user is None
 
+    def test_delete_user_cascades_owned_projects_and_memberships(
+        self, test_client, admin_user, regular_user, admin_headers
+    ):
+        """Deleting a user cleans up their projects and project memberships."""
+        project = ProjectDocument(
+            project_id="regular-project",
+            name="Regular Project",
+            owner_user_id=regular_user.user_id,
+            owner_username=regular_user.username,
+        )
+        project.insert()
+        ProjectMembershipDocument(
+            project_id=project.project_id,
+            user_id=regular_user.user_id,
+            username=regular_user.username,
+            role=ProjectRole.OWNER,
+            status="active",
+            invited_by_user_id=admin_user.user_id,
+            invited_by=admin_user.username,
+            system_info=SystemInfoModel(),
+        ).insert()
+
+        response = test_client.delete("/admin/users/regularuser", headers=admin_headers)
+        assert response.status_code == 200
+
+        assert UserDocument.find_one({"username": "regularuser"}).run() is None
+        assert ProjectDocument.find_one({"project_id": project.project_id}).run() is None
+        assert ProjectMembershipDocument.find_one({"project_id": project.project_id}).run() is None
+
     def test_cannot_delete_self(self, test_client, admin_user, admin_headers):
         """Admin cannot delete themselves."""
         response = test_client.delete("/admin/users/admin", headers=admin_headers)

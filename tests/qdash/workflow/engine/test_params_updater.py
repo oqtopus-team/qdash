@@ -217,7 +217,7 @@ data:
         updater = _QubexParamsUpdater(backend, chip_id="144Qv1")
 
         with patch(
-            "qdash.common.qubit_utils._get_chip_size",
+            "qdash.common.domain.qubit._get_chip_size",
             return_value=144,
         ):
             updater.update("47", {"control_amplitude": {"value": 0.25}})

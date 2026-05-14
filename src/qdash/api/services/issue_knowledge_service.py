@@ -664,7 +664,7 @@ class IssueKnowledgeService:
             repo.git.config("user.name", "github-actions[bot]")
             repo.git.config("user.email", "github-actions[bot]@users.noreply.github.com")
 
-            from qdash.common.datetime_utils import now_iso
+            from qdash.common.utils.datetime import now_iso
 
             commit_msg = f"Add case: {doc.title}"
             repo.index.commit(f"{commit_msg} at {now_iso()}")

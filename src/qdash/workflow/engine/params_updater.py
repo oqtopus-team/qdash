@@ -155,7 +155,7 @@ class _QubexParamsUpdater:
         chip_id = config.get("chip_id") or self._chip_id
         if project_id and chip_id:
             try:
-                from qdash.common.qubit_utils import qid_to_label_from_chip
+                from qdash.common.domain.qubit import qid_to_label_from_chip
 
                 return qid_to_label_from_chip(qid, project_id=project_id, chip_id=chip_id)
             except Exception:

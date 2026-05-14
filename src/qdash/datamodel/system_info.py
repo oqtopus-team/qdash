@@ -2,7 +2,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field, field_serializer
 
-from qdash.common.datetime_utils import format_iso, now
+from qdash.common.utils.datetime import format_iso, now
 
 
 class SystemInfoModel(BaseModel):

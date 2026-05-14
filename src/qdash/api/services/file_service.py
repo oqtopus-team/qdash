@@ -17,8 +17,8 @@ from git.exc import GitCommandError
 
 from qdash.api.lib.file_utils import validate_relative_path
 from qdash.api.schemas.file import FileTreeNode
-from qdash.common.datetime_utils import now_iso
-from qdash.common.paths import QUBEX_CONFIG_BASE
+from qdash.common.config.paths import QUBEX_CONFIG_BASE
+from qdash.common.utils.datetime import now_iso
 
 logger = logging.getLogger(__name__)
 

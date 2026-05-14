@@ -13,12 +13,6 @@ if TYPE_CHECKING:
 
 from fastapi import HTTPException
 
-from qdash.api.lib.backend_config import (
-    get_task_category,
-    get_tasks,
-    load_backend_config,
-)
-from qdash.api.lib.config_loader import ConfigLoader
 from qdash.api.lib.file_utils import validate_relative_path
 from qdash.api.schemas.task_file import (
     BackendConfigResponse,
@@ -31,7 +25,13 @@ from qdash.api.schemas.task_file import (
     TaskFileTreeNode,
     TaskInfo,
 )
-from qdash.common.paths import CALIBTASKS_DIR
+from qdash.common.config.backend import (
+    get_task_category,
+    get_tasks,
+    load_backend_config,
+)
+from qdash.common.config.loader import ConfigLoader
+from qdash.common.config.paths import CALIBTASKS_DIR
 
 logger = logging.getLogger(__name__)
 
