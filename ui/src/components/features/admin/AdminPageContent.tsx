@@ -3,7 +3,7 @@
 import { useState } from "react";
 
 import { useQueryClient } from "@tanstack/react-query";
-import { Download, Upload } from "lucide-react";
+import { Download, FolderPlus, Info, Search, Trash2, Upload, UserPlus, X } from "lucide-react";
 
 import type {
   UserListItem,
@@ -48,6 +48,17 @@ export function AdminPageContent() {
   const [isBulkImportModalOpen, setIsBulkImportModalOpen] = useState(false);
   const [isDeleteProjectModalOpen, setIsDeleteProjectModalOpen] = useState(false);
   const [isMembersModalOpen, setIsMembersModalOpen] = useState(false);
+  const [selectedUsernames, setSelectedUsernames] = useState<string[]>([]);
+  const [userSearch, setUserSearch] = useState("");
+  const [userRoleFilter, setUserRoleFilter] = useState<"all" | "admin" | "user">("all");
+  const [userProjectFilter, setUserProjectFilter] = useState<"all" | "with" | "without">("all");
+  const [bulkDeleteTargets, setBulkDeleteTargets] = useState<UserListItem[]>([]);
+  const [bulkAction, setBulkAction] = useState<"delete" | "create-project" | null>(null);
+  const [bulkFeedback, setBulkFeedback] = useState<{
+    tone: "success" | "warning" | "error";
+    message: string;
+  } | null>(null);
+  const [isAssignProjectModalOpen, setIsAssignProjectModalOpen] = useState(false);
 
   const { data: usersData, isLoading, error } = useListAllUsers();
   const {
@@ -63,6 +74,33 @@ export function AdminPageContent() {
   const addMemberMutation = useAddProjectMemberAdmin();
   const removeMemberMutation = useRemoveProjectMemberAdmin();
   const createProjectMutation = useCreateProjectForUser();
+
+  const allUsers = usersData?.data?.users ?? [];
+  const filteredUsers = allUsers.filter((userItem) => {
+    const normalizedSearch = userSearch.trim().toLowerCase();
+    const matchesSearch =
+      normalizedSearch.length === 0 ||
+      userItem.username.toLowerCase().includes(normalizedSearch) ||
+      (userItem.display_name ?? "").toLowerCase().includes(normalizedSearch) ||
+      (userItem.organization ?? "").toLowerCase().includes(normalizedSearch);
+    const matchesRole = userRoleFilter === "all" || userItem.system_role === userRoleFilter;
+    const hasDefaultProject = !!userItem.default_project_id;
+    const matchesProject =
+      userProjectFilter === "all" ||
+      (userProjectFilter === "with" && hasDefaultProject) ||
+      (userProjectFilter === "without" && !hasDefaultProject);
+    return matchesSearch && matchesRole && matchesProject;
+  });
+  const selectableFilteredUsers = filteredUsers.filter(
+    (userItem) => userItem.system_role !== "admin" && userItem.username !== user?.username,
+  );
+  const selectedUsers = allUsers.filter((userItem) =>
+    selectedUsernames.includes(userItem.username),
+  );
+  const bulkProjectCandidates = selectedUsers.filter((userItem) => !userItem.default_project_id);
+  const allSelectableUsersSelected =
+    selectableFilteredUsers.length > 0 &&
+    selectableFilteredUsers.every((userItem) => selectedUsernames.includes(userItem.username));
 
   // Check if current user is admin
   if (user?.system_role !== "admin") {
@@ -98,6 +136,35 @@ export function AdminPageContent() {
     setIsDeleteModalOpen(true);
   };
 
+  const handleToggleUserSelection = (username: string) => {
+    setSelectedUsernames((current) =>
+      current.includes(username)
+        ? current.filter((item) => item !== username)
+        : [...current, username],
+    );
+  };
+
+  const handleToggleSelectAllUsers = () => {
+    if (allSelectableUsersSelected) {
+      setSelectedUsernames((current) =>
+        current.filter(
+          (username) => !selectableFilteredUsers.some((userItem) => userItem.username === username),
+        ),
+      );
+      return;
+    }
+
+    setSelectedUsernames((current) => {
+      const next = new Set(current);
+      selectableFilteredUsers.forEach((userItem) => next.add(userItem.username));
+      return Array.from(next);
+    });
+  };
+
+  const clearUserSelection = () => {
+    setSelectedUsernames([]);
+  };
+
   const handleUpdateUser = async (updates: {
     organization?: string;
     disabled?: boolean;
@@ -129,6 +196,46 @@ export function AdminPageContent() {
     } catch (err) {
       console.error("Failed to delete user:", err);
     }
+  };
+
+  const handleBulkDeleteUsers = async () => {
+    if (bulkDeleteTargets.length === 0) return;
+
+    setBulkAction("delete");
+    const deleted: string[] = [];
+    const failed: string[] = [];
+
+    for (const userItem of bulkDeleteTargets) {
+      try {
+        await deleteUserMutation.mutateAsync({ username: userItem.username });
+        deleted.push(userItem.username);
+      } catch {
+        failed.push(userItem.username);
+      }
+    }
+
+    await queryClient.invalidateQueries({ queryKey: getListAllUsersQueryKey() });
+    await queryClient.invalidateQueries({ queryKey: getListAllProjectsQueryKey() });
+
+    setBulkDeleteTargets([]);
+    setSelectedUsernames((current) => current.filter((username) => !deleted.includes(username)));
+    setBulkAction(null);
+
+    if (failed.length === 0) {
+      setBulkFeedback({
+        tone: "success",
+        message: `Deleted ${deleted.length} user${deleted.length !== 1 ? "s" : ""}.`,
+      });
+      return;
+    }
+
+    setBulkFeedback({
+      tone: deleted.length > 0 ? "warning" : "error",
+      message:
+        deleted.length > 0
+          ? `Deleted ${deleted.length} users. ${failed.length} failed: ${failed.join(", ")}`
+          : `Failed to delete selected users: ${failed.join(", ")}`,
+    });
   };
 
   const handleCreateUser = async (userData: {
@@ -194,6 +301,37 @@ export function AdminPageContent() {
     }
   };
 
+  const handleBulkCreateProjects = async () => {
+    if (bulkProjectCandidates.length === 0) return;
+
+    setBulkAction("create-project");
+    const created: string[] = [];
+    const failed: string[] = [];
+
+    for (const userItem of bulkProjectCandidates) {
+      try {
+        await createProjectMutation.mutateAsync({ username: userItem.username });
+        created.push(userItem.username);
+      } catch {
+        failed.push(userItem.username);
+      }
+    }
+
+    await queryClient.invalidateQueries({ queryKey: getListAllUsersQueryKey() });
+    await queryClient.invalidateQueries({ queryKey: getListAllProjectsQueryKey() });
+
+    setBulkAction(null);
+    setBulkFeedback({
+      tone: failed.length === 0 ? "success" : created.length > 0 ? "warning" : "error",
+      message:
+        failed.length === 0
+          ? `Created default project for ${created.length} user${created.length !== 1 ? "s" : ""}.`
+          : created.length > 0
+            ? `Created ${created.length} default projects. ${failed.length} failed: ${failed.join(", ")}`
+            : `Failed to create default projects: ${failed.join(", ")}`,
+    });
+  };
+
   const handleAddMember = async (username: string, role: ProjectRole) => {
     if (!selectedProject) return;
 
@@ -234,6 +372,29 @@ export function AdminPageContent() {
   return (
     <PageContainer>
       <PageHeader title="Admin Panel" description="Manage users, projects, and system settings" />
+
+      {bulkFeedback && (
+        <div
+          className={`alert mb-4 ${
+            bulkFeedback.tone === "success"
+              ? "alert-success"
+              : bulkFeedback.tone === "warning"
+                ? "alert-warning"
+                : "alert-error"
+          }`}
+          role="status"
+        >
+          <span className="flex-1">{bulkFeedback.message}</span>
+          <button
+            type="button"
+            aria-label="Dismiss notification"
+            className="btn btn-ghost btn-xs btn-square"
+            onClick={() => setBulkFeedback(null)}
+          >
+            <X size={16} />
+          </button>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="tabs tabs-boxed mb-4 sm:mb-6 w-full sm:w-fit">
@@ -294,20 +455,127 @@ export function AdminPageContent() {
               </div>
             </div>
 
+            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+              <label className="input input-bordered flex items-center gap-2 w-full sm:flex-1 sm:min-w-[16rem]">
+                <Search size={16} className="text-base-content/50" />
+                <input
+                  type="text"
+                  className="grow"
+                  value={userSearch}
+                  onChange={(event) => setUserSearch(event.target.value)}
+                  placeholder="Search username, display name, organization"
+                  aria-label="Search users"
+                />
+              </label>
+              <select
+                className="select select-bordered w-full sm:w-auto"
+                value={userRoleFilter}
+                onChange={(event) =>
+                  setUserRoleFilter(event.target.value as "all" | "admin" | "user")
+                }
+                aria-label="Filter by role"
+              >
+                <option value="all">All roles</option>
+                <option value="admin">Admins</option>
+                <option value="user">Users</option>
+              </select>
+              <select
+                className="select select-bordered w-full sm:w-auto"
+                value={userProjectFilter}
+                onChange={(event) =>
+                  setUserProjectFilter(event.target.value as "all" | "with" | "without")
+                }
+                aria-label="Filter by default project"
+              >
+                <option value="all">All projects</option>
+                <option value="with">Has default project</option>
+                <option value="without">No default project</option>
+              </select>
+              <span className="text-sm text-base-content/70 sm:ml-auto">
+                Showing {filteredUsers.length} of {allUsers.length} users
+              </span>
+            </div>
+
+            {selectedUsers.length > 0 && (
+              <div className="mb-4 alert alert-info flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <span className="font-medium">{selectedUsers.length} selected</span>
+                  <span className="text-sm opacity-80">
+                    {bulkProjectCandidates.length} can get a default project
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    className="btn btn-sm btn-error"
+                    onClick={() => setBulkDeleteTargets(selectedUsers)}
+                    disabled={bulkAction !== null}
+                  >
+                    <Trash2 size={16} />
+                    Delete Selected
+                  </button>
+                  <button
+                    className="btn btn-sm btn-primary"
+                    onClick={handleBulkCreateProjects}
+                    disabled={bulkAction !== null || bulkProjectCandidates.length === 0}
+                  >
+                    {bulkAction === "create-project" ? (
+                      <span className="loading loading-spinner loading-xs" />
+                    ) : (
+                      <FolderPlus size={16} />
+                    )}
+                    Create Default Projects
+                  </button>
+                  <button
+                    className="btn btn-sm btn-outline"
+                    onClick={() => setIsAssignProjectModalOpen(true)}
+                    disabled={bulkAction !== null}
+                  >
+                    <UserPlus size={16} />
+                    Assign To Project
+                  </button>
+                  <button className="btn btn-sm btn-ghost" onClick={clearUserSelection}>
+                    Clear
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Mobile card view */}
             <div className="sm:hidden space-y-3">
-              {usersData?.data?.users.map((userItem: UserListItem) => (
+              <label className="flex items-center gap-3 bg-base-100 rounded-box border border-base-300 px-3 py-2">
+                <input
+                  type="checkbox"
+                  className="checkbox checkbox-sm"
+                  checked={allSelectableUsersSelected}
+                  onChange={handleToggleSelectAllUsers}
+                  disabled={selectableFilteredUsers.length === 0}
+                />
+                <span className="text-sm font-medium">Select all removable users in view</span>
+              </label>
+
+              {filteredUsers.map((userItem: UserListItem) => (
                 <div key={userItem.username} className="card bg-base-100 shadow-sm">
                   <div className="card-body p-4">
                     <div className="flex justify-between items-start">
-                      <div>
-                        <h3 className="font-mono font-medium">{userItem.username}</h3>
-                        <p className="text-sm text-base-content/60">
-                          {userItem.display_name || "-"}
-                        </p>
-                        <p className="text-xs text-base-content/50">
-                          {userItem.organization || "No organization"}
-                        </p>
+                      <div className="flex items-start gap-3">
+                        <input
+                          type="checkbox"
+                          className="checkbox checkbox-sm mt-1"
+                          checked={selectedUsernames.includes(userItem.username)}
+                          disabled={
+                            userItem.system_role === "admin" || userItem.username === user?.username
+                          }
+                          onChange={() => handleToggleUserSelection(userItem.username)}
+                        />
+                        <div>
+                          <h3 className="font-mono font-medium">{userItem.username}</h3>
+                          <p className="text-sm text-base-content/60">
+                            {userItem.display_name || "-"}
+                          </p>
+                          <p className="text-xs text-base-content/50">
+                            {userItem.organization || "No organization"}
+                          </p>
+                        </div>
                       </div>
                       <div className="flex flex-col gap-1 items-end">
                         <span
@@ -363,6 +631,11 @@ export function AdminPageContent() {
                   </div>
                 </div>
               ))}
+              {filteredUsers.length === 0 && (
+                <div className="bg-base-100 rounded-box border border-dashed border-base-300 p-6 text-center text-sm text-base-content/60">
+                  No users match the current filters.
+                </div>
+              )}
             </div>
 
             {/* Desktop table view */}
@@ -370,6 +643,15 @@ export function AdminPageContent() {
               <table className="table table-zebra">
                 <thead>
                   <tr>
+                    <th>
+                      <input
+                        type="checkbox"
+                        className="checkbox checkbox-sm"
+                        checked={allSelectableUsersSelected}
+                        onChange={handleToggleSelectAllUsers}
+                        disabled={selectableFilteredUsers.length === 0}
+                      />
+                    </th>
                     <th>Username</th>
                     <th>Display Name</th>
                     <th>Organization</th>
@@ -380,8 +662,19 @@ export function AdminPageContent() {
                   </tr>
                 </thead>
                 <tbody>
-                  {usersData?.data?.users.map((userItem: UserListItem) => (
+                  {filteredUsers.map((userItem: UserListItem) => (
                     <tr key={userItem.username}>
+                      <td>
+                        <input
+                          type="checkbox"
+                          className="checkbox checkbox-sm"
+                          checked={selectedUsernames.includes(userItem.username)}
+                          disabled={
+                            userItem.system_role === "admin" || userItem.username === user?.username
+                          }
+                          onChange={() => handleToggleUserSelection(userItem.username)}
+                        />
+                      </td>
                       <td className="font-mono">{userItem.username}</td>
                       <td>{userItem.display_name || "-"}</td>
                       <td>{userItem.organization || "-"}</td>
@@ -437,6 +730,13 @@ export function AdminPageContent() {
                       </td>
                     </tr>
                   ))}
+                  {filteredUsers.length === 0 && (
+                    <tr>
+                      <td colSpan={8} className="text-center text-base-content/60">
+                        No users match the current filters.
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -631,6 +931,52 @@ export function AdminPageContent() {
         </dialog>
       )}
 
+      {bulkDeleteTargets.length > 0 && (
+        <dialog className="modal modal-open">
+          <div className="modal-box">
+            <h3 className="font-bold text-lg">Delete Selected Users</h3>
+            <p className="py-4">
+              Delete {bulkDeleteTargets.length} selected user
+              {bulkDeleteTargets.length !== 1 ? "s" : ""}?
+            </p>
+            <p className="text-sm text-base-content/60">
+              Owned projects and project memberships for these users will also be removed.
+            </p>
+            <div className="mt-4 card bg-base-200">
+              <div className="card-body p-3">
+                <div className="text-sm font-medium">Targets</div>
+                <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto">
+                  {bulkDeleteTargets.map((userItem) => (
+                    <span key={userItem.username} className="badge badge-ghost font-mono">
+                      {userItem.username}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div className="modal-action">
+              <button className="btn" onClick={() => setBulkDeleteTargets([])}>
+                Cancel
+              </button>
+              <button
+                className="btn btn-error"
+                onClick={handleBulkDeleteUsers}
+                disabled={bulkAction === "delete"}
+              >
+                {bulkAction === "delete" ? (
+                  <span className="loading loading-spinner loading-sm" />
+                ) : (
+                  "Delete Users"
+                )}
+              </button>
+            </div>
+          </div>
+          <form method="dialog" className="modal-backdrop">
+            <button onClick={() => setBulkDeleteTargets([])}>close</button>
+          </form>
+        </dialog>
+      )}
+
       {/* Create User Modal */}
       {isCreateModalOpen && (
         <CreateUserModal
@@ -709,9 +1055,46 @@ export function AdminPageContent() {
           }}
           onAddMember={handleAddMember}
           onRemoveMember={handleRemoveMember}
-          isAddingMember={addMemberMutation.isPending}
           isRemovingMember={removeMemberMutation.isPending}
           addMemberError={addMemberMutation.error}
+        />
+      )}
+
+      {isAssignProjectModalOpen && (
+        <AssignUsersToProjectModal
+          users={selectedUsers}
+          projects={projectsData?.data?.projects || []}
+          onClose={() => setIsAssignProjectModalOpen(false)}
+          onAssign={async (projectId, role, usernames) => {
+            const added: string[] = [];
+            const failed: string[] = [];
+
+            for (const username of usernames) {
+              try {
+                await addMemberMutation.mutateAsync({
+                  projectId,
+                  data: { username, role },
+                });
+                added.push(username);
+              } catch {
+                failed.push(username);
+              }
+            }
+
+            await queryClient.invalidateQueries({ queryKey: getListAllProjectsQueryKey() });
+
+            setBulkFeedback({
+              tone: failed.length === 0 ? "success" : added.length > 0 ? "warning" : "error",
+              message:
+                failed.length === 0
+                  ? `Assigned ${added.length} user${added.length !== 1 ? "s" : ""} to the project as ${role}.`
+                  : added.length > 0
+                    ? `Assigned ${added.length} users. ${failed.length} failed: ${failed.join(", ")}`
+                    : `Failed to assign selected users: ${failed.join(", ")}`,
+            });
+          }}
+          isLoading={addMemberMutation.isPending}
+          error={addMemberMutation.error}
         />
       )}
     </PageContainer>
@@ -1355,7 +1738,6 @@ function MembersModal({
   onClose,
   onAddMember,
   onRemoveMember,
-  isAddingMember,
   isRemovingMember,
   addMemberError,
 }: {
@@ -1364,15 +1746,19 @@ function MembersModal({
   onClose: () => void;
   onAddMember: (username: string, role: ProjectRole) => Promise<void>;
   onRemoveMember: (username: string) => Promise<void>;
-  isAddingMember: boolean;
   isRemovingMember: boolean;
   addMemberError: Error | unknown | null;
 }) {
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [selectedUsername, setSelectedUsername] = useState("");
+  const [candidateSearch, setCandidateSearch] = useState("");
+  const [selectedCandidateUsernames, setSelectedCandidateUsernames] = useState<string[]>([]);
   const [selectedRole, setSelectedRole] = useState<ProjectRole>("viewer");
   const [removingUsername, setRemovingUsername] = useState<string | null>(null);
   const [localError, setLocalError] = useState<string | null>(null);
+  const [membersFeedback, setMembersFeedback] = useState<{
+    tone: "success" | "warning" | "error";
+    message: string;
+  } | null>(null);
+  const [isBulkAdding, setIsBulkAdding] = useState(false);
 
   // Fetch members for this project
   const {
@@ -1387,27 +1773,89 @@ function MembersModal({
   const availableUsers = users.filter(
     (u) => !members.some((m: MemberItem) => m.username === u.username),
   );
+  const filteredAvailableUsers = availableUsers.filter((userItem) => {
+    const normalizedSearch = candidateSearch.trim().toLowerCase();
+    return (
+      normalizedSearch.length === 0 ||
+      userItem.username.toLowerCase().includes(normalizedSearch) ||
+      (userItem.display_name ?? "").toLowerCase().includes(normalizedSearch) ||
+      (userItem.organization ?? "").toLowerCase().includes(normalizedSearch)
+    );
+  });
+  const allFilteredCandidatesSelected =
+    filteredAvailableUsers.length > 0 &&
+    filteredAvailableUsers.every((userItem) =>
+      selectedCandidateUsernames.includes(userItem.username),
+    );
 
-  const handleAddMember = async () => {
-    setLocalError(null);
+  const handleToggleCandidate = (username: string) => {
+    setSelectedCandidateUsernames((current) =>
+      current.includes(username)
+        ? current.filter((item) => item !== username)
+        : [...current, username],
+    );
+  };
 
-    if (!selectedUsername) {
-      setLocalError("Please select a user");
+  const handleToggleAllCandidates = () => {
+    if (allFilteredCandidatesSelected) {
+      setSelectedCandidateUsernames((current) =>
+        current.filter(
+          (username) => !filteredAvailableUsers.some((userItem) => userItem.username === username),
+        ),
+      );
       return;
     }
 
+    setSelectedCandidateUsernames((current) => {
+      const next = new Set(current);
+      filteredAvailableUsers.forEach((userItem) => next.add(userItem.username));
+      return Array.from(next);
+    });
+  };
+
+  const handleAddMembers = async () => {
+    setLocalError(null);
+    setMembersFeedback(null);
+
+    if (selectedCandidateUsernames.length === 0) {
+      setLocalError("Select at least one user");
+      return;
+    }
+
+    setIsBulkAdding(true);
+    const added: string[] = [];
+    const failed: string[] = [];
+
     try {
-      await onAddMember(selectedUsername, selectedRole);
-      setSelectedUsername("");
-      setSelectedRole("viewer");
-      setIsAddModalOpen(false);
+      for (const username of selectedCandidateUsernames) {
+        try {
+          await onAddMember(username, selectedRole);
+          added.push(username);
+        } catch {
+          failed.push(username);
+        }
+      }
+
+      setSelectedCandidateUsernames((current) =>
+        current.filter((username) => !added.includes(username)),
+      );
       refetch();
-    } catch {
-      // Error is handled by the mutation
+      setMembersFeedback({
+        tone: failed.length === 0 ? "success" : added.length > 0 ? "warning" : "error",
+        message:
+          failed.length === 0
+            ? `Added ${added.length} member${added.length !== 1 ? "s" : ""} as ${selectedRole}.`
+            : added.length > 0
+              ? `Added ${added.length} members. ${failed.length} failed: ${failed.join(", ")}`
+              : `Failed to add selected members: ${failed.join(", ")}`,
+      });
+    } finally {
+      setIsBulkAdding(false);
     }
   };
 
   const handleRemoveMember = async (username: string) => {
+    setMembersFeedback(null);
     setRemovingUsername(username);
     await onRemoveMember(username);
     setRemovingUsername(null);
@@ -1429,76 +1877,233 @@ function MembersModal({
 
   return (
     <dialog className="modal modal-open">
-      <div className="modal-box max-w-2xl">
-        <h3 className="font-bold text-lg mb-4">Members of {project.name}</h3>
+      <div className="modal-box max-w-5xl w-full sm:w-11/12 max-h-[90vh] p-4 sm:p-6">
+        <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h3 className="font-bold text-lg">Members of {project.name}</h3>
+            <p className="text-sm text-base-content/60">
+              Add multiple users at once and manage memberships in one place.
+            </p>
+          </div>
+          <span className="badge badge-ghost self-start sm:self-auto">
+            {members.length} member{members.length !== 1 ? "s" : ""}
+          </span>
+        </div>
+
+        {membersFeedback && (
+          <div
+            className={`alert mb-4 ${
+              membersFeedback.tone === "success"
+                ? "alert-success"
+                : membersFeedback.tone === "warning"
+                  ? "alert-warning"
+                  : "alert-error"
+            }`}
+            role="status"
+          >
+            <span>{membersFeedback.message}</span>
+          </div>
+        )}
 
         {membersLoading ? (
           <div className="flex justify-center py-8">
-            <span className="loading loading-spinner loading-lg"></span>
+            <span className="loading loading-spinner loading-lg" />
           </div>
         ) : (
-          <>
-            <div className="flex justify-between items-center mb-4">
-              <span className="text-sm text-base-content/60">
-                {members.length} member{members.length !== 1 ? "s" : ""}
-              </span>
-              <button className="btn btn-primary btn-sm" onClick={() => setIsAddModalOpen(true)}>
-                Add Member
-              </button>
+          <div className="grid gap-4 lg:grid-cols-2">
+            <div className="card bg-base-100 shadow-sm">
+              <div className="card-body p-4">
+                <div>
+                  <h4 className="font-medium">Current members</h4>
+                  <p className="text-sm text-base-content/60">
+                    Remove non-owner members from this list.
+                  </p>
+                </div>
+
+                <div className="overflow-x-auto mt-2">
+                  <table className="table table-zebra table-sm">
+                    <thead>
+                      <tr>
+                        <th>Username</th>
+                        <th>Role</th>
+                        <th className="text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {members.map((member: MemberItem) => (
+                        <tr key={member.username}>
+                          <td>
+                            <div className="font-mono text-sm">{member.username}</div>
+                            {member.display_name && (
+                              <div className="text-xs text-base-content/60">
+                                {member.display_name}
+                              </div>
+                            )}
+                          </td>
+                          <td>
+                            <span className={`badge badge-sm ${getRoleBadgeClass(member.role)}`}>
+                              {member.role}
+                            </span>
+                          </td>
+                          <td className="text-right">
+                            {member.role !== "owner" ? (
+                              <button
+                                className="btn btn-xs btn-ghost btn-error"
+                                onClick={() => handleRemoveMember(member.username)}
+                                disabled={isRemovingMember && removingUsername === member.username}
+                              >
+                                {isRemovingMember && removingUsername === member.username ? (
+                                  <span className="loading loading-spinner loading-xs" />
+                                ) : (
+                                  "Remove"
+                                )}
+                              </button>
+                            ) : (
+                              <span className="text-xs text-base-content/60">Owner</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                      {members.length === 0 && (
+                        <tr>
+                          <td colSpan={3} className="text-center text-base-content/60">
+                            No members found
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="table table-zebra">
-                <thead>
-                  <tr>
-                    <th>Username</th>
-                    <th>Display Name</th>
-                    <th>Organization</th>
-                    <th>Role</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {members.map((member: MemberItem) => (
-                    <tr key={member.username}>
-                      <td className="font-mono">{member.username}</td>
-                      <td>{member.display_name || "-"}</td>
-                      <td>{member.organization || "-"}</td>
-                      <td>
-                        <span className={`badge ${getRoleBadgeClass(member.role)}`}>
-                          {member.role}
-                        </span>
-                      </td>
-                      <td>
-                        {member.role !== "owner" ? (
-                          <button
-                            className="btn btn-sm btn-error btn-ghost"
-                            onClick={() => handleRemoveMember(member.username)}
-                            disabled={isRemovingMember && removingUsername === member.username}
-                          >
-                            {isRemovingMember && removingUsername === member.username ? (
-                              <span className="loading loading-spinner loading-xs"></span>
-                            ) : (
-                              "Remove"
-                            )}
-                          </button>
-                        ) : (
-                          <span className="text-xs text-base-content/60">Owner</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                  {members.length === 0 && (
-                    <tr>
-                      <td colSpan={5} className="text-center text-base-content/60">
-                        No members found
-                      </td>
-                    </tr>
+            <div className="card bg-base-100 shadow-sm">
+              <div className="card-body p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h4 className="font-medium">Add members</h4>
+                    <p className="text-sm text-base-content/60">
+                      Search, select multiple, and add them with one role.
+                    </p>
+                  </div>
+                  <span className="badge badge-outline shrink-0">
+                    {availableUsers.length} available
+                  </span>
+                </div>
+
+                {(localError || !!addMemberError) && (
+                  <div className="alert alert-error">
+                    <span>
+                      {localError || (addMemberError as Error)?.message || "Failed to add member"}
+                    </span>
+                  </div>
+                )}
+
+                <label className="input input-bordered flex items-center gap-2">
+                  <Search size={16} className="text-base-content/50" />
+                  <input
+                    type="text"
+                    className="grow"
+                    value={candidateSearch}
+                    onChange={(event) => setCandidateSearch(event.target.value)}
+                    placeholder="Search username, display name, organization"
+                    aria-label="Search candidates"
+                  />
+                </label>
+
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      className="checkbox checkbox-sm"
+                      checked={allFilteredCandidatesSelected}
+                      onChange={handleToggleAllCandidates}
+                      disabled={filteredAvailableUsers.length === 0}
+                    />
+                    <span className="text-sm font-medium">Select all in results</span>
+                  </label>
+                  <span className="text-sm text-base-content/60">
+                    {selectedCandidateUsernames.length} selected
+                  </span>
+                </div>
+
+                <div className="max-h-[22rem] overflow-y-auto rounded-lg border border-base-300">
+                  {filteredAvailableUsers.length === 0 ? (
+                    <div className="p-6 text-center text-sm text-base-content/60">
+                      No available users match the current search.
+                    </div>
+                  ) : (
+                    <ul className="divide-y divide-base-300">
+                      {filteredAvailableUsers.map((userItem) => (
+                        <li key={userItem.username}>
+                          <label className="flex cursor-pointer items-start gap-3 p-3 hover:bg-base-200">
+                            <input
+                              type="checkbox"
+                              className="checkbox checkbox-sm mt-1"
+                              checked={selectedCandidateUsernames.includes(userItem.username)}
+                              onChange={() => handleToggleCandidate(userItem.username)}
+                            />
+                            <div className="min-w-0 flex-1">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="font-mono text-sm">{userItem.username}</span>
+                                <span
+                                  className={`badge badge-sm ${
+                                    userItem.system_role === "admin"
+                                      ? "badge-primary"
+                                      : "badge-ghost"
+                                  }`}
+                                >
+                                  {userItem.system_role}
+                                </span>
+                              </div>
+                              <div className="text-sm text-base-content/70">
+                                {userItem.display_name || "No display name"}
+                              </div>
+                              <div className="text-xs text-base-content/50">
+                                {userItem.organization || "No organization"}
+                              </div>
+                            </div>
+                          </label>
+                        </li>
+                      ))}
+                    </ul>
                   )}
-                </tbody>
-              </table>
+                </div>
+
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <select
+                    className="select select-bordered sm:w-40"
+                    value={selectedRole}
+                    onChange={(event) => setSelectedRole(event.target.value as ProjectRole)}
+                    aria-label="Role for new members"
+                  >
+                    <option value="viewer">Viewer</option>
+                    <option value="editor">Editor</option>
+                  </select>
+                  <button
+                    className="btn btn-primary sm:flex-1"
+                    onClick={handleAddMembers}
+                    disabled={isBulkAdding || selectedCandidateUsernames.length === 0}
+                  >
+                    {isBulkAdding ? (
+                      <span className="loading loading-spinner loading-sm" />
+                    ) : (
+                      <UserPlus size={16} />
+                    )}
+                    Add Selected
+                  </button>
+                </div>
+
+                <div className="alert alert-info">
+                  <Info size={16} className="shrink-0" />
+                  <span className="text-sm">
+                    Viewers can read project data. Editors can also operate workflows, notes, chips,
+                    and calibration data.
+                  </span>
+                </div>
+              </div>
             </div>
-          </>
+          </div>
         )}
 
         <div className="modal-action">
@@ -1506,99 +2111,226 @@ function MembersModal({
             Close
           </button>
         </div>
+      </div>
+      <form method="dialog" className="modal-backdrop">
+        <button onClick={onClose}>close</button>
+      </form>
+    </dialog>
+  );
+}
 
-        {/* Add Member Sub-Modal */}
-        {isAddModalOpen && (
-          <dialog className="modal modal-open" style={{ zIndex: 100 }}>
-            <div className="modal-box">
-              <h3 className="font-bold text-lg mb-4">Add Member</h3>
+function AssignUsersToProjectModal({
+  users,
+  projects,
+  onClose,
+  onAssign,
+  isLoading,
+  error,
+}: {
+  users: UserListItem[];
+  projects: ProjectListItem[];
+  onClose: () => void;
+  onAssign: (projectId: string, role: ProjectRole, usernames: string[]) => Promise<void>;
+  isLoading: boolean;
+  error: Error | unknown | null;
+}) {
+  const [projectSearch, setProjectSearch] = useState("");
+  const [selectedProjectId, setSelectedProjectId] = useState("");
+  const [selectedRole, setSelectedRole] = useState<ProjectRole>("viewer");
+  const [localError, setLocalError] = useState<string | null>(null);
+  const { data: selectedProjectMembersData, isLoading: selectedProjectMembersLoading } =
+    useListProjectMembersAdmin(selectedProjectId);
 
-              {(localError || !!addMemberError) && (
-                <div className="alert alert-error mb-4">
-                  <span>
-                    {localError || (addMemberError as Error)?.message || "Failed to add member"}
+  const filteredProjects = projects.filter((project) => {
+    const normalizedSearch = projectSearch.trim().toLowerCase();
+    return (
+      normalizedSearch.length === 0 ||
+      project.name.toLowerCase().includes(normalizedSearch) ||
+      project.owner_username.toLowerCase().includes(normalizedSearch) ||
+      project.project_id.toLowerCase().includes(normalizedSearch)
+    );
+  });
+  const selectedProjectMemberUsernames = new Set(
+    selectedProjectMembersData?.data?.members.map((member) => member.username) ?? [],
+  );
+  const assignableUsers = users.filter(
+    (user) => !selectedProjectMemberUsernames.has(user.username),
+  );
+  const alreadyAssignedUsers = users.filter((user) =>
+    selectedProjectMemberUsernames.has(user.username),
+  );
+
+  const handleAssign = async () => {
+    setLocalError(null);
+
+    if (users.length === 0) {
+      setLocalError("No users selected");
+      return;
+    }
+
+    if (!selectedProjectId) {
+      setLocalError("Select a project");
+      return;
+    }
+
+    if (assignableUsers.length === 0) {
+      setLocalError("All selected users are already members of this project");
+      return;
+    }
+
+    await onAssign(
+      selectedProjectId,
+      selectedRole,
+      assignableUsers.map((user) => user.username),
+    );
+    onClose();
+  };
+
+  return (
+    <dialog className="modal modal-open">
+      <div className="modal-box max-w-4xl w-full sm:w-11/12 max-h-[90vh] p-4 sm:p-6">
+        <h3 className="font-bold text-lg">Assign Users To Project</h3>
+        <p className="text-sm text-base-content/60 mb-4">
+          Add the selected users to one project with the same role in a single action.
+        </p>
+
+        {(localError || !!error) && (
+          <div className="alert alert-error mb-4">
+            <span>{localError || (error as Error)?.message || "Failed to assign users"}</span>
+          </div>
+        )}
+
+        <div className="grid gap-4 lg:grid-cols-2">
+          <div className="card bg-base-100 shadow-sm">
+            <div className="card-body p-4">
+              <div className="flex items-center justify-between gap-2">
+                <h4 className="font-medium">Selected users</h4>
+                <span className="badge badge-ghost">{users.length}</span>
+              </div>
+              <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto">
+                {users.map((u) => (
+                  <span key={u.username} className="badge badge-ghost font-mono">
+                    {u.username}
                   </span>
+                ))}
+              </div>
+
+              {selectedProjectId && (
+                <div className="stats stats-vertical sm:stats-horizontal w-full bg-base-200">
+                  <div className="stat py-2 px-3">
+                    <div className="stat-title text-xs">Will add</div>
+                    <div className="stat-value text-primary text-2xl">
+                      {selectedProjectMembersLoading ? "-" : assignableUsers.length}
+                    </div>
+                  </div>
+                  <div className="stat py-2 px-3">
+                    <div className="stat-title text-xs">Already member</div>
+                    <div className="stat-value text-2xl">
+                      {selectedProjectMembersLoading ? "-" : alreadyAssignedUsers.length}
+                    </div>
+                  </div>
                 </div>
               )}
 
-              <div className="space-y-4">
-                <div className="form-control">
-                  <label className="label">
-                    <span className="label-text font-medium">User</span>
-                  </label>
-                  <select
-                    className="select select-bordered ml-2"
-                    value={selectedUsername}
-                    onChange={(e) => setSelectedUsername(e.target.value)}
-                  >
-                    <option value="">Select a user...</option>
-                    {availableUsers.map((u: UserListItem) => (
-                      <option key={u.username} value={u.username}>
-                        {u.username}
-                        {u.display_name ? ` (${u.display_name})` : ""}
-                        {u.organization ? ` - ${u.organization}` : ""}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+              {selectedProjectId &&
+                alreadyAssignedUsers.length > 0 &&
+                !selectedProjectMembersLoading && (
+                  <div className="rounded-lg bg-base-200 p-3">
+                    <div className="mb-2 text-sm font-medium">Skipped (already members)</div>
+                    <div className="flex flex-wrap gap-2">
+                      {alreadyAssignedUsers.map((u) => (
+                        <span key={u.username} className="badge badge-outline font-mono">
+                          {u.username}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
-                <div className="form-control">
-                  <label className="label">
-                    <span className="label-text font-medium">Role</span>
-                  </label>
-                  <select
-                    className="select select-bordered ml-2"
-                    value={selectedRole}
-                    onChange={(e) => setSelectedRole(e.target.value as ProjectRole)}
-                  >
-                    <option value="viewer">Viewer</option>
-                    <option value="editor">Editor</option>
-                  </select>
-                </div>
-
-                <div className="alert alert-info">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    className="stroke-current shrink-0 w-5 h-5"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth="2"
-                      d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                    ></path>
-                  </svg>
-                  <span className="text-sm">
-                    Viewers can read project data. Editors can also operate workflows, notes, chips,
-                    and calibration data.
-                  </span>
-                </div>
-              </div>
-
-              <div className="modal-action">
-                <button className="btn" onClick={() => setIsAddModalOpen(false)}>
-                  Cancel
-                </button>
-                <button
-                  className="btn btn-primary"
-                  onClick={handleAddMember}
-                  disabled={isAddingMember || !selectedUsername}
+              <div className="form-control">
+                <label className="label" htmlFor="assign-role">
+                  <span className="label-text font-medium">Role</span>
+                </label>
+                <select
+                  id="assign-role"
+                  className="select select-bordered w-full"
+                  value={selectedRole}
+                  onChange={(event) => setSelectedRole(event.target.value as ProjectRole)}
                 >
-                  {isAddingMember ? (
-                    <span className="loading loading-spinner loading-sm"></span>
-                  ) : (
-                    "Add Member"
-                  )}
-                </button>
+                  <option value="viewer">Viewer</option>
+                  <option value="editor">Editor</option>
+                </select>
               </div>
             </div>
-            <form method="dialog" className="modal-backdrop">
-              <button onClick={() => setIsAddModalOpen(false)}>close</button>
-            </form>
-          </dialog>
-        )}
+          </div>
+
+          <div className="card bg-base-100 shadow-sm">
+            <div className="card-body p-4">
+              <h4 className="font-medium">Target project</h4>
+              <label className="input input-bordered flex items-center gap-2">
+                <Search size={16} className="text-base-content/50" />
+                <input
+                  type="text"
+                  className="grow"
+                  value={projectSearch}
+                  onChange={(event) => setProjectSearch(event.target.value)}
+                  placeholder="Search project name, owner, or project ID"
+                  aria-label="Search projects"
+                />
+              </label>
+
+              <div className="max-h-[22rem] overflow-y-auto rounded-lg border border-base-300">
+                {filteredProjects.length === 0 ? (
+                  <div className="p-6 text-center text-sm text-base-content/60">
+                    No projects match the current search.
+                  </div>
+                ) : (
+                  <ul className="divide-y divide-base-300">
+                    {filteredProjects.map((project) => (
+                      <li key={project.project_id}>
+                        <label className="flex cursor-pointer items-start gap-3 p-3 hover:bg-base-200">
+                          <input
+                            type="radio"
+                            name="assign-project"
+                            className="radio radio-sm mt-1"
+                            checked={selectedProjectId === project.project_id}
+                            onChange={() => setSelectedProjectId(project.project_id)}
+                          />
+                          <div className="min-w-0 flex-1">
+                            <div className="font-medium">{project.name}</div>
+                            <div className="text-sm text-base-content/70">
+                              Owner: <span className="font-mono">{project.owner_username}</span>
+                            </div>
+                            <div className="text-xs text-base-content/50">
+                              {project.member_count} members · {project.project_id}
+                            </div>
+                          </div>
+                        </label>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="modal-action">
+          <button className="btn" onClick={onClose}>
+            Cancel
+          </button>
+          <button
+            className="btn btn-primary"
+            onClick={handleAssign}
+            disabled={isLoading || selectedProjectMembersLoading || !selectedProjectId}
+          >
+            {isLoading || selectedProjectMembersLoading ? (
+              <span className="loading loading-spinner loading-sm" />
+            ) : (
+              "Assign Users"
+            )}
+          </button>
+        </div>
       </div>
       <form method="dialog" className="modal-backdrop">
         <button onClick={onClose}>close</button>
