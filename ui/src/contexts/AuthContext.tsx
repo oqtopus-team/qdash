@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import { createContext, useCallback, useContext, useState, useEffect } from "react";
+import Axios from "axios";
 
 import type { User } from "@/schemas";
 
@@ -18,6 +19,14 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+function isAuthenticationError(error: unknown): boolean {
+  if (!Axios.isAxiosError(error)) {
+    return false;
+  }
+  const status = error.response?.status;
+  return status === 401 || status === 403;
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -51,6 +60,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     query: {
       enabled: !!accessToken,
       retry: false,
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: false,
+      staleTime: 5 * 60 * 1000,
     },
   });
 
@@ -66,8 +78,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (userError) {
       console.error("Failed to fetch user info:", userError);
-      removeAuth();
-      setUser(null);
+      if (isAuthenticationError(userError)) {
+        removeAuth();
+        setUser(null);
+      }
     }
   }, [userError, removeAuth]);
 
