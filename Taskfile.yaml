@@ -201,6 +201,7 @@ tasks:
   check:
     desc: Run all checks locally (lint, typecheck, test, UI, audit)
     cmds:
+      - task: lint
       - task: ci-lint
       - task: ci-typecheck
       - task: ci-test

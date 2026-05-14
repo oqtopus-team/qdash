@@ -27,6 +27,8 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 MAX_TOOL_ROUNDS = 10
+OLLAMA_MAX_TOOL_ROUNDS = 16
+MAX_IDENTICAL_TOOL_CALLS = 3
 MAX_TOOL_RESULT_CHARS = 30000
 _TIMESERIES_CALL_LIMIT = 3
 _STORED_TOOLS: dict[str, StoredToolKey] = {
@@ -149,6 +151,47 @@ def sanitize_nan(obj: Any) -> Any:
     return obj
 
 
+def build_tool_call_signature(name: str, args: dict[str, Any]) -> str:
+    """Build a stable signature for repeated tool-call detection."""
+    try:
+        normalized_args = json.dumps(args, sort_keys=True, ensure_ascii=False, default=str)
+    except TypeError:
+        normalized_args = str(args)
+    return f"{name}:{normalized_args}"
+
+
+def build_tool_loop_finalization_prompt(reason: str) -> str:
+    """Instruct the model to stop calling tools and answer with current evidence."""
+    return (
+        "Tool execution was stopped before completion. "
+        f"Reason: {reason} "
+        "Do not call any more tools. "
+        "Using only the tool results and conversation context already available, "
+        "produce the best possible final answer in the required JSON format. "
+        "If evidence is incomplete, say that briefly and avoid inventing missing data."
+    )
+
+
+def build_responses_finalization_item(reason: str) -> dict[str, Any]:
+    """Create a Responses API input item that forces finalization without tools."""
+    return {
+        "role": "user",
+        "content": [{"type": "input_text", "text": build_tool_loop_finalization_prompt(reason)}],
+    }
+
+
+def build_chat_finalization_message(reason: str) -> dict[str, Any]:
+    """Create a Chat Completions message that forces finalization without tools."""
+    return {"role": "user", "content": build_tool_loop_finalization_prompt(reason)}
+
+
+def get_max_tool_rounds(config: CopilotConfig) -> int:
+    """Return the provider-specific tool-call budget."""
+    if config.model.provider == "ollama":
+        return OLLAMA_MAX_TOOL_ROUNDS
+    return MAX_TOOL_ROUNDS
+
+
 def inject_collected_charts(
     result: dict[str, Any],
     collected_charts: list[SandboxChartSpec | dict[str, Any]],
@@ -211,15 +254,42 @@ async def run_responses_api(
     response = await _create(**kwargs)
 
     if tool_executors:
-        for round_index in range(MAX_TOOL_ROUNDS):
+        max_tool_rounds = get_max_tool_rounds(config)
+        tool_call_counts: dict[str, int] = {}
+        stop_reason: str | None = None
+        for round_index in range(max_tool_rounds):
             function_calls = [item for item in response.output if item.type == "function_call"]
             if not function_calls:
+                break
+
+            parsed_calls: list[tuple[Any, dict[str, Any]]] = []
+            repeated_signature: str | None = None
+            for fc in function_calls:
+                try:
+                    args = json.loads(fc.arguments)
+                except (json.JSONDecodeError, TypeError):
+                    args = {}
+                signature = build_tool_call_signature(fc.name, args)
+                tool_call_counts[signature] = tool_call_counts.get(signature, 0) + 1
+                if (
+                    tool_call_counts[signature] > MAX_IDENTICAL_TOOL_CALLS
+                    and repeated_signature is None
+                ):
+                    repeated_signature = signature
+                parsed_calls.append((fc, args))
+
+            if repeated_signature is not None:
+                stop_reason = (
+                    "Detected repeated identical tool calls "
+                    f"more than {MAX_IDENTICAL_TOOL_CALLS} times: {repeated_signature}"
+                )
+                logger.warning(stop_reason)
                 break
 
             logger.info(
                 "Tool round %d/%d: %d call(s) — %s",
                 round_index + 1,
-                MAX_TOOL_ROUNDS,
+                max_tool_rounds,
                 len(function_calls),
                 ", ".join(fc.name for fc in function_calls),
             )
@@ -227,11 +297,7 @@ async def run_responses_api(
             for item in response.output:
                 new_input.append(item.model_dump())
 
-            for fc in function_calls:
-                try:
-                    args = json.loads(fc.arguments)
-                except (json.JSONDecodeError, TypeError):
-                    args = {}
+            for fc, args in parsed_calls:
                 logger.info("Tool call: %s(%s)", fc.name, json.dumps(args, ensure_ascii=False))
                 if on_tool_call:
                     await on_tool_call(fc.name, args)
@@ -275,6 +341,23 @@ async def run_responses_api(
             if on_status:
                 await on_status("thinking")
             response = await _create(**kwargs)
+        else:
+            stop_reason = f"Reached the maximum number of tool rounds ({max_tool_rounds})."
+
+        if stop_reason is not None:
+            logger.warning("Finalizing tool loop without further tool calls: %s", stop_reason)
+            final_input = list(kwargs["input"])
+            for item in response.output:
+                dumped = item.model_dump()
+                if dumped.get("type") == "function_call":
+                    continue
+                final_input.append(dumped)
+            final_input.append(build_responses_finalization_item(stop_reason))
+            final_kwargs = {k: v for k, v in kwargs.items() if k != "tools"}
+            final_kwargs["input"] = final_input
+            if on_status:
+                await on_status("thinking")
+            response = await _create(**final_kwargs)
 
     output = response.output_text
     if output is None:
@@ -400,7 +483,10 @@ async def run_chat_completions_with_tools(
         await on_status("thinking")
 
     last_message: Any = None
-    for _ in range(MAX_TOOL_ROUNDS):
+    max_tool_rounds = get_max_tool_rounds(config)
+    tool_call_counts: dict[str, int] = {}
+    stop_reason: str | None = None
+    for round_index in range(max_tool_rounds):
         response = await _create(messages=msgs, **base_kwargs)
         choice = response.choices[0]
         msg = choice.message
@@ -409,6 +495,37 @@ async def run_chat_completions_with_tools(
         if not tool_calls:
             break
 
+        parsed_calls: list[tuple[Any, dict[str, Any]]] = []
+        repeated_signature: str | None = None
+        for tc in tool_calls:
+            try:
+                args = json.loads(tc.function.arguments)
+            except (json.JSONDecodeError, TypeError):
+                args = {}
+            signature = build_tool_call_signature(tc.function.name, args)
+            tool_call_counts[signature] = tool_call_counts.get(signature, 0) + 1
+            if (
+                tool_call_counts[signature] > MAX_IDENTICAL_TOOL_CALLS
+                and repeated_signature is None
+            ):
+                repeated_signature = signature
+            parsed_calls.append((tc, args))
+
+        if repeated_signature is not None:
+            stop_reason = (
+                "Detected repeated identical tool calls "
+                f"more than {MAX_IDENTICAL_TOOL_CALLS} times: {repeated_signature}"
+            )
+            logger.warning(stop_reason)
+            break
+
+        logger.info(
+            "Tool round %d/%d: %d call(s) — %s",
+            round_index + 1,
+            max_tool_rounds,
+            len(tool_calls),
+            ", ".join(tc.function.name for tc in tool_calls),
+        )
         assistant_msg: dict[str, Any] = {
             "role": "assistant",
             "content": msg.content or None,
@@ -426,11 +543,7 @@ async def run_chat_completions_with_tools(
             assistant_msg["reasoning_content"] = reasoning_content
         msgs.append(assistant_msg)
 
-        for tc in tool_calls:
-            try:
-                args = json.loads(tc.function.arguments)
-            except (json.JSONDecodeError, TypeError):
-                args = {}
+        for tc, args in parsed_calls:
             if on_tool_call:
                 await on_tool_call(tc.function.name, args)
 
@@ -457,8 +570,14 @@ async def run_chat_completions_with_tools(
         if on_status:
             await on_status("thinking")
     else:
+        stop_reason = f"Reached the maximum number of tool rounds ({max_tool_rounds})."
+
+    if stop_reason is not None:
+        logger.warning("Finalizing tool loop without further tool calls: %s", stop_reason)
         final_kwargs = {k: v for k, v in base_kwargs.items() if k not in ("tools", "tool_choice")}
-        response = await _create(messages=msgs, **final_kwargs)
+        final_messages = list(msgs)
+        final_messages.append(build_chat_finalization_message(stop_reason))
+        response = await _create(messages=final_messages, **final_kwargs)
         last_message = response.choices[0].message
 
     content = (getattr(last_message, "content", None) or "") if last_message is not None else ""

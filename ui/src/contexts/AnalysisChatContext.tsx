@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from "react";
 import type { AnalysisContext, ChatMessage } from "@/hooks/useAnalysisChat";
+import { buildHeaders } from "@/lib/sse-utils";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -12,8 +13,10 @@ export interface ChatSession {
   title: string;
   context: AnalysisContext | null;
   messages: ChatMessage[];
+  messageCount: number;
   createdAt: number;
   updatedAt: number;
+  messagesLoaded: boolean;
 }
 
 interface AnalysisChatContextValue {
@@ -64,11 +67,46 @@ interface LegacyCopilotSession {
   updatedAt: number;
 }
 
+interface ServerMessage {
+  role: string;
+  content: string;
+  attached_image?: string | null;
+}
+
+interface ServerSessionSummary {
+  session_id: string;
+  title: string;
+  context?: AnalysisContext | null;
+  message_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+interface ServerSessionDetail extends ServerSessionSummary {
+  messages: ServerMessage[];
+}
+
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "/api";
+const SESSIONS_PATH = "/copilot/chat/sessions";
+
 function loadSessions(): ChatSession[] {
   if (typeof window === "undefined") return [];
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw) as ChatSession[];
+    if (raw) {
+      return (JSON.parse(raw) as Array<Partial<ChatSession> & Pick<ChatSession, "id">>).map(
+        (session) => ({
+          id: session.id,
+          title: session.title ?? "New Chat",
+          context: session.context ?? null,
+          messages: session.messages ?? [],
+          messageCount: session.messageCount ?? session.messages?.length ?? 0,
+          createdAt: session.createdAt ?? Date.now(),
+          updatedAt: session.updatedAt ?? Date.now(),
+          messagesLoaded: session.messagesLoaded ?? true,
+        }),
+      );
+    }
 
     // One-time migration from legacy keys
     const merged: ChatSession[] = [];
@@ -80,6 +118,8 @@ function loadSessions(): ChatSession[] {
         merged.push({
           ...s,
           title: s.context ? `${s.context.taskName} / ${s.context.qid}` : "General Chat",
+          messageCount: s.messages.length,
+          messagesLoaded: true,
         });
       }
     }
@@ -95,8 +135,10 @@ function loadSessions(): ChatSession[] {
           title: s.title || "New Chat",
           context: null,
           messages: s.messages,
+          messageCount: s.messages.length,
           createdAt: s.createdAt,
           updatedAt: s.updatedAt,
+          messagesLoaded: true,
         });
       }
     }
@@ -130,6 +172,119 @@ function generateId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+function toTimestamp(iso: string | undefined | null): number {
+  if (!iso) return Date.now();
+  const timestamp = new Date(iso).getTime();
+  return Number.isNaN(timestamp) ? Date.now() : timestamp;
+}
+
+function serverMessageToLocal(message: ServerMessage): ChatMessage {
+  return {
+    role: message.role as ChatMessage["role"],
+    content: message.content,
+    attachedImage: Boolean(message.attached_image),
+  };
+}
+
+function localMessageToServer(message: ChatMessage): ServerMessage {
+  return {
+    role: message.role,
+    content: message.content,
+    attached_image: message.attachedImage ? "1" : null,
+  };
+}
+
+function summaryToSession(session: ServerSessionSummary): ChatSession {
+  return {
+    id: session.session_id,
+    title: session.title,
+    context: session.context ?? null,
+    messages: [],
+    messageCount: session.message_count,
+    createdAt: toTimestamp(session.created_at),
+    updatedAt: toTimestamp(session.updated_at),
+    messagesLoaded: false,
+  };
+}
+
+function detailToSession(session: ServerSessionDetail): ChatSession {
+  return {
+    id: session.session_id,
+    title: session.title,
+    context: session.context ?? null,
+    messages: session.messages.map(serverMessageToLocal),
+    messageCount: session.message_count,
+    createdAt: toTimestamp(session.created_at),
+    updatedAt: toTimestamp(session.updated_at),
+    messagesLoaded: true,
+  };
+}
+
+function deriveSessionTitle(currentTitle: string, messages: ChatMessage[]): string {
+  if (currentTitle !== "New Chat") return currentTitle;
+  const firstUserMessage = messages.find((message) => message.role === "user");
+  return firstUserMessage?.content ? firstUserMessage.content.slice(0, 50) : currentTitle;
+}
+
+async function apiListSessions(): Promise<ServerSessionSummary[]> {
+  const response = await fetch(`${BASE_URL}${SESSIONS_PATH}`, {
+    headers: buildHeaders(),
+  });
+  if (!response.ok) throw new Error(`Failed to list sessions: ${response.status}`);
+  const data = (await response.json()) as { sessions: ServerSessionSummary[] };
+  return data.sessions;
+}
+
+async function apiGetSession(sessionId: string): Promise<ServerSessionDetail> {
+  const response = await fetch(`${BASE_URL}${SESSIONS_PATH}/${encodeURIComponent(sessionId)}`, {
+    headers: buildHeaders(),
+  });
+  if (!response.ok) throw new Error(`Failed to get session: ${response.status}`);
+  return (await response.json()) as ServerSessionDetail;
+}
+
+async function apiCreateSession(session: ChatSession): Promise<ServerSessionDetail> {
+  const response = await fetch(`${BASE_URL}${SESSIONS_PATH}`, {
+    method: "POST",
+    headers: buildHeaders(),
+    body: JSON.stringify({
+      session_id: session.id,
+      title: session.title,
+      context: session.context,
+      messages: session.messages.map(localMessageToServer),
+    }),
+  });
+  if (!response.ok) throw new Error(`Failed to create session: ${response.status}`);
+  return (await response.json()) as ServerSessionDetail;
+}
+
+async function apiUpdateSession(
+  sessionId: string,
+  patch: {
+    title?: string;
+    context?: AnalysisContext | null;
+    messages?: ServerMessage[];
+  },
+): Promise<ServerSessionDetail> {
+  const response = await fetch(`${BASE_URL}${SESSIONS_PATH}/${encodeURIComponent(sessionId)}`, {
+    method: "PATCH",
+    headers: buildHeaders(),
+    body: JSON.stringify(patch),
+  });
+  if (!response.ok) throw new Error(`Failed to update session: ${response.status}`);
+  return (await response.json()) as ServerSessionDetail;
+}
+
+async function apiDeleteSession(sessionId: string): Promise<void> {
+  const response = await fetch(`${BASE_URL}${SESSIONS_PATH}/${encodeURIComponent(sessionId)}`, {
+    method: "DELETE",
+    headers: buildHeaders(),
+  });
+  if (!response.ok && response.status !== 404) {
+    throw new Error(`Failed to delete session: ${response.status}`);
+  }
+}
+
 const GENERAL_CHAT_KEY = "__general__";
 
 function contextKey(ctx: AnalysisContext | null): string {
@@ -152,12 +307,39 @@ export function AnalysisChatProvider({ children }: { children: React.ReactNode }
     context: AnalysisContext | null;
   }>({ isOpen: false, context: null });
   const initialized = useRef(false);
+  const messagesFetched = useRef<Set<string>>(new Set());
+  const pendingCreates = useRef<Map<string, Promise<void>>>(new Map());
 
-  // Load from localStorage on mount
+  const awaitCreate = useCallback(async (sessionId: string) => {
+    const pending = pendingCreates.current.get(sessionId);
+    if (!pending) return;
+    try {
+      await pending;
+    } catch {
+      // The create path handles rollback.
+    }
+  }, []);
+
+  // Load cached sessions immediately, then replace with server-backed sessions.
   useEffect(() => {
     const loaded = loadSessions();
     setSessions(loaded);
     initialized.current = true;
+
+    let cancelled = false;
+    apiListSessions()
+      .then((serverSessions) => {
+        if (cancelled) return;
+        messagesFetched.current.clear();
+        setSessions(serverSessions.map(summaryToSession));
+      })
+      .catch(() => {
+        // Fall back to localStorage if the API is unavailable.
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // Persist to localStorage when sessions change
@@ -170,6 +352,59 @@ export function AnalysisChatProvider({ children }: { children: React.ReactNode }
   // Derived: active session
   const activeSession = sessions.find((s) => s.id === activeSessionId) ?? null;
 
+  useEffect(() => {
+    if (!activeSessionId) return;
+    if (messagesFetched.current.has(activeSessionId)) return;
+    messagesFetched.current.add(activeSessionId);
+
+    let cancelled = false;
+    apiGetSession(activeSessionId)
+      .then((detail) => {
+        if (cancelled) return;
+        const session = detailToSession(detail);
+        setSessions((prev) => prev.map((item) => (item.id === session.id ? session : item)));
+      })
+      .catch(() => {
+        messagesFetched.current.delete(activeSessionId);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeSessionId]);
+
+  const createSession = useCallback((ctx: AnalysisContext | null): string => {
+    const id = generateId();
+    const now = Date.now();
+    const session: ChatSession = {
+      id,
+      title: ctx ? `${ctx.taskName} / ${ctx.qid}` : "New Chat",
+      context: ctx,
+      messages: [],
+      messageCount: 0,
+      createdAt: now,
+      updatedAt: now,
+      messagesLoaded: true,
+    };
+    messagesFetched.current.add(id);
+    setSessions((prev) => [session, ...prev]);
+    setActiveSessionId(id);
+
+    const createPromise = apiCreateSession(session)
+      .then(() => {
+        pendingCreates.current.delete(id);
+      })
+      .catch((error) => {
+        pendingCreates.current.delete(id);
+        messagesFetched.current.delete(id);
+        setSessions((prev) => prev.filter((item) => item.id !== id));
+        setActiveSessionId((current) => (current === id ? null : current));
+        throw error;
+      });
+    pendingCreates.current.set(id, createPromise);
+    return id;
+  }, []);
+
   // ------- sidebar -------
 
   const openAnalysisChat = useCallback(
@@ -180,23 +415,11 @@ export function AnalysisChatProvider({ children }: { children: React.ReactNode }
       if (existing) {
         setActiveSessionId(existing.id);
       } else {
-        // Create new session
-        const id = generateId();
-        const now = Date.now();
-        const session: ChatSession = {
-          id,
-          title: `${ctx.taskName} / ${ctx.qid}`,
-          context: ctx,
-          messages: [],
-          createdAt: now,
-          updatedAt: now,
-        };
-        setSessions((prev) => [session, ...prev]);
-        setActiveSessionId(id);
+        createSession(ctx);
       }
       setIsOpen(true);
     },
-    [sessions],
+    [createSession, sessions],
   );
 
   const openGeneralChat = useCallback(() => {
@@ -205,21 +428,10 @@ export function AnalysisChatProvider({ children }: { children: React.ReactNode }
     if (existing) {
       setActiveSessionId(existing.id);
     } else {
-      const id = generateId();
-      const now = Date.now();
-      const session: ChatSession = {
-        id,
-        title: "New Chat",
-        context: null,
-        messages: [],
-        createdAt: now,
-        updatedAt: now,
-      };
-      setSessions((prev) => [session, ...prev]);
-      setActiveSessionId(id);
+      createSession(null);
     }
     setIsOpen(true);
-  }, [sessions]);
+  }, [createSession, sessions]);
 
   const closeAnalysisChat = useCallback(() => {
     setIsOpen(false);
@@ -239,22 +451,11 @@ export function AnalysisChatProvider({ children }: { children: React.ReactNode }
       if (existing) {
         setActiveSessionId(existing.id);
       } else {
-        const id = generateId();
-        const now = Date.now();
-        const session: ChatSession = {
-          id,
-          title: `${ctx.taskName} / ${ctx.qid}`,
-          context: ctx,
-          messages: [],
-          createdAt: now,
-          updatedAt: now,
-        };
-        setSessions((prev) => [session, ...prev]);
-        setActiveSessionId(id);
+        createSession(ctx);
       }
       setMiniChat({ isOpen: true, context: ctx });
     },
-    [sessions],
+    [createSession, sessions],
   );
 
   const closeMiniChat = useCallback(() => {
@@ -267,40 +468,51 @@ export function AnalysisChatProvider({ children }: { children: React.ReactNode }
     setActiveSessionId(sessionId);
   }, []);
 
-  const createNewSession = useCallback((ctx: AnalysisContext | null): string => {
-    const id = generateId();
-    const now = Date.now();
-    const session: ChatSession = {
-      id,
-      title: ctx ? `${ctx.taskName} / ${ctx.qid}` : "New Chat",
-      context: ctx,
-      messages: [],
-      createdAt: now,
-      updatedAt: now,
-    };
-    setSessions((prev) => [session, ...prev]);
-    setActiveSessionId(id);
-    return id;
-  }, []);
+  const createNewSession = useCallback(
+    (ctx: AnalysisContext | null): string => {
+      return createSession(ctx);
+    },
+    [createSession],
+  );
 
   const deleteSession = useCallback(
     (sessionId: string) => {
       setSessions((prev) => prev.filter((s) => s.id !== sessionId));
+      messagesFetched.current.delete(sessionId);
       if (activeSessionId === sessionId) {
         setActiveSessionId(null);
       }
+      (async () => {
+        try {
+          await awaitCreate(sessionId);
+          await apiDeleteSession(sessionId);
+        } catch {
+          apiListSessions().then((serverSessions) => {
+            setSessions(serverSessions.map(summaryToSession));
+          });
+        }
+      })();
     },
-    [activeSessionId],
+    [activeSessionId, awaitCreate],
   );
 
   const clearActiveSession = useCallback(() => {
     if (!activeSessionId) return;
+    const sessionId = activeSessionId;
     setSessions((prev) =>
       prev.map((s) =>
-        s.id === activeSessionId ? { ...s, messages: [], updatedAt: Date.now() } : s,
+        s.id === sessionId
+          ? { ...s, messages: [], messageCount: 0, updatedAt: Date.now(), messagesLoaded: true }
+          : s,
       ),
     );
-  }, [activeSessionId]);
+    (async () => {
+      await awaitCreate(sessionId);
+      apiUpdateSession(sessionId, { messages: [] }).catch(() => {
+        // Keep local state and retry on the next update.
+      });
+    })();
+  }, [activeSessionId, awaitCreate]);
 
   // ------- message sync (for useAnalysisChat hook) -------
 
@@ -311,31 +523,98 @@ export function AnalysisChatProvider({ children }: { children: React.ReactNode }
     [activeSession],
   );
 
+  const updateSessionMessages = useCallback(
+    (sessionId: string, messages: ChatMessage[]) => {
+      let patchTitle: string | undefined;
+      let patchContext: AnalysisContext | null | undefined;
+
+      setSessions((prev) =>
+        prev.map((session) => {
+          if (session.id !== sessionId) return session;
+          const nextTitle = deriveSessionTitle(session.title, messages);
+          if (nextTitle !== session.title) {
+            patchTitle = nextTitle;
+          }
+          patchContext = session.context;
+          return {
+            ...session,
+            title: nextTitle,
+            messages,
+            messageCount: messages.length,
+            updatedAt: Date.now(),
+            messagesLoaded: true,
+          };
+        }),
+      );
+
+      const patch: {
+        title?: string;
+        context?: AnalysisContext | null;
+        messages: ServerMessage[];
+      } = {
+        messages: messages.map(localMessageToServer),
+      };
+      if (patchTitle !== undefined) {
+        patch.title = patchTitle;
+      }
+      if (patchContext !== undefined) {
+        patch.context = patchContext;
+      }
+
+      (async () => {
+        await awaitCreate(sessionId);
+        apiUpdateSession(sessionId, patch).catch(() => {
+          // Keep local state and retry on the next update.
+        });
+      })();
+    },
+    [awaitCreate],
+  );
+
   const setSessionMessages = useCallback(
     (_ctx: AnalysisContext, messages: ChatMessage[]) => {
       if (!activeSessionId) return;
-      setSessions((prev) =>
-        prev.map((s) => (s.id === activeSessionId ? { ...s, messages, updatedAt: Date.now() } : s)),
-      );
+      updateSessionMessages(activeSessionId, messages);
     },
-    [activeSessionId],
+    [activeSessionId, updateSessionMessages],
   );
 
-  const updateSessionMessages = useCallback((sessionId: string, messages: ChatMessage[]) => {
-    setSessions((prev) =>
-      prev.map((s) => (s.id === sessionId ? { ...s, messages, updatedAt: Date.now() } : s)),
-    );
-  }, []);
+  const autoTitleSession = useCallback(
+    (sessionId: string, firstMessage: string) => {
+      const newTitle = firstMessage.slice(0, 50);
+      let shouldPersist = false;
+      let patchContext: AnalysisContext | null | undefined;
 
-  const autoTitleSession = useCallback((sessionId: string, firstMessage: string) => {
-    setSessions((prev) =>
-      prev.map((s) =>
-        s.id === sessionId && s.title === "New Chat"
-          ? { ...s, title: firstMessage.slice(0, 50) }
-          : s,
-      ),
-    );
-  }, []);
+      setSessions((prev) =>
+        prev.map((session) => {
+          if (session.id !== sessionId || session.title !== "New Chat") {
+            return session;
+          }
+          shouldPersist = true;
+          patchContext = session.context;
+          return {
+            ...session,
+            title: newTitle,
+          };
+        }),
+      );
+
+      if (!shouldPersist) {
+        return;
+      }
+
+      (async () => {
+        await awaitCreate(sessionId);
+        apiUpdateSession(sessionId, {
+          title: newTitle,
+          context: patchContext,
+        }).catch(() => {
+          // Keep local state and retry on the next message update.
+        });
+      })();
+    },
+    [awaitCreate],
+  );
 
   return (
     <AnalysisChatCtx.Provider

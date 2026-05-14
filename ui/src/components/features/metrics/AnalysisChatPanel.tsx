@@ -326,7 +326,7 @@ function SessionItem({
             {session.context ? session.context.qid : "General"}
           </div>
           <div className="flex items-center gap-2 mt-0.5 text-base-content/40">
-            <span>{session.messages.length} msgs</span>
+            <span>{session.messageCount} msgs</span>
             <span>{formatTimeAgo(session.updatedAt)}</span>
           </div>
         </div>
@@ -379,6 +379,7 @@ export function AnalysisChatPanel({ context, onClose }: AnalysisChatPanelProps) 
     clearActiveSession,
     getSessionMessages,
     setSessionMessages,
+    autoTitleSession,
   } = useAnalysisChatContext();
 
   const [showSessions, setShowSessions] = useState(false);
@@ -453,9 +454,33 @@ export function AnalysisChatPanel({ context, onClose }: AnalysisChatPanelProps) 
     inputRef.current?.focus();
   }, [activeSessionId]);
 
+  useEffect(() => {
+    if (!activeSessionId) return;
+    if (activeSession?.messages === messages && activeSession.messageCount === messages.length) {
+      return;
+    }
+    if (effectiveContext) {
+      setSessionMessages(effectiveContext, messages);
+      return;
+    }
+    setSessionMessages(
+      {
+        taskId: "__general__",
+        executionId: "",
+        qid: "",
+        taskName: "",
+        chipId: "",
+      } as AnalysisContext,
+      messages,
+    );
+  }, [activeSession, activeSessionId, effectiveContext, messages, setSessionMessages]);
+
   const handleSend = () => {
     const trimmed = input.trim();
     if (!trimmed || isLoading) return;
+    if (activeSessionId) {
+      autoTitleSession(activeSessionId, trimmed);
+    }
     setInput("");
     sendMessage(trimmed);
   };
