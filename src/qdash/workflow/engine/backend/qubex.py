@@ -216,7 +216,7 @@ class QubexBackend(BaseBackend):
         # matches the qid that was just calibrated.
         # Note: qid is numeric (e.g. "16") but keys use label format (e.g. "Q16").
         if qid is not None:
-            from qdash.common.qubit_utils import qid_to_label_from_chip
+            from qdash.common.domain.qubit import qid_to_label_from_chip
 
             label = qid_to_label_from_chip(qid, project_id=project_id, chip_id=chip_id)
 

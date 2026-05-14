@@ -5,7 +5,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from qdash.common.datetime_utils import now
+from qdash.common.utils.datetime import now
 from qdash.datamodel.task import (
     BaseTaskResultModel,
     CalibDataModel,

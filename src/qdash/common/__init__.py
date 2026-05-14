@@ -1,6 +1,6 @@
 """Common utilities shared between API and Workflow modules."""
 
-from qdash.common.backend_config import (
+from qdash.common.config.backend import (
     BackendConfig,
     BackendDefinition,
     get_available_backends,
@@ -10,11 +10,11 @@ from qdash.common.backend_config import (
     is_task_available,
     load_backend_config,
 )
-from qdash.common.backend_config import (
+from qdash.common.config.backend import (
     clear_cache as clear_backend_cache,
 )
-from qdash.common.config_loader import ConfigLoader
-from qdash.common.paths import (
+from qdash.common.config.loader import ConfigLoader
+from qdash.common.config.paths import (
     CALIB_DATA_BASE,
     CALIBTASKS_DIR,
     CONFIG_DIR,

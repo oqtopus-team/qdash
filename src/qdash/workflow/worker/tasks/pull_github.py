@@ -8,7 +8,7 @@ from git import Repo
 from git.exc import GitCommandError
 from prefect import get_run_logger, task
 
-from qdash.common.paths import QUBEX_CONFIG_BASE
+from qdash.common.config.paths import QUBEX_CONFIG_BASE
 
 
 @task(task_run_name="Pull GitHub")

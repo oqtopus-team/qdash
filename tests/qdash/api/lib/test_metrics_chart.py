@@ -1,11 +1,11 @@
-"""Tests for qdash.api.lib.metrics_chart module."""
+"""Tests for qdash.common.visualization.metrics_chart module."""
 
 from __future__ import annotations
 
 import math
 from unittest.mock import MagicMock
 
-from qdash.api.lib.metrics_chart import (
+from qdash.common.visualization.metrics_chart import (
     ChipGeometry,
     _format_qubit_text,
     build_chip_geometry,

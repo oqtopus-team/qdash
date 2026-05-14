@@ -443,7 +443,7 @@ def _set_task_note_content(
     content: str,
 ) -> None:
     """Persist the dashboard-facing task-result note directly on history."""
-    from qdash.common.datetime_utils import now
+    from qdash.common.utils.datetime import now
     from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
 
     doc = TaskResultHistoryDocument.find_one(
@@ -467,6 +467,6 @@ def _truncate_markdown(markdown: str) -> str:
 
 def _format_review_metadata(model: ModelConfig) -> str:
     """Return a compact metadata line for the model that produced the review."""
-    from qdash.common.datetime_utils import now
+    from qdash.common.utils.datetime import now
 
     return f"*Reviewed by: {model.provider}/{model.name} at {now().isoformat()}*"

@@ -1,10 +1,10 @@
-"""Tests for qdash.common.qubit_utils module."""
+"""Tests for qdash.common.domain.qubit module."""
 
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from qdash.common.qubit_utils import (
+from qdash.common.domain.qubit import (
     DEFAULT_NUM_QUBITS,
     _get_chip_size,
     qid_to_label,

@@ -7,7 +7,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException
 
-from qdash.common.topology_config import (
+from qdash.common.config.topology import (
     list_topologies,
     load_topology,
 )

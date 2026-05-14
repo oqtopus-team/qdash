@@ -348,7 +348,7 @@ def _resolve_json_path() -> Path | None:
     knowledge repo), then falls back to ``config/task-knowledge.json``
     for backward compatibility.
     """
-    from qdash.common.config_loader import ConfigLoader
+    from qdash.common.config.loader import ConfigLoader
 
     config_dir = ConfigLoader.get_config_dir()
     # Primary: inside the cloned knowledge repo directory

@@ -7,8 +7,6 @@ from fastapi import APIRouter, Depends, File, UploadFile, status
 
 from qdash.api.dependencies import get_admin_service
 from qdash.api.lib.auth import get_admin_user
-from qdash.api.lib.config_loader import ConfigLoader
-from qdash.api.lib.metrics_config import clear_metrics_config_cache
 from qdash.api.lib.policy_config import clear_policy_config_cache
 from qdash.api.schemas.admin import (
     AddMemberRequest,
@@ -23,6 +21,8 @@ from qdash.api.schemas.admin import (
 )
 from qdash.api.schemas.auth import User
 from qdash.api.services.admin_service import AdminService
+from qdash.common.config.loader import ConfigLoader
+from qdash.common.config.metrics import clear_metrics_config_cache
 from qdash.common.copilot.config import clear_copilot_config_cache
 
 logger = logging.getLogger(__name__)

@@ -11,10 +11,10 @@ from uuid import uuid4
 
 from starlette.exceptions import HTTPException
 
-from qdash.api.lib.json_utils import sanitize_for_json
 from qdash.api.schemas.issue import IssueResponse, ListIssuesResponse
 from qdash.api.schemas.success import SuccessResponse
-from qdash.common.paths import CALIB_DATA_BASE
+from qdash.common.config.paths import CALIB_DATA_BASE
+from qdash.common.utils.json import sanitize_for_json
 from qdash.datamodel.project import ProjectRole
 from qdash.dbmodel.issue import IssueDocument
 from qdash.dbmodel.user import UserDocument

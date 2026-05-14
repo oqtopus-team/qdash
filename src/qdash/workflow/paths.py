@@ -1,7 +1,7 @@
 """Path resolution for workflow components.
 
 This module provides path management for workflow-related directories and files.
-Path constants are imported from qdash.common.paths for consistency across
+Path constants are imported from qdash.common.config.paths for consistency across
 API and workflow modules.
 
 For host-side path customization, use .env and docker-compose.yaml volume mounts.
@@ -12,7 +12,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 # Re-export path constants from common module for backward compatibility
-from qdash.common.paths import (
+from qdash.common.config.paths import (
     CALIB_DATA_BASE,
     CALIBTASKS_DIR,
     SERVICE_DIR,

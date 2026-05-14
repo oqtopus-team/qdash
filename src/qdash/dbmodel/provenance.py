@@ -21,7 +21,7 @@ from bunnet import Document
 from pydantic import ConfigDict, Field
 from pymongo import ASCENDING, DESCENDING, IndexModel
 
-from qdash.common.datetime_utils import now
+from qdash.common.utils.datetime import now
 
 
 class ProvenanceRelationType(str, Enum):

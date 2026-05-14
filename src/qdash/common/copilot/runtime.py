@@ -38,7 +38,7 @@ from qdash.common.copilot.services.provenance_context_service import (
 from qdash.common.copilot.services.support_service import CopilotSupportService
 from qdash.common.copilot.services.topology_context_service import TopologyContextLoader
 from qdash.common.copilot.tooling.registry import ToolExecutorRegistryBuilder
-from qdash.common.json_utils import sanitize_for_json
+from qdash.common.utils.json import sanitize_for_json
 
 if TYPE_CHECKING:
     from qdash.common.copilot.config import CopilotConfig

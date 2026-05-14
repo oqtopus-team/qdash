@@ -13,7 +13,7 @@ from qdash.api.schemas.copilot_chat_session import (
     ListCopilotChatSessionsResponse,
     UpdateCopilotChatSessionRequest,
 )
-from qdash.common.datetime_utils import now
+from qdash.common.utils.datetime import now
 from qdash.dbmodel.copilot_chat_session import (
     CopilotChatMessage,
     CopilotChatSessionDocument,

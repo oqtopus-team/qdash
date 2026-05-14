@@ -45,7 +45,7 @@ def validate_task_name(
         If any task name is invalid for the specified backend
 
     """
-    from qdash.common.backend_config import get_default_backend, is_task_available
+    from qdash.common.config.backend import get_default_backend, is_task_available
 
     if backend is None:
         backend = get_default_backend()

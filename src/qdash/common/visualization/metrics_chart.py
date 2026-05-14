@@ -1,9 +1,4 @@
-"""Standalone chart-generation helpers for chip metrics.
-
-Functions in this module are used by both the PDF report generator
-(``metrics_pdf.MetricsPDFGenerator``) and the Copilot heatmap tool.
-They have **no dependency** on ReportLab or any PDF-specific logic.
-"""
+"""Standalone chart-generation helpers for chip metrics."""
 
 from __future__ import annotations
 
@@ -14,13 +9,10 @@ from typing import TYPE_CHECKING, Any
 import plotly.graph_objects as go
 
 if TYPE_CHECKING:
-    from qdash.common.topology_config import TopologyDefinition
+    from qdash.common.config.topology import TopologyDefinition
 
-# Default sizing constants (PDF-oriented)
 NODE_SIZE_DEFAULT = 48
 TEXT_SIZE_DEFAULT = 18
-
-# Compact sizing constants (chat UI)
 NODE_SIZE_COMPACT = 28
 TEXT_SIZE_COMPACT = 10
 
@@ -56,19 +48,18 @@ def get_qubit_position(geometry: ChipGeometry, qid: int) -> tuple[int, int]:
     if qid in geometry.qubit_positions:
         return geometry.qubit_positions[qid]
 
-    mux_size = geometry.mux_size
-    qubits_per_mux = mux_size * mux_size
-    muxes_per_row = geometry.grid_size // mux_size
+    qubits_per_mux = geometry.mux_size * geometry.mux_size
+    muxes_per_row = geometry.grid_size // geometry.mux_size
 
     mux_index = qid // qubits_per_mux
     mux_row = mux_index // muxes_per_row
     mux_col = mux_index % muxes_per_row
 
     local_index = qid % qubits_per_mux
-    local_row = local_index // mux_size
-    local_col = local_index % mux_size
+    local_row = local_index // geometry.mux_size
+    local_col = local_index % geometry.mux_size
 
-    return mux_row * mux_size + local_row, mux_col * mux_size + local_col
+    return mux_row * geometry.mux_size + local_row, mux_col * geometry.mux_size + local_col
 
 
 def create_data_matrix(
@@ -87,12 +78,7 @@ def create_data_matrix(
     return matrix
 
 
-def _format_qubit_text(
-    qid: int,
-    scaled_value: float,
-    metric_title: str,
-    metric_unit: str,
-) -> str:
+def _format_qubit_text(qid: int, scaled_value: float, metric_title: str, metric_unit: str) -> str:
     """Format qubit label text for heatmap cells."""
     label = f"Q{qid:03d}"
     if "fidelity" in metric_title.lower() or "%" in metric_unit:
@@ -115,26 +101,7 @@ def create_qubit_heatmap(
     text_size: int = TEXT_SIZE_DEFAULT,
     compact: bool = False,
 ) -> go.Figure:
-    """Create a Plotly heatmap for qubit metrics.
-
-    Parameters
-    ----------
-    metric_data:
-        Mapping ``qid_str -> MetricValue`` (must have ``.value`` attribute).
-    geometry:
-        Chip grid geometry.
-    metric_scale:
-        Multiplicative scaling factor for raw values.
-    metric_title:
-        Display title of the metric (used for text formatting heuristics).
-    metric_unit:
-        Display unit string.
-    node_size / text_size:
-        Sizing overrides (ignored when *compact* is ``True``).
-    compact:
-        If ``True``, use smaller sizing suitable for a chat UI, show a title
-        and a colour-bar.
-    """
+    """Create a Plotly heatmap for qubit metrics."""
     if compact:
         node_size = NODE_SIZE_COMPACT
         text_size = TEXT_SIZE_COMPACT
@@ -166,17 +133,12 @@ def create_qubit_heatmap(
             hovertext=text_matrix,
             texttemplate="%{text}",
             showscale=compact,
-            textfont={
-                "family": "monospace",
-                "size": text_size,
-                "weight": "bold",
-            },
+            textfont={"family": "monospace", "size": text_size, "weight": "bold"},
         )
     )
 
     width = 3 * node_size * geometry.grid_size
     height = 3 * node_size * geometry.grid_size
-
     layout_kwargs: dict[str, Any] = {
         "showlegend": False,
         "xaxis": {

@@ -12,7 +12,6 @@ from collections import defaultdict, deque
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, cast
 
-from qdash.api.lib.metrics_config import MetricMetadata, load_metrics_config
 from qdash.api.lib.policy_config import load_policy_config
 from qdash.api.schemas.provenance import (
     ActivityResponse,
@@ -36,6 +35,7 @@ from qdash.api.schemas.provenance import (
     RecentExecutionsResponse,
     RecommendedTaskResponse,
 )
+from qdash.common.config.metrics import MetricMetadata, load_metrics_config
 
 if TYPE_CHECKING:
     from qdash.repository.provenance import (
@@ -650,7 +650,7 @@ class ProvenanceService:
         doc: Any,
     ) -> ParameterChangeResponse | None:
         """Build one recent-change response from a current and previous version pair."""
-        from qdash.common.datetime_utils import ensure_timezone
+        from qdash.common.utils.datetime import ensure_timezone
 
         current_version = getattr(doc, "version", 1)
         if current_version <= 1:
@@ -851,7 +851,7 @@ class ProvenanceService:
         trend_config: _DegradationTrendConfig,
     ) -> DegradationTrendResponse | None:
         """Build one degradation trend response from a bulk-data item."""
-        from qdash.common.datetime_utils import ensure_timezone
+        from qdash.common.utils.datetime import ensure_timezone
 
         param_name = item.get("parameter_name", "")
         versions = item.get("versions", [])
@@ -1058,7 +1058,7 @@ class ProvenanceService:
     def _evaluate_policy_rule(self, doc: Any, rule: Any) -> list[PolicyViolationResponse]:
         from datetime import datetime, timezone
 
-        from qdash.common.datetime_utils import ensure_timezone
+        from qdash.common.utils.datetime import ensure_timezone
 
         results: list[PolicyViolationResponse] = []
 
@@ -1371,7 +1371,7 @@ class ProvenanceService:
         if not metadata:
             return None
 
-        from qdash.common.datetime_utils import now
+        from qdash.common.utils.datetime import now
 
         return ParameterVersionResponse(
             entity_id=item.get("id", ""),
@@ -1489,7 +1489,7 @@ class ProvenanceService:
             Version response object
 
         """
-        from qdash.common.datetime_utils import ensure_timezone
+        from qdash.common.utils.datetime import ensure_timezone
 
         if isinstance(entity, dict):
             return ParameterVersionResponse(
@@ -1541,7 +1541,7 @@ class ProvenanceService:
             Activity response object
 
         """
-        from qdash.common.datetime_utils import ensure_timezone
+        from qdash.common.utils.datetime import ensure_timezone
 
         if isinstance(activity, dict):
             return ActivityResponse(

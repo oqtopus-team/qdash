@@ -9,7 +9,7 @@ from typing import Any, cast
 
 from pydantic import BaseModel, field_validator
 
-from qdash.common.datetime_utils import calculate_elapsed_time, now
+from qdash.common.utils.datetime import calculate_elapsed_time, now
 from qdash.datamodel.execution import (
     ExecutionModel,
     ExecutionStatusModel,

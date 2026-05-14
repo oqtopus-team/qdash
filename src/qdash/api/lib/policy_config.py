@@ -11,7 +11,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
-from qdash.api.lib.config_loader import ConfigLoader
+from qdash.common.config.loader import ConfigLoader
 
 
 class PolicyCheck(BaseModel):

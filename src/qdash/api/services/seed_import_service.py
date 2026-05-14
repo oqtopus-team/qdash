@@ -21,8 +21,8 @@ from qdash.api.schemas.calibration import (
     SeedImportResultItem,
     SeedImportSource,
 )
-from qdash.common.datetime_utils import now
-from qdash.common.paths import QUBEX_CONFIG_BASE
+from qdash.common.config.paths import QUBEX_CONFIG_BASE
+from qdash.common.utils.datetime import now
 from qdash.datamodel.system_info import SystemInfoModel
 from qdash.dbmodel.provenance import ProvenanceRelationType
 from qdash.dbmodel.qubit import QubitDocument

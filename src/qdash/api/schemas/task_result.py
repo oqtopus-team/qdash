@@ -6,7 +6,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, field_serializer, field_validator
 
 from qdash.common.copilot.config import ModelConfig
-from qdash.common.datetime_utils import format_elapsed_time, parse_elapsed_time
+from qdash.common.utils.datetime import format_elapsed_time, parse_elapsed_time
 from qdash.datamodel.note import AiTriageReviewModel
 from qdash.datamodel.task import ParameterModel
 

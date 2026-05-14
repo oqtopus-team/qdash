@@ -220,6 +220,6 @@ class TopologyContextLoader:
 
     @staticmethod
     def _load_topology(topology_id: str) -> Any:
-        from qdash.common.topology_config import load_topology
+        from qdash.common.config.topology import load_topology
 
         return load_topology(topology_id)

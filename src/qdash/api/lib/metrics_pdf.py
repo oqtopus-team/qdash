@@ -20,15 +20,15 @@ from reportlab.lib.pagesizes import A4
 from reportlab.lib.utils import ImageReader
 from reportlab.pdfgen import canvas
 
-from qdash.api.lib.metrics_chart import (
+from qdash.common.config.metrics import load_metrics_config
+from qdash.common.config.topology import TopologyDefinition, load_topology
+from qdash.common.visualization.metrics_chart import (
     ChipGeometry,
     build_chip_geometry,
     chip_geometry_from_topology,
     create_qubit_heatmap,
     get_qubit_position,
 )
-from qdash.api.lib.metrics_config import load_metrics_config
-from qdash.common.topology_config import TopologyDefinition, load_topology
 
 if TYPE_CHECKING:
     from qdash.api.schemas.metrics import ChipMetricsResponse
