@@ -84,6 +84,37 @@ class ProjectService:
         user = self._user_repo.find_one({"username": username})
         return user.user_id if user else None
 
+    def _find_membership_for_user(
+        self,
+        project_id: str,
+        username: str,
+        user_id: str,
+        *,
+        status: str | None = None,
+    ) -> ProjectMembershipDocument | None:
+        """Find membership by current user_id, then repair stale rows by username.
+
+        Historical rows can retain an old user_id when an account is deleted and
+        recreated with the same username. In that case the username is still the
+        durable external key the operator sees, so reconcile the row in place.
+        """
+        query: dict[str, Any] = {"project_id": project_id, "user_id": user_id}
+        if status is not None:
+            query["status"] = status
+        membership = self._membership_repo.find_one(query)
+        if membership:
+            return membership
+
+        fallback_query: dict[str, Any] = {"project_id": project_id, "username": username}
+        if status is not None:
+            fallback_query["status"] = status
+        membership = self._membership_repo.find_one(fallback_query)
+        if membership and membership.user_id != user_id:
+            membership.user_id = user_id
+            membership.system_info.update_time()
+            self._membership_repo.save(membership)
+        return membership
+
     def create_project(
         self,
         owner_username: str,
@@ -318,8 +349,10 @@ class ProjectService:
                 detail=f"User '{username}' not found",
             )
 
-        existing = self._membership_repo.find_one(
-            {"project_id": project_id, "user_id": target_user.user_id}
+        existing = self._find_membership_for_user(
+            project_id=project_id,
+            username=username,
+            user_id=target_user.user_id,
         )
 
         if existing:
@@ -406,8 +439,10 @@ class ProjectService:
                 detail="Use ownership transfer to assign the owner role",
             )
 
-        membership = self._membership_repo.find_one(
-            {"project_id": project_id, "user_id": target_user_id}
+        membership = self._find_membership_for_user(
+            project_id=project_id,
+            username=username,
+            user_id=target_user_id,
         )
         if not membership:
             raise HTTPException(
@@ -465,8 +500,11 @@ class ProjectService:
                 detail="Cannot remove the project owner",
             )
 
-        membership = self._membership_repo.find_one(
-            {"project_id": project_id, "user_id": target_user_id}
+        membership = self._find_membership_for_user(
+            project_id=project_id,
+            username=username,
+            user_id=target_user_id,
+            status="active",
         )
         if not membership:
             raise HTTPException(
@@ -539,8 +577,10 @@ class ProjectService:
             self._membership_repo.save(old_owner_membership)
 
         # Update or create new owner membership
-        new_owner_membership = self._membership_repo.find_one(
-            {"project_id": project_id, "user_id": target_user.user_id}
+        new_owner_membership = self._find_membership_for_user(
+            project_id=project_id,
+            username=new_owner_username,
+            user_id=target_user.user_id,
         )
 
         if new_owner_membership:
@@ -600,9 +640,11 @@ class ProjectService:
                 status_code=404,
                 detail=f"User '{username}' not found",
             )
-        membership = ProjectMembershipDocument.find_one(
-            {"project_id": project_id, "user_id": user_id}
-        ).run()
+        membership = self._find_membership_for_user(
+            project_id=project_id,
+            username=username,
+            user_id=user_id,
+        )
         invited_by_user_id = self._user_id_for_username(invited_by)
         if membership:
             membership.user_id = user_id

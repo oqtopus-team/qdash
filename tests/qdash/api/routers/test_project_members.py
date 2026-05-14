@@ -158,3 +158,50 @@ def test_owner_can_remove_project_member(
     )
 
     assert response.status_code == 204
+
+
+def test_owner_can_remove_reregistered_member_with_stale_membership(
+    test_client: TestClient,
+    project_with_members: ProjectDocument,
+) -> None:
+    """Member removal repairs rows that still point at a deleted account's user_id."""
+    original_candidate = UserDocument.find_one({"username": "candidate"}).run()
+    assert original_candidate is not None
+    owner_user = UserDocument.find_one({"username": "owner"}).run()
+    assert owner_user is not None
+
+    ProjectMembershipDocument(
+        project_id="project-1",
+        user_id=original_candidate.user_id,
+        username="candidate",
+        role=ProjectRole.VIEWER,
+        status="active",
+        invited_by_user_id=owner_user.user_id,
+        invited_by="owner",
+    ).insert()
+
+    original_candidate.delete()
+    recreated_candidate = UserDocument(
+        username="candidate",
+        display_name="Candidate Reloaded",
+        organization="Project Org",
+        avatar_key="planet",
+        hashed_password="hashed",
+        access_token="candidate-token-2",
+        default_project_id=None,
+        system_info=SystemInfoModel(),
+    )
+    recreated_candidate.insert()
+
+    response = test_client.delete(
+        "/projects/project-1/members/candidate",
+        headers=_headers("owner-token"),
+    )
+
+    assert response.status_code == 204
+    membership = ProjectMembershipDocument.find_one(
+        {"project_id": "project-1", "username": "candidate"}
+    ).run()
+    assert membership is not None
+    assert membership.user_id == recreated_candidate.user_id
+    assert membership.status == "revoked"
