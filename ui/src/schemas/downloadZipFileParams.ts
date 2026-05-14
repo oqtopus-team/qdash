@@ -7,5 +7,5 @@
  */
 
 export type DownloadZipFileParams = {
-  path: string;
+path: string;
 };

@@ -5,9 +5,9 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { CooldownResponseEndedAt } from "./cooldownResponseEndedAt";
-import type { NoteModel } from "./noteModel";
-import type { CooldownResponseWiringBlocksItem } from "./cooldownResponseWiringBlocksItem";
+import type { CooldownResponseEndedAt } from './cooldownResponseEndedAt';
+import type { NoteModel } from './noteModel';
+import type { CooldownResponseWiringBlocksItem } from './cooldownResponseWiringBlocksItem';
 
 /**
  * Single cool-down record.

@@ -9,7 +9,4 @@
 /**
  * If 'high_frequency_strength', the high/low-power boundary is auto-detected from the FFT energy of each row, overriding high_power_min/max/low_power.
  */
-export type ReanalyzeResonatorSpectroscopyParamsBareShiftEstimatorType =
-  | "config"
-  | "high_frequency_strength"
-  | null;
+export type ReanalyzeResonatorSpectroscopyParamsBareShiftEstimatorType = 'config' | 'high_frequency_strength' | null;

@@ -5,9 +5,9 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { ScheduleFlowRequestCron } from "./scheduleFlowRequestCron";
-import type { ScheduleFlowRequestScheduledTime } from "./scheduleFlowRequestScheduledTime";
-import type { ScheduleFlowRequestParameters } from "./scheduleFlowRequestParameters";
+import type { ScheduleFlowRequestCron } from './scheduleFlowRequestCron';
+import type { ScheduleFlowRequestScheduledTime } from './scheduleFlowRequestScheduledTime';
+import type { ScheduleFlowRequestParameters } from './scheduleFlowRequestParameters';
 
 /**
  * Request to schedule a Flow execution.

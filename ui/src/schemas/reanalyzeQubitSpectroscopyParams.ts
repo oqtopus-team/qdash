@@ -5,14 +5,14 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { ReanalyzeQubitSpectroscopyParamsBinarizeThresholdSigmaPlus } from "./reanalyzeQubitSpectroscopyParamsBinarizeThresholdSigmaPlus";
-import type { ReanalyzeQubitSpectroscopyParamsBinarizeThresholdSigmaMinus } from "./reanalyzeQubitSpectroscopyParamsBinarizeThresholdSigmaMinus";
-import type { ReanalyzeQubitSpectroscopyParamsTopPower } from "./reanalyzeQubitSpectroscopyParamsTopPower";
-import type { ReanalyzeQubitSpectroscopyParamsF01HeightMin } from "./reanalyzeQubitSpectroscopyParamsF01HeightMin";
-import type { ReanalyzeQubitSpectroscopyParamsF12DistanceMin } from "./reanalyzeQubitSpectroscopyParamsF12DistanceMin";
-import type { ReanalyzeQubitSpectroscopyParamsF12DistanceMax } from "./reanalyzeQubitSpectroscopyParamsF12DistanceMax";
-import type { ReanalyzeQubitSpectroscopyParamsF12HeightMin } from "./reanalyzeQubitSpectroscopyParamsF12HeightMin";
-import type { ReanalyzeQubitSpectroscopyParamsRetryWithTrim } from "./reanalyzeQubitSpectroscopyParamsRetryWithTrim";
+import type { ReanalyzeQubitSpectroscopyParamsBinarizeThresholdSigmaPlus } from './reanalyzeQubitSpectroscopyParamsBinarizeThresholdSigmaPlus';
+import type { ReanalyzeQubitSpectroscopyParamsBinarizeThresholdSigmaMinus } from './reanalyzeQubitSpectroscopyParamsBinarizeThresholdSigmaMinus';
+import type { ReanalyzeQubitSpectroscopyParamsTopPower } from './reanalyzeQubitSpectroscopyParamsTopPower';
+import type { ReanalyzeQubitSpectroscopyParamsF01HeightMin } from './reanalyzeQubitSpectroscopyParamsF01HeightMin';
+import type { ReanalyzeQubitSpectroscopyParamsF12DistanceMin } from './reanalyzeQubitSpectroscopyParamsF12DistanceMin';
+import type { ReanalyzeQubitSpectroscopyParamsF12DistanceMax } from './reanalyzeQubitSpectroscopyParamsF12DistanceMax';
+import type { ReanalyzeQubitSpectroscopyParamsF12HeightMin } from './reanalyzeQubitSpectroscopyParamsF12HeightMin';
+import type { ReanalyzeQubitSpectroscopyParamsRetryWithTrim } from './reanalyzeQubitSpectroscopyParamsRetryWithTrim';
 
 /**
  * Optional analysis-parameter overrides for qubit spectroscopy.

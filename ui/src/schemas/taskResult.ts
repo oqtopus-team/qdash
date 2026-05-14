@@ -5,23 +5,23 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { TaskResultTaskId } from "./taskResultTaskId";
-import type { TaskResultQid } from "./taskResultQid";
-import type { TaskResultUpstreamId } from "./taskResultUpstreamId";
-import type { TaskResultMessage } from "./taskResultMessage";
-import type { TaskResultInputParameters } from "./taskResultInputParameters";
-import type { TaskResultOutputParameters } from "./taskResultOutputParameters";
-import type { TaskResultOutputParameterNames } from "./taskResultOutputParameterNames";
-import type { TaskResultRunParameters } from "./taskResultRunParameters";
-import type { TaskResultNote } from "./taskResultNote";
-import type { TaskResultFigurePath } from "./taskResultFigurePath";
-import type { TaskResultJsonFigurePath } from "./taskResultJsonFigurePath";
-import type { TaskResultRawDataPath } from "./taskResultRawDataPath";
-import type { TaskResultStartAt } from "./taskResultStartAt";
-import type { TaskResultEndAt } from "./taskResultEndAt";
-import type { TaskResultElapsedTime } from "./taskResultElapsedTime";
-import type { TaskResultTaskType } from "./taskResultTaskType";
-import type { TaskResultAiTriage } from "./taskResultAiTriage";
+import type { TaskResultTaskId } from './taskResultTaskId';
+import type { TaskResultQid } from './taskResultQid';
+import type { TaskResultUpstreamId } from './taskResultUpstreamId';
+import type { TaskResultMessage } from './taskResultMessage';
+import type { TaskResultInputParameters } from './taskResultInputParameters';
+import type { TaskResultOutputParameters } from './taskResultOutputParameters';
+import type { TaskResultOutputParameterNames } from './taskResultOutputParameterNames';
+import type { TaskResultRunParameters } from './taskResultRunParameters';
+import type { TaskResultNote } from './taskResultNote';
+import type { TaskResultFigurePath } from './taskResultFigurePath';
+import type { TaskResultJsonFigurePath } from './taskResultJsonFigurePath';
+import type { TaskResultRawDataPath } from './taskResultRawDataPath';
+import type { TaskResultStartAt } from './taskResultStartAt';
+import type { TaskResultEndAt } from './taskResultEndAt';
+import type { TaskResultElapsedTime } from './taskResultElapsedTime';
+import type { TaskResultTaskType } from './taskResultTaskType';
+import type { TaskResultAiTriage } from './taskResultAiTriage';
 
 /**
  * TaskResult is a Pydantic model that represents a task result.

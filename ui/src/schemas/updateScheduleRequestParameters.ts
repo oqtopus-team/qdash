@@ -5,10 +5,9 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { UpdateScheduleRequestParametersAnyOf } from "./updateScheduleRequestParametersAnyOf";
+import type { UpdateScheduleRequestParametersAnyOf } from './updateScheduleRequestParametersAnyOf';
 
 /**
  * Updated parameters (optional)
  */
-export type UpdateScheduleRequestParameters =
-  UpdateScheduleRequestParametersAnyOf | null;
+export type UpdateScheduleRequestParameters = UpdateScheduleRequestParametersAnyOf | null;

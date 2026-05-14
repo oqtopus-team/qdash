@@ -6,4 +6,4 @@
  * OpenAPI spec version: 0.0.1
  */
 
-export type ResetPassword200 = { [key: string]: string };
+export type ResetPassword200 = {[key: string]: string};

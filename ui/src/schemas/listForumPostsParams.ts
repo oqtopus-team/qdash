@@ -7,23 +7,23 @@
  */
 
 export type ListForumPostsParams = {
-  /**
-   * Number of items to skip
-   * @minimum 0
-   */
-  skip?: number;
-  /**
-   * Max items to return
-   * @minimum 1
-   * @maximum 200
-   */
-  limit?: number;
-  /**
-   * Filter by category key
-   */
-  category?: string | null;
-  /**
-   * Filter by closed status. Default false (open only). Set to true for closed, or omit/null for all.
-   */
-  is_closed?: boolean | null;
+/**
+ * Number of items to skip
+ * @minimum 0
+ */
+skip?: number;
+/**
+ * Max items to return
+ * @minimum 1
+ * @maximum 200
+ */
+limit?: number;
+/**
+ * Filter by category key
+ */
+category?: string | null;
+/**
+ * Filter by closed status. Default false (open only). Set to true for closed, or omit/null for all.
+ */
+is_closed?: boolean | null;
 };

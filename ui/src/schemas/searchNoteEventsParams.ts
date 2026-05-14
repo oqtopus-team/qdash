@@ -7,18 +7,18 @@
  */
 
 export type SearchNoteEventsParams = {
-  /**
-   * Free-text search query
-   * @minLength 1
-   */
-  q: string;
-  /**
-   * @minimum 0
-   */
-  skip?: number;
-  /**
-   * @minimum 1
-   * @maximum 200
-   */
-  limit?: number;
+/**
+ * Free-text search query
+ * @minLength 1
+ */
+q: string;
+/**
+ * @minimum 0
+ */
+skip?: number;
+/**
+ * @minimum 1
+ * @maximum 200
+ */
+limit?: number;
 };

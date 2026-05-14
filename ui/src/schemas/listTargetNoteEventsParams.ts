@@ -7,22 +7,22 @@
  */
 
 export type ListTargetNoteEventsParams = {
-  /**
-   * Note scope
-   * @pattern ^(qubit|qubit_metric|coupling|coupling_metric|task_result)$
-   */
-  scope: string;
-  /**
-   * qid / coupling_id / task_id
-   */
-  target_id: string;
-  /**
-   * @minimum 0
-   */
-  skip?: number;
-  /**
-   * @minimum 1
-   * @maximum 200
-   */
-  limit?: number;
+/**
+ * Note scope
+ * @pattern ^(qubit|qubit_metric|coupling|coupling_metric|task_result)$
+ */
+scope: string;
+/**
+ * qid / coupling_id / task_id
+ */
+target_id: string;
+/**
+ * @minimum 0
+ */
+skip?: number;
+/**
+ * @minimum 1
+ * @maximum 200
+ */
+limit?: number;
 };

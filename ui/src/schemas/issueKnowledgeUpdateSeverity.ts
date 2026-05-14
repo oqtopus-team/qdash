@@ -9,8 +9,4 @@
 /**
  * Updated severity
  */
-export type IssueKnowledgeUpdateSeverity =
-  | "critical"
-  | "warning"
-  | "info"
-  | null;
+export type IssueKnowledgeUpdateSeverity = 'critical' | 'warning' | 'info' | null;

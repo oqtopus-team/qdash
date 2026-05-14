@@ -5,7 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { DegradationTrendResponse } from "./degradationTrendResponse";
+import type { DegradationTrendResponse } from './degradationTrendResponse';
 
 /**
  * Response model for degradation trends.

@@ -5,7 +5,10 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import { useMutation, useQuery } from "@tanstack/react-query";
+import {
+  useMutation,
+  useQuery
+} from '@tanstack/react-query';
 import type {
   DataTag,
   DefinedInitialDataOptions,
@@ -18,8 +21,8 @@ import type {
   UseMutationOptions,
   UseMutationResult,
   UseQueryOptions,
-  UseQueryResult,
-} from "@tanstack/react-query";
+  UseQueryResult
+} from '@tanstack/react-query';
 
 import type {
   CooldownCreateRequest,
@@ -28,723 +31,511 @@ import type {
   HTTPValidationError,
   ListCooldownsParams,
   ListCooldownsResponse,
-  SuccessResponse,
-} from "../../schemas";
+  SuccessResponse
+} from '../../schemas';
 
-import { customInstance } from "../../lib/custom-instance";
+import { customInstance } from '../../lib/custom-instance';
+
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
+
+
 
 /**
  * @summary List cool-downs (optionally filter by cryostat or chip)
  */
 export const listCooldowns = (
-  params?: ListCooldownsParams,
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
+    params?: ListCooldownsParams,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  return customInstance<ListCooldownsResponse>(
-    { url: `/cooldowns`, method: "GET", params, signal },
-    options,
-  );
-};
+      
+      
+      return customInstance<ListCooldownsResponse>(
+      {url: `/cooldowns`, method: 'GET',
+        params, signal
+    },
+      options);
+    }
+  
 
-export const getListCooldownsQueryKey = (params?: ListCooldownsParams) => {
-  return [`/cooldowns`, ...(params ? [params] : [])] as const;
-};
 
-export const getListCooldownsQueryOptions = <
-  TData = Awaited<ReturnType<typeof listCooldowns>>,
-  TError = HTTPValidationError,
->(
-  params?: ListCooldownsParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof listCooldowns>>, TError, TData>
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
+
+export const getListCooldownsQueryKey = (params?: ListCooldownsParams,) => {
+    return [
+    `/cooldowns`, ...(params ? [params]: [])
+    ] as const;
+    }
+
+    
+export const getListCooldownsQueryOptions = <TData = Awaited<ReturnType<typeof listCooldowns>>, TError = HTTPValidationError>(params?: ListCooldownsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listCooldowns>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey = queryOptions?.queryKey ?? getListCooldownsQueryKey(params);
+const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof listCooldowns>>> = ({
-    signal,
-  }) => listCooldowns(params, requestOptions, signal);
+  const queryKey =  queryOptions?.queryKey ?? getListCooldownsQueryKey(params);
 
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof listCooldowns>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData> };
-};
+  
 
-export type ListCooldownsQueryResult = NonNullable<
-  Awaited<ReturnType<typeof listCooldowns>>
->;
-export type ListCooldownsQueryError = HTTPValidationError;
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listCooldowns>>> = ({ signal }) => listCooldowns(params, requestOptions, signal);
 
-export function useListCooldowns<
-  TData = Awaited<ReturnType<typeof listCooldowns>>,
-  TError = HTTPValidationError,
->(
-  params: undefined | ListCooldownsParams,
-  options: {
-    query: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof listCooldowns>>, TError, TData>
-    > &
-      Pick<
+      
+
+      
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listCooldowns>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+}
+
+export type ListCooldownsQueryResult = NonNullable<Awaited<ReturnType<typeof listCooldowns>>>
+export type ListCooldownsQueryError = HTTPValidationError
+
+
+export function useListCooldowns<TData = Awaited<ReturnType<typeof listCooldowns>>, TError = HTTPValidationError>(
+ params: undefined |  ListCooldownsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listCooldowns>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof listCooldowns>>,
           TError,
           Awaited<ReturnType<typeof listCooldowns>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData>;
-};
-export function useListCooldowns<
-  TData = Awaited<ReturnType<typeof listCooldowns>>,
-  TError = HTTPValidationError,
->(
-  params?: ListCooldownsParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof listCooldowns>>, TError, TData>
-    > &
-      Pick<
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useListCooldowns<TData = Awaited<ReturnType<typeof listCooldowns>>, TError = HTTPValidationError>(
+ params?: ListCooldownsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listCooldowns>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof listCooldowns>>,
           TError,
           Awaited<ReturnType<typeof listCooldowns>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
-export function useListCooldowns<
-  TData = Awaited<ReturnType<typeof listCooldowns>>,
-  TError = HTTPValidationError,
->(
-  params?: ListCooldownsParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof listCooldowns>>, TError, TData>
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useListCooldowns<TData = Awaited<ReturnType<typeof listCooldowns>>, TError = HTTPValidationError>(
+ params?: ListCooldownsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listCooldowns>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
 /**
  * @summary List cool-downs (optionally filter by cryostat or chip)
  */
 
-export function useListCooldowns<
-  TData = Awaited<ReturnType<typeof listCooldowns>>,
-  TError = HTTPValidationError,
->(
-  params?: ListCooldownsParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof listCooldowns>>, TError, TData>
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
-  const queryOptions = getListCooldownsQueryOptions(params, options);
+export function useListCooldowns<TData = Awaited<ReturnType<typeof listCooldowns>>, TError = HTTPValidationError>(
+ params?: ListCooldownsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listCooldowns>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
 
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData> };
+  const queryOptions = getListCooldownsQueryOptions(params,options)
 
-  query.queryKey = queryOptions.queryKey;
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey ;
 
   return query;
 }
+
+
 
 /**
  * @summary Create a cool-down
  */
 export const createCooldown = (
-  cooldownCreateRequest: CooldownCreateRequest,
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
+    cooldownCreateRequest: CooldownCreateRequest,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  return customInstance<CooldownResponse>(
-    {
-      url: `/cooldowns`,
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      data: cooldownCreateRequest,
-      signal,
+      
+      
+      return customInstance<CooldownResponse>(
+      {url: `/cooldowns`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: cooldownCreateRequest, signal
     },
-    options,
-  );
-};
+      options);
+    }
+  
 
-export const getCreateCooldownMutationOptions = <
-  TError = HTTPValidationError,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof createCooldown>>,
-    TError,
-    { data: CooldownCreateRequest },
-    TContext
-  >;
-  request?: SecondParameter<typeof customInstance>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof createCooldown>>,
-  TError,
-  { data: CooldownCreateRequest },
-  TContext
-> => {
-  const mutationKey = ["createCooldown"];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      "mutationKey" in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
 
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof createCooldown>>,
-    { data: CooldownCreateRequest }
-  > = (props) => {
-    const { data } = props ?? {};
+export const getCreateCooldownMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createCooldown>>, TError,{data: CooldownCreateRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof createCooldown>>, TError,{data: CooldownCreateRequest}, TContext> => {
 
-    return createCooldown(data, requestOptions);
-  };
+const mutationKey = ['createCooldown'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
 
-  return { mutationFn, ...mutationOptions };
-};
+      
 
-export type CreateCooldownMutationResult = NonNullable<
-  Awaited<ReturnType<typeof createCooldown>>
->;
-export type CreateCooldownMutationBody = CooldownCreateRequest;
-export type CreateCooldownMutationError = HTTPValidationError;
 
-/**
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createCooldown>>, {data: CooldownCreateRequest}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createCooldown(data,requestOptions)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateCooldownMutationResult = NonNullable<Awaited<ReturnType<typeof createCooldown>>>
+    export type CreateCooldownMutationBody = CooldownCreateRequest
+    export type CreateCooldownMutationError = HTTPValidationError
+
+    /**
  * @summary Create a cool-down
  */
-export const useCreateCooldown = <
-  TError = HTTPValidationError,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof createCooldown>>,
-      TError,
-      { data: CooldownCreateRequest },
-      TContext
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof createCooldown>>,
-  TError,
-  { data: CooldownCreateRequest },
-  TContext
-> => {
-  const mutationOptions = getCreateCooldownMutationOptions(options);
+export const useCreateCooldown = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createCooldown>>, TError,{data: CooldownCreateRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof createCooldown>>,
+        TError,
+        {data: CooldownCreateRequest},
+        TContext
+      > => {
 
-  return useMutation(mutationOptions, queryClient);
-};
-/**
+      const mutationOptions = getCreateCooldownMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    /**
  * @summary Get a cool-down by id
  */
 export const getCooldown = (
-  cooldownId: string,
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
+    cooldownId: string,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  return customInstance<CooldownResponse>(
-    { url: `/cooldowns/${cooldownId}`, method: "GET", signal },
-    options,
-  );
-};
+      
+      
+      return customInstance<CooldownResponse>(
+      {url: `/cooldowns/${cooldownId}`, method: 'GET', signal
+    },
+      options);
+    }
+  
 
-export const getGetCooldownQueryKey = (cooldownId?: string) => {
-  return [`/cooldowns/${cooldownId}`] as const;
-};
 
-export const getGetCooldownQueryOptions = <
-  TData = Awaited<ReturnType<typeof getCooldown>>,
-  TError = HTTPValidationError,
->(
-  cooldownId: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof getCooldown>>, TError, TData>
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
+
+export const getGetCooldownQueryKey = (cooldownId?: string,) => {
+    return [
+    `/cooldowns/${cooldownId}`
+    ] as const;
+    }
+
+    
+export const getGetCooldownQueryOptions = <TData = Awaited<ReturnType<typeof getCooldown>>, TError = HTTPValidationError>(cooldownId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCooldown>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey = queryOptions?.queryKey ?? getGetCooldownQueryKey(cooldownId);
+const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof getCooldown>>> = ({
-    signal,
-  }) => getCooldown(cooldownId, requestOptions, signal);
+  const queryKey =  queryOptions?.queryKey ?? getGetCooldownQueryKey(cooldownId);
 
-  return {
-    queryKey,
-    queryFn,
-    enabled: !!cooldownId,
-    ...queryOptions,
-  } as UseQueryOptions<
-    Awaited<ReturnType<typeof getCooldown>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData> };
-};
+  
 
-export type GetCooldownQueryResult = NonNullable<
-  Awaited<ReturnType<typeof getCooldown>>
->;
-export type GetCooldownQueryError = HTTPValidationError;
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCooldown>>> = ({ signal }) => getCooldown(cooldownId, requestOptions, signal);
 
-export function useGetCooldown<
-  TData = Awaited<ReturnType<typeof getCooldown>>,
-  TError = HTTPValidationError,
->(
-  cooldownId: string,
-  options: {
-    query: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof getCooldown>>, TError, TData>
-    > &
-      Pick<
+      
+
+      
+
+   return  { queryKey, queryFn, enabled: !!(cooldownId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCooldown>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+}
+
+export type GetCooldownQueryResult = NonNullable<Awaited<ReturnType<typeof getCooldown>>>
+export type GetCooldownQueryError = HTTPValidationError
+
+
+export function useGetCooldown<TData = Awaited<ReturnType<typeof getCooldown>>, TError = HTTPValidationError>(
+ cooldownId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCooldown>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getCooldown>>,
           TError,
           Awaited<ReturnType<typeof getCooldown>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData>;
-};
-export function useGetCooldown<
-  TData = Awaited<ReturnType<typeof getCooldown>>,
-  TError = HTTPValidationError,
->(
-  cooldownId: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof getCooldown>>, TError, TData>
-    > &
-      Pick<
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useGetCooldown<TData = Awaited<ReturnType<typeof getCooldown>>, TError = HTTPValidationError>(
+ cooldownId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCooldown>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getCooldown>>,
           TError,
           Awaited<ReturnType<typeof getCooldown>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
-export function useGetCooldown<
-  TData = Awaited<ReturnType<typeof getCooldown>>,
-  TError = HTTPValidationError,
->(
-  cooldownId: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof getCooldown>>, TError, TData>
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useGetCooldown<TData = Awaited<ReturnType<typeof getCooldown>>, TError = HTTPValidationError>(
+ cooldownId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCooldown>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
 /**
  * @summary Get a cool-down by id
  */
 
-export function useGetCooldown<
-  TData = Awaited<ReturnType<typeof getCooldown>>,
-  TError = HTTPValidationError,
->(
-  cooldownId: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof getCooldown>>, TError, TData>
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
-  const queryOptions = getGetCooldownQueryOptions(cooldownId, options);
+export function useGetCooldown<TData = Awaited<ReturnType<typeof getCooldown>>, TError = HTTPValidationError>(
+ cooldownId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCooldown>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
 
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData> };
+  const queryOptions = getGetCooldownQueryOptions(cooldownId,options)
 
-  query.queryKey = queryOptions.queryKey;
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey ;
 
   return query;
 }
+
+
 
 /**
  * @summary Update a cool-down
  */
 export const updateCooldown = (
-  cooldownId: string,
-  cooldownUpdateRequest: CooldownUpdateRequest,
-  options?: SecondParameter<typeof customInstance>,
-) => {
-  return customInstance<CooldownResponse>(
-    {
-      url: `/cooldowns/${cooldownId}`,
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      data: cooldownUpdateRequest,
+    cooldownId: string,
+    cooldownUpdateRequest: CooldownUpdateRequest,
+ options?: SecondParameter<typeof customInstance>,) => {
+      
+      
+      return customInstance<CooldownResponse>(
+      {url: `/cooldowns/${cooldownId}`, method: 'PATCH',
+      headers: {'Content-Type': 'application/json', },
+      data: cooldownUpdateRequest
     },
-    options,
-  );
-};
+      options);
+    }
+  
 
-export const getUpdateCooldownMutationOptions = <
-  TError = HTTPValidationError,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof updateCooldown>>,
-    TError,
-    { cooldownId: string; data: CooldownUpdateRequest },
-    TContext
-  >;
-  request?: SecondParameter<typeof customInstance>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof updateCooldown>>,
-  TError,
-  { cooldownId: string; data: CooldownUpdateRequest },
-  TContext
-> => {
-  const mutationKey = ["updateCooldown"];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      "mutationKey" in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
 
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof updateCooldown>>,
-    { cooldownId: string; data: CooldownUpdateRequest }
-  > = (props) => {
-    const { cooldownId, data } = props ?? {};
+export const getUpdateCooldownMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateCooldown>>, TError,{cooldownId: string;data: CooldownUpdateRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateCooldown>>, TError,{cooldownId: string;data: CooldownUpdateRequest}, TContext> => {
 
-    return updateCooldown(cooldownId, data, requestOptions);
-  };
+const mutationKey = ['updateCooldown'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
 
-  return { mutationFn, ...mutationOptions };
-};
+      
 
-export type UpdateCooldownMutationResult = NonNullable<
-  Awaited<ReturnType<typeof updateCooldown>>
->;
-export type UpdateCooldownMutationBody = CooldownUpdateRequest;
-export type UpdateCooldownMutationError = HTTPValidationError;
 
-/**
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateCooldown>>, {cooldownId: string;data: CooldownUpdateRequest}> = (props) => {
+          const {cooldownId,data} = props ?? {};
+
+          return  updateCooldown(cooldownId,data,requestOptions)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateCooldownMutationResult = NonNullable<Awaited<ReturnType<typeof updateCooldown>>>
+    export type UpdateCooldownMutationBody = CooldownUpdateRequest
+    export type UpdateCooldownMutationError = HTTPValidationError
+
+    /**
  * @summary Update a cool-down
  */
-export const useUpdateCooldown = <
-  TError = HTTPValidationError,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof updateCooldown>>,
-      TError,
-      { cooldownId: string; data: CooldownUpdateRequest },
-      TContext
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof updateCooldown>>,
-  TError,
-  { cooldownId: string; data: CooldownUpdateRequest },
-  TContext
-> => {
-  const mutationOptions = getUpdateCooldownMutationOptions(options);
+export const useUpdateCooldown = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateCooldown>>, TError,{cooldownId: string;data: CooldownUpdateRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof updateCooldown>>,
+        TError,
+        {cooldownId: string;data: CooldownUpdateRequest},
+        TContext
+      > => {
 
-  return useMutation(mutationOptions, queryClient);
-};
-/**
+      const mutationOptions = getUpdateCooldownMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    /**
  * @summary Delete a cool-down
  */
 export const deleteCooldown = (
-  cooldownId: string,
-  options?: SecondParameter<typeof customInstance>,
-) => {
-  return customInstance<SuccessResponse>(
-    { url: `/cooldowns/${cooldownId}`, method: "DELETE" },
-    options,
-  );
-};
+    cooldownId: string,
+ options?: SecondParameter<typeof customInstance>,) => {
+      
+      
+      return customInstance<SuccessResponse>(
+      {url: `/cooldowns/${cooldownId}`, method: 'DELETE'
+    },
+      options);
+    }
+  
 
-export const getDeleteCooldownMutationOptions = <
-  TError = HTTPValidationError,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof deleteCooldown>>,
-    TError,
-    { cooldownId: string },
-    TContext
-  >;
-  request?: SecondParameter<typeof customInstance>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof deleteCooldown>>,
-  TError,
-  { cooldownId: string },
-  TContext
-> => {
-  const mutationKey = ["deleteCooldown"];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      "mutationKey" in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
 
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof deleteCooldown>>,
-    { cooldownId: string }
-  > = (props) => {
-    const { cooldownId } = props ?? {};
+export const getDeleteCooldownMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteCooldown>>, TError,{cooldownId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteCooldown>>, TError,{cooldownId: string}, TContext> => {
 
-    return deleteCooldown(cooldownId, requestOptions);
-  };
+const mutationKey = ['deleteCooldown'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
 
-  return { mutationFn, ...mutationOptions };
-};
+      
 
-export type DeleteCooldownMutationResult = NonNullable<
-  Awaited<ReturnType<typeof deleteCooldown>>
->;
 
-export type DeleteCooldownMutationError = HTTPValidationError;
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteCooldown>>, {cooldownId: string}> = (props) => {
+          const {cooldownId} = props ?? {};
 
-/**
+          return  deleteCooldown(cooldownId,requestOptions)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteCooldownMutationResult = NonNullable<Awaited<ReturnType<typeof deleteCooldown>>>
+    
+    export type DeleteCooldownMutationError = HTTPValidationError
+
+    /**
  * @summary Delete a cool-down
  */
-export const useDeleteCooldown = <
-  TError = HTTPValidationError,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof deleteCooldown>>,
-      TError,
-      { cooldownId: string },
-      TContext
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof deleteCooldown>>,
-  TError,
-  { cooldownId: string },
-  TContext
-> => {
-  const mutationOptions = getDeleteCooldownMutationOptions(options);
+export const useDeleteCooldown = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteCooldown>>, TError,{cooldownId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof deleteCooldown>>,
+        TError,
+        {cooldownId: string},
+        TContext
+      > => {
 
-  return useMutation(mutationOptions, queryClient);
-};
-/**
+      const mutationOptions = getDeleteCooldownMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    /**
  * @summary Assign a chip to a cool-down
  */
 export const assignChipToCooldown = (
-  cooldownId: string,
-  chipId: string,
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
+    cooldownId: string,
+    chipId: string,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  return customInstance<CooldownResponse>(
-    { url: `/cooldowns/${cooldownId}/chips/${chipId}`, method: "POST", signal },
-    options,
-  );
-};
+      
+      
+      return customInstance<CooldownResponse>(
+      {url: `/cooldowns/${cooldownId}/chips/${chipId}`, method: 'POST', signal
+    },
+      options);
+    }
+  
 
-export const getAssignChipToCooldownMutationOptions = <
-  TError = HTTPValidationError,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof assignChipToCooldown>>,
-    TError,
-    { cooldownId: string; chipId: string },
-    TContext
-  >;
-  request?: SecondParameter<typeof customInstance>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof assignChipToCooldown>>,
-  TError,
-  { cooldownId: string; chipId: string },
-  TContext
-> => {
-  const mutationKey = ["assignChipToCooldown"];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      "mutationKey" in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
 
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof assignChipToCooldown>>,
-    { cooldownId: string; chipId: string }
-  > = (props) => {
-    const { cooldownId, chipId } = props ?? {};
+export const getAssignChipToCooldownMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof assignChipToCooldown>>, TError,{cooldownId: string;chipId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof assignChipToCooldown>>, TError,{cooldownId: string;chipId: string}, TContext> => {
 
-    return assignChipToCooldown(cooldownId, chipId, requestOptions);
-  };
+const mutationKey = ['assignChipToCooldown'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
 
-  return { mutationFn, ...mutationOptions };
-};
+      
 
-export type AssignChipToCooldownMutationResult = NonNullable<
-  Awaited<ReturnType<typeof assignChipToCooldown>>
->;
 
-export type AssignChipToCooldownMutationError = HTTPValidationError;
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof assignChipToCooldown>>, {cooldownId: string;chipId: string}> = (props) => {
+          const {cooldownId,chipId} = props ?? {};
 
-/**
+          return  assignChipToCooldown(cooldownId,chipId,requestOptions)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AssignChipToCooldownMutationResult = NonNullable<Awaited<ReturnType<typeof assignChipToCooldown>>>
+    
+    export type AssignChipToCooldownMutationError = HTTPValidationError
+
+    /**
  * @summary Assign a chip to a cool-down
  */
-export const useAssignChipToCooldown = <
-  TError = HTTPValidationError,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof assignChipToCooldown>>,
-      TError,
-      { cooldownId: string; chipId: string },
-      TContext
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof assignChipToCooldown>>,
-  TError,
-  { cooldownId: string; chipId: string },
-  TContext
-> => {
-  const mutationOptions = getAssignChipToCooldownMutationOptions(options);
+export const useAssignChipToCooldown = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof assignChipToCooldown>>, TError,{cooldownId: string;chipId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof assignChipToCooldown>>,
+        TError,
+        {cooldownId: string;chipId: string},
+        TContext
+      > => {
 
-  return useMutation(mutationOptions, queryClient);
-};
-/**
+      const mutationOptions = getAssignChipToCooldownMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    /**
  * @summary Unassign a chip from a cool-down
  */
 export const unassignChipFromCooldown = (
-  cooldownId: string,
-  chipId: string,
-  options?: SecondParameter<typeof customInstance>,
-) => {
-  return customInstance<CooldownResponse>(
-    { url: `/cooldowns/${cooldownId}/chips/${chipId}`, method: "DELETE" },
-    options,
-  );
-};
+    cooldownId: string,
+    chipId: string,
+ options?: SecondParameter<typeof customInstance>,) => {
+      
+      
+      return customInstance<CooldownResponse>(
+      {url: `/cooldowns/${cooldownId}/chips/${chipId}`, method: 'DELETE'
+    },
+      options);
+    }
+  
 
-export const getUnassignChipFromCooldownMutationOptions = <
-  TError = HTTPValidationError,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof unassignChipFromCooldown>>,
-    TError,
-    { cooldownId: string; chipId: string },
-    TContext
-  >;
-  request?: SecondParameter<typeof customInstance>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof unassignChipFromCooldown>>,
-  TError,
-  { cooldownId: string; chipId: string },
-  TContext
-> => {
-  const mutationKey = ["unassignChipFromCooldown"];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      "mutationKey" in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
 
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof unassignChipFromCooldown>>,
-    { cooldownId: string; chipId: string }
-  > = (props) => {
-    const { cooldownId, chipId } = props ?? {};
+export const getUnassignChipFromCooldownMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof unassignChipFromCooldown>>, TError,{cooldownId: string;chipId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof unassignChipFromCooldown>>, TError,{cooldownId: string;chipId: string}, TContext> => {
 
-    return unassignChipFromCooldown(cooldownId, chipId, requestOptions);
-  };
+const mutationKey = ['unassignChipFromCooldown'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
 
-  return { mutationFn, ...mutationOptions };
-};
+      
 
-export type UnassignChipFromCooldownMutationResult = NonNullable<
-  Awaited<ReturnType<typeof unassignChipFromCooldown>>
->;
 
-export type UnassignChipFromCooldownMutationError = HTTPValidationError;
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof unassignChipFromCooldown>>, {cooldownId: string;chipId: string}> = (props) => {
+          const {cooldownId,chipId} = props ?? {};
 
-/**
+          return  unassignChipFromCooldown(cooldownId,chipId,requestOptions)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UnassignChipFromCooldownMutationResult = NonNullable<Awaited<ReturnType<typeof unassignChipFromCooldown>>>
+    
+    export type UnassignChipFromCooldownMutationError = HTTPValidationError
+
+    /**
  * @summary Unassign a chip from a cool-down
  */
-export const useUnassignChipFromCooldown = <
-  TError = HTTPValidationError,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof unassignChipFromCooldown>>,
-      TError,
-      { cooldownId: string; chipId: string },
-      TContext
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof unassignChipFromCooldown>>,
-  TError,
-  { cooldownId: string; chipId: string },
-  TContext
-> => {
-  const mutationOptions = getUnassignChipFromCooldownMutationOptions(options);
+export const useUnassignChipFromCooldown = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof unassignChipFromCooldown>>, TError,{cooldownId: string;chipId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof unassignChipFromCooldown>>,
+        TError,
+        {cooldownId: string;chipId: string},
+        TContext
+      > => {
 
-  return useMutation(mutationOptions, queryClient);
-};
+      const mutationOptions = getUnassignChipFromCooldownMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    

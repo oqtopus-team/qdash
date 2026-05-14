@@ -5,8 +5,8 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { ScheduleFlowResponseCron } from "./scheduleFlowResponseCron";
-import type { ScheduleFlowResponseNextRun } from "./scheduleFlowResponseNextRun";
+import type { ScheduleFlowResponseCron } from './scheduleFlowResponseCron';
+import type { ScheduleFlowResponseNextRun } from './scheduleFlowResponseNextRun';
 
 /**
  * Response after scheduling a flow.

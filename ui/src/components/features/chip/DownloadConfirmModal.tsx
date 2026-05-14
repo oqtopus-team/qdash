@@ -1,6 +1,6 @@
 "use client";
 
-import { Database, FileJson, FileText, Image, X } from "lucide-react";
+import { Bot, Database, FileJson, FileText, Image, X } from "lucide-react";
 import type { ReactNode } from "react";
 
 export interface DownloadOptions {
@@ -8,6 +8,7 @@ export interface DownloadOptions {
   jsonFigures: boolean;
   rawData: boolean;
   aiTriageNotes: boolean;
+  aiTriageReplayBundles: boolean;
 }
 
 export interface DownloadItemCounts {
@@ -15,6 +16,7 @@ export interface DownloadItemCounts {
   jsonFigures: number;
   rawData: number;
   aiTriageNotes: number;
+  aiTriageReplayBundles: number;
 }
 
 interface DownloadConfirmModalProps {
@@ -44,7 +46,8 @@ export function DownloadConfirmModal({
     (options.figureImages ? counts.figureImages : 0) +
     (options.jsonFigures ? counts.jsonFigures : 0) +
     (options.rawData ? counts.rawData : 0) +
-    (options.aiTriageNotes ? counts.aiTriageNotes : 0);
+    (options.aiTriageNotes ? counts.aiTriageNotes : 0) +
+    (options.aiTriageReplayBundles ? counts.aiTriageReplayBundles : 0);
 
   const toggle = (key: keyof DownloadOptions) => {
     onOptionsChange({ ...options, [key]: !options[key] });
@@ -98,6 +101,13 @@ export function DownloadConfirmModal({
             count={counts.aiTriageNotes}
             checked={options.aiTriageNotes}
             onToggle={() => toggle("aiTriageNotes")}
+          />
+          <DownloadOptionRow
+            icon={<Bot className="h-4 w-4" />}
+            label="AI triage replay bundles"
+            count={counts.aiTriageReplayBundles}
+            checked={options.aiTriageReplayBundles}
+            onToggle={() => toggle("aiTriageReplayBundles")}
           />
         </div>
 

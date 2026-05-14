@@ -7,16 +7,16 @@
  */
 
 export type GetHistoricalCouplingTaskResultsParams = {
-  /**
-   * Chip ID
-   */
-  chip_id: string;
-  /**
-   * Task name
-   */
-  task: string;
-  /**
-   * Date in YYYYMMDD format
-   */
-  date: string;
+/**
+ * Chip ID
+ */
+chip_id: string;
+/**
+ * Task name
+ */
+task: string;
+/**
+ * Date in YYYYMMDD format
+ */
+date: string;
 };

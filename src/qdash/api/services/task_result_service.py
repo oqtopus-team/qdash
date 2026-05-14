@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import io
 import logging
+import tempfile
 import zipfile
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
@@ -33,6 +34,21 @@ from qdash.common.utils.datetime import (
     parse_elapsed_time,
     start_of_day,
 )
+from qdash.copilot.triage import (
+    apply_ai_triage_config as _shared_ai_triage_config,
+)
+from qdash.copilot.triage import (
+    build_ai_triage_context as _shared_build_ai_triage_context,
+)
+from qdash.copilot.triage import (
+    forced_ai_triage_markdown as _shared_forced_ai_triage_markdown,
+)
+from qdash.copilot.triage import (
+    render_ai_triage_markdown as _shared_render_ai_triage_markdown,
+)
+from qdash.copilot.triage import (
+    select_analysis_model as _shared_select_analysis_model,
+)
 from qdash.datamodel.task import ParameterModel
 
 if TYPE_CHECKING:
@@ -46,23 +62,6 @@ AI_TRIAGE_HEADER = "## AI triage"
 AI_TRIAGE_SEPARATOR = "\n\n---\n\n"
 MAX_AI_TRIAGE_NOTE_CHARS = 4500
 AI_TRIAGE_WORKERS = 2
-AI_TRIAGE_FORMAT_REMINDER = """\
-
-Required output format:
-Return JSON, but the JSON `explanation` string must start exactly with this
-markdown block. Do not put prose before it.
-
-**Review triage**
-- Decision: `PASS` | `PASS_WITH_NOTE` | `REVIEW` | `FAIL`
-- Human label suggestion: `CORRECT` | `SUSPICIOUS` | `MISASSIGNMENT` | `NO_SIGNAL` | `ANOMALY`
-- Accepted parameter(s): ...
-- Needs review: ...
-- Primary reason: ...
-- Closest knowledge case: ...
-- Suggested labels: ...
-- Recommended action: ...
-- Optional note: ...
-"""
 
 _AI_TRIAGE_EXECUTOR = ThreadPoolExecutor(
     max_workers=AI_TRIAGE_WORKERS,
@@ -671,20 +670,13 @@ class TaskResultService:
         config: Any,
     ) -> Any:
         """Build the compact context passed to AI triage analysis."""
-        from qdash.copilot.runtime import CopilotRuntime
-
-        context_bundle = CopilotRuntime().build_analysis_context(
+        return _shared_build_ai_triage_context(
             task_name=task_name,
             chip_id=chip_id,
             qid=qid,
             task_id=task_id,
-            image_base64=None,
             config=config,
         )
-        context_bundle.context = context_bundle.context.model_copy(
-            update={"recent_values": [], "history_results": []}
-        )
-        return context_bundle
 
     @staticmethod
     def _render_ai_triage_markdown(
@@ -694,28 +686,11 @@ class TaskResultService:
         context_bundle: Any,
     ) -> str:
         """Render markdown for a triage run, using deterministic guards when possible."""
-        import asyncio
-
-        from qdash.copilot.agent import blocks_to_markdown, run_analysis
-
-        if forced := TaskResultService._forced_ai_triage_markdown(
-            task_name,
-            context_bundle.context.output_parameters,
-        ):
-            return forced
-
-        result = asyncio.run(
-            run_analysis(
-                context=context_bundle.context,
-                user_message=f"{config.analysis.ai_triage_message}\n\n{AI_TRIAGE_FORMAT_REMINDER}",
-                config=config,
-                image_base64=context_bundle.image_base64,
-                expected_images=context_bundle.expected_images,
-                conversation_history=[],
-                tool_executors=None,
-            )
+        return _shared_render_ai_triage_markdown(
+            task_name=task_name,
+            config=config,
+            context_bundle=context_bundle,
         )
-        return blocks_to_markdown(result).strip()
 
     @staticmethod
     def _persist_ai_triage_markdown(
@@ -815,67 +790,17 @@ class TaskResultService:
     @staticmethod
     def _select_analysis_model(config: Any) -> Any:
         """Return the effective model used for task-result analysis."""
-        return config.analysis_model or (
-            config.analysis_models[0] if config.analysis_models else config.model
-        )
+        return _shared_select_analysis_model(config)
 
     @staticmethod
     def _ai_triage_config(config: Any) -> Any:
         """Apply AI-triage-only speed defaults without changing side-panel chat."""
-        analysis = config.analysis
-        if analysis.ai_triage_max_expected_images is not None:
-            analysis = analysis.model_copy(
-                update={"max_expected_images": analysis.ai_triage_max_expected_images}
-            )
-        model = TaskResultService._select_analysis_model(config)
-        if analysis.ai_triage_max_output_tokens is not None:
-            model = model.model_copy(
-                update={"max_output_tokens": analysis.ai_triage_max_output_tokens}
-            )
-        return config.model_copy(update={"analysis": analysis, "analysis_model": model})
-
-    @staticmethod
-    def _param_value(params: dict[str, Any], *names: str) -> Any:
-        """Return a compact output-parameter value from possible parameter names."""
-        for name in names:
-            if name not in params:
-                continue
-            raw = params[name]
-            if isinstance(raw, dict):
-                return raw.get("value")
-            return raw
-        return None
+        return _shared_ai_triage_config(config)
 
     @staticmethod
     def _forced_ai_triage_markdown(task_name: str, output_params: dict[str, Any]) -> str | None:
         """Apply deterministic safety guards before asking a local VLM."""
-        if task_name != "CheckQubitSpectroscopy":
-            return None
-        f01 = TaskResultService._param_value(
-            output_params,
-            "coarse_qubit_frequency",
-            "coarse_qubit_frequency_ghz",
-            "f01_frequency",
-            "f01_frequency_ghz",
-        )
-        if f01 is not None:
-            return None
-        return "\n".join(
-            [
-                "**Review triage**",
-                "- Decision: `FAIL`",
-                "- Human label suggestion: `NO_SIGNAL`",
-                "- Accepted parameter(s): `none`",
-                "- Needs review: `none`",
-                "- Primary reason: No f01 output parameter was detected, so the "
-                "result is not safe for automatic update.",
-                "- Closest knowledge case: `none`",
-                "- Suggested labels: `no_signal`",
-                "- Recommended action: Rerun qubit spectroscopy with an adjusted "
-                "frequency range or drive power.",
-                "- Optional note: Deterministic safety guard applied before local VLM review.",
-            ]
-        )
+        return _shared_forced_ai_triage_markdown(task_name, output_params)
 
     @staticmethod
     def create_figures_zip(
@@ -884,6 +809,7 @@ class TaskResultService:
         *,
         project_id: str | None = None,
         ai_triage_task_ids: list[str] | None = None,
+        ai_triage_bundle_task_ids: list[str] | None = None,
     ) -> tuple[io.BytesIO, str]:
         """Create a ZIP archive from the given file paths.
 
@@ -911,7 +837,11 @@ class TaskResultService:
             project_id=project_id,
             task_ids=ai_triage_task_ids or [],
         )
-        if not paths and not ai_triage_entries:
+        ai_triage_bundle_entries = TaskResultService._load_ai_triage_bundle_entries(
+            project_id=project_id,
+            task_ids=ai_triage_bundle_task_ids or [],
+        )
+        if not paths and not ai_triage_entries and not ai_triage_bundle_entries:
             raise HTTPException(status_code=400, detail="No files provided")
 
         missing = [p for p in paths if not Path(p).exists()]
@@ -926,8 +856,10 @@ class TaskResultService:
             for file_path in paths:
                 path = Path(file_path)
                 zf.write(path, path.name)
-            for entry_name, content in ai_triage_entries:
-                zf.writestr(entry_name, content)
+            for entry_name, note_content in ai_triage_entries:
+                zf.writestr(entry_name, note_content)
+            for entry_name, bundle_content in ai_triage_bundle_entries:
+                zf.writestr(entry_name, bundle_content)
         zip_buffer.seek(0)
 
         safe_filename = (
@@ -975,6 +907,57 @@ class TaskResultService:
                 suffix += 1
             used_names.add(entry_name)
             entries.append((entry_name, content))
+        return entries
+
+    @staticmethod
+    def _load_ai_triage_bundle_entries(
+        *,
+        project_id: str | None,
+        task_ids: list[str],
+    ) -> list[tuple[str, bytes]]:
+        """Return ZIP entries containing replay bundles for selected task results."""
+        if not task_ids:
+            return []
+
+        from qdash.copilot.bundle.exporters.ai_triage import export_ai_triage_replay_bundle
+        from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
+
+        docs = TaskResultHistoryDocument.find(
+            {"project_id": project_id, "task_id": {"$in": task_ids}}
+        ).run()
+        docs_by_task_id = {doc.task_id: doc for doc in docs}
+
+        entries: list[tuple[str, bytes]] = []
+        used_names: set[str] = set()
+        for task_id in task_ids:
+            doc = docs_by_task_id.get(task_id)
+            if doc is None:
+                continue
+
+            qid = doc.qid or "unknown"
+            base_name = TaskResultService._safe_zip_entry_name(
+                f"ai_triage_bundle/{doc.name}_{qid}_{doc.task_id}.zip"
+            )
+            entry_name = base_name
+            suffix = 2
+            while entry_name in used_names:
+                entry_name = base_name.replace(".zip", f"_{suffix}.zip")
+                suffix += 1
+            used_names.add(entry_name)
+
+            with tempfile.TemporaryDirectory() as tmp_dir:
+                bundle_path = Path(tmp_dir) / "bundle.zip"
+                export_ai_triage_replay_bundle(
+                    task_name=doc.name,
+                    chip_id=doc.chip_id,
+                    qid=doc.qid or "",
+                    task_id=doc.task_id,
+                    trigger="chip_page",
+                    output_path=bundle_path,
+                    project_id=project_id,
+                    execution_id=doc.execution_id,
+                )
+                entries.append((entry_name, bundle_path.read_bytes()))
         return entries
 
     @staticmethod

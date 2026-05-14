@@ -5,7 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { PolicyViolationResponse } from "./policyViolationResponse";
+import type { PolicyViolationResponse } from './policyViolationResponse';
 
 /**
  * Response model for a list of policy violations.

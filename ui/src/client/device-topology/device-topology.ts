@@ -5,205 +5,157 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import { useMutation } from "@tanstack/react-query";
+import {
+  useMutation
+} from '@tanstack/react-query';
 import type {
   MutationFunction,
   QueryClient,
   UseMutationOptions,
-  UseMutationResult,
-} from "@tanstack/react-query";
+  UseMutationResult
+} from '@tanstack/react-query';
 
 import type {
   Device,
   DeviceTopologyRequest,
-  HTTPValidationError,
-} from "../../schemas";
+  HTTPValidationError
+} from '../../schemas';
 
-import { customInstance } from "../../lib/custom-instance";
+import { customInstance } from '../../lib/custom-instance';
+
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
+
+
 
 /**
  * Get the device topology.
  * @summary Get the device topology
  */
 export const getDeviceTopology = (
-  deviceTopologyRequest: DeviceTopologyRequest,
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
+    deviceTopologyRequest: DeviceTopologyRequest,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  return customInstance<Device>(
-    {
-      url: `/device-topology`,
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      data: deviceTopologyRequest,
-      signal,
+      
+      
+      return customInstance<Device>(
+      {url: `/device-topology`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: deviceTopologyRequest, signal
     },
-    options,
-  );
-};
+      options);
+    }
+  
 
-export const getGetDeviceTopologyMutationOptions = <
-  TError = HTTPValidationError,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof getDeviceTopology>>,
-    TError,
-    { data: DeviceTopologyRequest },
-    TContext
-  >;
-  request?: SecondParameter<typeof customInstance>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof getDeviceTopology>>,
-  TError,
-  { data: DeviceTopologyRequest },
-  TContext
-> => {
-  const mutationKey = ["getDeviceTopology"];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      "mutationKey" in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
 
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof getDeviceTopology>>,
-    { data: DeviceTopologyRequest }
-  > = (props) => {
-    const { data } = props ?? {};
+export const getGetDeviceTopologyMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof getDeviceTopology>>, TError,{data: DeviceTopologyRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof getDeviceTopology>>, TError,{data: DeviceTopologyRequest}, TContext> => {
 
-    return getDeviceTopology(data, requestOptions);
-  };
+const mutationKey = ['getDeviceTopology'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
 
-  return { mutationFn, ...mutationOptions };
-};
+      
 
-export type GetDeviceTopologyMutationResult = NonNullable<
-  Awaited<ReturnType<typeof getDeviceTopology>>
->;
-export type GetDeviceTopologyMutationBody = DeviceTopologyRequest;
-export type GetDeviceTopologyMutationError = HTTPValidationError;
 
-/**
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof getDeviceTopology>>, {data: DeviceTopologyRequest}> = (props) => {
+          const {data} = props ?? {};
+
+          return  getDeviceTopology(data,requestOptions)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type GetDeviceTopologyMutationResult = NonNullable<Awaited<ReturnType<typeof getDeviceTopology>>>
+    export type GetDeviceTopologyMutationBody = DeviceTopologyRequest
+    export type GetDeviceTopologyMutationError = HTTPValidationError
+
+    /**
  * @summary Get the device topology
  */
-export const useGetDeviceTopology = <
-  TError = HTTPValidationError,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof getDeviceTopology>>,
-      TError,
-      { data: DeviceTopologyRequest },
-      TContext
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof getDeviceTopology>>,
-  TError,
-  { data: DeviceTopologyRequest },
-  TContext
-> => {
-  const mutationOptions = getGetDeviceTopologyMutationOptions(options);
+export const useGetDeviceTopology = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof getDeviceTopology>>, TError,{data: DeviceTopologyRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof getDeviceTopology>>,
+        TError,
+        {data: DeviceTopologyRequest},
+        TContext
+      > => {
 
-  return useMutation(mutationOptions, queryClient);
-};
-/**
+      const mutationOptions = getGetDeviceTopologyMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    /**
  * Get the device topology as a PNG image.
  * @summary Get the device topology plot
  */
 export const getDeviceTopologyPlot = (
-  device: Device,
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
+    device: Device,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  return customInstance<void>(
-    {
-      url: `/device-topology/plot`,
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      data: device,
-      signal,
+      
+      
+      return customInstance<void>(
+      {url: `/device-topology/plot`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: device, signal
     },
-    options,
-  );
-};
+      options);
+    }
+  
 
-export const getGetDeviceTopologyPlotMutationOptions = <
-  TError = HTTPValidationError,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof getDeviceTopologyPlot>>,
-    TError,
-    { data: Device },
-    TContext
-  >;
-  request?: SecondParameter<typeof customInstance>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof getDeviceTopologyPlot>>,
-  TError,
-  { data: Device },
-  TContext
-> => {
-  const mutationKey = ["getDeviceTopologyPlot"];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      "mutationKey" in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
 
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof getDeviceTopologyPlot>>,
-    { data: Device }
-  > = (props) => {
-    const { data } = props ?? {};
+export const getGetDeviceTopologyPlotMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof getDeviceTopologyPlot>>, TError,{data: Device}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof getDeviceTopologyPlot>>, TError,{data: Device}, TContext> => {
 
-    return getDeviceTopologyPlot(data, requestOptions);
-  };
+const mutationKey = ['getDeviceTopologyPlot'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
 
-  return { mutationFn, ...mutationOptions };
-};
+      
 
-export type GetDeviceTopologyPlotMutationResult = NonNullable<
-  Awaited<ReturnType<typeof getDeviceTopologyPlot>>
->;
-export type GetDeviceTopologyPlotMutationBody = Device;
-export type GetDeviceTopologyPlotMutationError = HTTPValidationError;
 
-/**
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof getDeviceTopologyPlot>>, {data: Device}> = (props) => {
+          const {data} = props ?? {};
+
+          return  getDeviceTopologyPlot(data,requestOptions)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type GetDeviceTopologyPlotMutationResult = NonNullable<Awaited<ReturnType<typeof getDeviceTopologyPlot>>>
+    export type GetDeviceTopologyPlotMutationBody = Device
+    export type GetDeviceTopologyPlotMutationError = HTTPValidationError
+
+    /**
  * @summary Get the device topology plot
  */
-export const useGetDeviceTopologyPlot = <
-  TError = HTTPValidationError,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof getDeviceTopologyPlot>>,
-      TError,
-      { data: Device },
-      TContext
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof getDeviceTopologyPlot>>,
-  TError,
-  { data: Device },
-  TContext
-> => {
-  const mutationOptions = getGetDeviceTopologyPlotMutationOptions(options);
+export const useGetDeviceTopologyPlot = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof getDeviceTopologyPlot>>, TError,{data: Device}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof getDeviceTopologyPlot>>,
+        TError,
+        {data: Device},
+        TContext
+      > => {
 
-  return useMutation(mutationOptions, queryClient);
-};
+      const mutationOptions = getGetDeviceTopologyPlotMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    

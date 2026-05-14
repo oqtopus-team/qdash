@@ -7,5 +7,5 @@
  */
 
 export type DownloadFileParams = {
-  path: string;
+path: string;
 };

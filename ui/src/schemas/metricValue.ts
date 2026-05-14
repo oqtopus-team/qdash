@@ -5,10 +5,10 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { MetricValueValue } from "./metricValueValue";
-import type { MetricValueTaskId } from "./metricValueTaskId";
-import type { MetricValueExecutionId } from "./metricValueExecutionId";
-import type { MetricValueStddev } from "./metricValueStddev";
+import type { MetricValueValue } from './metricValueValue';
+import type { MetricValueTaskId } from './metricValueTaskId';
+import type { MetricValueExecutionId } from './metricValueExecutionId';
+import type { MetricValueStddev } from './metricValueStddev';
 
 /**
  * Single metric value with metadata.

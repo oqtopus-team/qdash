@@ -5,8 +5,8 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { BulkAiTriageResponseDate } from "./bulkAiTriageResponseDate";
-import type { BulkAiTriageResponseSkippedReason } from "./bulkAiTriageResponseSkippedReason";
+import type { BulkAiTriageResponseDate } from './bulkAiTriageResponseDate';
+import type { BulkAiTriageResponseSkippedReason } from './bulkAiTriageResponseSkippedReason';
 
 /**
  * Response after enqueueing bulk AI triage review.

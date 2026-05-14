@@ -5,7 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { UITaskFilesSettings } from "./uITaskFilesSettings";
+import type { UITaskFilesSettings } from './uITaskFilesSettings';
 
 /**
  * UI-specific settings.

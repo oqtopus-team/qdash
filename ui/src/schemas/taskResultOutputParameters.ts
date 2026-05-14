@@ -5,6 +5,6 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { TaskResultOutputParametersAnyOf } from "./taskResultOutputParametersAnyOf";
+import type { TaskResultOutputParametersAnyOf } from './taskResultOutputParametersAnyOf';
 
 export type TaskResultOutputParameters = TaskResultOutputParametersAnyOf | null;

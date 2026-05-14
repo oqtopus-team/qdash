@@ -5,10 +5,10 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { ExecutionResponseSummaryStartAt } from "./executionResponseSummaryStartAt";
-import type { ExecutionResponseSummaryEndAt } from "./executionResponseSummaryEndAt";
-import type { ExecutionResponseSummaryElapsedTime } from "./executionResponseSummaryElapsedTime";
-import type { ExecutionResponseSummaryNote } from "./executionResponseSummaryNote";
+import type { ExecutionResponseSummaryStartAt } from './executionResponseSummaryStartAt';
+import type { ExecutionResponseSummaryEndAt } from './executionResponseSummaryEndAt';
+import type { ExecutionResponseSummaryElapsedTime } from './executionResponseSummaryElapsedTime';
+import type { ExecutionResponseSummaryNote } from './executionResponseSummaryNote';
 
 /**
  * ExecutionResponseSummary is a Pydantic model that represents the summary of an execution response.

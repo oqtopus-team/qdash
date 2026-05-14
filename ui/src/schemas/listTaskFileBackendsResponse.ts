@@ -5,7 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { TaskFileBackend } from "./taskFileBackend";
+import type { TaskFileBackend } from './taskFileBackend';
 
 /**
  * Response model for listing task file backends.

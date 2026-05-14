@@ -5,8 +5,8 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { ActivityResponseStartedAt } from "./activityResponseStartedAt";
-import type { ActivityResponseEndedAt } from "./activityResponseEndedAt";
+import type { ActivityResponseStartedAt } from './activityResponseStartedAt';
+import type { ActivityResponseEndedAt } from './activityResponseEndedAt';
 
 /**
  * Response model for an activity (task execution).

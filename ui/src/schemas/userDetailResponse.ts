@@ -5,13 +5,13 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { UserDetailResponseDisplayName } from "./userDetailResponseDisplayName";
-import type { UserDetailResponseOrganization } from "./userDetailResponseOrganization";
-import type { UserDetailResponseAvatarKey } from "./userDetailResponseAvatarKey";
-import type { SystemRole } from "./systemRole";
-import type { UserDetailResponseDefaultProjectId } from "./userDetailResponseDefaultProjectId";
-import type { UserDetailResponseCreatedAt } from "./userDetailResponseCreatedAt";
-import type { UserDetailResponseUpdatedAt } from "./userDetailResponseUpdatedAt";
+import type { UserDetailResponseDisplayName } from './userDetailResponseDisplayName';
+import type { UserDetailResponseOrganization } from './userDetailResponseOrganization';
+import type { UserDetailResponseAvatarKey } from './userDetailResponseAvatarKey';
+import type { SystemRole } from './systemRole';
+import type { UserDetailResponseDefaultProjectId } from './userDetailResponseDefaultProjectId';
+import type { UserDetailResponseCreatedAt } from './userDetailResponseCreatedAt';
+import type { UserDetailResponseUpdatedAt } from './userDetailResponseUpdatedAt';
 
 /**
  * Detailed user response for admin view.

@@ -6,4 +6,4 @@
  * OpenAPI spec version: 0.0.1
  */
 
-export type DeleteCopilotChatSession200 = { [key: string]: boolean };
+export type DeleteCopilotChatSession200 = {[key: string]: boolean};

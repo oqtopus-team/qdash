@@ -5,9 +5,9 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { TaskInfoTaskType } from "./taskInfoTaskType";
-import type { TaskInfoDescription } from "./taskInfoDescription";
-import type { TaskInfoCategory } from "./taskInfoCategory";
+import type { TaskInfoTaskType } from './taskInfoTaskType';
+import type { TaskInfoDescription } from './taskInfoDescription';
+import type { TaskInfoCategory } from './taskInfoCategory';
 
 /**
  * Task information extracted from Python file.

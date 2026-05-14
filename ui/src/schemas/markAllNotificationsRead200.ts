@@ -6,4 +6,4 @@
  * OpenAPI spec version: 0.0.1
  */
 
-export type MarkAllNotificationsRead200 = { [key: string]: number };
+export type MarkAllNotificationsRead200 = {[key: string]: number};

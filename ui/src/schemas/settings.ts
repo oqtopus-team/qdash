@@ -12,6 +12,7 @@
 export interface Settings {
   env: string;
   client_url?: string;
+  api_cors_origins?: string[];
   prefect_api_url: string;
   slack_bot_token?: string;
   slack_channel_id?: string;

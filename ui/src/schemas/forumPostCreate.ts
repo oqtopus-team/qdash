@@ -5,8 +5,8 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { ForumPostCreateTitle } from "./forumPostCreateTitle";
-import type { ForumPostCreateParentId } from "./forumPostCreateParentId";
+import type { ForumPostCreateTitle } from './forumPostCreateTitle';
+import type { ForumPostCreateParentId } from './forumPostCreateParentId';
 
 /**
  * Request schema for creating a forum thread or reply.

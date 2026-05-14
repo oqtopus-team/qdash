@@ -5,14 +5,14 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { TaskResultResponseInputParameters } from "./taskResultResponseInputParameters";
-import type { TaskResultResponseOutputParameters } from "./taskResultResponseOutputParameters";
-import type { TaskResultResponseRunParameters } from "./taskResultResponseRunParameters";
-import type { TaskResultResponseSourceTaskId } from "./taskResultResponseSourceTaskId";
-import type { ReExecutionEntry } from "./reExecutionEntry";
-import type { TaskResultResponseStartAt } from "./taskResultResponseStartAt";
-import type { TaskResultResponseEndAt } from "./taskResultResponseEndAt";
-import type { TaskResultResponseElapsedTime } from "./taskResultResponseElapsedTime";
+import type { TaskResultResponseInputParameters } from './taskResultResponseInputParameters';
+import type { TaskResultResponseOutputParameters } from './taskResultResponseOutputParameters';
+import type { TaskResultResponseRunParameters } from './taskResultResponseRunParameters';
+import type { TaskResultResponseSourceTaskId } from './taskResultResponseSourceTaskId';
+import type { ReExecutionEntry } from './reExecutionEntry';
+import type { TaskResultResponseStartAt } from './taskResultResponseStartAt';
+import type { TaskResultResponseEndAt } from './taskResultResponseEndAt';
+import type { TaskResultResponseElapsedTime } from './taskResultResponseElapsedTime';
 
 /**
  * Response model for task result by task_id.

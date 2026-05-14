@@ -12,10 +12,11 @@
 ADMIN: Full system access, can manage all users and projects.
 USER: Regular user.
  */
-export type SystemRole = (typeof SystemRole)[keyof typeof SystemRole];
+export type SystemRole = typeof SystemRole[keyof typeof SystemRole];
+
 
 // eslint-disable-next-line @typescript-eslint/no-redeclare
 export const SystemRole = {
-  admin: "admin",
-  user: "user",
+  admin: 'admin',
+  user: 'user',
 } as const;

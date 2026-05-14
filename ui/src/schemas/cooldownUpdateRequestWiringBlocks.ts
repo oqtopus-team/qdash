@@ -5,11 +5,9 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { CooldownUpdateRequestWiringBlocksAnyOfItem } from "./cooldownUpdateRequestWiringBlocksAnyOfItem";
+import type { CooldownUpdateRequestWiringBlocksAnyOfItem } from './cooldownUpdateRequestWiringBlocksAnyOfItem';
 
 /**
  * BlockNote document JSON. Source of truth when present.
  */
-export type CooldownUpdateRequestWiringBlocks =
-  | CooldownUpdateRequestWiringBlocksAnyOfItem[]
-  | null;
+export type CooldownUpdateRequestWiringBlocks = CooldownUpdateRequestWiringBlocksAnyOfItem[] | null;

@@ -5,8 +5,8 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { TargetNoteEntry } from "./targetNoteEntry";
-import type { TaskNoteEntry } from "./taskNoteEntry";
+import type { TargetNoteEntry } from './targetNoteEntry';
+import type { TaskNoteEntry } from './taskNoteEntry';
 
 /**
  * All notes for a chip in one fetch — drives the dashboard summary view.

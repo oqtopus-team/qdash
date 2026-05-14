@@ -5,7 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { CooldownWiringEventResponseActorUserId } from "./cooldownWiringEventResponseActorUserId";
+import type { CooldownWiringEventResponseActorUserId } from './cooldownWiringEventResponseActorUserId';
 
 /**
  * One wiring-history entry for a cool-down.

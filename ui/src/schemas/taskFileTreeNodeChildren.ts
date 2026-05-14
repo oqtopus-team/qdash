@@ -5,6 +5,6 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { TaskFileTreeNode } from "./taskFileTreeNode";
+import type { TaskFileTreeNode } from './taskFileTreeNode';
 
 export type TaskFileTreeNodeChildren = TaskFileTreeNode[] | null;

@@ -5,6 +5,6 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { ModelConfig } from "./modelConfig";
+import type { ModelConfig } from './modelConfig';
 
 export type BulkAiTriageRequestModelOverride = ModelConfig | null;

@@ -5,23 +5,23 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { GetChipMetricsSelectionMode } from "./getChipMetricsSelectionMode";
+import type { GetChipMetricsSelectionMode } from './getChipMetricsSelectionMode';
 
 export type GetChipMetricsParams = {
-  /**
-   * Filter to data within N hours (e.g., 24)
-   */
-  within_hours?: number | null;
-  /**
-   * Selection mode: 'latest' for most recent, 'best' for optimal, 'average' for mean values
-   */
-  selection_mode?: GetChipMetricsSelectionMode;
-  /**
-   * Inclusive absolute lower bound on task start time (ISO8601 or date). Takes precedence over within_hours for the lower bound.
-   */
-  start_at?: string | null;
-  /**
-   * Inclusive absolute upper bound on task start time (ISO8601 or date).
-   */
-  end_at?: string | null;
+/**
+ * Filter to data within N hours (e.g., 24)
+ */
+within_hours?: number | null;
+/**
+ * Selection mode: 'latest' for most recent, 'best' for optimal, 'average' for mean values
+ */
+selection_mode?: GetChipMetricsSelectionMode;
+/**
+ * Inclusive absolute lower bound on task start time (ISO8601 or date). Takes precedence over within_hours for the lower bound.
+ */
+start_at?: string | null;
+/**
+ * Inclusive absolute upper bound on task start time (ISO8601 or date).
+ */
+end_at?: string | null;
 };

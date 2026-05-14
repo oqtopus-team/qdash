@@ -5,7 +5,6 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { MetricHistoryItemInputParametersAnyOf } from "./metricHistoryItemInputParametersAnyOf";
+import type { MetricHistoryItemInputParametersAnyOf } from './metricHistoryItemInputParametersAnyOf';
 
-export type MetricHistoryItemInputParameters =
-  MetricHistoryItemInputParametersAnyOf | null;
+export type MetricHistoryItemInputParameters = MetricHistoryItemInputParametersAnyOf | null;

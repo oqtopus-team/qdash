@@ -7,16 +7,16 @@
  */
 
 export type GetQubitMetricHistoryParams = {
-  /**
-   * Metric name (e.g., t1, qubit_frequency)
-   */
-  metric: string;
-  /**
-   * Max number of history items (None for unlimited)
-   */
-  limit?: number | null;
-  /**
-   * Filter to last N days
-   */
-  within_days?: number | null;
+/**
+ * Metric name (e.g., t1, qubit_frequency)
+ */
+metric: string;
+/**
+ * Max number of history items (None for unlimited)
+ */
+limit?: number | null;
+/**
+ * Filter to last N days
+ */
+within_days?: number | null;
 };

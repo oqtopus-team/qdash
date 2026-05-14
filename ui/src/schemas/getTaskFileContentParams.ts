@@ -7,5 +7,5 @@
  */
 
 export type GetTaskFileContentParams = {
-  path: string;
+path: string;
 };

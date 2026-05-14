@@ -5,7 +5,10 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import { useMutation, useQuery } from "@tanstack/react-query";
+import {
+  useMutation,
+  useQuery
+} from '@tanstack/react-query';
 import type {
   DataTag,
   DefinedInitialDataOptions,
@@ -18,8 +21,8 @@ import type {
   UseMutationOptions,
   UseMutationResult,
   UseQueryOptions,
-  UseQueryResult,
-} from "@tanstack/react-query";
+  UseQueryResult
+} from '@tanstack/react-query';
 
 import type {
   ChipMetricsResponse,
@@ -29,12 +32,15 @@ import type {
   GetMetricsConfig200,
   GetQubitMetricHistoryParams,
   HTTPValidationError,
-  QubitMetricHistoryResponse,
-} from "../../schemas";
+  QubitMetricHistoryResponse
+} from '../../schemas';
 
-import { customInstance } from "../../lib/custom-instance";
+import { customInstance } from '../../lib/custom-instance';
+
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
+
+
 
 /**
  * Get metrics metadata configuration for visualization.
@@ -52,145 +58,92 @@ dict[str, Any]
  * @summary Get metrics configuration
  */
 export const getMetricsConfig = (
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
+    
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  return customInstance<GetMetricsConfig200>(
-    { url: `/metrics/config`, method: "GET", signal },
-    options,
-  );
-};
+      
+      
+      return customInstance<GetMetricsConfig200>(
+      {url: `/metrics/config`, method: 'GET', signal
+    },
+      options);
+    }
+  
+
+
 
 export const getGetMetricsConfigQueryKey = () => {
-  return [`/metrics/config`] as const;
-};
+    return [
+    `/metrics/config`
+    ] as const;
+    }
 
-export const getGetMetricsConfigQueryOptions = <
-  TData = Awaited<ReturnType<typeof getMetricsConfig>>,
-  TError = unknown,
->(options?: {
-  query?: Partial<
-    UseQueryOptions<Awaited<ReturnType<typeof getMetricsConfig>>, TError, TData>
-  >;
-  request?: SecondParameter<typeof customInstance>;
-}) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
+    
+export const getGetMetricsConfigQueryOptions = <TData = Awaited<ReturnType<typeof getMetricsConfig>>, TError = unknown>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMetricsConfig>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
 
-  const queryKey = queryOptions?.queryKey ?? getGetMetricsConfigQueryKey();
+const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof getMetricsConfig>>
-  > = ({ signal }) => getMetricsConfig(requestOptions, signal);
+  const queryKey =  queryOptions?.queryKey ?? getGetMetricsConfigQueryKey();
 
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof getMetricsConfig>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData> };
-};
+  
 
-export type GetMetricsConfigQueryResult = NonNullable<
-  Awaited<ReturnType<typeof getMetricsConfig>>
->;
-export type GetMetricsConfigQueryError = unknown;
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMetricsConfig>>> = ({ signal }) => getMetricsConfig(requestOptions, signal);
 
-export function useGetMetricsConfig<
-  TData = Awaited<ReturnType<typeof getMetricsConfig>>,
-  TError = unknown,
->(
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getMetricsConfig>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
+      
+
+      
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMetricsConfig>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+}
+
+export type GetMetricsConfigQueryResult = NonNullable<Awaited<ReturnType<typeof getMetricsConfig>>>
+export type GetMetricsConfigQueryError = unknown
+
+
+export function useGetMetricsConfig<TData = Awaited<ReturnType<typeof getMetricsConfig>>, TError = unknown>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMetricsConfig>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getMetricsConfig>>,
           TError,
           Awaited<ReturnType<typeof getMetricsConfig>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData>;
-};
-export function useGetMetricsConfig<
-  TData = Awaited<ReturnType<typeof getMetricsConfig>>,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getMetricsConfig>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useGetMetricsConfig<TData = Awaited<ReturnType<typeof getMetricsConfig>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMetricsConfig>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getMetricsConfig>>,
           TError,
           Awaited<ReturnType<typeof getMetricsConfig>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
-export function useGetMetricsConfig<
-  TData = Awaited<ReturnType<typeof getMetricsConfig>>,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getMetricsConfig>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useGetMetricsConfig<TData = Awaited<ReturnType<typeof getMetricsConfig>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMetricsConfig>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
 /**
  * @summary Get metrics configuration
  */
 
-export function useGetMetricsConfig<
-  TData = Awaited<ReturnType<typeof getMetricsConfig>>,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getMetricsConfig>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
-  const queryOptions = getGetMetricsConfigQueryOptions(options);
+export function useGetMetricsConfig<TData = Awaited<ReturnType<typeof getMetricsConfig>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMetricsConfig>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
 
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData> };
+  const queryOptions = getGetMetricsConfigQueryOptions(options)
 
-  query.queryKey = queryOptions.queryKey;
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey ;
 
   return query;
 }
+
+
 
 /**
  * Get chip calibration metrics for visualization.
@@ -216,155 +169,100 @@ Returns:
  * @summary Get Chip Metrics
  */
 export const getChipMetrics = (
-  chipId: string,
-  params?: GetChipMetricsParams,
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
+    chipId: string,
+    params?: GetChipMetricsParams,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  return customInstance<ChipMetricsResponse>(
-    { url: `/metrics/chips/${chipId}/metrics`, method: "GET", params, signal },
-    options,
-  );
-};
+      
+      
+      return customInstance<ChipMetricsResponse>(
+      {url: `/metrics/chips/${chipId}/metrics`, method: 'GET',
+        params, signal
+    },
+      options);
+    }
+  
 
-export const getGetChipMetricsQueryKey = (
-  chipId?: string,
-  params?: GetChipMetricsParams,
+
+
+export const getGetChipMetricsQueryKey = (chipId?: string,
+    params?: GetChipMetricsParams,) => {
+    return [
+    `/metrics/chips/${chipId}/metrics`, ...(params ? [params]: [])
+    ] as const;
+    }
+
+    
+export const getGetChipMetricsQueryOptions = <TData = Awaited<ReturnType<typeof getChipMetrics>>, TError = HTTPValidationError>(chipId: string,
+    params?: GetChipMetricsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getChipMetrics>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
-  return [
-    `/metrics/chips/${chipId}/metrics`,
-    ...(params ? [params] : []),
-  ] as const;
-};
 
-export const getGetChipMetricsQueryOptions = <
-  TData = Awaited<ReturnType<typeof getChipMetrics>>,
-  TError = HTTPValidationError,
->(
-  chipId: string,
-  params?: GetChipMetricsParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof getChipMetrics>>, TError, TData>
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
+const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =
-    queryOptions?.queryKey ?? getGetChipMetricsQueryKey(chipId, params);
+  const queryKey =  queryOptions?.queryKey ?? getGetChipMetricsQueryKey(chipId,params);
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof getChipMetrics>>> = ({
-    signal,
-  }) => getChipMetrics(chipId, params, requestOptions, signal);
+  
 
-  return {
-    queryKey,
-    queryFn,
-    enabled: !!chipId,
-    ...queryOptions,
-  } as UseQueryOptions<
-    Awaited<ReturnType<typeof getChipMetrics>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData> };
-};
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getChipMetrics>>> = ({ signal }) => getChipMetrics(chipId,params, requestOptions, signal);
 
-export type GetChipMetricsQueryResult = NonNullable<
-  Awaited<ReturnType<typeof getChipMetrics>>
->;
-export type GetChipMetricsQueryError = HTTPValidationError;
+      
 
-export function useGetChipMetrics<
-  TData = Awaited<ReturnType<typeof getChipMetrics>>,
-  TError = HTTPValidationError,
->(
-  chipId: string,
-  params: undefined | GetChipMetricsParams,
-  options: {
-    query: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof getChipMetrics>>, TError, TData>
-    > &
-      Pick<
+      
+
+   return  { queryKey, queryFn, enabled: !!(chipId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getChipMetrics>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+}
+
+export type GetChipMetricsQueryResult = NonNullable<Awaited<ReturnType<typeof getChipMetrics>>>
+export type GetChipMetricsQueryError = HTTPValidationError
+
+
+export function useGetChipMetrics<TData = Awaited<ReturnType<typeof getChipMetrics>>, TError = HTTPValidationError>(
+ chipId: string,
+    params: undefined |  GetChipMetricsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getChipMetrics>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getChipMetrics>>,
           TError,
           Awaited<ReturnType<typeof getChipMetrics>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData>;
-};
-export function useGetChipMetrics<
-  TData = Awaited<ReturnType<typeof getChipMetrics>>,
-  TError = HTTPValidationError,
->(
-  chipId: string,
-  params?: GetChipMetricsParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof getChipMetrics>>, TError, TData>
-    > &
-      Pick<
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useGetChipMetrics<TData = Awaited<ReturnType<typeof getChipMetrics>>, TError = HTTPValidationError>(
+ chipId: string,
+    params?: GetChipMetricsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getChipMetrics>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getChipMetrics>>,
           TError,
           Awaited<ReturnType<typeof getChipMetrics>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
-export function useGetChipMetrics<
-  TData = Awaited<ReturnType<typeof getChipMetrics>>,
-  TError = HTTPValidationError,
->(
-  chipId: string,
-  params?: GetChipMetricsParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof getChipMetrics>>, TError, TData>
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useGetChipMetrics<TData = Awaited<ReturnType<typeof getChipMetrics>>, TError = HTTPValidationError>(
+ chipId: string,
+    params?: GetChipMetricsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getChipMetrics>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
 /**
  * @summary Get Chip Metrics
  */
 
-export function useGetChipMetrics<
-  TData = Awaited<ReturnType<typeof getChipMetrics>>,
-  TError = HTTPValidationError,
->(
-  chipId: string,
-  params?: GetChipMetricsParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof getChipMetrics>>, TError, TData>
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
-  const queryOptions = getGetChipMetricsQueryOptions(chipId, params, options);
+export function useGetChipMetrics<TData = Awaited<ReturnType<typeof getChipMetrics>>, TError = HTTPValidationError>(
+ chipId: string,
+    params?: GetChipMetricsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getChipMetrics>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
 
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData> };
+  const queryOptions = getGetChipMetricsQueryOptions(chipId,params,options)
 
-  query.queryKey = queryOptions.queryKey;
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey ;
 
   return query;
 }
+
+
 
 /**
  * Get historical metric data for a specific qubit with task_id for figure display.
@@ -389,194 +287,107 @@ Returns:
  * @summary Get Qubit Metric History
  */
 export const getQubitMetricHistory = (
-  chipId: string,
-  qid: string,
-  params: GetQubitMetricHistoryParams,
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
+    chipId: string,
+    qid: string,
+    params: GetQubitMetricHistoryParams,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  return customInstance<QubitMetricHistoryResponse>(
-    {
-      url: `/metrics/chips/${chipId}/qubits/${qid}/history`,
-      method: "GET",
-      params,
-      signal,
+      
+      
+      return customInstance<QubitMetricHistoryResponse>(
+      {url: `/metrics/chips/${chipId}/qubits/${qid}/history`, method: 'GET',
+        params, signal
     },
-    options,
-  );
-};
+      options);
+    }
+  
 
-export const getGetQubitMetricHistoryQueryKey = (
-  chipId?: string,
-  qid?: string,
-  params?: GetQubitMetricHistoryParams,
+
+
+export const getGetQubitMetricHistoryQueryKey = (chipId?: string,
+    qid?: string,
+    params?: GetQubitMetricHistoryParams,) => {
+    return [
+    `/metrics/chips/${chipId}/qubits/${qid}/history`, ...(params ? [params]: [])
+    ] as const;
+    }
+
+    
+export const getGetQubitMetricHistoryQueryOptions = <TData = Awaited<ReturnType<typeof getQubitMetricHistory>>, TError = HTTPValidationError>(chipId: string,
+    qid: string,
+    params: GetQubitMetricHistoryParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getQubitMetricHistory>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
-  return [
-    `/metrics/chips/${chipId}/qubits/${qid}/history`,
-    ...(params ? [params] : []),
-  ] as const;
-};
 
-export const getGetQubitMetricHistoryQueryOptions = <
-  TData = Awaited<ReturnType<typeof getQubitMetricHistory>>,
-  TError = HTTPValidationError,
->(
-  chipId: string,
-  qid: string,
-  params: GetQubitMetricHistoryParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getQubitMetricHistory>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
+const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =
-    queryOptions?.queryKey ??
-    getGetQubitMetricHistoryQueryKey(chipId, qid, params);
+  const queryKey =  queryOptions?.queryKey ?? getGetQubitMetricHistoryQueryKey(chipId,qid,params);
 
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof getQubitMetricHistory>>
-  > = ({ signal }) =>
-    getQubitMetricHistory(chipId, qid, params, requestOptions, signal);
+  
 
-  return {
-    queryKey,
-    queryFn,
-    enabled: !!(chipId && qid),
-    ...queryOptions,
-  } as UseQueryOptions<
-    Awaited<ReturnType<typeof getQubitMetricHistory>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData> };
-};
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getQubitMetricHistory>>> = ({ signal }) => getQubitMetricHistory(chipId,qid,params, requestOptions, signal);
 
-export type GetQubitMetricHistoryQueryResult = NonNullable<
-  Awaited<ReturnType<typeof getQubitMetricHistory>>
->;
-export type GetQubitMetricHistoryQueryError = HTTPValidationError;
+      
 
-export function useGetQubitMetricHistory<
-  TData = Awaited<ReturnType<typeof getQubitMetricHistory>>,
-  TError = HTTPValidationError,
->(
-  chipId: string,
-  qid: string,
-  params: GetQubitMetricHistoryParams,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getQubitMetricHistory>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
+      
+
+   return  { queryKey, queryFn, enabled: !!(chipId && qid), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getQubitMetricHistory>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+}
+
+export type GetQubitMetricHistoryQueryResult = NonNullable<Awaited<ReturnType<typeof getQubitMetricHistory>>>
+export type GetQubitMetricHistoryQueryError = HTTPValidationError
+
+
+export function useGetQubitMetricHistory<TData = Awaited<ReturnType<typeof getQubitMetricHistory>>, TError = HTTPValidationError>(
+ chipId: string,
+    qid: string,
+    params: GetQubitMetricHistoryParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getQubitMetricHistory>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getQubitMetricHistory>>,
           TError,
           Awaited<ReturnType<typeof getQubitMetricHistory>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData>;
-};
-export function useGetQubitMetricHistory<
-  TData = Awaited<ReturnType<typeof getQubitMetricHistory>>,
-  TError = HTTPValidationError,
->(
-  chipId: string,
-  qid: string,
-  params: GetQubitMetricHistoryParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getQubitMetricHistory>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useGetQubitMetricHistory<TData = Awaited<ReturnType<typeof getQubitMetricHistory>>, TError = HTTPValidationError>(
+ chipId: string,
+    qid: string,
+    params: GetQubitMetricHistoryParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getQubitMetricHistory>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getQubitMetricHistory>>,
           TError,
           Awaited<ReturnType<typeof getQubitMetricHistory>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
-export function useGetQubitMetricHistory<
-  TData = Awaited<ReturnType<typeof getQubitMetricHistory>>,
-  TError = HTTPValidationError,
->(
-  chipId: string,
-  qid: string,
-  params: GetQubitMetricHistoryParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getQubitMetricHistory>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useGetQubitMetricHistory<TData = Awaited<ReturnType<typeof getQubitMetricHistory>>, TError = HTTPValidationError>(
+ chipId: string,
+    qid: string,
+    params: GetQubitMetricHistoryParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getQubitMetricHistory>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
 /**
  * @summary Get Qubit Metric History
  */
 
-export function useGetQubitMetricHistory<
-  TData = Awaited<ReturnType<typeof getQubitMetricHistory>>,
-  TError = HTTPValidationError,
->(
-  chipId: string,
-  qid: string,
-  params: GetQubitMetricHistoryParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getQubitMetricHistory>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
-  const queryOptions = getGetQubitMetricHistoryQueryOptions(
-    chipId,
-    qid,
-    params,
-    options,
-  );
+export function useGetQubitMetricHistory<TData = Awaited<ReturnType<typeof getQubitMetricHistory>>, TError = HTTPValidationError>(
+ chipId: string,
+    qid: string,
+    params: GetQubitMetricHistoryParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getQubitMetricHistory>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
 
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData> };
+  const queryOptions = getGetQubitMetricHistoryQueryOptions(chipId,qid,params,options)
 
-  query.queryKey = queryOptions.queryKey;
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey ;
 
   return query;
 }
+
+
 
 /**
  * Get historical metric data for a specific coupling with task_id for figure display.
@@ -602,200 +413,107 @@ Returns:
  * @summary Get Coupling Metric History
  */
 export const getCouplingMetricHistory = (
-  chipId: string,
-  couplingId: string,
-  params: GetCouplingMetricHistoryParams,
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
+    chipId: string,
+    couplingId: string,
+    params: GetCouplingMetricHistoryParams,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  return customInstance<QubitMetricHistoryResponse>(
-    {
-      url: `/metrics/chips/${chipId}/couplings/${couplingId}/history`,
-      method: "GET",
-      params,
-      signal,
+      
+      
+      return customInstance<QubitMetricHistoryResponse>(
+      {url: `/metrics/chips/${chipId}/couplings/${couplingId}/history`, method: 'GET',
+        params, signal
     },
-    options,
-  );
-};
+      options);
+    }
+  
 
-export const getGetCouplingMetricHistoryQueryKey = (
-  chipId?: string,
-  couplingId?: string,
-  params?: GetCouplingMetricHistoryParams,
+
+
+export const getGetCouplingMetricHistoryQueryKey = (chipId?: string,
+    couplingId?: string,
+    params?: GetCouplingMetricHistoryParams,) => {
+    return [
+    `/metrics/chips/${chipId}/couplings/${couplingId}/history`, ...(params ? [params]: [])
+    ] as const;
+    }
+
+    
+export const getGetCouplingMetricHistoryQueryOptions = <TData = Awaited<ReturnType<typeof getCouplingMetricHistory>>, TError = HTTPValidationError>(chipId: string,
+    couplingId: string,
+    params: GetCouplingMetricHistoryParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCouplingMetricHistory>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
-  return [
-    `/metrics/chips/${chipId}/couplings/${couplingId}/history`,
-    ...(params ? [params] : []),
-  ] as const;
-};
 
-export const getGetCouplingMetricHistoryQueryOptions = <
-  TData = Awaited<ReturnType<typeof getCouplingMetricHistory>>,
-  TError = HTTPValidationError,
->(
-  chipId: string,
-  couplingId: string,
-  params: GetCouplingMetricHistoryParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getCouplingMetricHistory>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
+const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =
-    queryOptions?.queryKey ??
-    getGetCouplingMetricHistoryQueryKey(chipId, couplingId, params);
+  const queryKey =  queryOptions?.queryKey ?? getGetCouplingMetricHistoryQueryKey(chipId,couplingId,params);
 
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof getCouplingMetricHistory>>
-  > = ({ signal }) =>
-    getCouplingMetricHistory(
-      chipId,
-      couplingId,
-      params,
-      requestOptions,
-      signal,
-    );
+  
 
-  return {
-    queryKey,
-    queryFn,
-    enabled: !!(chipId && couplingId),
-    ...queryOptions,
-  } as UseQueryOptions<
-    Awaited<ReturnType<typeof getCouplingMetricHistory>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData> };
-};
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCouplingMetricHistory>>> = ({ signal }) => getCouplingMetricHistory(chipId,couplingId,params, requestOptions, signal);
 
-export type GetCouplingMetricHistoryQueryResult = NonNullable<
-  Awaited<ReturnType<typeof getCouplingMetricHistory>>
->;
-export type GetCouplingMetricHistoryQueryError = HTTPValidationError;
+      
 
-export function useGetCouplingMetricHistory<
-  TData = Awaited<ReturnType<typeof getCouplingMetricHistory>>,
-  TError = HTTPValidationError,
->(
-  chipId: string,
-  couplingId: string,
-  params: GetCouplingMetricHistoryParams,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getCouplingMetricHistory>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
+      
+
+   return  { queryKey, queryFn, enabled: !!(chipId && couplingId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCouplingMetricHistory>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+}
+
+export type GetCouplingMetricHistoryQueryResult = NonNullable<Awaited<ReturnType<typeof getCouplingMetricHistory>>>
+export type GetCouplingMetricHistoryQueryError = HTTPValidationError
+
+
+export function useGetCouplingMetricHistory<TData = Awaited<ReturnType<typeof getCouplingMetricHistory>>, TError = HTTPValidationError>(
+ chipId: string,
+    couplingId: string,
+    params: GetCouplingMetricHistoryParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCouplingMetricHistory>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getCouplingMetricHistory>>,
           TError,
           Awaited<ReturnType<typeof getCouplingMetricHistory>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData>;
-};
-export function useGetCouplingMetricHistory<
-  TData = Awaited<ReturnType<typeof getCouplingMetricHistory>>,
-  TError = HTTPValidationError,
->(
-  chipId: string,
-  couplingId: string,
-  params: GetCouplingMetricHistoryParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getCouplingMetricHistory>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useGetCouplingMetricHistory<TData = Awaited<ReturnType<typeof getCouplingMetricHistory>>, TError = HTTPValidationError>(
+ chipId: string,
+    couplingId: string,
+    params: GetCouplingMetricHistoryParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCouplingMetricHistory>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getCouplingMetricHistory>>,
           TError,
           Awaited<ReturnType<typeof getCouplingMetricHistory>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
-export function useGetCouplingMetricHistory<
-  TData = Awaited<ReturnType<typeof getCouplingMetricHistory>>,
-  TError = HTTPValidationError,
->(
-  chipId: string,
-  couplingId: string,
-  params: GetCouplingMetricHistoryParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getCouplingMetricHistory>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useGetCouplingMetricHistory<TData = Awaited<ReturnType<typeof getCouplingMetricHistory>>, TError = HTTPValidationError>(
+ chipId: string,
+    couplingId: string,
+    params: GetCouplingMetricHistoryParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCouplingMetricHistory>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
 /**
  * @summary Get Coupling Metric History
  */
 
-export function useGetCouplingMetricHistory<
-  TData = Awaited<ReturnType<typeof getCouplingMetricHistory>>,
-  TError = HTTPValidationError,
->(
-  chipId: string,
-  couplingId: string,
-  params: GetCouplingMetricHistoryParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getCouplingMetricHistory>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
-  const queryOptions = getGetCouplingMetricHistoryQueryOptions(
-    chipId,
-    couplingId,
-    params,
-    options,
-  );
+export function useGetCouplingMetricHistory<TData = Awaited<ReturnType<typeof getCouplingMetricHistory>>, TError = HTTPValidationError>(
+ chipId: string,
+    couplingId: string,
+    params: GetCouplingMetricHistoryParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCouplingMetricHistory>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
 
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData> };
+  const queryOptions = getGetCouplingMetricHistoryQueryOptions(chipId,couplingId,params,options)
 
-  query.queryKey = queryOptions.queryKey;
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey ;
 
   return query;
 }
+
+
 
 /**
  * Download chip metrics as a PDF report.
@@ -817,90 +535,64 @@ Args:
  * @summary Download metrics as PDF report
  */
 export const downloadMetricsPdf = (
-  chipId: string,
-  params?: DownloadMetricsPdfParams,
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
+    chipId: string,
+    params?: DownloadMetricsPdfParams,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  return customInstance<unknown>(
-    {
-      url: `/metrics/chips/${chipId}/metrics/pdf`,
-      method: "POST",
-      params,
-      signal,
+      
+      
+      return customInstance<unknown>(
+      {url: `/metrics/chips/${chipId}/metrics/pdf`, method: 'POST',
+        params, signal
     },
-    options,
-  );
-};
+      options);
+    }
+  
 
-export const getDownloadMetricsPdfMutationOptions = <
-  TError = HTTPValidationError,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof downloadMetricsPdf>>,
-    TError,
-    { chipId: string; params?: DownloadMetricsPdfParams },
-    TContext
-  >;
-  request?: SecondParameter<typeof customInstance>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof downloadMetricsPdf>>,
-  TError,
-  { chipId: string; params?: DownloadMetricsPdfParams },
-  TContext
-> => {
-  const mutationKey = ["downloadMetricsPdf"];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      "mutationKey" in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
 
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof downloadMetricsPdf>>,
-    { chipId: string; params?: DownloadMetricsPdfParams }
-  > = (props) => {
-    const { chipId, params } = props ?? {};
+export const getDownloadMetricsPdfMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof downloadMetricsPdf>>, TError,{chipId: string;params?: DownloadMetricsPdfParams}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof downloadMetricsPdf>>, TError,{chipId: string;params?: DownloadMetricsPdfParams}, TContext> => {
 
-    return downloadMetricsPdf(chipId, params, requestOptions);
-  };
+const mutationKey = ['downloadMetricsPdf'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
 
-  return { mutationFn, ...mutationOptions };
-};
+      
 
-export type DownloadMetricsPdfMutationResult = NonNullable<
-  Awaited<ReturnType<typeof downloadMetricsPdf>>
->;
 
-export type DownloadMetricsPdfMutationError = HTTPValidationError;
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof downloadMetricsPdf>>, {chipId: string;params?: DownloadMetricsPdfParams}> = (props) => {
+          const {chipId,params} = props ?? {};
 
-/**
+          return  downloadMetricsPdf(chipId,params,requestOptions)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DownloadMetricsPdfMutationResult = NonNullable<Awaited<ReturnType<typeof downloadMetricsPdf>>>
+    
+    export type DownloadMetricsPdfMutationError = HTTPValidationError
+
+    /**
  * @summary Download metrics as PDF report
  */
-export const useDownloadMetricsPdf = <
-  TError = HTTPValidationError,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof downloadMetricsPdf>>,
-      TError,
-      { chipId: string; params?: DownloadMetricsPdfParams },
-      TContext
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof downloadMetricsPdf>>,
-  TError,
-  { chipId: string; params?: DownloadMetricsPdfParams },
-  TContext
-> => {
-  const mutationOptions = getDownloadMetricsPdfMutationOptions(options);
+export const useDownloadMetricsPdf = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof downloadMetricsPdf>>, TError,{chipId: string;params?: DownloadMetricsPdfParams}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof downloadMetricsPdf>>,
+        TError,
+        {chipId: string;params?: DownloadMetricsPdfParams},
+        TContext
+      > => {
 
-  return useMutation(mutationOptions, queryClient);
-};
+      const mutationOptions = getDownloadMetricsPdfMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    

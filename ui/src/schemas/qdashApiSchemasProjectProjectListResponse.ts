@@ -5,7 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { ProjectResponse } from "./projectResponse";
+import type { ProjectResponse } from './projectResponse';
 
 /**
  * Response schema for listing projects.

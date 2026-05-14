@@ -5,8 +5,8 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { UserProfileUpdateDisplayName } from "./userProfileUpdateDisplayName";
-import type { UserProfileUpdateAvatarKey } from "./userProfileUpdateAvatarKey";
+import type { UserProfileUpdateDisplayName } from './userProfileUpdateDisplayName';
+import type { UserProfileUpdateAvatarKey } from './userProfileUpdateAvatarKey';
 
 /**
  * Current user profile update model.

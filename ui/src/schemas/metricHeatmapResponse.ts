@@ -5,8 +5,8 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { MetricHeatmapResponseValues } from "./metricHeatmapResponseValues";
-import type { MetricHeatmapResponseUnit } from "./metricHeatmapResponseUnit";
+import type { MetricHeatmapResponseValues } from './metricHeatmapResponseValues';
+import type { MetricHeatmapResponseUnit } from './metricHeatmapResponseUnit';
 
 /**
  * Response model for metric heatmap data.

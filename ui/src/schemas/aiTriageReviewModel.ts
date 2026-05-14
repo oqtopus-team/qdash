@@ -5,8 +5,8 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { AiTriageReviewModelRequestedAt } from "./aiTriageReviewModelRequestedAt";
-import type { AiTriageReviewModelCompletedAt } from "./aiTriageReviewModelCompletedAt";
+import type { AiTriageReviewModelRequestedAt } from './aiTriageReviewModelRequestedAt';
+import type { AiTriageReviewModelCompletedAt } from './aiTriageReviewModelCompletedAt';
 
 /**
  * Persistent state for an AI triage review request on a task result.

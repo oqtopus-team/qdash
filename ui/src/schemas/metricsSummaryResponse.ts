@@ -5,7 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { MetricsSummaryResponseAverages } from "./metricsSummaryResponseAverages";
+import type { MetricsSummaryResponseAverages } from './metricsSummaryResponseAverages';
 
 /**
  * Response model for aggregated metrics summary.

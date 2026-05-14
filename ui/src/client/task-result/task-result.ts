@@ -5,7 +5,10 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import { useMutation, useQuery } from "@tanstack/react-query";
+import {
+  useMutation,
+  useQuery
+} from '@tanstack/react-query';
 import type {
   DataTag,
   DefinedInitialDataOptions,
@@ -18,8 +21,8 @@ import type {
   UseMutationOptions,
   UseMutationResult,
   UseQueryOptions,
-  UseQueryResult,
-} from "@tanstack/react-query";
+  UseQueryResult
+} from '@tanstack/react-query';
 
 import type {
   BodyReExecuteTaskResult,
@@ -39,12 +42,15 @@ import type {
   TaskHistoryResponse,
   TaskResultExcludeRequest,
   TaskResultExcludeResponse,
-  TimeSeriesData,
-} from "../../schemas";
+  TimeSeriesData
+} from '../../schemas';
 
-import { customInstance } from "../../lib/custom-instance";
+import { customInstance } from '../../lib/custom-instance';
+
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
+
+
 
 /**
  * Get the latest qubit task results for all qubits on a chip.
@@ -75,163 +81,93 @@ ValueError
  * @summary Get latest qubit task results
  */
 export const getLatestQubitTaskResults = (
-  params: GetLatestQubitTaskResultsParams,
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
+    params: GetLatestQubitTaskResultsParams,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  return customInstance<LatestTaskResultResponse>(
-    { url: `/task-results/qubits/latest`, method: "GET", params, signal },
-    options,
-  );
-};
+      
+      
+      return customInstance<LatestTaskResultResponse>(
+      {url: `/task-results/qubits/latest`, method: 'GET',
+        params, signal
+    },
+      options);
+    }
+  
 
-export const getGetLatestQubitTaskResultsQueryKey = (
-  params?: GetLatestQubitTaskResultsParams,
+
+
+export const getGetLatestQubitTaskResultsQueryKey = (params?: GetLatestQubitTaskResultsParams,) => {
+    return [
+    `/task-results/qubits/latest`, ...(params ? [params]: [])
+    ] as const;
+    }
+
+    
+export const getGetLatestQubitTaskResultsQueryOptions = <TData = Awaited<ReturnType<typeof getLatestQubitTaskResults>>, TError = HTTPValidationError>(params: GetLatestQubitTaskResultsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLatestQubitTaskResults>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
-  return [`/task-results/qubits/latest`, ...(params ? [params] : [])] as const;
-};
 
-export const getGetLatestQubitTaskResultsQueryOptions = <
-  TData = Awaited<ReturnType<typeof getLatestQubitTaskResults>>,
-  TError = HTTPValidationError,
->(
-  params: GetLatestQubitTaskResultsParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getLatestQubitTaskResults>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
+const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =
-    queryOptions?.queryKey ?? getGetLatestQubitTaskResultsQueryKey(params);
+  const queryKey =  queryOptions?.queryKey ?? getGetLatestQubitTaskResultsQueryKey(params);
 
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof getLatestQubitTaskResults>>
-  > = ({ signal }) => getLatestQubitTaskResults(params, requestOptions, signal);
+  
 
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof getLatestQubitTaskResults>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData> };
-};
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getLatestQubitTaskResults>>> = ({ signal }) => getLatestQubitTaskResults(params, requestOptions, signal);
 
-export type GetLatestQubitTaskResultsQueryResult = NonNullable<
-  Awaited<ReturnType<typeof getLatestQubitTaskResults>>
->;
-export type GetLatestQubitTaskResultsQueryError = HTTPValidationError;
+      
 
-export function useGetLatestQubitTaskResults<
-  TData = Awaited<ReturnType<typeof getLatestQubitTaskResults>>,
-  TError = HTTPValidationError,
->(
-  params: GetLatestQubitTaskResultsParams,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getLatestQubitTaskResults>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
+      
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getLatestQubitTaskResults>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+}
+
+export type GetLatestQubitTaskResultsQueryResult = NonNullable<Awaited<ReturnType<typeof getLatestQubitTaskResults>>>
+export type GetLatestQubitTaskResultsQueryError = HTTPValidationError
+
+
+export function useGetLatestQubitTaskResults<TData = Awaited<ReturnType<typeof getLatestQubitTaskResults>>, TError = HTTPValidationError>(
+ params: GetLatestQubitTaskResultsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLatestQubitTaskResults>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getLatestQubitTaskResults>>,
           TError,
           Awaited<ReturnType<typeof getLatestQubitTaskResults>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData>;
-};
-export function useGetLatestQubitTaskResults<
-  TData = Awaited<ReturnType<typeof getLatestQubitTaskResults>>,
-  TError = HTTPValidationError,
->(
-  params: GetLatestQubitTaskResultsParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getLatestQubitTaskResults>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useGetLatestQubitTaskResults<TData = Awaited<ReturnType<typeof getLatestQubitTaskResults>>, TError = HTTPValidationError>(
+ params: GetLatestQubitTaskResultsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLatestQubitTaskResults>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getLatestQubitTaskResults>>,
           TError,
           Awaited<ReturnType<typeof getLatestQubitTaskResults>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
-export function useGetLatestQubitTaskResults<
-  TData = Awaited<ReturnType<typeof getLatestQubitTaskResults>>,
-  TError = HTTPValidationError,
->(
-  params: GetLatestQubitTaskResultsParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getLatestQubitTaskResults>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useGetLatestQubitTaskResults<TData = Awaited<ReturnType<typeof getLatestQubitTaskResults>>, TError = HTTPValidationError>(
+ params: GetLatestQubitTaskResultsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLatestQubitTaskResults>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
 /**
  * @summary Get latest qubit task results
  */
 
-export function useGetLatestQubitTaskResults<
-  TData = Awaited<ReturnType<typeof getLatestQubitTaskResults>>,
-  TError = HTTPValidationError,
->(
-  params: GetLatestQubitTaskResultsParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getLatestQubitTaskResults>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
-  const queryOptions = getGetLatestQubitTaskResultsQueryOptions(
-    params,
-    options,
-  );
+export function useGetLatestQubitTaskResults<TData = Awaited<ReturnType<typeof getLatestQubitTaskResults>>, TError = HTTPValidationError>(
+ params: GetLatestQubitTaskResultsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLatestQubitTaskResults>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
 
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData> };
+  const queryOptions = getGetLatestQubitTaskResultsQueryOptions(params,options)
 
-  query.queryKey = queryOptions.queryKey;
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey ;
 
   return query;
 }
+
+
 
 /**
  * Get historical qubit task results for a specific date.
@@ -265,164 +201,93 @@ ValueError
  * @summary Get historical qubit task results
  */
 export const getHistoricalQubitTaskResults = (
-  params: GetHistoricalQubitTaskResultsParams,
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
+    params: GetHistoricalQubitTaskResultsParams,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  return customInstance<LatestTaskResultResponse>(
-    { url: `/task-results/qubits/history`, method: "GET", params, signal },
-    options,
-  );
-};
+      
+      
+      return customInstance<LatestTaskResultResponse>(
+      {url: `/task-results/qubits/history`, method: 'GET',
+        params, signal
+    },
+      options);
+    }
+  
 
-export const getGetHistoricalQubitTaskResultsQueryKey = (
-  params?: GetHistoricalQubitTaskResultsParams,
+
+
+export const getGetHistoricalQubitTaskResultsQueryKey = (params?: GetHistoricalQubitTaskResultsParams,) => {
+    return [
+    `/task-results/qubits/history`, ...(params ? [params]: [])
+    ] as const;
+    }
+
+    
+export const getGetHistoricalQubitTaskResultsQueryOptions = <TData = Awaited<ReturnType<typeof getHistoricalQubitTaskResults>>, TError = HTTPValidationError>(params: GetHistoricalQubitTaskResultsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getHistoricalQubitTaskResults>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
-  return [`/task-results/qubits/history`, ...(params ? [params] : [])] as const;
-};
 
-export const getGetHistoricalQubitTaskResultsQueryOptions = <
-  TData = Awaited<ReturnType<typeof getHistoricalQubitTaskResults>>,
-  TError = HTTPValidationError,
->(
-  params: GetHistoricalQubitTaskResultsParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getHistoricalQubitTaskResults>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
+const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =
-    queryOptions?.queryKey ?? getGetHistoricalQubitTaskResultsQueryKey(params);
+  const queryKey =  queryOptions?.queryKey ?? getGetHistoricalQubitTaskResultsQueryKey(params);
 
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof getHistoricalQubitTaskResults>>
-  > = ({ signal }) =>
-    getHistoricalQubitTaskResults(params, requestOptions, signal);
+  
 
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof getHistoricalQubitTaskResults>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData> };
-};
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getHistoricalQubitTaskResults>>> = ({ signal }) => getHistoricalQubitTaskResults(params, requestOptions, signal);
 
-export type GetHistoricalQubitTaskResultsQueryResult = NonNullable<
-  Awaited<ReturnType<typeof getHistoricalQubitTaskResults>>
->;
-export type GetHistoricalQubitTaskResultsQueryError = HTTPValidationError;
+      
 
-export function useGetHistoricalQubitTaskResults<
-  TData = Awaited<ReturnType<typeof getHistoricalQubitTaskResults>>,
-  TError = HTTPValidationError,
->(
-  params: GetHistoricalQubitTaskResultsParams,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getHistoricalQubitTaskResults>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
+      
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getHistoricalQubitTaskResults>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+}
+
+export type GetHistoricalQubitTaskResultsQueryResult = NonNullable<Awaited<ReturnType<typeof getHistoricalQubitTaskResults>>>
+export type GetHistoricalQubitTaskResultsQueryError = HTTPValidationError
+
+
+export function useGetHistoricalQubitTaskResults<TData = Awaited<ReturnType<typeof getHistoricalQubitTaskResults>>, TError = HTTPValidationError>(
+ params: GetHistoricalQubitTaskResultsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getHistoricalQubitTaskResults>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getHistoricalQubitTaskResults>>,
           TError,
           Awaited<ReturnType<typeof getHistoricalQubitTaskResults>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData>;
-};
-export function useGetHistoricalQubitTaskResults<
-  TData = Awaited<ReturnType<typeof getHistoricalQubitTaskResults>>,
-  TError = HTTPValidationError,
->(
-  params: GetHistoricalQubitTaskResultsParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getHistoricalQubitTaskResults>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useGetHistoricalQubitTaskResults<TData = Awaited<ReturnType<typeof getHistoricalQubitTaskResults>>, TError = HTTPValidationError>(
+ params: GetHistoricalQubitTaskResultsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getHistoricalQubitTaskResults>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getHistoricalQubitTaskResults>>,
           TError,
           Awaited<ReturnType<typeof getHistoricalQubitTaskResults>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
-export function useGetHistoricalQubitTaskResults<
-  TData = Awaited<ReturnType<typeof getHistoricalQubitTaskResults>>,
-  TError = HTTPValidationError,
->(
-  params: GetHistoricalQubitTaskResultsParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getHistoricalQubitTaskResults>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useGetHistoricalQubitTaskResults<TData = Awaited<ReturnType<typeof getHistoricalQubitTaskResults>>, TError = HTTPValidationError>(
+ params: GetHistoricalQubitTaskResultsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getHistoricalQubitTaskResults>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
 /**
  * @summary Get historical qubit task results
  */
 
-export function useGetHistoricalQubitTaskResults<
-  TData = Awaited<ReturnType<typeof getHistoricalQubitTaskResults>>,
-  TError = HTTPValidationError,
->(
-  params: GetHistoricalQubitTaskResultsParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getHistoricalQubitTaskResults>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
-  const queryOptions = getGetHistoricalQubitTaskResultsQueryOptions(
-    params,
-    options,
-  );
+export function useGetHistoricalQubitTaskResults<TData = Awaited<ReturnType<typeof getHistoricalQubitTaskResults>>, TError = HTTPValidationError>(
+ params: GetHistoricalQubitTaskResultsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getHistoricalQubitTaskResults>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
 
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData> };
+  const queryOptions = getGetHistoricalQubitTaskResultsQueryOptions(params,options)
 
-  query.queryKey = queryOptions.queryKey;
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey ;
 
   return query;
 }
+
+
 
 /**
  * Get complete task history for a specific qubit.
@@ -456,180 +321,100 @@ ValueError
  * @summary Get qubit task history
  */
 export const getQubitTaskHistory = (
-  qid: string,
-  params: GetQubitTaskHistoryParams,
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
+    qid: string,
+    params: GetQubitTaskHistoryParams,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  return customInstance<TaskHistoryResponse>(
-    {
-      url: `/task-results/qubits/${qid}/history`,
-      method: "GET",
-      params,
-      signal,
+      
+      
+      return customInstance<TaskHistoryResponse>(
+      {url: `/task-results/qubits/${qid}/history`, method: 'GET',
+        params, signal
     },
-    options,
-  );
-};
+      options);
+    }
+  
 
-export const getGetQubitTaskHistoryQueryKey = (
-  qid?: string,
-  params?: GetQubitTaskHistoryParams,
+
+
+export const getGetQubitTaskHistoryQueryKey = (qid?: string,
+    params?: GetQubitTaskHistoryParams,) => {
+    return [
+    `/task-results/qubits/${qid}/history`, ...(params ? [params]: [])
+    ] as const;
+    }
+
+    
+export const getGetQubitTaskHistoryQueryOptions = <TData = Awaited<ReturnType<typeof getQubitTaskHistory>>, TError = HTTPValidationError>(qid: string,
+    params: GetQubitTaskHistoryParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getQubitTaskHistory>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
-  return [
-    `/task-results/qubits/${qid}/history`,
-    ...(params ? [params] : []),
-  ] as const;
-};
 
-export const getGetQubitTaskHistoryQueryOptions = <
-  TData = Awaited<ReturnType<typeof getQubitTaskHistory>>,
-  TError = HTTPValidationError,
->(
-  qid: string,
-  params: GetQubitTaskHistoryParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getQubitTaskHistory>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
+const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =
-    queryOptions?.queryKey ?? getGetQubitTaskHistoryQueryKey(qid, params);
+  const queryKey =  queryOptions?.queryKey ?? getGetQubitTaskHistoryQueryKey(qid,params);
 
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof getQubitTaskHistory>>
-  > = ({ signal }) => getQubitTaskHistory(qid, params, requestOptions, signal);
+  
 
-  return {
-    queryKey,
-    queryFn,
-    enabled: !!qid,
-    ...queryOptions,
-  } as UseQueryOptions<
-    Awaited<ReturnType<typeof getQubitTaskHistory>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData> };
-};
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getQubitTaskHistory>>> = ({ signal }) => getQubitTaskHistory(qid,params, requestOptions, signal);
 
-export type GetQubitTaskHistoryQueryResult = NonNullable<
-  Awaited<ReturnType<typeof getQubitTaskHistory>>
->;
-export type GetQubitTaskHistoryQueryError = HTTPValidationError;
+      
 
-export function useGetQubitTaskHistory<
-  TData = Awaited<ReturnType<typeof getQubitTaskHistory>>,
-  TError = HTTPValidationError,
->(
-  qid: string,
-  params: GetQubitTaskHistoryParams,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getQubitTaskHistory>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
+      
+
+   return  { queryKey, queryFn, enabled: !!(qid), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getQubitTaskHistory>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+}
+
+export type GetQubitTaskHistoryQueryResult = NonNullable<Awaited<ReturnType<typeof getQubitTaskHistory>>>
+export type GetQubitTaskHistoryQueryError = HTTPValidationError
+
+
+export function useGetQubitTaskHistory<TData = Awaited<ReturnType<typeof getQubitTaskHistory>>, TError = HTTPValidationError>(
+ qid: string,
+    params: GetQubitTaskHistoryParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getQubitTaskHistory>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getQubitTaskHistory>>,
           TError,
           Awaited<ReturnType<typeof getQubitTaskHistory>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData>;
-};
-export function useGetQubitTaskHistory<
-  TData = Awaited<ReturnType<typeof getQubitTaskHistory>>,
-  TError = HTTPValidationError,
->(
-  qid: string,
-  params: GetQubitTaskHistoryParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getQubitTaskHistory>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useGetQubitTaskHistory<TData = Awaited<ReturnType<typeof getQubitTaskHistory>>, TError = HTTPValidationError>(
+ qid: string,
+    params: GetQubitTaskHistoryParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getQubitTaskHistory>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getQubitTaskHistory>>,
           TError,
           Awaited<ReturnType<typeof getQubitTaskHistory>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
-export function useGetQubitTaskHistory<
-  TData = Awaited<ReturnType<typeof getQubitTaskHistory>>,
-  TError = HTTPValidationError,
->(
-  qid: string,
-  params: GetQubitTaskHistoryParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getQubitTaskHistory>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useGetQubitTaskHistory<TData = Awaited<ReturnType<typeof getQubitTaskHistory>>, TError = HTTPValidationError>(
+ qid: string,
+    params: GetQubitTaskHistoryParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getQubitTaskHistory>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
 /**
  * @summary Get qubit task history
  */
 
-export function useGetQubitTaskHistory<
-  TData = Awaited<ReturnType<typeof getQubitTaskHistory>>,
-  TError = HTTPValidationError,
->(
-  qid: string,
-  params: GetQubitTaskHistoryParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getQubitTaskHistory>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
-  const queryOptions = getGetQubitTaskHistoryQueryOptions(qid, params, options);
+export function useGetQubitTaskHistory<TData = Awaited<ReturnType<typeof getQubitTaskHistory>>, TError = HTTPValidationError>(
+ qid: string,
+    params: GetQubitTaskHistoryParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getQubitTaskHistory>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
 
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData> };
+  const queryOptions = getGetQubitTaskHistoryQueryOptions(qid,params,options)
 
-  query.queryKey = queryOptions.queryKey;
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey ;
 
   return query;
 }
+
+
 
 /**
  * Get the latest coupling task results for all couplings on a chip.
@@ -661,167 +446,93 @@ ValueError
  * @summary Get latest coupling task results
  */
 export const getLatestCouplingTaskResults = (
-  params: GetLatestCouplingTaskResultsParams,
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
+    params: GetLatestCouplingTaskResultsParams,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  return customInstance<LatestTaskResultResponse>(
-    { url: `/task-results/couplings/latest`, method: "GET", params, signal },
-    options,
-  );
-};
+      
+      
+      return customInstance<LatestTaskResultResponse>(
+      {url: `/task-results/couplings/latest`, method: 'GET',
+        params, signal
+    },
+      options);
+    }
+  
 
-export const getGetLatestCouplingTaskResultsQueryKey = (
-  params?: GetLatestCouplingTaskResultsParams,
+
+
+export const getGetLatestCouplingTaskResultsQueryKey = (params?: GetLatestCouplingTaskResultsParams,) => {
+    return [
+    `/task-results/couplings/latest`, ...(params ? [params]: [])
+    ] as const;
+    }
+
+    
+export const getGetLatestCouplingTaskResultsQueryOptions = <TData = Awaited<ReturnType<typeof getLatestCouplingTaskResults>>, TError = HTTPValidationError>(params: GetLatestCouplingTaskResultsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLatestCouplingTaskResults>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
-  return [
-    `/task-results/couplings/latest`,
-    ...(params ? [params] : []),
-  ] as const;
-};
 
-export const getGetLatestCouplingTaskResultsQueryOptions = <
-  TData = Awaited<ReturnType<typeof getLatestCouplingTaskResults>>,
-  TError = HTTPValidationError,
->(
-  params: GetLatestCouplingTaskResultsParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getLatestCouplingTaskResults>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
+const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =
-    queryOptions?.queryKey ?? getGetLatestCouplingTaskResultsQueryKey(params);
+  const queryKey =  queryOptions?.queryKey ?? getGetLatestCouplingTaskResultsQueryKey(params);
 
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof getLatestCouplingTaskResults>>
-  > = ({ signal }) =>
-    getLatestCouplingTaskResults(params, requestOptions, signal);
+  
 
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof getLatestCouplingTaskResults>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData> };
-};
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getLatestCouplingTaskResults>>> = ({ signal }) => getLatestCouplingTaskResults(params, requestOptions, signal);
 
-export type GetLatestCouplingTaskResultsQueryResult = NonNullable<
-  Awaited<ReturnType<typeof getLatestCouplingTaskResults>>
->;
-export type GetLatestCouplingTaskResultsQueryError = HTTPValidationError;
+      
 
-export function useGetLatestCouplingTaskResults<
-  TData = Awaited<ReturnType<typeof getLatestCouplingTaskResults>>,
-  TError = HTTPValidationError,
->(
-  params: GetLatestCouplingTaskResultsParams,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getLatestCouplingTaskResults>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
+      
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getLatestCouplingTaskResults>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+}
+
+export type GetLatestCouplingTaskResultsQueryResult = NonNullable<Awaited<ReturnType<typeof getLatestCouplingTaskResults>>>
+export type GetLatestCouplingTaskResultsQueryError = HTTPValidationError
+
+
+export function useGetLatestCouplingTaskResults<TData = Awaited<ReturnType<typeof getLatestCouplingTaskResults>>, TError = HTTPValidationError>(
+ params: GetLatestCouplingTaskResultsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLatestCouplingTaskResults>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getLatestCouplingTaskResults>>,
           TError,
           Awaited<ReturnType<typeof getLatestCouplingTaskResults>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData>;
-};
-export function useGetLatestCouplingTaskResults<
-  TData = Awaited<ReturnType<typeof getLatestCouplingTaskResults>>,
-  TError = HTTPValidationError,
->(
-  params: GetLatestCouplingTaskResultsParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getLatestCouplingTaskResults>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useGetLatestCouplingTaskResults<TData = Awaited<ReturnType<typeof getLatestCouplingTaskResults>>, TError = HTTPValidationError>(
+ params: GetLatestCouplingTaskResultsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLatestCouplingTaskResults>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getLatestCouplingTaskResults>>,
           TError,
           Awaited<ReturnType<typeof getLatestCouplingTaskResults>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
-export function useGetLatestCouplingTaskResults<
-  TData = Awaited<ReturnType<typeof getLatestCouplingTaskResults>>,
-  TError = HTTPValidationError,
->(
-  params: GetLatestCouplingTaskResultsParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getLatestCouplingTaskResults>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useGetLatestCouplingTaskResults<TData = Awaited<ReturnType<typeof getLatestCouplingTaskResults>>, TError = HTTPValidationError>(
+ params: GetLatestCouplingTaskResultsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLatestCouplingTaskResults>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
 /**
  * @summary Get latest coupling task results
  */
 
-export function useGetLatestCouplingTaskResults<
-  TData = Awaited<ReturnType<typeof getLatestCouplingTaskResults>>,
-  TError = HTTPValidationError,
->(
-  params: GetLatestCouplingTaskResultsParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getLatestCouplingTaskResults>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
-  const queryOptions = getGetLatestCouplingTaskResultsQueryOptions(
-    params,
-    options,
-  );
+export function useGetLatestCouplingTaskResults<TData = Awaited<ReturnType<typeof getLatestCouplingTaskResults>>, TError = HTTPValidationError>(
+ params: GetLatestCouplingTaskResultsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLatestCouplingTaskResults>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
 
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData> };
+  const queryOptions = getGetLatestCouplingTaskResultsQueryOptions(params,options)
 
-  query.queryKey = queryOptions.queryKey;
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey ;
 
   return query;
 }
+
+
 
 /**
  * Get historical coupling task results for a specific date.
@@ -855,168 +566,93 @@ ValueError
  * @summary Get historical coupling task results
  */
 export const getHistoricalCouplingTaskResults = (
-  params: GetHistoricalCouplingTaskResultsParams,
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
+    params: GetHistoricalCouplingTaskResultsParams,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  return customInstance<LatestTaskResultResponse>(
-    { url: `/task-results/couplings/history`, method: "GET", params, signal },
-    options,
-  );
-};
+      
+      
+      return customInstance<LatestTaskResultResponse>(
+      {url: `/task-results/couplings/history`, method: 'GET',
+        params, signal
+    },
+      options);
+    }
+  
 
-export const getGetHistoricalCouplingTaskResultsQueryKey = (
-  params?: GetHistoricalCouplingTaskResultsParams,
+
+
+export const getGetHistoricalCouplingTaskResultsQueryKey = (params?: GetHistoricalCouplingTaskResultsParams,) => {
+    return [
+    `/task-results/couplings/history`, ...(params ? [params]: [])
+    ] as const;
+    }
+
+    
+export const getGetHistoricalCouplingTaskResultsQueryOptions = <TData = Awaited<ReturnType<typeof getHistoricalCouplingTaskResults>>, TError = HTTPValidationError>(params: GetHistoricalCouplingTaskResultsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getHistoricalCouplingTaskResults>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
-  return [
-    `/task-results/couplings/history`,
-    ...(params ? [params] : []),
-  ] as const;
-};
 
-export const getGetHistoricalCouplingTaskResultsQueryOptions = <
-  TData = Awaited<ReturnType<typeof getHistoricalCouplingTaskResults>>,
-  TError = HTTPValidationError,
->(
-  params: GetHistoricalCouplingTaskResultsParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getHistoricalCouplingTaskResults>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
+const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =
-    queryOptions?.queryKey ??
-    getGetHistoricalCouplingTaskResultsQueryKey(params);
+  const queryKey =  queryOptions?.queryKey ?? getGetHistoricalCouplingTaskResultsQueryKey(params);
 
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof getHistoricalCouplingTaskResults>>
-  > = ({ signal }) =>
-    getHistoricalCouplingTaskResults(params, requestOptions, signal);
+  
 
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof getHistoricalCouplingTaskResults>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData> };
-};
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getHistoricalCouplingTaskResults>>> = ({ signal }) => getHistoricalCouplingTaskResults(params, requestOptions, signal);
 
-export type GetHistoricalCouplingTaskResultsQueryResult = NonNullable<
-  Awaited<ReturnType<typeof getHistoricalCouplingTaskResults>>
->;
-export type GetHistoricalCouplingTaskResultsQueryError = HTTPValidationError;
+      
 
-export function useGetHistoricalCouplingTaskResults<
-  TData = Awaited<ReturnType<typeof getHistoricalCouplingTaskResults>>,
-  TError = HTTPValidationError,
->(
-  params: GetHistoricalCouplingTaskResultsParams,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getHistoricalCouplingTaskResults>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
+      
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getHistoricalCouplingTaskResults>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+}
+
+export type GetHistoricalCouplingTaskResultsQueryResult = NonNullable<Awaited<ReturnType<typeof getHistoricalCouplingTaskResults>>>
+export type GetHistoricalCouplingTaskResultsQueryError = HTTPValidationError
+
+
+export function useGetHistoricalCouplingTaskResults<TData = Awaited<ReturnType<typeof getHistoricalCouplingTaskResults>>, TError = HTTPValidationError>(
+ params: GetHistoricalCouplingTaskResultsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getHistoricalCouplingTaskResults>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getHistoricalCouplingTaskResults>>,
           TError,
           Awaited<ReturnType<typeof getHistoricalCouplingTaskResults>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData>;
-};
-export function useGetHistoricalCouplingTaskResults<
-  TData = Awaited<ReturnType<typeof getHistoricalCouplingTaskResults>>,
-  TError = HTTPValidationError,
->(
-  params: GetHistoricalCouplingTaskResultsParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getHistoricalCouplingTaskResults>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useGetHistoricalCouplingTaskResults<TData = Awaited<ReturnType<typeof getHistoricalCouplingTaskResults>>, TError = HTTPValidationError>(
+ params: GetHistoricalCouplingTaskResultsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getHistoricalCouplingTaskResults>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getHistoricalCouplingTaskResults>>,
           TError,
           Awaited<ReturnType<typeof getHistoricalCouplingTaskResults>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
-export function useGetHistoricalCouplingTaskResults<
-  TData = Awaited<ReturnType<typeof getHistoricalCouplingTaskResults>>,
-  TError = HTTPValidationError,
->(
-  params: GetHistoricalCouplingTaskResultsParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getHistoricalCouplingTaskResults>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useGetHistoricalCouplingTaskResults<TData = Awaited<ReturnType<typeof getHistoricalCouplingTaskResults>>, TError = HTTPValidationError>(
+ params: GetHistoricalCouplingTaskResultsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getHistoricalCouplingTaskResults>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
 /**
  * @summary Get historical coupling task results
  */
 
-export function useGetHistoricalCouplingTaskResults<
-  TData = Awaited<ReturnType<typeof getHistoricalCouplingTaskResults>>,
-  TError = HTTPValidationError,
->(
-  params: GetHistoricalCouplingTaskResultsParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getHistoricalCouplingTaskResults>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
-  const queryOptions = getGetHistoricalCouplingTaskResultsQueryOptions(
-    params,
-    options,
-  );
+export function useGetHistoricalCouplingTaskResults<TData = Awaited<ReturnType<typeof getHistoricalCouplingTaskResults>>, TError = HTTPValidationError>(
+ params: GetHistoricalCouplingTaskResultsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getHistoricalCouplingTaskResults>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
 
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData> };
+  const queryOptions = getGetHistoricalCouplingTaskResultsQueryOptions(params,options)
 
-  query.queryKey = queryOptions.queryKey;
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey ;
 
   return query;
 }
+
+
 
 /**
  * Get complete task history for a specific coupling.
@@ -1050,186 +686,100 @@ ValueError
  * @summary Get coupling task history
  */
 export const getCouplingTaskHistory = (
-  couplingId: string,
-  params: GetCouplingTaskHistoryParams,
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
+    couplingId: string,
+    params: GetCouplingTaskHistoryParams,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  return customInstance<TaskHistoryResponse>(
-    {
-      url: `/task-results/couplings/${couplingId}/history`,
-      method: "GET",
-      params,
-      signal,
+      
+      
+      return customInstance<TaskHistoryResponse>(
+      {url: `/task-results/couplings/${couplingId}/history`, method: 'GET',
+        params, signal
     },
-    options,
-  );
-};
+      options);
+    }
+  
 
-export const getGetCouplingTaskHistoryQueryKey = (
-  couplingId?: string,
-  params?: GetCouplingTaskHistoryParams,
+
+
+export const getGetCouplingTaskHistoryQueryKey = (couplingId?: string,
+    params?: GetCouplingTaskHistoryParams,) => {
+    return [
+    `/task-results/couplings/${couplingId}/history`, ...(params ? [params]: [])
+    ] as const;
+    }
+
+    
+export const getGetCouplingTaskHistoryQueryOptions = <TData = Awaited<ReturnType<typeof getCouplingTaskHistory>>, TError = HTTPValidationError>(couplingId: string,
+    params: GetCouplingTaskHistoryParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCouplingTaskHistory>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
-  return [
-    `/task-results/couplings/${couplingId}/history`,
-    ...(params ? [params] : []),
-  ] as const;
-};
 
-export const getGetCouplingTaskHistoryQueryOptions = <
-  TData = Awaited<ReturnType<typeof getCouplingTaskHistory>>,
-  TError = HTTPValidationError,
->(
-  couplingId: string,
-  params: GetCouplingTaskHistoryParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getCouplingTaskHistory>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
+const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =
-    queryOptions?.queryKey ??
-    getGetCouplingTaskHistoryQueryKey(couplingId, params);
+  const queryKey =  queryOptions?.queryKey ?? getGetCouplingTaskHistoryQueryKey(couplingId,params);
 
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof getCouplingTaskHistory>>
-  > = ({ signal }) =>
-    getCouplingTaskHistory(couplingId, params, requestOptions, signal);
+  
 
-  return {
-    queryKey,
-    queryFn,
-    enabled: !!couplingId,
-    ...queryOptions,
-  } as UseQueryOptions<
-    Awaited<ReturnType<typeof getCouplingTaskHistory>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData> };
-};
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCouplingTaskHistory>>> = ({ signal }) => getCouplingTaskHistory(couplingId,params, requestOptions, signal);
 
-export type GetCouplingTaskHistoryQueryResult = NonNullable<
-  Awaited<ReturnType<typeof getCouplingTaskHistory>>
->;
-export type GetCouplingTaskHistoryQueryError = HTTPValidationError;
+      
 
-export function useGetCouplingTaskHistory<
-  TData = Awaited<ReturnType<typeof getCouplingTaskHistory>>,
-  TError = HTTPValidationError,
->(
-  couplingId: string,
-  params: GetCouplingTaskHistoryParams,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getCouplingTaskHistory>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
+      
+
+   return  { queryKey, queryFn, enabled: !!(couplingId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCouplingTaskHistory>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+}
+
+export type GetCouplingTaskHistoryQueryResult = NonNullable<Awaited<ReturnType<typeof getCouplingTaskHistory>>>
+export type GetCouplingTaskHistoryQueryError = HTTPValidationError
+
+
+export function useGetCouplingTaskHistory<TData = Awaited<ReturnType<typeof getCouplingTaskHistory>>, TError = HTTPValidationError>(
+ couplingId: string,
+    params: GetCouplingTaskHistoryParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCouplingTaskHistory>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getCouplingTaskHistory>>,
           TError,
           Awaited<ReturnType<typeof getCouplingTaskHistory>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData>;
-};
-export function useGetCouplingTaskHistory<
-  TData = Awaited<ReturnType<typeof getCouplingTaskHistory>>,
-  TError = HTTPValidationError,
->(
-  couplingId: string,
-  params: GetCouplingTaskHistoryParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getCouplingTaskHistory>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useGetCouplingTaskHistory<TData = Awaited<ReturnType<typeof getCouplingTaskHistory>>, TError = HTTPValidationError>(
+ couplingId: string,
+    params: GetCouplingTaskHistoryParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCouplingTaskHistory>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getCouplingTaskHistory>>,
           TError,
           Awaited<ReturnType<typeof getCouplingTaskHistory>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
-export function useGetCouplingTaskHistory<
-  TData = Awaited<ReturnType<typeof getCouplingTaskHistory>>,
-  TError = HTTPValidationError,
->(
-  couplingId: string,
-  params: GetCouplingTaskHistoryParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getCouplingTaskHistory>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useGetCouplingTaskHistory<TData = Awaited<ReturnType<typeof getCouplingTaskHistory>>, TError = HTTPValidationError>(
+ couplingId: string,
+    params: GetCouplingTaskHistoryParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCouplingTaskHistory>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
 /**
  * @summary Get coupling task history
  */
 
-export function useGetCouplingTaskHistory<
-  TData = Awaited<ReturnType<typeof getCouplingTaskHistory>>,
-  TError = HTTPValidationError,
->(
-  couplingId: string,
-  params: GetCouplingTaskHistoryParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getCouplingTaskHistory>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
-  const queryOptions = getGetCouplingTaskHistoryQueryOptions(
-    couplingId,
-    params,
-    options,
-  );
+export function useGetCouplingTaskHistory<TData = Awaited<ReturnType<typeof getCouplingTaskHistory>>, TError = HTTPValidationError>(
+ couplingId: string,
+    params: GetCouplingTaskHistoryParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCouplingTaskHistory>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
 
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData> };
+  const queryOptions = getGetCouplingTaskHistoryQueryOptions(couplingId,params,options)
 
-  query.queryKey = queryOptions.queryKey;
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey ;
 
   return query;
 }
+
+
 
 /**
  * Get timeseries task results filtered by tag and parameter.
@@ -1264,254 +814,160 @@ TimeSeriesData
  * @summary Get timeseries task results by tag and parameter
  */
 export const getTimeseriesTaskResults = (
-  params: GetTimeseriesTaskResultsParams,
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
+    params: GetTimeseriesTaskResultsParams,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  return customInstance<TimeSeriesData>(
-    { url: `/task-results/timeseries`, method: "GET", params, signal },
-    options,
-  );
-};
+      
+      
+      return customInstance<TimeSeriesData>(
+      {url: `/task-results/timeseries`, method: 'GET',
+        params, signal
+    },
+      options);
+    }
+  
 
-export const getGetTimeseriesTaskResultsQueryKey = (
-  params?: GetTimeseriesTaskResultsParams,
+
+
+export const getGetTimeseriesTaskResultsQueryKey = (params?: GetTimeseriesTaskResultsParams,) => {
+    return [
+    `/task-results/timeseries`, ...(params ? [params]: [])
+    ] as const;
+    }
+
+    
+export const getGetTimeseriesTaskResultsQueryOptions = <TData = Awaited<ReturnType<typeof getTimeseriesTaskResults>>, TError = HTTPValidationError>(params: GetTimeseriesTaskResultsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTimeseriesTaskResults>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
-  return [`/task-results/timeseries`, ...(params ? [params] : [])] as const;
-};
 
-export const getGetTimeseriesTaskResultsQueryOptions = <
-  TData = Awaited<ReturnType<typeof getTimeseriesTaskResults>>,
-  TError = HTTPValidationError,
->(
-  params: GetTimeseriesTaskResultsParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getTimeseriesTaskResults>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
+const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =
-    queryOptions?.queryKey ?? getGetTimeseriesTaskResultsQueryKey(params);
+  const queryKey =  queryOptions?.queryKey ?? getGetTimeseriesTaskResultsQueryKey(params);
 
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof getTimeseriesTaskResults>>
-  > = ({ signal }) => getTimeseriesTaskResults(params, requestOptions, signal);
+  
 
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof getTimeseriesTaskResults>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData> };
-};
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getTimeseriesTaskResults>>> = ({ signal }) => getTimeseriesTaskResults(params, requestOptions, signal);
 
-export type GetTimeseriesTaskResultsQueryResult = NonNullable<
-  Awaited<ReturnType<typeof getTimeseriesTaskResults>>
->;
-export type GetTimeseriesTaskResultsQueryError = HTTPValidationError;
+      
 
-export function useGetTimeseriesTaskResults<
-  TData = Awaited<ReturnType<typeof getTimeseriesTaskResults>>,
-  TError = HTTPValidationError,
->(
-  params: GetTimeseriesTaskResultsParams,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getTimeseriesTaskResults>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
+      
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getTimeseriesTaskResults>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+}
+
+export type GetTimeseriesTaskResultsQueryResult = NonNullable<Awaited<ReturnType<typeof getTimeseriesTaskResults>>>
+export type GetTimeseriesTaskResultsQueryError = HTTPValidationError
+
+
+export function useGetTimeseriesTaskResults<TData = Awaited<ReturnType<typeof getTimeseriesTaskResults>>, TError = HTTPValidationError>(
+ params: GetTimeseriesTaskResultsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTimeseriesTaskResults>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getTimeseriesTaskResults>>,
           TError,
           Awaited<ReturnType<typeof getTimeseriesTaskResults>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData>;
-};
-export function useGetTimeseriesTaskResults<
-  TData = Awaited<ReturnType<typeof getTimeseriesTaskResults>>,
-  TError = HTTPValidationError,
->(
-  params: GetTimeseriesTaskResultsParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getTimeseriesTaskResults>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useGetTimeseriesTaskResults<TData = Awaited<ReturnType<typeof getTimeseriesTaskResults>>, TError = HTTPValidationError>(
+ params: GetTimeseriesTaskResultsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTimeseriesTaskResults>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getTimeseriesTaskResults>>,
           TError,
           Awaited<ReturnType<typeof getTimeseriesTaskResults>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
-export function useGetTimeseriesTaskResults<
-  TData = Awaited<ReturnType<typeof getTimeseriesTaskResults>>,
-  TError = HTTPValidationError,
->(
-  params: GetTimeseriesTaskResultsParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getTimeseriesTaskResults>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useGetTimeseriesTaskResults<TData = Awaited<ReturnType<typeof getTimeseriesTaskResults>>, TError = HTTPValidationError>(
+ params: GetTimeseriesTaskResultsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTimeseriesTaskResults>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
 /**
  * @summary Get timeseries task results by tag and parameter
  */
 
-export function useGetTimeseriesTaskResults<
-  TData = Awaited<ReturnType<typeof getTimeseriesTaskResults>>,
-  TError = HTTPValidationError,
->(
-  params: GetTimeseriesTaskResultsParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getTimeseriesTaskResults>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
-  const queryOptions = getGetTimeseriesTaskResultsQueryOptions(params, options);
+export function useGetTimeseriesTaskResults<TData = Awaited<ReturnType<typeof getTimeseriesTaskResults>>, TError = HTTPValidationError>(
+ params: GetTimeseriesTaskResultsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTimeseriesTaskResults>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
 
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData> };
+  const queryOptions = getGetTimeseriesTaskResultsQueryOptions(params,options)
 
-  query.queryKey = queryOptions.queryKey;
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey ;
 
   return query;
 }
+
+
 
 /**
  * Enqueue AI triage review for the current latest task result per entity.
  * @summary Request bulk AI triage review for latest task results
  */
 export const requestBulkAiTriageReview = (
-  bulkAiTriageRequest: BulkAiTriageRequest,
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
+    bulkAiTriageRequest: BulkAiTriageRequest,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  return customInstance<BulkAiTriageResponse>(
-    {
-      url: `/task-results/ai-triage/bulk`,
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      data: bulkAiTriageRequest,
-      signal,
+      
+      
+      return customInstance<BulkAiTriageResponse>(
+      {url: `/task-results/ai-triage/bulk`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: bulkAiTriageRequest, signal
     },
-    options,
-  );
-};
+      options);
+    }
+  
 
-export const getRequestBulkAiTriageReviewMutationOptions = <
-  TError = HTTPValidationError,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof requestBulkAiTriageReview>>,
-    TError,
-    { data: BulkAiTriageRequest },
-    TContext
-  >;
-  request?: SecondParameter<typeof customInstance>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof requestBulkAiTriageReview>>,
-  TError,
-  { data: BulkAiTriageRequest },
-  TContext
-> => {
-  const mutationKey = ["requestBulkAiTriageReview"];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      "mutationKey" in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
 
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof requestBulkAiTriageReview>>,
-    { data: BulkAiTriageRequest }
-  > = (props) => {
-    const { data } = props ?? {};
+export const getRequestBulkAiTriageReviewMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requestBulkAiTriageReview>>, TError,{data: BulkAiTriageRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof requestBulkAiTriageReview>>, TError,{data: BulkAiTriageRequest}, TContext> => {
 
-    return requestBulkAiTriageReview(data, requestOptions);
-  };
+const mutationKey = ['requestBulkAiTriageReview'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
 
-  return { mutationFn, ...mutationOptions };
-};
+      
 
-export type RequestBulkAiTriageReviewMutationResult = NonNullable<
-  Awaited<ReturnType<typeof requestBulkAiTriageReview>>
->;
-export type RequestBulkAiTriageReviewMutationBody = BulkAiTriageRequest;
-export type RequestBulkAiTriageReviewMutationError = HTTPValidationError;
 
-/**
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof requestBulkAiTriageReview>>, {data: BulkAiTriageRequest}> = (props) => {
+          const {data} = props ?? {};
+
+          return  requestBulkAiTriageReview(data,requestOptions)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RequestBulkAiTriageReviewMutationResult = NonNullable<Awaited<ReturnType<typeof requestBulkAiTriageReview>>>
+    export type RequestBulkAiTriageReviewMutationBody = BulkAiTriageRequest
+    export type RequestBulkAiTriageReviewMutationError = HTTPValidationError
+
+    /**
  * @summary Request bulk AI triage review for latest task results
  */
-export const useRequestBulkAiTriageReview = <
-  TError = HTTPValidationError,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof requestBulkAiTriageReview>>,
-      TError,
-      { data: BulkAiTriageRequest },
-      TContext
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof requestBulkAiTriageReview>>,
-  TError,
-  { data: BulkAiTriageRequest },
-  TContext
-> => {
-  const mutationOptions = getRequestBulkAiTriageReviewMutationOptions(options);
+export const useRequestBulkAiTriageReview = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requestBulkAiTriageReview>>, TError,{data: BulkAiTriageRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof requestBulkAiTriageReview>>,
+        TError,
+        {data: BulkAiTriageRequest},
+        TContext
+      > => {
 
-  return useMutation(mutationOptions, queryClient);
-};
-/**
+      const mutationOptions = getRequestBulkAiTriageReviewMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    /**
  * Re-execute a single task using the system single-task-executor deployment.
 
 Looks up the TaskResultHistoryDocument to extract task_name, qid, chip_id,
@@ -1536,95 +992,68 @@ ExecuteFlowResponse
  * @summary Re-execute a single task from its task result
  */
 export const reExecuteTaskResult = (
-  taskId: string,
-  bodyReExecuteTaskResult: BodyReExecuteTaskResult,
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
+    taskId: string,
+    bodyReExecuteTaskResult: BodyReExecuteTaskResult,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  return customInstance<ExecuteFlowResponse>(
-    {
-      url: `/task-results/${taskId}/re-execute`,
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      data: bodyReExecuteTaskResult,
-      signal,
+      
+      
+      return customInstance<ExecuteFlowResponse>(
+      {url: `/task-results/${taskId}/re-execute`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: bodyReExecuteTaskResult, signal
     },
-    options,
-  );
-};
+      options);
+    }
+  
 
-export const getReExecuteTaskResultMutationOptions = <
-  TError = HTTPValidationError,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof reExecuteTaskResult>>,
-    TError,
-    { taskId: string; data: BodyReExecuteTaskResult },
-    TContext
-  >;
-  request?: SecondParameter<typeof customInstance>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof reExecuteTaskResult>>,
-  TError,
-  { taskId: string; data: BodyReExecuteTaskResult },
-  TContext
-> => {
-  const mutationKey = ["reExecuteTaskResult"];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      "mutationKey" in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
 
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof reExecuteTaskResult>>,
-    { taskId: string; data: BodyReExecuteTaskResult }
-  > = (props) => {
-    const { taskId, data } = props ?? {};
+export const getReExecuteTaskResultMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reExecuteTaskResult>>, TError,{taskId: string;data: BodyReExecuteTaskResult}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof reExecuteTaskResult>>, TError,{taskId: string;data: BodyReExecuteTaskResult}, TContext> => {
 
-    return reExecuteTaskResult(taskId, data, requestOptions);
-  };
+const mutationKey = ['reExecuteTaskResult'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
 
-  return { mutationFn, ...mutationOptions };
-};
+      
 
-export type ReExecuteTaskResultMutationResult = NonNullable<
-  Awaited<ReturnType<typeof reExecuteTaskResult>>
->;
-export type ReExecuteTaskResultMutationBody = BodyReExecuteTaskResult;
-export type ReExecuteTaskResultMutationError = HTTPValidationError;
 
-/**
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof reExecuteTaskResult>>, {taskId: string;data: BodyReExecuteTaskResult}> = (props) => {
+          const {taskId,data} = props ?? {};
+
+          return  reExecuteTaskResult(taskId,data,requestOptions)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ReExecuteTaskResultMutationResult = NonNullable<Awaited<ReturnType<typeof reExecuteTaskResult>>>
+    export type ReExecuteTaskResultMutationBody = BodyReExecuteTaskResult
+    export type ReExecuteTaskResultMutationError = HTTPValidationError
+
+    /**
  * @summary Re-execute a single task from its task result
  */
-export const useReExecuteTaskResult = <
-  TError = HTTPValidationError,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof reExecuteTaskResult>>,
-      TError,
-      { taskId: string; data: BodyReExecuteTaskResult },
-      TContext
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof reExecuteTaskResult>>,
-  TError,
-  { taskId: string; data: BodyReExecuteTaskResult },
-  TContext
-> => {
-  const mutationOptions = getReExecuteTaskResultMutationOptions(options);
+export const useReExecuteTaskResult = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reExecuteTaskResult>>, TError,{taskId: string;data: BodyReExecuteTaskResult}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof reExecuteTaskResult>>,
+        TError,
+        {taskId: string;data: BodyReExecuteTaskResult},
+        TContext
+      > => {
 
-  return useMutation(mutationOptions, queryClient);
-};
-/**
+      const mutationOptions = getReExecuteTaskResultMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    /**
  * Toggle the excluded flag on a task result.
 
 Excluded measurements are skipped when aggregating metrics for the
@@ -1632,95 +1061,68 @@ dashboard / metrics screens. Raw data is preserved.
  * @summary Toggle exclusion of a task result from metrics aggregations
  */
 export const setTaskResultExcluded = (
-  taskId: string,
-  taskResultExcludeRequest: TaskResultExcludeRequest,
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
+    taskId: string,
+    taskResultExcludeRequest: TaskResultExcludeRequest,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  return customInstance<TaskResultExcludeResponse>(
-    {
-      url: `/task-results/${taskId}/exclude`,
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      data: taskResultExcludeRequest,
-      signal,
+      
+      
+      return customInstance<TaskResultExcludeResponse>(
+      {url: `/task-results/${taskId}/exclude`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: taskResultExcludeRequest, signal
     },
-    options,
-  );
-};
+      options);
+    }
+  
 
-export const getSetTaskResultExcludedMutationOptions = <
-  TError = HTTPValidationError,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof setTaskResultExcluded>>,
-    TError,
-    { taskId: string; data: TaskResultExcludeRequest },
-    TContext
-  >;
-  request?: SecondParameter<typeof customInstance>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof setTaskResultExcluded>>,
-  TError,
-  { taskId: string; data: TaskResultExcludeRequest },
-  TContext
-> => {
-  const mutationKey = ["setTaskResultExcluded"];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      "mutationKey" in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
 
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof setTaskResultExcluded>>,
-    { taskId: string; data: TaskResultExcludeRequest }
-  > = (props) => {
-    const { taskId, data } = props ?? {};
+export const getSetTaskResultExcludedMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setTaskResultExcluded>>, TError,{taskId: string;data: TaskResultExcludeRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof setTaskResultExcluded>>, TError,{taskId: string;data: TaskResultExcludeRequest}, TContext> => {
 
-    return setTaskResultExcluded(taskId, data, requestOptions);
-  };
+const mutationKey = ['setTaskResultExcluded'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
 
-  return { mutationFn, ...mutationOptions };
-};
+      
 
-export type SetTaskResultExcludedMutationResult = NonNullable<
-  Awaited<ReturnType<typeof setTaskResultExcluded>>
->;
-export type SetTaskResultExcludedMutationBody = TaskResultExcludeRequest;
-export type SetTaskResultExcludedMutationError = HTTPValidationError;
 
-/**
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof setTaskResultExcluded>>, {taskId: string;data: TaskResultExcludeRequest}> = (props) => {
+          const {taskId,data} = props ?? {};
+
+          return  setTaskResultExcluded(taskId,data,requestOptions)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SetTaskResultExcludedMutationResult = NonNullable<Awaited<ReturnType<typeof setTaskResultExcluded>>>
+    export type SetTaskResultExcludedMutationBody = TaskResultExcludeRequest
+    export type SetTaskResultExcludedMutationError = HTTPValidationError
+
+    /**
  * @summary Toggle exclusion of a task result from metrics aggregations
  */
-export const useSetTaskResultExcluded = <
-  TError = HTTPValidationError,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof setTaskResultExcluded>>,
-      TError,
-      { taskId: string; data: TaskResultExcludeRequest },
-      TContext
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof setTaskResultExcluded>>,
-  TError,
-  { taskId: string; data: TaskResultExcludeRequest },
-  TContext
-> => {
-  const mutationOptions = getSetTaskResultExcludedMutationOptions(options);
+export const useSetTaskResultExcluded = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setTaskResultExcluded>>, TError,{taskId: string;data: TaskResultExcludeRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof setTaskResultExcluded>>,
+        TError,
+        {taskId: string;data: TaskResultExcludeRequest},
+        TContext
+      > => {
 
-  return useMutation(mutationOptions, queryClient);
-};
-/**
+      const mutationOptions = getSetTaskResultExcludedMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    /**
  * Download multiple calibration figures as a ZIP file.
 
 Creates a ZIP archive containing all requested figure files and returns it
@@ -1745,90 +1147,64 @@ HTTPException
  * @summary Download multiple figures as a ZIP file
  */
 export const downloadFiguresAsZip = (
-  downloadFiguresAsZipRequest: DownloadFiguresAsZipRequest,
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
+    downloadFiguresAsZipRequest: DownloadFiguresAsZipRequest,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  return customInstance<unknown>(
-    {
-      url: `/task-results/figures/download`,
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      data: downloadFiguresAsZipRequest,
-      signal,
+      
+      
+      return customInstance<unknown>(
+      {url: `/task-results/figures/download`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: downloadFiguresAsZipRequest, signal
     },
-    options,
-  );
-};
+      options);
+    }
+  
 
-export const getDownloadFiguresAsZipMutationOptions = <
-  TError = HTTPValidationError,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof downloadFiguresAsZip>>,
-    TError,
-    { data: DownloadFiguresAsZipRequest },
-    TContext
-  >;
-  request?: SecondParameter<typeof customInstance>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof downloadFiguresAsZip>>,
-  TError,
-  { data: DownloadFiguresAsZipRequest },
-  TContext
-> => {
-  const mutationKey = ["downloadFiguresAsZip"];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      "mutationKey" in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
 
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof downloadFiguresAsZip>>,
-    { data: DownloadFiguresAsZipRequest }
-  > = (props) => {
-    const { data } = props ?? {};
+export const getDownloadFiguresAsZipMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof downloadFiguresAsZip>>, TError,{data: DownloadFiguresAsZipRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof downloadFiguresAsZip>>, TError,{data: DownloadFiguresAsZipRequest}, TContext> => {
 
-    return downloadFiguresAsZip(data, requestOptions);
-  };
+const mutationKey = ['downloadFiguresAsZip'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
 
-  return { mutationFn, ...mutationOptions };
-};
+      
 
-export type DownloadFiguresAsZipMutationResult = NonNullable<
-  Awaited<ReturnType<typeof downloadFiguresAsZip>>
->;
-export type DownloadFiguresAsZipMutationBody = DownloadFiguresAsZipRequest;
-export type DownloadFiguresAsZipMutationError = HTTPValidationError;
 
-/**
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof downloadFiguresAsZip>>, {data: DownloadFiguresAsZipRequest}> = (props) => {
+          const {data} = props ?? {};
+
+          return  downloadFiguresAsZip(data,requestOptions)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DownloadFiguresAsZipMutationResult = NonNullable<Awaited<ReturnType<typeof downloadFiguresAsZip>>>
+    export type DownloadFiguresAsZipMutationBody = DownloadFiguresAsZipRequest
+    export type DownloadFiguresAsZipMutationError = HTTPValidationError
+
+    /**
  * @summary Download multiple figures as a ZIP file
  */
-export const useDownloadFiguresAsZip = <
-  TError = HTTPValidationError,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof downloadFiguresAsZip>>,
-      TError,
-      { data: DownloadFiguresAsZipRequest },
-      TContext
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof downloadFiguresAsZip>>,
-  TError,
-  { data: DownloadFiguresAsZipRequest },
-  TContext
-> => {
-  const mutationOptions = getDownloadFiguresAsZipMutationOptions(options);
+export const useDownloadFiguresAsZip = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof downloadFiguresAsZip>>, TError,{data: DownloadFiguresAsZipRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof downloadFiguresAsZip>>,
+        TError,
+        {data: DownloadFiguresAsZipRequest},
+        TContext
+      > => {
 
-  return useMutation(mutationOptions, queryClient);
-};
+      const mutationOptions = getDownloadFiguresAsZipMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    

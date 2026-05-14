@@ -5,7 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { ManualEditItemValue } from "./manualEditItemValue";
+import type { ManualEditItemValue } from './manualEditItemValue';
 
 /**
  * A single manual edit record.

@@ -7,6 +7,6 @@
  */
 
 export type ListAllFlowSchedulesParams = {
-  limit?: number;
-  offset?: number;
+limit?: number;
+offset?: number;
 };

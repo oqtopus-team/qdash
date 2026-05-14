@@ -5,9 +5,9 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { Qubit } from "./qubit";
-import type { Coupling } from "./coupling";
-import type { DeviceCalibratedAt } from "./deviceCalibratedAt";
+import type { Qubit } from './qubit';
+import type { Coupling } from './coupling';
+import type { DeviceCalibratedAt } from './deviceCalibratedAt';
 
 /**
  * Device information.

@@ -5,7 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { BackendResponseModel } from "./backendResponseModel";
+import type { BackendResponseModel } from './backendResponseModel';
 
 /**
  * Response model for listing all backends.

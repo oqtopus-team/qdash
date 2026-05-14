@@ -5,10 +5,10 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { IssueResponseUserId } from "./issueResponseUserId";
-import type { IssueResponseAvatarKey } from "./issueResponseAvatarKey";
-import type { IssueResponseTitle } from "./issueResponseTitle";
-import type { IssueResponseParentId } from "./issueResponseParentId";
+import type { IssueResponseUserId } from './issueResponseUserId';
+import type { IssueResponseAvatarKey } from './issueResponseAvatarKey';
+import type { IssueResponseTitle } from './issueResponseTitle';
+import type { IssueResponseParentId } from './issueResponseParentId';
 
 /**
  * Response schema for a single issue.

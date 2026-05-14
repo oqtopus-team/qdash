@@ -5,7 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { UserListItem } from "./userListItem";
+import type { UserListItem } from './userListItem';
 
 /**
  * Response containing list of users.

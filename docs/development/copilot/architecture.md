@@ -141,6 +141,8 @@ A standalone page (`/copilot`) for general questions about the calibration syste
 
 Automatic AI triage attaches an LLM-generated operational review note to selected terminal task results after they are persisted. It is designed for tasks where visual or contextual review is valuable, but sending every calibration result to an LLM would be too slow or expensive.
 
+For prompt and task-knowledge tuning, use the [AI triage evaluation loop](./ai-triage-evals.md) to capture a real task result once and replay it in either frozen-context or rebuilt-context mode.
+
 - **Entry point**: `enqueue_ai_triage_note()` in `src/qdash/workflow/engine/task/ai_triage.py`
 - **Trigger**: task-result history save paths in the workflow recorder and repository
 - **Configuration**: `analysis.ai_triage_tasks` and `analysis.ai_triage_message` in `config/copilot.yaml`

@@ -13,4 +13,5 @@ export interface DownloadFiguresAsZipRequest {
   paths?: string[];
   filename?: string;
   ai_triage_task_ids?: string[];
+  ai_triage_bundle_task_ids?: string[];
 }

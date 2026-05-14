@@ -5,7 +5,9 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import { useQuery } from "@tanstack/react-query";
+import {
+  useQuery
+} from '@tanstack/react-query';
 import type {
   DataTag,
   DefinedInitialDataOptions,
@@ -15,14 +17,20 @@ import type {
   QueryKey,
   UndefinedInitialDataOptions,
   UseQueryOptions,
-  UseQueryResult,
-} from "@tanstack/react-query";
+  UseQueryResult
+} from '@tanstack/react-query';
 
-import type { HTTPValidationError, ListTagResponse } from "../../schemas";
+import type {
+  HTTPValidationError,
+  ListTagResponse
+} from '../../schemas';
 
-import { customInstance } from "../../lib/custom-instance";
+import { customInstance } from '../../lib/custom-instance';
+
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
+
+
 
 /**
  * List all tags for the current project.
@@ -44,126 +52,90 @@ ListTagResponse
  * @summary List all tags
  */
 export const listTags = (
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
+    
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  return customInstance<ListTagResponse>(
-    { url: `/tags`, method: "GET", signal },
-    options,
-  );
-};
+      
+      
+      return customInstance<ListTagResponse>(
+      {url: `/tags`, method: 'GET', signal
+    },
+      options);
+    }
+  
+
+
 
 export const getListTagsQueryKey = () => {
-  return [`/tags`] as const;
-};
+    return [
+    `/tags`
+    ] as const;
+    }
 
-export const getListTagsQueryOptions = <
-  TData = Awaited<ReturnType<typeof listTags>>,
-  TError = HTTPValidationError,
->(options?: {
-  query?: Partial<
-    UseQueryOptions<Awaited<ReturnType<typeof listTags>>, TError, TData>
-  >;
-  request?: SecondParameter<typeof customInstance>;
-}) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
+    
+export const getListTagsQueryOptions = <TData = Awaited<ReturnType<typeof listTags>>, TError = HTTPValidationError>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listTags>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
 
-  const queryKey = queryOptions?.queryKey ?? getListTagsQueryKey();
+const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof listTags>>> = ({
-    signal,
-  }) => listTags(requestOptions, signal);
+  const queryKey =  queryOptions?.queryKey ?? getListTagsQueryKey();
 
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof listTags>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData> };
-};
+  
 
-export type ListTagsQueryResult = NonNullable<
-  Awaited<ReturnType<typeof listTags>>
->;
-export type ListTagsQueryError = HTTPValidationError;
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listTags>>> = ({ signal }) => listTags(requestOptions, signal);
 
-export function useListTags<
-  TData = Awaited<ReturnType<typeof listTags>>,
-  TError = HTTPValidationError,
->(
-  options: {
-    query: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof listTags>>, TError, TData>
-    > &
-      Pick<
+      
+
+      
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listTags>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+}
+
+export type ListTagsQueryResult = NonNullable<Awaited<ReturnType<typeof listTags>>>
+export type ListTagsQueryError = HTTPValidationError
+
+
+export function useListTags<TData = Awaited<ReturnType<typeof listTags>>, TError = HTTPValidationError>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listTags>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof listTags>>,
           TError,
           Awaited<ReturnType<typeof listTags>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData>;
-};
-export function useListTags<
-  TData = Awaited<ReturnType<typeof listTags>>,
-  TError = HTTPValidationError,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof listTags>>, TError, TData>
-    > &
-      Pick<
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useListTags<TData = Awaited<ReturnType<typeof listTags>>, TError = HTTPValidationError>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listTags>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof listTags>>,
           TError,
           Awaited<ReturnType<typeof listTags>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
-export function useListTags<
-  TData = Awaited<ReturnType<typeof listTags>>,
-  TError = HTTPValidationError,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof listTags>>, TError, TData>
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useListTags<TData = Awaited<ReturnType<typeof listTags>>, TError = HTTPValidationError>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listTags>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
 /**
  * @summary List all tags
  */
 
-export function useListTags<
-  TData = Awaited<ReturnType<typeof listTags>>,
-  TError = HTTPValidationError,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof listTags>>, TError, TData>
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
-  const queryOptions = getListTagsQueryOptions(options);
+export function useListTags<TData = Awaited<ReturnType<typeof listTags>>, TError = HTTPValidationError>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listTags>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
 
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData> };
+  const queryOptions = getListTagsQueryOptions(options)
 
-  query.queryKey = queryOptions.queryKey;
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey ;
 
   return query;
 }
+
+
+

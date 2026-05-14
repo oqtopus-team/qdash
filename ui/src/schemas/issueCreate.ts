@@ -5,8 +5,8 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { IssueCreateTitle } from "./issueCreateTitle";
-import type { IssueCreateParentId } from "./issueCreateParentId";
+import type { IssueCreateTitle } from './issueCreateTitle';
+import type { IssueCreateParentId } from './issueCreateParentId';
 
 /**
  * Request schema for creating an issue.

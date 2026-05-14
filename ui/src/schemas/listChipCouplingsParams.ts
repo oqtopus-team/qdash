@@ -7,13 +7,13 @@
  */
 
 export type ListChipCouplingsParams = {
-  /**
-   * @minimum 1
-   * @maximum 512
-   */
-  limit?: number;
-  /**
-   * @minimum 0
-   */
-  offset?: number;
+/**
+ * @minimum 1
+ * @maximum 512
+ */
+limit?: number;
+/**
+ * @minimum 0
+ */
+offset?: number;
 };

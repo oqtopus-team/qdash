@@ -68,6 +68,7 @@ const DEFAULT_DOWNLOAD_OPTIONS: DownloadOptions = {
   jsonFigures: true,
   rawData: false,
   aiTriageNotes: false,
+  aiTriageReplayBundles: false,
 };
 
 // Zoom control buttons component
@@ -396,6 +397,7 @@ export function QubitGrid({
       jsonFigures: 0,
       rawData: 0,
       aiTriageNotes: 0,
+      aiTriageReplayBundles: 0,
     };
     selectedForDownload.forEach((qid) => {
       const task = taskResponse?.data?.result?.[qid];
@@ -404,6 +406,9 @@ export function QubitGrid({
       counts.rawData += toPathList(task?.raw_data_path).length;
       if (task?.task_id && aiTriageBadgesByTaskId?.has(task.task_id)) {
         counts.aiTriageNotes += 1;
+      }
+      if (task?.task_id) {
+        counts.aiTriageReplayBundles += 1;
       }
     });
     return counts;
@@ -537,6 +542,7 @@ export function QubitGrid({
 
     const paths: string[] = [];
     const aiTriageTaskIds: string[] = [];
+    const aiTriageBundleTaskIds: string[] = [];
     selectedForDownload.forEach((qid) => {
       const task = taskResponse?.data?.result?.[qid];
       if (!task) return;
@@ -552,15 +558,24 @@ export function QubitGrid({
       if (downloadOptions.aiTriageNotes && task.task_id) {
         aiTriageTaskIds.push(task.task_id);
       }
+      if (downloadOptions.aiTriageReplayBundles && task.task_id) {
+        aiTriageBundleTaskIds.push(task.task_id);
+      }
     });
 
-    if (paths.length === 0 && aiTriageTaskIds.length === 0) return;
+    if (paths.length === 0 && aiTriageTaskIds.length === 0 && aiTriageBundleTaskIds.length === 0)
+      return;
 
     setIsDownloading(true);
     try {
       const filename = `${chipId}_${selectedTask}_${selectedDate}_artifacts.zip`;
       const response = await downloadFiguresAsZip(
-        { paths, filename, ai_triage_task_ids: aiTriageTaskIds },
+        {
+          paths,
+          filename,
+          ai_triage_task_ids: aiTriageTaskIds,
+          ai_triage_bundle_task_ids: aiTriageBundleTaskIds,
+        },
         { responseType: "blob" },
       );
 

@@ -7,14 +7,14 @@
  */
 
 export type ListChipQubitsParams = {
-  /**
-   * @minimum 1
-   * @maximum 256
-   */
-  limit?: number;
-  /**
-   * @minimum 0
-   */
-  offset?: number;
-  qids?: string[] | null;
+/**
+ * @minimum 1
+ * @maximum 256
+ */
+limit?: number;
+/**
+ * @minimum 0
+ */
+offset?: number;
+qids?: string[] | null;
 };

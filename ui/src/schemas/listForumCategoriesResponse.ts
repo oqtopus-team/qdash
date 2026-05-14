@@ -5,7 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { ForumCategoryResponse } from "./forumCategoryResponse";
+import type { ForumCategoryResponse } from './forumCategoryResponse';
 
 /**
  * List of forum categories.

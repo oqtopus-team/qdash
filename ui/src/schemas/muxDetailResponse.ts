@@ -5,7 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { MuxDetailResponseDetail } from "./muxDetailResponseDetail";
+import type { MuxDetailResponseDetail } from './muxDetailResponseDetail';
 
 /**
  * MuxDetailResponse is a Pydantic model that represents the response for fetching the multiplexer details.

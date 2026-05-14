@@ -6,6 +6,4 @@
  * OpenAPI spec version: 0.0.1
  */
 
-export type CooldownUpdateRequestWiringBlocksAnyOfItem = {
-  [key: string]: unknown;
-};
+export type CooldownUpdateRequestWiringBlocksAnyOfItem = { [key: string]: unknown };

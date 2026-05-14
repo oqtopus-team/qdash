@@ -9,10 +9,11 @@
 /**
  * File node type enum.
  */
-export type FileNodeType = (typeof FileNodeType)[keyof typeof FileNodeType];
+export type FileNodeType = typeof FileNodeType[keyof typeof FileNodeType];
+
 
 // eslint-disable-next-line @typescript-eslint/no-redeclare
 export const FileNodeType = {
-  file: "file",
-  directory: "directory",
+  file: 'file',
+  directory: 'directory',
 } as const;

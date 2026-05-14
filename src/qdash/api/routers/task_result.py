@@ -623,6 +623,7 @@ def download_figures_as_zip(
         body.filename,
         project_id=ctx.project_id,
         ai_triage_task_ids=body.ai_triage_task_ids,
+        ai_triage_bundle_task_ids=body.ai_triage_bundle_task_ids,
     )
 
     return StreamingResponse(

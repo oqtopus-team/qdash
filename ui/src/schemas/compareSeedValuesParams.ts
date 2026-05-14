@@ -7,5 +7,5 @@
  */
 
 export type CompareSeedValuesParams = {
-  parameters?: string | null;
+parameters?: string | null;
 };

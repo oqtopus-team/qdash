@@ -5,7 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { ProjectCreateDescription } from "./projectCreateDescription";
+import type { ProjectCreateDescription } from './projectCreateDescription';
 
 /**
  * Request schema for creating a new project.

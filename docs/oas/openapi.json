@@ -14,11 +14,6 @@
     },
     "version": "0.0.1"
   },
-  "servers": [
-    {
-      "url": "/api"
-    }
-  ],
   "paths": {
     "/auth/login": {
       "post": {
@@ -13708,7 +13703,7 @@
         "properties": {
           "file": {
             "type": "string",
-            "format": "binary",
+            "contentMediaType": "application/octet-stream",
             "title": "File"
           }
         },
@@ -15520,6 +15515,14 @@
             },
             "type": "array",
             "title": "Ai Triage Task Ids",
+            "default": []
+          },
+          "ai_triage_bundle_task_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Ai Triage Bundle Task Ids",
             "default": []
           }
         },
@@ -19038,6 +19041,11 @@
             "type": "boolean",
             "title": "Disable Thinking Instruction",
             "default": false
+          },
+          "api_style": {
+            "type": "string",
+            "title": "Api Style",
+            "default": "responses"
           }
         },
         "type": "object",
@@ -21501,6 +21509,14 @@
             "title": "Client Url",
             "default": ""
           },
+          "api_cors_origins": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Api Cors Origins",
+            "default": []
+          },
           "prefect_api_url": {
             "type": "string",
             "title": "Prefect Api Url"
@@ -23585,6 +23601,13 @@
           "type": {
             "type": "string",
             "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
           }
         },
         "type": "object",
@@ -23690,5 +23713,10 @@
         "scheme": "bearer"
       }
     }
-  }
+  },
+  "servers": [
+    {
+      "url": "/api"
+    }
+  ]
 }

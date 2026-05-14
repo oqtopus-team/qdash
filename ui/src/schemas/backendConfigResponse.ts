@@ -5,8 +5,8 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { BackendConfigResponseBackends } from "./backendConfigResponseBackends";
-import type { BackendConfigResponseCategories } from "./backendConfigResponseCategories";
+import type { BackendConfigResponseBackends } from './backendConfigResponseBackends';
+import type { BackendConfigResponseCategories } from './backendConfigResponseCategories';
 
 /**
  * Response model for backend configuration.

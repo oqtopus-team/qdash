@@ -5,9 +5,9 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { IssueKnowledgeResponseReviewedByUserId } from "./issueKnowledgeResponseReviewedByUserId";
-import type { IssueKnowledgeResponseReviewedBy } from "./issueKnowledgeResponseReviewedBy";
-import type { IssueKnowledgeResponsePrUrl } from "./issueKnowledgeResponsePrUrl";
+import type { IssueKnowledgeResponseReviewedByUserId } from './issueKnowledgeResponseReviewedByUserId';
+import type { IssueKnowledgeResponseReviewedBy } from './issueKnowledgeResponseReviewedBy';
+import type { IssueKnowledgeResponsePrUrl } from './issueKnowledgeResponsePrUrl';
 
 /**
  * Response schema for a knowledge case.

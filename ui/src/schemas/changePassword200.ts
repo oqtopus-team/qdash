@@ -6,4 +6,4 @@
  * OpenAPI spec version: 0.0.1
  */
 
-export type ChangePassword200 = { [key: string]: string };
+export type ChangePassword200 = {[key: string]: string};

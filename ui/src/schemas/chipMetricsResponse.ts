@@ -5,11 +5,11 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { ChipMetricsResponseWithinHours } from "./chipMetricsResponseWithinHours";
-import type { ChipMetricsResponseStartAt } from "./chipMetricsResponseStartAt";
-import type { ChipMetricsResponseEndAt } from "./chipMetricsResponseEndAt";
-import type { ChipMetricsResponseQubitMetrics } from "./chipMetricsResponseQubitMetrics";
-import type { ChipMetricsResponseCouplingMetrics } from "./chipMetricsResponseCouplingMetrics";
+import type { ChipMetricsResponseWithinHours } from './chipMetricsResponseWithinHours';
+import type { ChipMetricsResponseStartAt } from './chipMetricsResponseStartAt';
+import type { ChipMetricsResponseEndAt } from './chipMetricsResponseEndAt';
+import type { ChipMetricsResponseQubitMetrics } from './chipMetricsResponseQubitMetrics';
+import type { ChipMetricsResponseCouplingMetrics } from './chipMetricsResponseCouplingMetrics';
 
 /**
  * Complete chip metrics response.

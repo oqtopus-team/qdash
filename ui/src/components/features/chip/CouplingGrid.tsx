@@ -72,6 +72,7 @@ const DEFAULT_DOWNLOAD_OPTIONS: DownloadOptions = {
   jsonFigures: true,
   rawData: false,
   aiTriageNotes: false,
+  aiTriageReplayBundles: false,
 };
 
 function toPathList(paths: string[] | string | null | undefined): string[] {
@@ -254,6 +255,7 @@ export function CouplingGrid({
       jsonFigures: 0,
       rawData: 0,
       aiTriageNotes: 0,
+      aiTriageReplayBundles: 0,
     };
     selectedForDownload.forEach((couplingId) => {
       const task = taskResponse?.data?.result?.[couplingId];
@@ -262,6 +264,9 @@ export function CouplingGrid({
       counts.rawData += toPathList(task?.raw_data_path).length;
       if (task?.task_id && aiTriageBadgesByTaskId?.has(task.task_id)) {
         counts.aiTriageNotes += 1;
+      }
+      if (task?.task_id) {
+        counts.aiTriageReplayBundles += 1;
       }
     });
     return counts;
@@ -409,6 +414,7 @@ export function CouplingGrid({
 
     const paths: string[] = [];
     const aiTriageTaskIds: string[] = [];
+    const aiTriageBundleTaskIds: string[] = [];
     selectedForDownload.forEach((couplingId) => {
       const task = taskResponse?.data?.result?.[couplingId];
       if (!task) return;
@@ -424,15 +430,24 @@ export function CouplingGrid({
       if (downloadOptions.aiTriageNotes && task.task_id) {
         aiTriageTaskIds.push(task.task_id);
       }
+      if (downloadOptions.aiTriageReplayBundles && task.task_id) {
+        aiTriageBundleTaskIds.push(task.task_id);
+      }
     });
 
-    if (paths.length === 0 && aiTriageTaskIds.length === 0) return;
+    if (paths.length === 0 && aiTriageTaskIds.length === 0 && aiTriageBundleTaskIds.length === 0)
+      return;
 
     setIsDownloading(true);
     try {
       const filename = `${chipId}_${selectedTask}_${selectedDate}_coupling_artifacts.zip`;
       const response = await downloadFiguresAsZip(
-        { paths, filename, ai_triage_task_ids: aiTriageTaskIds },
+        {
+          paths,
+          filename,
+          ai_triage_task_ids: aiTriageTaskIds,
+          ai_triage_bundle_task_ids: aiTriageBundleTaskIds,
+        },
         { responseType: "blob" },
       );
 

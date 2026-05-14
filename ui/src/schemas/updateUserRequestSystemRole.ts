@@ -5,6 +5,6 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { SystemRole } from "./systemRole";
+import type { SystemRole } from './systemRole';
 
 export type UpdateUserRequestSystemRole = SystemRole | null;

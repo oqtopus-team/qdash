@@ -5,21 +5,21 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { MuxTaskTaskId } from "./muxTaskTaskId";
-import type { MuxTaskQid } from "./muxTaskQid";
-import type { MuxTaskUpstreamId } from "./muxTaskUpstreamId";
-import type { MuxTaskMessage } from "./muxTaskMessage";
-import type { MuxTaskInputParameters } from "./muxTaskInputParameters";
-import type { MuxTaskOutputParameters } from "./muxTaskOutputParameters";
-import type { MuxTaskOutputParameterNames } from "./muxTaskOutputParameterNames";
-import type { MuxTaskNote } from "./muxTaskNote";
-import type { MuxTaskFigurePath } from "./muxTaskFigurePath";
-import type { MuxTaskJsonFigurePath } from "./muxTaskJsonFigurePath";
-import type { MuxTaskRawDataPath } from "./muxTaskRawDataPath";
-import type { MuxTaskStartAt } from "./muxTaskStartAt";
-import type { MuxTaskEndAt } from "./muxTaskEndAt";
-import type { MuxTaskElapsedTime } from "./muxTaskElapsedTime";
-import type { MuxTaskTaskType } from "./muxTaskTaskType";
+import type { MuxTaskTaskId } from './muxTaskTaskId';
+import type { MuxTaskQid } from './muxTaskQid';
+import type { MuxTaskUpstreamId } from './muxTaskUpstreamId';
+import type { MuxTaskMessage } from './muxTaskMessage';
+import type { MuxTaskInputParameters } from './muxTaskInputParameters';
+import type { MuxTaskOutputParameters } from './muxTaskOutputParameters';
+import type { MuxTaskOutputParameterNames } from './muxTaskOutputParameterNames';
+import type { MuxTaskNote } from './muxTaskNote';
+import type { MuxTaskFigurePath } from './muxTaskFigurePath';
+import type { MuxTaskJsonFigurePath } from './muxTaskJsonFigurePath';
+import type { MuxTaskRawDataPath } from './muxTaskRawDataPath';
+import type { MuxTaskStartAt } from './muxTaskStartAt';
+import type { MuxTaskEndAt } from './muxTaskEndAt';
+import type { MuxTaskElapsedTime } from './muxTaskElapsedTime';
+import type { MuxTaskTaskType } from './muxTaskTaskType';
 
 /**
  * Task information for mux display.

@@ -5,10 +5,10 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { ParameterDiffResponseValueBefore } from "./parameterDiffResponseValueBefore";
-import type { ParameterDiffResponseValueAfter } from "./parameterDiffResponseValueAfter";
-import type { ParameterDiffResponseDelta } from "./parameterDiffResponseDelta";
-import type { ParameterDiffResponseDeltaPercent } from "./parameterDiffResponseDeltaPercent";
+import type { ParameterDiffResponseValueBefore } from './parameterDiffResponseValueBefore';
+import type { ParameterDiffResponseValueAfter } from './parameterDiffResponseValueAfter';
+import type { ParameterDiffResponseDelta } from './parameterDiffResponseDelta';
+import type { ParameterDiffResponseDeltaPercent } from './parameterDiffResponseDeltaPercent';
 
 /**
  * Response model for parameter difference between executions.

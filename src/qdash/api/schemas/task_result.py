@@ -127,3 +127,4 @@ class DownloadFiguresAsZipRequest(BaseModel):
     paths: list[str] = []
     filename: str = "figures.zip"
     ai_triage_task_ids: list[str] = []
+    ai_triage_bundle_task_ids: list[str] = []

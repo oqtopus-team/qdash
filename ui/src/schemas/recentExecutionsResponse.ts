@@ -5,7 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { ExecutionIdResponse } from "./executionIdResponse";
+import type { ExecutionIdResponse } from './executionIdResponse';
 
 /**
  * Response model for recent execution IDs.

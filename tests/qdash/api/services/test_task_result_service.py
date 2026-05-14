@@ -341,3 +341,28 @@ def test_create_figures_zip_includes_ai_triage_markdown(tmp_path) -> None:
         assert archive.read("ai_triage/CheckRabi_0_task-1.md").decode() == (
             "## AI triage\n\n- Decision: `REVIEW`\n"
         )
+
+
+def test_create_figures_zip_includes_ai_triage_replay_bundle(tmp_path) -> None:
+    figure = tmp_path / "figure.json"
+    figure.write_text('{"data":[]}', encoding="utf-8")
+
+    with patch.object(
+        TaskResultService,
+        "_load_ai_triage_bundle_entries",
+        return_value=[("ai_triage_bundle/CheckRabi_0_task-1.zip", b"bundle-bytes")],
+    ):
+        buffer, filename = TaskResultService.create_figures_zip(
+            [str(figure)],
+            "artifacts.zip",
+            project_id="proj-1",
+            ai_triage_bundle_task_ids=["task-1"],
+        )
+
+    assert filename == "artifacts.zip"
+    with zipfile.ZipFile(buffer) as archive:
+        assert sorted(archive.namelist()) == [
+            "ai_triage_bundle/CheckRabi_0_task-1.zip",
+            "figure.json",
+        ]
+        assert archive.read("ai_triage_bundle/CheckRabi_0_task-1.zip") == b"bundle-bytes"
