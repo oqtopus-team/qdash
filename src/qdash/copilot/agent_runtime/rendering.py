@@ -5,8 +5,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from qdash.common.copilot.config import CopilotConfig
-    from qdash.common.copilot.contracts import AnalysisResponse
+    from qdash.copilot.config import CopilotConfig
+    from qdash.copilot.contracts import AnalysisResponse
 
 _ASSESSMENT_LABELS_JA = {
     "good": ("✅", "良好"),

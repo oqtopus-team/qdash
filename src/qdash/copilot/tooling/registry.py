@@ -7,7 +7,7 @@ from typing import Any, Protocol, TypeVar
 
 from pydantic import BaseModel
 
-from qdash.common.copilot.tooling.models import (
+from qdash.copilot.tooling.models import (
     CompareQubitsArgs,
     ExecutePythonAnalysisArgs,
     GenerateChipHeatmapArgs,
@@ -158,7 +158,7 @@ class ToolExecutorRegistryBuilder:
 
     def build_tool_executors(self) -> ToolExecutors:
         """Build the tool executor mapping for LLM function calling."""
-        from qdash.common.copilot.tooling.sandbox import execute_python_analysis
+        from qdash.copilot.tooling.sandbox import execute_python_analysis
 
         return (
             self._build_qubit_analysis_tool_executors()

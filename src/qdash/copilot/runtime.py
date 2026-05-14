@@ -17,32 +17,32 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any
 
-from qdash.common.copilot.formatters.compact import (
+from qdash.common.utils.json import sanitize_for_json
+from qdash.copilot.formatters.compact import (
     compact_number as _compact_number,
 )
-from qdash.common.copilot.formatters.compact import (
+from qdash.copilot.formatters.compact import (
     compact_output_parameters as _compact_output_parameters,
 )
-from qdash.common.copilot.formatters.compact import (
+from qdash.copilot.formatters.compact import (
     compact_timestamp as _compact_timestamp,
 )
-from qdash.common.copilot.services.analysis_context_service import AnalysisContextBuilder
-from qdash.common.copilot.services.chip_overview_service import ChipOverviewLoader
-from qdash.common.copilot.services.data_access import CopilotDataAccess
-from qdash.common.copilot.services.heatmap_service import ChipHeatmapLoader
-from qdash.common.copilot.services.history_service import CopilotHistoryLoader
-from qdash.common.copilot.services.provenance_context_service import (
+from qdash.copilot.services.analysis_context_service import AnalysisContextBuilder
+from qdash.copilot.services.chip_overview_service import ChipOverviewLoader
+from qdash.copilot.services.data_access import CopilotDataAccess
+from qdash.copilot.services.heatmap_service import ChipHeatmapLoader
+from qdash.copilot.services.history_service import CopilotHistoryLoader
+from qdash.copilot.services.provenance_context_service import (
     ProvenanceLineageGraphLoader,
     ProvenanceServiceProtocol,
 )
-from qdash.common.copilot.services.support_service import CopilotSupportService
-from qdash.common.copilot.services.topology_context_service import TopologyContextLoader
-from qdash.common.copilot.tooling.registry import ToolExecutorRegistryBuilder
-from qdash.common.utils.json import sanitize_for_json
+from qdash.copilot.services.support_service import CopilotSupportService
+from qdash.copilot.services.topology_context_service import TopologyContextLoader
+from qdash.copilot.tooling.registry import ToolExecutorRegistryBuilder
 
 if TYPE_CHECKING:
-    from qdash.common.copilot.config import CopilotConfig
-    from qdash.common.copilot.contracts import AnalysisContextResult
+    from qdash.copilot.config import CopilotConfig
+    from qdash.copilot.contracts import AnalysisContextResult
 
 logger = logging.getLogger(__name__)
 

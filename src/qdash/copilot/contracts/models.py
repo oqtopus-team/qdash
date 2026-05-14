@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Any
 from pydantic import BaseModel, Field, field_validator
 
 if TYPE_CHECKING:
-    from qdash.common.copilot.config import ModelConfig
+    from qdash.copilot.config import ModelConfig
 
 
 @dataclass
@@ -181,7 +181,7 @@ class ChatRequest(BaseModel):
 
 
 def _rebuild_models() -> None:
-    from qdash.common.copilot.config import ModelConfig as _RuntimeModelConfig
+    from qdash.copilot.config import ModelConfig as _RuntimeModelConfig
 
     AnalyzeRequest.model_rebuild(_types_namespace={"ModelConfig": _RuntimeModelConfig})
     ChatRequest.model_rebuild(_types_namespace={"ModelConfig": _RuntimeModelConfig})

@@ -592,7 +592,7 @@ class TaskResultService:
     @staticmethod
     def _load_ai_triage_config() -> Any:
         """Load Copilot config lazily so tests can patch it."""
-        from qdash.common.copilot.config import load_copilot_config
+        from qdash.copilot.config import load_copilot_config
 
         return load_copilot_config()
 
@@ -654,7 +654,7 @@ class TaskResultService:
     @staticmethod
     def _load_ai_triage_runtime_config(model_override: Any | None) -> Any:
         """Load Copilot config and apply AI-triage-specific defaults."""
-        from qdash.common.copilot.config import load_copilot_config
+        from qdash.copilot.config import load_copilot_config
 
         config = load_copilot_config()
         if model_override is not None:
@@ -671,7 +671,7 @@ class TaskResultService:
         config: Any,
     ) -> Any:
         """Build the compact context passed to AI triage analysis."""
-        from qdash.common.copilot.runtime import CopilotRuntime
+        from qdash.copilot.runtime import CopilotRuntime
 
         context_bundle = CopilotRuntime().build_analysis_context(
             task_name=task_name,
@@ -696,7 +696,7 @@ class TaskResultService:
         """Render markdown for a triage run, using deterministic guards when possible."""
         import asyncio
 
-        from qdash.common.copilot.agent import blocks_to_markdown, run_analysis
+        from qdash.copilot.agent import blocks_to_markdown, run_analysis
 
         if forced := TaskResultService._forced_ai_triage_markdown(
             task_name,

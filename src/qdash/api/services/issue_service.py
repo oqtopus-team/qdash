@@ -98,7 +98,7 @@ class IssueService:
         Falls back to a JSON code block when the conversion returns empty.
         Returns ``None`` only if even the fallback fails.
         """
-        from qdash.common.copilot.agent import blocks_to_markdown
+        from qdash.copilot.agent import blocks_to_markdown
 
         markdown_content = blocks_to_markdown(result)
         if markdown_content:

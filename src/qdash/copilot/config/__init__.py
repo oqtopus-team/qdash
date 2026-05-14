@@ -1,6 +1,6 @@
 """Copilot configuration models and YAML loader."""
 
-from qdash.common.copilot.config.settings import (
+from qdash.copilot.config.settings import (
     AnalysisConfig,
     CopilotConfig,
     EvaluationMetrics,

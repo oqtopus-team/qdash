@@ -6,11 +6,11 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from qdash.common.copilot.agent import _run_chat_completions, _run_responses_api, run_analysis
-from qdash.common.copilot.agent_runtime.execution import get_max_tool_rounds
-from qdash.common.copilot.agent_runtime.parsing import parse_response
-from qdash.common.copilot.config import CopilotConfig, ModelConfig
-from qdash.common.copilot.contracts import TaskAnalysisContext
+from qdash.copilot.agent import _run_chat_completions, _run_responses_api, run_analysis
+from qdash.copilot.agent_runtime.execution import get_max_tool_rounds
+from qdash.copilot.agent_runtime.parsing import parse_response
+from qdash.copilot.config import CopilotConfig, ModelConfig
+from qdash.copilot.contracts import TaskAnalysisContext
 
 
 def test_parse_response_accepts_review_triage_markdown_without_json() -> None:
@@ -232,15 +232,15 @@ async def test_run_analysis_translates_ollama_output_when_target_language_mismat
     )
 
     with (
-        patch("qdash.common.copilot.agent._build_client", return_value=client),
+        patch("qdash.copilot.agent._build_client", return_value=client),
         patch(
-            "qdash.common.copilot.agent._run_chat_completions",
+            "qdash.copilot.agent._run_chat_completions",
             new=AsyncMock(
                 return_value='{"summary":"한국어 요약","assessment":"good","explanation":"검토 분류\\n결정: PASS"}'
             ),
         ),
         patch(
-            "qdash.common.copilot.agent._translate_analysis_response",
+            "qdash.copilot.agent._translate_analysis_response",
             new=AsyncMock(return_value=translated),
         ) as translate_mock,
     ):

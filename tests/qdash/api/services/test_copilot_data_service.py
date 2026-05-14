@@ -5,8 +5,8 @@ from __future__ import annotations
 import math
 from unittest.mock import MagicMock, patch
 
-from qdash.common.copilot.config import AnalysisConfig, CopilotConfig, ModelConfig
-from qdash.common.copilot.runtime import FALLBACK_QUERY_LIMIT, CopilotRuntime
+from qdash.copilot.config import AnalysisConfig, CopilotConfig, ModelConfig
+from qdash.copilot.runtime import FALLBACK_QUERY_LIMIT, CopilotRuntime
 
 
 class TestLoadChipHeatmapValidation:

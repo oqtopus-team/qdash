@@ -8,14 +8,14 @@ from typing import TYPE_CHECKING, Any
 
 from openai import BadRequestError
 
-from qdash.common.copilot.agent_runtime.client import build_client
-from qdash.common.copilot.agent_runtime.parsing import strip_code_fences
+from qdash.copilot.agent_runtime.client import build_client
+from qdash.copilot.agent_runtime.parsing import strip_code_fences
 
 if TYPE_CHECKING:
-    from qdash.common.copilot.config import ModelConfig
-    from qdash.common.copilot.contracts import AnalysisResponse
+    from qdash.copilot.config import ModelConfig
+    from qdash.copilot.contracts import AnalysisResponse
 
-from qdash.common.copilot.config import CopilotConfig
+from qdash.copilot.config import CopilotConfig
 
 logger = logging.getLogger(__name__)
 

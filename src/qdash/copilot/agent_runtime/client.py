@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 from openai import AsyncOpenAI
 
 if TYPE_CHECKING:
-    from qdash.common.copilot.config import CopilotConfig
+    from qdash.copilot.config import CopilotConfig
 
 
 def build_client(config: CopilotConfig) -> AsyncOpenAI:
