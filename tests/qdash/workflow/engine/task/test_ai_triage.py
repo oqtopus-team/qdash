@@ -2,7 +2,7 @@
 
 from unittest.mock import MagicMock, patch
 
-from qdash.common.copilot.config import AnalysisConfig, CopilotConfig, ModelConfig
+from qdash.copilot.config import AnalysisConfig, CopilotConfig, ModelConfig
 from qdash.datamodel.execution import ExecutionModel, ExecutionStatusModel
 from qdash.datamodel.system_info import SystemInfoModel
 from qdash.datamodel.task import QubitTaskModel, TaskStatusModel
@@ -52,7 +52,7 @@ def _config() -> MagicMock:
 
 
 @patch("qdash.workflow.engine.task.ai_triage._EXECUTOR")
-@patch("qdash.common.copilot.config.load_copilot_config")
+@patch("qdash.copilot.config.load_copilot_config")
 def test_enqueue_skips_non_representative_resonator_spectroscopy(
     mock_load_config: MagicMock,
     mock_executor: MagicMock,
@@ -66,7 +66,7 @@ def test_enqueue_skips_non_representative_resonator_spectroscopy(
 
 
 @patch("qdash.workflow.engine.task.ai_triage._EXECUTOR")
-@patch("qdash.common.copilot.config.load_copilot_config")
+@patch("qdash.copilot.config.load_copilot_config")
 def test_enqueue_accepts_representative_resonator_spectroscopy(
     mock_load_config: MagicMock,
     mock_executor: MagicMock,
@@ -80,7 +80,7 @@ def test_enqueue_accepts_representative_resonator_spectroscopy(
 
 
 @patch("qdash.workflow.engine.task.ai_triage._EXECUTOR")
-@patch("qdash.common.copilot.config.load_copilot_config")
+@patch("qdash.copilot.config.load_copilot_config")
 def test_enqueue_accepts_failed_ai_triage_task(
     mock_load_config: MagicMock,
     mock_executor: MagicMock,
@@ -97,7 +97,7 @@ def test_enqueue_accepts_failed_ai_triage_task(
 
 
 @patch("qdash.workflow.engine.task.ai_triage._EXECUTOR")
-@patch("qdash.common.copilot.config.load_copilot_config")
+@patch("qdash.copilot.config.load_copilot_config")
 def test_enqueue_skips_running_ai_triage_task(
     mock_load_config: MagicMock,
     mock_executor: MagicMock,

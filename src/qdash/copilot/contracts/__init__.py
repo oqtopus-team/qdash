@@ -1,6 +1,6 @@
 """Shared request/response models for Copilot APIs and workflows."""
 
-from qdash.common.copilot.contracts.models import (
+from qdash.copilot.contracts.models import (
     AnalysisContextResult,
     AnalysisResponse,
     AnalyzeRequest,

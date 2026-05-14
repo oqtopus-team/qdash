@@ -37,7 +37,7 @@ from qdash.api.services.seed_import_service import SeedImportService
 from qdash.api.services.task_file_service import TaskFileService
 from qdash.api.services.task_result_service import TaskResultService
 from qdash.api.services.task_service import TaskService
-from qdash.common.copilot.runtime import CopilotRuntime
+from qdash.copilot.runtime import CopilotRuntime
 from qdash.repository import (
     MongoChipRepository,
     MongoExecutionCounterRepository,

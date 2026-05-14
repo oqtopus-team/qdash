@@ -7,8 +7,8 @@ from typing import TYPE_CHECKING, Any, cast
 from bunnet import SortDirection
 
 if TYPE_CHECKING:
-    from qdash.common.copilot.services.heatmap_service import TaskResultHistoryRepositoryProtocol
-    from qdash.common.copilot.services.provenance_context_service import ProvenanceServiceProtocol
+    from qdash.copilot.services.heatmap_service import TaskResultHistoryRepositoryProtocol
+    from qdash.copilot.services.provenance_context_service import ProvenanceServiceProtocol
     from qdash.dbmodel.calibration_note import CalibrationNoteDocument
     from qdash.dbmodel.chip import ChipDocument
     from qdash.dbmodel.coupling import CouplingDocument

@@ -9,10 +9,10 @@ Package layout:
 - ``prompts`` / ``tooling`` / ``services``: implementation details grouped by role
 """
 
-from qdash.common.copilot.agent import blocks_to_markdown, run_analysis, run_chat
-from qdash.common.copilot.config import CopilotConfig, ModelConfig, load_copilot_config
-from qdash.common.copilot.contracts import AnalysisResponse, ChatRequest, TaskAnalysisContext
-from qdash.common.copilot.runtime import CopilotRuntime
+from qdash.copilot.agent import blocks_to_markdown, run_analysis, run_chat
+from qdash.copilot.config import CopilotConfig, ModelConfig, load_copilot_config
+from qdash.copilot.contracts import AnalysisResponse, ChatRequest, TaskAnalysisContext
+from qdash.copilot.runtime import CopilotRuntime
 
 __all__ = [
     "AnalysisResponse",

@@ -17,43 +17,43 @@ import json
 import logging
 from typing import TYPE_CHECKING, Any
 
-from qdash.common.copilot.agent_runtime import client as _agent_client
-from qdash.common.copilot.agent_runtime import execution as _agent_execution
-from qdash.common.copilot.agent_runtime.parsing import (
+from qdash.copilot.agent_runtime import client as _agent_client
+from qdash.copilot.agent_runtime import execution as _agent_execution
+from qdash.copilot.agent_runtime.parsing import (
     has_real_blocks as _has_real_blocks,
 )
-from qdash.common.copilot.agent_runtime.parsing import (
+from qdash.copilot.agent_runtime.parsing import (
     parse_blocks_response as _parse_blocks_response,
 )
-from qdash.common.copilot.agent_runtime.parsing import (
+from qdash.copilot.agent_runtime.parsing import (
     parse_response as _parse_response,
 )
-from qdash.common.copilot.agent_runtime.rendering import (
+from qdash.copilot.agent_runtime.rendering import (
     legacy_to_blocks as _legacy_to_blocks,
 )
-from qdash.common.copilot.agent_runtime.schemas import BLOCKS_RESPONSE_SCHEMA
-from qdash.common.copilot.agent_runtime.translation import (
+from qdash.copilot.agent_runtime.schemas import BLOCKS_RESPONSE_SCHEMA
+from qdash.copilot.agent_runtime.translation import (
     translate_analysis_response as _translate_analysis_response_impl,
 )
-from qdash.common.copilot.prompts.analysis import build_analysis_system_prompt
-from qdash.common.copilot.prompts.chat import (
+from qdash.copilot.prompts.analysis import build_analysis_system_prompt
+from qdash.copilot.prompts.chat import (
     CHART_SYSTEM_PROMPT,
     CHAT_COMPLETIONS_STRICT_EMULATION,
     build_chat_system_prompt,
 )
-from qdash.common.copilot.prompts.models import AnalysisPromptOptions, ChatPromptContext
+from qdash.copilot.prompts.models import AnalysisPromptOptions, ChatPromptContext
 
 if TYPE_CHECKING:
     from openai import AsyncOpenAI
 
-    from qdash.common.copilot.agent_runtime.types import (
+    from qdash.copilot.agent_runtime.types import (
         OnStatusHook,
         OnToolCallHook,
         ToolExecutors,
     )
-    from qdash.common.copilot.config import CopilotConfig, ModelConfig
-    from qdash.common.copilot.contracts import AnalysisResponse, TaskAnalysisContext
-    from qdash.common.copilot.tooling.sandbox import SandboxChartSpec
+    from qdash.copilot.config import CopilotConfig, ModelConfig
+    from qdash.copilot.contracts import AnalysisResponse, TaskAnalysisContext
+    from qdash.copilot.tooling.sandbox import SandboxChartSpec
 
 logger = logging.getLogger(__name__)
 

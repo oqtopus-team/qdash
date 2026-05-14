@@ -7,11 +7,11 @@ import logging
 import re
 from typing import TYPE_CHECKING, Any
 
-from qdash.common.copilot.agent_runtime.rendering import legacy_to_blocks
-from qdash.common.copilot.contracts import AnalysisResponse
+from qdash.copilot.agent_runtime.rendering import legacy_to_blocks
+from qdash.copilot.contracts import AnalysisResponse
 
 if TYPE_CHECKING:
-    from qdash.common.copilot.config import CopilotConfig
+    from qdash.copilot.config import CopilotConfig
 
 logger = logging.getLogger(__name__)
 

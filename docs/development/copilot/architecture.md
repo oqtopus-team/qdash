@@ -20,7 +20,7 @@ Both modes use the same underlying LLM agent with tool-calling capabilities, san
 | `src/qdash/api/routers/copilot.py` | FastAPI router with `/config`, `/analyze`, `/analyze/stream`, `/chat/stream` endpoints; SSE event generation via `SSETaskBridge` |
 | `src/qdash/api/services/copilot_data_service.py` | Data loading service: `build_analysis_context()`, `build_images_sent_metadata()`, qubit/task/history queries, tool executor wiring |
 | `src/qdash/api/lib/copilot_agent.py` | LLM agent: system prompt construction, OpenAI Responses API calls, tool call loop, response parsing |
-| `src/qdash/common/copilot/` | Shared Copilot runtime used outside the API process, including workflow-side automatic triage |
+| `src/qdash/copilot/` | Shared Copilot runtime used outside the API process, including workflow-side automatic triage |
 | `src/qdash/workflow/engine/task/ai_triage.py` | Asynchronous task-result triage hook that writes AI review notes to task history |
 | `src/qdash/api/lib/copilot_sandbox.py` | Sandboxed Python execution: AST validation, restricted builtins, resource limits |
 | `src/qdash/api/lib/copilot_analysis.py` | Pydantic models: `TaskAnalysisContext`, `AnalysisResponse`, `AnalysisContextResult`; request schemas |

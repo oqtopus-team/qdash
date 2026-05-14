@@ -9,20 +9,20 @@ from typing import TYPE_CHECKING, Any, cast
 
 from openai import AsyncOpenAI, BadRequestError
 
-from qdash.common.copilot.agent_runtime.rendering import build_llm_summary
-from qdash.common.copilot.agent_runtime.schemas import ANALYSIS_RESPONSE_SCHEMA
-from qdash.common.copilot.tooling.schemas import AGENT_TOOLS
+from qdash.copilot.agent_runtime.rendering import build_llm_summary
+from qdash.copilot.agent_runtime.schemas import ANALYSIS_RESPONSE_SCHEMA
+from qdash.copilot.tooling.schemas import AGENT_TOOLS
 
 if TYPE_CHECKING:
-    from qdash.common.copilot.agent_runtime.types import (
+    from qdash.copilot.agent_runtime.types import (
         OnStatusHook,
         OnToolCallHook,
         StoredToolKey,
         ToolExecutor,
         ToolExecutors,
     )
-    from qdash.common.copilot.config import CopilotConfig
-    from qdash.common.copilot.tooling.sandbox import SandboxChartSpec, SandboxResult
+    from qdash.copilot.config import CopilotConfig
+    from qdash.copilot.tooling.sandbox import SandboxChartSpec, SandboxResult
 
 logger = logging.getLogger(__name__)
 
@@ -87,7 +87,7 @@ def wrap_tool_executors(
         wrapped["generate_chip_heatmap"] = heatmap_wrapper
 
     def python_wrapper(args: dict[str, Any]) -> SandboxResult | dict[str, Any]:
-        from qdash.common.copilot.tooling.sandbox import execute_python_analysis
+        from qdash.copilot.tooling.sandbox import execute_python_analysis
 
         result = execute_python_analysis(args["code"], data_store)
         if isinstance(result, dict) and result.get("chart"):

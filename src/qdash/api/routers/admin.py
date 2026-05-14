@@ -23,7 +23,7 @@ from qdash.api.schemas.auth import User
 from qdash.api.services.admin_service import AdminService
 from qdash.common.config.loader import ConfigLoader
 from qdash.common.config.metrics import clear_metrics_config_cache
-from qdash.common.copilot.config import clear_copilot_config_cache
+from qdash.copilot.config import clear_copilot_config_cache
 
 logger = logging.getLogger(__name__)
 
