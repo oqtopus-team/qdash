@@ -6,7 +6,8 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from qdash.common.copilot.agent import _run_chat_completions, run_analysis
+from qdash.common.copilot.agent import _run_chat_completions, _run_responses_api, run_analysis
+from qdash.common.copilot.agent_runtime.execution import get_max_tool_rounds
 from qdash.common.copilot.agent_runtime.parsing import parse_response
 from qdash.common.copilot.config import CopilotConfig, ModelConfig
 from qdash.common.copilot.contracts import TaskAnalysisContext
@@ -113,6 +114,84 @@ async def test_run_chat_completions_uses_reasoning_when_content_is_empty() -> No
     content = await _run_chat_completions(client, [{"role": "user", "content": "hi"}], config)
 
     assert content == "reasoning triage text"
+
+
+def test_get_max_tool_rounds_uses_higher_budget_for_ollama() -> None:
+    ollama_config = CopilotConfig(model=ModelConfig(provider="ollama", name="gemma4:27b"))
+    openai_config = CopilotConfig(model=ModelConfig(provider="openai", name="gpt-5"))
+
+    assert get_max_tool_rounds(ollama_config) == 16
+    assert get_max_tool_rounds(openai_config) == 10
+
+
+@pytest.mark.asyncio
+async def test_run_responses_api_finalizes_after_repeated_identical_tool_calls() -> None:
+    captured_final_input: list[dict[str, Any]] = []
+
+    class _FunctionCallItem:
+        type = "function_call"
+
+        def __init__(self, *, name: str, arguments: str, call_id: str) -> None:
+            self.name = name
+            self.arguments = arguments
+            self.call_id = call_id
+
+        def model_dump(self) -> dict[str, Any]:
+            return {
+                "type": "function_call",
+                "name": self.name,
+                "arguments": self.arguments,
+                "call_id": self.call_id,
+            }
+
+    class _Responses:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        async def create(self, **kwargs):
+            self.calls += 1
+            if self.calls <= 4:
+                return SimpleNamespace(
+                    output=[
+                        _FunctionCallItem(
+                            name="execute_python_analysis",
+                            arguments='{"code":"result = 1"}',
+                            call_id=f"call-{self.calls}",
+                        )
+                    ],
+                    output_text=None,
+                )
+
+            nonlocal captured_final_input
+            captured_final_input = kwargs["input"]
+            return SimpleNamespace(
+                output=[],
+                output_text='{"blocks":[{"type":"text","content":"best effort","chart":null}],"assessment":"warning"}',
+            )
+
+    client: Any = SimpleNamespace(responses=_Responses())
+    config = CopilotConfig(
+        model=ModelConfig(
+            provider="ollama",
+            name="gemma4:27b",
+            temperature=0,
+        )
+    )
+
+    content = await _run_responses_api(
+        client,
+        "system",
+        [{"role": "user", "content": [{"type": "input_text", "text": "hi"}]}],
+        config,
+        {"execute_python_analysis": lambda _args: {"output": "ok"}},
+    )
+
+    assert "best effort" in content
+    assert captured_final_input[-1]["role"] == "user"
+    assert "Do not call any more tools." in captured_final_input[-1]["content"][0]["text"]
+    assert (
+        "Detected repeated identical tool calls" in captured_final_input[-1]["content"][0]["text"]
+    )
 
 
 @pytest.mark.asyncio
