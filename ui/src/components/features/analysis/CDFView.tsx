@@ -919,10 +919,11 @@ export function CDFView() {
 
       {/* Data Table */}
       <div className="card bg-base-100 shadow-md">
-        <div className="card-body">
+        <div className="card-body px-2 sm:px-8">
           <DataTable
             title="Data Points"
             data={combinedTableData}
+            className="px-2 sm:px-8"
             columns={[
               { key: "qid", label: "Entity ID", sortable: true },
               ...selectedParameters.map((param) => {
