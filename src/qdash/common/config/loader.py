@@ -26,7 +26,7 @@ class ConfigLoader:
     """Unified configuration loader with local override support."""
 
     _CONFIG_DIR: Path = CONFIG_DIR
-    LOCAL_CONFIG_DIR: Path = Path(__file__).parent.parent.parent.parent.parent / "config"
+    LOCAL_CONFIG_DIR: Path = Path(__file__).resolve().parents[4] / "config"
 
     @classmethod
     def get_config_dir(cls) -> Path:
