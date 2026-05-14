@@ -9,7 +9,6 @@ from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
 
 from qdash.api.dependencies import get_metrics_service
-from qdash.api.lib.metrics_config import load_metrics_config
 from qdash.api.lib.project import (
     ProjectContext,
     get_project_context,
@@ -19,6 +18,7 @@ from qdash.api.schemas.metrics import (
     QubitMetricHistoryResponse,
 )
 from qdash.api.services.metrics_service import MetricsService
+from qdash.common.config.metrics import load_metrics_config
 
 router = APIRouter()
 logger = logging.getLogger(__name__)

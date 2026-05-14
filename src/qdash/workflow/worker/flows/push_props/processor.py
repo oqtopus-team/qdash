@@ -3,7 +3,7 @@ from typing import Any, TypeVar
 
 from pydantic import BaseModel
 
-from qdash.common.datetime_utils import now, to_datetime
+from qdash.common.utils.datetime import now, to_datetime
 
 T = TypeVar("T", bound=BaseModel)
 

@@ -23,7 +23,7 @@ from qdash.api.schemas.admin import (
     UserListResponse,
 )
 from qdash.api.services.auth_service import generate_temporary_password
-from qdash.common.datetime_utils import now
+from qdash.common.utils.datetime import now
 from qdash.datamodel.system_info import SystemInfoModel
 from qdash.datamodel.user import (
     USERNAME_PATTERN_DESCRIPTION,

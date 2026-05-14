@@ -1,14 +1,4 @@
-"""Datetime utilities for QDash application.
-
-This module provides centralized datetime handling with consistent timezone support.
-All datetime operations should use these utilities to ensure consistency across the application.
-
-Design decisions:
-- All persisted datetimes are stored in UTC
-- Configured timezone (default: Asia/Tokyo) is used only for calendar/date labels
-- pendulum is used for timezone-aware datetime operations
-- Standard datetime objects are used for MongoDB compatibility
-"""
+"""Datetime utilities for QDash application."""
 
 from datetime import UTC, datetime, timedelta
 from functools import lru_cache
@@ -17,17 +7,13 @@ import pendulum
 from pendulum import DateTime as PendulumDateTime
 
 DEFAULT_TIMEZONE = "Asia/Tokyo"
+MAX_ELAPSED_TIME_STRING_LENGTH = 100
+MAX_ELAPSED_TIME_SECONDS = 365 * 24 * 3600
 
 
 @lru_cache(maxsize=1)
 def get_timezone() -> str:
-    """Get the configured timezone.
-
-    Returns
-    -------
-        str: Timezone string (e.g., "Asia/Tokyo")
-
-    """
+    """Get the configured timezone."""
     try:
         from qdash.config import get_settings
 
@@ -37,15 +23,7 @@ def get_timezone() -> str:
 
 
 def now() -> datetime:
-    """Get current datetime in UTC.
-
-    Returns a timezone-aware standard datetime object in UTC for DB/API storage.
-
-    Returns
-    -------
-        datetime: Current datetime in UTC
-
-    """
+    """Get current datetime in UTC."""
     return datetime.now(UTC)
 
 
@@ -65,37 +43,16 @@ def local_now() -> datetime:
 
 
 def now_iso() -> str:
-    """Get current datetime as ISO8601 string.
-
-    Returns
-    -------
-        str: Current datetime in ISO8601 format
-
-    """
+    """Get current datetime as ISO8601 string."""
     return now().isoformat()
 
 
 def ensure_timezone(value: datetime | None) -> datetime | None:
-    """Ensure datetime is timezone-aware.
-
-    MongoDB returns naive datetimes (assumed UTC). This function converts them
-    to timezone-aware datetimes in UTC, which can then be compared with other
-    timezone-aware datetimes.
-
-    Args:
-    ----
-        value: datetime that may or may not have timezone info
-
-    Returns:
-    -------
-        datetime: Timezone-aware datetime, or None if input is None
-
-    """
+    """Ensure datetime is timezone-aware."""
     if value is None:
         return None
     if value.tzinfo is not None:
         value = value.astimezone(UTC)
-        # Convert pendulum DateTime to standard datetime for JSON serialization
         if isinstance(value, PendulumDateTime):
             return datetime(
                 value.year,
@@ -108,24 +65,14 @@ def ensure_timezone(value: datetime | None) -> datetime | None:
                 tzinfo=value.tzinfo,
             )
         return value
-    # Naive datetime from MongoDB is in UTC - convert to standard datetime with UTC
+
     from datetime import timezone as dt_timezone
 
     return value.replace(tzinfo=dt_timezone.utc)
 
 
 def to_datetime(value: str | datetime | PendulumDateTime | None) -> datetime | None:
-    """Convert various datetime representations to datetime object.
-
-    Args:
-    ----
-        value: String (ISO8601), datetime, or pendulum DateTime
-
-    Returns:
-    -------
-        datetime: Converted datetime object, or None if input is None
-
-    """
+    """Convert various datetime representations to datetime object."""
     if value is None:
         return None
     if isinstance(value, PendulumDateTime):
@@ -163,17 +110,7 @@ def to_datetime(value: str | datetime | PendulumDateTime | None) -> datetime | N
 
 
 def to_pendulum(value: str | datetime | PendulumDateTime | None) -> PendulumDateTime | None:
-    """Convert various datetime representations to pendulum DateTime.
-
-    Args:
-    ----
-        value: String (ISO8601), datetime, or pendulum DateTime
-
-    Returns:
-    -------
-        PendulumDateTime: Converted pendulum DateTime, or None if input is None
-
-    """
+    """Convert various datetime representations to pendulum DateTime."""
     if value is None:
         return None
     if isinstance(value, PendulumDateTime):
@@ -189,17 +126,7 @@ def to_pendulum(value: str | datetime | PendulumDateTime | None) -> PendulumDate
 
 
 def format_iso(dt: datetime | PendulumDateTime | None) -> str | None:
-    """Format datetime as ISO8601 string.
-
-    Args:
-    ----
-        dt: datetime or pendulum DateTime object
-
-    Returns:
-    -------
-        str: ISO8601 formatted string, or None if input is None
-
-    """
+    """Format datetime as ISO8601 string."""
     if dt is None:
         return None
     normalized = ensure_timezone(dt)
@@ -209,23 +136,8 @@ def format_iso(dt: datetime | PendulumDateTime | None) -> str | None:
 
 
 def calculate_elapsed_time(start: datetime, end: datetime) -> timedelta:
-    """Calculate elapsed time between two datetimes.
-
-    Handles mixed timezone-aware and naive datetimes by normalizing both.
-    Naive datetimes are assumed to be in the configured timezone.
-
-    Args:
-    ----
-        start: Start datetime
-        end: End datetime
-
-    Returns:
-    -------
-        timedelta: Elapsed time
-
-    """
+    """Calculate elapsed time between two datetimes."""
     tz = get_timezone()
-    # Normalize both to pendulum instances for consistent timezone handling
     start_p = pendulum.instance(start) if start.tzinfo else pendulum.instance(start, tz=tz)
     end_p = pendulum.instance(end) if end.tzinfo else pendulum.instance(end, tz=tz)
     diff = end_p.diff(start_p)
@@ -233,58 +145,15 @@ def calculate_elapsed_time(start: datetime, end: datetime) -> timedelta:
 
 
 def format_elapsed_time(elapsed: timedelta) -> str:
-    """Format elapsed time as human-readable string.
-
-    Args:
-    ----
-        elapsed: Elapsed time as timedelta
-
-    Returns:
-    -------
-        str: Formatted elapsed time (e.g., "1:23:45" or "0:00:30")
-
-    """
+    """Format elapsed time as human-readable string."""
     total_seconds = int(elapsed.total_seconds())
     hours, remainder = divmod(total_seconds, 3600)
     minutes, seconds = divmod(remainder, 60)
     return f"{hours}:{minutes:02d}:{seconds:02d}"
 
 
-MAX_ELAPSED_TIME_STRING_LENGTH = 100  # Prevent DoS from extremely long strings
-MAX_ELAPSED_TIME_SECONDS = 365 * 24 * 3600  # 1 year maximum
-
-
 def parse_elapsed_time(elapsed_str: str | timedelta | int | float | None) -> timedelta | None:
-    """Parse elapsed time string to timedelta.
-
-    Supports multiple formats:
-    - "1:23:45" (HH:MM:SS)
-    - "23:45" (MM:SS)
-    - "38 seconds", "38 second"
-    - "1 minute", "13 minutes"
-    - "1 hour", "2 hours"
-    - "1 hour 30 minutes"
-    - timedelta objects (pass through)
-    - int/float (interpreted as seconds)
-
-    Input validation:
-    - String inputs are limited to MAX_ELAPSED_TIME_STRING_LENGTH characters
-    - Parsed values are capped at MAX_ELAPSED_TIME_SECONDS (1 year)
-    - Negative values raise ValueError
-
-    Args:
-    ----
-        elapsed_str: Elapsed time string, timedelta, or number of seconds
-
-    Returns:
-    -------
-        timedelta: Parsed elapsed time, or None if input is None
-
-    Raises:
-    ------
-        ValueError: If string is too long, value is negative, or exceeds maximum
-
-    """
+    """Parse elapsed time string to timedelta."""
     import re
 
     if elapsed_str is None:
@@ -306,14 +175,11 @@ def parse_elapsed_time(elapsed_str: str | timedelta | int | float | None) -> tim
     elapsed_str = str(elapsed_str).strip()
     if not elapsed_str:
         return None
-
-    # Validate string length
     if len(elapsed_str) > MAX_ELAPSED_TIME_STRING_LENGTH:
         raise ValueError(
             f"Elapsed time string too long ({len(elapsed_str)} > {MAX_ELAPSED_TIME_STRING_LENGTH})"
         )
 
-    # Try HH:MM:SS or MM:SS format first
     parts = elapsed_str.split(":")
     if len(parts) == 3:
         try:
@@ -328,11 +194,7 @@ def parse_elapsed_time(elapsed_str: str | timedelta | int | float | None) -> tim
         except ValueError:
             pass
 
-    # Parse human-readable format like "38 seconds", "1 minute", "2 hours 30 minutes"
     total_seconds = 0.0
-
-    # Match patterns like "38 seconds", "1.5 hours", etc.
-    # Use word boundaries and order from longest to shortest to avoid overlap
     patterns = [
         (r"([\d.]+)\s*(?:seconds|second)\b", 1),
         (r"([\d.]+)\s*(?:minutes|minute)\b", 60),
@@ -351,8 +213,6 @@ def parse_elapsed_time(elapsed_str: str | timedelta | int | float | None) -> tim
     if matched:
         return timedelta(seconds=total_seconds)
 
-    # Handle approximate formats from pendulum (no numbers)
-    # These formats may appear in legacy data or from pendulum.diff().in_words()
     lower_str = elapsed_str.lower()
     if "few second" in lower_str:
         return timedelta(seconds=5)
@@ -363,7 +223,6 @@ def parse_elapsed_time(elapsed_str: str | timedelta | int | float | None) -> tim
     if "hour" in lower_str:
         return timedelta(hours=1)
 
-    # Try to parse as a plain number (assume seconds)
     try:
         return timedelta(seconds=float(elapsed_str))
     except ValueError:
@@ -373,18 +232,7 @@ def parse_elapsed_time(elapsed_str: str | timedelta | int | float | None) -> tim
 
 
 def parse_date(date_str: str, fmt: str = "YYYYMMDD") -> datetime:
-    """Parse date string to datetime in configured timezone.
-
-    Args:
-    ----
-        date_str: Date string (e.g., "20240101")
-        fmt: Format string in pendulum format (default: "YYYYMMDD")
-
-    Returns:
-    -------
-        datetime: Parsed datetime in configured timezone
-
-    """
+    """Parse date string to datetime in configured timezone."""
     tz = get_timezone()
     parsed = pendulum.from_format(date_str, fmt, tz=tz)
     return datetime(
@@ -400,17 +248,7 @@ def parse_date(date_str: str, fmt: str = "YYYYMMDD") -> datetime:
 
 
 def start_of_day(dt: datetime) -> datetime:
-    """Get the start of day for a datetime.
-
-    Args:
-    ----
-        dt: datetime object
-
-    Returns:
-    -------
-        datetime: Start of day (00:00:00)
-
-    """
+    """Get the start of day for a datetime."""
     pdt = pendulum.instance(dt)
     start = pdt.start_of("day")
     return datetime(
@@ -426,17 +264,7 @@ def start_of_day(dt: datetime) -> datetime:
 
 
 def end_of_day(dt: datetime) -> datetime:
-    """Get the end of day for a datetime.
-
-    Args:
-    ----
-        dt: datetime object
-
-    Returns:
-    -------
-        datetime: End of day (23:59:59.999999)
-
-    """
+    """Get the end of day for a datetime."""
     pdt = pendulum.instance(dt)
     end = pdt.end_of("day")
     return datetime(

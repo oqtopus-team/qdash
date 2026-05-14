@@ -11,8 +11,8 @@ from git import Repo
 from git.exc import GitCommandError, InvalidGitRepositoryError
 from prefect import get_run_logger, task
 
-from qdash.common.datetime_utils import now_iso
-from qdash.common.paths import QUBEX_CONFIG_BASE
+from qdash.common.config.paths import QUBEX_CONFIG_BASE
+from qdash.common.utils.datetime import now_iso
 
 if TYPE_CHECKING:
     import logging

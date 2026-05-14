@@ -15,8 +15,8 @@ class TestLoadChipHeatmapValidation:
     def setup_method(self):
         self.service = CopilotRuntime()
 
-    @patch("qdash.api.lib.metrics_config.load_metrics_config")
-    @patch("qdash.api.lib.metrics_config.get_qubit_metric_metadata", return_value=None)
+    @patch("qdash.common.config.metrics.load_metrics_config")
+    @patch("qdash.common.config.metrics.get_qubit_metric_metadata", return_value=None)
     def test_unknown_metric_returns_error(self, _mock_meta, mock_config):
         mock_config.return_value = MagicMock(qubit_metrics={"t1": None, "t2_echo": None})
         result = self.service.load_chip_heatmap("chip-1", "nonexistent_metric")
@@ -25,7 +25,7 @@ class TestLoadChipHeatmapValidation:
         assert "nonexistent_metric" in result["error"]
 
     @patch("qdash.dbmodel.chip.ChipDocument")
-    @patch("qdash.api.lib.metrics_config.get_qubit_metric_metadata")
+    @patch("qdash.common.config.metrics.get_qubit_metric_metadata")
     def test_chip_not_found_returns_error(self, mock_meta, mock_chip_doc):
         mock_meta.return_value = MagicMock()
         mock_chip_doc.find_one.return_value.run.return_value = None
@@ -34,9 +34,9 @@ class TestLoadChipHeatmapValidation:
         assert "not found" in result["error"]
 
     @patch("qdash.repository.task_result_history.MongoTaskResultHistoryRepository")
-    @patch("qdash.common.topology_config.load_topology")
+    @patch("qdash.common.config.topology.load_topology")
     @patch("qdash.dbmodel.chip.ChipDocument")
-    @patch("qdash.api.lib.metrics_config.get_qubit_metric_metadata")
+    @patch("qdash.common.config.metrics.get_qubit_metric_metadata")
     def test_no_data_returns_error(self, mock_meta, mock_chip_doc, _mock_topo, mock_repo):
         meta = MagicMock()
         meta.evaluation.mode = "maximize"
@@ -58,9 +58,9 @@ class TestLoadChipHeatmapValidation:
         assert "No data found" in result["error"]
 
     @patch("qdash.repository.task_result_history.MongoTaskResultHistoryRepository")
-    @patch("qdash.common.topology_config.load_topology")
+    @patch("qdash.common.config.topology.load_topology")
     @patch("qdash.dbmodel.chip.ChipDocument")
-    @patch("qdash.api.lib.metrics_config.get_qubit_metric_metadata")
+    @patch("qdash.common.config.metrics.get_qubit_metric_metadata")
     def test_topology_load_failure_falls_back_to_grid(
         self, mock_meta, mock_chip_doc, mock_topo, mock_repo
     ):
@@ -92,7 +92,7 @@ class TestLoadChipHeatmapValidation:
 
     @patch("qdash.repository.task_result_history.MongoTaskResultHistoryRepository")
     @patch("qdash.dbmodel.chip.ChipDocument")
-    @patch("qdash.api.lib.metrics_config.get_qubit_metric_metadata")
+    @patch("qdash.common.config.metrics.get_qubit_metric_metadata")
     def test_aggregation_error_returns_error(self, mock_meta, mock_chip_doc, mock_repo):
         meta = MagicMock()
         meta.evaluation.mode = "maximize"
@@ -119,7 +119,7 @@ class TestLoadChipHeatmapSuccess:
 
     @patch("qdash.repository.task_result_history.MongoTaskResultHistoryRepository")
     @patch("qdash.dbmodel.chip.ChipDocument")
-    @patch("qdash.api.lib.metrics_config.get_qubit_metric_metadata")
+    @patch("qdash.common.config.metrics.get_qubit_metric_metadata")
     def test_successful_heatmap_has_chart_and_statistics(self, mock_meta, mock_chip_doc, mock_repo):
         meta = MagicMock()
         meta.evaluation.mode = "maximize"

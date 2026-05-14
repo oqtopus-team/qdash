@@ -1,9 +1,9 @@
 """Centralized logging configuration for the QDash Workflow services.
 
-Delegates to the shared YAML-based loader in :mod:`qdash.common.logging`.
+Delegates to the shared YAML-based loader in :mod:`qdash.common.infrastructure.logging`.
 """
 
-from qdash.common.logging import setup_logging as _setup
+from qdash.common.infrastructure.logging import setup_logging as _setup
 
 
 def setup_logging(service_name: str = "workflow") -> None:

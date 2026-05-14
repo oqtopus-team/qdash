@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from qdash.repository.protocols import ExecutionCounterRepository
 
-from qdash.common.datetime_utils import local_now
+from qdash.common.utils.datetime import local_now
 
 logger = logging.getLogger(__name__)
 

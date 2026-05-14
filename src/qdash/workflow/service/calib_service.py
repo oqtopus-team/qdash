@@ -50,8 +50,8 @@ if TYPE_CHECKING:
 
 from prefect import get_run_logger
 
-from qdash.common.backend_config import get_default_backend
-from qdash.common.datetime_utils import now
+from qdash.common.config.backend import get_default_backend
+from qdash.common.utils.datetime import now
 from qdash.workflow.engine import CalibConfig, CalibOrchestrator
 from qdash.workflow.engine.params_updater import get_params_updater
 from qdash.workflow.service.execution_id import generate_execution_id
@@ -109,7 +109,7 @@ def _cancel_executions_by_flow_run_id(
     _logger: Any,
 ) -> None:
     """Find executions with the given flow_run_id in note and mark as cancelled."""
-    from qdash.common.datetime_utils import now
+    from qdash.common.utils.datetime import now
     from qdash.dbmodel.execution_history import ExecutionHistoryDocument
     from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
 

@@ -58,7 +58,7 @@ from qdash.workflow.engine.scheduler.cr_utils import (
 )
 
 if TYPE_CHECKING:
-    from qdash.common.topology_config import TopologyDefinition
+    from qdash.common.config.topology import TopologyDefinition
     from qdash.datamodel.chip import ChipModel
     from qdash.repository.protocols import ChipRepository
 
@@ -229,7 +229,7 @@ class CRScheduler:
             chip = self._load_chip_data()
             if chip.topology_id:
                 try:
-                    from qdash.common.topology_config import load_topology
+                    from qdash.common.config.topology import load_topology
 
                     self._topology = load_topology(chip.topology_id)
                 except FileNotFoundError:

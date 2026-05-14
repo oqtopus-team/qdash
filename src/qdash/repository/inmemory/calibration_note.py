@@ -6,7 +6,7 @@ useful for unit testing without requiring a MongoDB instance.
 
 from typing import Any
 
-from qdash.common.datetime_utils import now
+from qdash.common.utils.datetime import now
 from qdash.datamodel.calibration_note import CalibrationNoteModel
 
 

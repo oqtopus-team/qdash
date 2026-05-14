@@ -26,7 +26,7 @@ from qdash.api.schemas.task_result import (
     TimeSeriesData,
     TimeSeriesProjection,
 )
-from qdash.common.datetime_utils import (
+from qdash.common.utils.datetime import (
     end_of_day,
     now,
     parse_date,
@@ -777,7 +777,7 @@ class TaskResultService:
         """Insert or replace the AI triage section in the task-result note."""
         import re
 
-        from qdash.common.datetime_utils import now
+        from qdash.common.utils.datetime import now
         from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
 
         section_re = re.compile(r"^## AI triage\n\n.*?(?:\n\n---\n\n|$)", re.DOTALL)

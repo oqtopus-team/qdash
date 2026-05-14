@@ -6,8 +6,8 @@ from typing import Any
 from prefect import task
 from pydantic import BaseModel, Field
 
-from qdash.common.datetime_utils import now
-from qdash.common.qubit_utils import qid_to_label, qid_to_label_from_chip
+from qdash.common.domain.qubit import qid_to_label, qid_to_label_from_chip
+from qdash.common.utils.datetime import now
 from qdash.datamodel.task import TaskModel
 from qdash.workflow.calibtasks.base import BaseTask
 

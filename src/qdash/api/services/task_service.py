@@ -22,7 +22,7 @@ from qdash.api.schemas.task import (
     TaskResponse,
     TaskResultResponse,
 )
-from qdash.common.config_loader import ConfigLoader
+from qdash.common.config.loader import ConfigLoader
 from qdash.datamodel.task_knowledge import (
     CATEGORY_DISPLAY_NAMES,
 )

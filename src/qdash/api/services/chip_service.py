@@ -10,7 +10,6 @@ from typing import Any
 
 from starlette.exceptions import HTTPException
 
-from qdash.api.lib.metrics_config import load_metrics_config
 from qdash.api.schemas.chip import (
     ChipDeletionImpactResponse,
     ChipResponse,
@@ -23,7 +22,8 @@ from qdash.api.schemas.chip import (
     UpdateChipRequest,
 )
 from qdash.api.schemas.success import SuccessResponse
-from qdash.common.datetime_utils import now
+from qdash.common.config.metrics import load_metrics_config
+from qdash.common.utils.datetime import now
 from qdash.datamodel.note import NoteModel
 from qdash.dbmodel.chip import ChipDocument
 from qdash.dbmodel.cooldown import CooldownDocument
@@ -48,8 +48,8 @@ def _get_task_names_cached() -> tuple[str, ...]:
     Returns a tuple for cache compatibility.
     """
     from qdash.api.dependencies import get_task_file_service
-    from qdash.api.lib.config_loader import ConfigLoader
-    from qdash.common.paths import CALIBTASKS_DIR
+    from qdash.common.config.loader import ConfigLoader
+    from qdash.common.config.paths import CALIBTASKS_DIR
 
     default_backend = "qubex"
     try:

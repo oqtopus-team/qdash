@@ -18,7 +18,7 @@ from qdash.api.schemas.calibration import (
     ManualParameterUpdateRequest,
     ManualParameterUpdateResponse,
 )
-from qdash.common.datetime_utils import now
+from qdash.common.utils.datetime import now
 from qdash.datamodel.system_info import SystemInfoModel
 from qdash.dbmodel.provenance import ParameterVersionDocument, ProvenanceRelationType
 from qdash.dbmodel.task_result_history import TaskResultHistoryDocument

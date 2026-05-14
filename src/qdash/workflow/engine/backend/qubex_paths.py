@@ -1,7 +1,7 @@
 """Path resolution for Qubex backend.
 
 This module provides path management for Qubex-specific directories and
-configuration files. Base paths are imported from qdash.common.paths.
+configuration files. Base paths are imported from qdash.common.config.paths.
 
 For host-side path customization, use .env and docker-compose.yaml volume mounts.
 """
@@ -11,7 +11,7 @@ from __future__ import annotations
 from pathlib import Path
 
 # Re-export base path from common module
-from qdash.common.paths import QUBEX_CONFIG_BASE
+from qdash.common.config.paths import QUBEX_CONFIG_BASE
 
 # Qubex-specific paths
 DEFAULT_CALIB_NOTE_PATH = Path("/app/calib_note.json")

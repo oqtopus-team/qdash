@@ -24,7 +24,7 @@ from qdash.api.schemas.flow import (
     SaveFlowRequest,
     SaveFlowResponse,
 )
-from qdash.common.paths import SERVICE_DIR, TEMPLATES_DIR, USER_FLOWS_DIR
+from qdash.common.config.paths import SERVICE_DIR, TEMPLATES_DIR, USER_FLOWS_DIR
 from qdash.config import get_settings
 
 if TYPE_CHECKING:

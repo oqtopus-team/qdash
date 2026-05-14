@@ -13,14 +13,14 @@ from typing import TYPE_CHECKING, Any, Literal
 from bunnet import SortDirection
 from fastapi import HTTPException
 
-from qdash.api.lib.metrics_config import load_metrics_config
 from qdash.api.schemas.metrics import (
     ChipMetricsResponse,
     MetricHistoryItem,
     MetricValue,
     QubitMetricHistoryResponse,
 )
-from qdash.common.datetime_utils import local_now, now, to_datetime
+from qdash.common.config.metrics import load_metrics_config
+from qdash.common.utils.datetime import local_now, now, to_datetime
 
 if TYPE_CHECKING:
     from io import BytesIO
