@@ -13,6 +13,8 @@ import numpy as np
 import numpy.typing as npt
 import plotly.graph_objs as go
 
+from qdash.figure_metadata import figure_role_suffix
+
 logger = logging.getLogger(__name__)
 
 
@@ -152,14 +154,19 @@ class FilesystemCalibDataSaver:
         json_paths: list[str] = []
 
         for i, fig in enumerate(figures):
+            figure_suffix = figure_role_suffix(fig)
             # Save PNG
-            png_filename = self._build_filename(task_name, task_type, qid, "", "png", i)
+            png_filename = self._build_filename(
+                task_name, task_type, qid, figure_suffix, "png", i
+            )
             png_path = self._resolve_conflict(fig_dir / png_filename)
             fig.write_image(str(png_path))
             png_paths.append(str(png_path))
 
             # Save JSON
-            json_filename = self._build_filename(task_name, task_type, qid, "", "json", i)
+            json_filename = self._build_filename(
+                task_name, task_type, qid, figure_suffix, "json", i
+            )
             json_path = self._resolve_conflict(fig_dir / json_filename)
             fig.write_json(str(json_path))
             json_paths.append(str(json_path))

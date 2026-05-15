@@ -134,9 +134,9 @@ def _bundle_context(tmp_path: Path) -> AITriageBundleContext:
 
 
 def _analysis_context_result(tmp_path: Path) -> AnalysisContextResult:
-    figure_png = tmp_path / "figure.png"
+    figure_png = tmp_path / "CheckQubitSpectroscopy_4_raw_0.png"
     figure_png.write_bytes(b"png-bytes")
-    figure_json = tmp_path / "figure.json"
+    figure_json = tmp_path / "CheckQubitSpectroscopy_4_marked_1.json"
     figure_json.write_text('{"value": 1}', encoding="utf-8")
     return AnalysisContextResult(
         context=_context(),
@@ -223,7 +223,7 @@ def test_export_ai_triage_replay_bundle_uses_shared_triage_inputs(tmp_path: Path
         "experiment_images/01_marked.png",
     ]
     assert manifest.inputs.expected_image_paths == ["expected_images/00.png"]
-    assert manifest.inputs.figure_paths == ["figures/00.png", "figures/01.json"]
+    assert manifest.inputs.figure_paths == ["figures/00_raw.png", "figures/01_marked.json"]
     assert bundle_context.context.qid == "4"
     assert runtime_config.analysis_model is not None
     assert runtime_config.analysis_model.name == "gpt-5.1"
@@ -244,3 +244,5 @@ def test_export_ai_triage_replay_bundle_uses_shared_triage_inputs(tmp_path: Path
         )
         assert "experiment_images/00_raw.png" in zf.namelist()
         assert "experiment_images/01_marked.png" in zf.namelist()
+        assert "figures/00_raw.png" in zf.namelist()
+        assert "figures/01_marked.json" in zf.namelist()

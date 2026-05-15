@@ -68,11 +68,18 @@ def _knowledge_ref(task_name: str) -> AITriageKnowledgeRef:
 def _figure_entries(figure_paths: list[str]) -> list[AITriageFigureEntry]:
     entries: list[AITriageFigureEntry] = []
     for index, source_path in enumerate(figure_paths):
-        suffix = Path(source_path).suffix or ".bin"
+        path = Path(source_path)
+        suffix = path.suffix or ".bin"
+        role = ""
+        stem = path.stem.lower()
+        if "marked" in stem:
+            role = "_marked"
+        elif "raw" in stem:
+            role = "_raw"
         entries.append(
             AITriageFigureEntry(
                 source_path=source_path,
-                archive_path=f"figures/{index:02d}{suffix}",
+                archive_path=f"figures/{index:02d}{role}{suffix}",
             )
         )
     return entries
