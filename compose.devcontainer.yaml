@@ -5,8 +5,9 @@ services:
       context: .
       dockerfile: ./.devcontainer/Dockerfile
     env_file:
-      - .env
-    command: sleep infinity
+      - path: .env
+        required: false
+    command: start-container
     volumes:
       - .:/workspace/qdash
       - /var/run/docker.sock:/var/run/docker.sock
@@ -24,7 +25,7 @@ services:
       watch:
         - action: sync
           path: ./src/qdash/api
-          target: /workspace/qdash/api
+          target: /workspace/qdash/src/qdash/api
     working_dir: /workspace/qdash
 networks:
   custom_net:
