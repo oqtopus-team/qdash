@@ -156,9 +156,7 @@ class FilesystemCalibDataSaver:
         for i, fig in enumerate(figures):
             figure_suffix = figure_role_suffix(fig)
             # Save PNG
-            png_filename = self._build_filename(
-                task_name, task_type, qid, figure_suffix, "png", i
-            )
+            png_filename = self._build_filename(task_name, task_type, qid, figure_suffix, "png", i)
             png_path = self._resolve_conflict(fig_dir / png_filename)
             fig.write_image(str(png_path))
             png_paths.append(str(png_path))

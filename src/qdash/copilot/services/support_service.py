@@ -162,8 +162,7 @@ class CopilotSupportService:
             "experiment_figure": bool(experiment_images or image_base64),
             "experiment_figure_paths": figure_paths if experiment_images or image_base64 else [],
             "experiment_images": [
-                {"alt_text": alt, "index": i}
-                for i, (_, alt) in enumerate(experiment_images or [])
+                {"alt_text": alt, "index": i} for i, (_, alt) in enumerate(experiment_images or [])
             ],
             "expected_images": [
                 {"alt_text": alt, "index": i} for i, (_, alt) in enumerate(expected_images)

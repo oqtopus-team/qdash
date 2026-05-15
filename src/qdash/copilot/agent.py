@@ -175,9 +175,7 @@ def _build_input(
                 }
             )
 
-    actual_images = experiment_images or (
-        [(image_base64, "result figure")] if image_base64 else []
-    )
+    actual_images = experiment_images or ([(image_base64, "result figure")] if image_base64 else [])
     if actual_images:
         label = (
             "Actual experimental result images:"
@@ -225,9 +223,7 @@ def _build_messages(
             )
 
     # Build the current user message
-    actual_images = experiment_images or (
-        [(image_base64, "result figure")] if image_base64 else []
-    )
+    actual_images = experiment_images or ([(image_base64, "result figure")] if image_base64 else [])
     has_images = actual_images or expected_images
     if has_images:
         content_parts: list[dict[str, Any]] = []

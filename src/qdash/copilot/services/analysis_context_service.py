@@ -163,7 +163,7 @@ class AnalysisContextBuilder:
         if task_result:
             experiment_images = self._load_figures_as_base64(figure_paths)
         if not image_base64:
-            image_base64 = experiment_images[0][0] if experiment_images else None
+            image_base64 = self._load_figure_as_base64(figure_paths)
         expected_images = self._collect_expected_images(
             knowledge,
             config.analysis.max_expected_images,

@@ -52,9 +52,7 @@ class TestFilesystemCalibDataSaver:
             set_figure_role(go.Figure(data=[go.Scatter(x=[3], y=[4])]), "marked"),
         ]
 
-        png_paths, json_paths = saver.save_figures(
-            figs, "CheckQubitSpectroscopy", "qubit", "2"
-        )
+        png_paths, json_paths = saver.save_figures(figs, "CheckQubitSpectroscopy", "qubit", "2")
 
         assert Path(png_paths[0]).name == "CheckQubitSpectroscopy_2_raw_0.png"
         assert Path(png_paths[1]).name == "CheckQubitSpectroscopy_2_marked_1.png"
