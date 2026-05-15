@@ -90,16 +90,12 @@ class CopilotSupportService:
 
     @staticmethod
     def _target_figure_role(path: Path, index: int) -> str:
-        """Infer the target figure role from filename suffixes, falling back to order."""
+        """Infer the target figure role from filename suffixes."""
         stem = path.stem.lower()
         if "marked" in stem:
             return "target marked result image; validate heuristic markers against the raw signal"
         if "raw" in stem:
             return "target raw result image; inspect the measured signal without overlays"
-        if index == 0:
-            return "target raw result image; inspect the measured signal without overlays"
-        if index == 1:
-            return "target marked result image; validate heuristic markers against the raw signal"
         return f"target supporting result image {index + 1}"
 
     @staticmethod
