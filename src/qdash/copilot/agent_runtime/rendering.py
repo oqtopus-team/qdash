@@ -55,7 +55,7 @@ def legacy_to_blocks(
     response: AnalysisResponse, config: CopilotConfig | None = None
 ) -> dict[str, Any]:
     """Convert a legacy analysis response into the frontend blocks format."""
-    lang_raw = (config.response_language if config else "ja") or "ja"
+    lang_raw = (config.response_language if config else "en") or "en"
     lang = "ja" if lang_raw.startswith("ja") else "en"
     labels = _SECTION_LABELS[lang]
 

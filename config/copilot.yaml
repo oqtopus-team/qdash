@@ -8,7 +8,7 @@ enabled: true
 # thinking_language: Language for internal reasoning (en recommended for technical accuracy)
 # response_language: Language for user-facing responses (ja or en)
 thinking_language: en
-response_language: ja
+response_language: en
 
 # Model configuration
 # `model` is used as the default for general chat (side-panel Q&A, tool use, explanations).
