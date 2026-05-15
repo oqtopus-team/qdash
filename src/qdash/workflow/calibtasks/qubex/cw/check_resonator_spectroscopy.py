@@ -18,8 +18,8 @@ from qdash.analysis.spectroscopy import (
     estimate_resonator_frequency_from_figure,
     remove_false_spike_from_figure,
 )
+from qdash.common.visualization.figure_metadata import set_figure_role
 from qdash.datamodel.task import ParameterModel, RunParameterModel
-from qdash.figure_metadata import set_figure_role
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
     RunResult,

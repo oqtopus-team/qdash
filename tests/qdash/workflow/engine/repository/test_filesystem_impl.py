@@ -7,7 +7,7 @@ import numpy as np
 import plotly.graph_objs as go
 import pytest
 
-from qdash.figure_metadata import set_figure_role
+from qdash.common.visualization.figure_metadata import set_figure_role
 from qdash.repository.filesystem import FilesystemCalibDataSaver
 
 
