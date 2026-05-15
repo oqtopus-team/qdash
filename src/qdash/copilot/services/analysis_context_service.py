@@ -26,7 +26,7 @@ class AnalysisContextBuilder:
         load_coupling_params: Callable[[str, str, list[str] | None], dict[str, dict[str, Any]]],
         load_figure_as_base64: Callable[[list[str]], str | None],
         load_figures_as_base64: Callable[[list[str]], list[tuple[str, str]]],
-        collect_expected_images: Callable[[Any, int | None], list[tuple[str, str]]],
+        collect_expected_images: Callable[..., list[tuple[str, str]]],
     ) -> None:
         self._load_qubit_params = load_qubit_params
         self._load_task_result = load_task_result
@@ -46,6 +46,7 @@ class AnalysisContextBuilder:
         task_id: str,
         image_base64: str | None,
         config: CopilotConfig,
+        use_triage_knowledge: bool = False,
     ) -> AnalysisContextResult:
         """Build the full analysis context consumed by Copilot review flows."""
         from qdash.copilot.contracts import (
@@ -55,7 +56,11 @@ class AnalysisContextBuilder:
         from qdash.datamodel.task_knowledge import get_task_knowledge
 
         knowledge = get_task_knowledge(task_name)
-        knowledge_prompt = self._build_task_knowledge_prompt(task_name, knowledge)
+        knowledge_prompt = self._build_task_knowledge_prompt(
+            task_name,
+            knowledge,
+            use_triage_knowledge=use_triage_knowledge,
+        )
         qubit_params = self._load_qubit_params(chip_id, qid)
         task_result = self._load_task_result(task_id)
         input_params, output_params, run_params, figure_paths = self._extract_task_result_payload(
@@ -75,6 +80,7 @@ class AnalysisContextBuilder:
             figure_paths=figure_paths,
             image_base64=image_base64,
             config=config,
+            use_triage_knowledge=use_triage_knowledge,
         )
 
         context = TaskAnalysisContext(
@@ -98,9 +104,18 @@ class AnalysisContextBuilder:
         )
 
     @staticmethod
-    def _build_task_knowledge_prompt(task_name: str, knowledge: Any) -> str:
+    def _build_task_knowledge_prompt(
+        task_name: str,
+        knowledge: Any,
+        *,
+        use_triage_knowledge: bool,
+    ) -> str:
         """Build the prompt prefix from task knowledge or fall back to the task name."""
-        return knowledge.to_prompt() if knowledge else f"Task: {task_name}"
+        if not knowledge:
+            return f"Task: {task_name}"
+        if use_triage_knowledge:
+            return knowledge.to_triage_prompt()
+        return knowledge.to_prompt()
 
     @staticmethod
     def _extract_task_result_payload(
@@ -153,6 +168,7 @@ class AnalysisContextBuilder:
         figure_paths: list[str],
         image_base64: str | None,
         config: CopilotConfig,
+        use_triage_knowledge: bool,
     ) -> tuple[str | None, list[tuple[str, str]], list[tuple[str, str]]]:
         """Resolve experiment and expected images for multimodal analysis."""
         expected_images: list[tuple[str, str]] = []
@@ -167,5 +183,7 @@ class AnalysisContextBuilder:
         expected_images = self._collect_expected_images(
             knowledge,
             config.analysis.max_expected_images,
+            include_case_images=not use_triage_knowledge,
+            include_triage_images=use_triage_knowledge,
         )
         return image_base64, expected_images, experiment_images

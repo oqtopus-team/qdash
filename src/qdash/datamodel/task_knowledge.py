@@ -187,6 +187,14 @@ class TaskKnowledge(BaseModel):
         default_factory=list,
         description="Image references from the markdown file",
     )
+    triage_markdown: str = Field(
+        default="",
+        description="Optional AI-triage-specific markdown guidance",
+    )
+    triage_images: list[TaskKnowledgeImage] = Field(
+        default_factory=list,
+        description="Image references from the triage markdown file",
+    )
     related_context: list[RelatedContextItem] = Field(
         default_factory=list,
         description="Additional data sources to load during analysis",
@@ -333,6 +341,59 @@ class TaskKnowledge(BaseModel):
                 if case.images:
                     for img in case.images:
                         lines.append(f"   - Image: {img.alt_text} ({img.relative_path})")
+
+        return "\n".join(lines)
+
+    @staticmethod
+    def _normalize_markdown_block(markdown: str) -> str:
+        """Strip top-level heading and image lines from a markdown block."""
+        normalized_lines: list[str] = []
+        for line in markdown.splitlines():
+            stripped = line.strip()
+            if stripped.startswith("# "):
+                continue
+            if stripped.startswith("!["):
+                continue
+            normalized_lines.append(line)
+        return "\n".join(normalized_lines).strip()
+
+    def to_triage_prompt(self) -> str:
+        """Build a compact prompt focused on AI triage decisions."""
+        lines = [
+            f"## Experiment: {self.name}",
+            self.summary,
+            "",
+            "### What it measures",
+            self.what_it_measures,
+            "",
+            "### Expected result",
+            self.expected_result.description,
+        ]
+
+        if self.expected_result.good_visual:
+            lines += ["", f"- Good result looks like: {self.expected_result.good_visual}"]
+
+        if self.check_questions:
+            lines += ["", "### Review questions"]
+            lines += [f"- {question}" for question in self.check_questions]
+
+        if self.failure_modes:
+            lines += ["", "### Common failure patterns"]
+            for failure in self.failure_modes:
+                lines.append(f"- [{failure.severity}] {failure.description}")
+                if failure.visual:
+                    lines.append(f"  - Visual: {failure.visual}")
+                if failure.next_action:
+                    lines.append(f"  - Next: {failure.next_action}")
+
+        if self.analysis_guide:
+            lines += ["", "### Analysis guide"]
+            for index, step in enumerate(self.analysis_guide, 1):
+                lines.append(f"{index}. {step}")
+
+        triage_markdown = self._normalize_markdown_block(self.triage_markdown)
+        if triage_markdown:
+            lines += ["", "### AI triage guidance", triage_markdown]
 
         return "\n".join(lines)
 

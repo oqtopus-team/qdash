@@ -106,10 +106,6 @@
       {
         "text": "ReadoutClassification",
         "link": "/task-knowledge/td-characterization/ReadoutClassification"
-      },
-      {
-        "text": "ChevronPattern",
-        "link": "/task-knowledge/td-characterization/ChevronPattern"
       }
     ]
   },
@@ -196,6 +192,16 @@
       {
         "text": "ZX90InterleavedRandomizedBenchmarking",
         "link": "/task-knowledge/benchmarking/ZX90InterleavedRandomizedBenchmarking"
+      }
+    ]
+  },
+  {
+    "text": "Other",
+    "collapsed": true,
+    "items": [
+      {
+        "text": "ChevronPattern",
+        "link": "/task-knowledge/other/ChevronPattern"
       }
     ]
   }

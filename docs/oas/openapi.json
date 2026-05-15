@@ -17612,6 +17612,14 @@
             "type": "string",
             "title": "Prompt Guidance",
             "default": ""
+          },
+          "images": {
+            "items": {
+              "$ref": "#/components/schemas/KnowledgeImageResponse"
+            },
+            "type": "array",
+            "title": "Images",
+            "default": []
           }
         },
         "type": "object",
@@ -22147,6 +22155,19 @@
             "title": "Images",
             "default": []
           },
+          "triage_markdown": {
+            "type": "string",
+            "title": "Triage Markdown",
+            "default": ""
+          },
+          "triage_images": {
+            "items": {
+              "$ref": "#/components/schemas/KnowledgeImageResponse"
+            },
+            "type": "array",
+            "title": "Triage Images",
+            "default": []
+          },
           "cases": {
             "items": {
               "$ref": "#/components/schemas/KnowledgeCaseResponse"
@@ -22158,6 +22179,11 @@
           "prompt_text": {
             "type": "string",
             "title": "Prompt Text"
+          },
+          "triage_prompt_text": {
+            "type": "string",
+            "title": "Triage Prompt Text",
+            "default": ""
           }
         },
         "type": "object",
@@ -22208,6 +22234,11 @@
           "has_analysis_guide": {
             "type": "boolean",
             "title": "Has Analysis Guide",
+            "default": false
+          },
+          "has_triage_guide": {
+            "type": "boolean",
+            "title": "Has Triage Guide",
             "default": false
           }
         },

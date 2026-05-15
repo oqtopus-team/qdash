@@ -29,6 +29,9 @@ export interface TaskKnowledgeResponse {
   analysis_guide?: string[];
   prerequisites?: string[];
   images?: KnowledgeImageResponse[];
+  triage_markdown?: string;
+  triage_images?: KnowledgeImageResponse[];
   cases?: KnowledgeCaseResponse[];
   prompt_text: string;
+  triage_prompt_text?: string;
 }

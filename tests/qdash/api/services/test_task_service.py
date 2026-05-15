@@ -1,0 +1,115 @@
+from unittest.mock import MagicMock, patch
+
+from qdash.api.services.task_service import TaskService
+from qdash.datamodel.task_knowledge import (
+    ExpectedResult,
+    FailureMode,
+    KnowledgeCase,
+    OutputParameterInfo,
+    TaskKnowledge,
+    TaskKnowledgeImage,
+)
+
+
+def _service() -> TaskService:
+    return TaskService(task_definition_repository=MagicMock())
+
+
+def _knowledge() -> TaskKnowledge:
+    return TaskKnowledge(
+        name="CheckResonatorSpectroscopy",
+        category="cw-characterization",
+        summary="High-resolution 2D spectroscopy of all resonators in a readout multiplexer.",
+        what_it_measures="Readout resonator frequencies within one MUX.",
+        physical_principle="Resonator response is swept across frequency and power.",
+        expected_result=ExpectedResult(
+            description="A 2D map with annotated resonator peaks.",
+            good_visual="Four clean resonator trajectories with stable peak assignment.",
+        ),
+        evaluation_criteria="All expected resonators should be visible and separable.",
+        check_questions=["Are all expected resonators detected?"],
+        failure_modes=[
+            FailureMode(
+                severity="critical",
+                description="Missing resonator peaks",
+                visual="Fewer peaks than expected",
+                next_action="Widen the scan range",
+            )
+        ],
+        output_parameters_info=[
+            OutputParameterInfo(
+                name="readout_frequency",
+                description="Assigned resonator frequency for the qubit under review.",
+            )
+        ],
+        analysis_guide=["Review the annotated 2D map."],
+        images=[
+            TaskKnowledgeImage(
+                alt_text="Expected resonator map",
+                relative_path="expected-map.png",
+                section="expected_result",
+                base64_data="task-image-b64",
+            )
+        ],
+        triage_markdown=(
+            "# CheckResonatorSpectroscopy AI Triage Guide\n\n"
+            "Use REVIEW when peak assignment is ambiguous.\n\n"
+            "![Triage example](triage.png)"
+        ),
+        triage_images=[
+            TaskKnowledgeImage(
+                alt_text="Triage example",
+                relative_path="triage.png",
+                section="triage",
+                base64_data="triage-image-b64",
+            )
+        ],
+        cases=[
+            KnowledgeCase(
+                title="Overlapping resonators in one MUX",
+                severity="warning",
+                human_review_decision="Escalate for human review.",
+                boundary_criteria="Two resonators overlap near the assigned slot.",
+                lesson_learned=["Peak overlap should block auto-pass."],
+                images=[
+                    TaskKnowledgeImage(
+                        alt_text="Case overlap map",
+                        relative_path="cases/overlap.png",
+                        section="cases",
+                        base64_data="case-image-b64",
+                    )
+                ],
+            )
+        ],
+    )
+
+
+def test_list_task_knowledge_sets_has_triage_guide_from_markdown() -> None:
+    knowledge = _knowledge()
+    service = _service()
+
+    with patch("qdash.api.services.task_service._list_all_knowledge", return_value=[knowledge]):
+        response = service.list_task_knowledge()
+
+    assert len(response.items) == 1
+    assert response.items[0].name == "CheckResonatorSpectroscopy"
+    assert response.items[0].has_analysis_guide is True
+    assert response.items[0].has_triage_guide is True
+    assert response.items[0].case_count == 1
+    assert response.items[0].image_count == 1
+
+
+def test_get_task_knowledge_includes_triage_prompt_and_case_images() -> None:
+    knowledge = _knowledge()
+    service = _service()
+
+    with patch("qdash.api.services.task_service._lookup_knowledge", return_value=knowledge):
+        response = service.get_task_knowledge("CheckResonatorSpectroscopy")
+
+    assert response.triage_markdown == knowledge.triage_markdown
+    assert response.triage_images[0].base64_data == "triage-image-b64"
+    assert response.cases[0].images[0].base64_data == "case-image-b64"
+    assert response.prompt_text
+    assert "### AI triage guidance" in response.triage_prompt_text
+    assert "Use REVIEW when peak assignment is ambiguous." in response.triage_prompt_text
+    assert "![Triage example]" not in response.triage_prompt_text

@@ -102,15 +102,23 @@ class CopilotSupportService:
     def collect_expected_images(
         knowledge: Any,
         max_images: int | None = None,
+        *,
+        include_case_images: bool = True,
+        include_triage_images: bool = True,
     ) -> list[tuple[str, str]]:
         """Collect expected reference images from TaskKnowledge."""
         if knowledge is None:
             return []
         result = [(img.base64_data, img.alt_text) for img in knowledge.images if img.base64_data]
-        for case in knowledge.cases:
-            for img in case.images:
+        if include_triage_images:
+            for img in getattr(knowledge, "triage_images", []):
                 if img.base64_data:
-                    result.append((img.base64_data, f"[Case: {case.title}] {img.alt_text}"))
+                    result.append((img.base64_data, f"[Triage guide] {img.alt_text}"))
+        if include_case_images:
+            for case in knowledge.cases:
+                for img in case.images:
+                    if img.base64_data:
+                        result.append((img.base64_data, f"[Case: {case.title}] {img.alt_text}"))
         if max_images is not None and max_images >= 0:
             return result[:max_images]
         return result

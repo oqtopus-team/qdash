@@ -150,9 +150,17 @@ class CopilotRuntime:
         self,
         knowledge: Any,
         max_images: int | None,
+        *,
+        include_case_images: bool = True,
+        include_triage_images: bool = True,
     ) -> list[tuple[str, str]]:
         """Forward expected-image lookup for analysis context assembly."""
-        return self.collect_expected_images(knowledge, max_images=max_images)
+        return self.collect_expected_images(
+            knowledge,
+            max_images=max_images,
+            include_case_images=include_case_images,
+            include_triage_images=include_triage_images,
+        )
 
     def _provenance_resolve_project_id(self, chip_id: str) -> str | None:
         """Forward project-id lookup for provenance lineage assembly."""
@@ -186,13 +194,21 @@ class CopilotRuntime:
         self,
         knowledge: Any,
         max_images: int | None = None,
+        *,
+        include_case_images: bool = True,
+        include_triage_images: bool = True,
     ) -> list[tuple[str, str]]:
         """Collect expected reference images from TaskKnowledge.
 
         Returns list of (base64_data, alt_text) for images with embedded data.
         Includes both task-level images and case-level images.
         """
-        return self._support_service.collect_expected_images(knowledge, max_images=max_images)
+        return self._support_service.collect_expected_images(
+            knowledge,
+            max_images=max_images,
+            include_case_images=include_case_images,
+            include_triage_images=include_triage_images,
+        )
 
     def load_task_history(
         self, task_name: str, chip_id: str, qid: str, last_n: int = 5
@@ -434,6 +450,7 @@ class CopilotRuntime:
         task_id: str,
         image_base64: str | None,
         config: CopilotConfig,
+        use_triage_knowledge: bool = False,
     ) -> AnalysisContextResult:
         """Build a full analysis context from DB data and TaskKnowledge.
 
@@ -448,6 +465,7 @@ class CopilotRuntime:
             task_id=task_id,
             image_base64=image_base64,
             config=config,
+            use_triage_knowledge=use_triage_knowledge,
         )
 
     @staticmethod
