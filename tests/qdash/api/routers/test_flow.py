@@ -1,6 +1,7 @@
 """Tests for flow router endpoints."""
 
 from datetime import datetime
+from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -340,3 +341,29 @@ class TestFlowExecution:
         parameters = call_args.kwargs.get("parameters", {})
         assert parameters["username"] == "editor_user"
         assert parameters["project_id"] == "test_project"
+
+
+class TestFlowTemplates:
+    """Tests for flow template endpoints."""
+
+    def test_get_full_calibration_template_includes_configure_all(
+        self, test_client, test_project, auth_headers
+    ):
+        """Test that the full calibration template starts with ConfigureAll."""
+        repo_root = Path(__file__).resolve().parents[4]
+        templates_dir = repo_root / "src/qdash/workflow/templates"
+
+        with (
+            patch("qdash.api.services.flow_service.TEMPLATES_DIR", templates_dir),
+            patch(
+                "qdash.api.services.flow_service.TEMPLATES_METADATA_FILE",
+                templates_dir / "templates.json",
+            ),
+        ):
+            response = test_client.get("/flows/templates/full_calibration", headers=auth_headers)
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["id"] == "full_calibration"
+        assert "ConfigureAll -> 1Q Check" in data["description"]
+        assert "ConfigureAll()," in data["code"]
