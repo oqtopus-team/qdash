@@ -9,11 +9,11 @@
 /**
  * Source of seed parameters.
  */
-export type SeedImportSource =
-  (typeof SeedImportSource)[keyof typeof SeedImportSource];
+export type SeedImportSource = typeof SeedImportSource[keyof typeof SeedImportSource];
+
 
 // eslint-disable-next-line @typescript-eslint/no-redeclare
 export const SeedImportSource = {
-  qubex_params: "qubex_params",
-  manual: "manual",
+  qubex_params: 'qubex_params',
+  manual: 'manual',
 } as const;

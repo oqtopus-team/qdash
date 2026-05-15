@@ -5,9 +5,9 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { BulkAiTriageRequestDate } from "./bulkAiTriageRequestDate";
-import type { BulkAiTriageRequestTaskIds } from "./bulkAiTriageRequestTaskIds";
-import type { BulkAiTriageRequestModelOverride } from "./bulkAiTriageRequestModelOverride";
+import type { BulkAiTriageRequestDate } from './bulkAiTriageRequestDate';
+import type { BulkAiTriageRequestTaskIds } from './bulkAiTriageRequestTaskIds';
+import type { BulkAiTriageRequestModelOverride } from './bulkAiTriageRequestModelOverride';
 
 /**
  * Request body for bulk AI triage review.

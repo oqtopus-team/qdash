@@ -5,7 +5,10 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import { useMutation, useQuery } from "@tanstack/react-query";
+import {
+  useMutation,
+  useQuery
+} from '@tanstack/react-query';
 import type {
   DataTag,
   DefinedInitialDataOptions,
@@ -18,8 +21,8 @@ import type {
   UseMutationOptions,
   UseMutationResult,
   UseQueryOptions,
-  UseQueryResult,
-} from "@tanstack/react-query";
+  UseQueryResult
+} from '@tanstack/react-query';
 
 import type {
   HTTPValidationError,
@@ -30,1076 +33,743 @@ import type {
   ProjectResponse,
   ProjectUpdate,
   QdashApiSchemasProjectMemberListResponse,
-  QdashApiSchemasProjectProjectListResponse,
-} from "../../schemas";
+  QdashApiSchemasProjectProjectListResponse
+} from '../../schemas';
 
-import { customInstance } from "../../lib/custom-instance";
+import { customInstance } from '../../lib/custom-instance';
+
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
+
+
 
 /**
  * List all projects the user has access to.
  * @summary List user's projects
  */
 export const listProjects = (
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
+    
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  return customInstance<QdashApiSchemasProjectProjectListResponse>(
-    { url: `/projects`, method: "GET", signal },
-    options,
-  );
-};
+      
+      
+      return customInstance<QdashApiSchemasProjectProjectListResponse>(
+      {url: `/projects`, method: 'GET', signal
+    },
+      options);
+    }
+  
+
+
 
 export const getListProjectsQueryKey = () => {
-  return [`/projects`] as const;
-};
+    return [
+    `/projects`
+    ] as const;
+    }
 
-export const getListProjectsQueryOptions = <
-  TData = Awaited<ReturnType<typeof listProjects>>,
-  TError = void,
->(options?: {
-  query?: Partial<
-    UseQueryOptions<Awaited<ReturnType<typeof listProjects>>, TError, TData>
-  >;
-  request?: SecondParameter<typeof customInstance>;
-}) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
+    
+export const getListProjectsQueryOptions = <TData = Awaited<ReturnType<typeof listProjects>>, TError = void>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listProjects>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
 
-  const queryKey = queryOptions?.queryKey ?? getListProjectsQueryKey();
+const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof listProjects>>> = ({
-    signal,
-  }) => listProjects(requestOptions, signal);
+  const queryKey =  queryOptions?.queryKey ?? getListProjectsQueryKey();
 
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof listProjects>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData> };
-};
+  
 
-export type ListProjectsQueryResult = NonNullable<
-  Awaited<ReturnType<typeof listProjects>>
->;
-export type ListProjectsQueryError = void;
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listProjects>>> = ({ signal }) => listProjects(requestOptions, signal);
 
-export function useListProjects<
-  TData = Awaited<ReturnType<typeof listProjects>>,
-  TError = void,
->(
-  options: {
-    query: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof listProjects>>, TError, TData>
-    > &
-      Pick<
+      
+
+      
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listProjects>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+}
+
+export type ListProjectsQueryResult = NonNullable<Awaited<ReturnType<typeof listProjects>>>
+export type ListProjectsQueryError = void
+
+
+export function useListProjects<TData = Awaited<ReturnType<typeof listProjects>>, TError = void>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listProjects>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof listProjects>>,
           TError,
           Awaited<ReturnType<typeof listProjects>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData>;
-};
-export function useListProjects<
-  TData = Awaited<ReturnType<typeof listProjects>>,
-  TError = void,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof listProjects>>, TError, TData>
-    > &
-      Pick<
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useListProjects<TData = Awaited<ReturnType<typeof listProjects>>, TError = void>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listProjects>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof listProjects>>,
           TError,
           Awaited<ReturnType<typeof listProjects>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
-export function useListProjects<
-  TData = Awaited<ReturnType<typeof listProjects>>,
-  TError = void,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof listProjects>>, TError, TData>
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useListProjects<TData = Awaited<ReturnType<typeof listProjects>>, TError = void>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listProjects>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
 /**
  * @summary List user's projects
  */
 
-export function useListProjects<
-  TData = Awaited<ReturnType<typeof listProjects>>,
-  TError = void,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof listProjects>>, TError, TData>
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
-  const queryOptions = getListProjectsQueryOptions(options);
+export function useListProjects<TData = Awaited<ReturnType<typeof listProjects>>, TError = void>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listProjects>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
 
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData> };
+  const queryOptions = getListProjectsQueryOptions(options)
 
-  query.queryKey = queryOptions.queryKey;
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey ;
 
   return query;
 }
+
+
 
 /**
  * Create a new project with the current user as owner.
  * @summary Create a new project
  */
 export const createProject = (
-  projectCreate: ProjectCreate,
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
+    projectCreate: ProjectCreate,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  return customInstance<ProjectResponse>(
-    {
-      url: `/projects`,
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      data: projectCreate,
-      signal,
+      
+      
+      return customInstance<ProjectResponse>(
+      {url: `/projects`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: projectCreate, signal
     },
-    options,
-  );
-};
+      options);
+    }
+  
 
-export const getCreateProjectMutationOptions = <
-  TError = void | HTTPValidationError,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof createProject>>,
-    TError,
-    { data: ProjectCreate },
-    TContext
-  >;
-  request?: SecondParameter<typeof customInstance>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof createProject>>,
-  TError,
-  { data: ProjectCreate },
-  TContext
-> => {
-  const mutationKey = ["createProject"];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      "mutationKey" in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
 
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof createProject>>,
-    { data: ProjectCreate }
-  > = (props) => {
-    const { data } = props ?? {};
+export const getCreateProjectMutationOptions = <TError = void | HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createProject>>, TError,{data: ProjectCreate}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof createProject>>, TError,{data: ProjectCreate}, TContext> => {
 
-    return createProject(data, requestOptions);
-  };
+const mutationKey = ['createProject'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
 
-  return { mutationFn, ...mutationOptions };
-};
+      
 
-export type CreateProjectMutationResult = NonNullable<
-  Awaited<ReturnType<typeof createProject>>
->;
-export type CreateProjectMutationBody = ProjectCreate;
-export type CreateProjectMutationError = void | HTTPValidationError;
 
-/**
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createProject>>, {data: ProjectCreate}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createProject(data,requestOptions)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateProjectMutationResult = NonNullable<Awaited<ReturnType<typeof createProject>>>
+    export type CreateProjectMutationBody = ProjectCreate
+    export type CreateProjectMutationError = void | HTTPValidationError
+
+    /**
  * @summary Create a new project
  */
-export const useCreateProject = <
-  TError = void | HTTPValidationError,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof createProject>>,
-      TError,
-      { data: ProjectCreate },
-      TContext
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof createProject>>,
-  TError,
-  { data: ProjectCreate },
-  TContext
-> => {
-  const mutationOptions = getCreateProjectMutationOptions(options);
+export const useCreateProject = <TError = void | HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createProject>>, TError,{data: ProjectCreate}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof createProject>>,
+        TError,
+        {data: ProjectCreate},
+        TContext
+      > => {
 
-  return useMutation(mutationOptions, queryClient);
-};
-/**
+      const mutationOptions = getCreateProjectMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    /**
  * Get details of a specific project.
  * @summary Get project details
  */
 export const getProject = (
-  projectId: string,
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
+    projectId: string,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  return customInstance<ProjectResponse>(
-    { url: `/projects/${projectId}`, method: "GET", signal },
-    options,
-  );
-};
+      
+      
+      return customInstance<ProjectResponse>(
+      {url: `/projects/${projectId}`, method: 'GET', signal
+    },
+      options);
+    }
+  
 
-export const getGetProjectQueryKey = (projectId?: string) => {
-  return [`/projects/${projectId}`] as const;
-};
 
-export const getGetProjectQueryOptions = <
-  TData = Awaited<ReturnType<typeof getProject>>,
-  TError = void | HTTPValidationError,
->(
-  projectId: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof getProject>>, TError, TData>
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
+
+export const getGetProjectQueryKey = (projectId?: string,) => {
+    return [
+    `/projects/${projectId}`
+    ] as const;
+    }
+
+    
+export const getGetProjectQueryOptions = <TData = Awaited<ReturnType<typeof getProject>>, TError = void | HTTPValidationError>(projectId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getProject>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey = queryOptions?.queryKey ?? getGetProjectQueryKey(projectId);
+const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof getProject>>> = ({
-    signal,
-  }) => getProject(projectId, requestOptions, signal);
+  const queryKey =  queryOptions?.queryKey ?? getGetProjectQueryKey(projectId);
 
-  return {
-    queryKey,
-    queryFn,
-    enabled: !!projectId,
-    ...queryOptions,
-  } as UseQueryOptions<
-    Awaited<ReturnType<typeof getProject>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData> };
-};
+  
 
-export type GetProjectQueryResult = NonNullable<
-  Awaited<ReturnType<typeof getProject>>
->;
-export type GetProjectQueryError = void | HTTPValidationError;
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getProject>>> = ({ signal }) => getProject(projectId, requestOptions, signal);
 
-export function useGetProject<
-  TData = Awaited<ReturnType<typeof getProject>>,
-  TError = void | HTTPValidationError,
->(
-  projectId: string,
-  options: {
-    query: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof getProject>>, TError, TData>
-    > &
-      Pick<
+      
+
+      
+
+   return  { queryKey, queryFn, enabled: !!(projectId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getProject>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+}
+
+export type GetProjectQueryResult = NonNullable<Awaited<ReturnType<typeof getProject>>>
+export type GetProjectQueryError = void | HTTPValidationError
+
+
+export function useGetProject<TData = Awaited<ReturnType<typeof getProject>>, TError = void | HTTPValidationError>(
+ projectId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getProject>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getProject>>,
           TError,
           Awaited<ReturnType<typeof getProject>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData>;
-};
-export function useGetProject<
-  TData = Awaited<ReturnType<typeof getProject>>,
-  TError = void | HTTPValidationError,
->(
-  projectId: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof getProject>>, TError, TData>
-    > &
-      Pick<
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useGetProject<TData = Awaited<ReturnType<typeof getProject>>, TError = void | HTTPValidationError>(
+ projectId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getProject>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getProject>>,
           TError,
           Awaited<ReturnType<typeof getProject>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
-export function useGetProject<
-  TData = Awaited<ReturnType<typeof getProject>>,
-  TError = void | HTTPValidationError,
->(
-  projectId: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof getProject>>, TError, TData>
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useGetProject<TData = Awaited<ReturnType<typeof getProject>>, TError = void | HTTPValidationError>(
+ projectId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getProject>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
 /**
  * @summary Get project details
  */
 
-export function useGetProject<
-  TData = Awaited<ReturnType<typeof getProject>>,
-  TError = void | HTTPValidationError,
->(
-  projectId: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof getProject>>, TError, TData>
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
-  const queryOptions = getGetProjectQueryOptions(projectId, options);
+export function useGetProject<TData = Awaited<ReturnType<typeof getProject>>, TError = void | HTTPValidationError>(
+ projectId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getProject>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
 
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData> };
+  const queryOptions = getGetProjectQueryOptions(projectId,options)
 
-  query.queryKey = queryOptions.queryKey;
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey ;
 
   return query;
 }
+
+
 
 /**
  * Update project settings. Owner only.
  * @summary Update project
  */
 export const updateProject = (
-  projectId: string,
-  projectUpdate: ProjectUpdate,
-  options?: SecondParameter<typeof customInstance>,
-) => {
-  return customInstance<ProjectResponse>(
-    {
-      url: `/projects/${projectId}`,
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      data: projectUpdate,
+    projectId: string,
+    projectUpdate: ProjectUpdate,
+ options?: SecondParameter<typeof customInstance>,) => {
+      
+      
+      return customInstance<ProjectResponse>(
+      {url: `/projects/${projectId}`, method: 'PATCH',
+      headers: {'Content-Type': 'application/json', },
+      data: projectUpdate
     },
-    options,
-  );
-};
+      options);
+    }
+  
 
-export const getUpdateProjectMutationOptions = <
-  TError = void | HTTPValidationError,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof updateProject>>,
-    TError,
-    { projectId: string; data: ProjectUpdate },
-    TContext
-  >;
-  request?: SecondParameter<typeof customInstance>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof updateProject>>,
-  TError,
-  { projectId: string; data: ProjectUpdate },
-  TContext
-> => {
-  const mutationKey = ["updateProject"];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      "mutationKey" in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
 
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof updateProject>>,
-    { projectId: string; data: ProjectUpdate }
-  > = (props) => {
-    const { projectId, data } = props ?? {};
+export const getUpdateProjectMutationOptions = <TError = void | HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateProject>>, TError,{projectId: string;data: ProjectUpdate}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateProject>>, TError,{projectId: string;data: ProjectUpdate}, TContext> => {
 
-    return updateProject(projectId, data, requestOptions);
-  };
+const mutationKey = ['updateProject'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
 
-  return { mutationFn, ...mutationOptions };
-};
+      
 
-export type UpdateProjectMutationResult = NonNullable<
-  Awaited<ReturnType<typeof updateProject>>
->;
-export type UpdateProjectMutationBody = ProjectUpdate;
-export type UpdateProjectMutationError = void | HTTPValidationError;
 
-/**
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateProject>>, {projectId: string;data: ProjectUpdate}> = (props) => {
+          const {projectId,data} = props ?? {};
+
+          return  updateProject(projectId,data,requestOptions)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateProjectMutationResult = NonNullable<Awaited<ReturnType<typeof updateProject>>>
+    export type UpdateProjectMutationBody = ProjectUpdate
+    export type UpdateProjectMutationError = void | HTTPValidationError
+
+    /**
  * @summary Update project
  */
-export const useUpdateProject = <
-  TError = void | HTTPValidationError,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof updateProject>>,
-      TError,
-      { projectId: string; data: ProjectUpdate },
-      TContext
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof updateProject>>,
-  TError,
-  { projectId: string; data: ProjectUpdate },
-  TContext
-> => {
-  const mutationOptions = getUpdateProjectMutationOptions(options);
+export const useUpdateProject = <TError = void | HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateProject>>, TError,{projectId: string;data: ProjectUpdate}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof updateProject>>,
+        TError,
+        {projectId: string;data: ProjectUpdate},
+        TContext
+      > => {
 
-  return useMutation(mutationOptions, queryClient);
-};
-/**
+      const mutationOptions = getUpdateProjectMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    /**
  * Delete a project. Owner only.
  * @summary Delete project
  */
 export const deleteProject = (
-  projectId: string,
-  options?: SecondParameter<typeof customInstance>,
-) => {
-  return customInstance<void>(
-    { url: `/projects/${projectId}`, method: "DELETE" },
-    options,
-  );
-};
+    projectId: string,
+ options?: SecondParameter<typeof customInstance>,) => {
+      
+      
+      return customInstance<void>(
+      {url: `/projects/${projectId}`, method: 'DELETE'
+    },
+      options);
+    }
+  
 
-export const getDeleteProjectMutationOptions = <
-  TError = void | HTTPValidationError,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof deleteProject>>,
-    TError,
-    { projectId: string },
-    TContext
-  >;
-  request?: SecondParameter<typeof customInstance>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof deleteProject>>,
-  TError,
-  { projectId: string },
-  TContext
-> => {
-  const mutationKey = ["deleteProject"];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      "mutationKey" in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
 
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof deleteProject>>,
-    { projectId: string }
-  > = (props) => {
-    const { projectId } = props ?? {};
+export const getDeleteProjectMutationOptions = <TError = void | HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteProject>>, TError,{projectId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteProject>>, TError,{projectId: string}, TContext> => {
 
-    return deleteProject(projectId, requestOptions);
-  };
+const mutationKey = ['deleteProject'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
 
-  return { mutationFn, ...mutationOptions };
-};
+      
 
-export type DeleteProjectMutationResult = NonNullable<
-  Awaited<ReturnType<typeof deleteProject>>
->;
 
-export type DeleteProjectMutationError = void | HTTPValidationError;
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteProject>>, {projectId: string}> = (props) => {
+          const {projectId} = props ?? {};
 
-/**
+          return  deleteProject(projectId,requestOptions)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteProjectMutationResult = NonNullable<Awaited<ReturnType<typeof deleteProject>>>
+    
+    export type DeleteProjectMutationError = void | HTTPValidationError
+
+    /**
  * @summary Delete project
  */
-export const useDeleteProject = <
-  TError = void | HTTPValidationError,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof deleteProject>>,
-      TError,
-      { projectId: string },
-      TContext
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof deleteProject>>,
-  TError,
-  { projectId: string },
-  TContext
-> => {
-  const mutationOptions = getDeleteProjectMutationOptions(options);
+export const useDeleteProject = <TError = void | HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteProject>>, TError,{projectId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof deleteProject>>,
+        TError,
+        {projectId: string},
+        TContext
+      > => {
 
-  return useMutation(mutationOptions, queryClient);
-};
-/**
+      const mutationOptions = getDeleteProjectMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    /**
  * List all members of a project.
  * @summary List project members
  */
 export const listProjectMembers = (
-  projectId: string,
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
+    projectId: string,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  return customInstance<QdashApiSchemasProjectMemberListResponse>(
-    { url: `/projects/${projectId}/members`, method: "GET", signal },
-    options,
-  );
-};
+      
+      
+      return customInstance<QdashApiSchemasProjectMemberListResponse>(
+      {url: `/projects/${projectId}/members`, method: 'GET', signal
+    },
+      options);
+    }
+  
 
-export const getListProjectMembersQueryKey = (projectId?: string) => {
-  return [`/projects/${projectId}/members`] as const;
-};
 
-export const getListProjectMembersQueryOptions = <
-  TData = Awaited<ReturnType<typeof listProjectMembers>>,
-  TError = void | HTTPValidationError,
->(
-  projectId: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof listProjectMembers>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
+
+export const getListProjectMembersQueryKey = (projectId?: string,) => {
+    return [
+    `/projects/${projectId}/members`
+    ] as const;
+    }
+
+    
+export const getListProjectMembersQueryOptions = <TData = Awaited<ReturnType<typeof listProjectMembers>>, TError = void | HTTPValidationError>(projectId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listProjectMembers>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey =
-    queryOptions?.queryKey ?? getListProjectMembersQueryKey(projectId);
+const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof listProjectMembers>>
-  > = ({ signal }) => listProjectMembers(projectId, requestOptions, signal);
+  const queryKey =  queryOptions?.queryKey ?? getListProjectMembersQueryKey(projectId);
 
-  return {
-    queryKey,
-    queryFn,
-    enabled: !!projectId,
-    ...queryOptions,
-  } as UseQueryOptions<
-    Awaited<ReturnType<typeof listProjectMembers>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData> };
-};
+  
 
-export type ListProjectMembersQueryResult = NonNullable<
-  Awaited<ReturnType<typeof listProjectMembers>>
->;
-export type ListProjectMembersQueryError = void | HTTPValidationError;
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listProjectMembers>>> = ({ signal }) => listProjectMembers(projectId, requestOptions, signal);
 
-export function useListProjectMembers<
-  TData = Awaited<ReturnType<typeof listProjectMembers>>,
-  TError = void | HTTPValidationError,
->(
-  projectId: string,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof listProjectMembers>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
+      
+
+      
+
+   return  { queryKey, queryFn, enabled: !!(projectId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listProjectMembers>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+}
+
+export type ListProjectMembersQueryResult = NonNullable<Awaited<ReturnType<typeof listProjectMembers>>>
+export type ListProjectMembersQueryError = void | HTTPValidationError
+
+
+export function useListProjectMembers<TData = Awaited<ReturnType<typeof listProjectMembers>>, TError = void | HTTPValidationError>(
+ projectId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listProjectMembers>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof listProjectMembers>>,
           TError,
           Awaited<ReturnType<typeof listProjectMembers>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData>;
-};
-export function useListProjectMembers<
-  TData = Awaited<ReturnType<typeof listProjectMembers>>,
-  TError = void | HTTPValidationError,
->(
-  projectId: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof listProjectMembers>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useListProjectMembers<TData = Awaited<ReturnType<typeof listProjectMembers>>, TError = void | HTTPValidationError>(
+ projectId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listProjectMembers>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof listProjectMembers>>,
           TError,
           Awaited<ReturnType<typeof listProjectMembers>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
-export function useListProjectMembers<
-  TData = Awaited<ReturnType<typeof listProjectMembers>>,
-  TError = void | HTTPValidationError,
->(
-  projectId: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof listProjectMembers>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useListProjectMembers<TData = Awaited<ReturnType<typeof listProjectMembers>>, TError = void | HTTPValidationError>(
+ projectId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listProjectMembers>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
 /**
  * @summary List project members
  */
 
-export function useListProjectMembers<
-  TData = Awaited<ReturnType<typeof listProjectMembers>>,
-  TError = void | HTTPValidationError,
->(
-  projectId: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof listProjectMembers>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
-  const queryOptions = getListProjectMembersQueryOptions(projectId, options);
+export function useListProjectMembers<TData = Awaited<ReturnType<typeof listProjectMembers>>, TError = void | HTTPValidationError>(
+ projectId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listProjectMembers>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
 
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData> };
+  const queryOptions = getListProjectMembersQueryOptions(projectId,options)
 
-  query.queryKey = queryOptions.queryKey;
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey ;
 
   return query;
 }
+
+
 
 /**
  * Invite a user to the project. Owner only.
  * @summary Invite a member
  */
 export const inviteProjectMember = (
-  projectId: string,
-  memberInvite: MemberInvite,
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
+    projectId: string,
+    memberInvite: MemberInvite,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  return customInstance<MemberResponse>(
-    {
-      url: `/projects/${projectId}/members`,
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      data: memberInvite,
-      signal,
+      
+      
+      return customInstance<MemberResponse>(
+      {url: `/projects/${projectId}/members`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: memberInvite, signal
     },
-    options,
-  );
-};
+      options);
+    }
+  
 
-export const getInviteProjectMemberMutationOptions = <
-  TError = void | HTTPValidationError,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof inviteProjectMember>>,
-    TError,
-    { projectId: string; data: MemberInvite },
-    TContext
-  >;
-  request?: SecondParameter<typeof customInstance>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof inviteProjectMember>>,
-  TError,
-  { projectId: string; data: MemberInvite },
-  TContext
-> => {
-  const mutationKey = ["inviteProjectMember"];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      "mutationKey" in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
 
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof inviteProjectMember>>,
-    { projectId: string; data: MemberInvite }
-  > = (props) => {
-    const { projectId, data } = props ?? {};
+export const getInviteProjectMemberMutationOptions = <TError = void | HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof inviteProjectMember>>, TError,{projectId: string;data: MemberInvite}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof inviteProjectMember>>, TError,{projectId: string;data: MemberInvite}, TContext> => {
 
-    return inviteProjectMember(projectId, data, requestOptions);
-  };
+const mutationKey = ['inviteProjectMember'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
 
-  return { mutationFn, ...mutationOptions };
-};
+      
 
-export type InviteProjectMemberMutationResult = NonNullable<
-  Awaited<ReturnType<typeof inviteProjectMember>>
->;
-export type InviteProjectMemberMutationBody = MemberInvite;
-export type InviteProjectMemberMutationError = void | HTTPValidationError;
 
-/**
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof inviteProjectMember>>, {projectId: string;data: MemberInvite}> = (props) => {
+          const {projectId,data} = props ?? {};
+
+          return  inviteProjectMember(projectId,data,requestOptions)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type InviteProjectMemberMutationResult = NonNullable<Awaited<ReturnType<typeof inviteProjectMember>>>
+    export type InviteProjectMemberMutationBody = MemberInvite
+    export type InviteProjectMemberMutationError = void | HTTPValidationError
+
+    /**
  * @summary Invite a member
  */
-export const useInviteProjectMember = <
-  TError = void | HTTPValidationError,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof inviteProjectMember>>,
-      TError,
-      { projectId: string; data: MemberInvite },
-      TContext
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof inviteProjectMember>>,
-  TError,
-  { projectId: string; data: MemberInvite },
-  TContext
-> => {
-  const mutationOptions = getInviteProjectMemberMutationOptions(options);
+export const useInviteProjectMember = <TError = void | HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof inviteProjectMember>>, TError,{projectId: string;data: MemberInvite}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof inviteProjectMember>>,
+        TError,
+        {projectId: string;data: MemberInvite},
+        TContext
+      > => {
 
-  return useMutation(mutationOptions, queryClient);
-};
-/**
+      const mutationOptions = getInviteProjectMemberMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    /**
  * Update a member's role. Owner only.
  * @summary Update member role
  */
 export const updateProjectMember = (
-  projectId: string,
-  username: string,
-  memberUpdate: MemberUpdate,
-  options?: SecondParameter<typeof customInstance>,
-) => {
-  return customInstance<MemberResponse>(
-    {
-      url: `/projects/${projectId}/members/${username}`,
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      data: memberUpdate,
+    projectId: string,
+    username: string,
+    memberUpdate: MemberUpdate,
+ options?: SecondParameter<typeof customInstance>,) => {
+      
+      
+      return customInstance<MemberResponse>(
+      {url: `/projects/${projectId}/members/${username}`, method: 'PATCH',
+      headers: {'Content-Type': 'application/json', },
+      data: memberUpdate
     },
-    options,
-  );
-};
+      options);
+    }
+  
 
-export const getUpdateProjectMemberMutationOptions = <
-  TError = void | HTTPValidationError,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof updateProjectMember>>,
-    TError,
-    { projectId: string; username: string; data: MemberUpdate },
-    TContext
-  >;
-  request?: SecondParameter<typeof customInstance>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof updateProjectMember>>,
-  TError,
-  { projectId: string; username: string; data: MemberUpdate },
-  TContext
-> => {
-  const mutationKey = ["updateProjectMember"];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      "mutationKey" in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
 
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof updateProjectMember>>,
-    { projectId: string; username: string; data: MemberUpdate }
-  > = (props) => {
-    const { projectId, username, data } = props ?? {};
+export const getUpdateProjectMemberMutationOptions = <TError = void | HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateProjectMember>>, TError,{projectId: string;username: string;data: MemberUpdate}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateProjectMember>>, TError,{projectId: string;username: string;data: MemberUpdate}, TContext> => {
 
-    return updateProjectMember(projectId, username, data, requestOptions);
-  };
+const mutationKey = ['updateProjectMember'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
 
-  return { mutationFn, ...mutationOptions };
-};
+      
 
-export type UpdateProjectMemberMutationResult = NonNullable<
-  Awaited<ReturnType<typeof updateProjectMember>>
->;
-export type UpdateProjectMemberMutationBody = MemberUpdate;
-export type UpdateProjectMemberMutationError = void | HTTPValidationError;
 
-/**
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateProjectMember>>, {projectId: string;username: string;data: MemberUpdate}> = (props) => {
+          const {projectId,username,data} = props ?? {};
+
+          return  updateProjectMember(projectId,username,data,requestOptions)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateProjectMemberMutationResult = NonNullable<Awaited<ReturnType<typeof updateProjectMember>>>
+    export type UpdateProjectMemberMutationBody = MemberUpdate
+    export type UpdateProjectMemberMutationError = void | HTTPValidationError
+
+    /**
  * @summary Update member role
  */
-export const useUpdateProjectMember = <
-  TError = void | HTTPValidationError,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof updateProjectMember>>,
-      TError,
-      { projectId: string; username: string; data: MemberUpdate },
-      TContext
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof updateProjectMember>>,
-  TError,
-  { projectId: string; username: string; data: MemberUpdate },
-  TContext
-> => {
-  const mutationOptions = getUpdateProjectMemberMutationOptions(options);
+export const useUpdateProjectMember = <TError = void | HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateProjectMember>>, TError,{projectId: string;username: string;data: MemberUpdate}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof updateProjectMember>>,
+        TError,
+        {projectId: string;username: string;data: MemberUpdate},
+        TContext
+      > => {
 
-  return useMutation(mutationOptions, queryClient);
-};
-/**
+      const mutationOptions = getUpdateProjectMemberMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    /**
  * Remove a member from the project. Owner only.
  * @summary Remove member
  */
 export const removeProjectMember = (
-  projectId: string,
-  username: string,
-  options?: SecondParameter<typeof customInstance>,
-) => {
-  return customInstance<void>(
-    { url: `/projects/${projectId}/members/${username}`, method: "DELETE" },
-    options,
-  );
-};
+    projectId: string,
+    username: string,
+ options?: SecondParameter<typeof customInstance>,) => {
+      
+      
+      return customInstance<void>(
+      {url: `/projects/${projectId}/members/${username}`, method: 'DELETE'
+    },
+      options);
+    }
+  
 
-export const getRemoveProjectMemberMutationOptions = <
-  TError = void | HTTPValidationError,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof removeProjectMember>>,
-    TError,
-    { projectId: string; username: string },
-    TContext
-  >;
-  request?: SecondParameter<typeof customInstance>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof removeProjectMember>>,
-  TError,
-  { projectId: string; username: string },
-  TContext
-> => {
-  const mutationKey = ["removeProjectMember"];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      "mutationKey" in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
 
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof removeProjectMember>>,
-    { projectId: string; username: string }
-  > = (props) => {
-    const { projectId, username } = props ?? {};
+export const getRemoveProjectMemberMutationOptions = <TError = void | HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof removeProjectMember>>, TError,{projectId: string;username: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof removeProjectMember>>, TError,{projectId: string;username: string}, TContext> => {
 
-    return removeProjectMember(projectId, username, requestOptions);
-  };
+const mutationKey = ['removeProjectMember'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
 
-  return { mutationFn, ...mutationOptions };
-};
+      
 
-export type RemoveProjectMemberMutationResult = NonNullable<
-  Awaited<ReturnType<typeof removeProjectMember>>
->;
 
-export type RemoveProjectMemberMutationError = void | HTTPValidationError;
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof removeProjectMember>>, {projectId: string;username: string}> = (props) => {
+          const {projectId,username} = props ?? {};
 
-/**
+          return  removeProjectMember(projectId,username,requestOptions)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RemoveProjectMemberMutationResult = NonNullable<Awaited<ReturnType<typeof removeProjectMember>>>
+    
+    export type RemoveProjectMemberMutationError = void | HTTPValidationError
+
+    /**
  * @summary Remove member
  */
-export const useRemoveProjectMember = <
-  TError = void | HTTPValidationError,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof removeProjectMember>>,
-      TError,
-      { projectId: string; username: string },
-      TContext
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof removeProjectMember>>,
-  TError,
-  { projectId: string; username: string },
-  TContext
-> => {
-  const mutationOptions = getRemoveProjectMemberMutationOptions(options);
+export const useRemoveProjectMember = <TError = void | HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof removeProjectMember>>, TError,{projectId: string;username: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof removeProjectMember>>,
+        TError,
+        {projectId: string;username: string},
+        TContext
+      > => {
 
-  return useMutation(mutationOptions, queryClient);
-};
-/**
+      const mutationOptions = getRemoveProjectMemberMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    /**
  * Transfer project ownership to another user. Admin only.
  * @summary Transfer project ownership
  */
 export const transferProjectOwnership = (
-  projectId: string,
-  memberInvite: MemberInvite,
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
+    projectId: string,
+    memberInvite: MemberInvite,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  return customInstance<ProjectResponse>(
-    {
-      url: `/projects/${projectId}/transfer`,
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      data: memberInvite,
-      signal,
+      
+      
+      return customInstance<ProjectResponse>(
+      {url: `/projects/${projectId}/transfer`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: memberInvite, signal
     },
-    options,
-  );
-};
+      options);
+    }
+  
 
-export const getTransferProjectOwnershipMutationOptions = <
-  TError = void | HTTPValidationError,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof transferProjectOwnership>>,
-    TError,
-    { projectId: string; data: MemberInvite },
-    TContext
-  >;
-  request?: SecondParameter<typeof customInstance>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof transferProjectOwnership>>,
-  TError,
-  { projectId: string; data: MemberInvite },
-  TContext
-> => {
-  const mutationKey = ["transferProjectOwnership"];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      "mutationKey" in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
 
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof transferProjectOwnership>>,
-    { projectId: string; data: MemberInvite }
-  > = (props) => {
-    const { projectId, data } = props ?? {};
+export const getTransferProjectOwnershipMutationOptions = <TError = void | HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof transferProjectOwnership>>, TError,{projectId: string;data: MemberInvite}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof transferProjectOwnership>>, TError,{projectId: string;data: MemberInvite}, TContext> => {
 
-    return transferProjectOwnership(projectId, data, requestOptions);
-  };
+const mutationKey = ['transferProjectOwnership'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
 
-  return { mutationFn, ...mutationOptions };
-};
+      
 
-export type TransferProjectOwnershipMutationResult = NonNullable<
-  Awaited<ReturnType<typeof transferProjectOwnership>>
->;
-export type TransferProjectOwnershipMutationBody = MemberInvite;
-export type TransferProjectOwnershipMutationError = void | HTTPValidationError;
 
-/**
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof transferProjectOwnership>>, {projectId: string;data: MemberInvite}> = (props) => {
+          const {projectId,data} = props ?? {};
+
+          return  transferProjectOwnership(projectId,data,requestOptions)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type TransferProjectOwnershipMutationResult = NonNullable<Awaited<ReturnType<typeof transferProjectOwnership>>>
+    export type TransferProjectOwnershipMutationBody = MemberInvite
+    export type TransferProjectOwnershipMutationError = void | HTTPValidationError
+
+    /**
  * @summary Transfer project ownership
  */
-export const useTransferProjectOwnership = <
-  TError = void | HTTPValidationError,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof transferProjectOwnership>>,
-      TError,
-      { projectId: string; data: MemberInvite },
-      TContext
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof transferProjectOwnership>>,
-  TError,
-  { projectId: string; data: MemberInvite },
-  TContext
-> => {
-  const mutationOptions = getTransferProjectOwnershipMutationOptions(options);
+export const useTransferProjectOwnership = <TError = void | HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof transferProjectOwnership>>, TError,{projectId: string;data: MemberInvite}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof transferProjectOwnership>>,
+        TError,
+        {projectId: string;data: MemberInvite},
+        TContext
+      > => {
 
-  return useMutation(mutationOptions, queryClient);
-};
+      const mutationOptions = getTransferProjectOwnershipMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    

@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -362,6 +363,21 @@ def _resolve_json_path() -> Path | None:
     return None
 
 
+def _resolve_repo_dir() -> Path | None:
+    """Locate the cloned task-knowledge repository directory, if available."""
+    from qdash.common.config.loader import ConfigLoader
+
+    repo_dir = ConfigLoader.get_config_dir() / "task-knowledge"
+    if repo_dir.is_dir():
+        return repo_dir
+
+    json_path = _resolve_json_path()
+    if json_path is not None and json_path.parent.name == "task-knowledge":
+        return json_path.parent
+
+    return None
+
+
 def _build_registry() -> dict[str, TaskKnowledge]:
     """Build the task knowledge registry from the generated JSON file."""
     json_path = _resolve_json_path()
@@ -388,6 +404,25 @@ def get_task_knowledge(task_name: str) -> TaskKnowledge | None:
 def list_all_task_knowledge() -> list[TaskKnowledge]:
     """Return all task knowledge entries."""
     return list(TASK_KNOWLEDGE_REGISTRY.values())
+
+
+def get_task_knowledge_repo_metadata() -> tuple[str | None, str | None]:
+    """Return the configured knowledge repo URL and current commit if available."""
+    repo_url = os.getenv("KNOWLEDGE_REPO_URL") or None
+    repo_dir = _resolve_repo_dir()
+    if repo_dir is None:
+        return repo_url, None
+
+    try:
+        from git import Repo
+        from git.exc import GitError, InvalidGitRepositoryError, NoSuchPathError
+
+        repo = Repo(repo_dir)
+        if repo_url is None and repo.remotes:
+            repo_url = next((remote.url for remote in repo.remotes if remote.url), None)
+        return repo_url, repo.head.commit.hexsha
+    except (GitError, InvalidGitRepositoryError, NoSuchPathError, ValueError):
+        return repo_url, None
 
 
 # Category slug → display name mapping

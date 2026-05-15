@@ -14,11 +14,12 @@ Roles intentionally stay coarse-grained:
 - EDITOR: Operational write access
 - VIEWER: Read-only access
  */
-export type ProjectRole = (typeof ProjectRole)[keyof typeof ProjectRole];
+export type ProjectRole = typeof ProjectRole[keyof typeof ProjectRole];
+
 
 // eslint-disable-next-line @typescript-eslint/no-redeclare
 export const ProjectRole = {
-  owner: "owner",
-  editor: "editor",
-  viewer: "viewer",
+  owner: 'owner',
+  editor: 'editor',
+  viewer: 'viewer',
 } as const;

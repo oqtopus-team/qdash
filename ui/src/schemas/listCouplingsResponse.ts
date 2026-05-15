@@ -5,7 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { CouplingResponse } from "./couplingResponse";
+import type { CouplingResponse } from './couplingResponse';
 
 /**
  * Response model for listing couplings with pagination.

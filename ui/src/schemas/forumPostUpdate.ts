@@ -5,7 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { ForumPostUpdateTitle } from "./forumPostUpdateTitle";
+import type { ForumPostUpdateTitle } from './forumPostUpdateTitle';
 
 /**
  * Request schema for updating a forum post.

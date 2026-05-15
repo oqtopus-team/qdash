@@ -5,7 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { NoteEventResponse } from "./noteEventResponse";
+import type { NoteEventResponse } from './noteEventResponse';
 
 /**
  * Paginated note-event feed.

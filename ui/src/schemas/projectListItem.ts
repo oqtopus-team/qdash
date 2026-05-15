@@ -5,8 +5,8 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { ProjectListItemDescription } from "./projectListItemDescription";
-import type { ProjectListItemCreatedAt } from "./projectListItemCreatedAt";
+import type { ProjectListItemDescription } from './projectListItemDescription';
+import type { ProjectListItemCreatedAt } from './projectListItemCreatedAt';
 
 /**
  * Project summary for admin list view.

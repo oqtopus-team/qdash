@@ -79,6 +79,7 @@ services:
     volumes:
       - ./src/qdash/workflow:/app/qdash/workflow
       - ./src/qdash/analysis:/app/qdash/analysis # Shared spectroscopy analysis (also used by api)
+      - ./src/qdash/copilot:/app/qdash/copilot
       - ./src/qdash/dbmodel:/app/qdash/dbmodel
       - ./src/qdash/datamodel:/app/qdash/datamodel
       - ./src/qdash/common:/app/qdash/common
@@ -109,6 +110,7 @@ services:
     volumes:
       - ./src/qdash/workflow:/app/qdash/workflow
       - ./src/qdash/analysis:/app/qdash/analysis # Shared spectroscopy analysis
+      - ./src/qdash/copilot:/app/qdash/copilot
       - ./src/qdash/dbmodel:/app/qdash/dbmodel
       - ./src/qdash/datamodel:/app/qdash/datamodel
       - ./src/qdash/common:/app/qdash/common
@@ -140,6 +142,7 @@ services:
     volumes:
       - ./src/qdash/api:/app/qdash/api
       - ./src/qdash/analysis:/app/qdash/analysis # Shared spectroscopy analysis (used by reanalysis service)
+      - ./src/qdash/copilot:/app/qdash/copilot
       - ./src/qdash/dbmodel:/app/qdash/dbmodel
       - ./src/qdash/datamodel:/app/qdash/datamodel
       - ./src/qdash/common:/app/qdash/common

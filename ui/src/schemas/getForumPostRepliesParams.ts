@@ -7,15 +7,15 @@
  */
 
 export type GetForumPostRepliesParams = {
-  /**
-   * Number of replies to skip
-   * @minimum 0
-   */
-  skip?: number;
-  /**
-   * Max replies to return
-   * @minimum 1
-   * @maximum 200
-   */
-  limit?: number;
+/**
+ * Number of replies to skip
+ * @minimum 0
+ */
+skip?: number;
+/**
+ * Max replies to return
+ * @minimum 1
+ * @maximum 200
+ */
+limit?: number;
 };

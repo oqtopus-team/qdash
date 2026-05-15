@@ -5,7 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { TaskHistoryResponseData } from "./taskHistoryResponseData";
+import type { TaskHistoryResponseData } from './taskHistoryResponseData';
 
 /**
  * Response model for fetching task history.

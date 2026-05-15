@@ -5,11 +5,11 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { UserListItemDisplayName } from "./userListItemDisplayName";
-import type { UserListItemOrganization } from "./userListItemOrganization";
-import type { UserListItemAvatarKey } from "./userListItemAvatarKey";
-import type { SystemRole } from "./systemRole";
-import type { UserListItemDefaultProjectId } from "./userListItemDefaultProjectId";
+import type { UserListItemDisplayName } from './userListItemDisplayName';
+import type { UserListItemOrganization } from './userListItemOrganization';
+import type { UserListItemAvatarKey } from './userListItemAvatarKey';
+import type { SystemRole } from './systemRole';
+import type { UserListItemDefaultProjectId } from './userListItemDefaultProjectId';
 
 /**
  * User summary for admin list view.

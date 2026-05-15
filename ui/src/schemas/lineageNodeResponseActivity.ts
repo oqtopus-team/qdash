@@ -5,6 +5,6 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { ActivityResponse } from "./activityResponse";
+import type { ActivityResponse } from './activityResponse';
 
 export type LineageNodeResponseActivity = ActivityResponse | null;

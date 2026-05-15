@@ -5,7 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { ManualEditItem } from "./manualEditItem";
+import type { ManualEditItem } from './manualEditItem';
 
 /**
  * All manual edits for a qid.

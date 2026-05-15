@@ -7,8 +7,8 @@
  */
 
 export type ListTasksParams = {
-  /**
-   * Optional backend name to filter tasks by
-   */
-  backend?: string | null;
+/**
+ * Optional backend name to filter tasks by
+ */
+backend?: string | null;
 };

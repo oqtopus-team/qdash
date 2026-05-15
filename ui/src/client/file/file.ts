@@ -5,7 +5,10 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import { useMutation, useQuery } from "@tanstack/react-query";
+import {
+  useMutation,
+  useQuery
+} from '@tanstack/react-query';
 import type {
   DataTag,
   DefinedInitialDataOptions,
@@ -18,8 +21,8 @@ import type {
   UseMutationOptions,
   UseMutationResult,
   UseQueryOptions,
-  UseQueryResult,
-} from "@tanstack/react-query";
+  UseQueryResult
+} from '@tanstack/react-query';
 
 import type {
   DownloadFileParams,
@@ -35,12 +38,15 @@ import type {
   SaveFileContent200,
   SaveFileRequest,
   ValidateFileContent200,
-  ValidateFileRequest,
-} from "../../schemas";
+  ValidateFileRequest
+} from '../../schemas';
 
-import { customInstance } from "../../lib/custom-instance";
+import { customInstance } from '../../lib/custom-instance';
+
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
+
+
 
 /**
  * Download a raw data file from the server.
@@ -57,137 +63,93 @@ FileResponse
  * @summary Download file
  */
 export const downloadFile = (
-  params: DownloadFileParams,
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
+    params: DownloadFileParams,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  return customInstance<void>(
-    { url: `/files/raw-data`, method: "GET", params, signal },
-    options,
-  );
-};
+      
+      
+      return customInstance<void>(
+      {url: `/files/raw-data`, method: 'GET',
+        params, signal
+    },
+      options);
+    }
+  
 
-export const getDownloadFileQueryKey = (params?: DownloadFileParams) => {
-  return [`/files/raw-data`, ...(params ? [params] : [])] as const;
-};
 
-export const getDownloadFileQueryOptions = <
-  TData = Awaited<ReturnType<typeof downloadFile>>,
-  TError = HTTPValidationError,
->(
-  params: DownloadFileParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof downloadFile>>, TError, TData>
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
+
+export const getDownloadFileQueryKey = (params?: DownloadFileParams,) => {
+    return [
+    `/files/raw-data`, ...(params ? [params]: [])
+    ] as const;
+    }
+
+    
+export const getDownloadFileQueryOptions = <TData = Awaited<ReturnType<typeof downloadFile>>, TError = HTTPValidationError>(params: DownloadFileParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof downloadFile>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey = queryOptions?.queryKey ?? getDownloadFileQueryKey(params);
+const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof downloadFile>>> = ({
-    signal,
-  }) => downloadFile(params, requestOptions, signal);
+  const queryKey =  queryOptions?.queryKey ?? getDownloadFileQueryKey(params);
 
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof downloadFile>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData> };
-};
+  
 
-export type DownloadFileQueryResult = NonNullable<
-  Awaited<ReturnType<typeof downloadFile>>
->;
-export type DownloadFileQueryError = HTTPValidationError;
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof downloadFile>>> = ({ signal }) => downloadFile(params, requestOptions, signal);
 
-export function useDownloadFile<
-  TData = Awaited<ReturnType<typeof downloadFile>>,
-  TError = HTTPValidationError,
->(
-  params: DownloadFileParams,
-  options: {
-    query: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof downloadFile>>, TError, TData>
-    > &
-      Pick<
+      
+
+      
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof downloadFile>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+}
+
+export type DownloadFileQueryResult = NonNullable<Awaited<ReturnType<typeof downloadFile>>>
+export type DownloadFileQueryError = HTTPValidationError
+
+
+export function useDownloadFile<TData = Awaited<ReturnType<typeof downloadFile>>, TError = HTTPValidationError>(
+ params: DownloadFileParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof downloadFile>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof downloadFile>>,
           TError,
           Awaited<ReturnType<typeof downloadFile>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData>;
-};
-export function useDownloadFile<
-  TData = Awaited<ReturnType<typeof downloadFile>>,
-  TError = HTTPValidationError,
->(
-  params: DownloadFileParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof downloadFile>>, TError, TData>
-    > &
-      Pick<
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useDownloadFile<TData = Awaited<ReturnType<typeof downloadFile>>, TError = HTTPValidationError>(
+ params: DownloadFileParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof downloadFile>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof downloadFile>>,
           TError,
           Awaited<ReturnType<typeof downloadFile>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
-export function useDownloadFile<
-  TData = Awaited<ReturnType<typeof downloadFile>>,
-  TError = HTTPValidationError,
->(
-  params: DownloadFileParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof downloadFile>>, TError, TData>
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useDownloadFile<TData = Awaited<ReturnType<typeof downloadFile>>, TError = HTTPValidationError>(
+ params: DownloadFileParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof downloadFile>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
 /**
  * @summary Download file
  */
 
-export function useDownloadFile<
-  TData = Awaited<ReturnType<typeof downloadFile>>,
-  TError = HTTPValidationError,
->(
-  params: DownloadFileParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof downloadFile>>, TError, TData>
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
-  const queryOptions = getDownloadFileQueryOptions(params, options);
+export function useDownloadFile<TData = Awaited<ReturnType<typeof downloadFile>>, TError = HTTPValidationError>(
+ params: DownloadFileParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof downloadFile>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
 
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData> };
+  const queryOptions = getDownloadFileQueryOptions(params,options)
 
-  query.queryKey = queryOptions.queryKey;
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey ;
 
   return query;
 }
+
+
 
 /**
  * Download a file or directory as a ZIP archive.
@@ -204,157 +166,93 @@ FileResponse
  * @summary Download file or directory as zip
  */
 export const downloadZipFile = (
-  params: DownloadZipFileParams,
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
+    params: DownloadZipFileParams,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  return customInstance<void>(
-    { url: `/files/zip`, method: "GET", params, signal },
-    options,
-  );
-};
+      
+      
+      return customInstance<void>(
+      {url: `/files/zip`, method: 'GET',
+        params, signal
+    },
+      options);
+    }
+  
 
-export const getDownloadZipFileQueryKey = (params?: DownloadZipFileParams) => {
-  return [`/files/zip`, ...(params ? [params] : [])] as const;
-};
 
-export const getDownloadZipFileQueryOptions = <
-  TData = Awaited<ReturnType<typeof downloadZipFile>>,
-  TError = HTTPValidationError,
->(
-  params: DownloadZipFileParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof downloadZipFile>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
+
+export const getDownloadZipFileQueryKey = (params?: DownloadZipFileParams,) => {
+    return [
+    `/files/zip`, ...(params ? [params]: [])
+    ] as const;
+    }
+
+    
+export const getDownloadZipFileQueryOptions = <TData = Awaited<ReturnType<typeof downloadZipFile>>, TError = HTTPValidationError>(params: DownloadZipFileParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof downloadZipFile>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey = queryOptions?.queryKey ?? getDownloadZipFileQueryKey(params);
+const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof downloadZipFile>>> = ({
-    signal,
-  }) => downloadZipFile(params, requestOptions, signal);
+  const queryKey =  queryOptions?.queryKey ?? getDownloadZipFileQueryKey(params);
 
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof downloadZipFile>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData> };
-};
+  
 
-export type DownloadZipFileQueryResult = NonNullable<
-  Awaited<ReturnType<typeof downloadZipFile>>
->;
-export type DownloadZipFileQueryError = HTTPValidationError;
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof downloadZipFile>>> = ({ signal }) => downloadZipFile(params, requestOptions, signal);
 
-export function useDownloadZipFile<
-  TData = Awaited<ReturnType<typeof downloadZipFile>>,
-  TError = HTTPValidationError,
->(
-  params: DownloadZipFileParams,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof downloadZipFile>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
+      
+
+      
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof downloadZipFile>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+}
+
+export type DownloadZipFileQueryResult = NonNullable<Awaited<ReturnType<typeof downloadZipFile>>>
+export type DownloadZipFileQueryError = HTTPValidationError
+
+
+export function useDownloadZipFile<TData = Awaited<ReturnType<typeof downloadZipFile>>, TError = HTTPValidationError>(
+ params: DownloadZipFileParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof downloadZipFile>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof downloadZipFile>>,
           TError,
           Awaited<ReturnType<typeof downloadZipFile>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData>;
-};
-export function useDownloadZipFile<
-  TData = Awaited<ReturnType<typeof downloadZipFile>>,
-  TError = HTTPValidationError,
->(
-  params: DownloadZipFileParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof downloadZipFile>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useDownloadZipFile<TData = Awaited<ReturnType<typeof downloadZipFile>>, TError = HTTPValidationError>(
+ params: DownloadZipFileParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof downloadZipFile>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof downloadZipFile>>,
           TError,
           Awaited<ReturnType<typeof downloadZipFile>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
-export function useDownloadZipFile<
-  TData = Awaited<ReturnType<typeof downloadZipFile>>,
-  TError = HTTPValidationError,
->(
-  params: DownloadZipFileParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof downloadZipFile>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useDownloadZipFile<TData = Awaited<ReturnType<typeof downloadZipFile>>, TError = HTTPValidationError>(
+ params: DownloadZipFileParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof downloadZipFile>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
 /**
  * @summary Download file or directory as zip
  */
 
-export function useDownloadZipFile<
-  TData = Awaited<ReturnType<typeof downloadZipFile>>,
-  TError = HTTPValidationError,
->(
-  params: DownloadZipFileParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof downloadZipFile>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
-  const queryOptions = getDownloadZipFileQueryOptions(params, options);
+export function useDownloadZipFile<TData = Awaited<ReturnType<typeof downloadZipFile>>, TError = HTTPValidationError>(
+ params: DownloadZipFileParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof downloadZipFile>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
 
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData> };
+  const queryOptions = getDownloadZipFileQueryOptions(params,options)
 
-  query.queryKey = queryOptions.queryKey;
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey ;
 
   return query;
 }
+
+
 
 /**
  * Get file tree structure for entire config directory.
@@ -365,129 +263,92 @@ Returns
  * @summary Get file tree for entire config directory
  */
 export const getFileTree = (
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
+    
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  return customInstance<FileTreeNode[]>(
-    { url: `/files/tree`, method: "GET", signal },
-    options,
-  );
-};
+      
+      
+      return customInstance<FileTreeNode[]>(
+      {url: `/files/tree`, method: 'GET', signal
+    },
+      options);
+    }
+  
+
+
 
 export const getGetFileTreeQueryKey = () => {
-  return [`/files/tree`] as const;
-};
+    return [
+    `/files/tree`
+    ] as const;
+    }
 
-export const getGetFileTreeQueryOptions = <
-  TData = Awaited<ReturnType<typeof getFileTree>>,
-  TError = unknown,
->(options?: {
-  query?: Partial<
-    UseQueryOptions<Awaited<ReturnType<typeof getFileTree>>, TError, TData>
-  >;
-  request?: SecondParameter<typeof customInstance>;
-}) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
+    
+export const getGetFileTreeQueryOptions = <TData = Awaited<ReturnType<typeof getFileTree>>, TError = unknown>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFileTree>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
 
-  const queryKey = queryOptions?.queryKey ?? getGetFileTreeQueryKey();
+const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof getFileTree>>> = ({
-    signal,
-  }) => getFileTree(requestOptions, signal);
+  const queryKey =  queryOptions?.queryKey ?? getGetFileTreeQueryKey();
 
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof getFileTree>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData> };
-};
+  
 
-export type GetFileTreeQueryResult = NonNullable<
-  Awaited<ReturnType<typeof getFileTree>>
->;
-export type GetFileTreeQueryError = unknown;
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getFileTree>>> = ({ signal }) => getFileTree(requestOptions, signal);
 
-export function useGetFileTree<
-  TData = Awaited<ReturnType<typeof getFileTree>>,
-  TError = unknown,
->(
-  options: {
-    query: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof getFileTree>>, TError, TData>
-    > &
-      Pick<
+      
+
+      
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getFileTree>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+}
+
+export type GetFileTreeQueryResult = NonNullable<Awaited<ReturnType<typeof getFileTree>>>
+export type GetFileTreeQueryError = unknown
+
+
+export function useGetFileTree<TData = Awaited<ReturnType<typeof getFileTree>>, TError = unknown>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFileTree>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getFileTree>>,
           TError,
           Awaited<ReturnType<typeof getFileTree>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData>;
-};
-export function useGetFileTree<
-  TData = Awaited<ReturnType<typeof getFileTree>>,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof getFileTree>>, TError, TData>
-    > &
-      Pick<
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useGetFileTree<TData = Awaited<ReturnType<typeof getFileTree>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFileTree>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getFileTree>>,
           TError,
           Awaited<ReturnType<typeof getFileTree>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
-export function useGetFileTree<
-  TData = Awaited<ReturnType<typeof getFileTree>>,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof getFileTree>>, TError, TData>
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useGetFileTree<TData = Awaited<ReturnType<typeof getFileTree>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFileTree>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
 /**
  * @summary Get file tree for entire config directory
  */
 
-export function useGetFileTree<
-  TData = Awaited<ReturnType<typeof getFileTree>>,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof getFileTree>>, TError, TData>
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
-  const queryOptions = getGetFileTreeQueryOptions(options);
+export function useGetFileTree<TData = Awaited<ReturnType<typeof getFileTree>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFileTree>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
 
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData> };
+  const queryOptions = getGetFileTreeQueryOptions(options)
 
-  query.queryKey = queryOptions.queryKey;
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey ;
 
   return query;
 }
+
+
 
 /**
  * Get file content for editing.
@@ -502,137 +363,93 @@ Returns:
  * @summary Get file content for editing
  */
 export const getFileContent = (
-  params: GetFileContentParams,
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
+    params: GetFileContentParams,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  return customInstance<GetFileContent200>(
-    { url: `/files/content`, method: "GET", params, signal },
-    options,
-  );
-};
+      
+      
+      return customInstance<GetFileContent200>(
+      {url: `/files/content`, method: 'GET',
+        params, signal
+    },
+      options);
+    }
+  
 
-export const getGetFileContentQueryKey = (params?: GetFileContentParams) => {
-  return [`/files/content`, ...(params ? [params] : [])] as const;
-};
 
-export const getGetFileContentQueryOptions = <
-  TData = Awaited<ReturnType<typeof getFileContent>>,
-  TError = HTTPValidationError,
->(
-  params: GetFileContentParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof getFileContent>>, TError, TData>
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
+
+export const getGetFileContentQueryKey = (params?: GetFileContentParams,) => {
+    return [
+    `/files/content`, ...(params ? [params]: [])
+    ] as const;
+    }
+
+    
+export const getGetFileContentQueryOptions = <TData = Awaited<ReturnType<typeof getFileContent>>, TError = HTTPValidationError>(params: GetFileContentParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFileContent>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey = queryOptions?.queryKey ?? getGetFileContentQueryKey(params);
+const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof getFileContent>>> = ({
-    signal,
-  }) => getFileContent(params, requestOptions, signal);
+  const queryKey =  queryOptions?.queryKey ?? getGetFileContentQueryKey(params);
 
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof getFileContent>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData> };
-};
+  
 
-export type GetFileContentQueryResult = NonNullable<
-  Awaited<ReturnType<typeof getFileContent>>
->;
-export type GetFileContentQueryError = HTTPValidationError;
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getFileContent>>> = ({ signal }) => getFileContent(params, requestOptions, signal);
 
-export function useGetFileContent<
-  TData = Awaited<ReturnType<typeof getFileContent>>,
-  TError = HTTPValidationError,
->(
-  params: GetFileContentParams,
-  options: {
-    query: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof getFileContent>>, TError, TData>
-    > &
-      Pick<
+      
+
+      
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getFileContent>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+}
+
+export type GetFileContentQueryResult = NonNullable<Awaited<ReturnType<typeof getFileContent>>>
+export type GetFileContentQueryError = HTTPValidationError
+
+
+export function useGetFileContent<TData = Awaited<ReturnType<typeof getFileContent>>, TError = HTTPValidationError>(
+ params: GetFileContentParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFileContent>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getFileContent>>,
           TError,
           Awaited<ReturnType<typeof getFileContent>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData>;
-};
-export function useGetFileContent<
-  TData = Awaited<ReturnType<typeof getFileContent>>,
-  TError = HTTPValidationError,
->(
-  params: GetFileContentParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof getFileContent>>, TError, TData>
-    > &
-      Pick<
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useGetFileContent<TData = Awaited<ReturnType<typeof getFileContent>>, TError = HTTPValidationError>(
+ params: GetFileContentParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFileContent>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getFileContent>>,
           TError,
           Awaited<ReturnType<typeof getFileContent>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
-export function useGetFileContent<
-  TData = Awaited<ReturnType<typeof getFileContent>>,
-  TError = HTTPValidationError,
->(
-  params: GetFileContentParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof getFileContent>>, TError, TData>
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useGetFileContent<TData = Awaited<ReturnType<typeof getFileContent>>, TError = HTTPValidationError>(
+ params: GetFileContentParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFileContent>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
 /**
  * @summary Get file content for editing
  */
 
-export function useGetFileContent<
-  TData = Awaited<ReturnType<typeof getFileContent>>,
-  TError = HTTPValidationError,
->(
-  params: GetFileContentParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof getFileContent>>, TError, TData>
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
-  const queryOptions = getGetFileContentQueryOptions(params, options);
+export function useGetFileContent<TData = Awaited<ReturnType<typeof getFileContent>>, TError = HTTPValidationError>(
+ params: GetFileContentParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFileContent>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
 
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData> };
+  const queryOptions = getGetFileContentQueryOptions(params,options)
 
-  query.queryKey = queryOptions.queryKey;
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey ;
 
   return query;
 }
+
+
 
 /**
  * Save file content.
@@ -647,92 +464,66 @@ Returns:
  * @summary Save file content
  */
 export const saveFileContent = (
-  saveFileRequest: SaveFileRequest,
-  options?: SecondParameter<typeof customInstance>,
-) => {
-  return customInstance<SaveFileContent200>(
-    {
-      url: `/files/content`,
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      data: saveFileRequest,
+    saveFileRequest: SaveFileRequest,
+ options?: SecondParameter<typeof customInstance>,) => {
+      
+      
+      return customInstance<SaveFileContent200>(
+      {url: `/files/content`, method: 'PUT',
+      headers: {'Content-Type': 'application/json', },
+      data: saveFileRequest
     },
-    options,
-  );
-};
+      options);
+    }
+  
 
-export const getSaveFileContentMutationOptions = <
-  TError = HTTPValidationError,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof saveFileContent>>,
-    TError,
-    { data: SaveFileRequest },
-    TContext
-  >;
-  request?: SecondParameter<typeof customInstance>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof saveFileContent>>,
-  TError,
-  { data: SaveFileRequest },
-  TContext
-> => {
-  const mutationKey = ["saveFileContent"];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      "mutationKey" in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
 
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof saveFileContent>>,
-    { data: SaveFileRequest }
-  > = (props) => {
-    const { data } = props ?? {};
+export const getSaveFileContentMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveFileContent>>, TError,{data: SaveFileRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof saveFileContent>>, TError,{data: SaveFileRequest}, TContext> => {
 
-    return saveFileContent(data, requestOptions);
-  };
+const mutationKey = ['saveFileContent'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
 
-  return { mutationFn, ...mutationOptions };
-};
+      
 
-export type SaveFileContentMutationResult = NonNullable<
-  Awaited<ReturnType<typeof saveFileContent>>
->;
-export type SaveFileContentMutationBody = SaveFileRequest;
-export type SaveFileContentMutationError = HTTPValidationError;
 
-/**
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof saveFileContent>>, {data: SaveFileRequest}> = (props) => {
+          const {data} = props ?? {};
+
+          return  saveFileContent(data,requestOptions)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SaveFileContentMutationResult = NonNullable<Awaited<ReturnType<typeof saveFileContent>>>
+    export type SaveFileContentMutationBody = SaveFileRequest
+    export type SaveFileContentMutationError = HTTPValidationError
+
+    /**
  * @summary Save file content
  */
-export const useSaveFileContent = <
-  TError = HTTPValidationError,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof saveFileContent>>,
-      TError,
-      { data: SaveFileRequest },
-      TContext
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof saveFileContent>>,
-  TError,
-  { data: SaveFileRequest },
-  TContext
-> => {
-  const mutationOptions = getSaveFileContentMutationOptions(options);
+export const useSaveFileContent = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveFileContent>>, TError,{data: SaveFileRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof saveFileContent>>,
+        TError,
+        {data: SaveFileRequest},
+        TContext
+      > => {
 
-  return useMutation(mutationOptions, queryClient);
-};
-/**
+      const mutationOptions = getSaveFileContentMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    /**
  * Validate YAML or JSON content.
 
 Args:
@@ -745,94 +536,67 @@ Returns:
  * @summary Validate file content (YAML/JSON)
  */
 export const validateFileContent = (
-  validateFileRequest: ValidateFileRequest,
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
+    validateFileRequest: ValidateFileRequest,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  return customInstance<ValidateFileContent200>(
-    {
-      url: `/files/validate`,
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      data: validateFileRequest,
-      signal,
+      
+      
+      return customInstance<ValidateFileContent200>(
+      {url: `/files/validate`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: validateFileRequest, signal
     },
-    options,
-  );
-};
+      options);
+    }
+  
 
-export const getValidateFileContentMutationOptions = <
-  TError = HTTPValidationError,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof validateFileContent>>,
-    TError,
-    { data: ValidateFileRequest },
-    TContext
-  >;
-  request?: SecondParameter<typeof customInstance>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof validateFileContent>>,
-  TError,
-  { data: ValidateFileRequest },
-  TContext
-> => {
-  const mutationKey = ["validateFileContent"];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      "mutationKey" in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
 
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof validateFileContent>>,
-    { data: ValidateFileRequest }
-  > = (props) => {
-    const { data } = props ?? {};
+export const getValidateFileContentMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof validateFileContent>>, TError,{data: ValidateFileRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof validateFileContent>>, TError,{data: ValidateFileRequest}, TContext> => {
 
-    return validateFileContent(data, requestOptions);
-  };
+const mutationKey = ['validateFileContent'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
 
-  return { mutationFn, ...mutationOptions };
-};
+      
 
-export type ValidateFileContentMutationResult = NonNullable<
-  Awaited<ReturnType<typeof validateFileContent>>
->;
-export type ValidateFileContentMutationBody = ValidateFileRequest;
-export type ValidateFileContentMutationError = HTTPValidationError;
 
-/**
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof validateFileContent>>, {data: ValidateFileRequest}> = (props) => {
+          const {data} = props ?? {};
+
+          return  validateFileContent(data,requestOptions)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ValidateFileContentMutationResult = NonNullable<Awaited<ReturnType<typeof validateFileContent>>>
+    export type ValidateFileContentMutationBody = ValidateFileRequest
+    export type ValidateFileContentMutationError = HTTPValidationError
+
+    /**
  * @summary Validate file content (YAML/JSON)
  */
-export const useValidateFileContent = <
-  TError = HTTPValidationError,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof validateFileContent>>,
-      TError,
-      { data: ValidateFileRequest },
-      TContext
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof validateFileContent>>,
-  TError,
-  { data: ValidateFileRequest },
-  TContext
-> => {
-  const mutationOptions = getValidateFileContentMutationOptions(options);
+export const useValidateFileContent = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof validateFileContent>>, TError,{data: ValidateFileRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof validateFileContent>>,
+        TError,
+        {data: ValidateFileRequest},
+        TContext
+      > => {
 
-  return useMutation(mutationOptions, queryClient);
-};
-/**
+      const mutationOptions = getValidateFileContentMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    /**
  * Get Git status of config directory.
 
 Returns
@@ -841,129 +605,92 @@ Returns
  * @summary Get Git status of config directory
  */
 export const getGitStatus = (
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
+    
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  return customInstance<GetGitStatus200>(
-    { url: `/files/git/status`, method: "GET", signal },
-    options,
-  );
-};
+      
+      
+      return customInstance<GetGitStatus200>(
+      {url: `/files/git/status`, method: 'GET', signal
+    },
+      options);
+    }
+  
+
+
 
 export const getGetGitStatusQueryKey = () => {
-  return [`/files/git/status`] as const;
-};
+    return [
+    `/files/git/status`
+    ] as const;
+    }
 
-export const getGetGitStatusQueryOptions = <
-  TData = Awaited<ReturnType<typeof getGitStatus>>,
-  TError = unknown,
->(options?: {
-  query?: Partial<
-    UseQueryOptions<Awaited<ReturnType<typeof getGitStatus>>, TError, TData>
-  >;
-  request?: SecondParameter<typeof customInstance>;
-}) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
+    
+export const getGetGitStatusQueryOptions = <TData = Awaited<ReturnType<typeof getGitStatus>>, TError = unknown>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getGitStatus>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
 
-  const queryKey = queryOptions?.queryKey ?? getGetGitStatusQueryKey();
+const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof getGitStatus>>> = ({
-    signal,
-  }) => getGitStatus(requestOptions, signal);
+  const queryKey =  queryOptions?.queryKey ?? getGetGitStatusQueryKey();
 
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof getGitStatus>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData> };
-};
+  
 
-export type GetGitStatusQueryResult = NonNullable<
-  Awaited<ReturnType<typeof getGitStatus>>
->;
-export type GetGitStatusQueryError = unknown;
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getGitStatus>>> = ({ signal }) => getGitStatus(requestOptions, signal);
 
-export function useGetGitStatus<
-  TData = Awaited<ReturnType<typeof getGitStatus>>,
-  TError = unknown,
->(
-  options: {
-    query: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof getGitStatus>>, TError, TData>
-    > &
-      Pick<
+      
+
+      
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getGitStatus>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+}
+
+export type GetGitStatusQueryResult = NonNullable<Awaited<ReturnType<typeof getGitStatus>>>
+export type GetGitStatusQueryError = unknown
+
+
+export function useGetGitStatus<TData = Awaited<ReturnType<typeof getGitStatus>>, TError = unknown>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getGitStatus>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getGitStatus>>,
           TError,
           Awaited<ReturnType<typeof getGitStatus>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData>;
-};
-export function useGetGitStatus<
-  TData = Awaited<ReturnType<typeof getGitStatus>>,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof getGitStatus>>, TError, TData>
-    > &
-      Pick<
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useGetGitStatus<TData = Awaited<ReturnType<typeof getGitStatus>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getGitStatus>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getGitStatus>>,
           TError,
           Awaited<ReturnType<typeof getGitStatus>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
-export function useGetGitStatus<
-  TData = Awaited<ReturnType<typeof getGitStatus>>,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof getGitStatus>>, TError, TData>
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useGetGitStatus<TData = Awaited<ReturnType<typeof getGitStatus>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getGitStatus>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
 /**
  * @summary Get Git status of config directory
  */
 
-export function useGetGitStatus<
-  TData = Awaited<ReturnType<typeof getGitStatus>>,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof getGitStatus>>, TError, TData>
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
-  const queryOptions = getGetGitStatusQueryOptions(options);
+export function useGetGitStatus<TData = Awaited<ReturnType<typeof getGitStatus>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getGitStatus>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
 
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData> };
+  const queryOptions = getGetGitStatusQueryOptions(options)
 
-  query.queryKey = queryOptions.queryKey;
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey ;
 
   return query;
 }
+
+
 
 /**
  * Pull latest config from Git repository.
@@ -974,82 +701,65 @@ Returns
  * @summary Pull latest config from Git repository
  */
 export const gitPullConfig = (
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
+    
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  return customInstance<GitPullConfig200>(
-    { url: `/files/git/pull`, method: "POST", signal },
-    options,
-  );
-};
+      
+      
+      return customInstance<GitPullConfig200>(
+      {url: `/files/git/pull`, method: 'POST', signal
+    },
+      options);
+    }
+  
 
-export const getGitPullConfigMutationOptions = <
-  TError = unknown,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof gitPullConfig>>,
-    TError,
-    void,
-    TContext
-  >;
-  request?: SecondParameter<typeof customInstance>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof gitPullConfig>>,
-  TError,
-  void,
-  TContext
-> => {
-  const mutationKey = ["gitPullConfig"];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      "mutationKey" in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
 
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof gitPullConfig>>,
-    void
-  > = () => {
-    return gitPullConfig(requestOptions);
-  };
+export const getGitPullConfigMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof gitPullConfig>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof gitPullConfig>>, TError,void, TContext> => {
 
-  return { mutationFn, ...mutationOptions };
-};
+const mutationKey = ['gitPullConfig'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
 
-export type GitPullConfigMutationResult = NonNullable<
-  Awaited<ReturnType<typeof gitPullConfig>>
->;
+      
 
-export type GitPullConfigMutationError = unknown;
 
-/**
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof gitPullConfig>>, void> = () => {
+          
+
+          return  gitPullConfig(requestOptions)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type GitPullConfigMutationResult = NonNullable<Awaited<ReturnType<typeof gitPullConfig>>>
+    
+    export type GitPullConfigMutationError = unknown
+
+    /**
  * @summary Pull latest config from Git repository
  */
-export const useGitPullConfig = <TError = unknown, TContext = unknown>(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof gitPullConfig>>,
-      TError,
-      void,
-      TContext
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof gitPullConfig>>,
-  TError,
-  void,
-  TContext
-> => {
-  const mutationOptions = getGitPullConfigMutationOptions(options);
+export const useGitPullConfig = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof gitPullConfig>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof gitPullConfig>>,
+        TError,
+        void,
+        TContext
+      > => {
 
-  return useMutation(mutationOptions, queryClient);
-};
-/**
+      const mutationOptions = getGitPullConfigMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    /**
  * Push config changes to Git repository.
 
 Args:
@@ -1062,90 +772,64 @@ Returns:
  * @summary Push config changes to Git repository
  */
 export const gitPushConfig = (
-  gitPushRequest: GitPushRequest,
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
+    gitPushRequest: GitPushRequest,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  return customInstance<GitPushConfig200>(
-    {
-      url: `/files/git/push`,
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      data: gitPushRequest,
-      signal,
+      
+      
+      return customInstance<GitPushConfig200>(
+      {url: `/files/git/push`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: gitPushRequest, signal
     },
-    options,
-  );
-};
+      options);
+    }
+  
 
-export const getGitPushConfigMutationOptions = <
-  TError = HTTPValidationError,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof gitPushConfig>>,
-    TError,
-    { data: GitPushRequest },
-    TContext
-  >;
-  request?: SecondParameter<typeof customInstance>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof gitPushConfig>>,
-  TError,
-  { data: GitPushRequest },
-  TContext
-> => {
-  const mutationKey = ["gitPushConfig"];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      "mutationKey" in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
 
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof gitPushConfig>>,
-    { data: GitPushRequest }
-  > = (props) => {
-    const { data } = props ?? {};
+export const getGitPushConfigMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof gitPushConfig>>, TError,{data: GitPushRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof gitPushConfig>>, TError,{data: GitPushRequest}, TContext> => {
 
-    return gitPushConfig(data, requestOptions);
-  };
+const mutationKey = ['gitPushConfig'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
 
-  return { mutationFn, ...mutationOptions };
-};
+      
 
-export type GitPushConfigMutationResult = NonNullable<
-  Awaited<ReturnType<typeof gitPushConfig>>
->;
-export type GitPushConfigMutationBody = GitPushRequest;
-export type GitPushConfigMutationError = HTTPValidationError;
 
-/**
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof gitPushConfig>>, {data: GitPushRequest}> = (props) => {
+          const {data} = props ?? {};
+
+          return  gitPushConfig(data,requestOptions)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type GitPushConfigMutationResult = NonNullable<Awaited<ReturnType<typeof gitPushConfig>>>
+    export type GitPushConfigMutationBody = GitPushRequest
+    export type GitPushConfigMutationError = HTTPValidationError
+
+    /**
  * @summary Push config changes to Git repository
  */
-export const useGitPushConfig = <
-  TError = HTTPValidationError,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof gitPushConfig>>,
-      TError,
-      { data: GitPushRequest },
-      TContext
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof gitPushConfig>>,
-  TError,
-  { data: GitPushRequest },
-  TContext
-> => {
-  const mutationOptions = getGitPushConfigMutationOptions(options);
+export const useGitPushConfig = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof gitPushConfig>>, TError,{data: GitPushRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof gitPushConfig>>,
+        TError,
+        {data: GitPushRequest},
+        TContext
+      > => {
 
-  return useMutation(mutationOptions, queryClient);
-};
+      const mutationOptions = getGitPushConfigMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    

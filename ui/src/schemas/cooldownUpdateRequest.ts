@@ -5,11 +5,11 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { CooldownUpdateRequestDescription } from "./cooldownUpdateRequestDescription";
-import type { CooldownUpdateRequestStartedAt } from "./cooldownUpdateRequestStartedAt";
-import type { CooldownUpdateRequestEndedAt } from "./cooldownUpdateRequestEndedAt";
-import type { CooldownUpdateRequestWiringInfo } from "./cooldownUpdateRequestWiringInfo";
-import type { CooldownUpdateRequestWiringBlocks } from "./cooldownUpdateRequestWiringBlocks";
+import type { CooldownUpdateRequestDescription } from './cooldownUpdateRequestDescription';
+import type { CooldownUpdateRequestStartedAt } from './cooldownUpdateRequestStartedAt';
+import type { CooldownUpdateRequestEndedAt } from './cooldownUpdateRequestEndedAt';
+import type { CooldownUpdateRequestWiringInfo } from './cooldownUpdateRequestWiringInfo';
+import type { CooldownUpdateRequestWiringBlocks } from './cooldownUpdateRequestWiringBlocks';
 
 /**
  * Body for updating a cool-down. All fields optional.

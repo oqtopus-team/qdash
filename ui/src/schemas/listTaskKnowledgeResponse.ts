@@ -5,8 +5,8 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { TaskKnowledgeSummaryResponse } from "./taskKnowledgeSummaryResponse";
-import type { ListTaskKnowledgeResponseCategories } from "./listTaskKnowledgeResponseCategories";
+import type { TaskKnowledgeSummaryResponse } from './taskKnowledgeSummaryResponse';
+import type { ListTaskKnowledgeResponseCategories } from './listTaskKnowledgeResponseCategories';
 
 /**
  * Response model for listing all task knowledge entries.

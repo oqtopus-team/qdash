@@ -5,9 +5,9 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { AnalyzeRequestImageBase64 } from "./analyzeRequestImageBase64";
-import type { AnalyzeRequestConversationHistoryItem } from "./analyzeRequestConversationHistoryItem";
-import type { AnalyzeRequestModelOverride } from "./analyzeRequestModelOverride";
+import type { AnalyzeRequestImageBase64 } from './analyzeRequestImageBase64';
+import type { AnalyzeRequestConversationHistoryItem } from './analyzeRequestConversationHistoryItem';
+import type { AnalyzeRequestModelOverride } from './analyzeRequestModelOverride';
 
 /**
  * Request body for POST /copilot/analyze.

@@ -5,8 +5,8 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { DegradationTrendResponseCurrentValue } from "./degradationTrendResponseCurrentValue";
-import type { DegradationTrendResponseValidFrom } from "./degradationTrendResponseValidFrom";
+import type { DegradationTrendResponseCurrentValue } from './degradationTrendResponseCurrentValue';
+import type { DegradationTrendResponseValidFrom } from './degradationTrendResponseValidFrom';
 
 /**
  * Response model for a single degradation trend (consecutive worsening).

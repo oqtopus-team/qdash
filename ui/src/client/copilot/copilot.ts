@@ -5,7 +5,10 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import { useMutation, useQuery } from "@tanstack/react-query";
+import {
+  useMutation,
+  useQuery
+} from '@tanstack/react-query';
 import type {
   DataTag,
   DefinedInitialDataOptions,
@@ -18,8 +21,8 @@ import type {
   UseMutationOptions,
   UseMutationResult,
   UseQueryOptions,
-  UseQueryResult,
-} from "@tanstack/react-query";
+  UseQueryResult
+} from '@tanstack/react-query';
 
 import type {
   AnalysisResponse,
@@ -30,12 +33,15 @@ import type {
   GetCopilotConfig200,
   HTTPValidationError,
   ListCopilotChatSessionsResponse,
-  UpdateCopilotChatSessionRequest,
-} from "../../schemas";
+  UpdateCopilotChatSessionRequest
+} from '../../schemas';
 
-import { customInstance } from "../../lib/custom-instance";
+import { customInstance } from '../../lib/custom-instance';
+
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
+
+
 
 /**
  * Get Copilot configuration for the metrics assistant.
@@ -54,145 +60,92 @@ dict[str, Any]
  * @summary Get Copilot configuration
  */
 export const getCopilotConfig = (
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
+    
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  return customInstance<GetCopilotConfig200>(
-    { url: `/copilot/config`, method: "GET", signal },
-    options,
-  );
-};
+      
+      
+      return customInstance<GetCopilotConfig200>(
+      {url: `/copilot/config`, method: 'GET', signal
+    },
+      options);
+    }
+  
+
+
 
 export const getGetCopilotConfigQueryKey = () => {
-  return [`/copilot/config`] as const;
-};
+    return [
+    `/copilot/config`
+    ] as const;
+    }
 
-export const getGetCopilotConfigQueryOptions = <
-  TData = Awaited<ReturnType<typeof getCopilotConfig>>,
-  TError = unknown,
->(options?: {
-  query?: Partial<
-    UseQueryOptions<Awaited<ReturnType<typeof getCopilotConfig>>, TError, TData>
-  >;
-  request?: SecondParameter<typeof customInstance>;
-}) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
+    
+export const getGetCopilotConfigQueryOptions = <TData = Awaited<ReturnType<typeof getCopilotConfig>>, TError = unknown>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCopilotConfig>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
 
-  const queryKey = queryOptions?.queryKey ?? getGetCopilotConfigQueryKey();
+const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof getCopilotConfig>>
-  > = ({ signal }) => getCopilotConfig(requestOptions, signal);
+  const queryKey =  queryOptions?.queryKey ?? getGetCopilotConfigQueryKey();
 
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof getCopilotConfig>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData> };
-};
+  
 
-export type GetCopilotConfigQueryResult = NonNullable<
-  Awaited<ReturnType<typeof getCopilotConfig>>
->;
-export type GetCopilotConfigQueryError = unknown;
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCopilotConfig>>> = ({ signal }) => getCopilotConfig(requestOptions, signal);
 
-export function useGetCopilotConfig<
-  TData = Awaited<ReturnType<typeof getCopilotConfig>>,
-  TError = unknown,
->(
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getCopilotConfig>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
+      
+
+      
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCopilotConfig>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+}
+
+export type GetCopilotConfigQueryResult = NonNullable<Awaited<ReturnType<typeof getCopilotConfig>>>
+export type GetCopilotConfigQueryError = unknown
+
+
+export function useGetCopilotConfig<TData = Awaited<ReturnType<typeof getCopilotConfig>>, TError = unknown>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCopilotConfig>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getCopilotConfig>>,
           TError,
           Awaited<ReturnType<typeof getCopilotConfig>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData>;
-};
-export function useGetCopilotConfig<
-  TData = Awaited<ReturnType<typeof getCopilotConfig>>,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getCopilotConfig>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useGetCopilotConfig<TData = Awaited<ReturnType<typeof getCopilotConfig>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCopilotConfig>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getCopilotConfig>>,
           TError,
           Awaited<ReturnType<typeof getCopilotConfig>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
-export function useGetCopilotConfig<
-  TData = Awaited<ReturnType<typeof getCopilotConfig>>,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getCopilotConfig>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useGetCopilotConfig<TData = Awaited<ReturnType<typeof getCopilotConfig>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCopilotConfig>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
 /**
  * @summary Get Copilot configuration
  */
 
-export function useGetCopilotConfig<
-  TData = Awaited<ReturnType<typeof getCopilotConfig>>,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getCopilotConfig>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
-  const queryOptions = getGetCopilotConfigQueryOptions(options);
+export function useGetCopilotConfig<TData = Awaited<ReturnType<typeof getCopilotConfig>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCopilotConfig>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
 
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData> };
+  const queryOptions = getGetCopilotConfigQueryOptions(options)
 
-  query.queryKey = queryOptions.queryKey;
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey ;
 
   return query;
 }
+
+
 
 /**
  * Analyze a calibration task result using LLM.
@@ -212,673 +165,440 @@ AnalysisResponse
  * @summary Analyze calibration result with AI
  */
 export const analyzeCopilot = (
-  analyzeRequest: AnalyzeRequest,
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
+    analyzeRequest: AnalyzeRequest,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  return customInstance<AnalysisResponse>(
-    {
-      url: `/copilot/analyze`,
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      data: analyzeRequest,
-      signal,
+      
+      
+      return customInstance<AnalysisResponse>(
+      {url: `/copilot/analyze`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: analyzeRequest, signal
     },
-    options,
-  );
-};
+      options);
+    }
+  
 
-export const getAnalyzeCopilotMutationOptions = <
-  TError = HTTPValidationError,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof analyzeCopilot>>,
-    TError,
-    { data: AnalyzeRequest },
-    TContext
-  >;
-  request?: SecondParameter<typeof customInstance>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof analyzeCopilot>>,
-  TError,
-  { data: AnalyzeRequest },
-  TContext
-> => {
-  const mutationKey = ["analyzeCopilot"];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      "mutationKey" in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
 
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof analyzeCopilot>>,
-    { data: AnalyzeRequest }
-  > = (props) => {
-    const { data } = props ?? {};
+export const getAnalyzeCopilotMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof analyzeCopilot>>, TError,{data: AnalyzeRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof analyzeCopilot>>, TError,{data: AnalyzeRequest}, TContext> => {
 
-    return analyzeCopilot(data, requestOptions);
-  };
+const mutationKey = ['analyzeCopilot'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
 
-  return { mutationFn, ...mutationOptions };
-};
+      
 
-export type AnalyzeCopilotMutationResult = NonNullable<
-  Awaited<ReturnType<typeof analyzeCopilot>>
->;
-export type AnalyzeCopilotMutationBody = AnalyzeRequest;
-export type AnalyzeCopilotMutationError = HTTPValidationError;
 
-/**
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof analyzeCopilot>>, {data: AnalyzeRequest}> = (props) => {
+          const {data} = props ?? {};
+
+          return  analyzeCopilot(data,requestOptions)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AnalyzeCopilotMutationResult = NonNullable<Awaited<ReturnType<typeof analyzeCopilot>>>
+    export type AnalyzeCopilotMutationBody = AnalyzeRequest
+    export type AnalyzeCopilotMutationError = HTTPValidationError
+
+    /**
  * @summary Analyze calibration result with AI
  */
-export const useAnalyzeCopilot = <
-  TError = HTTPValidationError,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof analyzeCopilot>>,
-      TError,
-      { data: AnalyzeRequest },
-      TContext
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof analyzeCopilot>>,
-  TError,
-  { data: AnalyzeRequest },
-  TContext
-> => {
-  const mutationOptions = getAnalyzeCopilotMutationOptions(options);
+export const useAnalyzeCopilot = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof analyzeCopilot>>, TError,{data: AnalyzeRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof analyzeCopilot>>,
+        TError,
+        {data: AnalyzeRequest},
+        TContext
+      > => {
 
-  return useMutation(mutationOptions, queryClient);
-};
-/**
+      const mutationOptions = getAnalyzeCopilotMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    /**
  * Return all persisted chat sessions owned by the current user.
  * @summary List the current user's chat sessions
  */
 export const listCopilotChatSessions = (
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
+    
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  return customInstance<ListCopilotChatSessionsResponse>(
-    { url: `/copilot/chat/sessions`, method: "GET", signal },
-    options,
-  );
-};
+      
+      
+      return customInstance<ListCopilotChatSessionsResponse>(
+      {url: `/copilot/chat/sessions`, method: 'GET', signal
+    },
+      options);
+    }
+  
+
+
 
 export const getListCopilotChatSessionsQueryKey = () => {
-  return [`/copilot/chat/sessions`] as const;
-};
+    return [
+    `/copilot/chat/sessions`
+    ] as const;
+    }
 
-export const getListCopilotChatSessionsQueryOptions = <
-  TData = Awaited<ReturnType<typeof listCopilotChatSessions>>,
-  TError = unknown,
->(options?: {
-  query?: Partial<
-    UseQueryOptions<
-      Awaited<ReturnType<typeof listCopilotChatSessions>>,
-      TError,
-      TData
-    >
-  >;
-  request?: SecondParameter<typeof customInstance>;
-}) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
+    
+export const getListCopilotChatSessionsQueryOptions = <TData = Awaited<ReturnType<typeof listCopilotChatSessions>>, TError = unknown>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listCopilotChatSessions>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
 
-  const queryKey =
-    queryOptions?.queryKey ?? getListCopilotChatSessionsQueryKey();
+const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof listCopilotChatSessions>>
-  > = ({ signal }) => listCopilotChatSessions(requestOptions, signal);
+  const queryKey =  queryOptions?.queryKey ?? getListCopilotChatSessionsQueryKey();
 
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof listCopilotChatSessions>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData> };
-};
+  
 
-export type ListCopilotChatSessionsQueryResult = NonNullable<
-  Awaited<ReturnType<typeof listCopilotChatSessions>>
->;
-export type ListCopilotChatSessionsQueryError = unknown;
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listCopilotChatSessions>>> = ({ signal }) => listCopilotChatSessions(requestOptions, signal);
 
-export function useListCopilotChatSessions<
-  TData = Awaited<ReturnType<typeof listCopilotChatSessions>>,
-  TError = unknown,
->(
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof listCopilotChatSessions>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
+      
+
+      
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listCopilotChatSessions>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+}
+
+export type ListCopilotChatSessionsQueryResult = NonNullable<Awaited<ReturnType<typeof listCopilotChatSessions>>>
+export type ListCopilotChatSessionsQueryError = unknown
+
+
+export function useListCopilotChatSessions<TData = Awaited<ReturnType<typeof listCopilotChatSessions>>, TError = unknown>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listCopilotChatSessions>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof listCopilotChatSessions>>,
           TError,
           Awaited<ReturnType<typeof listCopilotChatSessions>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData>;
-};
-export function useListCopilotChatSessions<
-  TData = Awaited<ReturnType<typeof listCopilotChatSessions>>,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof listCopilotChatSessions>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useListCopilotChatSessions<TData = Awaited<ReturnType<typeof listCopilotChatSessions>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listCopilotChatSessions>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof listCopilotChatSessions>>,
           TError,
           Awaited<ReturnType<typeof listCopilotChatSessions>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
-export function useListCopilotChatSessions<
-  TData = Awaited<ReturnType<typeof listCopilotChatSessions>>,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof listCopilotChatSessions>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useListCopilotChatSessions<TData = Awaited<ReturnType<typeof listCopilotChatSessions>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listCopilotChatSessions>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
 /**
  * @summary List the current user's chat sessions
  */
 
-export function useListCopilotChatSessions<
-  TData = Awaited<ReturnType<typeof listCopilotChatSessions>>,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof listCopilotChatSessions>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
-  const queryOptions = getListCopilotChatSessionsQueryOptions(options);
+export function useListCopilotChatSessions<TData = Awaited<ReturnType<typeof listCopilotChatSessions>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listCopilotChatSessions>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
 
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData> };
+  const queryOptions = getListCopilotChatSessionsQueryOptions(options)
 
-  query.queryKey = queryOptions.queryKey;
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey ;
 
   return query;
 }
+
+
 
 /**
  * Create a new chat session owned by the current user.
  * @summary Create a new chat session
  */
 export const createCopilotChatSession = (
-  createCopilotChatSessionRequest: CreateCopilotChatSessionRequest,
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
+    createCopilotChatSessionRequest: CreateCopilotChatSessionRequest,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  return customInstance<CopilotChatSessionResponse>(
-    {
-      url: `/copilot/chat/sessions`,
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      data: createCopilotChatSessionRequest,
-      signal,
+      
+      
+      return customInstance<CopilotChatSessionResponse>(
+      {url: `/copilot/chat/sessions`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: createCopilotChatSessionRequest, signal
     },
-    options,
-  );
-};
+      options);
+    }
+  
 
-export const getCreateCopilotChatSessionMutationOptions = <
-  TError = HTTPValidationError,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof createCopilotChatSession>>,
-    TError,
-    { data: CreateCopilotChatSessionRequest },
-    TContext
-  >;
-  request?: SecondParameter<typeof customInstance>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof createCopilotChatSession>>,
-  TError,
-  { data: CreateCopilotChatSessionRequest },
-  TContext
-> => {
-  const mutationKey = ["createCopilotChatSession"];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      "mutationKey" in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
 
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof createCopilotChatSession>>,
-    { data: CreateCopilotChatSessionRequest }
-  > = (props) => {
-    const { data } = props ?? {};
+export const getCreateCopilotChatSessionMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createCopilotChatSession>>, TError,{data: CreateCopilotChatSessionRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof createCopilotChatSession>>, TError,{data: CreateCopilotChatSessionRequest}, TContext> => {
 
-    return createCopilotChatSession(data, requestOptions);
-  };
+const mutationKey = ['createCopilotChatSession'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
 
-  return { mutationFn, ...mutationOptions };
-};
+      
 
-export type CreateCopilotChatSessionMutationResult = NonNullable<
-  Awaited<ReturnType<typeof createCopilotChatSession>>
->;
-export type CreateCopilotChatSessionMutationBody =
-  CreateCopilotChatSessionRequest;
-export type CreateCopilotChatSessionMutationError = HTTPValidationError;
 
-/**
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createCopilotChatSession>>, {data: CreateCopilotChatSessionRequest}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createCopilotChatSession(data,requestOptions)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateCopilotChatSessionMutationResult = NonNullable<Awaited<ReturnType<typeof createCopilotChatSession>>>
+    export type CreateCopilotChatSessionMutationBody = CreateCopilotChatSessionRequest
+    export type CreateCopilotChatSessionMutationError = HTTPValidationError
+
+    /**
  * @summary Create a new chat session
  */
-export const useCreateCopilotChatSession = <
-  TError = HTTPValidationError,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof createCopilotChatSession>>,
-      TError,
-      { data: CreateCopilotChatSessionRequest },
-      TContext
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof createCopilotChatSession>>,
-  TError,
-  { data: CreateCopilotChatSessionRequest },
-  TContext
-> => {
-  const mutationOptions = getCreateCopilotChatSessionMutationOptions(options);
+export const useCreateCopilotChatSession = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createCopilotChatSession>>, TError,{data: CreateCopilotChatSessionRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof createCopilotChatSession>>,
+        TError,
+        {data: CreateCopilotChatSessionRequest},
+        TContext
+      > => {
 
-  return useMutation(mutationOptions, queryClient);
-};
-/**
+      const mutationOptions = getCreateCopilotChatSessionMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    /**
  * Return one chat session including the full message list.
  * @summary Get a chat session with messages
  */
 export const getCopilotChatSession = (
-  sessionId: string,
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
+    sessionId: string,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  return customInstance<CopilotChatSessionResponse>(
-    { url: `/copilot/chat/sessions/${sessionId}`, method: "GET", signal },
-    options,
-  );
-};
+      
+      
+      return customInstance<CopilotChatSessionResponse>(
+      {url: `/copilot/chat/sessions/${sessionId}`, method: 'GET', signal
+    },
+      options);
+    }
+  
 
-export const getGetCopilotChatSessionQueryKey = (sessionId?: string) => {
-  return [`/copilot/chat/sessions/${sessionId}`] as const;
-};
 
-export const getGetCopilotChatSessionQueryOptions = <
-  TData = Awaited<ReturnType<typeof getCopilotChatSession>>,
-  TError = HTTPValidationError,
->(
-  sessionId: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getCopilotChatSession>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
+
+export const getGetCopilotChatSessionQueryKey = (sessionId?: string,) => {
+    return [
+    `/copilot/chat/sessions/${sessionId}`
+    ] as const;
+    }
+
+    
+export const getGetCopilotChatSessionQueryOptions = <TData = Awaited<ReturnType<typeof getCopilotChatSession>>, TError = HTTPValidationError>(sessionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCopilotChatSession>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey =
-    queryOptions?.queryKey ?? getGetCopilotChatSessionQueryKey(sessionId);
+const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof getCopilotChatSession>>
-  > = ({ signal }) => getCopilotChatSession(sessionId, requestOptions, signal);
+  const queryKey =  queryOptions?.queryKey ?? getGetCopilotChatSessionQueryKey(sessionId);
 
-  return {
-    queryKey,
-    queryFn,
-    enabled: !!sessionId,
-    ...queryOptions,
-  } as UseQueryOptions<
-    Awaited<ReturnType<typeof getCopilotChatSession>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData> };
-};
+  
 
-export type GetCopilotChatSessionQueryResult = NonNullable<
-  Awaited<ReturnType<typeof getCopilotChatSession>>
->;
-export type GetCopilotChatSessionQueryError = HTTPValidationError;
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCopilotChatSession>>> = ({ signal }) => getCopilotChatSession(sessionId, requestOptions, signal);
 
-export function useGetCopilotChatSession<
-  TData = Awaited<ReturnType<typeof getCopilotChatSession>>,
-  TError = HTTPValidationError,
->(
-  sessionId: string,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getCopilotChatSession>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
+      
+
+      
+
+   return  { queryKey, queryFn, enabled: !!(sessionId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCopilotChatSession>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+}
+
+export type GetCopilotChatSessionQueryResult = NonNullable<Awaited<ReturnType<typeof getCopilotChatSession>>>
+export type GetCopilotChatSessionQueryError = HTTPValidationError
+
+
+export function useGetCopilotChatSession<TData = Awaited<ReturnType<typeof getCopilotChatSession>>, TError = HTTPValidationError>(
+ sessionId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCopilotChatSession>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getCopilotChatSession>>,
           TError,
           Awaited<ReturnType<typeof getCopilotChatSession>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData>;
-};
-export function useGetCopilotChatSession<
-  TData = Awaited<ReturnType<typeof getCopilotChatSession>>,
-  TError = HTTPValidationError,
->(
-  sessionId: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getCopilotChatSession>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useGetCopilotChatSession<TData = Awaited<ReturnType<typeof getCopilotChatSession>>, TError = HTTPValidationError>(
+ sessionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCopilotChatSession>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getCopilotChatSession>>,
           TError,
           Awaited<ReturnType<typeof getCopilotChatSession>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
-export function useGetCopilotChatSession<
-  TData = Awaited<ReturnType<typeof getCopilotChatSession>>,
-  TError = HTTPValidationError,
->(
-  sessionId: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getCopilotChatSession>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useGetCopilotChatSession<TData = Awaited<ReturnType<typeof getCopilotChatSession>>, TError = HTTPValidationError>(
+ sessionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCopilotChatSession>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
 /**
  * @summary Get a chat session with messages
  */
 
-export function useGetCopilotChatSession<
-  TData = Awaited<ReturnType<typeof getCopilotChatSession>>,
-  TError = HTTPValidationError,
->(
-  sessionId: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getCopilotChatSession>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
-  const queryOptions = getGetCopilotChatSessionQueryOptions(sessionId, options);
+export function useGetCopilotChatSession<TData = Awaited<ReturnType<typeof getCopilotChatSession>>, TError = HTTPValidationError>(
+ sessionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCopilotChatSession>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
 
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData> };
+  const queryOptions = getGetCopilotChatSessionQueryOptions(sessionId,options)
 
-  query.queryKey = queryOptions.queryKey;
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey ;
 
   return query;
 }
+
+
 
 /**
  * Update title, context, or messages of an existing chat session.
  * @summary Update a chat session
  */
 export const updateCopilotChatSession = (
-  sessionId: string,
-  updateCopilotChatSessionRequest: UpdateCopilotChatSessionRequest,
-  options?: SecondParameter<typeof customInstance>,
-) => {
-  return customInstance<CopilotChatSessionResponse>(
-    {
-      url: `/copilot/chat/sessions/${sessionId}`,
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      data: updateCopilotChatSessionRequest,
+    sessionId: string,
+    updateCopilotChatSessionRequest: UpdateCopilotChatSessionRequest,
+ options?: SecondParameter<typeof customInstance>,) => {
+      
+      
+      return customInstance<CopilotChatSessionResponse>(
+      {url: `/copilot/chat/sessions/${sessionId}`, method: 'PATCH',
+      headers: {'Content-Type': 'application/json', },
+      data: updateCopilotChatSessionRequest
     },
-    options,
-  );
-};
+      options);
+    }
+  
 
-export const getUpdateCopilotChatSessionMutationOptions = <
-  TError = HTTPValidationError,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof updateCopilotChatSession>>,
-    TError,
-    { sessionId: string; data: UpdateCopilotChatSessionRequest },
-    TContext
-  >;
-  request?: SecondParameter<typeof customInstance>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof updateCopilotChatSession>>,
-  TError,
-  { sessionId: string; data: UpdateCopilotChatSessionRequest },
-  TContext
-> => {
-  const mutationKey = ["updateCopilotChatSession"];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      "mutationKey" in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
 
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof updateCopilotChatSession>>,
-    { sessionId: string; data: UpdateCopilotChatSessionRequest }
-  > = (props) => {
-    const { sessionId, data } = props ?? {};
+export const getUpdateCopilotChatSessionMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateCopilotChatSession>>, TError,{sessionId: string;data: UpdateCopilotChatSessionRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateCopilotChatSession>>, TError,{sessionId: string;data: UpdateCopilotChatSessionRequest}, TContext> => {
 
-    return updateCopilotChatSession(sessionId, data, requestOptions);
-  };
+const mutationKey = ['updateCopilotChatSession'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
 
-  return { mutationFn, ...mutationOptions };
-};
+      
 
-export type UpdateCopilotChatSessionMutationResult = NonNullable<
-  Awaited<ReturnType<typeof updateCopilotChatSession>>
->;
-export type UpdateCopilotChatSessionMutationBody =
-  UpdateCopilotChatSessionRequest;
-export type UpdateCopilotChatSessionMutationError = HTTPValidationError;
 
-/**
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateCopilotChatSession>>, {sessionId: string;data: UpdateCopilotChatSessionRequest}> = (props) => {
+          const {sessionId,data} = props ?? {};
+
+          return  updateCopilotChatSession(sessionId,data,requestOptions)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateCopilotChatSessionMutationResult = NonNullable<Awaited<ReturnType<typeof updateCopilotChatSession>>>
+    export type UpdateCopilotChatSessionMutationBody = UpdateCopilotChatSessionRequest
+    export type UpdateCopilotChatSessionMutationError = HTTPValidationError
+
+    /**
  * @summary Update a chat session
  */
-export const useUpdateCopilotChatSession = <
-  TError = HTTPValidationError,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof updateCopilotChatSession>>,
-      TError,
-      { sessionId: string; data: UpdateCopilotChatSessionRequest },
-      TContext
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof updateCopilotChatSession>>,
-  TError,
-  { sessionId: string; data: UpdateCopilotChatSessionRequest },
-  TContext
-> => {
-  const mutationOptions = getUpdateCopilotChatSessionMutationOptions(options);
+export const useUpdateCopilotChatSession = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateCopilotChatSession>>, TError,{sessionId: string;data: UpdateCopilotChatSessionRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof updateCopilotChatSession>>,
+        TError,
+        {sessionId: string;data: UpdateCopilotChatSessionRequest},
+        TContext
+      > => {
 
-  return useMutation(mutationOptions, queryClient);
-};
-/**
+      const mutationOptions = getUpdateCopilotChatSessionMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    /**
  * Delete a chat session owned by the current user.
  * @summary Delete a chat session
  */
 export const deleteCopilotChatSession = (
-  sessionId: string,
-  options?: SecondParameter<typeof customInstance>,
-) => {
-  return customInstance<DeleteCopilotChatSession200>(
-    { url: `/copilot/chat/sessions/${sessionId}`, method: "DELETE" },
-    options,
-  );
-};
+    sessionId: string,
+ options?: SecondParameter<typeof customInstance>,) => {
+      
+      
+      return customInstance<DeleteCopilotChatSession200>(
+      {url: `/copilot/chat/sessions/${sessionId}`, method: 'DELETE'
+    },
+      options);
+    }
+  
 
-export const getDeleteCopilotChatSessionMutationOptions = <
-  TError = HTTPValidationError,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof deleteCopilotChatSession>>,
-    TError,
-    { sessionId: string },
-    TContext
-  >;
-  request?: SecondParameter<typeof customInstance>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof deleteCopilotChatSession>>,
-  TError,
-  { sessionId: string },
-  TContext
-> => {
-  const mutationKey = ["deleteCopilotChatSession"];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      "mutationKey" in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
 
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof deleteCopilotChatSession>>,
-    { sessionId: string }
-  > = (props) => {
-    const { sessionId } = props ?? {};
+export const getDeleteCopilotChatSessionMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteCopilotChatSession>>, TError,{sessionId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteCopilotChatSession>>, TError,{sessionId: string}, TContext> => {
 
-    return deleteCopilotChatSession(sessionId, requestOptions);
-  };
+const mutationKey = ['deleteCopilotChatSession'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
 
-  return { mutationFn, ...mutationOptions };
-};
+      
 
-export type DeleteCopilotChatSessionMutationResult = NonNullable<
-  Awaited<ReturnType<typeof deleteCopilotChatSession>>
->;
 
-export type DeleteCopilotChatSessionMutationError = HTTPValidationError;
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteCopilotChatSession>>, {sessionId: string}> = (props) => {
+          const {sessionId} = props ?? {};
 
-/**
+          return  deleteCopilotChatSession(sessionId,requestOptions)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteCopilotChatSessionMutationResult = NonNullable<Awaited<ReturnType<typeof deleteCopilotChatSession>>>
+    
+    export type DeleteCopilotChatSessionMutationError = HTTPValidationError
+
+    /**
  * @summary Delete a chat session
  */
-export const useDeleteCopilotChatSession = <
-  TError = HTTPValidationError,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof deleteCopilotChatSession>>,
-      TError,
-      { sessionId: string },
-      TContext
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof deleteCopilotChatSession>>,
-  TError,
-  { sessionId: string },
-  TContext
-> => {
-  const mutationOptions = getDeleteCopilotChatSessionMutationOptions(options);
+export const useDeleteCopilotChatSession = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteCopilotChatSession>>, TError,{sessionId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof deleteCopilotChatSession>>,
+        TError,
+        {sessionId: string},
+        TContext
+      > => {
 
-  return useMutation(mutationOptions, queryClient);
-};
+      const mutationOptions = getDeleteCopilotChatSessionMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    

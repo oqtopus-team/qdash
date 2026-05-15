@@ -5,7 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { CreateChipRequestTopologyId } from "./createChipRequestTopologyId";
+import type { CreateChipRequestTopologyId } from './createChipRequestTopologyId';
 
 /**
  * Request model for creating a new chip.

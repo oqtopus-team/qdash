@@ -5,9 +5,9 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { UpdateCopilotChatSessionRequestTitle } from "./updateCopilotChatSessionRequestTitle";
-import type { UpdateCopilotChatSessionRequestContext } from "./updateCopilotChatSessionRequestContext";
-import type { UpdateCopilotChatSessionRequestMessages } from "./updateCopilotChatSessionRequestMessages";
+import type { UpdateCopilotChatSessionRequestTitle } from './updateCopilotChatSessionRequestTitle';
+import type { UpdateCopilotChatSessionRequestContext } from './updateCopilotChatSessionRequestContext';
+import type { UpdateCopilotChatSessionRequestMessages } from './updateCopilotChatSessionRequestMessages';
 
 /**
  * Body for PATCH /copilot/chat/sessions/{session_id}.

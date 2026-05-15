@@ -7,24 +7,24 @@
  */
 
 export type GetDashboardAiInsightsParams = {
-  /**
-   * Optional task-name filter
-   */
-  task_name?: string | null;
-  /**
-   * If true, use only the latest result per task and target
-   */
-  latest_only?: boolean;
-  /**
-   * Dashboard selection mode; accepted for filter-state traceability
-   */
-  selection_mode?: string | null;
-  /**
-   * Dashboard lower time bound; accepted for filter-state traceability
-   */
-  start_at?: string | null;
-  /**
-   * Dashboard upper time bound; accepted for filter-state traceability
-   */
-  end_at?: string | null;
+/**
+ * Optional task-name filter
+ */
+task_name?: string | null;
+/**
+ * If true, use only the latest result per task and target
+ */
+latest_only?: boolean;
+/**
+ * Dashboard selection mode; accepted for filter-state traceability
+ */
+selection_mode?: string | null;
+/**
+ * Dashboard lower time bound; accepted for filter-state traceability
+ */
+start_at?: string | null;
+/**
+ * Dashboard upper time bound; accepted for filter-state traceability
+ */
+end_at?: string | null;
 };

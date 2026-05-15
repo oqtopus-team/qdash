@@ -5,15 +5,15 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { MetricHistoryItemValue } from "./metricHistoryItemValue";
-import type { MetricHistoryItemTaskId } from "./metricHistoryItemTaskId";
-import type { MetricHistoryItemCalibratedAt } from "./metricHistoryItemCalibratedAt";
-import type { MetricHistoryItemName } from "./metricHistoryItemName";
-import type { MetricHistoryItemInputParameters } from "./metricHistoryItemInputParameters";
-import type { MetricHistoryItemOutputParameters } from "./metricHistoryItemOutputParameters";
-import type { MetricHistoryItemExcludedByUserId } from "./metricHistoryItemExcludedByUserId";
-import type { MetricHistoryItemExcludedBy } from "./metricHistoryItemExcludedBy";
-import type { MetricHistoryItemExcludedAt } from "./metricHistoryItemExcludedAt";
+import type { MetricHistoryItemValue } from './metricHistoryItemValue';
+import type { MetricHistoryItemTaskId } from './metricHistoryItemTaskId';
+import type { MetricHistoryItemCalibratedAt } from './metricHistoryItemCalibratedAt';
+import type { MetricHistoryItemName } from './metricHistoryItemName';
+import type { MetricHistoryItemInputParameters } from './metricHistoryItemInputParameters';
+import type { MetricHistoryItemOutputParameters } from './metricHistoryItemOutputParameters';
+import type { MetricHistoryItemExcludedByUserId } from './metricHistoryItemExcludedByUserId';
+import type { MetricHistoryItemExcludedBy } from './metricHistoryItemExcludedBy';
+import type { MetricHistoryItemExcludedAt } from './metricHistoryItemExcludedAt';
 
 /**
  * Single historical metric data point.

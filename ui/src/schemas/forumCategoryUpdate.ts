@@ -5,12 +5,12 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { ForumCategoryUpdateName } from "./forumCategoryUpdateName";
-import type { ForumCategoryUpdateDescription } from "./forumCategoryUpdateDescription";
-import type { ForumCategoryUpdateColor } from "./forumCategoryUpdateColor";
-import type { ForumCategoryUpdateIcon } from "./forumCategoryUpdateIcon";
-import type { ForumCategoryUpdateSortOrder } from "./forumCategoryUpdateSortOrder";
-import type { ForumCategoryUpdateIsArchived } from "./forumCategoryUpdateIsArchived";
+import type { ForumCategoryUpdateName } from './forumCategoryUpdateName';
+import type { ForumCategoryUpdateDescription } from './forumCategoryUpdateDescription';
+import type { ForumCategoryUpdateColor } from './forumCategoryUpdateColor';
+import type { ForumCategoryUpdateIcon } from './forumCategoryUpdateIcon';
+import type { ForumCategoryUpdateSortOrder } from './forumCategoryUpdateSortOrder';
+import type { ForumCategoryUpdateIsArchived } from './forumCategoryUpdateIsArchived';
 
 /**
  * Request schema for updating a forum category.

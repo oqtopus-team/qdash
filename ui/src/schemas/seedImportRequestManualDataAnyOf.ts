@@ -6,6 +6,4 @@
  * OpenAPI spec version: 0.0.1
  */
 
-export type SeedImportRequestManualDataAnyOf = {
-  [key: string]: { [key: string]: unknown };
-};
+export type SeedImportRequestManualDataAnyOf = {[key: string]: { [key: string]: unknown }};

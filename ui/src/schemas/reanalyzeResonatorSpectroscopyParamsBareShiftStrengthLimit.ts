@@ -9,6 +9,4 @@
 /**
  * Strength cutoff for the high_frequency_strength estimator.
  */
-export type ReanalyzeResonatorSpectroscopyParamsBareShiftStrengthLimit =
-  | number
-  | null;
+export type ReanalyzeResonatorSpectroscopyParamsBareShiftStrengthLimit = number | null;

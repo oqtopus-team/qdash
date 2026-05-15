@@ -5,13 +5,13 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { MemberResponseDisplayName } from "./memberResponseDisplayName";
-import type { MemberResponseOrganization } from "./memberResponseOrganization";
-import type { MemberResponseAvatarKey } from "./memberResponseAvatarKey";
-import type { ProjectRole } from "./projectRole";
-import type { MemberResponseInvitedByUserId } from "./memberResponseInvitedByUserId";
-import type { MemberResponseInvitedBy } from "./memberResponseInvitedBy";
-import type { MemberResponseLastAccessedAt } from "./memberResponseLastAccessedAt";
+import type { MemberResponseDisplayName } from './memberResponseDisplayName';
+import type { MemberResponseOrganization } from './memberResponseOrganization';
+import type { MemberResponseAvatarKey } from './memberResponseAvatarKey';
+import type { ProjectRole } from './projectRole';
+import type { MemberResponseInvitedByUserId } from './memberResponseInvitedByUserId';
+import type { MemberResponseInvitedBy } from './memberResponseInvitedBy';
+import type { MemberResponseLastAccessedAt } from './memberResponseLastAccessedAt';
 
 /**
  * Response schema for project membership.

@@ -5,11 +5,11 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { ExecutionResponseDetailStartAt } from "./executionResponseDetailStartAt";
-import type { ExecutionResponseDetailEndAt } from "./executionResponseDetailEndAt";
-import type { ExecutionResponseDetailElapsedTime } from "./executionResponseDetailElapsedTime";
-import type { Task } from "./task";
-import type { ExecutionResponseDetailNote } from "./executionResponseDetailNote";
+import type { ExecutionResponseDetailStartAt } from './executionResponseDetailStartAt';
+import type { ExecutionResponseDetailEndAt } from './executionResponseDetailEndAt';
+import type { ExecutionResponseDetailElapsedTime } from './executionResponseDetailElapsedTime';
+import type { Task } from './task';
+import type { ExecutionResponseDetailNote } from './executionResponseDetailNote';
 
 /**
  * ExecutionResponseDetail is a Pydantic model that represents the detail of an execution response.

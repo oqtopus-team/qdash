@@ -5,10 +5,10 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { ProjectUpdateName } from "./projectUpdateName";
-import type { ProjectUpdateDescription } from "./projectUpdateDescription";
-import type { ProjectUpdateTags } from "./projectUpdateTags";
-import type { ProjectUpdateDefaultRole } from "./projectUpdateDefaultRole";
+import type { ProjectUpdateName } from './projectUpdateName';
+import type { ProjectUpdateDescription } from './projectUpdateDescription';
+import type { ProjectUpdateTags } from './projectUpdateTags';
+import type { ProjectUpdateDefaultRole } from './projectUpdateDefaultRole';
 
 /**
  * Request schema for updating a project.

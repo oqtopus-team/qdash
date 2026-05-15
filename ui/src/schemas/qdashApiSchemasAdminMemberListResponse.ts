@@ -5,7 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { MemberItem } from "./memberItem";
+import type { MemberItem } from './memberItem';
 
 /**
  * Response containing list of project members.

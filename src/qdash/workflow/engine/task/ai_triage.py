@@ -2,12 +2,27 @@
 
 from __future__ import annotations
 
-import asyncio
 import logging
 import re
 from concurrent.futures import ThreadPoolExecutor
 from threading import Lock
 from typing import TYPE_CHECKING, cast
+
+from qdash.copilot.triage import (
+    apply_ai_triage_config as _shared_ai_triage_config,
+)
+from qdash.copilot.triage import (
+    build_ai_triage_context as _shared_build_ai_triage_context,
+)
+from qdash.copilot.triage import (
+    forced_ai_triage_markdown as _shared_forced_ai_triage_markdown,
+)
+from qdash.copilot.triage import (
+    render_ai_triage_markdown as _shared_render_ai_triage_markdown,
+)
+from qdash.copilot.triage import (
+    select_analysis_model as _shared_select_analysis_model,
+)
 
 if TYPE_CHECKING:
     from qdash.copilot.config import CopilotConfig, ModelConfig
@@ -22,23 +37,6 @@ AI_TRIAGE_SEPARATOR = "\n\n---\n\n"
 AI_TRIAGE_SECTION_RE = re.compile(r"^## AI triage\n\n.*?(?:\n\n---\n\n|$)", re.DOTALL)
 MAX_AI_TRIAGE_NOTE_CHARS = 4500
 AI_TRIAGE_WORKERS = 2
-AI_TRIAGE_FORMAT_REMINDER = """\
-
-Required output format:
-Return JSON, but the JSON `explanation` string must start exactly with this
-markdown block. Do not put prose before it.
-
-**Review triage**
-- Decision: `PASS` | `PASS_WITH_NOTE` | `REVIEW` | `FAIL`
-- Human label suggestion: `CORRECT` | `SUSPICIOUS` | `MISASSIGNMENT` | `NO_SIGNAL` | `ANOMALY`
-- Accepted parameter(s): ...
-- Needs review: ...
-- Primary reason: ...
-- Closest knowledge case: ...
-- Suggested labels: ...
-- Recommended action: ...
-- Optional note: ...
-"""
 AI_TRIAGE_ELIGIBLE_STATUSES = frozenset({"completed", "failed"})
 
 _EXECUTOR = ThreadPoolExecutor(max_workers=AI_TRIAGE_WORKERS, thread_name_prefix="ai-triage")
@@ -258,65 +256,17 @@ def _log_warning(message: str, *args: object) -> None:
 
 def _select_analysis_model(config: CopilotConfig) -> ModelConfig:
     """Return the effective model used for task-result analysis."""
-    return config.analysis_model or (
-        config.analysis_models[0] if config.analysis_models else config.model
-    )
+    return _shared_select_analysis_model(config)
 
 
 def _ai_triage_config(config: CopilotConfig) -> CopilotConfig:
     """Apply AI-triage-only speed defaults without changing side-panel chat."""
-    analysis = config.analysis
-    if analysis.ai_triage_max_expected_images is not None:
-        analysis = analysis.model_copy(
-            update={"max_expected_images": analysis.ai_triage_max_expected_images}
-        )
-    model = _select_analysis_model(config)
-    if analysis.ai_triage_max_output_tokens is not None:
-        model = model.model_copy(update={"max_output_tokens": analysis.ai_triage_max_output_tokens})
-    return config.model_copy(update={"analysis": analysis, "analysis_model": model})
-
-
-def _param_value(params: dict[str, object], *names: str) -> object:
-    """Return a compact output-parameter value from possible parameter names."""
-    for name in names:
-        if name not in params:
-            continue
-        raw = params[name]
-        if isinstance(raw, dict):
-            return raw.get("value")
-        return raw
-    return None
+    return _shared_ai_triage_config(config)
 
 
 def _forced_ai_triage_markdown(task_name: str, output_params: dict[str, object]) -> str | None:
     """Apply deterministic safety guards before asking a local VLM."""
-    if task_name != "CheckQubitSpectroscopy":
-        return None
-    f01 = _param_value(
-        output_params,
-        "coarse_qubit_frequency",
-        "coarse_qubit_frequency_ghz",
-        "f01_frequency",
-        "f01_frequency_ghz",
-    )
-    if f01 is not None:
-        return None
-    return "\n".join(
-        [
-            "**Review triage**",
-            "- Decision: `FAIL`",
-            "- Human label suggestion: `NO_SIGNAL`",
-            "- Accepted parameter(s): `none`",
-            "- Needs review: `none`",
-            "- Primary reason: No f01 output parameter was detected, so the "
-            "result is not safe for automatic update.",
-            "- Closest knowledge case: `none`",
-            "- Suggested labels: `no_signal`",
-            "- Recommended action: Rerun qubit spectroscopy with an adjusted "
-            "frequency range or drive power.",
-            "- Optional note: Deterministic safety guard applied before local VLM review.",
-        ]
-    )
+    return _shared_forced_ai_triage_markdown(task_name, output_params)
 
 
 def _is_non_representative_mux_result(task: BaseTaskResultModel) -> bool:
@@ -347,22 +297,14 @@ def _run_ai_triage(
     config: CopilotConfig,
 ) -> str | None:
     """Run Copilot analysis and return markdown content."""
-    from qdash.copilot.agent import blocks_to_markdown, run_analysis
-    from qdash.copilot.runtime import CopilotRuntime
-
     config = _ai_triage_config(config)
-    service = CopilotRuntime()
-    ctx = service.build_analysis_context(
+    ctx = _shared_build_ai_triage_context(
         task_name=task.name,
         chip_id=execution_model.chip_id,
         qid=getattr(task, "qid", ""),
         task_id=task.task_id,
-        image_base64=None,
         config=config,
     )
-    ctx.context = ctx.context.model_copy(update={"recent_values": [], "history_results": []})
-    if forced := _forced_ai_triage_markdown(task.name, ctx.context.output_parameters):
-        return forced
     selected_model = _select_analysis_model(config)
     _log_info(
         "AI triage request: task=%s task_id=%s provider=%s model=%s image=%s expected_images=%d",
@@ -373,18 +315,11 @@ def _run_ai_triage(
         bool(ctx.image_base64),
         len(ctx.expected_images),
     )
-    result = asyncio.run(
-        run_analysis(
-            context=ctx.context,
-            user_message=f"{config.analysis.ai_triage_message}\n\n{AI_TRIAGE_FORMAT_REMINDER}",
-            config=config,
-            image_base64=ctx.image_base64,
-            expected_images=ctx.expected_images,
-            conversation_history=[],
-            tool_executors=None,
-        )
+    markdown = _shared_render_ai_triage_markdown(
+        task_name=task.name,
+        config=config,
+        context_bundle=ctx,
     )
-    markdown = blocks_to_markdown(result).strip()
     return markdown or None
 
 

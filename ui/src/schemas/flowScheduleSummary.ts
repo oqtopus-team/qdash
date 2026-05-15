@@ -5,8 +5,8 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { FlowScheduleSummaryCron } from "./flowScheduleSummaryCron";
-import type { FlowScheduleSummaryNextRun } from "./flowScheduleSummaryNextRun";
+import type { FlowScheduleSummaryCron } from './flowScheduleSummaryCron';
+import type { FlowScheduleSummaryNextRun } from './flowScheduleSummaryNextRun';
 
 /**
  * Summary of a scheduled Flow.

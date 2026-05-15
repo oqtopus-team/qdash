@@ -9,4 +9,4 @@
 /**
  * Count by relation type
  */
-export type ProvenanceStatsResponseRelationCounts = { [key: string]: number };
+export type ProvenanceStatsResponseRelationCounts = {[key: string]: number};

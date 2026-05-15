@@ -5,7 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { ParameterModelValue } from "./parameterModelValue";
+import type { ParameterModelValue } from './parameterModelValue';
 
 /**
  * Calibration parameter model.

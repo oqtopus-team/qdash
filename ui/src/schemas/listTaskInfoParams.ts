@@ -7,7 +7,7 @@
  */
 
 export type ListTaskInfoParams = {
-  backend: string;
-  sort_order?: string | null;
-  enabled_only?: boolean;
+backend: string;
+sort_order?: string | null;
+enabled_only?: boolean;
 };

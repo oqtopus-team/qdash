@@ -5,7 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { TaskResponse } from "./taskResponse";
+import type { TaskResponse } from './taskResponse';
 
 /**
  * Response model for a list of tasks.

@@ -5,6 +5,6 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { ParameterVersionResponse } from "./parameterVersionResponse";
+import type { ParameterVersionResponse } from './parameterVersionResponse';
 
 export type LineageNodeResponseEntity = ParameterVersionResponse | null;

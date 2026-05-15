@@ -5,10 +5,10 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { ChipResponseTopologyId } from "./chipResponseTopologyId";
-import type { ChipResponseInstalledAt } from "./chipResponseInstalledAt";
-import type { ChipResponseCurrentCooldownId } from "./chipResponseCurrentCooldownId";
-import type { NoteModel } from "./noteModel";
+import type { ChipResponseTopologyId } from './chipResponseTopologyId';
+import type { ChipResponseInstalledAt } from './chipResponseInstalledAt';
+import type { ChipResponseCurrentCooldownId } from './chipResponseCurrentCooldownId';
+import type { NoteModel } from './noteModel';
 
 /**
  * Chip response model.

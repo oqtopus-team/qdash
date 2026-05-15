@@ -5,9 +5,9 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { TaskFileSettingsDefaultBackend } from "./taskFileSettingsDefaultBackend";
-import type { TaskFileSettingsDefaultViewMode } from "./taskFileSettingsDefaultViewMode";
-import type { TaskFileSettingsSortOrder } from "./taskFileSettingsSortOrder";
+import type { TaskFileSettingsDefaultBackend } from './taskFileSettingsDefaultBackend';
+import type { TaskFileSettingsDefaultViewMode } from './taskFileSettingsDefaultViewMode';
+import type { TaskFileSettingsSortOrder } from './taskFileSettingsSortOrder';
 
 /**
  * Task file settings model.

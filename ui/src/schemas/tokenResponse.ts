@@ -5,7 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { TokenResponseDefaultProjectId } from "./tokenResponseDefaultProjectId";
+import type { TokenResponseDefaultProjectId } from './tokenResponseDefaultProjectId';
 
 /**
  * Token response model for login.

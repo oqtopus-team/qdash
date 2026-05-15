@@ -7,20 +7,20 @@
  */
 
 export type GetDegradationTrendsParams = {
-  /**
-   * Minimum consecutive worsening steps
-   * @minimum 3
-   * @maximum 20
-   */
-  min_streak?: number;
-  /**
-   * Maximum number of trends to return
-   * @minimum 1
-   * @maximum 100
-   */
-  limit?: number;
-  /**
-   * Filter by parameter names
-   */
-  parameter_names?: string[] | null;
+/**
+ * Minimum consecutive worsening steps
+ * @minimum 3
+ * @maximum 20
+ */
+min_streak?: number;
+/**
+ * Maximum number of trends to return
+ * @minimum 1
+ * @maximum 100
+ */
+limit?: number;
+/**
+ * Filter by parameter names
+ */
+parameter_names?: string[] | null;
 };

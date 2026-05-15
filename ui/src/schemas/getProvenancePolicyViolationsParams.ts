@@ -7,18 +7,18 @@
  */
 
 export type GetProvenancePolicyViolationsParams = {
-  /**
-   * Filter by severity (warn)
-   */
-  severity?: string | null;
-  /**
-   * Maximum number of violations to return
-   * @minimum 1
-   * @maximum 500
-   */
-  limit?: number;
-  /**
-   * Filter by parameter names
-   */
-  parameter_names?: string[] | null;
+/**
+ * Filter by severity (warn)
+ */
+severity?: string | null;
+/**
+ * Maximum number of violations to return
+ * @minimum 1
+ * @maximum 500
+ */
+limit?: number;
+/**
+ * Filter by parameter names
+ */
+parameter_names?: string[] | null;
 };

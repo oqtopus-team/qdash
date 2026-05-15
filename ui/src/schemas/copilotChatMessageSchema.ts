@@ -5,8 +5,8 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { CopilotChatMessageSchemaAttachedImage } from "./copilotChatMessageSchemaAttachedImage";
-import type { CopilotChatMessageSchemaCreatedAt } from "./copilotChatMessageSchemaCreatedAt";
+import type { CopilotChatMessageSchemaAttachedImage } from './copilotChatMessageSchemaAttachedImage';
+import type { CopilotChatMessageSchemaCreatedAt } from './copilotChatMessageSchemaCreatedAt';
 
 /**
  * One message inside a copilot chat session.

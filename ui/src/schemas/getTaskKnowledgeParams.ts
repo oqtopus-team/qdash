@@ -7,8 +7,8 @@
  */
 
 export type GetTaskKnowledgeParams = {
-  /**
-   * Backend name
-   */
-  backend?: string;
+/**
+ * Backend name
+ */
+backend?: string;
 };

@@ -5,7 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { NoteModelUpdatedAt } from "./noteModelUpdatedAt";
+import type { NoteModelUpdatedAt } from './noteModelUpdatedAt';
 
 /**
  * A free-form note with author and timestamp metadata.

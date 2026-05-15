@@ -5,7 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { CopilotChatSessionSummaryContext } from "./copilotChatSessionSummaryContext";
+import type { CopilotChatSessionSummaryContext } from './copilotChatSessionSummaryContext';
 
 /**
  * Lightweight session entry used in the session list.

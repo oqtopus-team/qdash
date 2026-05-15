@@ -5,7 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { ManualParameterUpdateRequestParameters } from "./manualParameterUpdateRequestParameters";
+import type { ManualParameterUpdateRequestParameters } from './manualParameterUpdateRequestParameters';
 
 /**
  * Request to manually update calibration parameters.

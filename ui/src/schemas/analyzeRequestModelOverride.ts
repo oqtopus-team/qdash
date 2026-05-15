@@ -5,7 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { ModelConfig } from "./modelConfig";
+import type { ModelConfig } from './modelConfig';
 
 /**
  * Optional per-request model override for task result analysis. When unset, the configured analysis_model/model selection is used.

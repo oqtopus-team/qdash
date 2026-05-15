@@ -9,6 +9,4 @@
 /**
  * Parameters to update. Format: {"param_name": {"value": 4.85, "unit": "GHz"}}
  */
-export type ManualParameterUpdateRequestParameters = {
-  [key: string]: { [key: string]: unknown };
-};
+export type ManualParameterUpdateRequestParameters = {[key: string]: { [key: string]: unknown }};

@@ -5,10 +5,10 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { UserCreatePassword } from "./userCreatePassword";
-import type { UserCreateDisplayName } from "./userCreateDisplayName";
-import type { UserCreateOrganization } from "./userCreateOrganization";
-import type { UserCreateAvatarKey } from "./userCreateAvatarKey";
+import type { UserCreatePassword } from './userCreatePassword';
+import type { UserCreateDisplayName } from './userCreateDisplayName';
+import type { UserCreateOrganization } from './userCreateOrganization';
+import type { UserCreateAvatarKey } from './userCreateAvatarKey';
 
 /**
  * User creation model for registration (admin only).

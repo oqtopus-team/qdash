@@ -5,7 +5,10 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import { useMutation, useQuery } from "@tanstack/react-query";
+import {
+  useMutation,
+  useQuery
+} from '@tanstack/react-query';
 import type {
   DataTag,
   DefinedInitialDataOptions,
@@ -18,8 +21,8 @@ import type {
   UseMutationOptions,
   UseMutationResult,
   UseQueryOptions,
-  UseQueryResult,
-} from "@tanstack/react-query";
+  UseQueryResult
+} from '@tanstack/react-query';
 
 import type {
   DeleteFlow200,
@@ -39,1767 +42,1144 @@ import type {
   ScheduleFlowRequest,
   ScheduleFlowResponse,
   UpdateScheduleRequest,
-  UpdateScheduleResponse,
-} from "../../schemas";
+  UpdateScheduleResponse
+} from '../../schemas';
 
-import { customInstance } from "../../lib/custom-instance";
+import { customInstance } from '../../lib/custom-instance';
+
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
+
+
 
 /**
  * Save a Flow to file system and MongoDB.
  * @summary Save a flow
  */
 export const saveFlow = (
-  saveFlowRequest: SaveFlowRequest,
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
+    saveFlowRequest: SaveFlowRequest,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  return customInstance<SaveFlowResponse>(
-    {
-      url: `/flows`,
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      data: saveFlowRequest,
-      signal,
+      
+      
+      return customInstance<SaveFlowResponse>(
+      {url: `/flows`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: saveFlowRequest, signal
     },
-    options,
-  );
-};
+      options);
+    }
+  
 
-export const getSaveFlowMutationOptions = <
-  TError = HTTPValidationError,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof saveFlow>>,
-    TError,
-    { data: SaveFlowRequest },
-    TContext
-  >;
-  request?: SecondParameter<typeof customInstance>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof saveFlow>>,
-  TError,
-  { data: SaveFlowRequest },
-  TContext
-> => {
-  const mutationKey = ["saveFlow"];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      "mutationKey" in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
 
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof saveFlow>>,
-    { data: SaveFlowRequest }
-  > = (props) => {
-    const { data } = props ?? {};
+export const getSaveFlowMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveFlow>>, TError,{data: SaveFlowRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof saveFlow>>, TError,{data: SaveFlowRequest}, TContext> => {
 
-    return saveFlow(data, requestOptions);
-  };
+const mutationKey = ['saveFlow'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
 
-  return { mutationFn, ...mutationOptions };
-};
+      
 
-export type SaveFlowMutationResult = NonNullable<
-  Awaited<ReturnType<typeof saveFlow>>
->;
-export type SaveFlowMutationBody = SaveFlowRequest;
-export type SaveFlowMutationError = HTTPValidationError;
 
-/**
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof saveFlow>>, {data: SaveFlowRequest}> = (props) => {
+          const {data} = props ?? {};
+
+          return  saveFlow(data,requestOptions)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SaveFlowMutationResult = NonNullable<Awaited<ReturnType<typeof saveFlow>>>
+    export type SaveFlowMutationBody = SaveFlowRequest
+    export type SaveFlowMutationError = HTTPValidationError
+
+    /**
  * @summary Save a flow
  */
-export const useSaveFlow = <TError = HTTPValidationError, TContext = unknown>(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof saveFlow>>,
-      TError,
-      { data: SaveFlowRequest },
-      TContext
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof saveFlow>>,
-  TError,
-  { data: SaveFlowRequest },
-  TContext
-> => {
-  const mutationOptions = getSaveFlowMutationOptions(options);
+export const useSaveFlow = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveFlow>>, TError,{data: SaveFlowRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof saveFlow>>,
+        TError,
+        {data: SaveFlowRequest},
+        TContext
+      > => {
 
-  return useMutation(mutationOptions, queryClient);
-};
-/**
+      const mutationOptions = getSaveFlowMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    /**
  * List all Flows for the current project.
  * @summary List all flows
  */
 export const listFlows = (
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
+    
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  return customInstance<ListFlowsResponse>(
-    { url: `/flows`, method: "GET", signal },
-    options,
-  );
-};
+      
+      
+      return customInstance<ListFlowsResponse>(
+      {url: `/flows`, method: 'GET', signal
+    },
+      options);
+    }
+  
+
+
 
 export const getListFlowsQueryKey = () => {
-  return [`/flows`] as const;
-};
+    return [
+    `/flows`
+    ] as const;
+    }
 
-export const getListFlowsQueryOptions = <
-  TData = Awaited<ReturnType<typeof listFlows>>,
-  TError = HTTPValidationError,
->(options?: {
-  query?: Partial<
-    UseQueryOptions<Awaited<ReturnType<typeof listFlows>>, TError, TData>
-  >;
-  request?: SecondParameter<typeof customInstance>;
-}) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
+    
+export const getListFlowsQueryOptions = <TData = Awaited<ReturnType<typeof listFlows>>, TError = HTTPValidationError>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listFlows>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
 
-  const queryKey = queryOptions?.queryKey ?? getListFlowsQueryKey();
+const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof listFlows>>> = ({
-    signal,
-  }) => listFlows(requestOptions, signal);
+  const queryKey =  queryOptions?.queryKey ?? getListFlowsQueryKey();
 
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof listFlows>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData> };
-};
+  
 
-export type ListFlowsQueryResult = NonNullable<
-  Awaited<ReturnType<typeof listFlows>>
->;
-export type ListFlowsQueryError = HTTPValidationError;
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listFlows>>> = ({ signal }) => listFlows(requestOptions, signal);
 
-export function useListFlows<
-  TData = Awaited<ReturnType<typeof listFlows>>,
-  TError = HTTPValidationError,
->(
-  options: {
-    query: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof listFlows>>, TError, TData>
-    > &
-      Pick<
+      
+
+      
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listFlows>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+}
+
+export type ListFlowsQueryResult = NonNullable<Awaited<ReturnType<typeof listFlows>>>
+export type ListFlowsQueryError = HTTPValidationError
+
+
+export function useListFlows<TData = Awaited<ReturnType<typeof listFlows>>, TError = HTTPValidationError>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listFlows>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof listFlows>>,
           TError,
           Awaited<ReturnType<typeof listFlows>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData>;
-};
-export function useListFlows<
-  TData = Awaited<ReturnType<typeof listFlows>>,
-  TError = HTTPValidationError,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof listFlows>>, TError, TData>
-    > &
-      Pick<
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useListFlows<TData = Awaited<ReturnType<typeof listFlows>>, TError = HTTPValidationError>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listFlows>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof listFlows>>,
           TError,
           Awaited<ReturnType<typeof listFlows>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
-export function useListFlows<
-  TData = Awaited<ReturnType<typeof listFlows>>,
-  TError = HTTPValidationError,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof listFlows>>, TError, TData>
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useListFlows<TData = Awaited<ReturnType<typeof listFlows>>, TError = HTTPValidationError>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listFlows>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
 /**
  * @summary List all flows
  */
 
-export function useListFlows<
-  TData = Awaited<ReturnType<typeof listFlows>>,
-  TError = HTTPValidationError,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof listFlows>>, TError, TData>
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
-  const queryOptions = getListFlowsQueryOptions(options);
+export function useListFlows<TData = Awaited<ReturnType<typeof listFlows>>, TError = HTTPValidationError>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listFlows>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
 
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData> };
+  const queryOptions = getListFlowsQueryOptions(options)
 
-  query.queryKey = queryOptions.queryKey;
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey ;
 
   return query;
 }
+
+
 
 /**
  * List all available flow templates.
  * @summary List all flow templates
  */
 export const listFlowTemplates = (
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
+    
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  return customInstance<FlowTemplate[]>(
-    { url: `/flows/templates`, method: "GET", signal },
-    options,
-  );
-};
+      
+      
+      return customInstance<FlowTemplate[]>(
+      {url: `/flows/templates`, method: 'GET', signal
+    },
+      options);
+    }
+  
+
+
 
 export const getListFlowTemplatesQueryKey = () => {
-  return [`/flows/templates`] as const;
-};
+    return [
+    `/flows/templates`
+    ] as const;
+    }
 
-export const getListFlowTemplatesQueryOptions = <
-  TData = Awaited<ReturnType<typeof listFlowTemplates>>,
-  TError = unknown,
->(options?: {
-  query?: Partial<
-    UseQueryOptions<
-      Awaited<ReturnType<typeof listFlowTemplates>>,
-      TError,
-      TData
-    >
-  >;
-  request?: SecondParameter<typeof customInstance>;
-}) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
+    
+export const getListFlowTemplatesQueryOptions = <TData = Awaited<ReturnType<typeof listFlowTemplates>>, TError = unknown>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listFlowTemplates>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
 
-  const queryKey = queryOptions?.queryKey ?? getListFlowTemplatesQueryKey();
+const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof listFlowTemplates>>
-  > = ({ signal }) => listFlowTemplates(requestOptions, signal);
+  const queryKey =  queryOptions?.queryKey ?? getListFlowTemplatesQueryKey();
 
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof listFlowTemplates>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData> };
-};
+  
 
-export type ListFlowTemplatesQueryResult = NonNullable<
-  Awaited<ReturnType<typeof listFlowTemplates>>
->;
-export type ListFlowTemplatesQueryError = unknown;
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listFlowTemplates>>> = ({ signal }) => listFlowTemplates(requestOptions, signal);
 
-export function useListFlowTemplates<
-  TData = Awaited<ReturnType<typeof listFlowTemplates>>,
-  TError = unknown,
->(
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof listFlowTemplates>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
+      
+
+      
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listFlowTemplates>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+}
+
+export type ListFlowTemplatesQueryResult = NonNullable<Awaited<ReturnType<typeof listFlowTemplates>>>
+export type ListFlowTemplatesQueryError = unknown
+
+
+export function useListFlowTemplates<TData = Awaited<ReturnType<typeof listFlowTemplates>>, TError = unknown>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listFlowTemplates>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof listFlowTemplates>>,
           TError,
           Awaited<ReturnType<typeof listFlowTemplates>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData>;
-};
-export function useListFlowTemplates<
-  TData = Awaited<ReturnType<typeof listFlowTemplates>>,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof listFlowTemplates>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useListFlowTemplates<TData = Awaited<ReturnType<typeof listFlowTemplates>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listFlowTemplates>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof listFlowTemplates>>,
           TError,
           Awaited<ReturnType<typeof listFlowTemplates>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
-export function useListFlowTemplates<
-  TData = Awaited<ReturnType<typeof listFlowTemplates>>,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof listFlowTemplates>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useListFlowTemplates<TData = Awaited<ReturnType<typeof listFlowTemplates>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listFlowTemplates>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
 /**
  * @summary List all flow templates
  */
 
-export function useListFlowTemplates<
-  TData = Awaited<ReturnType<typeof listFlowTemplates>>,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof listFlowTemplates>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
-  const queryOptions = getListFlowTemplatesQueryOptions(options);
+export function useListFlowTemplates<TData = Awaited<ReturnType<typeof listFlowTemplates>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listFlowTemplates>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
 
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData> };
+  const queryOptions = getListFlowTemplatesQueryOptions(options)
 
-  query.queryKey = queryOptions.queryKey;
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey ;
 
   return query;
 }
+
+
 
 /**
  * Get flow template details including code content.
  * @summary Get a flow template
  */
 export const getFlowTemplate = (
-  templateId: string,
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
+    templateId: string,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  return customInstance<FlowTemplateWithCode>(
-    { url: `/flows/templates/${templateId}`, method: "GET", signal },
-    options,
-  );
-};
+      
+      
+      return customInstance<FlowTemplateWithCode>(
+      {url: `/flows/templates/${templateId}`, method: 'GET', signal
+    },
+      options);
+    }
+  
 
-export const getGetFlowTemplateQueryKey = (templateId?: string) => {
-  return [`/flows/templates/${templateId}`] as const;
-};
 
-export const getGetFlowTemplateQueryOptions = <
-  TData = Awaited<ReturnType<typeof getFlowTemplate>>,
-  TError = HTTPValidationError,
->(
-  templateId: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getFlowTemplate>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
+
+export const getGetFlowTemplateQueryKey = (templateId?: string,) => {
+    return [
+    `/flows/templates/${templateId}`
+    ] as const;
+    }
+
+    
+export const getGetFlowTemplateQueryOptions = <TData = Awaited<ReturnType<typeof getFlowTemplate>>, TError = HTTPValidationError>(templateId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFlowTemplate>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey =
-    queryOptions?.queryKey ?? getGetFlowTemplateQueryKey(templateId);
+const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof getFlowTemplate>>> = ({
-    signal,
-  }) => getFlowTemplate(templateId, requestOptions, signal);
+  const queryKey =  queryOptions?.queryKey ?? getGetFlowTemplateQueryKey(templateId);
 
-  return {
-    queryKey,
-    queryFn,
-    enabled: !!templateId,
-    ...queryOptions,
-  } as UseQueryOptions<
-    Awaited<ReturnType<typeof getFlowTemplate>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData> };
-};
+  
 
-export type GetFlowTemplateQueryResult = NonNullable<
-  Awaited<ReturnType<typeof getFlowTemplate>>
->;
-export type GetFlowTemplateQueryError = HTTPValidationError;
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getFlowTemplate>>> = ({ signal }) => getFlowTemplate(templateId, requestOptions, signal);
 
-export function useGetFlowTemplate<
-  TData = Awaited<ReturnType<typeof getFlowTemplate>>,
-  TError = HTTPValidationError,
->(
-  templateId: string,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getFlowTemplate>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
+      
+
+      
+
+   return  { queryKey, queryFn, enabled: !!(templateId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getFlowTemplate>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+}
+
+export type GetFlowTemplateQueryResult = NonNullable<Awaited<ReturnType<typeof getFlowTemplate>>>
+export type GetFlowTemplateQueryError = HTTPValidationError
+
+
+export function useGetFlowTemplate<TData = Awaited<ReturnType<typeof getFlowTemplate>>, TError = HTTPValidationError>(
+ templateId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFlowTemplate>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getFlowTemplate>>,
           TError,
           Awaited<ReturnType<typeof getFlowTemplate>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData>;
-};
-export function useGetFlowTemplate<
-  TData = Awaited<ReturnType<typeof getFlowTemplate>>,
-  TError = HTTPValidationError,
->(
-  templateId: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getFlowTemplate>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useGetFlowTemplate<TData = Awaited<ReturnType<typeof getFlowTemplate>>, TError = HTTPValidationError>(
+ templateId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFlowTemplate>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getFlowTemplate>>,
           TError,
           Awaited<ReturnType<typeof getFlowTemplate>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
-export function useGetFlowTemplate<
-  TData = Awaited<ReturnType<typeof getFlowTemplate>>,
-  TError = HTTPValidationError,
->(
-  templateId: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getFlowTemplate>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useGetFlowTemplate<TData = Awaited<ReturnType<typeof getFlowTemplate>>, TError = HTTPValidationError>(
+ templateId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFlowTemplate>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
 /**
  * @summary Get a flow template
  */
 
-export function useGetFlowTemplate<
-  TData = Awaited<ReturnType<typeof getFlowTemplate>>,
-  TError = HTTPValidationError,
->(
-  templateId: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getFlowTemplate>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
-  const queryOptions = getGetFlowTemplateQueryOptions(templateId, options);
+export function useGetFlowTemplate<TData = Awaited<ReturnType<typeof getFlowTemplate>>, TError = HTTPValidationError>(
+ templateId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFlowTemplate>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
 
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData> };
+  const queryOptions = getGetFlowTemplateQueryOptions(templateId,options)
 
-  query.queryKey = queryOptions.queryKey;
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey ;
 
   return query;
 }
+
+
 
 /**
  * List all Python files in the qdash.workflow.service module.
  * @summary List flow helper files
  */
 export const listFlowHelperFiles = (
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
+    
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  return customInstance<string[]>(
-    { url: `/flows/helpers`, method: "GET", signal },
-    options,
-  );
-};
+      
+      
+      return customInstance<string[]>(
+      {url: `/flows/helpers`, method: 'GET', signal
+    },
+      options);
+    }
+  
+
+
 
 export const getListFlowHelperFilesQueryKey = () => {
-  return [`/flows/helpers`] as const;
-};
+    return [
+    `/flows/helpers`
+    ] as const;
+    }
 
-export const getListFlowHelperFilesQueryOptions = <
-  TData = Awaited<ReturnType<typeof listFlowHelperFiles>>,
-  TError = unknown,
->(options?: {
-  query?: Partial<
-    UseQueryOptions<
-      Awaited<ReturnType<typeof listFlowHelperFiles>>,
-      TError,
-      TData
-    >
-  >;
-  request?: SecondParameter<typeof customInstance>;
-}) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
+    
+export const getListFlowHelperFilesQueryOptions = <TData = Awaited<ReturnType<typeof listFlowHelperFiles>>, TError = unknown>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listFlowHelperFiles>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
 
-  const queryKey = queryOptions?.queryKey ?? getListFlowHelperFilesQueryKey();
+const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof listFlowHelperFiles>>
-  > = ({ signal }) => listFlowHelperFiles(requestOptions, signal);
+  const queryKey =  queryOptions?.queryKey ?? getListFlowHelperFilesQueryKey();
 
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof listFlowHelperFiles>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData> };
-};
+  
 
-export type ListFlowHelperFilesQueryResult = NonNullable<
-  Awaited<ReturnType<typeof listFlowHelperFiles>>
->;
-export type ListFlowHelperFilesQueryError = unknown;
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listFlowHelperFiles>>> = ({ signal }) => listFlowHelperFiles(requestOptions, signal);
 
-export function useListFlowHelperFiles<
-  TData = Awaited<ReturnType<typeof listFlowHelperFiles>>,
-  TError = unknown,
->(
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof listFlowHelperFiles>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
+      
+
+      
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listFlowHelperFiles>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+}
+
+export type ListFlowHelperFilesQueryResult = NonNullable<Awaited<ReturnType<typeof listFlowHelperFiles>>>
+export type ListFlowHelperFilesQueryError = unknown
+
+
+export function useListFlowHelperFiles<TData = Awaited<ReturnType<typeof listFlowHelperFiles>>, TError = unknown>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listFlowHelperFiles>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof listFlowHelperFiles>>,
           TError,
           Awaited<ReturnType<typeof listFlowHelperFiles>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData>;
-};
-export function useListFlowHelperFiles<
-  TData = Awaited<ReturnType<typeof listFlowHelperFiles>>,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof listFlowHelperFiles>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useListFlowHelperFiles<TData = Awaited<ReturnType<typeof listFlowHelperFiles>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listFlowHelperFiles>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof listFlowHelperFiles>>,
           TError,
           Awaited<ReturnType<typeof listFlowHelperFiles>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
-export function useListFlowHelperFiles<
-  TData = Awaited<ReturnType<typeof listFlowHelperFiles>>,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof listFlowHelperFiles>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useListFlowHelperFiles<TData = Awaited<ReturnType<typeof listFlowHelperFiles>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listFlowHelperFiles>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
 /**
  * @summary List flow helper files
  */
 
-export function useListFlowHelperFiles<
-  TData = Awaited<ReturnType<typeof listFlowHelperFiles>>,
-  TError = unknown,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof listFlowHelperFiles>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
-  const queryOptions = getListFlowHelperFilesQueryOptions(options);
+export function useListFlowHelperFiles<TData = Awaited<ReturnType<typeof listFlowHelperFiles>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listFlowHelperFiles>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
 
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData> };
+  const queryOptions = getListFlowHelperFilesQueryOptions(options)
 
-  query.queryKey = queryOptions.queryKey;
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey ;
 
   return query;
 }
+
+
 
 /**
  * Get the content of a flow helper file.
  * @summary Get flow helper file content
  */
 export const getFlowHelperFile = (
-  filename: string,
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
+    filename: string,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  return customInstance<string>(
-    { url: `/flows/helpers/${filename}`, method: "GET", signal },
-    options,
-  );
-};
+      
+      
+      return customInstance<string>(
+      {url: `/flows/helpers/${filename}`, method: 'GET', signal
+    },
+      options);
+    }
+  
 
-export const getGetFlowHelperFileQueryKey = (filename?: string) => {
-  return [`/flows/helpers/${filename}`] as const;
-};
 
-export const getGetFlowHelperFileQueryOptions = <
-  TData = Awaited<ReturnType<typeof getFlowHelperFile>>,
-  TError = HTTPValidationError,
->(
-  filename: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getFlowHelperFile>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
+
+export const getGetFlowHelperFileQueryKey = (filename?: string,) => {
+    return [
+    `/flows/helpers/${filename}`
+    ] as const;
+    }
+
+    
+export const getGetFlowHelperFileQueryOptions = <TData = Awaited<ReturnType<typeof getFlowHelperFile>>, TError = HTTPValidationError>(filename: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFlowHelperFile>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey =
-    queryOptions?.queryKey ?? getGetFlowHelperFileQueryKey(filename);
+const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof getFlowHelperFile>>
-  > = ({ signal }) => getFlowHelperFile(filename, requestOptions, signal);
+  const queryKey =  queryOptions?.queryKey ?? getGetFlowHelperFileQueryKey(filename);
 
-  return {
-    queryKey,
-    queryFn,
-    enabled: !!filename,
-    ...queryOptions,
-  } as UseQueryOptions<
-    Awaited<ReturnType<typeof getFlowHelperFile>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData> };
-};
+  
 
-export type GetFlowHelperFileQueryResult = NonNullable<
-  Awaited<ReturnType<typeof getFlowHelperFile>>
->;
-export type GetFlowHelperFileQueryError = HTTPValidationError;
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getFlowHelperFile>>> = ({ signal }) => getFlowHelperFile(filename, requestOptions, signal);
 
-export function useGetFlowHelperFile<
-  TData = Awaited<ReturnType<typeof getFlowHelperFile>>,
-  TError = HTTPValidationError,
->(
-  filename: string,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getFlowHelperFile>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
+      
+
+      
+
+   return  { queryKey, queryFn, enabled: !!(filename), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getFlowHelperFile>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+}
+
+export type GetFlowHelperFileQueryResult = NonNullable<Awaited<ReturnType<typeof getFlowHelperFile>>>
+export type GetFlowHelperFileQueryError = HTTPValidationError
+
+
+export function useGetFlowHelperFile<TData = Awaited<ReturnType<typeof getFlowHelperFile>>, TError = HTTPValidationError>(
+ filename: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFlowHelperFile>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getFlowHelperFile>>,
           TError,
           Awaited<ReturnType<typeof getFlowHelperFile>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData>;
-};
-export function useGetFlowHelperFile<
-  TData = Awaited<ReturnType<typeof getFlowHelperFile>>,
-  TError = HTTPValidationError,
->(
-  filename: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getFlowHelperFile>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useGetFlowHelperFile<TData = Awaited<ReturnType<typeof getFlowHelperFile>>, TError = HTTPValidationError>(
+ filename: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFlowHelperFile>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getFlowHelperFile>>,
           TError,
           Awaited<ReturnType<typeof getFlowHelperFile>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
-export function useGetFlowHelperFile<
-  TData = Awaited<ReturnType<typeof getFlowHelperFile>>,
-  TError = HTTPValidationError,
->(
-  filename: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getFlowHelperFile>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useGetFlowHelperFile<TData = Awaited<ReturnType<typeof getFlowHelperFile>>, TError = HTTPValidationError>(
+ filename: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFlowHelperFile>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
 /**
  * @summary Get flow helper file content
  */
 
-export function useGetFlowHelperFile<
-  TData = Awaited<ReturnType<typeof getFlowHelperFile>>,
-  TError = HTTPValidationError,
->(
-  filename: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getFlowHelperFile>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
-  const queryOptions = getGetFlowHelperFileQueryOptions(filename, options);
+export function useGetFlowHelperFile<TData = Awaited<ReturnType<typeof getFlowHelperFile>>, TError = HTTPValidationError>(
+ filename: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFlowHelperFile>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
 
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData> };
+  const queryOptions = getGetFlowHelperFileQueryOptions(filename,options)
 
-  query.queryKey = queryOptions.queryKey;
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey ;
 
   return query;
 }
+
+
 
 /**
  * List all Flow schedules (cron and one-time) for the current project.
  * @summary List all flow schedules for current project
  */
 export const listAllFlowSchedules = (
-  params?: ListAllFlowSchedulesParams,
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
+    params?: ListAllFlowSchedulesParams,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  return customInstance<ListFlowSchedulesResponse>(
-    { url: `/flows/schedules`, method: "GET", params, signal },
-    options,
-  );
-};
+      
+      
+      return customInstance<ListFlowSchedulesResponse>(
+      {url: `/flows/schedules`, method: 'GET',
+        params, signal
+    },
+      options);
+    }
+  
 
-export const getListAllFlowSchedulesQueryKey = (
-  params?: ListAllFlowSchedulesParams,
+
+
+export const getListAllFlowSchedulesQueryKey = (params?: ListAllFlowSchedulesParams,) => {
+    return [
+    `/flows/schedules`, ...(params ? [params]: [])
+    ] as const;
+    }
+
+    
+export const getListAllFlowSchedulesQueryOptions = <TData = Awaited<ReturnType<typeof listAllFlowSchedules>>, TError = HTTPValidationError>(params?: ListAllFlowSchedulesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listAllFlowSchedules>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
-  return [`/flows/schedules`, ...(params ? [params] : [])] as const;
-};
 
-export const getListAllFlowSchedulesQueryOptions = <
-  TData = Awaited<ReturnType<typeof listAllFlowSchedules>>,
-  TError = HTTPValidationError,
->(
-  params?: ListAllFlowSchedulesParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof listAllFlowSchedules>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
+const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =
-    queryOptions?.queryKey ?? getListAllFlowSchedulesQueryKey(params);
+  const queryKey =  queryOptions?.queryKey ?? getListAllFlowSchedulesQueryKey(params);
 
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof listAllFlowSchedules>>
-  > = ({ signal }) => listAllFlowSchedules(params, requestOptions, signal);
+  
 
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof listAllFlowSchedules>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData> };
-};
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listAllFlowSchedules>>> = ({ signal }) => listAllFlowSchedules(params, requestOptions, signal);
 
-export type ListAllFlowSchedulesQueryResult = NonNullable<
-  Awaited<ReturnType<typeof listAllFlowSchedules>>
->;
-export type ListAllFlowSchedulesQueryError = HTTPValidationError;
+      
 
-export function useListAllFlowSchedules<
-  TData = Awaited<ReturnType<typeof listAllFlowSchedules>>,
-  TError = HTTPValidationError,
->(
-  params: undefined | ListAllFlowSchedulesParams,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof listAllFlowSchedules>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
+      
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listAllFlowSchedules>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+}
+
+export type ListAllFlowSchedulesQueryResult = NonNullable<Awaited<ReturnType<typeof listAllFlowSchedules>>>
+export type ListAllFlowSchedulesQueryError = HTTPValidationError
+
+
+export function useListAllFlowSchedules<TData = Awaited<ReturnType<typeof listAllFlowSchedules>>, TError = HTTPValidationError>(
+ params: undefined |  ListAllFlowSchedulesParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listAllFlowSchedules>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof listAllFlowSchedules>>,
           TError,
           Awaited<ReturnType<typeof listAllFlowSchedules>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData>;
-};
-export function useListAllFlowSchedules<
-  TData = Awaited<ReturnType<typeof listAllFlowSchedules>>,
-  TError = HTTPValidationError,
->(
-  params?: ListAllFlowSchedulesParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof listAllFlowSchedules>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useListAllFlowSchedules<TData = Awaited<ReturnType<typeof listAllFlowSchedules>>, TError = HTTPValidationError>(
+ params?: ListAllFlowSchedulesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listAllFlowSchedules>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof listAllFlowSchedules>>,
           TError,
           Awaited<ReturnType<typeof listAllFlowSchedules>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
-export function useListAllFlowSchedules<
-  TData = Awaited<ReturnType<typeof listAllFlowSchedules>>,
-  TError = HTTPValidationError,
->(
-  params?: ListAllFlowSchedulesParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof listAllFlowSchedules>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useListAllFlowSchedules<TData = Awaited<ReturnType<typeof listAllFlowSchedules>>, TError = HTTPValidationError>(
+ params?: ListAllFlowSchedulesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listAllFlowSchedules>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
 /**
  * @summary List all flow schedules for current project
  */
 
-export function useListAllFlowSchedules<
-  TData = Awaited<ReturnType<typeof listAllFlowSchedules>>,
-  TError = HTTPValidationError,
->(
-  params?: ListAllFlowSchedulesParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof listAllFlowSchedules>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
-  const queryOptions = getListAllFlowSchedulesQueryOptions(params, options);
+export function useListAllFlowSchedules<TData = Awaited<ReturnType<typeof listAllFlowSchedules>>, TError = HTTPValidationError>(
+ params?: ListAllFlowSchedulesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listAllFlowSchedules>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
 
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData> };
+  const queryOptions = getListAllFlowSchedulesQueryOptions(params,options)
 
-  query.queryKey = queryOptions.queryKey;
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey ;
 
   return query;
 }
+
+
 
 /**
  * Delete a Flow schedule (cron or one-time).
  * @summary Delete a flow schedule
  */
 export const deleteFlowSchedule = (
-  scheduleId: string,
-  options?: SecondParameter<typeof customInstance>,
-) => {
-  return customInstance<DeleteScheduleResponse>(
-    { url: `/flows/schedules/${scheduleId}`, method: "DELETE" },
-    options,
-  );
-};
+    scheduleId: string,
+ options?: SecondParameter<typeof customInstance>,) => {
+      
+      
+      return customInstance<DeleteScheduleResponse>(
+      {url: `/flows/schedules/${scheduleId}`, method: 'DELETE'
+    },
+      options);
+    }
+  
 
-export const getDeleteFlowScheduleMutationOptions = <
-  TError = HTTPValidationError,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof deleteFlowSchedule>>,
-    TError,
-    { scheduleId: string },
-    TContext
-  >;
-  request?: SecondParameter<typeof customInstance>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof deleteFlowSchedule>>,
-  TError,
-  { scheduleId: string },
-  TContext
-> => {
-  const mutationKey = ["deleteFlowSchedule"];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      "mutationKey" in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
 
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof deleteFlowSchedule>>,
-    { scheduleId: string }
-  > = (props) => {
-    const { scheduleId } = props ?? {};
+export const getDeleteFlowScheduleMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteFlowSchedule>>, TError,{scheduleId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteFlowSchedule>>, TError,{scheduleId: string}, TContext> => {
 
-    return deleteFlowSchedule(scheduleId, requestOptions);
-  };
+const mutationKey = ['deleteFlowSchedule'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
 
-  return { mutationFn, ...mutationOptions };
-};
+      
 
-export type DeleteFlowScheduleMutationResult = NonNullable<
-  Awaited<ReturnType<typeof deleteFlowSchedule>>
->;
 
-export type DeleteFlowScheduleMutationError = HTTPValidationError;
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteFlowSchedule>>, {scheduleId: string}> = (props) => {
+          const {scheduleId} = props ?? {};
 
-/**
+          return  deleteFlowSchedule(scheduleId,requestOptions)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteFlowScheduleMutationResult = NonNullable<Awaited<ReturnType<typeof deleteFlowSchedule>>>
+    
+    export type DeleteFlowScheduleMutationError = HTTPValidationError
+
+    /**
  * @summary Delete a flow schedule
  */
-export const useDeleteFlowSchedule = <
-  TError = HTTPValidationError,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof deleteFlowSchedule>>,
-      TError,
-      { scheduleId: string },
-      TContext
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof deleteFlowSchedule>>,
-  TError,
-  { scheduleId: string },
-  TContext
-> => {
-  const mutationOptions = getDeleteFlowScheduleMutationOptions(options);
+export const useDeleteFlowSchedule = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteFlowSchedule>>, TError,{scheduleId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof deleteFlowSchedule>>,
+        TError,
+        {scheduleId: string},
+        TContext
+      > => {
 
-  return useMutation(mutationOptions, queryClient);
-};
-/**
+      const mutationOptions = getDeleteFlowScheduleMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    /**
  * Update a Flow schedule (cron schedules only).
  * @summary Update a flow schedule
  */
 export const updateFlowSchedule = (
-  scheduleId: string,
-  updateScheduleRequest: UpdateScheduleRequest,
-  options?: SecondParameter<typeof customInstance>,
-) => {
-  return customInstance<UpdateScheduleResponse>(
-    {
-      url: `/flows/schedules/${scheduleId}`,
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      data: updateScheduleRequest,
+    scheduleId: string,
+    updateScheduleRequest: UpdateScheduleRequest,
+ options?: SecondParameter<typeof customInstance>,) => {
+      
+      
+      return customInstance<UpdateScheduleResponse>(
+      {url: `/flows/schedules/${scheduleId}`, method: 'PATCH',
+      headers: {'Content-Type': 'application/json', },
+      data: updateScheduleRequest
     },
-    options,
-  );
-};
+      options);
+    }
+  
 
-export const getUpdateFlowScheduleMutationOptions = <
-  TError = HTTPValidationError,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof updateFlowSchedule>>,
-    TError,
-    { scheduleId: string; data: UpdateScheduleRequest },
-    TContext
-  >;
-  request?: SecondParameter<typeof customInstance>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof updateFlowSchedule>>,
-  TError,
-  { scheduleId: string; data: UpdateScheduleRequest },
-  TContext
-> => {
-  const mutationKey = ["updateFlowSchedule"];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      "mutationKey" in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
 
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof updateFlowSchedule>>,
-    { scheduleId: string; data: UpdateScheduleRequest }
-  > = (props) => {
-    const { scheduleId, data } = props ?? {};
+export const getUpdateFlowScheduleMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateFlowSchedule>>, TError,{scheduleId: string;data: UpdateScheduleRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateFlowSchedule>>, TError,{scheduleId: string;data: UpdateScheduleRequest}, TContext> => {
 
-    return updateFlowSchedule(scheduleId, data, requestOptions);
-  };
+const mutationKey = ['updateFlowSchedule'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
 
-  return { mutationFn, ...mutationOptions };
-};
+      
 
-export type UpdateFlowScheduleMutationResult = NonNullable<
-  Awaited<ReturnType<typeof updateFlowSchedule>>
->;
-export type UpdateFlowScheduleMutationBody = UpdateScheduleRequest;
-export type UpdateFlowScheduleMutationError = HTTPValidationError;
 
-/**
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateFlowSchedule>>, {scheduleId: string;data: UpdateScheduleRequest}> = (props) => {
+          const {scheduleId,data} = props ?? {};
+
+          return  updateFlowSchedule(scheduleId,data,requestOptions)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateFlowScheduleMutationResult = NonNullable<Awaited<ReturnType<typeof updateFlowSchedule>>>
+    export type UpdateFlowScheduleMutationBody = UpdateScheduleRequest
+    export type UpdateFlowScheduleMutationError = HTTPValidationError
+
+    /**
  * @summary Update a flow schedule
  */
-export const useUpdateFlowSchedule = <
-  TError = HTTPValidationError,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof updateFlowSchedule>>,
-      TError,
-      { scheduleId: string; data: UpdateScheduleRequest },
-      TContext
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof updateFlowSchedule>>,
-  TError,
-  { scheduleId: string; data: UpdateScheduleRequest },
-  TContext
-> => {
-  const mutationOptions = getUpdateFlowScheduleMutationOptions(options);
+export const useUpdateFlowSchedule = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateFlowSchedule>>, TError,{scheduleId: string;data: UpdateScheduleRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof updateFlowSchedule>>,
+        TError,
+        {scheduleId: string;data: UpdateScheduleRequest},
+        TContext
+      > => {
 
-  return useMutation(mutationOptions, queryClient);
-};
-/**
+      const mutationOptions = getUpdateFlowScheduleMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    /**
  * Get Flow details including code content.
  * @summary Get flow details
  */
 export const getFlow = (
-  name: string,
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
+    name: string,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  return customInstance<GetFlowResponse>(
-    { url: `/flows/${name}`, method: "GET", signal },
-    options,
-  );
-};
+      
+      
+      return customInstance<GetFlowResponse>(
+      {url: `/flows/${name}`, method: 'GET', signal
+    },
+      options);
+    }
+  
 
-export const getGetFlowQueryKey = (name?: string) => {
-  return [`/flows/${name}`] as const;
-};
 
-export const getGetFlowQueryOptions = <
-  TData = Awaited<ReturnType<typeof getFlow>>,
-  TError = HTTPValidationError,
->(
-  name: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof getFlow>>, TError, TData>
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
+
+export const getGetFlowQueryKey = (name?: string,) => {
+    return [
+    `/flows/${name}`
+    ] as const;
+    }
+
+    
+export const getGetFlowQueryOptions = <TData = Awaited<ReturnType<typeof getFlow>>, TError = HTTPValidationError>(name: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFlow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey = queryOptions?.queryKey ?? getGetFlowQueryKey(name);
+const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof getFlow>>> = ({
-    signal,
-  }) => getFlow(name, requestOptions, signal);
+  const queryKey =  queryOptions?.queryKey ?? getGetFlowQueryKey(name);
 
-  return {
-    queryKey,
-    queryFn,
-    enabled: !!name,
-    ...queryOptions,
-  } as UseQueryOptions<Awaited<ReturnType<typeof getFlow>>, TError, TData> & {
-    queryKey: DataTag<QueryKey, TData>;
-  };
-};
+  
 
-export type GetFlowQueryResult = NonNullable<
-  Awaited<ReturnType<typeof getFlow>>
->;
-export type GetFlowQueryError = HTTPValidationError;
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getFlow>>> = ({ signal }) => getFlow(name, requestOptions, signal);
 
-export function useGetFlow<
-  TData = Awaited<ReturnType<typeof getFlow>>,
-  TError = HTTPValidationError,
->(
-  name: string,
-  options: {
-    query: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof getFlow>>, TError, TData>
-    > &
-      Pick<
+      
+
+      
+
+   return  { queryKey, queryFn, enabled: !!(name), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getFlow>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+}
+
+export type GetFlowQueryResult = NonNullable<Awaited<ReturnType<typeof getFlow>>>
+export type GetFlowQueryError = HTTPValidationError
+
+
+export function useGetFlow<TData = Awaited<ReturnType<typeof getFlow>>, TError = HTTPValidationError>(
+ name: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFlow>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getFlow>>,
           TError,
           Awaited<ReturnType<typeof getFlow>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData>;
-};
-export function useGetFlow<
-  TData = Awaited<ReturnType<typeof getFlow>>,
-  TError = HTTPValidationError,
->(
-  name: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof getFlow>>, TError, TData>
-    > &
-      Pick<
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useGetFlow<TData = Awaited<ReturnType<typeof getFlow>>, TError = HTTPValidationError>(
+ name: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFlow>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getFlow>>,
           TError,
           Awaited<ReturnType<typeof getFlow>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
-export function useGetFlow<
-  TData = Awaited<ReturnType<typeof getFlow>>,
-  TError = HTTPValidationError,
->(
-  name: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof getFlow>>, TError, TData>
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useGetFlow<TData = Awaited<ReturnType<typeof getFlow>>, TError = HTTPValidationError>(
+ name: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFlow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
 /**
  * @summary Get flow details
  */
 
-export function useGetFlow<
-  TData = Awaited<ReturnType<typeof getFlow>>,
-  TError = HTTPValidationError,
->(
-  name: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof getFlow>>, TError, TData>
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
-  const queryOptions = getGetFlowQueryOptions(name, options);
+export function useGetFlow<TData = Awaited<ReturnType<typeof getFlow>>, TError = HTTPValidationError>(
+ name: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFlow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
 
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData> };
+  const queryOptions = getGetFlowQueryOptions(name,options)
 
-  query.queryKey = queryOptions.queryKey;
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey ;
 
   return query;
 }
+
+
 
 /**
  * Delete a Flow.
  * @summary Delete a flow
  */
 export const deleteFlow = (
-  name: string,
-  options?: SecondParameter<typeof customInstance>,
-) => {
-  return customInstance<DeleteFlow200>(
-    { url: `/flows/${name}`, method: "DELETE" },
-    options,
-  );
-};
+    name: string,
+ options?: SecondParameter<typeof customInstance>,) => {
+      
+      
+      return customInstance<DeleteFlow200>(
+      {url: `/flows/${name}`, method: 'DELETE'
+    },
+      options);
+    }
+  
 
-export const getDeleteFlowMutationOptions = <
-  TError = HTTPValidationError,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof deleteFlow>>,
-    TError,
-    { name: string },
-    TContext
-  >;
-  request?: SecondParameter<typeof customInstance>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof deleteFlow>>,
-  TError,
-  { name: string },
-  TContext
-> => {
-  const mutationKey = ["deleteFlow"];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      "mutationKey" in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
 
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof deleteFlow>>,
-    { name: string }
-  > = (props) => {
-    const { name } = props ?? {};
+export const getDeleteFlowMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteFlow>>, TError,{name: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteFlow>>, TError,{name: string}, TContext> => {
 
-    return deleteFlow(name, requestOptions);
-  };
+const mutationKey = ['deleteFlow'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
 
-  return { mutationFn, ...mutationOptions };
-};
+      
 
-export type DeleteFlowMutationResult = NonNullable<
-  Awaited<ReturnType<typeof deleteFlow>>
->;
 
-export type DeleteFlowMutationError = HTTPValidationError;
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteFlow>>, {name: string}> = (props) => {
+          const {name} = props ?? {};
 
-/**
+          return  deleteFlow(name,requestOptions)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteFlowMutationResult = NonNullable<Awaited<ReturnType<typeof deleteFlow>>>
+    
+    export type DeleteFlowMutationError = HTTPValidationError
+
+    /**
  * @summary Delete a flow
  */
-export const useDeleteFlow = <TError = HTTPValidationError, TContext = unknown>(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof deleteFlow>>,
-      TError,
-      { name: string },
-      TContext
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof deleteFlow>>,
-  TError,
-  { name: string },
-  TContext
-> => {
-  const mutationOptions = getDeleteFlowMutationOptions(options);
+export const useDeleteFlow = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteFlow>>, TError,{name: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof deleteFlow>>,
+        TError,
+        {name: string},
+        TContext
+      > => {
 
-  return useMutation(mutationOptions, queryClient);
-};
-/**
+      const mutationOptions = getDeleteFlowMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    /**
  * Execute a Flow via Prefect deployment.
  * @summary Execute a flow
  */
 export const executeFlow = (
-  name: string,
-  executeFlowRequest: ExecuteFlowRequest,
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
+    name: string,
+    executeFlowRequest: ExecuteFlowRequest,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  return customInstance<ExecuteFlowResponse>(
-    {
-      url: `/flows/${name}/execute`,
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      data: executeFlowRequest,
-      signal,
+      
+      
+      return customInstance<ExecuteFlowResponse>(
+      {url: `/flows/${name}/execute`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: executeFlowRequest, signal
     },
-    options,
-  );
-};
+      options);
+    }
+  
 
-export const getExecuteFlowMutationOptions = <
-  TError = HTTPValidationError,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof executeFlow>>,
-    TError,
-    { name: string; data: ExecuteFlowRequest },
-    TContext
-  >;
-  request?: SecondParameter<typeof customInstance>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof executeFlow>>,
-  TError,
-  { name: string; data: ExecuteFlowRequest },
-  TContext
-> => {
-  const mutationKey = ["executeFlow"];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      "mutationKey" in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
 
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof executeFlow>>,
-    { name: string; data: ExecuteFlowRequest }
-  > = (props) => {
-    const { name, data } = props ?? {};
+export const getExecuteFlowMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof executeFlow>>, TError,{name: string;data: ExecuteFlowRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof executeFlow>>, TError,{name: string;data: ExecuteFlowRequest}, TContext> => {
 
-    return executeFlow(name, data, requestOptions);
-  };
+const mutationKey = ['executeFlow'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
 
-  return { mutationFn, ...mutationOptions };
-};
+      
 
-export type ExecuteFlowMutationResult = NonNullable<
-  Awaited<ReturnType<typeof executeFlow>>
->;
-export type ExecuteFlowMutationBody = ExecuteFlowRequest;
-export type ExecuteFlowMutationError = HTTPValidationError;
 
-/**
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof executeFlow>>, {name: string;data: ExecuteFlowRequest}> = (props) => {
+          const {name,data} = props ?? {};
+
+          return  executeFlow(name,data,requestOptions)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ExecuteFlowMutationResult = NonNullable<Awaited<ReturnType<typeof executeFlow>>>
+    export type ExecuteFlowMutationBody = ExecuteFlowRequest
+    export type ExecuteFlowMutationError = HTTPValidationError
+
+    /**
  * @summary Execute a flow
  */
-export const useExecuteFlow = <
-  TError = HTTPValidationError,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof executeFlow>>,
-      TError,
-      { name: string; data: ExecuteFlowRequest },
-      TContext
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof executeFlow>>,
-  TError,
-  { name: string; data: ExecuteFlowRequest },
-  TContext
-> => {
-  const mutationOptions = getExecuteFlowMutationOptions(options);
+export const useExecuteFlow = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof executeFlow>>, TError,{name: string;data: ExecuteFlowRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof executeFlow>>,
+        TError,
+        {name: string;data: ExecuteFlowRequest},
+        TContext
+      > => {
 
-  return useMutation(mutationOptions, queryClient);
-};
-/**
+      const mutationOptions = getExecuteFlowMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    /**
  * Schedule a Flow execution with cron or one-time schedule.
  * @summary Schedule a flow execution (cron or one-time)
  */
 export const scheduleFlow = (
-  name: string,
-  scheduleFlowRequest: ScheduleFlowRequest,
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
+    name: string,
+    scheduleFlowRequest: ScheduleFlowRequest,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  return customInstance<ScheduleFlowResponse>(
-    {
-      url: `/flows/${name}/schedule`,
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      data: scheduleFlowRequest,
-      signal,
+      
+      
+      return customInstance<ScheduleFlowResponse>(
+      {url: `/flows/${name}/schedule`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: scheduleFlowRequest, signal
     },
-    options,
-  );
-};
+      options);
+    }
+  
 
-export const getScheduleFlowMutationOptions = <
-  TError = HTTPValidationError,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof scheduleFlow>>,
-    TError,
-    { name: string; data: ScheduleFlowRequest },
-    TContext
-  >;
-  request?: SecondParameter<typeof customInstance>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof scheduleFlow>>,
-  TError,
-  { name: string; data: ScheduleFlowRequest },
-  TContext
-> => {
-  const mutationKey = ["scheduleFlow"];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      "mutationKey" in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
 
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof scheduleFlow>>,
-    { name: string; data: ScheduleFlowRequest }
-  > = (props) => {
-    const { name, data } = props ?? {};
+export const getScheduleFlowMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof scheduleFlow>>, TError,{name: string;data: ScheduleFlowRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof scheduleFlow>>, TError,{name: string;data: ScheduleFlowRequest}, TContext> => {
 
-    return scheduleFlow(name, data, requestOptions);
-  };
+const mutationKey = ['scheduleFlow'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
 
-  return { mutationFn, ...mutationOptions };
-};
+      
 
-export type ScheduleFlowMutationResult = NonNullable<
-  Awaited<ReturnType<typeof scheduleFlow>>
->;
-export type ScheduleFlowMutationBody = ScheduleFlowRequest;
-export type ScheduleFlowMutationError = HTTPValidationError;
 
-/**
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof scheduleFlow>>, {name: string;data: ScheduleFlowRequest}> = (props) => {
+          const {name,data} = props ?? {};
+
+          return  scheduleFlow(name,data,requestOptions)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ScheduleFlowMutationResult = NonNullable<Awaited<ReturnType<typeof scheduleFlow>>>
+    export type ScheduleFlowMutationBody = ScheduleFlowRequest
+    export type ScheduleFlowMutationError = HTTPValidationError
+
+    /**
  * @summary Schedule a flow execution (cron or one-time)
  */
-export const useScheduleFlow = <
-  TError = HTTPValidationError,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof scheduleFlow>>,
-      TError,
-      { name: string; data: ScheduleFlowRequest },
-      TContext
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof scheduleFlow>>,
-  TError,
-  { name: string; data: ScheduleFlowRequest },
-  TContext
-> => {
-  const mutationOptions = getScheduleFlowMutationOptions(options);
+export const useScheduleFlow = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof scheduleFlow>>, TError,{name: string;data: ScheduleFlowRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof scheduleFlow>>,
+        TError,
+        {name: string;data: ScheduleFlowRequest},
+        TContext
+      > => {
 
-  return useMutation(mutationOptions, queryClient);
-};
-/**
+      const mutationOptions = getScheduleFlowMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    /**
  * List all schedules (cron and one-time) for a specific Flow.
  * @summary List schedules for a specific flow
  */
 export const listFlowSchedules = (
-  name: string,
-  params?: ListFlowSchedulesParams,
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
+    name: string,
+    params?: ListFlowSchedulesParams,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  return customInstance<ListFlowSchedulesResponse>(
-    { url: `/flows/${name}/schedules`, method: "GET", params, signal },
-    options,
-  );
-};
+      
+      
+      return customInstance<ListFlowSchedulesResponse>(
+      {url: `/flows/${name}/schedules`, method: 'GET',
+        params, signal
+    },
+      options);
+    }
+  
 
-export const getListFlowSchedulesQueryKey = (
-  name?: string,
-  params?: ListFlowSchedulesParams,
+
+
+export const getListFlowSchedulesQueryKey = (name?: string,
+    params?: ListFlowSchedulesParams,) => {
+    return [
+    `/flows/${name}/schedules`, ...(params ? [params]: [])
+    ] as const;
+    }
+
+    
+export const getListFlowSchedulesQueryOptions = <TData = Awaited<ReturnType<typeof listFlowSchedules>>, TError = HTTPValidationError>(name: string,
+    params?: ListFlowSchedulesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listFlowSchedules>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
-  return [`/flows/${name}/schedules`, ...(params ? [params] : [])] as const;
-};
 
-export const getListFlowSchedulesQueryOptions = <
-  TData = Awaited<ReturnType<typeof listFlowSchedules>>,
-  TError = HTTPValidationError,
->(
-  name: string,
-  params?: ListFlowSchedulesParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof listFlowSchedules>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
+const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =
-    queryOptions?.queryKey ?? getListFlowSchedulesQueryKey(name, params);
+  const queryKey =  queryOptions?.queryKey ?? getListFlowSchedulesQueryKey(name,params);
 
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof listFlowSchedules>>
-  > = ({ signal }) => listFlowSchedules(name, params, requestOptions, signal);
+  
 
-  return {
-    queryKey,
-    queryFn,
-    enabled: !!name,
-    ...queryOptions,
-  } as UseQueryOptions<
-    Awaited<ReturnType<typeof listFlowSchedules>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData> };
-};
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listFlowSchedules>>> = ({ signal }) => listFlowSchedules(name,params, requestOptions, signal);
 
-export type ListFlowSchedulesQueryResult = NonNullable<
-  Awaited<ReturnType<typeof listFlowSchedules>>
->;
-export type ListFlowSchedulesQueryError = HTTPValidationError;
+      
 
-export function useListFlowSchedules<
-  TData = Awaited<ReturnType<typeof listFlowSchedules>>,
-  TError = HTTPValidationError,
->(
-  name: string,
-  params: undefined | ListFlowSchedulesParams,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof listFlowSchedules>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
+      
+
+   return  { queryKey, queryFn, enabled: !!(name), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listFlowSchedules>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+}
+
+export type ListFlowSchedulesQueryResult = NonNullable<Awaited<ReturnType<typeof listFlowSchedules>>>
+export type ListFlowSchedulesQueryError = HTTPValidationError
+
+
+export function useListFlowSchedules<TData = Awaited<ReturnType<typeof listFlowSchedules>>, TError = HTTPValidationError>(
+ name: string,
+    params: undefined |  ListFlowSchedulesParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listFlowSchedules>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof listFlowSchedules>>,
           TError,
           Awaited<ReturnType<typeof listFlowSchedules>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData>;
-};
-export function useListFlowSchedules<
-  TData = Awaited<ReturnType<typeof listFlowSchedules>>,
-  TError = HTTPValidationError,
->(
-  name: string,
-  params?: ListFlowSchedulesParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof listFlowSchedules>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useListFlowSchedules<TData = Awaited<ReturnType<typeof listFlowSchedules>>, TError = HTTPValidationError>(
+ name: string,
+    params?: ListFlowSchedulesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listFlowSchedules>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof listFlowSchedules>>,
           TError,
           Awaited<ReturnType<typeof listFlowSchedules>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
-export function useListFlowSchedules<
-  TData = Awaited<ReturnType<typeof listFlowSchedules>>,
-  TError = HTTPValidationError,
->(
-  name: string,
-  params?: ListFlowSchedulesParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof listFlowSchedules>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useListFlowSchedules<TData = Awaited<ReturnType<typeof listFlowSchedules>>, TError = HTTPValidationError>(
+ name: string,
+    params?: ListFlowSchedulesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listFlowSchedules>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
 /**
  * @summary List schedules for a specific flow
  */
 
-export function useListFlowSchedules<
-  TData = Awaited<ReturnType<typeof listFlowSchedules>>,
-  TError = HTTPValidationError,
->(
-  name: string,
-  params?: ListFlowSchedulesParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof listFlowSchedules>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
-  const queryOptions = getListFlowSchedulesQueryOptions(name, params, options);
+export function useListFlowSchedules<TData = Awaited<ReturnType<typeof listFlowSchedules>>, TError = HTTPValidationError>(
+ name: string,
+    params?: ListFlowSchedulesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listFlowSchedules>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
 
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData> };
+  const queryOptions = getListFlowSchedulesQueryOptions(name,params,options)
 
-  query.queryKey = queryOptions.queryKey;
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey ;
 
   return query;
 }
+
+
+

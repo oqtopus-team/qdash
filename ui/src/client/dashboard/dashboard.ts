@@ -5,7 +5,9 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import { useQuery } from "@tanstack/react-query";
+import {
+  useQuery
+} from '@tanstack/react-query';
 import type {
   DataTag,
   DefinedInitialDataOptions,
@@ -15,18 +17,21 @@ import type {
   QueryKey,
   UndefinedInitialDataOptions,
   UseQueryOptions,
-  UseQueryResult,
-} from "@tanstack/react-query";
+  UseQueryResult
+} from '@tanstack/react-query';
 
 import type {
   DashboardAiInsightsResponse,
   GetDashboardAiInsightsParams,
-  HTTPValidationError,
-} from "../../schemas";
+  HTTPValidationError
+} from '../../schemas';
 
-import { customInstance } from "../../lib/custom-instance";
+import { customInstance } from '../../lib/custom-instance';
+
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
+
+
 
 /**
  * Return compact operational insights for the dashboard.
@@ -37,182 +42,98 @@ synthesis layer can consume the same structured candidate contract.
  * @summary Generate dashboard-level AI insight candidates
  */
 export const getDashboardAiInsights = (
-  chipId: string,
-  params?: GetDashboardAiInsightsParams,
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
+    chipId: string,
+    params?: GetDashboardAiInsightsParams,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  return customInstance<DashboardAiInsightsResponse>(
-    {
-      url: `/dashboard/chips/${chipId}/ai-insights`,
-      method: "GET",
-      params,
-      signal,
+      
+      
+      return customInstance<DashboardAiInsightsResponse>(
+      {url: `/dashboard/chips/${chipId}/ai-insights`, method: 'GET',
+        params, signal
     },
-    options,
-  );
-};
+      options);
+    }
+  
 
-export const getGetDashboardAiInsightsQueryKey = (
-  chipId?: string,
-  params?: GetDashboardAiInsightsParams,
+
+
+export const getGetDashboardAiInsightsQueryKey = (chipId?: string,
+    params?: GetDashboardAiInsightsParams,) => {
+    return [
+    `/dashboard/chips/${chipId}/ai-insights`, ...(params ? [params]: [])
+    ] as const;
+    }
+
+    
+export const getGetDashboardAiInsightsQueryOptions = <TData = Awaited<ReturnType<typeof getDashboardAiInsights>>, TError = HTTPValidationError>(chipId: string,
+    params?: GetDashboardAiInsightsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDashboardAiInsights>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
-  return [
-    `/dashboard/chips/${chipId}/ai-insights`,
-    ...(params ? [params] : []),
-  ] as const;
-};
 
-export const getGetDashboardAiInsightsQueryOptions = <
-  TData = Awaited<ReturnType<typeof getDashboardAiInsights>>,
-  TError = HTTPValidationError,
->(
-  chipId: string,
-  params?: GetDashboardAiInsightsParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getDashboardAiInsights>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
+const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =
-    queryOptions?.queryKey ?? getGetDashboardAiInsightsQueryKey(chipId, params);
+  const queryKey =  queryOptions?.queryKey ?? getGetDashboardAiInsightsQueryKey(chipId,params);
 
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof getDashboardAiInsights>>
-  > = ({ signal }) =>
-    getDashboardAiInsights(chipId, params, requestOptions, signal);
+  
 
-  return {
-    queryKey,
-    queryFn,
-    enabled: !!chipId,
-    ...queryOptions,
-  } as UseQueryOptions<
-    Awaited<ReturnType<typeof getDashboardAiInsights>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData> };
-};
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDashboardAiInsights>>> = ({ signal }) => getDashboardAiInsights(chipId,params, requestOptions, signal);
 
-export type GetDashboardAiInsightsQueryResult = NonNullable<
-  Awaited<ReturnType<typeof getDashboardAiInsights>>
->;
-export type GetDashboardAiInsightsQueryError = HTTPValidationError;
+      
 
-export function useGetDashboardAiInsights<
-  TData = Awaited<ReturnType<typeof getDashboardAiInsights>>,
-  TError = HTTPValidationError,
->(
-  chipId: string,
-  params: undefined | GetDashboardAiInsightsParams,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getDashboardAiInsights>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
+      
+
+   return  { queryKey, queryFn, enabled: !!(chipId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getDashboardAiInsights>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+}
+
+export type GetDashboardAiInsightsQueryResult = NonNullable<Awaited<ReturnType<typeof getDashboardAiInsights>>>
+export type GetDashboardAiInsightsQueryError = HTTPValidationError
+
+
+export function useGetDashboardAiInsights<TData = Awaited<ReturnType<typeof getDashboardAiInsights>>, TError = HTTPValidationError>(
+ chipId: string,
+    params: undefined |  GetDashboardAiInsightsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDashboardAiInsights>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getDashboardAiInsights>>,
           TError,
           Awaited<ReturnType<typeof getDashboardAiInsights>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData>;
-};
-export function useGetDashboardAiInsights<
-  TData = Awaited<ReturnType<typeof getDashboardAiInsights>>,
-  TError = HTTPValidationError,
->(
-  chipId: string,
-  params?: GetDashboardAiInsightsParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getDashboardAiInsights>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useGetDashboardAiInsights<TData = Awaited<ReturnType<typeof getDashboardAiInsights>>, TError = HTTPValidationError>(
+ chipId: string,
+    params?: GetDashboardAiInsightsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDashboardAiInsights>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getDashboardAiInsights>>,
           TError,
           Awaited<ReturnType<typeof getDashboardAiInsights>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
-export function useGetDashboardAiInsights<
-  TData = Awaited<ReturnType<typeof getDashboardAiInsights>>,
-  TError = HTTPValidationError,
->(
-  chipId: string,
-  params?: GetDashboardAiInsightsParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getDashboardAiInsights>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useGetDashboardAiInsights<TData = Awaited<ReturnType<typeof getDashboardAiInsights>>, TError = HTTPValidationError>(
+ chipId: string,
+    params?: GetDashboardAiInsightsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDashboardAiInsights>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
 /**
  * @summary Generate dashboard-level AI insight candidates
  */
 
-export function useGetDashboardAiInsights<
-  TData = Awaited<ReturnType<typeof getDashboardAiInsights>>,
-  TError = HTTPValidationError,
->(
-  chipId: string,
-  params?: GetDashboardAiInsightsParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getDashboardAiInsights>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
-  const queryOptions = getGetDashboardAiInsightsQueryOptions(
-    chipId,
-    params,
-    options,
-  );
+export function useGetDashboardAiInsights<TData = Awaited<ReturnType<typeof getDashboardAiInsights>>, TError = HTTPValidationError>(
+ chipId: string,
+    params?: GetDashboardAiInsightsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDashboardAiInsights>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
 
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData> };
+  const queryOptions = getGetDashboardAiInsightsQueryOptions(chipId,params,options)
 
-  query.queryKey = queryOptions.queryKey;
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey ;
 
   return query;
 }
+
+
+

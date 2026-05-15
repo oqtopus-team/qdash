@@ -5,7 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { Condition } from "./condition";
+import type { Condition } from './condition';
 
 /**
  * Request model for device topology.

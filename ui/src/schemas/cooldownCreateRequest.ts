@@ -5,7 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { CooldownCreateRequestEndedAt } from "./cooldownCreateRequestEndedAt";
+import type { CooldownCreateRequestEndedAt } from './cooldownCreateRequestEndedAt';
 
 /**
  * Body for creating a cool-down.

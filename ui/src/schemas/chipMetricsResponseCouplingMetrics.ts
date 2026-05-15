@@ -5,8 +5,6 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { MetricValue } from "./metricValue";
+import type { MetricValue } from './metricValue';
 
-export type ChipMetricsResponseCouplingMetrics = {
-  [key: string]: { [key: string]: MetricValue };
-};
+export type ChipMetricsResponseCouplingMetrics = {[key: string]: {[key: string]: MetricValue}};

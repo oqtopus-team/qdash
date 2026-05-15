@@ -5,8 +5,8 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { ReanalyzeQubitSpectroscopyRequestSourceTaskId } from "./reanalyzeQubitSpectroscopyRequestSourceTaskId";
-import type { ReanalyzeQubitSpectroscopyParams } from "./reanalyzeQubitSpectroscopyParams";
+import type { ReanalyzeQubitSpectroscopyRequestSourceTaskId } from './reanalyzeQubitSpectroscopyRequestSourceTaskId';
+import type { ReanalyzeQubitSpectroscopyParams } from './reanalyzeQubitSpectroscopyParams';
 
 /**
  * Request body for re-running CheckQubitSpectroscopy analysis.

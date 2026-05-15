@@ -5,7 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { NotificationResponse } from "./notificationResponse";
+import type { NotificationResponse } from './notificationResponse';
 
 /**
  * Paginated notifications for the current user.

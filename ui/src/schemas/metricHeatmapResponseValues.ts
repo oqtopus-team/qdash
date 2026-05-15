@@ -6,4 +6,4 @@
  * OpenAPI spec version: 0.0.1
  */
 
-export type MetricHeatmapResponseValues = { [key: string]: number | null };
+export type MetricHeatmapResponseValues = {[key: string]: number | null};

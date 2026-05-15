@@ -5,11 +5,11 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { ExpectedResultResponse } from "./expectedResultResponse";
-import type { FailureModeResponse } from "./failureModeResponse";
-import type { OutputParameterInfoResponse } from "./outputParameterInfoResponse";
-import type { KnowledgeImageResponse } from "./knowledgeImageResponse";
-import type { KnowledgeCaseResponse } from "./knowledgeCaseResponse";
+import type { ExpectedResultResponse } from './expectedResultResponse';
+import type { FailureModeResponse } from './failureModeResponse';
+import type { OutputParameterInfoResponse } from './outputParameterInfoResponse';
+import type { KnowledgeImageResponse } from './knowledgeImageResponse';
+import type { KnowledgeCaseResponse } from './knowledgeCaseResponse';
 
 /**
  * Response model for task knowledge (LLM-oriented domain knowledge).

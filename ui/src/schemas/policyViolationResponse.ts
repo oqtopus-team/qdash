@@ -5,10 +5,10 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { PolicyViolationResponseValue } from "./policyViolationResponseValue";
-import type { PolicyViolationResponseValidFrom } from "./policyViolationResponseValidFrom";
-import type { PolicyViolationResponseWarnThreshold } from "./policyViolationResponseWarnThreshold";
-import type { PolicyViolationResponseMeasured } from "./policyViolationResponseMeasured";
+import type { PolicyViolationResponseValue } from './policyViolationResponseValue';
+import type { PolicyViolationResponseValidFrom } from './policyViolationResponseValidFrom';
+import type { PolicyViolationResponseWarnThreshold } from './policyViolationResponseWarnThreshold';
+import type { PolicyViolationResponseMeasured } from './policyViolationResponseMeasured';
 
 /**
  * Response model for a policy violation on a current parameter version.

@@ -5,7 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { CouplingGateDuration } from "./couplingGateDuration";
+import type { CouplingGateDuration } from './couplingGateDuration';
 
 /**
  * Coupling information.

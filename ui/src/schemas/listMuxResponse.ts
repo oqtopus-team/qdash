@@ -5,7 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { ListMuxResponseMuxes } from "./listMuxResponseMuxes";
+import type { ListMuxResponseMuxes } from './listMuxResponseMuxes';
 
 /**
  * ListMuxResponse is a Pydantic model that represents the response for fetching the multiplexers.

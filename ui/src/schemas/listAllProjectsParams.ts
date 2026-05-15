@@ -7,6 +7,6 @@
  */
 
 export type ListAllProjectsParams = {
-  skip?: number;
-  limit?: number;
+skip?: number;
+limit?: number;
 };

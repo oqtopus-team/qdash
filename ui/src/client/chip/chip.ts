@@ -5,7 +5,10 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import { useMutation, useQuery } from "@tanstack/react-query";
+import {
+  useMutation,
+  useQuery
+} from '@tanstack/react-query';
 import type {
   DataTag,
   DefinedInitialDataOptions,
@@ -18,8 +21,8 @@ import type {
   UseMutationOptions,
   UseMutationResult,
   UseQueryOptions,
-  UseQueryResult,
-} from "@tanstack/react-query";
+  UseQueryResult
+} from '@tanstack/react-query';
 
 import type {
   ChipDatesResponse,
@@ -43,12 +46,15 @@ import type {
   ReanalyzeResonatorSpectroscopyRequest,
   ReanalyzeResponse,
   SuccessResponse,
-  UpdateChipRequest,
-} from "../../schemas";
+  UpdateChipRequest
+} from '../../schemas';
 
-import { customInstance } from "../../lib/custom-instance";
+import { customInstance } from '../../lib/custom-instance';
+
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
+
+
 
 /**
  * List all chips with summary information.
@@ -58,129 +64,92 @@ For detailed qubit/coupling data, use the dedicated endpoints.
  * @summary List all chips
  */
 export const listChips = (
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
+    
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  return customInstance<ListChipsResponse>(
-    { url: `/chips`, method: "GET", signal },
-    options,
-  );
-};
+      
+      
+      return customInstance<ListChipsResponse>(
+      {url: `/chips`, method: 'GET', signal
+    },
+      options);
+    }
+  
+
+
 
 export const getListChipsQueryKey = () => {
-  return [`/chips`] as const;
-};
+    return [
+    `/chips`
+    ] as const;
+    }
 
-export const getListChipsQueryOptions = <
-  TData = Awaited<ReturnType<typeof listChips>>,
-  TError = HTTPValidationError,
->(options?: {
-  query?: Partial<
-    UseQueryOptions<Awaited<ReturnType<typeof listChips>>, TError, TData>
-  >;
-  request?: SecondParameter<typeof customInstance>;
-}) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
+    
+export const getListChipsQueryOptions = <TData = Awaited<ReturnType<typeof listChips>>, TError = HTTPValidationError>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listChips>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
 
-  const queryKey = queryOptions?.queryKey ?? getListChipsQueryKey();
+const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof listChips>>> = ({
-    signal,
-  }) => listChips(requestOptions, signal);
+  const queryKey =  queryOptions?.queryKey ?? getListChipsQueryKey();
 
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof listChips>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData> };
-};
+  
 
-export type ListChipsQueryResult = NonNullable<
-  Awaited<ReturnType<typeof listChips>>
->;
-export type ListChipsQueryError = HTTPValidationError;
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listChips>>> = ({ signal }) => listChips(requestOptions, signal);
 
-export function useListChips<
-  TData = Awaited<ReturnType<typeof listChips>>,
-  TError = HTTPValidationError,
->(
-  options: {
-    query: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof listChips>>, TError, TData>
-    > &
-      Pick<
+      
+
+      
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listChips>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+}
+
+export type ListChipsQueryResult = NonNullable<Awaited<ReturnType<typeof listChips>>>
+export type ListChipsQueryError = HTTPValidationError
+
+
+export function useListChips<TData = Awaited<ReturnType<typeof listChips>>, TError = HTTPValidationError>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listChips>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof listChips>>,
           TError,
           Awaited<ReturnType<typeof listChips>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData>;
-};
-export function useListChips<
-  TData = Awaited<ReturnType<typeof listChips>>,
-  TError = HTTPValidationError,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof listChips>>, TError, TData>
-    > &
-      Pick<
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useListChips<TData = Awaited<ReturnType<typeof listChips>>, TError = HTTPValidationError>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listChips>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof listChips>>,
           TError,
           Awaited<ReturnType<typeof listChips>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
-export function useListChips<
-  TData = Awaited<ReturnType<typeof listChips>>,
-  TError = HTTPValidationError,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof listChips>>, TError, TData>
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useListChips<TData = Awaited<ReturnType<typeof listChips>>, TError = HTTPValidationError>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listChips>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
 /**
  * @summary List all chips
  */
 
-export function useListChips<
-  TData = Awaited<ReturnType<typeof listChips>>,
-  TError = HTTPValidationError,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof listChips>>, TError, TData>
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
-  const queryOptions = getListChipsQueryOptions(options);
+export function useListChips<TData = Awaited<ReturnType<typeof listChips>>, TError = HTTPValidationError>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listChips>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
 
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData> };
+  const queryOptions = getListChipsQueryOptions(options)
 
-  query.queryKey = queryOptions.queryKey;
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey ;
 
   return query;
 }
+
+
 
 /**
  * Create a new chip in the current project.
@@ -204,260 +173,194 @@ HTTPException
  * @summary Create a new chip
  */
 export const createChip = (
-  createChipRequest: CreateChipRequest,
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
+    createChipRequest: CreateChipRequest,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  return customInstance<ChipResponse>(
-    {
-      url: `/chips`,
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      data: createChipRequest,
-      signal,
+      
+      
+      return customInstance<ChipResponse>(
+      {url: `/chips`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: createChipRequest, signal
     },
-    options,
-  );
-};
+      options);
+    }
+  
 
-export const getCreateChipMutationOptions = <
-  TError = HTTPValidationError,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof createChip>>,
-    TError,
-    { data: CreateChipRequest },
-    TContext
-  >;
-  request?: SecondParameter<typeof customInstance>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof createChip>>,
-  TError,
-  { data: CreateChipRequest },
-  TContext
-> => {
-  const mutationKey = ["createChip"];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      "mutationKey" in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
 
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof createChip>>,
-    { data: CreateChipRequest }
-  > = (props) => {
-    const { data } = props ?? {};
+export const getCreateChipMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createChip>>, TError,{data: CreateChipRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof createChip>>, TError,{data: CreateChipRequest}, TContext> => {
 
-    return createChip(data, requestOptions);
-  };
+const mutationKey = ['createChip'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
 
-  return { mutationFn, ...mutationOptions };
-};
+      
 
-export type CreateChipMutationResult = NonNullable<
-  Awaited<ReturnType<typeof createChip>>
->;
-export type CreateChipMutationBody = CreateChipRequest;
-export type CreateChipMutationError = HTTPValidationError;
 
-/**
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createChip>>, {data: CreateChipRequest}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createChip(data,requestOptions)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateChipMutationResult = NonNullable<Awaited<ReturnType<typeof createChip>>>
+    export type CreateChipMutationBody = CreateChipRequest
+    export type CreateChipMutationError = HTTPValidationError
+
+    /**
  * @summary Create a new chip
  */
-export const useCreateChip = <TError = HTTPValidationError, TContext = unknown>(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof createChip>>,
-      TError,
-      { data: CreateChipRequest },
-      TContext
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof createChip>>,
-  TError,
-  { data: CreateChipRequest },
-  TContext
-> => {
-  const mutationOptions = getCreateChipMutationOptions(options);
+export const useCreateChip = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createChip>>, TError,{data: CreateChipRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof createChip>>,
+        TError,
+        {data: CreateChipRequest},
+        TContext
+      > => {
 
-  return useMutation(mutationOptions, queryClient);
-};
-/**
+      const mutationOptions = getCreateChipMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    /**
  * @summary Update chip metadata (topology_id, note)
  */
 export const updateChip = (
-  chipId: string,
-  updateChipRequest: UpdateChipRequest,
-  options?: SecondParameter<typeof customInstance>,
-) => {
-  return customInstance<ChipResponse>(
-    {
-      url: `/chips/${chipId}`,
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      data: updateChipRequest,
+    chipId: string,
+    updateChipRequest: UpdateChipRequest,
+ options?: SecondParameter<typeof customInstance>,) => {
+      
+      
+      return customInstance<ChipResponse>(
+      {url: `/chips/${chipId}`, method: 'PATCH',
+      headers: {'Content-Type': 'application/json', },
+      data: updateChipRequest
     },
-    options,
-  );
-};
+      options);
+    }
+  
 
-export const getUpdateChipMutationOptions = <
-  TError = HTTPValidationError,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof updateChip>>,
-    TError,
-    { chipId: string; data: UpdateChipRequest },
-    TContext
-  >;
-  request?: SecondParameter<typeof customInstance>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof updateChip>>,
-  TError,
-  { chipId: string; data: UpdateChipRequest },
-  TContext
-> => {
-  const mutationKey = ["updateChip"];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      "mutationKey" in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
 
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof updateChip>>,
-    { chipId: string; data: UpdateChipRequest }
-  > = (props) => {
-    const { chipId, data } = props ?? {};
+export const getUpdateChipMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateChip>>, TError,{chipId: string;data: UpdateChipRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateChip>>, TError,{chipId: string;data: UpdateChipRequest}, TContext> => {
 
-    return updateChip(chipId, data, requestOptions);
-  };
+const mutationKey = ['updateChip'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
 
-  return { mutationFn, ...mutationOptions };
-};
+      
 
-export type UpdateChipMutationResult = NonNullable<
-  Awaited<ReturnType<typeof updateChip>>
->;
-export type UpdateChipMutationBody = UpdateChipRequest;
-export type UpdateChipMutationError = HTTPValidationError;
 
-/**
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateChip>>, {chipId: string;data: UpdateChipRequest}> = (props) => {
+          const {chipId,data} = props ?? {};
+
+          return  updateChip(chipId,data,requestOptions)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateChipMutationResult = NonNullable<Awaited<ReturnType<typeof updateChip>>>
+    export type UpdateChipMutationBody = UpdateChipRequest
+    export type UpdateChipMutationError = HTTPValidationError
+
+    /**
  * @summary Update chip metadata (topology_id, note)
  */
-export const useUpdateChip = <TError = HTTPValidationError, TContext = unknown>(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof updateChip>>,
-      TError,
-      { chipId: string; data: UpdateChipRequest },
-      TContext
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof updateChip>>,
-  TError,
-  { chipId: string; data: UpdateChipRequest },
-  TContext
-> => {
-  const mutationOptions = getUpdateChipMutationOptions(options);
+export const useUpdateChip = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateChip>>, TError,{chipId: string;data: UpdateChipRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof updateChip>>,
+        TError,
+        {chipId: string;data: UpdateChipRequest},
+        TContext
+      > => {
 
-  return useMutation(mutationOptions, queryClient);
-};
-/**
+      const mutationOptions = getUpdateChipMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    /**
  * @summary Delete a chip (refuses if related data exists unless force=true)
  */
 export const deleteChip = (
-  chipId: string,
-  params?: DeleteChipParams,
-  options?: SecondParameter<typeof customInstance>,
-) => {
-  return customInstance<SuccessResponse>(
-    { url: `/chips/${chipId}`, method: "DELETE", params },
-    options,
-  );
-};
+    chipId: string,
+    params?: DeleteChipParams,
+ options?: SecondParameter<typeof customInstance>,) => {
+      
+      
+      return customInstance<SuccessResponse>(
+      {url: `/chips/${chipId}`, method: 'DELETE',
+        params
+    },
+      options);
+    }
+  
 
-export const getDeleteChipMutationOptions = <
-  TError = HTTPValidationError,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof deleteChip>>,
-    TError,
-    { chipId: string; params?: DeleteChipParams },
-    TContext
-  >;
-  request?: SecondParameter<typeof customInstance>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof deleteChip>>,
-  TError,
-  { chipId: string; params?: DeleteChipParams },
-  TContext
-> => {
-  const mutationKey = ["deleteChip"];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      "mutationKey" in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
 
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof deleteChip>>,
-    { chipId: string; params?: DeleteChipParams }
-  > = (props) => {
-    const { chipId, params } = props ?? {};
+export const getDeleteChipMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteChip>>, TError,{chipId: string;params?: DeleteChipParams}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteChip>>, TError,{chipId: string;params?: DeleteChipParams}, TContext> => {
 
-    return deleteChip(chipId, params, requestOptions);
-  };
+const mutationKey = ['deleteChip'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
 
-  return { mutationFn, ...mutationOptions };
-};
+      
 
-export type DeleteChipMutationResult = NonNullable<
-  Awaited<ReturnType<typeof deleteChip>>
->;
 
-export type DeleteChipMutationError = HTTPValidationError;
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteChip>>, {chipId: string;params?: DeleteChipParams}> = (props) => {
+          const {chipId,params} = props ?? {};
 
-/**
+          return  deleteChip(chipId,params,requestOptions)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteChipMutationResult = NonNullable<Awaited<ReturnType<typeof deleteChip>>>
+    
+    export type DeleteChipMutationError = HTTPValidationError
+
+    /**
  * @summary Delete a chip (refuses if related data exists unless force=true)
  */
-export const useDeleteChip = <TError = HTTPValidationError, TContext = unknown>(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof deleteChip>>,
-      TError,
-      { chipId: string; params?: DeleteChipParams },
-      TContext
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof deleteChip>>,
-  TError,
-  { chipId: string; params?: DeleteChipParams },
-  TContext
-> => {
-  const mutationOptions = getDeleteChipMutationOptions(options);
+export const useDeleteChip = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteChip>>, TError,{chipId: string;params?: DeleteChipParams}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof deleteChip>>,
+        TError,
+        {chipId: string;params?: DeleteChipParams},
+        TContext
+      > => {
 
-  return useMutation(mutationOptions, queryClient);
-};
-/**
+      const mutationOptions = getDeleteChipMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    /**
  * Get chip details including metadata and counts.
 
 Returns chip metadata (size, topology, qubit/coupling counts).
@@ -479,302 +382,183 @@ ChipResponse
  * @summary Get chip details
  */
 export const getChip = (
-  chipId: string,
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
+    chipId: string,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  return customInstance<ChipResponse>(
-    { url: `/chips/${chipId}`, method: "GET", signal },
-    options,
-  );
-};
+      
+      
+      return customInstance<ChipResponse>(
+      {url: `/chips/${chipId}`, method: 'GET', signal
+    },
+      options);
+    }
+  
 
-export const getGetChipQueryKey = (chipId?: string) => {
-  return [`/chips/${chipId}`] as const;
-};
 
-export const getGetChipQueryOptions = <
-  TData = Awaited<ReturnType<typeof getChip>>,
-  TError = HTTPValidationError,
->(
-  chipId: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof getChip>>, TError, TData>
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
+
+export const getGetChipQueryKey = (chipId?: string,) => {
+    return [
+    `/chips/${chipId}`
+    ] as const;
+    }
+
+    
+export const getGetChipQueryOptions = <TData = Awaited<ReturnType<typeof getChip>>, TError = HTTPValidationError>(chipId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getChip>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey = queryOptions?.queryKey ?? getGetChipQueryKey(chipId);
+const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof getChip>>> = ({
-    signal,
-  }) => getChip(chipId, requestOptions, signal);
+  const queryKey =  queryOptions?.queryKey ?? getGetChipQueryKey(chipId);
 
-  return {
-    queryKey,
-    queryFn,
-    enabled: !!chipId,
-    ...queryOptions,
-  } as UseQueryOptions<Awaited<ReturnType<typeof getChip>>, TError, TData> & {
-    queryKey: DataTag<QueryKey, TData>;
-  };
-};
+  
 
-export type GetChipQueryResult = NonNullable<
-  Awaited<ReturnType<typeof getChip>>
->;
-export type GetChipQueryError = HTTPValidationError;
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getChip>>> = ({ signal }) => getChip(chipId, requestOptions, signal);
 
-export function useGetChip<
-  TData = Awaited<ReturnType<typeof getChip>>,
-  TError = HTTPValidationError,
->(
-  chipId: string,
-  options: {
-    query: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof getChip>>, TError, TData>
-    > &
-      Pick<
+      
+
+      
+
+   return  { queryKey, queryFn, enabled: !!(chipId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getChip>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+}
+
+export type GetChipQueryResult = NonNullable<Awaited<ReturnType<typeof getChip>>>
+export type GetChipQueryError = HTTPValidationError
+
+
+export function useGetChip<TData = Awaited<ReturnType<typeof getChip>>, TError = HTTPValidationError>(
+ chipId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getChip>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getChip>>,
           TError,
           Awaited<ReturnType<typeof getChip>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData>;
-};
-export function useGetChip<
-  TData = Awaited<ReturnType<typeof getChip>>,
-  TError = HTTPValidationError,
->(
-  chipId: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof getChip>>, TError, TData>
-    > &
-      Pick<
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useGetChip<TData = Awaited<ReturnType<typeof getChip>>, TError = HTTPValidationError>(
+ chipId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getChip>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getChip>>,
           TError,
           Awaited<ReturnType<typeof getChip>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
-export function useGetChip<
-  TData = Awaited<ReturnType<typeof getChip>>,
-  TError = HTTPValidationError,
->(
-  chipId: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof getChip>>, TError, TData>
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useGetChip<TData = Awaited<ReturnType<typeof getChip>>, TError = HTTPValidationError>(
+ chipId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getChip>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
 /**
  * @summary Get chip details
  */
 
-export function useGetChip<
-  TData = Awaited<ReturnType<typeof getChip>>,
-  TError = HTTPValidationError,
->(
-  chipId: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof getChip>>, TError, TData>
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
-  const queryOptions = getGetChipQueryOptions(chipId, options);
+export function useGetChip<TData = Awaited<ReturnType<typeof getChip>>, TError = HTTPValidationError>(
+ chipId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getChip>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
 
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData> };
+  const queryOptions = getGetChipQueryOptions(chipId,options)
 
-  query.queryKey = queryOptions.queryKey;
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey ;
 
   return query;
 }
+
+
 
 /**
  * @summary Preview what would be affected by deleting this chip
  */
 export const getChipDeletionImpact = (
-  chipId: string,
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
+    chipId: string,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  return customInstance<ChipDeletionImpactResponse>(
-    { url: `/chips/${chipId}/deletion-impact`, method: "GET", signal },
-    options,
-  );
-};
+      
+      
+      return customInstance<ChipDeletionImpactResponse>(
+      {url: `/chips/${chipId}/deletion-impact`, method: 'GET', signal
+    },
+      options);
+    }
+  
 
-export const getGetChipDeletionImpactQueryKey = (chipId?: string) => {
-  return [`/chips/${chipId}/deletion-impact`] as const;
-};
 
-export const getGetChipDeletionImpactQueryOptions = <
-  TData = Awaited<ReturnType<typeof getChipDeletionImpact>>,
-  TError = HTTPValidationError,
->(
-  chipId: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getChipDeletionImpact>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
+
+export const getGetChipDeletionImpactQueryKey = (chipId?: string,) => {
+    return [
+    `/chips/${chipId}/deletion-impact`
+    ] as const;
+    }
+
+    
+export const getGetChipDeletionImpactQueryOptions = <TData = Awaited<ReturnType<typeof getChipDeletionImpact>>, TError = HTTPValidationError>(chipId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getChipDeletionImpact>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey =
-    queryOptions?.queryKey ?? getGetChipDeletionImpactQueryKey(chipId);
+const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof getChipDeletionImpact>>
-  > = ({ signal }) => getChipDeletionImpact(chipId, requestOptions, signal);
+  const queryKey =  queryOptions?.queryKey ?? getGetChipDeletionImpactQueryKey(chipId);
 
-  return {
-    queryKey,
-    queryFn,
-    enabled: !!chipId,
-    ...queryOptions,
-  } as UseQueryOptions<
-    Awaited<ReturnType<typeof getChipDeletionImpact>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData> };
-};
+  
 
-export type GetChipDeletionImpactQueryResult = NonNullable<
-  Awaited<ReturnType<typeof getChipDeletionImpact>>
->;
-export type GetChipDeletionImpactQueryError = HTTPValidationError;
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getChipDeletionImpact>>> = ({ signal }) => getChipDeletionImpact(chipId, requestOptions, signal);
 
-export function useGetChipDeletionImpact<
-  TData = Awaited<ReturnType<typeof getChipDeletionImpact>>,
-  TError = HTTPValidationError,
->(
-  chipId: string,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getChipDeletionImpact>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
+      
+
+      
+
+   return  { queryKey, queryFn, enabled: !!(chipId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getChipDeletionImpact>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+}
+
+export type GetChipDeletionImpactQueryResult = NonNullable<Awaited<ReturnType<typeof getChipDeletionImpact>>>
+export type GetChipDeletionImpactQueryError = HTTPValidationError
+
+
+export function useGetChipDeletionImpact<TData = Awaited<ReturnType<typeof getChipDeletionImpact>>, TError = HTTPValidationError>(
+ chipId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getChipDeletionImpact>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getChipDeletionImpact>>,
           TError,
           Awaited<ReturnType<typeof getChipDeletionImpact>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData>;
-};
-export function useGetChipDeletionImpact<
-  TData = Awaited<ReturnType<typeof getChipDeletionImpact>>,
-  TError = HTTPValidationError,
->(
-  chipId: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getChipDeletionImpact>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useGetChipDeletionImpact<TData = Awaited<ReturnType<typeof getChipDeletionImpact>>, TError = HTTPValidationError>(
+ chipId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getChipDeletionImpact>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getChipDeletionImpact>>,
           TError,
           Awaited<ReturnType<typeof getChipDeletionImpact>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
-export function useGetChipDeletionImpact<
-  TData = Awaited<ReturnType<typeof getChipDeletionImpact>>,
-  TError = HTTPValidationError,
->(
-  chipId: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getChipDeletionImpact>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useGetChipDeletionImpact<TData = Awaited<ReturnType<typeof getChipDeletionImpact>>, TError = HTTPValidationError>(
+ chipId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getChipDeletionImpact>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
 /**
  * @summary Preview what would be affected by deleting this chip
  */
 
-export function useGetChipDeletionImpact<
-  TData = Awaited<ReturnType<typeof getChipDeletionImpact>>,
-  TError = HTTPValidationError,
->(
-  chipId: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getChipDeletionImpact>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
-  const queryOptions = getGetChipDeletionImpactQueryOptions(chipId, options);
+export function useGetChipDeletionImpact<TData = Awaited<ReturnType<typeof getChipDeletionImpact>>, TError = HTTPValidationError>(
+ chipId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getChipDeletionImpact>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
 
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData> };
+  const queryOptions = getGetChipDeletionImpactQueryOptions(chipId,options)
 
-  query.queryKey = queryOptions.queryKey;
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey ;
 
   return query;
 }
+
+
 
 /**
  * Fetch available dates for a chip from execution counter.
@@ -795,142 +579,92 @@ ChipDatesResponse
  * @summary Get available dates for a chip
  */
 export const getChipDates = (
-  chipId: string,
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
+    chipId: string,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  return customInstance<ChipDatesResponse>(
-    { url: `/chips/${chipId}/dates`, method: "GET", signal },
-    options,
-  );
-};
+      
+      
+      return customInstance<ChipDatesResponse>(
+      {url: `/chips/${chipId}/dates`, method: 'GET', signal
+    },
+      options);
+    }
+  
 
-export const getGetChipDatesQueryKey = (chipId?: string) => {
-  return [`/chips/${chipId}/dates`] as const;
-};
 
-export const getGetChipDatesQueryOptions = <
-  TData = Awaited<ReturnType<typeof getChipDates>>,
-  TError = HTTPValidationError,
->(
-  chipId: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof getChipDates>>, TError, TData>
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
+
+export const getGetChipDatesQueryKey = (chipId?: string,) => {
+    return [
+    `/chips/${chipId}/dates`
+    ] as const;
+    }
+
+    
+export const getGetChipDatesQueryOptions = <TData = Awaited<ReturnType<typeof getChipDates>>, TError = HTTPValidationError>(chipId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getChipDates>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey = queryOptions?.queryKey ?? getGetChipDatesQueryKey(chipId);
+const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof getChipDates>>> = ({
-    signal,
-  }) => getChipDates(chipId, requestOptions, signal);
+  const queryKey =  queryOptions?.queryKey ?? getGetChipDatesQueryKey(chipId);
 
-  return {
-    queryKey,
-    queryFn,
-    enabled: !!chipId,
-    ...queryOptions,
-  } as UseQueryOptions<
-    Awaited<ReturnType<typeof getChipDates>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData> };
-};
+  
 
-export type GetChipDatesQueryResult = NonNullable<
-  Awaited<ReturnType<typeof getChipDates>>
->;
-export type GetChipDatesQueryError = HTTPValidationError;
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getChipDates>>> = ({ signal }) => getChipDates(chipId, requestOptions, signal);
 
-export function useGetChipDates<
-  TData = Awaited<ReturnType<typeof getChipDates>>,
-  TError = HTTPValidationError,
->(
-  chipId: string,
-  options: {
-    query: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof getChipDates>>, TError, TData>
-    > &
-      Pick<
+      
+
+      
+
+   return  { queryKey, queryFn, enabled: !!(chipId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getChipDates>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+}
+
+export type GetChipDatesQueryResult = NonNullable<Awaited<ReturnType<typeof getChipDates>>>
+export type GetChipDatesQueryError = HTTPValidationError
+
+
+export function useGetChipDates<TData = Awaited<ReturnType<typeof getChipDates>>, TError = HTTPValidationError>(
+ chipId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getChipDates>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getChipDates>>,
           TError,
           Awaited<ReturnType<typeof getChipDates>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData>;
-};
-export function useGetChipDates<
-  TData = Awaited<ReturnType<typeof getChipDates>>,
-  TError = HTTPValidationError,
->(
-  chipId: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof getChipDates>>, TError, TData>
-    > &
-      Pick<
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useGetChipDates<TData = Awaited<ReturnType<typeof getChipDates>>, TError = HTTPValidationError>(
+ chipId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getChipDates>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getChipDates>>,
           TError,
           Awaited<ReturnType<typeof getChipDates>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
-export function useGetChipDates<
-  TData = Awaited<ReturnType<typeof getChipDates>>,
-  TError = HTTPValidationError,
->(
-  chipId: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof getChipDates>>, TError, TData>
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useGetChipDates<TData = Awaited<ReturnType<typeof getChipDates>>, TError = HTTPValidationError>(
+ chipId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getChipDates>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
 /**
  * @summary Get available dates for a chip
  */
 
-export function useGetChipDates<
-  TData = Awaited<ReturnType<typeof getChipDates>>,
-  TError = HTTPValidationError,
->(
-  chipId: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof getChipDates>>, TError, TData>
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
-  const queryOptions = getGetChipDatesQueryOptions(chipId, options);
+export function useGetChipDates<TData = Awaited<ReturnType<typeof getChipDates>>, TError = HTTPValidationError>(
+ chipId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getChipDates>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
 
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData> };
+  const queryOptions = getGetChipDatesQueryOptions(chipId,options)
 
-  query.queryKey = queryOptions.queryKey;
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey ;
 
   return query;
 }
+
+
 
 /**
  * Get the multiplexer details.
@@ -953,149 +687,99 @@ MuxDetailResponse
  * @summary Get multiplexer details
  */
 export const getChipMux = (
-  chipId: string,
-  muxId: number,
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
+    chipId: string,
+    muxId: number,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  return customInstance<MuxDetailResponse>(
-    { url: `/chips/${chipId}/muxes/${muxId}`, method: "GET", signal },
-    options,
-  );
-};
+      
+      
+      return customInstance<MuxDetailResponse>(
+      {url: `/chips/${chipId}/muxes/${muxId}`, method: 'GET', signal
+    },
+      options);
+    }
+  
 
-export const getGetChipMuxQueryKey = (chipId?: string, muxId?: number) => {
-  return [`/chips/${chipId}/muxes/${muxId}`] as const;
-};
 
-export const getGetChipMuxQueryOptions = <
-  TData = Awaited<ReturnType<typeof getChipMux>>,
-  TError = HTTPValidationError,
->(
-  chipId: string,
-  muxId: number,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof getChipMux>>, TError, TData>
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
+
+export const getGetChipMuxQueryKey = (chipId?: string,
+    muxId?: number,) => {
+    return [
+    `/chips/${chipId}/muxes/${muxId}`
+    ] as const;
+    }
+
+    
+export const getGetChipMuxQueryOptions = <TData = Awaited<ReturnType<typeof getChipMux>>, TError = HTTPValidationError>(chipId: string,
+    muxId: number, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getChipMux>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey =
-    queryOptions?.queryKey ?? getGetChipMuxQueryKey(chipId, muxId);
+const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof getChipMux>>> = ({
-    signal,
-  }) => getChipMux(chipId, muxId, requestOptions, signal);
+  const queryKey =  queryOptions?.queryKey ?? getGetChipMuxQueryKey(chipId,muxId);
 
-  return {
-    queryKey,
-    queryFn,
-    enabled: !!(chipId && muxId),
-    ...queryOptions,
-  } as UseQueryOptions<
-    Awaited<ReturnType<typeof getChipMux>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData> };
-};
+  
 
-export type GetChipMuxQueryResult = NonNullable<
-  Awaited<ReturnType<typeof getChipMux>>
->;
-export type GetChipMuxQueryError = HTTPValidationError;
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getChipMux>>> = ({ signal }) => getChipMux(chipId,muxId, requestOptions, signal);
 
-export function useGetChipMux<
-  TData = Awaited<ReturnType<typeof getChipMux>>,
-  TError = HTTPValidationError,
->(
-  chipId: string,
-  muxId: number,
-  options: {
-    query: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof getChipMux>>, TError, TData>
-    > &
-      Pick<
+      
+
+      
+
+   return  { queryKey, queryFn, enabled: !!(chipId && muxId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getChipMux>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+}
+
+export type GetChipMuxQueryResult = NonNullable<Awaited<ReturnType<typeof getChipMux>>>
+export type GetChipMuxQueryError = HTTPValidationError
+
+
+export function useGetChipMux<TData = Awaited<ReturnType<typeof getChipMux>>, TError = HTTPValidationError>(
+ chipId: string,
+    muxId: number, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getChipMux>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getChipMux>>,
           TError,
           Awaited<ReturnType<typeof getChipMux>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData>;
-};
-export function useGetChipMux<
-  TData = Awaited<ReturnType<typeof getChipMux>>,
-  TError = HTTPValidationError,
->(
-  chipId: string,
-  muxId: number,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof getChipMux>>, TError, TData>
-    > &
-      Pick<
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useGetChipMux<TData = Awaited<ReturnType<typeof getChipMux>>, TError = HTTPValidationError>(
+ chipId: string,
+    muxId: number, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getChipMux>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getChipMux>>,
           TError,
           Awaited<ReturnType<typeof getChipMux>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
-export function useGetChipMux<
-  TData = Awaited<ReturnType<typeof getChipMux>>,
-  TError = HTTPValidationError,
->(
-  chipId: string,
-  muxId: number,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof getChipMux>>, TError, TData>
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useGetChipMux<TData = Awaited<ReturnType<typeof getChipMux>>, TError = HTTPValidationError>(
+ chipId: string,
+    muxId: number, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getChipMux>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
 /**
  * @summary Get multiplexer details
  */
 
-export function useGetChipMux<
-  TData = Awaited<ReturnType<typeof getChipMux>>,
-  TError = HTTPValidationError,
->(
-  chipId: string,
-  muxId: number,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof getChipMux>>, TError, TData>
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
-  const queryOptions = getGetChipMuxQueryOptions(chipId, muxId, options);
+export function useGetChipMux<TData = Awaited<ReturnType<typeof getChipMux>>, TError = HTTPValidationError>(
+ chipId: string,
+    muxId: number, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getChipMux>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
 
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData> };
+  const queryOptions = getGetChipMuxQueryOptions(chipId,muxId,options)
 
-  query.queryKey = queryOptions.queryKey;
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey ;
 
   return query;
 }
+
+
 
 /**
  * List all multiplexers for a chip.
@@ -1116,142 +800,92 @@ ListMuxResponse
  * @summary List all multiplexers for a chip
  */
 export const listChipMuxes = (
-  chipId: string,
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
+    chipId: string,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  return customInstance<ListMuxResponse>(
-    { url: `/chips/${chipId}/muxes`, method: "GET", signal },
-    options,
-  );
-};
+      
+      
+      return customInstance<ListMuxResponse>(
+      {url: `/chips/${chipId}/muxes`, method: 'GET', signal
+    },
+      options);
+    }
+  
 
-export const getListChipMuxesQueryKey = (chipId?: string) => {
-  return [`/chips/${chipId}/muxes`] as const;
-};
 
-export const getListChipMuxesQueryOptions = <
-  TData = Awaited<ReturnType<typeof listChipMuxes>>,
-  TError = HTTPValidationError,
->(
-  chipId: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof listChipMuxes>>, TError, TData>
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
+
+export const getListChipMuxesQueryKey = (chipId?: string,) => {
+    return [
+    `/chips/${chipId}/muxes`
+    ] as const;
+    }
+
+    
+export const getListChipMuxesQueryOptions = <TData = Awaited<ReturnType<typeof listChipMuxes>>, TError = HTTPValidationError>(chipId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listChipMuxes>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey = queryOptions?.queryKey ?? getListChipMuxesQueryKey(chipId);
+const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof listChipMuxes>>> = ({
-    signal,
-  }) => listChipMuxes(chipId, requestOptions, signal);
+  const queryKey =  queryOptions?.queryKey ?? getListChipMuxesQueryKey(chipId);
 
-  return {
-    queryKey,
-    queryFn,
-    enabled: !!chipId,
-    ...queryOptions,
-  } as UseQueryOptions<
-    Awaited<ReturnType<typeof listChipMuxes>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData> };
-};
+  
 
-export type ListChipMuxesQueryResult = NonNullable<
-  Awaited<ReturnType<typeof listChipMuxes>>
->;
-export type ListChipMuxesQueryError = HTTPValidationError;
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listChipMuxes>>> = ({ signal }) => listChipMuxes(chipId, requestOptions, signal);
 
-export function useListChipMuxes<
-  TData = Awaited<ReturnType<typeof listChipMuxes>>,
-  TError = HTTPValidationError,
->(
-  chipId: string,
-  options: {
-    query: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof listChipMuxes>>, TError, TData>
-    > &
-      Pick<
+      
+
+      
+
+   return  { queryKey, queryFn, enabled: !!(chipId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listChipMuxes>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+}
+
+export type ListChipMuxesQueryResult = NonNullable<Awaited<ReturnType<typeof listChipMuxes>>>
+export type ListChipMuxesQueryError = HTTPValidationError
+
+
+export function useListChipMuxes<TData = Awaited<ReturnType<typeof listChipMuxes>>, TError = HTTPValidationError>(
+ chipId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listChipMuxes>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof listChipMuxes>>,
           TError,
           Awaited<ReturnType<typeof listChipMuxes>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData>;
-};
-export function useListChipMuxes<
-  TData = Awaited<ReturnType<typeof listChipMuxes>>,
-  TError = HTTPValidationError,
->(
-  chipId: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof listChipMuxes>>, TError, TData>
-    > &
-      Pick<
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useListChipMuxes<TData = Awaited<ReturnType<typeof listChipMuxes>>, TError = HTTPValidationError>(
+ chipId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listChipMuxes>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof listChipMuxes>>,
           TError,
           Awaited<ReturnType<typeof listChipMuxes>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
-export function useListChipMuxes<
-  TData = Awaited<ReturnType<typeof listChipMuxes>>,
-  TError = HTTPValidationError,
->(
-  chipId: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof listChipMuxes>>, TError, TData>
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useListChipMuxes<TData = Awaited<ReturnType<typeof listChipMuxes>>, TError = HTTPValidationError>(
+ chipId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listChipMuxes>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
 /**
  * @summary List all multiplexers for a chip
  */
 
-export function useListChipMuxes<
-  TData = Awaited<ReturnType<typeof listChipMuxes>>,
-  TError = HTTPValidationError,
->(
-  chipId: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof listChipMuxes>>, TError, TData>
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
-  const queryOptions = getListChipMuxesQueryOptions(chipId, options);
+export function useListChipMuxes<TData = Awaited<ReturnType<typeof listChipMuxes>>, TError = HTTPValidationError>(
+ chipId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listChipMuxes>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
 
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData> };
+  const queryOptions = getListChipMuxesQueryOptions(chipId,options)
 
-  query.queryKey = queryOptions.queryKey;
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey ;
 
   return query;
 }
+
+
 
 /**
  * List qubits for a chip with pagination.
@@ -1281,152 +915,100 @@ ListQubitsResponse
  * @summary List qubits for a chip
  */
 export const listChipQubits = (
-  chipId: string,
-  params?: ListChipQubitsParams,
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
+    chipId: string,
+    params?: ListChipQubitsParams,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  return customInstance<ListQubitsResponse>(
-    { url: `/chips/${chipId}/qubits`, method: "GET", params, signal },
-    options,
-  );
-};
+      
+      
+      return customInstance<ListQubitsResponse>(
+      {url: `/chips/${chipId}/qubits`, method: 'GET',
+        params, signal
+    },
+      options);
+    }
+  
 
-export const getListChipQubitsQueryKey = (
-  chipId?: string,
-  params?: ListChipQubitsParams,
+
+
+export const getListChipQubitsQueryKey = (chipId?: string,
+    params?: ListChipQubitsParams,) => {
+    return [
+    `/chips/${chipId}/qubits`, ...(params ? [params]: [])
+    ] as const;
+    }
+
+    
+export const getListChipQubitsQueryOptions = <TData = Awaited<ReturnType<typeof listChipQubits>>, TError = HTTPValidationError>(chipId: string,
+    params?: ListChipQubitsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listChipQubits>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
-  return [`/chips/${chipId}/qubits`, ...(params ? [params] : [])] as const;
-};
 
-export const getListChipQubitsQueryOptions = <
-  TData = Awaited<ReturnType<typeof listChipQubits>>,
-  TError = HTTPValidationError,
->(
-  chipId: string,
-  params?: ListChipQubitsParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof listChipQubits>>, TError, TData>
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
+const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =
-    queryOptions?.queryKey ?? getListChipQubitsQueryKey(chipId, params);
+  const queryKey =  queryOptions?.queryKey ?? getListChipQubitsQueryKey(chipId,params);
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof listChipQubits>>> = ({
-    signal,
-  }) => listChipQubits(chipId, params, requestOptions, signal);
+  
 
-  return {
-    queryKey,
-    queryFn,
-    enabled: !!chipId,
-    ...queryOptions,
-  } as UseQueryOptions<
-    Awaited<ReturnType<typeof listChipQubits>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData> };
-};
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listChipQubits>>> = ({ signal }) => listChipQubits(chipId,params, requestOptions, signal);
 
-export type ListChipQubitsQueryResult = NonNullable<
-  Awaited<ReturnType<typeof listChipQubits>>
->;
-export type ListChipQubitsQueryError = HTTPValidationError;
+      
 
-export function useListChipQubits<
-  TData = Awaited<ReturnType<typeof listChipQubits>>,
-  TError = HTTPValidationError,
->(
-  chipId: string,
-  params: undefined | ListChipQubitsParams,
-  options: {
-    query: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof listChipQubits>>, TError, TData>
-    > &
-      Pick<
+      
+
+   return  { queryKey, queryFn, enabled: !!(chipId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listChipQubits>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+}
+
+export type ListChipQubitsQueryResult = NonNullable<Awaited<ReturnType<typeof listChipQubits>>>
+export type ListChipQubitsQueryError = HTTPValidationError
+
+
+export function useListChipQubits<TData = Awaited<ReturnType<typeof listChipQubits>>, TError = HTTPValidationError>(
+ chipId: string,
+    params: undefined |  ListChipQubitsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listChipQubits>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof listChipQubits>>,
           TError,
           Awaited<ReturnType<typeof listChipQubits>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData>;
-};
-export function useListChipQubits<
-  TData = Awaited<ReturnType<typeof listChipQubits>>,
-  TError = HTTPValidationError,
->(
-  chipId: string,
-  params?: ListChipQubitsParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof listChipQubits>>, TError, TData>
-    > &
-      Pick<
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useListChipQubits<TData = Awaited<ReturnType<typeof listChipQubits>>, TError = HTTPValidationError>(
+ chipId: string,
+    params?: ListChipQubitsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listChipQubits>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof listChipQubits>>,
           TError,
           Awaited<ReturnType<typeof listChipQubits>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
-export function useListChipQubits<
-  TData = Awaited<ReturnType<typeof listChipQubits>>,
-  TError = HTTPValidationError,
->(
-  chipId: string,
-  params?: ListChipQubitsParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof listChipQubits>>, TError, TData>
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useListChipQubits<TData = Awaited<ReturnType<typeof listChipQubits>>, TError = HTTPValidationError>(
+ chipId: string,
+    params?: ListChipQubitsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listChipQubits>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
 /**
  * @summary List qubits for a chip
  */
 
-export function useListChipQubits<
-  TData = Awaited<ReturnType<typeof listChipQubits>>,
-  TError = HTTPValidationError,
->(
-  chipId: string,
-  params?: ListChipQubitsParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof listChipQubits>>, TError, TData>
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
-  const queryOptions = getListChipQubitsQueryOptions(chipId, params, options);
+export function useListChipQubits<TData = Awaited<ReturnType<typeof listChipQubits>>, TError = HTTPValidationError>(
+ chipId: string,
+    params?: ListChipQubitsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listChipQubits>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
 
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData> };
+  const queryOptions = getListChipQubitsQueryOptions(chipId,params,options)
 
-  query.queryKey = queryOptions.queryKey;
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey ;
 
   return query;
 }
+
+
 
 /**
  * Get a single qubit by ID.
@@ -1451,149 +1033,99 @@ QubitResponse
  * @summary Get a single qubit
  */
 export const getChipQubit = (
-  chipId: string,
-  qid: string,
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
+    chipId: string,
+    qid: string,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  return customInstance<QubitResponse>(
-    { url: `/chips/${chipId}/qubits/${qid}`, method: "GET", signal },
-    options,
-  );
-};
+      
+      
+      return customInstance<QubitResponse>(
+      {url: `/chips/${chipId}/qubits/${qid}`, method: 'GET', signal
+    },
+      options);
+    }
+  
 
-export const getGetChipQubitQueryKey = (chipId?: string, qid?: string) => {
-  return [`/chips/${chipId}/qubits/${qid}`] as const;
-};
 
-export const getGetChipQubitQueryOptions = <
-  TData = Awaited<ReturnType<typeof getChipQubit>>,
-  TError = HTTPValidationError,
->(
-  chipId: string,
-  qid: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof getChipQubit>>, TError, TData>
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
+
+export const getGetChipQubitQueryKey = (chipId?: string,
+    qid?: string,) => {
+    return [
+    `/chips/${chipId}/qubits/${qid}`
+    ] as const;
+    }
+
+    
+export const getGetChipQubitQueryOptions = <TData = Awaited<ReturnType<typeof getChipQubit>>, TError = HTTPValidationError>(chipId: string,
+    qid: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getChipQubit>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey =
-    queryOptions?.queryKey ?? getGetChipQubitQueryKey(chipId, qid);
+const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof getChipQubit>>> = ({
-    signal,
-  }) => getChipQubit(chipId, qid, requestOptions, signal);
+  const queryKey =  queryOptions?.queryKey ?? getGetChipQubitQueryKey(chipId,qid);
 
-  return {
-    queryKey,
-    queryFn,
-    enabled: !!(chipId && qid),
-    ...queryOptions,
-  } as UseQueryOptions<
-    Awaited<ReturnType<typeof getChipQubit>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData> };
-};
+  
 
-export type GetChipQubitQueryResult = NonNullable<
-  Awaited<ReturnType<typeof getChipQubit>>
->;
-export type GetChipQubitQueryError = HTTPValidationError;
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getChipQubit>>> = ({ signal }) => getChipQubit(chipId,qid, requestOptions, signal);
 
-export function useGetChipQubit<
-  TData = Awaited<ReturnType<typeof getChipQubit>>,
-  TError = HTTPValidationError,
->(
-  chipId: string,
-  qid: string,
-  options: {
-    query: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof getChipQubit>>, TError, TData>
-    > &
-      Pick<
+      
+
+      
+
+   return  { queryKey, queryFn, enabled: !!(chipId && qid), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getChipQubit>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+}
+
+export type GetChipQubitQueryResult = NonNullable<Awaited<ReturnType<typeof getChipQubit>>>
+export type GetChipQubitQueryError = HTTPValidationError
+
+
+export function useGetChipQubit<TData = Awaited<ReturnType<typeof getChipQubit>>, TError = HTTPValidationError>(
+ chipId: string,
+    qid: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getChipQubit>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getChipQubit>>,
           TError,
           Awaited<ReturnType<typeof getChipQubit>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData>;
-};
-export function useGetChipQubit<
-  TData = Awaited<ReturnType<typeof getChipQubit>>,
-  TError = HTTPValidationError,
->(
-  chipId: string,
-  qid: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof getChipQubit>>, TError, TData>
-    > &
-      Pick<
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useGetChipQubit<TData = Awaited<ReturnType<typeof getChipQubit>>, TError = HTTPValidationError>(
+ chipId: string,
+    qid: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getChipQubit>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getChipQubit>>,
           TError,
           Awaited<ReturnType<typeof getChipQubit>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
-export function useGetChipQubit<
-  TData = Awaited<ReturnType<typeof getChipQubit>>,
-  TError = HTTPValidationError,
->(
-  chipId: string,
-  qid: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof getChipQubit>>, TError, TData>
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useGetChipQubit<TData = Awaited<ReturnType<typeof getChipQubit>>, TError = HTTPValidationError>(
+ chipId: string,
+    qid: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getChipQubit>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
 /**
  * @summary Get a single qubit
  */
 
-export function useGetChipQubit<
-  TData = Awaited<ReturnType<typeof getChipQubit>>,
-  TError = HTTPValidationError,
->(
-  chipId: string,
-  qid: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof getChipQubit>>, TError, TData>
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
-  const queryOptions = getGetChipQubitQueryOptions(chipId, qid, options);
+export function useGetChipQubit<TData = Awaited<ReturnType<typeof getChipQubit>>, TError = HTTPValidationError>(
+ chipId: string,
+    qid: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getChipQubit>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
 
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData> };
+  const queryOptions = getGetChipQubitQueryOptions(chipId,qid,options)
 
-  query.queryKey = queryOptions.queryKey;
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey ;
 
   return query;
 }
+
+
 
 /**
  * Re-run the resonator-spectroscopy analysis on a previously stored figure.
@@ -1603,106 +1135,69 @@ the requested qubit. The DB is **not** mutated; this is a preview only.
  * @summary Re-run resonator spectroscopy analysis on a stored task result (preview)
  */
 export const reanalyzeResonatorSpectroscopy = (
-  chipId: string,
-  qid: string,
-  reanalyzeResonatorSpectroscopyRequest: ReanalyzeResonatorSpectroscopyRequest,
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
+    chipId: string,
+    qid: string,
+    reanalyzeResonatorSpectroscopyRequest: ReanalyzeResonatorSpectroscopyRequest,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  return customInstance<ReanalyzeResponse>(
-    {
-      url: `/chips/${chipId}/qubits/${qid}/reanalyze/resonator-spectroscopy`,
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      data: reanalyzeResonatorSpectroscopyRequest,
-      signal,
+      
+      
+      return customInstance<ReanalyzeResponse>(
+      {url: `/chips/${chipId}/qubits/${qid}/reanalyze/resonator-spectroscopy`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: reanalyzeResonatorSpectroscopyRequest, signal
     },
-    options,
-  );
-};
+      options);
+    }
+  
 
-export const getReanalyzeResonatorSpectroscopyMutationOptions = <
-  TError = HTTPValidationError,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof reanalyzeResonatorSpectroscopy>>,
-    TError,
-    {
-      chipId: string;
-      qid: string;
-      data: ReanalyzeResonatorSpectroscopyRequest;
-    },
-    TContext
-  >;
-  request?: SecondParameter<typeof customInstance>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof reanalyzeResonatorSpectroscopy>>,
-  TError,
-  { chipId: string; qid: string; data: ReanalyzeResonatorSpectroscopyRequest },
-  TContext
-> => {
-  const mutationKey = ["reanalyzeResonatorSpectroscopy"];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      "mutationKey" in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
 
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof reanalyzeResonatorSpectroscopy>>,
-    { chipId: string; qid: string; data: ReanalyzeResonatorSpectroscopyRequest }
-  > = (props) => {
-    const { chipId, qid, data } = props ?? {};
+export const getReanalyzeResonatorSpectroscopyMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reanalyzeResonatorSpectroscopy>>, TError,{chipId: string;qid: string;data: ReanalyzeResonatorSpectroscopyRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof reanalyzeResonatorSpectroscopy>>, TError,{chipId: string;qid: string;data: ReanalyzeResonatorSpectroscopyRequest}, TContext> => {
 
-    return reanalyzeResonatorSpectroscopy(chipId, qid, data, requestOptions);
-  };
+const mutationKey = ['reanalyzeResonatorSpectroscopy'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
 
-  return { mutationFn, ...mutationOptions };
-};
+      
 
-export type ReanalyzeResonatorSpectroscopyMutationResult = NonNullable<
-  Awaited<ReturnType<typeof reanalyzeResonatorSpectroscopy>>
->;
-export type ReanalyzeResonatorSpectroscopyMutationBody =
-  ReanalyzeResonatorSpectroscopyRequest;
-export type ReanalyzeResonatorSpectroscopyMutationError = HTTPValidationError;
 
-/**
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof reanalyzeResonatorSpectroscopy>>, {chipId: string;qid: string;data: ReanalyzeResonatorSpectroscopyRequest}> = (props) => {
+          const {chipId,qid,data} = props ?? {};
+
+          return  reanalyzeResonatorSpectroscopy(chipId,qid,data,requestOptions)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ReanalyzeResonatorSpectroscopyMutationResult = NonNullable<Awaited<ReturnType<typeof reanalyzeResonatorSpectroscopy>>>
+    export type ReanalyzeResonatorSpectroscopyMutationBody = ReanalyzeResonatorSpectroscopyRequest
+    export type ReanalyzeResonatorSpectroscopyMutationError = HTTPValidationError
+
+    /**
  * @summary Re-run resonator spectroscopy analysis on a stored task result (preview)
  */
-export const useReanalyzeResonatorSpectroscopy = <
-  TError = HTTPValidationError,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof reanalyzeResonatorSpectroscopy>>,
-      TError,
-      {
-        chipId: string;
-        qid: string;
-        data: ReanalyzeResonatorSpectroscopyRequest;
-      },
-      TContext
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof reanalyzeResonatorSpectroscopy>>,
-  TError,
-  { chipId: string; qid: string; data: ReanalyzeResonatorSpectroscopyRequest },
-  TContext
-> => {
-  const mutationOptions =
-    getReanalyzeResonatorSpectroscopyMutationOptions(options);
+export const useReanalyzeResonatorSpectroscopy = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reanalyzeResonatorSpectroscopy>>, TError,{chipId: string;qid: string;data: ReanalyzeResonatorSpectroscopyRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof reanalyzeResonatorSpectroscopy>>,
+        TError,
+        {chipId: string;qid: string;data: ReanalyzeResonatorSpectroscopyRequest},
+        TContext
+      > => {
 
-  return useMutation(mutationOptions, queryClient);
-};
-/**
+      const mutationOptions = getReanalyzeResonatorSpectroscopyMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    /**
  * Re-run the qubit-spectroscopy analysis on a previously stored figure.
 
 Returns the marked figure and the re-estimated `qubit_frequency`,
@@ -1711,97 +1206,69 @@ qubit. The DB is **not** mutated; this is a preview only.
  * @summary Re-run qubit spectroscopy analysis on a stored task result (preview)
  */
 export const reanalyzeQubitSpectroscopy = (
-  chipId: string,
-  qid: string,
-  reanalyzeQubitSpectroscopyRequest: ReanalyzeQubitSpectroscopyRequest,
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
+    chipId: string,
+    qid: string,
+    reanalyzeQubitSpectroscopyRequest: ReanalyzeQubitSpectroscopyRequest,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  return customInstance<ReanalyzeResponse>(
-    {
-      url: `/chips/${chipId}/qubits/${qid}/reanalyze/qubit-spectroscopy`,
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      data: reanalyzeQubitSpectroscopyRequest,
-      signal,
+      
+      
+      return customInstance<ReanalyzeResponse>(
+      {url: `/chips/${chipId}/qubits/${qid}/reanalyze/qubit-spectroscopy`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: reanalyzeQubitSpectroscopyRequest, signal
     },
-    options,
-  );
-};
+      options);
+    }
+  
 
-export const getReanalyzeQubitSpectroscopyMutationOptions = <
-  TError = HTTPValidationError,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof reanalyzeQubitSpectroscopy>>,
-    TError,
-    { chipId: string; qid: string; data: ReanalyzeQubitSpectroscopyRequest },
-    TContext
-  >;
-  request?: SecondParameter<typeof customInstance>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof reanalyzeQubitSpectroscopy>>,
-  TError,
-  { chipId: string; qid: string; data: ReanalyzeQubitSpectroscopyRequest },
-  TContext
-> => {
-  const mutationKey = ["reanalyzeQubitSpectroscopy"];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      "mutationKey" in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
 
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof reanalyzeQubitSpectroscopy>>,
-    { chipId: string; qid: string; data: ReanalyzeQubitSpectroscopyRequest }
-  > = (props) => {
-    const { chipId, qid, data } = props ?? {};
+export const getReanalyzeQubitSpectroscopyMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reanalyzeQubitSpectroscopy>>, TError,{chipId: string;qid: string;data: ReanalyzeQubitSpectroscopyRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof reanalyzeQubitSpectroscopy>>, TError,{chipId: string;qid: string;data: ReanalyzeQubitSpectroscopyRequest}, TContext> => {
 
-    return reanalyzeQubitSpectroscopy(chipId, qid, data, requestOptions);
-  };
+const mutationKey = ['reanalyzeQubitSpectroscopy'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
 
-  return { mutationFn, ...mutationOptions };
-};
+      
 
-export type ReanalyzeQubitSpectroscopyMutationResult = NonNullable<
-  Awaited<ReturnType<typeof reanalyzeQubitSpectroscopy>>
->;
-export type ReanalyzeQubitSpectroscopyMutationBody =
-  ReanalyzeQubitSpectroscopyRequest;
-export type ReanalyzeQubitSpectroscopyMutationError = HTTPValidationError;
 
-/**
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof reanalyzeQubitSpectroscopy>>, {chipId: string;qid: string;data: ReanalyzeQubitSpectroscopyRequest}> = (props) => {
+          const {chipId,qid,data} = props ?? {};
+
+          return  reanalyzeQubitSpectroscopy(chipId,qid,data,requestOptions)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ReanalyzeQubitSpectroscopyMutationResult = NonNullable<Awaited<ReturnType<typeof reanalyzeQubitSpectroscopy>>>
+    export type ReanalyzeQubitSpectroscopyMutationBody = ReanalyzeQubitSpectroscopyRequest
+    export type ReanalyzeQubitSpectroscopyMutationError = HTTPValidationError
+
+    /**
  * @summary Re-run qubit spectroscopy analysis on a stored task result (preview)
  */
-export const useReanalyzeQubitSpectroscopy = <
-  TError = HTTPValidationError,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof reanalyzeQubitSpectroscopy>>,
-      TError,
-      { chipId: string; qid: string; data: ReanalyzeQubitSpectroscopyRequest },
-      TContext
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof reanalyzeQubitSpectroscopy>>,
-  TError,
-  { chipId: string; qid: string; data: ReanalyzeQubitSpectroscopyRequest },
-  TContext
-> => {
-  const mutationOptions = getReanalyzeQubitSpectroscopyMutationOptions(options);
+export const useReanalyzeQubitSpectroscopy = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reanalyzeQubitSpectroscopy>>, TError,{chipId: string;qid: string;data: ReanalyzeQubitSpectroscopyRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof reanalyzeQubitSpectroscopy>>,
+        TError,
+        {chipId: string;qid: string;data: ReanalyzeQubitSpectroscopyRequest},
+        TContext
+      > => {
 
-  return useMutation(mutationOptions, queryClient);
-};
-/**
+      const mutationOptions = getReanalyzeQubitSpectroscopyMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    /**
  * List couplings for a chip with pagination.
 
 Retrieves coupling data from the separate CouplingDocument collection.
@@ -1826,176 +1293,100 @@ ListCouplingsResponse
  * @summary List couplings for a chip
  */
 export const listChipCouplings = (
-  chipId: string,
-  params?: ListChipCouplingsParams,
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
+    chipId: string,
+    params?: ListChipCouplingsParams,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  return customInstance<ListCouplingsResponse>(
-    { url: `/chips/${chipId}/couplings`, method: "GET", params, signal },
-    options,
-  );
-};
+      
+      
+      return customInstance<ListCouplingsResponse>(
+      {url: `/chips/${chipId}/couplings`, method: 'GET',
+        params, signal
+    },
+      options);
+    }
+  
 
-export const getListChipCouplingsQueryKey = (
-  chipId?: string,
-  params?: ListChipCouplingsParams,
+
+
+export const getListChipCouplingsQueryKey = (chipId?: string,
+    params?: ListChipCouplingsParams,) => {
+    return [
+    `/chips/${chipId}/couplings`, ...(params ? [params]: [])
+    ] as const;
+    }
+
+    
+export const getListChipCouplingsQueryOptions = <TData = Awaited<ReturnType<typeof listChipCouplings>>, TError = HTTPValidationError>(chipId: string,
+    params?: ListChipCouplingsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listChipCouplings>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
-  return [`/chips/${chipId}/couplings`, ...(params ? [params] : [])] as const;
-};
 
-export const getListChipCouplingsQueryOptions = <
-  TData = Awaited<ReturnType<typeof listChipCouplings>>,
-  TError = HTTPValidationError,
->(
-  chipId: string,
-  params?: ListChipCouplingsParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof listChipCouplings>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
+const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =
-    queryOptions?.queryKey ?? getListChipCouplingsQueryKey(chipId, params);
+  const queryKey =  queryOptions?.queryKey ?? getListChipCouplingsQueryKey(chipId,params);
 
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof listChipCouplings>>
-  > = ({ signal }) => listChipCouplings(chipId, params, requestOptions, signal);
+  
 
-  return {
-    queryKey,
-    queryFn,
-    enabled: !!chipId,
-    ...queryOptions,
-  } as UseQueryOptions<
-    Awaited<ReturnType<typeof listChipCouplings>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData> };
-};
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listChipCouplings>>> = ({ signal }) => listChipCouplings(chipId,params, requestOptions, signal);
 
-export type ListChipCouplingsQueryResult = NonNullable<
-  Awaited<ReturnType<typeof listChipCouplings>>
->;
-export type ListChipCouplingsQueryError = HTTPValidationError;
+      
 
-export function useListChipCouplings<
-  TData = Awaited<ReturnType<typeof listChipCouplings>>,
-  TError = HTTPValidationError,
->(
-  chipId: string,
-  params: undefined | ListChipCouplingsParams,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof listChipCouplings>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
+      
+
+   return  { queryKey, queryFn, enabled: !!(chipId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listChipCouplings>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+}
+
+export type ListChipCouplingsQueryResult = NonNullable<Awaited<ReturnType<typeof listChipCouplings>>>
+export type ListChipCouplingsQueryError = HTTPValidationError
+
+
+export function useListChipCouplings<TData = Awaited<ReturnType<typeof listChipCouplings>>, TError = HTTPValidationError>(
+ chipId: string,
+    params: undefined |  ListChipCouplingsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listChipCouplings>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof listChipCouplings>>,
           TError,
           Awaited<ReturnType<typeof listChipCouplings>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData>;
-};
-export function useListChipCouplings<
-  TData = Awaited<ReturnType<typeof listChipCouplings>>,
-  TError = HTTPValidationError,
->(
-  chipId: string,
-  params?: ListChipCouplingsParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof listChipCouplings>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useListChipCouplings<TData = Awaited<ReturnType<typeof listChipCouplings>>, TError = HTTPValidationError>(
+ chipId: string,
+    params?: ListChipCouplingsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listChipCouplings>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof listChipCouplings>>,
           TError,
           Awaited<ReturnType<typeof listChipCouplings>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
-export function useListChipCouplings<
-  TData = Awaited<ReturnType<typeof listChipCouplings>>,
-  TError = HTTPValidationError,
->(
-  chipId: string,
-  params?: ListChipCouplingsParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof listChipCouplings>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useListChipCouplings<TData = Awaited<ReturnType<typeof listChipCouplings>>, TError = HTTPValidationError>(
+ chipId: string,
+    params?: ListChipCouplingsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listChipCouplings>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
 /**
  * @summary List couplings for a chip
  */
 
-export function useListChipCouplings<
-  TData = Awaited<ReturnType<typeof listChipCouplings>>,
-  TError = HTTPValidationError,
->(
-  chipId: string,
-  params?: ListChipCouplingsParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof listChipCouplings>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
-  const queryOptions = getListChipCouplingsQueryOptions(
-    chipId,
-    params,
-    options,
-  );
+export function useListChipCouplings<TData = Awaited<ReturnType<typeof listChipCouplings>>, TError = HTTPValidationError>(
+ chipId: string,
+    params?: ListChipCouplingsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listChipCouplings>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
 
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData> };
+  const queryOptions = getListChipCouplingsQueryOptions(chipId,params,options)
 
-  query.queryKey = queryOptions.queryKey;
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey ;
 
   return query;
 }
+
+
 
 /**
  * Get a single coupling by ID.
@@ -2018,176 +1409,99 @@ CouplingResponse
  * @summary Get a single coupling
  */
 export const getChipCoupling = (
-  chipId: string,
-  couplingId: string,
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
+    chipId: string,
+    couplingId: string,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  return customInstance<CouplingResponse>(
-    { url: `/chips/${chipId}/couplings/${couplingId}`, method: "GET", signal },
-    options,
-  );
-};
+      
+      
+      return customInstance<CouplingResponse>(
+      {url: `/chips/${chipId}/couplings/${couplingId}`, method: 'GET', signal
+    },
+      options);
+    }
+  
 
-export const getGetChipCouplingQueryKey = (
-  chipId?: string,
-  couplingId?: string,
+
+
+export const getGetChipCouplingQueryKey = (chipId?: string,
+    couplingId?: string,) => {
+    return [
+    `/chips/${chipId}/couplings/${couplingId}`
+    ] as const;
+    }
+
+    
+export const getGetChipCouplingQueryOptions = <TData = Awaited<ReturnType<typeof getChipCoupling>>, TError = HTTPValidationError>(chipId: string,
+    couplingId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getChipCoupling>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
-  return [`/chips/${chipId}/couplings/${couplingId}`] as const;
-};
 
-export const getGetChipCouplingQueryOptions = <
-  TData = Awaited<ReturnType<typeof getChipCoupling>>,
-  TError = HTTPValidationError,
->(
-  chipId: string,
-  couplingId: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getChipCoupling>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
+const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =
-    queryOptions?.queryKey ?? getGetChipCouplingQueryKey(chipId, couplingId);
+  const queryKey =  queryOptions?.queryKey ?? getGetChipCouplingQueryKey(chipId,couplingId);
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof getChipCoupling>>> = ({
-    signal,
-  }) => getChipCoupling(chipId, couplingId, requestOptions, signal);
+  
 
-  return {
-    queryKey,
-    queryFn,
-    enabled: !!(chipId && couplingId),
-    ...queryOptions,
-  } as UseQueryOptions<
-    Awaited<ReturnType<typeof getChipCoupling>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData> };
-};
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getChipCoupling>>> = ({ signal }) => getChipCoupling(chipId,couplingId, requestOptions, signal);
 
-export type GetChipCouplingQueryResult = NonNullable<
-  Awaited<ReturnType<typeof getChipCoupling>>
->;
-export type GetChipCouplingQueryError = HTTPValidationError;
+      
 
-export function useGetChipCoupling<
-  TData = Awaited<ReturnType<typeof getChipCoupling>>,
-  TError = HTTPValidationError,
->(
-  chipId: string,
-  couplingId: string,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getChipCoupling>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
+      
+
+   return  { queryKey, queryFn, enabled: !!(chipId && couplingId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getChipCoupling>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+}
+
+export type GetChipCouplingQueryResult = NonNullable<Awaited<ReturnType<typeof getChipCoupling>>>
+export type GetChipCouplingQueryError = HTTPValidationError
+
+
+export function useGetChipCoupling<TData = Awaited<ReturnType<typeof getChipCoupling>>, TError = HTTPValidationError>(
+ chipId: string,
+    couplingId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getChipCoupling>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getChipCoupling>>,
           TError,
           Awaited<ReturnType<typeof getChipCoupling>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData>;
-};
-export function useGetChipCoupling<
-  TData = Awaited<ReturnType<typeof getChipCoupling>>,
-  TError = HTTPValidationError,
->(
-  chipId: string,
-  couplingId: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getChipCoupling>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useGetChipCoupling<TData = Awaited<ReturnType<typeof getChipCoupling>>, TError = HTTPValidationError>(
+ chipId: string,
+    couplingId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getChipCoupling>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getChipCoupling>>,
           TError,
           Awaited<ReturnType<typeof getChipCoupling>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
-export function useGetChipCoupling<
-  TData = Awaited<ReturnType<typeof getChipCoupling>>,
-  TError = HTTPValidationError,
->(
-  chipId: string,
-  couplingId: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getChipCoupling>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useGetChipCoupling<TData = Awaited<ReturnType<typeof getChipCoupling>>, TError = HTTPValidationError>(
+ chipId: string,
+    couplingId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getChipCoupling>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
 /**
  * @summary Get a single coupling
  */
 
-export function useGetChipCoupling<
-  TData = Awaited<ReturnType<typeof getChipCoupling>>,
-  TError = HTTPValidationError,
->(
-  chipId: string,
-  couplingId: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getChipCoupling>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
-  const queryOptions = getGetChipCouplingQueryOptions(
-    chipId,
-    couplingId,
-    options,
-  );
+export function useGetChipCoupling<TData = Awaited<ReturnType<typeof getChipCoupling>>, TError = HTTPValidationError>(
+ chipId: string,
+    couplingId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getChipCoupling>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
 
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData> };
+  const queryOptions = getGetChipCouplingQueryOptions(chipId,couplingId,options)
 
-  query.queryKey = queryOptions.queryKey;
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey ;
 
   return query;
 }
+
+
 
 /**
  * Get aggregated metrics summary for a chip.
@@ -2211,163 +1525,92 @@ MetricsSummaryResponse
  * @summary Get aggregated metrics summary
  */
 export const getChipMetricsSummary = (
-  chipId: string,
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
+    chipId: string,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  return customInstance<MetricsSummaryResponse>(
-    { url: `/chips/${chipId}/metrics/summary`, method: "GET", signal },
-    options,
-  );
-};
+      
+      
+      return customInstance<MetricsSummaryResponse>(
+      {url: `/chips/${chipId}/metrics/summary`, method: 'GET', signal
+    },
+      options);
+    }
+  
 
-export const getGetChipMetricsSummaryQueryKey = (chipId?: string) => {
-  return [`/chips/${chipId}/metrics/summary`] as const;
-};
 
-export const getGetChipMetricsSummaryQueryOptions = <
-  TData = Awaited<ReturnType<typeof getChipMetricsSummary>>,
-  TError = HTTPValidationError,
->(
-  chipId: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getChipMetricsSummary>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
+
+export const getGetChipMetricsSummaryQueryKey = (chipId?: string,) => {
+    return [
+    `/chips/${chipId}/metrics/summary`
+    ] as const;
+    }
+
+    
+export const getGetChipMetricsSummaryQueryOptions = <TData = Awaited<ReturnType<typeof getChipMetricsSummary>>, TError = HTTPValidationError>(chipId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getChipMetricsSummary>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey =
-    queryOptions?.queryKey ?? getGetChipMetricsSummaryQueryKey(chipId);
+const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof getChipMetricsSummary>>
-  > = ({ signal }) => getChipMetricsSummary(chipId, requestOptions, signal);
+  const queryKey =  queryOptions?.queryKey ?? getGetChipMetricsSummaryQueryKey(chipId);
 
-  return {
-    queryKey,
-    queryFn,
-    enabled: !!chipId,
-    ...queryOptions,
-  } as UseQueryOptions<
-    Awaited<ReturnType<typeof getChipMetricsSummary>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData> };
-};
+  
 
-export type GetChipMetricsSummaryQueryResult = NonNullable<
-  Awaited<ReturnType<typeof getChipMetricsSummary>>
->;
-export type GetChipMetricsSummaryQueryError = HTTPValidationError;
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getChipMetricsSummary>>> = ({ signal }) => getChipMetricsSummary(chipId, requestOptions, signal);
 
-export function useGetChipMetricsSummary<
-  TData = Awaited<ReturnType<typeof getChipMetricsSummary>>,
-  TError = HTTPValidationError,
->(
-  chipId: string,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getChipMetricsSummary>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
+      
+
+      
+
+   return  { queryKey, queryFn, enabled: !!(chipId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getChipMetricsSummary>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+}
+
+export type GetChipMetricsSummaryQueryResult = NonNullable<Awaited<ReturnType<typeof getChipMetricsSummary>>>
+export type GetChipMetricsSummaryQueryError = HTTPValidationError
+
+
+export function useGetChipMetricsSummary<TData = Awaited<ReturnType<typeof getChipMetricsSummary>>, TError = HTTPValidationError>(
+ chipId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getChipMetricsSummary>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getChipMetricsSummary>>,
           TError,
           Awaited<ReturnType<typeof getChipMetricsSummary>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData>;
-};
-export function useGetChipMetricsSummary<
-  TData = Awaited<ReturnType<typeof getChipMetricsSummary>>,
-  TError = HTTPValidationError,
->(
-  chipId: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getChipMetricsSummary>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useGetChipMetricsSummary<TData = Awaited<ReturnType<typeof getChipMetricsSummary>>, TError = HTTPValidationError>(
+ chipId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getChipMetricsSummary>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getChipMetricsSummary>>,
           TError,
           Awaited<ReturnType<typeof getChipMetricsSummary>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
-export function useGetChipMetricsSummary<
-  TData = Awaited<ReturnType<typeof getChipMetricsSummary>>,
-  TError = HTTPValidationError,
->(
-  chipId: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getChipMetricsSummary>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useGetChipMetricsSummary<TData = Awaited<ReturnType<typeof getChipMetricsSummary>>, TError = HTTPValidationError>(
+ chipId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getChipMetricsSummary>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
 /**
  * @summary Get aggregated metrics summary
  */
 
-export function useGetChipMetricsSummary<
-  TData = Awaited<ReturnType<typeof getChipMetricsSummary>>,
-  TError = HTTPValidationError,
->(
-  chipId: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getChipMetricsSummary>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
-  const queryOptions = getGetChipMetricsSummaryQueryOptions(chipId, options);
+export function useGetChipMetricsSummary<TData = Awaited<ReturnType<typeof getChipMetricsSummary>>, TError = HTTPValidationError>(
+ chipId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getChipMetricsSummary>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
 
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData> };
+  const queryOptions = getGetChipMetricsSummaryQueryOptions(chipId,options)
 
-  query.queryKey = queryOptions.queryKey;
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey ;
 
   return query;
 }
+
+
 
 /**
  * Get heatmap data for a single metric.
@@ -2398,178 +1641,97 @@ MetricHeatmapResponse
  * @summary Get heatmap data for a single metric
  */
 export const getChipMetricHeatmap = (
-  chipId: string,
-  metric: string,
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
+    chipId: string,
+    metric: string,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  return customInstance<MetricHeatmapResponse>(
-    {
-      url: `/chips/${chipId}/metrics/heatmap/${metric}`,
-      method: "GET",
-      signal,
+      
+      
+      return customInstance<MetricHeatmapResponse>(
+      {url: `/chips/${chipId}/metrics/heatmap/${metric}`, method: 'GET', signal
     },
-    options,
-  );
-};
+      options);
+    }
+  
 
-export const getGetChipMetricHeatmapQueryKey = (
-  chipId?: string,
-  metric?: string,
+
+
+export const getGetChipMetricHeatmapQueryKey = (chipId?: string,
+    metric?: string,) => {
+    return [
+    `/chips/${chipId}/metrics/heatmap/${metric}`
+    ] as const;
+    }
+
+    
+export const getGetChipMetricHeatmapQueryOptions = <TData = Awaited<ReturnType<typeof getChipMetricHeatmap>>, TError = HTTPValidationError>(chipId: string,
+    metric: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getChipMetricHeatmap>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
-  return [`/chips/${chipId}/metrics/heatmap/${metric}`] as const;
-};
 
-export const getGetChipMetricHeatmapQueryOptions = <
-  TData = Awaited<ReturnType<typeof getChipMetricHeatmap>>,
-  TError = HTTPValidationError,
->(
-  chipId: string,
-  metric: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getChipMetricHeatmap>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
+const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =
-    queryOptions?.queryKey ?? getGetChipMetricHeatmapQueryKey(chipId, metric);
+  const queryKey =  queryOptions?.queryKey ?? getGetChipMetricHeatmapQueryKey(chipId,metric);
 
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof getChipMetricHeatmap>>
-  > = ({ signal }) =>
-    getChipMetricHeatmap(chipId, metric, requestOptions, signal);
+  
 
-  return {
-    queryKey,
-    queryFn,
-    enabled: !!(chipId && metric),
-    ...queryOptions,
-  } as UseQueryOptions<
-    Awaited<ReturnType<typeof getChipMetricHeatmap>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData> };
-};
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getChipMetricHeatmap>>> = ({ signal }) => getChipMetricHeatmap(chipId,metric, requestOptions, signal);
 
-export type GetChipMetricHeatmapQueryResult = NonNullable<
-  Awaited<ReturnType<typeof getChipMetricHeatmap>>
->;
-export type GetChipMetricHeatmapQueryError = HTTPValidationError;
+      
 
-export function useGetChipMetricHeatmap<
-  TData = Awaited<ReturnType<typeof getChipMetricHeatmap>>,
-  TError = HTTPValidationError,
->(
-  chipId: string,
-  metric: string,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getChipMetricHeatmap>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
+      
+
+   return  { queryKey, queryFn, enabled: !!(chipId && metric), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getChipMetricHeatmap>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+}
+
+export type GetChipMetricHeatmapQueryResult = NonNullable<Awaited<ReturnType<typeof getChipMetricHeatmap>>>
+export type GetChipMetricHeatmapQueryError = HTTPValidationError
+
+
+export function useGetChipMetricHeatmap<TData = Awaited<ReturnType<typeof getChipMetricHeatmap>>, TError = HTTPValidationError>(
+ chipId: string,
+    metric: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getChipMetricHeatmap>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getChipMetricHeatmap>>,
           TError,
           Awaited<ReturnType<typeof getChipMetricHeatmap>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData>;
-};
-export function useGetChipMetricHeatmap<
-  TData = Awaited<ReturnType<typeof getChipMetricHeatmap>>,
-  TError = HTTPValidationError,
->(
-  chipId: string,
-  metric: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getChipMetricHeatmap>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useGetChipMetricHeatmap<TData = Awaited<ReturnType<typeof getChipMetricHeatmap>>, TError = HTTPValidationError>(
+ chipId: string,
+    metric: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getChipMetricHeatmap>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getChipMetricHeatmap>>,
           TError,
           Awaited<ReturnType<typeof getChipMetricHeatmap>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
-export function useGetChipMetricHeatmap<
-  TData = Awaited<ReturnType<typeof getChipMetricHeatmap>>,
-  TError = HTTPValidationError,
->(
-  chipId: string,
-  metric: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getChipMetricHeatmap>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useGetChipMetricHeatmap<TData = Awaited<ReturnType<typeof getChipMetricHeatmap>>, TError = HTTPValidationError>(
+ chipId: string,
+    metric: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getChipMetricHeatmap>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
 /**
  * @summary Get heatmap data for a single metric
  */
 
-export function useGetChipMetricHeatmap<
-  TData = Awaited<ReturnType<typeof getChipMetricHeatmap>>,
-  TError = HTTPValidationError,
->(
-  chipId: string,
-  metric: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getChipMetricHeatmap>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
-  const queryOptions = getGetChipMetricHeatmapQueryOptions(
-    chipId,
-    metric,
-    options,
-  );
+export function useGetChipMetricHeatmap<TData = Awaited<ReturnType<typeof getChipMetricHeatmap>>, TError = HTTPValidationError>(
+ chipId: string,
+    metric: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getChipMetricHeatmap>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
 
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData> };
+  const queryOptions = getGetChipMetricHeatmapQueryOptions(chipId,metric,options)
 
-  query.queryKey = queryOptions.queryKey;
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey ;
 
   return query;
 }
+
+
+

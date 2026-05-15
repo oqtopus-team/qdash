@@ -7,17 +7,17 @@
  */
 
 export type ListNotificationsParams = {
-  /**
-   * Only return unread notifications
-   */
-  unread_only?: boolean;
-  /**
-   * @minimum 0
-   */
-  skip?: number;
-  /**
-   * @minimum 1
-   * @maximum 200
-   */
-  limit?: number;
+/**
+ * Only return unread notifications
+ */
+unread_only?: boolean;
+/**
+ * @minimum 0
+ */
+skip?: number;
+/**
+ * @minimum 1
+ * @maximum 200
+ */
+limit?: number;
 };

@@ -5,10 +5,9 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { SeedImportRequestManualDataAnyOf } from "./seedImportRequestManualDataAnyOf";
+import type { SeedImportRequestManualDataAnyOf } from './seedImportRequestManualDataAnyOf';
 
 /**
  * Manual data when source is MANUAL
  */
-export type SeedImportRequestManualData =
-  SeedImportRequestManualDataAnyOf | null;
+export type SeedImportRequestManualData = SeedImportRequestManualDataAnyOf | null;

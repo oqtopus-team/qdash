@@ -5,7 +5,9 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import { useQuery } from "@tanstack/react-query";
+import {
+  useQuery
+} from '@tanstack/react-query';
 import type {
   DataTag,
   DefinedInitialDataOptions,
@@ -15,19 +17,22 @@ import type {
   QueryKey,
   UndefinedInitialDataOptions,
   UseQueryOptions,
-  UseQueryResult,
-} from "@tanstack/react-query";
+  UseQueryResult
+} from '@tanstack/react-query';
 
 import type {
   GetTopologyById200,
   HTTPValidationError,
   ListTopologies200,
-  ListTopologiesParams,
-} from "../../schemas";
+  ListTopologiesParams
+} from '../../schemas';
 
-import { customInstance } from "../../lib/custom-instance";
+import { customInstance } from '../../lib/custom-instance';
+
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
+
+
 
 /**
  * List all available topology definitions.
@@ -42,137 +47,93 @@ Returns:
  * @summary List available topologies
  */
 export const listTopologies = (
-  params?: ListTopologiesParams,
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
+    params?: ListTopologiesParams,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  return customInstance<ListTopologies200>(
-    { url: `/topology/list`, method: "GET", params, signal },
-    options,
-  );
-};
+      
+      
+      return customInstance<ListTopologies200>(
+      {url: `/topology/list`, method: 'GET',
+        params, signal
+    },
+      options);
+    }
+  
 
-export const getListTopologiesQueryKey = (params?: ListTopologiesParams) => {
-  return [`/topology/list`, ...(params ? [params] : [])] as const;
-};
 
-export const getListTopologiesQueryOptions = <
-  TData = Awaited<ReturnType<typeof listTopologies>>,
-  TError = HTTPValidationError,
->(
-  params?: ListTopologiesParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof listTopologies>>, TError, TData>
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
+
+export const getListTopologiesQueryKey = (params?: ListTopologiesParams,) => {
+    return [
+    `/topology/list`, ...(params ? [params]: [])
+    ] as const;
+    }
+
+    
+export const getListTopologiesQueryOptions = <TData = Awaited<ReturnType<typeof listTopologies>>, TError = HTTPValidationError>(params?: ListTopologiesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listTopologies>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey = queryOptions?.queryKey ?? getListTopologiesQueryKey(params);
+const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof listTopologies>>> = ({
-    signal,
-  }) => listTopologies(params, requestOptions, signal);
+  const queryKey =  queryOptions?.queryKey ?? getListTopologiesQueryKey(params);
 
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof listTopologies>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData> };
-};
+  
 
-export type ListTopologiesQueryResult = NonNullable<
-  Awaited<ReturnType<typeof listTopologies>>
->;
-export type ListTopologiesQueryError = HTTPValidationError;
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listTopologies>>> = ({ signal }) => listTopologies(params, requestOptions, signal);
 
-export function useListTopologies<
-  TData = Awaited<ReturnType<typeof listTopologies>>,
-  TError = HTTPValidationError,
->(
-  params: undefined | ListTopologiesParams,
-  options: {
-    query: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof listTopologies>>, TError, TData>
-    > &
-      Pick<
+      
+
+      
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listTopologies>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+}
+
+export type ListTopologiesQueryResult = NonNullable<Awaited<ReturnType<typeof listTopologies>>>
+export type ListTopologiesQueryError = HTTPValidationError
+
+
+export function useListTopologies<TData = Awaited<ReturnType<typeof listTopologies>>, TError = HTTPValidationError>(
+ params: undefined |  ListTopologiesParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listTopologies>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof listTopologies>>,
           TError,
           Awaited<ReturnType<typeof listTopologies>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData>;
-};
-export function useListTopologies<
-  TData = Awaited<ReturnType<typeof listTopologies>>,
-  TError = HTTPValidationError,
->(
-  params?: ListTopologiesParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof listTopologies>>, TError, TData>
-    > &
-      Pick<
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useListTopologies<TData = Awaited<ReturnType<typeof listTopologies>>, TError = HTTPValidationError>(
+ params?: ListTopologiesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listTopologies>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof listTopologies>>,
           TError,
           Awaited<ReturnType<typeof listTopologies>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
-export function useListTopologies<
-  TData = Awaited<ReturnType<typeof listTopologies>>,
-  TError = HTTPValidationError,
->(
-  params?: ListTopologiesParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof listTopologies>>, TError, TData>
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useListTopologies<TData = Awaited<ReturnType<typeof listTopologies>>, TError = HTTPValidationError>(
+ params?: ListTopologiesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listTopologies>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
 /**
  * @summary List available topologies
  */
 
-export function useListTopologies<
-  TData = Awaited<ReturnType<typeof listTopologies>>,
-  TError = HTTPValidationError,
->(
-  params?: ListTopologiesParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof listTopologies>>, TError, TData>
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
-  const queryOptions = getListTopologiesQueryOptions(params, options);
+export function useListTopologies<TData = Awaited<ReturnType<typeof listTopologies>>, TError = HTTPValidationError>(
+ params?: ListTopologiesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listTopologies>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
 
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData> };
+  const queryOptions = getListTopologiesQueryOptions(params,options)
 
-  query.queryKey = queryOptions.queryKey;
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey ;
 
   return query;
 }
+
+
 
 /**
  * Get a specific topology definition.
@@ -187,160 +148,90 @@ Returns:
  * @summary Get topology by ID
  */
 export const getTopologyById = (
-  topologyId: string,
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
+    topologyId: string,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  return customInstance<GetTopologyById200>(
-    { url: `/topology/${topologyId}`, method: "GET", signal },
-    options,
-  );
-};
+      
+      
+      return customInstance<GetTopologyById200>(
+      {url: `/topology/${topologyId}`, method: 'GET', signal
+    },
+      options);
+    }
+  
 
-export const getGetTopologyByIdQueryKey = (topologyId?: string) => {
-  return [`/topology/${topologyId}`] as const;
-};
 
-export const getGetTopologyByIdQueryOptions = <
-  TData = Awaited<ReturnType<typeof getTopologyById>>,
-  TError = HTTPValidationError,
->(
-  topologyId: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getTopologyById>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
+
+export const getGetTopologyByIdQueryKey = (topologyId?: string,) => {
+    return [
+    `/topology/${topologyId}`
+    ] as const;
+    }
+
+    
+export const getGetTopologyByIdQueryOptions = <TData = Awaited<ReturnType<typeof getTopologyById>>, TError = HTTPValidationError>(topologyId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTopologyById>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey =
-    queryOptions?.queryKey ?? getGetTopologyByIdQueryKey(topologyId);
+const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof getTopologyById>>> = ({
-    signal,
-  }) => getTopologyById(topologyId, requestOptions, signal);
+  const queryKey =  queryOptions?.queryKey ?? getGetTopologyByIdQueryKey(topologyId);
 
-  return {
-    queryKey,
-    queryFn,
-    enabled: !!topologyId,
-    ...queryOptions,
-  } as UseQueryOptions<
-    Awaited<ReturnType<typeof getTopologyById>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData> };
-};
+  
 
-export type GetTopologyByIdQueryResult = NonNullable<
-  Awaited<ReturnType<typeof getTopologyById>>
->;
-export type GetTopologyByIdQueryError = HTTPValidationError;
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getTopologyById>>> = ({ signal }) => getTopologyById(topologyId, requestOptions, signal);
 
-export function useGetTopologyById<
-  TData = Awaited<ReturnType<typeof getTopologyById>>,
-  TError = HTTPValidationError,
->(
-  topologyId: string,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getTopologyById>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
+      
+
+      
+
+   return  { queryKey, queryFn, enabled: !!(topologyId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getTopologyById>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+}
+
+export type GetTopologyByIdQueryResult = NonNullable<Awaited<ReturnType<typeof getTopologyById>>>
+export type GetTopologyByIdQueryError = HTTPValidationError
+
+
+export function useGetTopologyById<TData = Awaited<ReturnType<typeof getTopologyById>>, TError = HTTPValidationError>(
+ topologyId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTopologyById>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getTopologyById>>,
           TError,
           Awaited<ReturnType<typeof getTopologyById>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData>;
-};
-export function useGetTopologyById<
-  TData = Awaited<ReturnType<typeof getTopologyById>>,
-  TError = HTTPValidationError,
->(
-  topologyId: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getTopologyById>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useGetTopologyById<TData = Awaited<ReturnType<typeof getTopologyById>>, TError = HTTPValidationError>(
+ topologyId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTopologyById>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getTopologyById>>,
           TError,
           Awaited<ReturnType<typeof getTopologyById>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
-export function useGetTopologyById<
-  TData = Awaited<ReturnType<typeof getTopologyById>>,
-  TError = HTTPValidationError,
->(
-  topologyId: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getTopologyById>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useGetTopologyById<TData = Awaited<ReturnType<typeof getTopologyById>>, TError = HTTPValidationError>(
+ topologyId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTopologyById>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
 /**
  * @summary Get topology by ID
  */
 
-export function useGetTopologyById<
-  TData = Awaited<ReturnType<typeof getTopologyById>>,
-  TError = HTTPValidationError,
->(
-  topologyId: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getTopologyById>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
-  const queryOptions = getGetTopologyByIdQueryOptions(topologyId, options);
+export function useGetTopologyById<TData = Awaited<ReturnType<typeof getTopologyById>>, TError = HTTPValidationError>(
+ topologyId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTopologyById>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
 
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData> };
+  const queryOptions = getGetTopologyByIdQueryOptions(topologyId,options)
 
-  query.queryKey = queryOptions.queryKey;
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey ;
 
   return query;
 }
+
+
+

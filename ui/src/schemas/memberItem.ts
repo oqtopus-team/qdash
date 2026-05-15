@@ -5,10 +5,10 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { MemberItemDisplayName } from "./memberItemDisplayName";
-import type { MemberItemOrganization } from "./memberItemOrganization";
-import type { MemberItemAvatarKey } from "./memberItemAvatarKey";
-import type { ProjectRole } from "./projectRole";
+import type { MemberItemDisplayName } from './memberItemDisplayName';
+import type { MemberItemOrganization } from './memberItemOrganization';
+import type { MemberItemAvatarKey } from './memberItemAvatarKey';
+import type { ProjectRole } from './projectRole';
 
 /**
  * Member info for admin view.

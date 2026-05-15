@@ -5,7 +5,10 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import { useMutation, useQuery } from "@tanstack/react-query";
+import {
+  useMutation,
+  useQuery
+} from '@tanstack/react-query';
 import type {
   DataTag,
   DefinedInitialDataOptions,
@@ -18,8 +21,8 @@ import type {
   UseMutationOptions,
   UseMutationResult,
   UseQueryOptions,
-  UseQueryResult,
-} from "@tanstack/react-query";
+  UseQueryResult
+} from '@tanstack/react-query';
 
 import type {
   CalibrationNoteResponse,
@@ -30,12 +33,15 @@ import type {
   ManualParameterUpdateRequest,
   ManualParameterUpdateResponse,
   SeedImportRequest,
-  SeedImportResponse,
-} from "../../schemas";
+  SeedImportResponse
+} from '../../schemas';
 
-import { customInstance } from "../../lib/custom-instance";
+import { customInstance } from '../../lib/custom-instance';
+
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
+
+
 
 /**
  * Get the latest calibration note for the master task.
@@ -64,149 +70,92 @@ HTTPException
  * @summary Get the calibration note
  */
 export const getCalibrationNote = (
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
+    
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  return customInstance<CalibrationNoteResponse>(
-    { url: `/calibrations/note`, method: "GET", signal },
-    options,
-  );
-};
+      
+      
+      return customInstance<CalibrationNoteResponse>(
+      {url: `/calibrations/note`, method: 'GET', signal
+    },
+      options);
+    }
+  
+
+
 
 export const getGetCalibrationNoteQueryKey = () => {
-  return [`/calibrations/note`] as const;
-};
+    return [
+    `/calibrations/note`
+    ] as const;
+    }
 
-export const getGetCalibrationNoteQueryOptions = <
-  TData = Awaited<ReturnType<typeof getCalibrationNote>>,
-  TError = HTTPValidationError,
->(options?: {
-  query?: Partial<
-    UseQueryOptions<
-      Awaited<ReturnType<typeof getCalibrationNote>>,
-      TError,
-      TData
-    >
-  >;
-  request?: SecondParameter<typeof customInstance>;
-}) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
+    
+export const getGetCalibrationNoteQueryOptions = <TData = Awaited<ReturnType<typeof getCalibrationNote>>, TError = HTTPValidationError>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCalibrationNote>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
 
-  const queryKey = queryOptions?.queryKey ?? getGetCalibrationNoteQueryKey();
+const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof getCalibrationNote>>
-  > = ({ signal }) => getCalibrationNote(requestOptions, signal);
+  const queryKey =  queryOptions?.queryKey ?? getGetCalibrationNoteQueryKey();
 
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof getCalibrationNote>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData> };
-};
+  
 
-export type GetCalibrationNoteQueryResult = NonNullable<
-  Awaited<ReturnType<typeof getCalibrationNote>>
->;
-export type GetCalibrationNoteQueryError = HTTPValidationError;
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCalibrationNote>>> = ({ signal }) => getCalibrationNote(requestOptions, signal);
 
-export function useGetCalibrationNote<
-  TData = Awaited<ReturnType<typeof getCalibrationNote>>,
-  TError = HTTPValidationError,
->(
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getCalibrationNote>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
+      
+
+      
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCalibrationNote>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+}
+
+export type GetCalibrationNoteQueryResult = NonNullable<Awaited<ReturnType<typeof getCalibrationNote>>>
+export type GetCalibrationNoteQueryError = HTTPValidationError
+
+
+export function useGetCalibrationNote<TData = Awaited<ReturnType<typeof getCalibrationNote>>, TError = HTTPValidationError>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCalibrationNote>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getCalibrationNote>>,
           TError,
           Awaited<ReturnType<typeof getCalibrationNote>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData>;
-};
-export function useGetCalibrationNote<
-  TData = Awaited<ReturnType<typeof getCalibrationNote>>,
-  TError = HTTPValidationError,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getCalibrationNote>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useGetCalibrationNote<TData = Awaited<ReturnType<typeof getCalibrationNote>>, TError = HTTPValidationError>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCalibrationNote>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getCalibrationNote>>,
           TError,
           Awaited<ReturnType<typeof getCalibrationNote>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
-export function useGetCalibrationNote<
-  TData = Awaited<ReturnType<typeof getCalibrationNote>>,
-  TError = HTTPValidationError,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getCalibrationNote>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useGetCalibrationNote<TData = Awaited<ReturnType<typeof getCalibrationNote>>, TError = HTTPValidationError>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCalibrationNote>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
 /**
  * @summary Get the calibration note
  */
 
-export function useGetCalibrationNote<
-  TData = Awaited<ReturnType<typeof getCalibrationNote>>,
-  TError = HTTPValidationError,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getCalibrationNote>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
-  const queryOptions = getGetCalibrationNoteQueryOptions(options);
+export function useGetCalibrationNote<TData = Awaited<ReturnType<typeof getCalibrationNote>>, TError = HTTPValidationError>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCalibrationNote>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
 
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData> };
+  const queryOptions = getGetCalibrationNoteQueryOptions(options)
 
-  query.queryKey = queryOptions.queryKey;
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey ;
 
   return query;
 }
+
+
 
 /**
  * Import initial calibration parameters from qubex params or manual input.
@@ -253,94 +202,67 @@ Manual import:
  * @summary Import seed parameters from qubex or manual input
  */
 export const importSeedParameters = (
-  seedImportRequest: SeedImportRequest,
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
+    seedImportRequest: SeedImportRequest,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  return customInstance<SeedImportResponse>(
-    {
-      url: `/calibrations/seed-import`,
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      data: seedImportRequest,
-      signal,
+      
+      
+      return customInstance<SeedImportResponse>(
+      {url: `/calibrations/seed-import`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: seedImportRequest, signal
     },
-    options,
-  );
-};
+      options);
+    }
+  
 
-export const getImportSeedParametersMutationOptions = <
-  TError = HTTPValidationError,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof importSeedParameters>>,
-    TError,
-    { data: SeedImportRequest },
-    TContext
-  >;
-  request?: SecondParameter<typeof customInstance>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof importSeedParameters>>,
-  TError,
-  { data: SeedImportRequest },
-  TContext
-> => {
-  const mutationKey = ["importSeedParameters"];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      "mutationKey" in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
 
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof importSeedParameters>>,
-    { data: SeedImportRequest }
-  > = (props) => {
-    const { data } = props ?? {};
+export const getImportSeedParametersMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof importSeedParameters>>, TError,{data: SeedImportRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof importSeedParameters>>, TError,{data: SeedImportRequest}, TContext> => {
 
-    return importSeedParameters(data, requestOptions);
-  };
+const mutationKey = ['importSeedParameters'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
 
-  return { mutationFn, ...mutationOptions };
-};
+      
 
-export type ImportSeedParametersMutationResult = NonNullable<
-  Awaited<ReturnType<typeof importSeedParameters>>
->;
-export type ImportSeedParametersMutationBody = SeedImportRequest;
-export type ImportSeedParametersMutationError = HTTPValidationError;
 
-/**
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof importSeedParameters>>, {data: SeedImportRequest}> = (props) => {
+          const {data} = props ?? {};
+
+          return  importSeedParameters(data,requestOptions)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ImportSeedParametersMutationResult = NonNullable<Awaited<ReturnType<typeof importSeedParameters>>>
+    export type ImportSeedParametersMutationBody = SeedImportRequest
+    export type ImportSeedParametersMutationError = HTTPValidationError
+
+    /**
  * @summary Import seed parameters from qubex or manual input
  */
-export const useImportSeedParameters = <
-  TError = HTTPValidationError,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof importSeedParameters>>,
-      TError,
-      { data: SeedImportRequest },
-      TContext
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof importSeedParameters>>,
-  TError,
-  { data: SeedImportRequest },
-  TContext
-> => {
-  const mutationOptions = getImportSeedParametersMutationOptions(options);
+export const useImportSeedParameters = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof importSeedParameters>>, TError,{data: SeedImportRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof importSeedParameters>>,
+        TError,
+        {data: SeedImportRequest},
+        TContext
+      > => {
 
-  return useMutation(mutationOptions, queryClient);
-};
-/**
+      const mutationOptions = getImportSeedParametersMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    /**
  * Get list of available parameter files in qubex params directory.
 
 Parameters
@@ -359,167 +281,92 @@ list[str]
  * @summary Get available seed parameters for a chip
  */
 export const getAvailableSeedParameters = (
-  chipId: string,
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
+    chipId: string,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  return customInstance<string[]>(
-    { url: `/calibrations/seed-parameters/${chipId}`, method: "GET", signal },
-    options,
-  );
-};
+      
+      
+      return customInstance<string[]>(
+      {url: `/calibrations/seed-parameters/${chipId}`, method: 'GET', signal
+    },
+      options);
+    }
+  
 
-export const getGetAvailableSeedParametersQueryKey = (chipId?: string) => {
-  return [`/calibrations/seed-parameters/${chipId}`] as const;
-};
 
-export const getGetAvailableSeedParametersQueryOptions = <
-  TData = Awaited<ReturnType<typeof getAvailableSeedParameters>>,
-  TError = HTTPValidationError,
->(
-  chipId: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getAvailableSeedParameters>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
+
+export const getGetAvailableSeedParametersQueryKey = (chipId?: string,) => {
+    return [
+    `/calibrations/seed-parameters/${chipId}`
+    ] as const;
+    }
+
+    
+export const getGetAvailableSeedParametersQueryOptions = <TData = Awaited<ReturnType<typeof getAvailableSeedParameters>>, TError = HTTPValidationError>(chipId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAvailableSeedParameters>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey =
-    queryOptions?.queryKey ?? getGetAvailableSeedParametersQueryKey(chipId);
+const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof getAvailableSeedParameters>>
-  > = ({ signal }) =>
-    getAvailableSeedParameters(chipId, requestOptions, signal);
+  const queryKey =  queryOptions?.queryKey ?? getGetAvailableSeedParametersQueryKey(chipId);
 
-  return {
-    queryKey,
-    queryFn,
-    enabled: !!chipId,
-    ...queryOptions,
-  } as UseQueryOptions<
-    Awaited<ReturnType<typeof getAvailableSeedParameters>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData> };
-};
+  
 
-export type GetAvailableSeedParametersQueryResult = NonNullable<
-  Awaited<ReturnType<typeof getAvailableSeedParameters>>
->;
-export type GetAvailableSeedParametersQueryError = HTTPValidationError;
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAvailableSeedParameters>>> = ({ signal }) => getAvailableSeedParameters(chipId, requestOptions, signal);
 
-export function useGetAvailableSeedParameters<
-  TData = Awaited<ReturnType<typeof getAvailableSeedParameters>>,
-  TError = HTTPValidationError,
->(
-  chipId: string,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getAvailableSeedParameters>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
+      
+
+      
+
+   return  { queryKey, queryFn, enabled: !!(chipId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAvailableSeedParameters>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+}
+
+export type GetAvailableSeedParametersQueryResult = NonNullable<Awaited<ReturnType<typeof getAvailableSeedParameters>>>
+export type GetAvailableSeedParametersQueryError = HTTPValidationError
+
+
+export function useGetAvailableSeedParameters<TData = Awaited<ReturnType<typeof getAvailableSeedParameters>>, TError = HTTPValidationError>(
+ chipId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAvailableSeedParameters>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getAvailableSeedParameters>>,
           TError,
           Awaited<ReturnType<typeof getAvailableSeedParameters>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData>;
-};
-export function useGetAvailableSeedParameters<
-  TData = Awaited<ReturnType<typeof getAvailableSeedParameters>>,
-  TError = HTTPValidationError,
->(
-  chipId: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getAvailableSeedParameters>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useGetAvailableSeedParameters<TData = Awaited<ReturnType<typeof getAvailableSeedParameters>>, TError = HTTPValidationError>(
+ chipId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAvailableSeedParameters>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getAvailableSeedParameters>>,
           TError,
           Awaited<ReturnType<typeof getAvailableSeedParameters>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
-export function useGetAvailableSeedParameters<
-  TData = Awaited<ReturnType<typeof getAvailableSeedParameters>>,
-  TError = HTTPValidationError,
->(
-  chipId: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getAvailableSeedParameters>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useGetAvailableSeedParameters<TData = Awaited<ReturnType<typeof getAvailableSeedParameters>>, TError = HTTPValidationError>(
+ chipId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAvailableSeedParameters>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
 /**
  * @summary Get available seed parameters for a chip
  */
 
-export function useGetAvailableSeedParameters<
-  TData = Awaited<ReturnType<typeof getAvailableSeedParameters>>,
-  TError = HTTPValidationError,
->(
-  chipId: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getAvailableSeedParameters>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
-  const queryOptions = getGetAvailableSeedParametersQueryOptions(
-    chipId,
-    options,
-  );
+export function useGetAvailableSeedParameters<TData = Awaited<ReturnType<typeof getAvailableSeedParameters>>, TError = HTTPValidationError>(
+ chipId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAvailableSeedParameters>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
 
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData> };
+  const queryOptions = getGetAvailableSeedParametersQueryOptions(chipId,options)
 
-  query.queryKey = queryOptions.queryKey;
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey ;
 
   return query;
 }
+
+
 
 /**
  * Compare seed parameter values from YAML files with current QDash values.
@@ -560,184 +407,100 @@ dict
  * @summary Compare YAML seed values with QDash values
  */
 export const compareSeedValues = (
-  chipId: string,
-  params?: CompareSeedValuesParams,
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
+    chipId: string,
+    params?: CompareSeedValuesParams,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  return customInstance<CompareSeedValues200>(
-    {
-      url: `/calibrations/seed-compare/${chipId}`,
-      method: "GET",
-      params,
-      signal,
+      
+      
+      return customInstance<CompareSeedValues200>(
+      {url: `/calibrations/seed-compare/${chipId}`, method: 'GET',
+        params, signal
     },
-    options,
-  );
-};
+      options);
+    }
+  
 
-export const getCompareSeedValuesQueryKey = (
-  chipId?: string,
-  params?: CompareSeedValuesParams,
+
+
+export const getCompareSeedValuesQueryKey = (chipId?: string,
+    params?: CompareSeedValuesParams,) => {
+    return [
+    `/calibrations/seed-compare/${chipId}`, ...(params ? [params]: [])
+    ] as const;
+    }
+
+    
+export const getCompareSeedValuesQueryOptions = <TData = Awaited<ReturnType<typeof compareSeedValues>>, TError = HTTPValidationError>(chipId: string,
+    params?: CompareSeedValuesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof compareSeedValues>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
-  return [
-    `/calibrations/seed-compare/${chipId}`,
-    ...(params ? [params] : []),
-  ] as const;
-};
 
-export const getCompareSeedValuesQueryOptions = <
-  TData = Awaited<ReturnType<typeof compareSeedValues>>,
-  TError = HTTPValidationError,
->(
-  chipId: string,
-  params?: CompareSeedValuesParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof compareSeedValues>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
+const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =
-    queryOptions?.queryKey ?? getCompareSeedValuesQueryKey(chipId, params);
+  const queryKey =  queryOptions?.queryKey ?? getCompareSeedValuesQueryKey(chipId,params);
 
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof compareSeedValues>>
-  > = ({ signal }) => compareSeedValues(chipId, params, requestOptions, signal);
+  
 
-  return {
-    queryKey,
-    queryFn,
-    enabled: !!chipId,
-    ...queryOptions,
-  } as UseQueryOptions<
-    Awaited<ReturnType<typeof compareSeedValues>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData> };
-};
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof compareSeedValues>>> = ({ signal }) => compareSeedValues(chipId,params, requestOptions, signal);
 
-export type CompareSeedValuesQueryResult = NonNullable<
-  Awaited<ReturnType<typeof compareSeedValues>>
->;
-export type CompareSeedValuesQueryError = HTTPValidationError;
+      
 
-export function useCompareSeedValues<
-  TData = Awaited<ReturnType<typeof compareSeedValues>>,
-  TError = HTTPValidationError,
->(
-  chipId: string,
-  params: undefined | CompareSeedValuesParams,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof compareSeedValues>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
+      
+
+   return  { queryKey, queryFn, enabled: !!(chipId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof compareSeedValues>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+}
+
+export type CompareSeedValuesQueryResult = NonNullable<Awaited<ReturnType<typeof compareSeedValues>>>
+export type CompareSeedValuesQueryError = HTTPValidationError
+
+
+export function useCompareSeedValues<TData = Awaited<ReturnType<typeof compareSeedValues>>, TError = HTTPValidationError>(
+ chipId: string,
+    params: undefined |  CompareSeedValuesParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof compareSeedValues>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof compareSeedValues>>,
           TError,
           Awaited<ReturnType<typeof compareSeedValues>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData>;
-};
-export function useCompareSeedValues<
-  TData = Awaited<ReturnType<typeof compareSeedValues>>,
-  TError = HTTPValidationError,
->(
-  chipId: string,
-  params?: CompareSeedValuesParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof compareSeedValues>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useCompareSeedValues<TData = Awaited<ReturnType<typeof compareSeedValues>>, TError = HTTPValidationError>(
+ chipId: string,
+    params?: CompareSeedValuesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof compareSeedValues>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof compareSeedValues>>,
           TError,
           Awaited<ReturnType<typeof compareSeedValues>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
-export function useCompareSeedValues<
-  TData = Awaited<ReturnType<typeof compareSeedValues>>,
-  TError = HTTPValidationError,
->(
-  chipId: string,
-  params?: CompareSeedValuesParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof compareSeedValues>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useCompareSeedValues<TData = Awaited<ReturnType<typeof compareSeedValues>>, TError = HTTPValidationError>(
+ chipId: string,
+    params?: CompareSeedValuesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof compareSeedValues>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
 /**
  * @summary Compare YAML seed values with QDash values
  */
 
-export function useCompareSeedValues<
-  TData = Awaited<ReturnType<typeof compareSeedValues>>,
-  TError = HTTPValidationError,
->(
-  chipId: string,
-  params?: CompareSeedValuesParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof compareSeedValues>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
-  const queryOptions = getCompareSeedValuesQueryOptions(
-    chipId,
-    params,
-    options,
-  );
+export function useCompareSeedValues<TData = Awaited<ReturnType<typeof compareSeedValues>>, TError = HTTPValidationError>(
+ chipId: string,
+    params?: CompareSeedValuesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof compareSeedValues>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
 
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData> };
+  const queryOptions = getCompareSeedValuesQueryOptions(chipId,params,options)
 
-  query.queryKey = queryOptions.queryKey;
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey ;
 
   return query;
 }
+
+
 
 /**
  * Manually update calibration parameters for a qubit or coupling.
@@ -748,231 +511,154 @@ The target type (qubit vs coupling) is determined by the qid format:
  * @summary Manually update calibration parameters
  */
 export const updateCalibrationParameters = (
-  manualParameterUpdateRequest: ManualParameterUpdateRequest,
-  options?: SecondParameter<typeof customInstance>,
-) => {
-  return customInstance<ManualParameterUpdateResponse>(
-    {
-      url: `/calibrations/parameters`,
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      data: manualParameterUpdateRequest,
+    manualParameterUpdateRequest: ManualParameterUpdateRequest,
+ options?: SecondParameter<typeof customInstance>,) => {
+      
+      
+      return customInstance<ManualParameterUpdateResponse>(
+      {url: `/calibrations/parameters`, method: 'PATCH',
+      headers: {'Content-Type': 'application/json', },
+      data: manualParameterUpdateRequest
     },
-    options,
-  );
-};
+      options);
+    }
+  
 
-export const getUpdateCalibrationParametersMutationOptions = <
-  TError = HTTPValidationError,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof updateCalibrationParameters>>,
-    TError,
-    { data: ManualParameterUpdateRequest },
-    TContext
-  >;
-  request?: SecondParameter<typeof customInstance>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof updateCalibrationParameters>>,
-  TError,
-  { data: ManualParameterUpdateRequest },
-  TContext
-> => {
-  const mutationKey = ["updateCalibrationParameters"];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      "mutationKey" in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
 
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof updateCalibrationParameters>>,
-    { data: ManualParameterUpdateRequest }
-  > = (props) => {
-    const { data } = props ?? {};
+export const getUpdateCalibrationParametersMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateCalibrationParameters>>, TError,{data: ManualParameterUpdateRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateCalibrationParameters>>, TError,{data: ManualParameterUpdateRequest}, TContext> => {
 
-    return updateCalibrationParameters(data, requestOptions);
-  };
+const mutationKey = ['updateCalibrationParameters'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
 
-  return { mutationFn, ...mutationOptions };
-};
+      
 
-export type UpdateCalibrationParametersMutationResult = NonNullable<
-  Awaited<ReturnType<typeof updateCalibrationParameters>>
->;
-export type UpdateCalibrationParametersMutationBody =
-  ManualParameterUpdateRequest;
-export type UpdateCalibrationParametersMutationError = HTTPValidationError;
 
-/**
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateCalibrationParameters>>, {data: ManualParameterUpdateRequest}> = (props) => {
+          const {data} = props ?? {};
+
+          return  updateCalibrationParameters(data,requestOptions)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateCalibrationParametersMutationResult = NonNullable<Awaited<ReturnType<typeof updateCalibrationParameters>>>
+    export type UpdateCalibrationParametersMutationBody = ManualParameterUpdateRequest
+    export type UpdateCalibrationParametersMutationError = HTTPValidationError
+
+    /**
  * @summary Manually update calibration parameters
  */
-export const useUpdateCalibrationParameters = <
-  TError = HTTPValidationError,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof updateCalibrationParameters>>,
-      TError,
-      { data: ManualParameterUpdateRequest },
-      TContext
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof updateCalibrationParameters>>,
-  TError,
-  { data: ManualParameterUpdateRequest },
-  TContext
-> => {
-  const mutationOptions =
-    getUpdateCalibrationParametersMutationOptions(options);
+export const useUpdateCalibrationParameters = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateCalibrationParameters>>, TError,{data: ManualParameterUpdateRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof updateCalibrationParameters>>,
+        TError,
+        {data: ManualParameterUpdateRequest},
+        TContext
+      > => {
 
-  return useMutation(mutationOptions, queryClient);
-};
-/**
+      const mutationOptions = getUpdateCalibrationParametersMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    /**
  * Get the most recent manual edit for each parameter of a qid.
  * @summary Get manual edits for a qubit or coupling
  */
 export const getManualEdits = (
-  qid: string,
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
+    qid: string,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  return customInstance<ManualEditsResponse>(
-    { url: `/calibrations/manual-edits/${qid}`, method: "GET", signal },
-    options,
-  );
-};
+      
+      
+      return customInstance<ManualEditsResponse>(
+      {url: `/calibrations/manual-edits/${qid}`, method: 'GET', signal
+    },
+      options);
+    }
+  
 
-export const getGetManualEditsQueryKey = (qid?: string) => {
-  return [`/calibrations/manual-edits/${qid}`] as const;
-};
 
-export const getGetManualEditsQueryOptions = <
-  TData = Awaited<ReturnType<typeof getManualEdits>>,
-  TError = HTTPValidationError,
->(
-  qid: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof getManualEdits>>, TError, TData>
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
+
+export const getGetManualEditsQueryKey = (qid?: string,) => {
+    return [
+    `/calibrations/manual-edits/${qid}`
+    ] as const;
+    }
+
+    
+export const getGetManualEditsQueryOptions = <TData = Awaited<ReturnType<typeof getManualEdits>>, TError = HTTPValidationError>(qid: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getManualEdits>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey = queryOptions?.queryKey ?? getGetManualEditsQueryKey(qid);
+const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof getManualEdits>>> = ({
-    signal,
-  }) => getManualEdits(qid, requestOptions, signal);
+  const queryKey =  queryOptions?.queryKey ?? getGetManualEditsQueryKey(qid);
 
-  return {
-    queryKey,
-    queryFn,
-    enabled: !!qid,
-    ...queryOptions,
-  } as UseQueryOptions<
-    Awaited<ReturnType<typeof getManualEdits>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData> };
-};
+  
 
-export type GetManualEditsQueryResult = NonNullable<
-  Awaited<ReturnType<typeof getManualEdits>>
->;
-export type GetManualEditsQueryError = HTTPValidationError;
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getManualEdits>>> = ({ signal }) => getManualEdits(qid, requestOptions, signal);
 
-export function useGetManualEdits<
-  TData = Awaited<ReturnType<typeof getManualEdits>>,
-  TError = HTTPValidationError,
->(
-  qid: string,
-  options: {
-    query: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof getManualEdits>>, TError, TData>
-    > &
-      Pick<
+      
+
+      
+
+   return  { queryKey, queryFn, enabled: !!(qid), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getManualEdits>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+}
+
+export type GetManualEditsQueryResult = NonNullable<Awaited<ReturnType<typeof getManualEdits>>>
+export type GetManualEditsQueryError = HTTPValidationError
+
+
+export function useGetManualEdits<TData = Awaited<ReturnType<typeof getManualEdits>>, TError = HTTPValidationError>(
+ qid: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getManualEdits>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getManualEdits>>,
           TError,
           Awaited<ReturnType<typeof getManualEdits>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData>;
-};
-export function useGetManualEdits<
-  TData = Awaited<ReturnType<typeof getManualEdits>>,
-  TError = HTTPValidationError,
->(
-  qid: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof getManualEdits>>, TError, TData>
-    > &
-      Pick<
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useGetManualEdits<TData = Awaited<ReturnType<typeof getManualEdits>>, TError = HTTPValidationError>(
+ qid: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getManualEdits>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getManualEdits>>,
           TError,
           Awaited<ReturnType<typeof getManualEdits>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
-export function useGetManualEdits<
-  TData = Awaited<ReturnType<typeof getManualEdits>>,
-  TError = HTTPValidationError,
->(
-  qid: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof getManualEdits>>, TError, TData>
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useGetManualEdits<TData = Awaited<ReturnType<typeof getManualEdits>>, TError = HTTPValidationError>(
+ qid: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getManualEdits>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
 /**
  * @summary Get manual edits for a qubit or coupling
  */
 
-export function useGetManualEdits<
-  TData = Awaited<ReturnType<typeof getManualEdits>>,
-  TError = HTTPValidationError,
->(
-  qid: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof getManualEdits>>, TError, TData>
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
-  const queryOptions = getGetManualEditsQueryOptions(qid, options);
+export function useGetManualEdits<TData = Awaited<ReturnType<typeof getManualEdits>>, TError = HTTPValidationError>(
+ qid: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getManualEdits>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
 
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData> };
+  const queryOptions = getGetManualEditsQueryOptions(qid,options)
 
-  query.queryKey = queryOptions.queryKey;
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey ;
 
   return query;
 }
+
+
+

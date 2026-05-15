@@ -5,7 +5,10 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import { useMutation, useQuery } from "@tanstack/react-query";
+import {
+  useMutation,
+  useQuery
+} from '@tanstack/react-query';
 import type {
   DataTag,
   DefinedInitialDataOptions,
@@ -18,296 +21,185 @@ import type {
   UseMutationOptions,
   UseMutationResult,
   UseQueryOptions,
-  UseQueryResult,
-} from "@tanstack/react-query";
+  UseQueryResult
+} from '@tanstack/react-query';
 
 import type {
   CooldownWiringCheckpointRequest,
   CooldownWiringEventResponse,
   HTTPValidationError,
   ListCooldownWiringEventsParams,
-  ListCooldownWiringEventsResponse,
-} from "../../schemas";
+  ListCooldownWiringEventsResponse
+} from '../../schemas';
 
-import { customInstance } from "../../lib/custom-instance";
+import { customInstance } from '../../lib/custom-instance';
+
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
+
+
 
 /**
  * @summary Record a wiring change checkpoint within a cool-down
  */
 export const createCooldownWiringCheckpoint = (
-  cooldownId: string,
-  cooldownWiringCheckpointRequest: CooldownWiringCheckpointRequest,
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
+    cooldownId: string,
+    cooldownWiringCheckpointRequest: CooldownWiringCheckpointRequest,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  return customInstance<CooldownWiringEventResponse>(
-    {
-      url: `/cooldowns/${cooldownId}/wiring-checkpoint`,
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      data: cooldownWiringCheckpointRequest,
-      signal,
+      
+      
+      return customInstance<CooldownWiringEventResponse>(
+      {url: `/cooldowns/${cooldownId}/wiring-checkpoint`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: cooldownWiringCheckpointRequest, signal
     },
-    options,
-  );
-};
+      options);
+    }
+  
 
-export const getCreateCooldownWiringCheckpointMutationOptions = <
-  TError = HTTPValidationError,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof createCooldownWiringCheckpoint>>,
-    TError,
-    { cooldownId: string; data: CooldownWiringCheckpointRequest },
-    TContext
-  >;
-  request?: SecondParameter<typeof customInstance>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof createCooldownWiringCheckpoint>>,
-  TError,
-  { cooldownId: string; data: CooldownWiringCheckpointRequest },
-  TContext
-> => {
-  const mutationKey = ["createCooldownWiringCheckpoint"];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      "mutationKey" in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
 
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof createCooldownWiringCheckpoint>>,
-    { cooldownId: string; data: CooldownWiringCheckpointRequest }
-  > = (props) => {
-    const { cooldownId, data } = props ?? {};
+export const getCreateCooldownWiringCheckpointMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createCooldownWiringCheckpoint>>, TError,{cooldownId: string;data: CooldownWiringCheckpointRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof createCooldownWiringCheckpoint>>, TError,{cooldownId: string;data: CooldownWiringCheckpointRequest}, TContext> => {
 
-    return createCooldownWiringCheckpoint(cooldownId, data, requestOptions);
-  };
+const mutationKey = ['createCooldownWiringCheckpoint'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
 
-  return { mutationFn, ...mutationOptions };
-};
+      
 
-export type CreateCooldownWiringCheckpointMutationResult = NonNullable<
-  Awaited<ReturnType<typeof createCooldownWiringCheckpoint>>
->;
-export type CreateCooldownWiringCheckpointMutationBody =
-  CooldownWiringCheckpointRequest;
-export type CreateCooldownWiringCheckpointMutationError = HTTPValidationError;
 
-/**
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createCooldownWiringCheckpoint>>, {cooldownId: string;data: CooldownWiringCheckpointRequest}> = (props) => {
+          const {cooldownId,data} = props ?? {};
+
+          return  createCooldownWiringCheckpoint(cooldownId,data,requestOptions)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateCooldownWiringCheckpointMutationResult = NonNullable<Awaited<ReturnType<typeof createCooldownWiringCheckpoint>>>
+    export type CreateCooldownWiringCheckpointMutationBody = CooldownWiringCheckpointRequest
+    export type CreateCooldownWiringCheckpointMutationError = HTTPValidationError
+
+    /**
  * @summary Record a wiring change checkpoint within a cool-down
  */
-export const useCreateCooldownWiringCheckpoint = <
-  TError = HTTPValidationError,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof createCooldownWiringCheckpoint>>,
-      TError,
-      { cooldownId: string; data: CooldownWiringCheckpointRequest },
-      TContext
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof createCooldownWiringCheckpoint>>,
-  TError,
-  { cooldownId: string; data: CooldownWiringCheckpointRequest },
-  TContext
-> => {
-  const mutationOptions =
-    getCreateCooldownWiringCheckpointMutationOptions(options);
+export const useCreateCooldownWiringCheckpoint = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createCooldownWiringCheckpoint>>, TError,{cooldownId: string;data: CooldownWiringCheckpointRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof createCooldownWiringCheckpoint>>,
+        TError,
+        {cooldownId: string;data: CooldownWiringCheckpointRequest},
+        TContext
+      > => {
 
-  return useMutation(mutationOptions, queryClient);
-};
-/**
+      const mutationOptions = getCreateCooldownWiringCheckpointMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    /**
  * @summary List wiring change history for a cool-down
  */
 export const listCooldownWiringEvents = (
-  cooldownId: string,
-  params?: ListCooldownWiringEventsParams,
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
+    cooldownId: string,
+    params?: ListCooldownWiringEventsParams,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  return customInstance<ListCooldownWiringEventsResponse>(
-    {
-      url: `/cooldowns/${cooldownId}/wiring-events`,
-      method: "GET",
-      params,
-      signal,
+      
+      
+      return customInstance<ListCooldownWiringEventsResponse>(
+      {url: `/cooldowns/${cooldownId}/wiring-events`, method: 'GET',
+        params, signal
     },
-    options,
-  );
-};
+      options);
+    }
+  
 
-export const getListCooldownWiringEventsQueryKey = (
-  cooldownId?: string,
-  params?: ListCooldownWiringEventsParams,
+
+
+export const getListCooldownWiringEventsQueryKey = (cooldownId?: string,
+    params?: ListCooldownWiringEventsParams,) => {
+    return [
+    `/cooldowns/${cooldownId}/wiring-events`, ...(params ? [params]: [])
+    ] as const;
+    }
+
+    
+export const getListCooldownWiringEventsQueryOptions = <TData = Awaited<ReturnType<typeof listCooldownWiringEvents>>, TError = HTTPValidationError>(cooldownId: string,
+    params?: ListCooldownWiringEventsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listCooldownWiringEvents>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
-  return [
-    `/cooldowns/${cooldownId}/wiring-events`,
-    ...(params ? [params] : []),
-  ] as const;
-};
 
-export const getListCooldownWiringEventsQueryOptions = <
-  TData = Awaited<ReturnType<typeof listCooldownWiringEvents>>,
-  TError = HTTPValidationError,
->(
-  cooldownId: string,
-  params?: ListCooldownWiringEventsParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof listCooldownWiringEvents>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
+const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =
-    queryOptions?.queryKey ??
-    getListCooldownWiringEventsQueryKey(cooldownId, params);
+  const queryKey =  queryOptions?.queryKey ?? getListCooldownWiringEventsQueryKey(cooldownId,params);
 
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof listCooldownWiringEvents>>
-  > = ({ signal }) =>
-    listCooldownWiringEvents(cooldownId, params, requestOptions, signal);
+  
 
-  return {
-    queryKey,
-    queryFn,
-    enabled: !!cooldownId,
-    ...queryOptions,
-  } as UseQueryOptions<
-    Awaited<ReturnType<typeof listCooldownWiringEvents>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData> };
-};
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listCooldownWiringEvents>>> = ({ signal }) => listCooldownWiringEvents(cooldownId,params, requestOptions, signal);
 
-export type ListCooldownWiringEventsQueryResult = NonNullable<
-  Awaited<ReturnType<typeof listCooldownWiringEvents>>
->;
-export type ListCooldownWiringEventsQueryError = HTTPValidationError;
+      
 
-export function useListCooldownWiringEvents<
-  TData = Awaited<ReturnType<typeof listCooldownWiringEvents>>,
-  TError = HTTPValidationError,
->(
-  cooldownId: string,
-  params: undefined | ListCooldownWiringEventsParams,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof listCooldownWiringEvents>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
+      
+
+   return  { queryKey, queryFn, enabled: !!(cooldownId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listCooldownWiringEvents>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+}
+
+export type ListCooldownWiringEventsQueryResult = NonNullable<Awaited<ReturnType<typeof listCooldownWiringEvents>>>
+export type ListCooldownWiringEventsQueryError = HTTPValidationError
+
+
+export function useListCooldownWiringEvents<TData = Awaited<ReturnType<typeof listCooldownWiringEvents>>, TError = HTTPValidationError>(
+ cooldownId: string,
+    params: undefined |  ListCooldownWiringEventsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listCooldownWiringEvents>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof listCooldownWiringEvents>>,
           TError,
           Awaited<ReturnType<typeof listCooldownWiringEvents>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData>;
-};
-export function useListCooldownWiringEvents<
-  TData = Awaited<ReturnType<typeof listCooldownWiringEvents>>,
-  TError = HTTPValidationError,
->(
-  cooldownId: string,
-  params?: ListCooldownWiringEventsParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof listCooldownWiringEvents>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useListCooldownWiringEvents<TData = Awaited<ReturnType<typeof listCooldownWiringEvents>>, TError = HTTPValidationError>(
+ cooldownId: string,
+    params?: ListCooldownWiringEventsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listCooldownWiringEvents>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof listCooldownWiringEvents>>,
           TError,
           Awaited<ReturnType<typeof listCooldownWiringEvents>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
-export function useListCooldownWiringEvents<
-  TData = Awaited<ReturnType<typeof listCooldownWiringEvents>>,
-  TError = HTTPValidationError,
->(
-  cooldownId: string,
-  params?: ListCooldownWiringEventsParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof listCooldownWiringEvents>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useListCooldownWiringEvents<TData = Awaited<ReturnType<typeof listCooldownWiringEvents>>, TError = HTTPValidationError>(
+ cooldownId: string,
+    params?: ListCooldownWiringEventsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listCooldownWiringEvents>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
 /**
  * @summary List wiring change history for a cool-down
  */
 
-export function useListCooldownWiringEvents<
-  TData = Awaited<ReturnType<typeof listCooldownWiringEvents>>,
-  TError = HTTPValidationError,
->(
-  cooldownId: string,
-  params?: ListCooldownWiringEventsParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof listCooldownWiringEvents>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
-  const queryOptions = getListCooldownWiringEventsQueryOptions(
-    cooldownId,
-    params,
-    options,
-  );
+export function useListCooldownWiringEvents<TData = Awaited<ReturnType<typeof listCooldownWiringEvents>>, TError = HTTPValidationError>(
+ cooldownId: string,
+    params?: ListCooldownWiringEventsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listCooldownWiringEvents>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
 
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData> };
+  const queryOptions = getListCooldownWiringEventsQueryOptions(cooldownId,params,options)
 
-  query.queryKey = queryOptions.queryKey;
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey ;
 
   return query;
 }
+
+
+

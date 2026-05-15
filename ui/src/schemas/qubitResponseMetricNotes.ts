@@ -5,6 +5,6 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { NoteModel } from "./noteModel";
+import type { NoteModel } from './noteModel';
 
-export type QubitResponseMetricNotes = { [key: string]: NoteModel };
+export type QubitResponseMetricNotes = {[key: string]: NoteModel};

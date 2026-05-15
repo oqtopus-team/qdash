@@ -5,9 +5,9 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { TaskResultExcludeResponseExcludedByUserId } from "./taskResultExcludeResponseExcludedByUserId";
-import type { TaskResultExcludeResponseExcludedBy } from "./taskResultExcludeResponseExcludedBy";
-import type { TaskResultExcludeResponseExcludedAt } from "./taskResultExcludeResponseExcludedAt";
+import type { TaskResultExcludeResponseExcludedByUserId } from './taskResultExcludeResponseExcludedByUserId';
+import type { TaskResultExcludeResponseExcludedBy } from './taskResultExcludeResponseExcludedBy';
+import type { TaskResultExcludeResponseExcludedAt } from './taskResultExcludeResponseExcludedAt';
 
 /**
  * Response after toggling exclusion on a task result.

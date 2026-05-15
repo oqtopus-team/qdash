@@ -7,12 +7,12 @@
  */
 
 export type GetCouplingTaskHistoryParams = {
-  /**
-   * Chip ID
-   */
-  chip_id: string;
-  /**
-   * Task name
-   */
-  task: string;
+/**
+ * Chip ID
+ */
+chip_id: string;
+/**
+ * Task name
+ */
+task: string;
 };

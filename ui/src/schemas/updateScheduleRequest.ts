@@ -5,8 +5,8 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { UpdateScheduleRequestCron } from "./updateScheduleRequestCron";
-import type { UpdateScheduleRequestParameters } from "./updateScheduleRequestParameters";
+import type { UpdateScheduleRequestCron } from './updateScheduleRequestCron';
+import type { UpdateScheduleRequestParameters } from './updateScheduleRequestParameters';
 
 /**
  * Request to update a schedule.

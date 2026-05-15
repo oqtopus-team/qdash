@@ -5,8 +5,8 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { ReanalyzeResponseFigure } from "./reanalyzeResponseFigure";
-import type { ReanalyzeOutputParameter } from "./reanalyzeOutputParameter";
+import type { ReanalyzeResponseFigure } from './reanalyzeResponseFigure';
+import type { ReanalyzeOutputParameter } from './reanalyzeOutputParameter';
 
 /**
  * Preview response from a reanalyze endpoint.

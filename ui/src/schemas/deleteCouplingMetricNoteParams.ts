@@ -7,16 +7,16 @@
  */
 
 export type DeleteCouplingMetricNoteParams = {
-  /**
-   * Optional explicit cool-down scope identifier
-   */
-  cooldown_id?: string | null;
-  /**
-   * Optional time-range scope start
-   */
-  start_at?: string | null;
-  /**
-   * Optional time-range scope end
-   */
-  end_at?: string | null;
+/**
+ * Optional explicit cool-down scope identifier
+ */
+cooldown_id?: string | null;
+/**
+ * Optional time-range scope start
+ */
+start_at?: string | null;
+/**
+ * Optional time-range scope end
+ */
+end_at?: string | null;
 };

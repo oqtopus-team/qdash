@@ -7,8 +7,8 @@
  */
 
 export type DeleteChipParams = {
-  /**
-   * If true, also delete the chip's qubits and couplings (history retained for audit).
-   */
-  force?: boolean;
+/**
+ * If true, also delete the chip's qubits and couplings (history retained for audit).
+ */
+force?: boolean;
 };

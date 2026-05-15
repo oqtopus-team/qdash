@@ -5,7 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { CryostatResponse } from "./cryostatResponse";
+import type { CryostatResponse } from './cryostatResponse';
 
 export interface ListCryostatsResponse {
   cryostats: CryostatResponse[];

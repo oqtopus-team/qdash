@@ -5,7 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { CooldownResponse } from "./cooldownResponse";
+import type { CooldownResponse } from './cooldownResponse';
 
 export interface ListCooldownsResponse {
   cooldowns: CooldownResponse[];

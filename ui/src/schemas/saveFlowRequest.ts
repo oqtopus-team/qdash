@@ -5,9 +5,9 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { SaveFlowRequestFlowFunctionName } from "./saveFlowRequestFlowFunctionName";
-import type { SaveFlowRequestDefaultParameters } from "./saveFlowRequestDefaultParameters";
-import type { SaveFlowRequestDefaultRunParameters } from "./saveFlowRequestDefaultRunParameters";
+import type { SaveFlowRequestFlowFunctionName } from './saveFlowRequestFlowFunctionName';
+import type { SaveFlowRequestDefaultParameters } from './saveFlowRequestDefaultParameters';
+import type { SaveFlowRequestDefaultRunParameters } from './saveFlowRequestDefaultRunParameters';
 
 /**
  * Request to save a Flow.

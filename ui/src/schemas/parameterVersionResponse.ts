@@ -5,9 +5,9 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { ParameterVersionResponseValue } from "./parameterVersionResponseValue";
-import type { ParameterVersionResponseValidFrom } from "./parameterVersionResponseValidFrom";
-import type { ParameterVersionResponseValidUntil } from "./parameterVersionResponseValidUntil";
+import type { ParameterVersionResponseValue } from './parameterVersionResponseValue';
+import type { ParameterVersionResponseValidFrom } from './parameterVersionResponseValidFrom';
+import type { ParameterVersionResponseValidUntil } from './parameterVersionResponseValidUntil';
 
 /**
  * Response model for a parameter version (entity).

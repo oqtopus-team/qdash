@@ -7,8 +7,8 @@
  */
 
 export type ListForumCategoriesParams = {
-  /**
-   * Include archived categories
-   */
-  include_archived?: boolean;
+/**
+ * Include archived categories
+ */
+include_archived?: boolean;
 };

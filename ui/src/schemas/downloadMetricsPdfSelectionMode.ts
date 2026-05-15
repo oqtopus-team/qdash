@@ -6,12 +6,12 @@
  * OpenAPI spec version: 0.0.1
  */
 
-export type DownloadMetricsPdfSelectionMode =
-  (typeof DownloadMetricsPdfSelectionMode)[keyof typeof DownloadMetricsPdfSelectionMode];
+export type DownloadMetricsPdfSelectionMode = typeof DownloadMetricsPdfSelectionMode[keyof typeof DownloadMetricsPdfSelectionMode];
+
 
 // eslint-disable-next-line @typescript-eslint/no-redeclare
 export const DownloadMetricsPdfSelectionMode = {
-  latest: "latest",
-  best: "best",
-  average: "average",
+  latest: 'latest',
+  best: 'best',
+  average: 'average',
 } as const;

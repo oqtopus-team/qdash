@@ -5,7 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { FidelityConditionMetric } from "./fidelityConditionMetric";
+import type { FidelityConditionMetric } from './fidelityConditionMetric';
 
 /**
  * Condition for fidelity filtering.

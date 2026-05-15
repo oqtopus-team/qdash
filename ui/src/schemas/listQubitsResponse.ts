@@ -5,7 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { QubitResponse } from "./qubitResponse";
+import type { QubitResponse } from './qubitResponse';
 
 /**
  * Response model for listing qubits with pagination.
