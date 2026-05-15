@@ -26,7 +26,7 @@
   {
     "id": "full_calibration",
     "name": "Full Calibration",
-    "description": "Complete calibration using step-based pipeline: 1Q Check -> 1Q Fine-tune -> Filter -> CR Schedule (forward/reverse) -> 2Q.",
+    "description": "Complete calibration using step-based pipeline: ConfigureAll -> 1Q Check -> 1Q Fine-tune -> Filter -> CR Schedule (forward/reverse) -> 2Q.",
     "category": "production",
     "filename": "full_calibration.py",
     "function_name": "full_calibration"
