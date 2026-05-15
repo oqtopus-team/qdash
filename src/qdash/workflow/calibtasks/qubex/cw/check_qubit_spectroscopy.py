@@ -2,8 +2,8 @@ import copy
 import logging
 from typing import TYPE_CHECKING, Any, ClassVar
 
+from qdash.common.visualization.figure_metadata import set_figure_role
 from qdash.datamodel.task import ParameterModel, RunParameterModel
-from qdash.figure_metadata import set_figure_role
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
     RunResult,

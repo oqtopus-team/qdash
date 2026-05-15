@@ -13,7 +13,7 @@ import numpy as np
 import numpy.typing as npt
 import plotly.graph_objs as go
 
-from qdash.figure_metadata import figure_role_suffix
+from qdash.common.visualization.figure_metadata import figure_role_suffix
 
 logger = logging.getLogger(__name__)
 
