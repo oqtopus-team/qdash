@@ -41,6 +41,31 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+def _normalize_markdown_image_path(path: str) -> str:
+    """Normalize markdown image paths for registry lookup."""
+    path = path.strip()
+    while path.startswith("./"):
+        path = path[2:]
+    return path
+
+
+def _image_media_type(relative_path: str) -> str:
+    """Infer a browser-safe media type for an embedded knowledge image."""
+    suffix = relative_path.rsplit(".", 1)[-1].lower() if "." in relative_path else "png"
+    if suffix in {"jpg", "jpeg"}:
+        return "image/jpeg"
+    if suffix == "gif":
+        return "image/gif"
+    if suffix == "webp":
+        return "image/webp"
+    return "image/png"
+
+
+def _image_markdown(alt_text: str, relative_path: str, base64_data: str) -> str:
+    media_type = _image_media_type(relative_path)
+    return f"![{alt_text}](data:{media_type};base64,{base64_data})"
+
+
 class TaskService:
     """Service for task definition and result operations."""
 
@@ -181,39 +206,77 @@ class TaskService:
         knowledge_dir = ConfigLoader.get_config_dir() / "task-knowledge"
         md_path = knowledge_dir / knowledge.category / task_name / "index.md"
 
-        if not md_path.is_file():
-            raise HTTPException(
-                status_code=404,
-                detail=f"Markdown file not found for '{task_name}'",
-            )
+        content = md_path.read_text(encoding="utf-8") if md_path.is_file() else knowledge.to_prompt()
 
-        content = md_path.read_text(encoding="utf-8")
-
-        # Build a lookup of relative_path -> base64_data from the registry
+        # Build a lookup of relative_path -> image metadata from the registry.
         img_map: dict[str, str] = {}
         for img in knowledge.images:
             if img.base64_data:
+                img_map[_normalize_markdown_image_path(img.relative_path)] = img.base64_data
                 img_map[img.relative_path] = img.base64_data
+        for case in knowledge.cases:
+            for img in case.images:
+                if img.base64_data:
+                    img_map[_normalize_markdown_image_path(img.relative_path)] = img.base64_data
+                    img_map[img.relative_path] = img.base64_data
 
-        # Replace ![alt](relative_path) with ![alt](data:image/png;base64,...)
+        embedded_paths: set[str] = set()
+
+        # Replace ![alt](relative_path) with ![alt](data:image/...;base64,...)
         def _replace_img(m: re.Match[str]) -> str:
             alt = m.group(1)
             rel_path = m.group(2)
-            b64 = img_map.get(rel_path)
+            if rel_path.startswith(("data:", "http://", "https://")):
+                return m.group(0)
+            normalized_path = _normalize_markdown_image_path(rel_path)
+            b64 = img_map.get(normalized_path) or img_map.get(rel_path)
             if b64:
-                return f"![{alt}](data:image/png;base64,{b64})"
+                embedded_paths.add(normalized_path)
+                return _image_markdown(alt, rel_path, b64)
             # Try reading the file directly as fallback
             img_path = md_path.parent / rel_path
             if img_path.is_file():
                 try:
                     data = img_path.read_bytes()
                     encoded = base64.b64encode(data).decode("ascii")
-                    return f"![{alt}](data:image/png;base64,{encoded})"
+                    embedded_paths.add(normalized_path)
+                    return _image_markdown(alt, rel_path, encoded)
                 except OSError:
                     pass
             return m.group(0)
 
-        return re.sub(r"!\[([^\]]*)\]\(([^)]+)\)", _replace_img, content)
+        content = re.sub(r"!\[([^\]]*)\]\(([^)]+)\)", _replace_img, content)
+
+        appended_lines: list[str] = []
+        for img in knowledge.images:
+            normalized_path = _normalize_markdown_image_path(img.relative_path)
+            if img.base64_data and normalized_path not in embedded_paths:
+                if not appended_lines:
+                    appended_lines += ["", "## Reference figures"]
+                appended_lines.append(_image_markdown(img.alt_text, img.relative_path, img.base64_data))
+                embedded_paths.add(normalized_path)
+
+        case_lines: list[str] = []
+        for case in knowledge.cases:
+            images = [
+                img
+                for img in case.images
+                if img.base64_data
+                and _normalize_markdown_image_path(img.relative_path) not in embedded_paths
+            ]
+            if not images:
+                continue
+            if not case_lines:
+                case_lines += ["", "## Past case figures"]
+            case_lines += ["", f"### {case.title}"]
+            for img in images:
+                case_lines.append(_image_markdown(img.alt_text, img.relative_path, img.base64_data))
+                embedded_paths.add(_normalize_markdown_image_path(img.relative_path))
+
+        if appended_lines or case_lines:
+            content = content.rstrip() + "\n" + "\n".join(appended_lines + case_lines) + "\n"
+
+        return content
 
     def list_task_knowledge(self) -> ListTaskKnowledgeResponse:
         """List all available task knowledge entries with summary info."""

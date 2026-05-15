@@ -97,6 +97,7 @@ class KnowledgeCaseResponse(BaseModel):
     applicability: str = ""
     counterexample: str = ""
     prompt_guidance: str = ""
+    images: list[KnowledgeImageResponse] = []
     model_config = ConfigDict(protected_namespaces=())
 
 
