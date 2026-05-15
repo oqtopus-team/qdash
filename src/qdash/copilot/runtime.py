@@ -72,6 +72,7 @@ class CopilotRuntime:
             load_neighbor_qubit_params=self._analysis_load_neighbor_qubit_params,
             load_coupling_params=self._analysis_load_coupling_params,
             load_figure_as_base64=self._analysis_load_figure_as_base64,
+            load_figures_as_base64=self._analysis_load_figures_as_base64,
             collect_expected_images=self._analysis_collect_expected_images,
         )
         self._heatmap_loader = ChipHeatmapLoader(
@@ -141,6 +142,10 @@ class CopilotRuntime:
         """Forward figure loading for analysis context assembly."""
         return self.load_figure_as_base64(figure_paths)
 
+    def _analysis_load_figures_as_base64(self, figure_paths: list[str]) -> list[tuple[str, str]]:
+        """Forward target figure loading for analysis context assembly."""
+        return self.load_figures_as_base64(figure_paths)
+
     def _analysis_collect_expected_images(
         self,
         knowledge: Any,
@@ -172,6 +177,10 @@ class CopilotRuntime:
     def load_figure_as_base64(self, figure_paths: list[str]) -> str | None:
         """Read the first existing PNG file from figure_paths and return base64."""
         return self._support_service.load_figure_as_base64(figure_paths)
+
+    def load_figures_as_base64(self, figure_paths: list[str]) -> list[tuple[str, str]]:
+        """Read existing PNG figures and return labeled target images."""
+        return self._support_service.load_figures_as_base64(figure_paths)
 
     def collect_expected_images(
         self,
@@ -447,6 +456,7 @@ class CopilotRuntime:
         figure_paths: list[str],
         expected_images: list[tuple[str, str]],
         task_name: str,
+        experiment_images: list[tuple[str, str]] | None = None,
     ) -> dict[str, Any]:
         """Build the ``images_sent`` metadata dict for analysis responses."""
         return CopilotSupportService.build_images_sent_metadata(
@@ -454,6 +464,7 @@ class CopilotRuntime:
             figure_paths=figure_paths,
             expected_images=expected_images,
             task_name=task_name,
+            experiment_images=experiment_images,
         )
 
     def build_tool_executors(self) -> dict[str, Any]:

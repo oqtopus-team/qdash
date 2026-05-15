@@ -72,14 +72,31 @@ class CopilotSupportService:
 
     def load_figure_as_base64(self, figure_paths: list[str]) -> str | None:
         """Read the first existing PNG file from figure_paths and return base64."""
+        images = self.load_figures_as_base64(figure_paths)
+        return images[0][0] if images else None
+
+    def load_figures_as_base64(self, figure_paths: list[str]) -> list[tuple[str, str]]:
+        """Read existing PNG figures and return labeled target images."""
+        images: list[tuple[str, str]] = []
         for figure_path in figure_paths:
             path = Path(figure_path)
             if path.is_file() and path.suffix.lower() == ".png":
                 if path.stat().st_size > self._max_figure_size:
                     self._logger.warning("Figure %s exceeds 5MB size limit, skipping", figure_path)
                     continue
-                return base64.b64encode(path.read_bytes()).decode("ascii")
-        return None
+                role = self._target_figure_role(path, len(images))
+                images.append((base64.b64encode(path.read_bytes()).decode("ascii"), role))
+        return images
+
+    @staticmethod
+    def _target_figure_role(path: Path, index: int) -> str:
+        """Infer the target figure role from filename suffixes."""
+        stem = path.stem.lower()
+        if "marked" in stem:
+            return "target marked result image; validate heuristic markers against the raw signal"
+        if "raw" in stem:
+            return "target raw result image; inspect the measured signal without overlays"
+        return f"target supporting result image {index + 1}"
 
     @staticmethod
     def collect_expected_images(
@@ -134,11 +151,15 @@ class CopilotSupportService:
         figure_paths: list[str],
         expected_images: list[tuple[str, str]],
         task_name: str,
+        experiment_images: list[tuple[str, str]] | None = None,
     ) -> dict[str, Any]:
         """Build the ``images_sent`` metadata dict for analysis responses."""
         return {
-            "experiment_figure": bool(image_base64),
-            "experiment_figure_paths": figure_paths if image_base64 else [],
+            "experiment_figure": bool(experiment_images or image_base64),
+            "experiment_figure_paths": figure_paths if experiment_images or image_base64 else [],
+            "experiment_images": [
+                {"alt_text": alt, "index": i} for i, (_, alt) in enumerate(experiment_images or [])
+            ],
             "expected_images": [
                 {"alt_text": alt, "index": i} for i, (_, alt) in enumerate(expected_images)
             ],

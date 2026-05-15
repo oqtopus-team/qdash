@@ -19,6 +19,7 @@ from qdash.analysis.spectroscopy import (
     remove_false_spike_from_figure,
 )
 from qdash.datamodel.task import ParameterModel, RunParameterModel
+from qdash.figure_metadata import set_figure_role
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
     RunResult,
@@ -273,6 +274,9 @@ class CheckResonatorSpectroscopy(QubexTask):
             )
 
         # Return both raw and marked figures
+        set_figure_role(raw_fig, "raw")
+        if marked_fig is not None:
+            set_figure_role(marked_fig, "marked")
         figures: list[go.Figure] = [raw_fig]
         if marked_fig is not None:
             figures.append(marked_fig)

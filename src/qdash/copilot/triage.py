@@ -144,6 +144,7 @@ def render_ai_triage_markdown(
             config=config,
             image_base64=context_bundle.image_base64,
             expected_images=context_bundle.expected_images,
+            experiment_images=context_bundle.experiment_images,
             conversation_history=[],
             tool_executors=None,
         )

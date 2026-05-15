@@ -7,6 +7,7 @@ import numpy as np
 import plotly.graph_objs as go
 import pytest
 
+from qdash.figure_metadata import set_figure_role
 from qdash.repository.filesystem import FilesystemCalibDataSaver
 
 
@@ -43,6 +44,20 @@ class TestFilesystemCalibDataSaver:
 
         assert len(png_paths) == 2
         assert len(json_paths) == 2
+
+    def test_save_figures_uses_figure_role_suffix(self, saver):
+        """Test save_figures includes raw/marked role suffixes when provided."""
+        figs = [
+            set_figure_role(go.Figure(data=[go.Scatter(x=[1], y=[2])]), "raw"),
+            set_figure_role(go.Figure(data=[go.Scatter(x=[3], y=[4])]), "marked"),
+        ]
+
+        png_paths, json_paths = saver.save_figures(figs, "CheckQubitSpectroscopy", "qubit", "2")
+
+        assert Path(png_paths[0]).name == "CheckQubitSpectroscopy_2_raw_0.png"
+        assert Path(png_paths[1]).name == "CheckQubitSpectroscopy_2_marked_1.png"
+        assert Path(json_paths[0]).name == "CheckQubitSpectroscopy_2_raw_0.json"
+        assert Path(json_paths[1]).name == "CheckQubitSpectroscopy_2_marked_1.json"
 
     def test_save_figures_empty_list(self, saver):
         """Test save_figures with empty list returns empty lists."""

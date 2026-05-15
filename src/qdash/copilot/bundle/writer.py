@@ -50,7 +50,10 @@ def write_ai_triage_bundle(
         zf.writestr("copilot_config.json", _json_bytes(runtime_config.model_dump(mode="json")))
         zf.writestr("prompt.txt", prompt_text.rstrip() + "\n")
 
-        if bundle_context.image_base64:
+        if bundle_context.experiment_images:
+            for image in bundle_context.experiment_images:
+                zf.writestr(image.path, _decode_base64(image.base64_data))
+        elif bundle_context.image_base64:
             zf.writestr("experiment_images/00.png", _decode_base64(bundle_context.image_base64))
 
         for image in bundle_context.expected_images:

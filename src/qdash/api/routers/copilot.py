@@ -168,6 +168,7 @@ async def analyze_task_result(
             config=analysis_config,
             image_base64=ctx.image_base64,
             expected_images=ctx.expected_images,
+            experiment_images=ctx.experiment_images,
             conversation_history=request.conversation_history,
             tool_executors=tool_executors,
         )
@@ -176,6 +177,7 @@ async def analyze_task_result(
             ctx.figure_paths,
             ctx.expected_images,
             request.task_name,
+            ctx.experiment_images,
         )
         return result
     except ImportError:
@@ -250,6 +252,7 @@ async def analyze_task_result_stream(
                 config=analysis_config,
                 image_base64=ctx.image_base64,
                 expected_images=ctx.expected_images,
+                experiment_images=ctx.experiment_images,
                 conversation_history=request.conversation_history,
                 tool_executors=tool_executors,
             )
@@ -280,6 +283,7 @@ async def analyze_task_result_stream(
             ctx.figure_paths,
             ctx.expected_images,
             request.task_name,
+            ctx.experiment_images,
         )
 
         # Complete

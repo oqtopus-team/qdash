@@ -88,6 +88,7 @@ class AITriageBundleContext(BaseModel):
 
     context: TaskAnalysisContext
     image_base64: str | None = None
+    experiment_images: list[AITriageImageEntry] = Field(default_factory=list)
     expected_images: list[AITriageImageEntry] = Field(default_factory=list)
     figures: list[AITriageFigureEntry] = Field(default_factory=list)
 
