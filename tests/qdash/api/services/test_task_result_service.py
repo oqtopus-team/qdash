@@ -7,7 +7,6 @@ from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import patch
 
 from qdash.api.routers.dashboard import _load_triaged_task_results
-
 from qdash.api.services.task_result_service import (
     _AI_TRIAGE_IN_FLIGHT_TASK_IDS,
     TaskResultService,

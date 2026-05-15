@@ -2,10 +2,9 @@
 
 from unittest.mock import MagicMock, patch
 
-from qdash.datamodel.note import AiTriageReviewModel, NoteModel
-
 from qdash.copilot.config import AnalysisConfig, CopilotConfig, ModelConfig
 from qdash.datamodel.execution import ExecutionModel, ExecutionStatusModel
+from qdash.datamodel.note import AiTriageReviewModel, NoteModel
 from qdash.datamodel.system_info import SystemInfoModel
 from qdash.datamodel.task import QubitTaskModel, TaskStatusModel
 from qdash.workflow.engine.task.ai_triage import (
