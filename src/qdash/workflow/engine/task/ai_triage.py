@@ -18,6 +18,9 @@ from qdash.copilot.triage import (
     forced_ai_triage_markdown as _shared_forced_ai_triage_markdown,
 )
 from qdash.copilot.triage import (
+    is_non_representative_mux_result as _shared_is_non_representative_mux_result,
+)
+from qdash.copilot.triage import (
     render_ai_triage_markdown as _shared_render_ai_triage_markdown,
 )
 from qdash.copilot.triage import (
@@ -217,6 +220,7 @@ def maybe_attach_ai_triage_note(
         _upsert_ai_triage_note(task, execution_model, markdown, selected_model)
         _log_info("AI triage note saved: task=%s task_id=%s", task.name, task.task_id)
     except Exception as exc:
+        _set_ai_triage_failure(task, execution_model, str(exc))
         _log_warning("AI triage failed for task %s (%s): %s", task.name, task.task_id, exc)
 
 
@@ -271,13 +275,7 @@ def _forced_ai_triage_markdown(task_name: str, output_params: dict[str, object])
 
 def _is_non_representative_mux_result(task: BaseTaskResultModel) -> bool:
     """Return True for copied MUX task results that should not receive AI notes."""
-    if task.name != "CheckResonatorSpectroscopy":
-        return False
-    qid = getattr(task, "qid", "")
-    try:
-        return int(qid) % 4 != 0
-    except (TypeError, ValueError):
-        return False
+    return _shared_is_non_representative_mux_result(task.name, getattr(task, "qid", ""))
 
 
 def _task_status_value(task: BaseTaskResultModel) -> str:
@@ -354,7 +352,7 @@ def _upsert_ai_triage_note(
     else:
         content = triage_section
 
-    _set_task_note_content(task, execution_model, content[:MAX_AI_TRIAGE_NOTE_CHARS])
+    _set_task_note_content(task, execution_model, content[:MAX_AI_TRIAGE_NOTE_CHARS], model)
 
 
 def _get_existing_task_note_content(
@@ -376,11 +374,13 @@ def _set_task_note_content(
     task: BaseTaskResultModel,
     execution_model: ExecutionModel,
     content: str,
+    model: ModelConfig,
 ) -> None:
     """Persist the dashboard-facing task-result note directly on history."""
     from qdash.common.utils.datetime import now
     from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
 
+    timestamp = now()
     doc = TaskResultHistoryDocument.find_one(
         {"project_id": execution_model.project_id, "task_id": task.task_id}
     ).run()
@@ -388,7 +388,32 @@ def _set_task_note_content(
         raise ValueError(f"Task result not found: {task.task_id}")
     doc.user_note.content = content
     doc.user_note.updated_by = AI_TRIAGE_ACTOR
-    doc.user_note.updated_at = now()
+    doc.user_note.updated_at = timestamp
+    doc.ai_triage.status = "completed"
+    doc.ai_triage.model_provider = model.provider
+    doc.ai_triage.model_name = model.name
+    doc.ai_triage.completed_at = timestamp
+    doc.ai_triage.error = ""
+    doc.save()
+
+
+def _set_ai_triage_failure(
+    task: BaseTaskResultModel,
+    execution_model: ExecutionModel,
+    error: str,
+) -> None:
+    """Persist AI triage failure metadata for workflow-triggered reviews."""
+    from qdash.common.utils.datetime import now
+    from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
+
+    doc = TaskResultHistoryDocument.find_one(
+        {"project_id": execution_model.project_id, "task_id": task.task_id}
+    ).run()
+    if doc is None:
+        return
+    doc.ai_triage.status = "failed"
+    doc.ai_triage.completed_at = now()
+    doc.ai_triage.error = error[:500]
     doc.save()
 
 
