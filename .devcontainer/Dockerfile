@@ -2,7 +2,17 @@
 # Stage 1: Base image and system packages
 # Change frequency: Low - Most likely to be cached
 # ========================================
-FROM python:3.11.14-slim-bookworm as base
+ARG TRUFFLEHOG_VERSION=3.95.3
+ARG GITLEAKS_VERSION=v8.30.1
+ARG LEFTHOOK_VERSION=2.1.6
+ARG UV_VERSION=0.11.11
+ARG BUN_VERSION=1.3.14
+ARG CODEX_VERSION=0.130.0
+
+FROM ghcr.io/gitleaks/gitleaks:${GITLEAKS_VERSION} AS gitleaks-bin
+FROM ghcr.io/astral-sh/uv:${UV_VERSION} AS uv-bin
+FROM oven/bun:${BUN_VERSION} AS bun-bin
+FROM python:3.11.14-slim-bookworm AS base
 
 # Install system packages by category
 # Docker CLI + compose plugin (Docker official installation)
@@ -51,8 +61,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     jq \
     unzip \
     sudo \
-    fzf \
     && rm -rf /var/lib/apt/lists/*
+
+ARG USERNAME=vscode
+ARG USER_UID=1000
+ARG USER_GID=${USER_UID}
+RUN groupadd --gid ${USER_GID} ${USERNAME} \
+    && useradd --uid ${USER_UID} --gid ${USER_GID} -m -s /bin/bash ${USERNAME} \
+    && echo "${USERNAME} ALL=(root) NOPASSWD:ALL" > /etc/sudoers.d/${USERNAME} \
+    && chmod 0440 /etc/sudoers.d/${USERNAME}
 
 # 3.1 GitHub CLI
 RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
@@ -64,19 +81,19 @@ RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
     && apt-get install -y --no-install-recommends gh \
     && rm -rf /var/lib/apt/lists/*
 
+ARG TRUFFLEHOG_VERSION
+ARG GITLEAKS_VERSION
+ARG LEFTHOOK_VERSION
+
 # 3.2 Secret scanning tools (gitleaks + trufflehog) and git hooks manager (lefthook)
-# All three tools resolve to the upstream latest release at image build time:
-#   - trufflehog: official install.sh with no tag arg -> fetches /releases/latest
-#   - lefthook:   official Cloudsmith apt repository (apt picks latest)
-#   - gitleaks:   upstream multi-arch container `:latest` tag (BuildKit resolves arch)
 RUN curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh \
-      | sh -s -- -b /usr/local/bin
+      | sh -s -- -b /usr/local/bin "v${TRUFFLEHOG_VERSION}"
 
 RUN curl -1sLf 'https://dl.cloudsmith.io/public/evilmartians/lefthook/setup.deb.sh' | bash \
-    && apt-get install -y --no-install-recommends lefthook \
+    && apt-get install -y --no-install-recommends "lefthook=${LEFTHOOK_VERSION}" \
     && rm -rf /var/lib/apt/lists/*
 
-COPY --from=ghcr.io/gitleaks/gitleaks:latest /usr/bin/gitleaks /usr/local/bin/gitleaks
+COPY --from=gitleaks-bin /usr/bin/gitleaks /usr/local/bin/gitleaks
 
 # 4. Editors and shells (Change frequency: Medium)
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -87,24 +104,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # ========================================
 # Stage 2: Python environment setup
 # ========================================
-FROM base as python-env
-
-# Install pip and uv
-RUN curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py && \
-    python get-pip.py && \
-    rm get-pip.py
-
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+FROM base AS toolchain
+COPY --from=uv-bin /uv /uvx /bin/
 
 WORKDIR /workspace/qdash
-
-# Install Python dependencies (copy only requirements.txt)
-COPY ./.devcontainer/requirements.txt ./requirements.txt
-RUN uv pip install --system --no-cache -r requirements.txt
 # ========================================
 # Stage 3: Node.js environment
 # ========================================
-FROM python-env as node-env
+FROM toolchain AS node-env
 
 ARG NODE_VERSION=20
 RUN curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | bash - && \
@@ -112,68 +119,63 @@ RUN curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | bash - && \
     apt-get clean && rm -rf /var/lib/apt/lists/* && \
     node -v && npm -v
 
-# Install bun
-RUN curl -fsSL https://bun.sh/install | bash
-ENV PATH="/root/.bun/bin:${PATH}"
+# Install bun in a shared location so the non-root dev user can run it.
+ENV BUN_INSTALL=/usr/local/bun
+COPY --from=bun-bin /usr/local/bin/bun /usr/local/bin/bun
+RUN mkdir -p "${BUN_INSTALL}/bin" \
+    && ln -sf /usr/local/bin/bun "${BUN_INSTALL}/bin/bun" \
+    && ln -sf /usr/local/bin/bun "${BUN_INSTALL}/bin/bunx" \
+    && ln -sf "${BUN_INSTALL}/bin/bunx" /usr/local/bin/bunx
+ENV PATH="${BUN_INSTALL}/bin:${PATH}"
 
 # ========================================
-# Stage 4: Pre-install frontend dependencies
-# Copy only package.json and bun.lock first to install dependencies
+# Stage 4: Final image
 # ========================================
-FROM node-env as frontend-deps
-
-WORKDIR /workspace/qdash/ui
-
-# Copy only package.json and bun.lock (cache optimization)
-COPY ./ui/package.json ./package.json
-COPY ./ui/bun.lock ./bun.lock
-
-# Install dependencies
-RUN bun install --frozen-lockfile
-# ========================================
-# Stage 5: Final image
-# ========================================
-FROM node-env as final
+FROM node-env AS final
+ARG CODEX_VERSION
 
 # Set default file permissions (644 for files, 755 for directories)
 # This ensures files created in devcontainer are readable in Docker builds
 RUN echo "umask 022" >> /etc/profile && \
     echo "umask 022" >> /etc/bash.bashrc
 
-# Install Claude Code (native install)
-RUN curl -fsSL https://claude.ai/install.sh | bash
-ENV PATH="/root/.local/bin:${PATH}"
+ENV HOME=/home/vscode
+ENV PATH="/home/vscode/.local/bin:${PATH}"
 
 # Install OpenAI Codex CLI
-RUN npm install -g @openai/codex && \
+RUN npm install -g "@openai/codex@${CODEX_VERSION}" && \
     codex --version
 
-# Configure Zsh (execute last)
+# Configure Zsh.
 ENV SHELL=/bin/zsh
 
-# Install fzf shell integration files
-RUN mkdir -p /usr/share/doc/fzf/examples && \
-    curl -fsSL https://raw.githubusercontent.com/junegunn/fzf/master/shell/key-bindings.zsh -o /usr/share/doc/fzf/examples/key-bindings.zsh && \
-    curl -fsSL https://raw.githubusercontent.com/junegunn/fzf/master/shell/completion.zsh -o /usr/share/doc/fzf/examples/completion.zsh && \
-    curl -fsSL https://raw.githubusercontent.com/junegunn/fzf/master/shell/key-bindings.bash -o /usr/share/doc/fzf/examples/key-bindings.bash && \
-    curl -fsSL https://raw.githubusercontent.com/junegunn/fzf/master/shell/completion.bash -o /usr/share/doc/fzf/examples/completion.bash
+# Setup workspace and cache directories.
+RUN mkdir -p \
+        /workspace/qdash/ui \
+        /commandhistory \
+        /home/vscode/.cache/pip \
+        /home/vscode/.cache/uv \
+        /home/vscode/.claude \
+        /home/vscode/.codex \
+        /home/vscode/.vscode-server/extensions \
+    && touch /workspace/qdash/ui/.bunfig.toml \
+    && touch /home/vscode/.bashrc /home/vscode/.zshrc \
+    && echo 'export PATH="$HOME/.local/bin:$PATH"' >> /home/vscode/.bashrc \
+    && echo 'export PATH="$HOME/.local/bin:$PATH"' >> /home/vscode/.zshrc \
+    && echo 'export HISTFILE=/commandhistory/.zsh_history' >> /home/vscode/.zshrc \
+    && echo 'setopt APPEND_HISTORY' >> /home/vscode/.zshrc \
+    && echo 'setopt HIST_IGNORE_DUPS' >> /home/vscode/.zshrc \
+    && chsh -s /bin/zsh vscode \
+    && chown -R vscode:vscode /workspace /commandhistory /home/vscode
 
-ARG ZSH_IN_DOCKER_VERSION=1.2.0
-RUN sh -c "$(wget -O- https://github.com/deluan/zsh-in-docker/releases/download/v${ZSH_IN_DOCKER_VERSION}/zsh-in-docker.sh)" -- \
-    -p git \
-    -p fzf \
-    -a "export FZF_BASE=/usr/bin" \
-    -a "export PROMPT_COMMAND='history -a' && export HISTFILE=/commandhistory/.bash_history" \
-    -a "umask 022" \
-    -x
-
-# Setup node_modules cache directory
-# This will be used by postCreateCommand
-RUN mkdir -p /workspace/qdash/ui && \
-    touch /workspace/qdash/ui/.bunfig.toml
-
-# Copy frontend dependencies to correct location
-# This pre-populates node_modules before volume mount
-COPY --from=frontend-deps /workspace/qdash/ui/node_modules /workspace/qdash/ui/node_modules
+COPY ./.devcontainer/update-docker-socket-group.sh /usr/local/bin/update-docker-socket-group
+COPY ./.devcontainer/start-container.sh /usr/local/bin/start-container
+COPY ./.devcontainer/post-create.sh /usr/local/bin/qdash-post-create
+COPY ./.devcontainer/post-start.sh /usr/local/bin/qdash-post-start
+RUN chmod 0755 \
+        /usr/local/bin/update-docker-socket-group \
+        /usr/local/bin/start-container \
+        /usr/local/bin/qdash-post-create \
+        /usr/local/bin/qdash-post-start
 
 WORKDIR /workspace/qdash

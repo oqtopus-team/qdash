@@ -7,7 +7,7 @@
 | Tool                                                       | Version | Description                              |
 | ---------------------------------------------------------- | ------- | ---------------------------------------- |
 | [Docker](https://docs.docker.com/get-docker/)              | -       | Container virtualization platform        |
-| [Docker Compose](https://docs.docker.com/compose/install/) | v2+     | Management of multiple Docker containers |
+| [Docker Compose](https://docs.docker.com/compose/install/) | v2.24+  | Management of multiple Docker containers |
 | [go-task](https://taskfile.dev/installation/)              | v3.41+  | Task runner for development commands     |
 | [uv](https://docs.astral.sh/uv/)                           | -       | Python package manager                   |
 
@@ -50,22 +50,27 @@ The recommended way to develop is using the DevContainer:
 docker compose -f compose.devcontainer.yaml up -d
 ```
 
+The DevContainer can start without a local `.env`; Docker Compose uses `.env` when present.
+The container mounts `/var/run/docker.sock` so devcontainer users can run the local Docker
+Compose tasks from inside the workspace. User-level tools installed under `/home/vscode/.local`
+and Claude Code configuration under `/home/vscode/.claude` are persisted in Docker volumes, so
+they survive container rebuilds.
+
 Then attach to the container using VS Code's DevContainer extension or:
 
 ```shell
-docker compose -f compose.devcontainer.yaml exec devcontainer bash
+docker compose -f compose.devcontainer.yaml exec --user vscode devcontainer zsh
 ```
 
 ### Install Dependencies
 
-Inside the devcontainer:
+The DevContainer installs Python, frontend, and Lefthook dependencies automatically during
+creation. To refresh dependencies manually, run:
 
 ```shell
-# Install Python dependencies
-pip install -e .
+uv sync --all-groups
 
-# Install frontend dependencies
-cd ui && bun install
+cd ui && bun install --frozen-lockfile
 ```
 
 ## Running Services

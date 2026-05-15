@@ -206,7 +206,9 @@ class TaskService:
         knowledge_dir = ConfigLoader.get_config_dir() / "task-knowledge"
         md_path = knowledge_dir / knowledge.category / task_name / "index.md"
 
-        content = md_path.read_text(encoding="utf-8") if md_path.is_file() else knowledge.to_prompt()
+        content = (
+            md_path.read_text(encoding="utf-8") if md_path.is_file() else knowledge.to_prompt()
+        )
 
         # Build a lookup of relative_path -> image metadata from the registry.
         img_map: dict[str, str] = {}
@@ -253,7 +255,9 @@ class TaskService:
             if img.base64_data and normalized_path not in embedded_paths:
                 if not appended_lines:
                     appended_lines += ["", "## Reference figures"]
-                appended_lines.append(_image_markdown(img.alt_text, img.relative_path, img.base64_data))
+                appended_lines.append(
+                    _image_markdown(img.alt_text, img.relative_path, img.base64_data)
+                )
                 embedded_paths.add(normalized_path)
 
         case_lines: list[str] = []
