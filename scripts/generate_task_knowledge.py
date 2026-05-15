@@ -426,6 +426,43 @@ def _parse_cases_dir(task_dir: Path) -> list[dict]:
     return cases
 
 
+def _parse_aux_markdown(path: Path) -> tuple[str, list[dict]]:
+    """Parse an auxiliary markdown file and inline any referenced images."""
+    if not path.is_file():
+        return "", []
+
+    raw = path.read_text(encoding="utf-8")
+    images: list[dict] = []
+    for m in _IMAGE_RE.finditer(raw):
+        rel = m.group(2)
+        img_path = (path.parent / rel).resolve()
+        b64 = ""
+        if img_path.is_file():
+            try:
+                data = img_path.read_bytes()
+                if len(data) > MAX_IMAGE_SIZE:
+                    print(f"  Warning: {img_path.name} ({len(data)} bytes) exceeds 1MB limit, skipping")
+                elif _detect_image_type(data) is None:
+                    print(f"  Warning: {img_path.name} is not a valid image format, skipping")
+                else:
+                    b64 = base64.b64encode(data).decode("ascii")
+                    print(f"  Encoded aux image {img_path.name} ({len(data)} bytes)")
+            except (OSError, MemoryError) as e:
+                print(f"  Error encoding {img_path.name}: {e}")
+        else:
+            print(f"  Warning: Aux image not found: {rel}")
+        images.append(
+            {
+                "alt_text": m.group(1),
+                "relative_path": rel,
+                "section": path.stem,
+                "base64_data": b64,
+            }
+        )
+
+    return raw, images
+
+
 def _parse_markdown_file(path: Path) -> dict | None:
     """Parse a Markdown knowledge file into a dict.
 
@@ -517,6 +554,9 @@ def _parse_markdown_file(path: Path) -> dict | None:
             ).strip()
             fields[field_name] = clean
 
+    # --- triage guide ---
+    triage_markdown, triage_images = _parse_aux_markdown(path.parent / "triage.md")
+
     # --- cases ---
     cases = _parse_cases_dir(path.parent)
 
@@ -540,6 +580,8 @@ def _parse_markdown_file(path: Path) -> dict | None:
         "output_parameters_info": fields.get("output_parameters_info", []),
         "analysis_guide": fields.get("analysis_guide", []),
         "images": images,
+        "triage_markdown": triage_markdown,
+        "triage_images": triage_images,
         "related_context": fields.get("related_context", []),
         "cases": cases,
     }

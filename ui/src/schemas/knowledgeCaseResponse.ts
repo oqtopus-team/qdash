@@ -5,6 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
+import type { KnowledgeImageResponse } from './knowledgeImageResponse';
 
 /**
  * Response model for a knowledge case (postmortem).
@@ -31,4 +32,5 @@ export interface KnowledgeCaseResponse {
   applicability?: string;
   counterexample?: string;
   prompt_guidance?: string;
+  images?: KnowledgeImageResponse[];
 }

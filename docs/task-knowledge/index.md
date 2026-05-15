@@ -11,6 +11,7 @@ Calibration task knowledge base for QDash copilot analysis. Each page describes 
 | [DumpBox](./box-setup/DumpBox) | Dumps diagnostic information from all control boxes. |
 | [CheckNoise](./box-setup/CheckNoise) | Checks the noise levels in the control and readout system. |
 | [Configure](./box-setup/Configure) | Loads and applies the full calibration state configuration to the control boxes. |
+| [ConfigureAll](./box-setup/ConfigureAll) |  |
 | [ReadoutConfigure](./box-setup/ReadoutConfigure) | Configures readout parameters for a specified subset of qubits. |
 
 ## CW Characterization
@@ -39,7 +40,7 @@ Calibration task knowledge base for QDash copilot analysis. Each page describes 
 | [CheckDispersiveShift](./td-characterization/CheckDispersiveShift) | Measures dispersive shift (χ) between qubit and readout resonator. |
 | [CheckOptimalReadoutAmplitude](./td-characterization/CheckOptimalReadoutAmplitude) | Optimizes readout pulse amplitude for best state discrimination. |
 | [ReadoutClassification](./td-characterization/ReadoutClassification) | Calibrates and evaluates readout state discrimination (|0⟩ vs |1⟩ classification). |
-| [ChevronPattern](./td-characterization/ChevronPattern) | Measures qubit response vs frequency and time to map the chevron pattern. |
+| [CheckFineChevron](./td-characterization/CheckFineChevron) |  |
 
 ## One-Qubit Gate Calibration
 
@@ -73,6 +74,12 @@ Calibration task knowledge base for QDash copilot analysis. Each page describes 
 | [X180InterleavedRandomizedBenchmarking](./benchmarking/X180InterleavedRandomizedBenchmarking) | Measures X180 (π) gate-specific error rate via interleaved randomized benchmarking. |
 | [ZX90InterleavedRandomizedBenchmarking](./benchmarking/ZX90InterleavedRandomizedBenchmarking) | Measures ZX90 two-qubit gate error rate via interleaved randomized benchmarking. |
 
+## Other
+
+| Task | Description |
+|------|-------------|
+| [ChevronPattern](./ChevronPattern) | Measures qubit response vs frequency and time to map the chevron pattern. |
+
 ## Calibration Workflows
 
 Standard calibration workflows and their task composition. See [workflow task definitions](https://github.com/oqtopus-team/qdash/blob/develop/src/qdash/workflow/service/tasks.py) for the source of truth.
@@ -92,7 +99,7 @@ flowchart LR
 
 1. [CheckResonatorSpectroscopy](./cw-characterization/CheckResonatorSpectroscopy)
 2. [CheckQubitSpectroscopy](./cw-characterization/CheckQubitSpectroscopy)
-3. [ChevronPattern](./td-characterization/ChevronPattern)
+3. ChevronPattern
 
 ### 1Q Check
 

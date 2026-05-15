@@ -118,8 +118,11 @@ class TaskKnowledgeResponse(BaseModel):
     analysis_guide: list[str] = []
     prerequisites: list[str] = []
     images: list[KnowledgeImageResponse] = []
+    triage_markdown: str = ""
+    triage_images: list[KnowledgeImageResponse] = []
     cases: list[KnowledgeCaseResponse] = []
     prompt_text: str
+    triage_prompt_text: str = ""
 
 
 class TaskKnowledgeSummaryResponse(BaseModel):
@@ -132,6 +135,7 @@ class TaskKnowledgeSummaryResponse(BaseModel):
     case_count: int = 0
     image_count: int = 0
     has_analysis_guide: bool = False
+    has_triage_guide: bool = False
 
 
 class ListTaskKnowledgeResponse(BaseModel):

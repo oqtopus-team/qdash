@@ -455,6 +455,60 @@ class TestBuildAnalysisContext:
             )
 
         load_fig.assert_called_once_with(["/tmp/figure.png"])
-        collect_expected.assert_called_once_with(knowledge, max_images=2)
+        collect_expected.assert_called_once_with(
+            knowledge,
+            max_images=2,
+            include_case_images=True,
+            include_triage_images=False,
+        )
         assert result.image_base64 == "encoded-image"
         assert result.expected_images == [("img-1", "expected alt")]
+
+    def test_triage_context_uses_triage_prompt_and_triage_images(self):
+        service = CopilotRuntime(data_access=MagicMock())
+        knowledge = MagicMock()
+        knowledge.to_triage_prompt.return_value = "Triage prompt body"
+        knowledge.related_context = []
+
+        with (
+            patch.object(service, "load_qubit_params", return_value={}),
+            patch.object(
+                service,
+                "load_task_result",
+                return_value={
+                    "input_parameters": {},
+                    "output_parameters": {},
+                    "run_parameters": {},
+                    "figure_path": ["/tmp/figure.png"],
+                },
+            ),
+            patch.object(
+                service, "load_figure_as_base64", return_value="encoded-image"
+            ) as load_fig,
+            patch.object(
+                service,
+                "collect_expected_images",
+                return_value=[("triage-img", "triage alt")],
+            ) as collect_expected,
+            patch("qdash.datamodel.task_knowledge.get_task_knowledge", return_value=knowledge),
+        ):
+            result = service.build_analysis_context(
+                task_name="CheckResonatorSpectroscopy",
+                chip_id="chip-1",
+                qid="16",
+                task_id="task-1",
+                image_base64=None,
+                config=self._config(multimodal=True),
+                use_triage_knowledge=True,
+            )
+
+        load_fig.assert_called_once_with(["/tmp/figure.png"])
+        collect_expected.assert_called_once_with(
+            knowledge,
+            max_images=2,
+            include_case_images=False,
+            include_triage_images=True,
+        )
+        assert result.context.task_knowledge_prompt == "Triage prompt body"
+        assert result.image_base64 == "encoded-image"
+        assert result.expected_images == [("triage-img", "triage alt")]
