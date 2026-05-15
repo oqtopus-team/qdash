@@ -122,6 +122,7 @@ def _build_input(
     image_base64: str | None,
     conversation_history: list[dict[str, str]] | None,
     expected_images: list[tuple[str, str]] | None = None,
+    experiment_images: list[tuple[str, str]] | None = None,
 ) -> list[dict[str, Any]]:
     """Build the input items list for the OpenAI Responses API.
 
@@ -139,6 +140,8 @@ def _build_input(
         Previous conversation messages.
     expected_images : list[tuple[str, str]] | None
         List of (base64_data, alt_text) for expected reference images.
+    experiment_images : list[tuple[str, str]] | None
+        List of (base64_data, alt_text) for actual experiment result images.
 
     """
     items: list[dict[str, Any]] = []
@@ -172,15 +175,25 @@ def _build_input(
                 }
             )
 
-    # Add experiment result image (with label)
-    if image_base64:
-        content_parts.append({"type": "input_text", "text": "Actual experimental result:"})
-        content_parts.append(
-            {
-                "type": "input_image",
-                "image_url": f"data:image/png;base64,{image_base64}",
-            }
+    actual_images = experiment_images or (
+        [(image_base64, "result figure")] if image_base64 else []
+    )
+    if actual_images:
+        label = (
+            "Actual experimental result images:"
+            if len(actual_images) > 1
+            else "Actual experimental result:"
         )
+        content_parts.append({"type": "input_text", "text": label})
+        for b64_data, alt_text in actual_images:
+            if len(actual_images) > 1:
+                content_parts.append({"type": "input_text", "text": f"[Target: {alt_text}]"})
+            content_parts.append(
+                {
+                    "type": "input_image",
+                    "image_url": f"data:image/png;base64,{b64_data}",
+                }
+            )
 
     # Add the user message text
     content_parts.append({"type": "input_text", "text": user_message})
@@ -196,6 +209,7 @@ def _build_messages(
     image_base64: str | None,
     conversation_history: list[dict[str, str]] | None,
     expected_images: list[tuple[str, str]] | None = None,
+    experiment_images: list[tuple[str, str]] | None = None,
 ) -> list[dict[str, Any]]:
     """Build the messages list for the Chat Completions API (Ollama fallback)."""
     messages: list[dict[str, Any]] = [{"role": "system", "content": system_prompt}]
@@ -211,7 +225,10 @@ def _build_messages(
             )
 
     # Build the current user message
-    has_images = image_base64 or expected_images
+    actual_images = experiment_images or (
+        [(image_base64, "result figure")] if image_base64 else []
+    )
+    has_images = actual_images or expected_images
     if has_images:
         content_parts: list[dict[str, Any]] = []
 
@@ -227,15 +244,22 @@ def _build_messages(
                     }
                 )
 
-        # Add experiment result image
-        if image_base64:
-            content_parts.append({"type": "text", "text": "Actual experimental result:"})
-            content_parts.append(
-                {
-                    "type": "image_url",
-                    "image_url": {"url": f"data:image/png;base64,{image_base64}"},
-                }
+        if actual_images:
+            label = (
+                "Actual experimental result images:"
+                if len(actual_images) > 1
+                else "Actual experimental result:"
             )
+            content_parts.append({"type": "text", "text": label})
+            for b64_data, alt_text in actual_images:
+                if len(actual_images) > 1:
+                    content_parts.append({"type": "text", "text": f"[Target: {alt_text}]"})
+                content_parts.append(
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": f"data:image/png;base64,{b64_data}"},
+                    }
+                )
 
         content_parts.append({"type": "text", "text": user_message})
         messages.append({"role": "user", "content": content_parts})
@@ -352,6 +376,7 @@ async def run_analysis(
     config: CopilotConfig,
     image_base64: str | None = None,
     expected_images: list[tuple[str, str]] | None = None,
+    experiment_images: list[tuple[str, str]] | None = None,
     conversation_history: list[dict[str, str]] | None = None,
     tool_executors: ToolExecutors | None = None,
     on_tool_call: OnToolCallHook = None,
@@ -376,6 +401,9 @@ async def run_analysis(
         Optional base64-encoded result figure.
     expected_images : list[tuple[str, str]] | None
         Optional list of (base64_data, alt_text) for expected reference images.
+    experiment_images : list[tuple[str, str]] | None
+        Optional list of actual experiment result images. When provided, this
+        supersedes image_base64 and preserves per-image target labels.
     conversation_history : list[dict[str, str]] | None
         Previous conversation messages.
     tool_executors : ToolExecutors | None
@@ -402,7 +430,7 @@ async def run_analysis(
     provider = config.model.provider
 
     has_expected = bool(expected_images)
-    has_experiment = bool(image_base64)
+    has_experiment = bool(experiment_images or image_base64)
 
     if provider == "ollama":
         # Ollama only supports Chat Completions API (no tool support)
@@ -414,7 +442,12 @@ async def run_analysis(
             has_experiment_image=has_experiment,
         )
         messages = _build_messages(
-            system_prompt, user_message, image_base64, conversation_history, expected_images
+            system_prompt,
+            user_message,
+            image_base64,
+            conversation_history,
+            expected_images,
+            experiment_images,
         )
         content = await _run_chat_completions(client, messages, config)
         # Ollama still uses legacy schema; convert to blocks
@@ -439,7 +472,11 @@ async def run_analysis(
             + CHART_SYSTEM_PROMPT
         )
         input_items = _build_input(
-            user_message, image_base64, conversation_history, expected_images
+            user_message,
+            image_base64,
+            conversation_history,
+            expected_images,
+            experiment_images,
         )
 
         # Wrap tools: data store + chart collection + rate limiting

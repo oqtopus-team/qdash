@@ -21,6 +21,7 @@ class AnalysisContextResult:
     context: TaskAnalysisContext
     image_base64: str | None
     expected_images: list[tuple[str, str]]
+    experiment_images: list[tuple[str, str]] = field(default_factory=list)
     figure_paths: list[str] = field(default_factory=list)
 
 

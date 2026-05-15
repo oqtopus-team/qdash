@@ -78,10 +78,27 @@ def _figure_entries(figure_paths: list[str]) -> list[AITriageFigureEntry]:
     return entries
 
 
+def _target_image_slug(alt_text: str) -> str:
+    text = alt_text.lower()
+    if "marked" in text:
+        return "marked"
+    if "raw" in text:
+        return "raw"
+    return "target"
+
+
 def _bundle_context(context_bundle: Any) -> AITriageBundleContext:
     return AITriageBundleContext(
         context=context_bundle.context,
         image_base64=context_bundle.image_base64,
+        experiment_images=[
+            AITriageImageEntry(
+                path=f"experiment_images/{index:02d}_{_target_image_slug(alt_text)}.png",
+                alt_text=alt_text,
+                base64_data=base64_data,
+            )
+            for index, (base64_data, alt_text) in enumerate(context_bundle.experiment_images)
+        ],
         expected_images=[
             AITriageImageEntry(
                 path=f"expected_images/{index:02d}.png",
@@ -143,7 +160,8 @@ def export_ai_triage_replay_bundle(
             copilot_config_path="copilot_config.json",
             expected_image_paths=[image.path for image in bundle_context.expected_images],
             experiment_image_paths=(
-                ["experiment_images/00.png"] if bundle_context.image_base64 else []
+                [image.path for image in bundle_context.experiment_images]
+                or (["experiment_images/00.png"] if bundle_context.image_base64 else [])
             ),
             figure_paths=[figure.archive_path for figure in bundle_context.figures],
             extra_paths=(

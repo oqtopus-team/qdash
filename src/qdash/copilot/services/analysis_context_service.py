@@ -25,6 +25,7 @@ class AnalysisContextBuilder:
         ],
         load_coupling_params: Callable[[str, str, list[str] | None], dict[str, dict[str, Any]]],
         load_figure_as_base64: Callable[[list[str]], str | None],
+        load_figures_as_base64: Callable[[list[str]], list[tuple[str, str]]],
         collect_expected_images: Callable[[Any, int | None], list[tuple[str, str]]],
     ) -> None:
         self._load_qubit_params = load_qubit_params
@@ -33,6 +34,7 @@ class AnalysisContextBuilder:
         self._load_neighbor_qubit_params = load_neighbor_qubit_params
         self._load_coupling_params = load_coupling_params
         self._load_figure_as_base64 = load_figure_as_base64
+        self._load_figures_as_base64 = load_figures_as_base64
         self._collect_expected_images = collect_expected_images
 
     def build_analysis_context(
@@ -67,7 +69,7 @@ class AnalysisContextBuilder:
                 knowledge=knowledge,
             )
         )
-        image_base64, expected_images = self._resolve_analysis_images(
+        image_base64, expected_images, experiment_images = self._resolve_analysis_images(
             knowledge=knowledge,
             task_result=task_result,
             figure_paths=figure_paths,
@@ -91,6 +93,7 @@ class AnalysisContextBuilder:
             context=context,
             image_base64=image_base64,
             expected_images=expected_images,
+            experiment_images=experiment_images,
             figure_paths=figure_paths,
         )
 
@@ -150,16 +153,19 @@ class AnalysisContextBuilder:
         figure_paths: list[str],
         image_base64: str | None,
         config: CopilotConfig,
-    ) -> tuple[str | None, list[tuple[str, str]]]:
+    ) -> tuple[str | None, list[tuple[str, str]], list[tuple[str, str]]]:
         """Resolve experiment and expected images for multimodal analysis."""
         expected_images: list[tuple[str, str]] = []
+        experiment_images: list[tuple[str, str]] = []
         if not config.analysis.multimodal:
-            return image_base64, expected_images
+            return image_base64, expected_images, experiment_images
 
-        if not image_base64 and task_result:
-            image_base64 = self._load_figure_as_base64(figure_paths)
+        if task_result:
+            experiment_images = self._load_figures_as_base64(figure_paths)
+        if not image_base64:
+            image_base64 = experiment_images[0][0] if experiment_images else None
         expected_images = self._collect_expected_images(
             knowledge,
             config.analysis.max_expected_images,
         )
-        return image_base64, expected_images
+        return image_base64, expected_images, experiment_images

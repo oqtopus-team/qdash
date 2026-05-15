@@ -6,7 +6,12 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from qdash.copilot.agent import _run_chat_completions, _run_responses_api, run_analysis
+from qdash.copilot.agent import (
+    _build_messages,
+    _run_chat_completions,
+    _run_responses_api,
+    run_analysis,
+)
 from qdash.copilot.agent_runtime.execution import get_max_tool_rounds
 from qdash.copilot.agent_runtime.parsing import parse_response
 from qdash.copilot.config import CopilotConfig, ModelConfig
@@ -58,6 +63,26 @@ def test_parse_response_converts_plain_missing_triage_text_to_safe_review() -> N
     assert response.explanation.startswith("**Review triage**")
     assert "- Decision: `REVIEW`" in response.explanation
     assert "- Suggested labels: `model_format_error`" in response.explanation
+
+
+def test_build_messages_includes_multiple_target_images_with_labels() -> None:
+    messages = _build_messages(
+        "system",
+        "review",
+        image_base64="raw",
+        conversation_history=None,
+        expected_images=None,
+        experiment_images=[("raw", "target raw"), ("marked", "target marked")],
+    )
+
+    content = messages[-1]["content"]
+    texts = [part["text"] for part in content if part["type"] == "text"]
+    images = [part for part in content if part["type"] == "image_url"]
+
+    assert "Actual experimental result images:" in texts
+    assert "[Target: target raw]" in texts
+    assert "[Target: target marked]" in texts
+    assert len(images) == 2
 
 
 @pytest.mark.asyncio

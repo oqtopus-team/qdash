@@ -141,6 +141,13 @@ def _analysis_context_result(tmp_path: Path) -> AnalysisContextResult:
     return AnalysisContextResult(
         context=_context(),
         image_base64=base64.b64encode(b"experiment").decode("utf-8"),
+        experiment_images=[
+            (base64.b64encode(b"experiment-raw").decode("utf-8"), "target raw result image"),
+            (
+                base64.b64encode(b"experiment-marked").decode("utf-8"),
+                "target marked result image",
+            ),
+        ],
         expected_images=[(base64.b64encode(b"expected").decode("utf-8"), "expected image")],
         figure_paths=[str(figure_png), str(figure_json)],
     )
@@ -211,6 +218,10 @@ def test_export_ai_triage_replay_bundle_uses_shared_triage_inputs(tmp_path: Path
     assert manifest.knowledge.repo_url == "https://github.com/example/qdash-task-knowledge.git"
     assert manifest.knowledge.commit == "abc123def456"
     assert manifest.selected_model.name == "gpt-5.1"
+    assert manifest.inputs.experiment_image_paths == [
+        "experiment_images/00_raw.png",
+        "experiment_images/01_marked.png",
+    ]
     assert manifest.inputs.expected_image_paths == ["expected_images/00.png"]
     assert manifest.inputs.figure_paths == ["figures/00.png", "figures/01.json"]
     assert bundle_context.context.qid == "4"
@@ -231,3 +242,5 @@ def test_export_ai_triage_replay_bundle_uses_shared_triage_inputs(tmp_path: Path
         assert json.loads(zf.read("manifest.json").decode("utf-8"))["bundle_type"] == (
             "ai_triage_replay"
         )
+        assert "experiment_images/00_raw.png" in zf.namelist()
+        assert "experiment_images/01_marked.png" in zf.namelist()
