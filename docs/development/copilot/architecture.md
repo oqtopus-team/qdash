@@ -42,7 +42,7 @@ enabled: true
 
 # Language settings
 thinking_language: en      # Internal reasoning language
-response_language: ja      # User-facing response language
+response_language: en      # User-facing response language
 
 # Model settings
 model:
