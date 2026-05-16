@@ -4,6 +4,9 @@ services:
     build:
       context: .
       dockerfile: ./.devcontainer/Dockerfile
+      args:
+        USER_UID: ${LOCAL_UID:-1000}
+        USER_GID: ${LOCAL_GID:-1000}
     env_file:
       - path: .env
         required: false
