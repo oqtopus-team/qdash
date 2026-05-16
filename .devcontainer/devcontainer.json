@@ -41,26 +41,26 @@
     }
   },
 
-  "remoteUser": "vscode",
-  "updateRemoteUserUID": true,
+  "remoteUser": "root",
+  "updateRemoteUserUID": false,
 
   // Volume mounts (persistence configuration)
   "mounts": [
     "source=claude-code-bashhistory-${devcontainerId},target=/commandhistory,type=volume",
-    "source=claude-code-config-${devcontainerId},target=/home/vscode/.claude,type=volume",
-    "source=codex-config-${devcontainerId},target=/home/vscode/.codex,type=volume",
-    "source=qdash-local-bin-${devcontainerId},target=/home/vscode/.local,type=volume",
-    "source=qdash-vscode-extensions-${devcontainerId},target=/home/vscode/.vscode-server/extensions,type=volume",
-    "source=qdash-pip-cache,target=/home/vscode/.cache/pip,type=volume",
-    "source=qdash-uv-cache,target=/home/vscode/.cache/uv,type=volume"
+    "source=claude-code-config-${devcontainerId},target=/root/.claude,type=volume",
+    "source=codex-config-${devcontainerId},target=/root/.codex,type=volume",
+    "source=qdash-local-bin-${devcontainerId},target=/root/.local,type=volume",
+    "source=qdash-vscode-extensions-${devcontainerId},target=/root/.vscode-server/extensions,type=volume",
+    "source=qdash-pip-cache,target=/root/.cache/pip,type=volume",
+    "source=qdash-uv-cache,target=/root/.cache/uv,type=volume"
   ],
 
   "containerEnv": {
     "NODE_OPTIONS": "--max-old-space-size=4096",
-    "CLAUDE_CONFIG_DIR": "/home/vscode/.claude",
+    "CLAUDE_CONFIG_DIR": "/root/.claude",
     "POWERLEVEL9K_DISABLE_GITSTATUS": "true",
-    "PIP_CACHE_DIR": "/home/vscode/.cache/pip",
-    "UV_CACHE_DIR": "/home/vscode/.cache/uv",
+    "PIP_CACHE_DIR": "/root/.cache/pip",
+    "UV_CACHE_DIR": "/root/.cache/uv",
     "UV_LINK_MODE": "copy"
   },
   // Startup optimization settings

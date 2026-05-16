@@ -1,19 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-sudo mkdir -p /home/vscode/.codex /home/vscode/.local
-sudo mkdir -p /home/vscode/.cache/pip /home/vscode/.cache/uv /workspace/qdash/ui/node_modules
-sudo chown -R vscode:vscode \
-  /home/vscode/.codex \
-  /home/vscode/.local \
-  /home/vscode/.cache/pip \
-  /home/vscode/.cache/uv \
-  /workspace/qdash/ui/node_modules
+mkdir -p /root/.codex /root/.local
+mkdir -p /root/.cache/pip /root/.cache/uv /workspace/qdash/ui/node_modules
 chmod -R u+rwX \
-  /home/vscode/.codex \
-  /home/vscode/.local \
-  /home/vscode/.cache/pip \
-  /home/vscode/.cache/uv \
+  /root/.codex \
+  /root/.local \
+  /root/.cache/pip \
+  /root/.cache/uv \
   /workspace/qdash/ui/node_modules
 
 git config --global --add safe.directory /workspace/qdash

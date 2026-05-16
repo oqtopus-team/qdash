@@ -119,7 +119,7 @@ RUN curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | bash - && \
     apt-get clean && rm -rf /var/lib/apt/lists/* && \
     node -v && npm -v
 
-# Install bun in a shared location so the non-root dev user can run it.
+# Install bun in a shared location so either root or a dev user can run it.
 ENV BUN_INSTALL=/usr/local/bun
 COPY --from=bun-bin /usr/local/bin/bun /usr/local/bin/bun
 RUN mkdir -p "${BUN_INSTALL}/bin" \
@@ -139,8 +139,8 @@ ARG CODEX_VERSION
 RUN echo "umask 022" >> /etc/profile && \
     echo "umask 022" >> /etc/bash.bashrc
 
-ENV HOME=/home/vscode
-ENV PATH="/home/vscode/.local/bin:${PATH}"
+ENV HOME=/root
+ENV PATH="/root/.local/bin:${PATH}"
 
 # Install OpenAI Codex CLI
 RUN npm install -g "@openai/codex@${CODEX_VERSION}" && \
@@ -153,20 +153,19 @@ ENV SHELL=/bin/zsh
 RUN mkdir -p \
         /workspace/qdash/ui \
         /commandhistory \
-        /home/vscode/.cache/pip \
-        /home/vscode/.cache/uv \
-        /home/vscode/.claude \
-        /home/vscode/.codex \
-        /home/vscode/.vscode-server/extensions \
+        /root/.cache/pip \
+        /root/.cache/uv \
+        /root/.claude \
+        /root/.codex \
+        /root/.vscode-server/extensions \
     && touch /workspace/qdash/ui/.bunfig.toml \
-    && touch /home/vscode/.bashrc /home/vscode/.zshrc \
-    && echo 'export PATH="$HOME/.local/bin:$PATH"' >> /home/vscode/.bashrc \
-    && echo 'export PATH="$HOME/.local/bin:$PATH"' >> /home/vscode/.zshrc \
-    && echo 'export HISTFILE=/commandhistory/.zsh_history' >> /home/vscode/.zshrc \
-    && echo 'setopt APPEND_HISTORY' >> /home/vscode/.zshrc \
-    && echo 'setopt HIST_IGNORE_DUPS' >> /home/vscode/.zshrc \
-    && chsh -s /bin/zsh vscode \
-    && chown -R vscode:vscode /workspace /commandhistory /home/vscode
+    && touch /root/.bashrc /root/.zshrc \
+    && echo 'export PATH="$HOME/.local/bin:$PATH"' >> /root/.bashrc \
+    && echo 'export PATH="$HOME/.local/bin:$PATH"' >> /root/.zshrc \
+    && echo 'export HISTFILE=/commandhistory/.zsh_history' >> /root/.zshrc \
+    && echo 'setopt APPEND_HISTORY' >> /root/.zshrc \
+    && echo 'setopt HIST_IGNORE_DUPS' >> /root/.zshrc \
+    && chsh -s /bin/zsh root
 
 COPY ./.devcontainer/update-docker-socket-group.sh /usr/local/bin/update-docker-socket-group
 COPY ./.devcontainer/start-container.sh /usr/local/bin/start-container
