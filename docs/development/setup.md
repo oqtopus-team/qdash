@@ -51,6 +51,15 @@ docker compose -f compose.devcontainer.yaml up -d
 ```
 
 The DevContainer can start without a local `.env`; Docker Compose uses `.env` when present.
+When starting it with Docker Compose directly on Linux, pass the host UID and GID so files
+generated in the mounted workspace remain writable from both the host and the container:
+
+```shell
+LOCAL_UID=$(id -u) LOCAL_GID=$(id -g) docker compose -f compose.devcontainer.yaml up -d --build
+```
+
+VS Code's Dev Containers extension also aligns the remote user's UID with the host by using
+`updateRemoteUserUID`.
 The container mounts `/var/run/docker.sock` so devcontainer users can run the local Docker
 Compose tasks from inside the workspace. User-level tools installed under `/home/vscode/.local`
 and Claude Code configuration under `/home/vscode/.claude` are persisted in Docker volumes, so
@@ -61,6 +70,16 @@ Then attach to the container using VS Code's DevContainer extension or:
 ```shell
 docker compose -f compose.devcontainer.yaml exec --user vscode devcontainer zsh
 ```
+
+Check the Git identity inside the container before committing because host-level Git settings are
+not copied into the DevContainer automatically:
+
+```shell
+git config --global user.name
+git config --global user.email
+```
+
+Set them in the container if either command is empty.
 
 ### Install Dependencies
 
