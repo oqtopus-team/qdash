@@ -137,9 +137,7 @@ def test_get_task_knowledge_markdown_embeds_referenced_and_case_images(tmp_path:
         patch("qdash.api.services.task_service._lookup_knowledge", return_value=_qubit_knowledge()),
         patch("qdash.api.services.task_service.ConfigLoader.get_config_dir", return_value=tmp_path),
     ):
-        markdown = _service().get_task_knowledge_markdown(
-            "CheckQubitSpectroscopy"
-        )
+        markdown = _service().get_task_knowledge_markdown("CheckQubitSpectroscopy")
 
     assert "![overview](data:image/png;base64,b3ZlcnZpZXc=)" in markdown
     assert "## Past case figures" in markdown
@@ -150,7 +148,9 @@ def test_get_task_knowledge_markdown_embeds_referenced_and_case_images(tmp_path:
 
 
 def test_get_task_knowledge_response_includes_case_images() -> None:
-    with patch("qdash.api.services.task_service._lookup_knowledge", return_value=_qubit_knowledge()):
+    with patch(
+        "qdash.api.services.task_service._lookup_knowledge", return_value=_qubit_knowledge()
+    ):
         response = _service().get_task_knowledge("CheckQubitSpectroscopy")
 
     assert response.cases[0].images[0].relative_path == "./figures/q12_raw.png"
@@ -162,9 +162,7 @@ def test_get_task_knowledge_markdown_falls_back_to_registry_prompt(tmp_path: Pat
         patch("qdash.api.services.task_service._lookup_knowledge", return_value=_qubit_knowledge()),
         patch("qdash.api.services.task_service.ConfigLoader.get_config_dir", return_value=tmp_path),
     ):
-        markdown = _service().get_task_knowledge_markdown(
-            "CheckQubitSpectroscopy"
-        )
+        markdown = _service().get_task_knowledge_markdown("CheckQubitSpectroscopy")
 
     assert "## Experiment: CheckQubitSpectroscopy" in markdown
     assert "## Reference figures" in markdown

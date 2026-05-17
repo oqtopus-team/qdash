@@ -607,28 +607,28 @@ qctrl-visualizer==8.0.2
     # via
     #   qubex
     #   qxsimulator
-qubex @ git+https://github.com/amachino/qubex.git@fbdef9d7bf3e86c2b92ab4aa9723181d8b8c153f
+qubex @ git+https://github.com/amachino/qubex.git@44100ebf92bc3b89cbbb2553d12f61399430bfb9
 quel-ic-config==0.10.7
     # via qxdriver-quel1
 qutip==5.2.0
     # via qxsimulator
-qxcore @ git+https://github.com/amachino/qubex.git@fbdef9d7bf3e86c2b92ab4aa9723181d8b8c153f#subdirectory=packages/qxcore
+qxcore @ git+https://github.com/amachino/qubex.git@44100ebf92bc3b89cbbb2553d12f61399430bfb9#subdirectory=packages/qxcore
     # via
     #   qubex
     #   qxschema
-qxdriver-quel1 @ git+https://github.com/amachino/qubex.git@fbdef9d7bf3e86c2b92ab4aa9723181d8b8c153f#subdirectory=packages/qxdriver-quel1
+qxdriver-quel1 @ git+https://github.com/amachino/qubex.git@44100ebf92bc3b89cbbb2553d12f61399430bfb9#subdirectory=packages/qxdriver-quel1
     # via qubex
-qxfitting @ git+https://github.com/amachino/qubex.git@fbdef9d7bf3e86c2b92ab4aa9723181d8b8c153f#subdirectory=packages/qxfitting
+qxfitting @ git+https://github.com/amachino/qubex.git@44100ebf92bc3b89cbbb2553d12f61399430bfb9#subdirectory=packages/qxfitting
     # via qubex
-qxpulse @ git+https://github.com/amachino/qubex.git@fbdef9d7bf3e86c2b92ab4aa9723181d8b8c153f#subdirectory=packages/qxpulse
+qxpulse @ git+https://github.com/amachino/qubex.git@44100ebf92bc3b89cbbb2553d12f61399430bfb9#subdirectory=packages/qxpulse
     # via
     #   qubex
     #   qxsimulator
-qxschema @ git+https://github.com/amachino/qubex.git@fbdef9d7bf3e86c2b92ab4aa9723181d8b8c153f#subdirectory=packages/qxschema
+qxschema @ git+https://github.com/amachino/qubex.git@44100ebf92bc3b89cbbb2553d12f61399430bfb9#subdirectory=packages/qxschema
     # via qubex
-qxsimulator @ git+https://github.com/amachino/qubex.git@fbdef9d7bf3e86c2b92ab4aa9723181d8b8c153f#subdirectory=packages/qxsimulator
+qxsimulator @ git+https://github.com/amachino/qubex.git@44100ebf92bc3b89cbbb2553d12f61399430bfb9#subdirectory=packages/qxsimulator
     # via qubex
-qxvisualizer @ git+https://github.com/amachino/qubex.git@fbdef9d7bf3e86c2b92ab4aa9723181d8b8c153f#subdirectory=packages/qxvisualizer
+qxvisualizer @ git+https://github.com/amachino/qubex.git@44100ebf92bc3b89cbbb2553d12f61399430bfb9#subdirectory=packages/qxvisualizer
     # via
     #   qubex
     #   qxpulse
@@ -681,7 +681,7 @@ ruamel-yaml-clib==0.2.15 ; platform_python_implementation == 'CPython'
     #   prefect
     #   prefect-client
     #   ruamel-yaml
-ruff==0.15.12
+ruff==0.15.13
 scikit-learn==1.7.1
     # via qubex
 scipy==1.13.1

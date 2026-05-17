@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, patch
 
 from qdash.copilot.config import AnalysisConfig, CopilotConfig, ModelConfig
 from qdash.datamodel.execution import ExecutionModel, ExecutionStatusModel
+from qdash.datamodel.note import AiTriageReviewModel, NoteModel
 from qdash.datamodel.system_info import SystemInfoModel
 from qdash.datamodel.task import QubitTaskModel, TaskStatusModel
 from qdash.workflow.engine.task.ai_triage import (
@@ -148,3 +149,46 @@ def test_forced_ai_triage_markdown_allows_present_f01() -> None:
     )
 
     assert markdown is None
+
+
+@patch("qdash.dbmodel.task_result_history.TaskResultHistoryDocument.find_one")
+def test_set_task_note_content_updates_ai_triage_metadata(mock_find_one: MagicMock) -> None:
+    doc = MagicMock()
+    doc.user_note = NoteModel()
+    doc.ai_triage = AiTriageReviewModel(status="running")
+    mock_find_one.return_value.run.return_value = doc
+
+    from qdash.workflow.engine.task.ai_triage import _set_task_note_content
+
+    _set_task_note_content(
+        _task("CheckQubitSpectroscopy", "4"),
+        _execution_model(),
+        "## AI triage\n\n- Decision: `PASS`",
+        ModelConfig(provider="ollama", name="gemma4:26b"),
+    )
+
+    assert doc.ai_triage.status == "completed"
+    assert doc.ai_triage.model_provider == "ollama"
+    assert doc.ai_triage.model_name == "gemma4:26b"
+    assert doc.ai_triage.error == ""
+    doc.save.assert_called_once()
+
+
+@patch("qdash.dbmodel.task_result_history.TaskResultHistoryDocument.find_one")
+def test_set_ai_triage_failure_marks_failed_status(mock_find_one: MagicMock) -> None:
+    doc = MagicMock()
+    doc.user_note = NoteModel()
+    doc.ai_triage = AiTriageReviewModel(status="running")
+    mock_find_one.return_value.run.return_value = doc
+
+    from qdash.workflow.engine.task.ai_triage import _set_ai_triage_failure
+
+    _set_ai_triage_failure(
+        _task("CheckQubitSpectroscopy", "4"),
+        _execution_model(),
+        "model unavailable",
+    )
+
+    assert doc.ai_triage.status == "failed"
+    assert doc.ai_triage.error == "model unavailable"
+    doc.save.assert_called_once()

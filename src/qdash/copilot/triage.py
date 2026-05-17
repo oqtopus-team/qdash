@@ -127,6 +127,16 @@ def forced_ai_triage_markdown(task_name: str, output_params: dict[str, object]) 
     )
 
 
+def is_non_representative_mux_result(task_name: str, qid: str | None) -> bool:
+    """Return True for copied MUX resonator results that should not be triaged."""
+    if task_name != "CheckResonatorSpectroscopy":
+        return False
+    try:
+        return int(qid or "") % 4 != 0
+    except (TypeError, ValueError):
+        return False
+
+
 def render_ai_triage_markdown(
     *,
     task_name: str,

@@ -107,9 +107,23 @@ def _load_triaged_task_results(
     latest: dict[tuple[str, str], TaskResultHistoryDocument] = {}
     for doc in docs:
         key = (doc.name, doc.qid)
-        if key not in latest:
+        current = latest.get(key)
+        if current is None:
+            latest[key] = doc
+            continue
+        if _has_terminal_triage_signal(current):
+            continue
+        if _has_terminal_triage_signal(doc):
             latest[key] = doc
     return list(latest.values())
+
+
+def _has_terminal_triage_signal(doc: TaskResultHistoryDocument) -> bool:
+    content = doc.user_note.content or ""
+    return bool(
+        AI_TRIAGE_RE.search(content)
+        or getattr(doc.ai_triage, "status", "") in {"completed", "failed"}
+    )
 
 
 def _parse_triage_record(doc: TaskResultHistoryDocument) -> dict[str, Any]:

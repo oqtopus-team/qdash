@@ -44,6 +44,9 @@ from qdash.copilot.triage import (
     forced_ai_triage_markdown as _shared_forced_ai_triage_markdown,
 )
 from qdash.copilot.triage import (
+    is_non_representative_mux_result as _shared_is_non_representative_mux_result,
+)
+from qdash.copilot.triage import (
     render_ai_triage_markdown as _shared_render_ai_triage_markdown,
 )
 from qdash.copilot.triage import (
@@ -503,8 +506,16 @@ class TaskResultService:
                 continue
             if selection.requested_task_ids and doc.task_id not in selection.requested_task_ids:
                 continue
-            self._mark_ai_triage_requested(doc, requested_by, selected_model)
-            self._enqueue_ai_triage_for_document(doc, model_override)
+            if self._is_non_representative_mux_result(doc.name, doc.qid):
+                continue
+            if not self._claim_ai_triage_task_id(doc.task_id):
+                continue
+            try:
+                self._mark_ai_triage_requested(doc, requested_by, selected_model)
+                self._submit_ai_triage_document(doc, model_override)
+            except Exception:
+                self._release_ai_triage_task_id(doc.task_id)
+                raise
             enqueued_task_ids.append(doc.task_id)
         return enqueued_task_ids
 
@@ -550,16 +561,26 @@ class TaskResultService:
         return task_results
 
     @staticmethod
-    def _enqueue_ai_triage_for_document(
+    def _claim_ai_triage_task_id(task_id: str) -> bool:
+        """Claim a task ID for AI triage if it is not already running."""
+        with _AI_TRIAGE_IN_FLIGHT_LOCK:
+            if task_id in _AI_TRIAGE_IN_FLIGHT_TASK_IDS:
+                return False
+            _AI_TRIAGE_IN_FLIGHT_TASK_IDS.add(task_id)
+        return True
+
+    @staticmethod
+    def _release_ai_triage_task_id(task_id: str) -> None:
+        """Release an in-flight AI triage claim."""
+        with _AI_TRIAGE_IN_FLIGHT_LOCK:
+            _AI_TRIAGE_IN_FLIGHT_TASK_IDS.discard(task_id)
+
+    @staticmethod
+    def _submit_ai_triage_document(
         doc: TaskResultHistoryDocument,
         model_override: Any | None = None,
     ) -> None:
-        """Enqueue API-side AI triage review for a task result document."""
-        with _AI_TRIAGE_IN_FLIGHT_LOCK:
-            if doc.task_id in _AI_TRIAGE_IN_FLIGHT_TASK_IDS:
-                return
-            _AI_TRIAGE_IN_FLIGHT_TASK_IDS.add(doc.task_id)
-
+        """Submit API-side AI triage review for a previously claimed task result."""
         _AI_TRIAGE_EXECUTOR.submit(
             TaskResultService._run_ai_triage_for_task_result,
             doc.project_id,
@@ -647,8 +668,7 @@ class TaskResultService:
                 error=str(exc),
             )
         finally:
-            with _AI_TRIAGE_IN_FLIGHT_LOCK:
-                _AI_TRIAGE_IN_FLIGHT_TASK_IDS.discard(task_id)
+            TaskResultService._release_ai_triage_task_id(task_id)
 
     @staticmethod
     def _load_ai_triage_runtime_config(model_override: Any | None) -> Any:
@@ -801,6 +821,11 @@ class TaskResultService:
     def _forced_ai_triage_markdown(task_name: str, output_params: dict[str, Any]) -> str | None:
         """Apply deterministic safety guards before asking a local VLM."""
         return _shared_forced_ai_triage_markdown(task_name, output_params)
+
+    @staticmethod
+    def _is_non_representative_mux_result(task_name: str, qid: str | None) -> bool:
+        """Return True for copied MUX resonator results that should not be triaged."""
+        return _shared_is_non_representative_mux_result(task_name, qid)
 
     @staticmethod
     def create_figures_zip(

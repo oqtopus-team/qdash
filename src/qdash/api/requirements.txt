@@ -77,7 +77,7 @@ griffelib==2.0.2
     # via
     #   griffe
     #   griffecli
-gunicorn==22.0.0
+gunicorn==26.0.0
 h11==0.16.0
     # via
     #   httpcore
@@ -180,7 +180,7 @@ pydantic-settings==2.14.0
     # via prefect-client
 pygments==2.20.0
     # via rich
-pymongo==4.8.0
+pymongo==4.17.0
     # via
     #   bunnet
     #   qdash
@@ -208,7 +208,7 @@ pytz==2025.2
     #   dateparser
     #   pandas
     #   prefect-client
-pyyaml==6.0.1
+pyyaml==6.0.3
     # via
     #   prefect-client
     #   uvicorn
@@ -233,7 +233,7 @@ ruamel-yaml-clib==0.2.15 ; platform_python_implementation == 'CPython'
     # via
     #   prefect-client
     #   ruamel-yaml
-ruff==0.5.5
+ruff==0.15.13
 scipy==1.13.1
 six==1.17.0
     # via
