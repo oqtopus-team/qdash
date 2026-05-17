@@ -1,3 +1,4 @@
+from qdash.analysis.spectroscopy import BareShiftBoundary
 from qdash.analysis.spectroscopy.estimate_resonator_frequency import (
     ComposeResonancesConfig,
     EstimateResonatorFrequencyConfig,
@@ -26,6 +27,23 @@ def test_estimate_optimal_powers_uses_midpoint_between_minimum_and_local_low_pow
 
     assert local_boundary.low_power == -30.0
     assert optimal_powers == [-35.0]
+
+
+def test_estimate_optimal_powers_rounds_midpoint_up_when_between_grid_points() -> None:
+    ys = [-60.0, -55.0, -50.0, -45.0, -40.0, -35.0, -30.0, -25.0]
+    local_boundary = BareShiftBoundary(
+        high_power_min=-20.0,
+        high_power_max=0.0,
+        low_power=-25.0,
+    )
+
+    optimal_powers = estimate_optimal_powers(
+        ys,
+        [local_boundary],
+        minimum_usable_power=-40.0,
+    )
+
+    assert optimal_powers == [-30.0]
 
 
 def test_resonance_score_prefers_wider_high_power_x_span() -> None:

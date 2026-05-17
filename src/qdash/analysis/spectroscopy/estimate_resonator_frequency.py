@@ -810,7 +810,7 @@ def estimate_optimal_powers(
 
     def compute_mid(y: float) -> float:
         y_idx_1 = _arg_closest(ys, y)
-        y_idx_mid = (y_idx_0 + y_idx_1) // 2
+        y_idx_mid = (y_idx_0 + y_idx_1 + 1) // 2
         return float(ys[y_idx_mid])
 
     return [compute_mid(boundary.low_power) for boundary in local_boundaries]
