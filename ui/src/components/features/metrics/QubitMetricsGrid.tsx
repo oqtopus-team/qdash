@@ -666,7 +666,7 @@ export function QubitMetricsGrid({
   );
 
   return (
-    <div className="flex flex-col h-full space-y-2 max-w-xl mx-auto w-full">
+    <div className="flex flex-col h-full space-y-2 max-w-2xl mx-auto w-full">
       {/* View Mode Toggle */}
       <div className="flex items-center gap-4">
         <div className="tabs tabs-boxed bg-base-200 w-fit">
@@ -741,7 +741,7 @@ export function QubitMetricsGrid({
             pinch={{ step: 5 }}
             doubleClick={{ mode: "zoomIn", step: 0.7 }}
             panning={{ velocityDisabled: false }}
-            smooth={true}
+            smooth={false}
             centerOnInit={true}
             onTransform={handleTransform}
           >
