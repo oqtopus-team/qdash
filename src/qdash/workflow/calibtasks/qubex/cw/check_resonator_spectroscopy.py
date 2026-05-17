@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import logging
+import math
 from typing import TYPE_CHECKING, Any, ClassVar
 
 from qdash.analysis.spectroscopy import (
@@ -32,6 +33,41 @@ if TYPE_CHECKING:
     from qdash.workflow.engine.backend.qubex import QubexBackend
 
 logger = logging.getLogger(__name__)
+
+
+def _guess_sorted_slots_for_partial_mux(
+    xs: list[float],
+    frequencies: list[float],
+) -> tuple[list[int | None], str]:
+    """Guess sorted-slot assignment when fewer than 4 resonator peaks are found."""
+    count = len(frequencies)
+    if count >= NUM_RESONATORS:
+        return list(range(count)), "full"
+    if count != 3:
+        return [None] * count, "unassigned"
+
+    left_gap = float(frequencies[1] - frequencies[0])
+    right_gap = float(frequencies[2] - frequencies[1])
+    min_gap = max(min(left_gap, right_gap), 1e-12)
+    gap_ratio = max(left_gap, right_gap) / min_gap
+
+    if gap_ratio >= 1.6:
+        if left_gap > right_gap:
+            return [0, 2, 3], "slot1-missing-large-left-gap"
+        return [0, 1, 3], "slot2-missing-large-right-gap"
+
+    scan_min = float(min(xs))
+    scan_max = float(max(xs))
+    scan_center = (scan_min + scan_max) / 2.0
+    cluster_center = sum(frequencies) / len(frequencies)
+    if cluster_center < scan_center:
+        return [0, 1, 2], "right-edge-missing-cluster-left"
+    return [1, 2, 3], "left-edge-missing-cluster-right"
+
+
+def _qid_for_sorted_slot(mux_index: int, sorted_slot: int) -> int:
+    inverse_peak_positions = {slot: pos for pos, slot in PEAK_POSITIONS.items()}
+    return mux_index * NUM_RESONATORS + inverse_peak_positions[sorted_slot]
 
 
 class CheckResonatorSpectroscopy(QubexTask):
@@ -246,10 +282,40 @@ class CheckResonatorSpectroscopy(QubexTask):
                 optimal_powers=optimal_powers,
             )
 
-            if len(frequencies) == NUM_RESONATORS:
-                # Get frequency for current qid based on its position in the MUX
-                id_in_mux = int(qid) % 4
-                resonance_index = PEAK_POSITIONS[id_in_mux]
+            id_in_mux = int(qid) % 4
+            sorted_slots, assignment_mode = _guess_sorted_slots_for_partial_mux(
+                list(trace.x),
+                frequencies,
+            )
+            if marked_fig is not None:
+                for sorted_slot, frequency in zip(sorted_slots, frequencies, strict=False):
+                    if sorted_slot is None:
+                        continue
+                    marked_fig.add_annotation(
+                        x=frequency,
+                        y=1.02,
+                        yref="paper",
+                        text=f"Q{_qid_for_sorted_slot(int(qid) // NUM_RESONATORS, sorted_slot):02d} / s{sorted_slot}",
+                        showarrow=False,
+                        font={"color": "red", "size": 11},
+                        align="center",
+                    )
+                if assignment_mode != "full":
+                    marked_fig.add_annotation(
+                        xref="paper",
+                        yref="paper",
+                        x=0.01,
+                        y=1.08,
+                        text=assignment_mode,
+                        showarrow=False,
+                        font={"color": "red", "size": 11},
+                        align="left",
+                    )
+            assigned_slot = PEAK_POSITIONS[id_in_mux]
+            resonance_index = (
+                sorted_slots.index(assigned_slot) if assigned_slot in sorted_slots else None
+            )
+            if resonance_index is not None and resonance_index < len(optimal_powers):
                 estimated_frequency = frequencies[resonance_index]
                 optimal_power = optimal_powers[resonance_index]
                 readout_amplitude = float(10 ** (optimal_power / 20))
@@ -257,6 +323,8 @@ class CheckResonatorSpectroscopy(QubexTask):
                 print(
                     f"Estimated resonator frequency for qid={qid}: "
                     f"{estimated_frequency:.6f} GHz (id_in_mux={id_in_mux}, "
+                    f"assigned_slot={assigned_slot}, "
+                    f"assignment_mode={assignment_mode}, "
                     f"optimal_power={optimal_power:.2f} dB, "
                     f"readout_amplitude={readout_amplitude:.6f} a.u., "
                     f"all={[f'{f:.6f}' for f in frequencies]})"
@@ -264,7 +332,8 @@ class CheckResonatorSpectroscopy(QubexTask):
             else:
                 print(
                     f"[WARNING] Failed to detect resonator frequency for qid={qid}: "
-                    f"expected {NUM_RESONATORS} peaks, found {len(frequencies)}"
+                    f"assigned slot {assigned_slot} unavailable "
+                    f"(mode={assignment_mode}, found {len(frequencies)}/{NUM_RESONATORS} peaks)"
                 )
         except Exception:
             logger.warning(
@@ -291,6 +360,26 @@ class CheckResonatorSpectroscopy(QubexTask):
             output_params_copy["readout_amplitude"].value = readout_amplitude
         for value in output_params_copy.values():
             value.execution_id = execution_id
+
+        error_msg: str | None = None
+        if not math.isfinite(estimated_frequency) or estimated_frequency <= 0.0:
+            error_msg = f"Invalid resonator frequency for qid={qid}: {estimated_frequency:.6f} GHz"
+        elif optimal_power is None or not math.isfinite(optimal_power):
+            error_msg = f"Invalid optimal_power for qid={qid}: {optimal_power}"
+        elif (
+            readout_amplitude is None
+            or not math.isfinite(readout_amplitude)
+            or readout_amplitude <= 0.0
+        ):
+            error_msg = f"Invalid readout_amplitude for qid={qid}: {readout_amplitude}"
+
+        if error_msg is not None:
+            print(f"[ERROR] {error_msg}")
+            return PostProcessResult(
+                output_parameters={},
+                figures=figures,
+                validation_error=error_msg,
+            )
 
         return PostProcessResult(
             output_parameters=output_params_copy,

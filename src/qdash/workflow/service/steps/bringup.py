@@ -35,7 +35,7 @@ class BringUp(CalibrationStep):
     - CheckQubitSpectroscopy: Estimates coarse_qubit_frequency, anharmonicity, coarse_control_amplitude
     - CheckControlAmplitude: Refines control_amplitude via sqrt-Lorentzian fit
     - Configure: Apply qubit_frequency / control_amplitude to backend
-    - CheckCoarseChevron: Coarse Rabi chevron, ±75 MHz, qubit_frequency to ~MHz
+    - CheckChevron: Adaptive chevron with rough/fine search for qubit_frequency
     - CheckRabi: Refines control_amplitude (Rabi-rate-derived)
     - CheckFineChevron (x2): Refines qubit_frequency, ±10 MHz, with the latest control_amplitude
     - CheckRabi (x2): Refines control_amplitude with the latest qubit_frequency
@@ -213,7 +213,7 @@ class BringUp(CalibrationStep):
         qubit_result = raw.get("CheckQubitSpectroscopy", {})
         if qubit_result and not qubit_result.get("skipped", False):
             # Coarse qubit frequency (f01) — proper qubit_frequency comes from
-            # CheckCoarseChevron's Rabi-detuning fit.
+            # CheckChevron's adaptive chevron fit.
             qubit_freq_param = qubit_result.get("coarse_qubit_frequency")
             if qubit_freq_param is not None:
                 metrics["coarse_qubit_frequency"] = (
@@ -229,8 +229,9 @@ class BringUp(CalibrationStep):
                 if value is not None:
                     metrics["anharmonicity"] = value
 
-        # Proper qubit frequency from CheckCoarseChevron
-        chevron_result = raw.get("CheckCoarseChevron", {})
+        # Proper qubit frequency from CheckChevron. Keep CheckCoarseChevron as
+        # a fallback so older persisted results still render metrics.
+        chevron_result = raw.get("CheckChevron", {}) or raw.get("CheckCoarseChevron", {})
         if chevron_result and not chevron_result.get("skipped", False):
             qubit_freq_param = chevron_result.get("qubit_frequency")
             if qubit_freq_param is not None:

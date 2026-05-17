@@ -1,5 +1,6 @@
 import copy
 import logging
+import math
 from typing import TYPE_CHECKING, Any, ClassVar
 
 from qdash.common.visualization.figure_metadata import set_figure_role
@@ -111,6 +112,24 @@ class CheckQubitSpectroscopy(QubexTask):
                 "detected on the first pass. Useful when the top row is noisy."
             ),
         ),
+        "seed_amplitude_headroom_db": RunParameterModel(
+            unit="dB",
+            value_type="float",
+            value=10.0,
+            description=(
+                "Headroom added on top of f01_repr_db before converting it to the "
+                "coarse_control_amplitude seed used by downstream chevron/amplitude tasks."
+            ),
+        ),
+        "max_coarse_control_amplitude": RunParameterModel(
+            unit="a.u.",
+            value_type="float",
+            value=1.0,
+            description=(
+                "Upper bound for the uplifted coarse_control_amplitude so strong "
+                "spectroscopy responses do not push the seed above a safe drive amplitude."
+            ),
+        ),
     }
     output_parameters: ClassVar[dict[str, ParameterModel]] = {
         "coarse_qubit_frequency": ParameterModel(
@@ -144,13 +163,22 @@ class CheckQubitSpectroscopy(QubexTask):
             unit="a.u.",
             description=(
                 "Coarse drive-amplitude threshold derived from f01_repr_db "
-                "(amplitude = 10**(repr_db/20)). NOT a calibrated control_amplitude "
-                "(those come from a Rabi-rate-based fit such as CheckControlAmplitude); "
-                "this is the lowest drive amplitude at which the f01 peak first "
-                "appears, intended as a seed for downstream amplitude calibration."
+                "with an additional headroom uplift. NOT a calibrated "
+                "control_amplitude (those come from a Rabi-rate-based fit such as "
+                "CheckControlAmplitude); this is a spectroscopy-derived seed for "
+                "downstream chevron/amplitude calibration."
             ),
         ),
     }
+
+    def _compute_coarse_control_amplitude(self, repr_db: float) -> tuple[float, float]:
+        raw_amplitude = float(10 ** (repr_db / 20))
+        headroom_db = float(self.run_parameters["seed_amplitude_headroom_db"].get_value())
+        max_amplitude = float(self.run_parameters["max_coarse_control_amplitude"].get_value())
+        uplifted_amplitude = raw_amplitude * (10 ** (headroom_db / 20))
+        coarse_control_amplitude = min(uplifted_amplitude, max_amplitude)
+        marker_db = float(20 * math.log10(coarse_control_amplitude))
+        return coarse_control_amplitude, marker_db
 
     def postprocess(
         self, backend: QubexBackend, execution_id: str, run_result: RunResult, qid: str
@@ -248,16 +276,25 @@ class CheckQubitSpectroscopy(QubexTask):
             output_params_copy["anharmonicity"].value = estimated_anharmonicity
         if estimated_repr_db is not None:
             output_params_copy["f01_repr_db"].value = estimated_repr_db
-            # Coarse drive amplitude from the lowest power where the f01 peak
-            # first appears. qubit_spectroscopy uses
-            #   amplitude = sqrt(10**(power_db/10)) = 10**(power_db/20)
-            # to map its dB y-axis to the drive amplitude, so we invert that.
-            coarse_control_amplitude = float(10 ** (estimated_repr_db / 20))
+            coarse_control_amplitude, coarse_control_marker_db = (
+                self._compute_coarse_control_amplitude(estimated_repr_db)
+            )
             output_params_copy["coarse_control_amplitude"].value = coarse_control_amplitude
+            if marked_fig is not None:
+                marked_fig.add_hline(
+                    y=coarse_control_marker_db,
+                    line_width=1,
+                    line_color="red",
+                    line_dash="dash",
+                    annotation_text=f"coarse A = {coarse_control_amplitude:.4f} a.u.",
+                    annotation_position="top left",
+                    annotation_font_color="red",
+                )
             print(
                 f"Coarse control amplitude for qid={qid}: "
                 f"{coarse_control_amplitude:.6f} a.u. "
-                f"(from f01_repr_db={estimated_repr_db:.2f} dB)"
+                f"(from f01_repr_db={estimated_repr_db:.2f} dB, "
+                f"marker={coarse_control_marker_db:.2f} dB)"
             )
         if estimated_quality_level is not None:
             output_params_copy["f01_quality_level"].value = estimated_quality_level
@@ -266,13 +303,14 @@ class CheckQubitSpectroscopy(QubexTask):
 
         # Validate qubit frequency range.
         # We still return figures so they are saved before the task is marked failed.
+        # Invalid outputs are excluded so they are not persisted to the DB.
         if estimated_frequency < 3.0:
             error_msg = (
                 f"Qubit frequency too low for qid={qid}: {estimated_frequency:.6f} GHz < 3.0 GHz"
             )
             print(f"[ERROR] {error_msg}")
             return PostProcessResult(
-                output_parameters=output_params_copy,
+                output_parameters={},
                 figures=figures,
                 validation_error=error_msg,
             )
