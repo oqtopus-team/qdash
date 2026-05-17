@@ -149,6 +149,11 @@ RUN npm install -g "@openai/codex@${CODEX_VERSION}" && \
 # Configure Zsh.
 ENV SHELL=/bin/zsh
 
+# Install zsh prompt/theme tooling for an improved interactive shell.
+RUN git clone --depth=1 https://github.com/romkatv/powerlevel10k.git /opt/powerlevel10k \
+    && git clone --depth=1 https://github.com/zsh-users/zsh-autosuggestions.git /opt/zsh-autosuggestions \
+    && git clone --depth=1 https://github.com/zsh-users/zsh-syntax-highlighting.git /opt/zsh-syntax-highlighting
+
 # Setup workspace and cache directories.
 RUN mkdir -p \
         /workspace/qdash/ui \
@@ -165,6 +170,7 @@ RUN mkdir -p \
     && echo 'export HISTFILE=/commandhistory/.zsh_history' >> /root/.zshrc \
     && echo 'setopt APPEND_HISTORY' >> /root/.zshrc \
     && echo 'setopt HIST_IGNORE_DUPS' >> /root/.zshrc \
+    && printf '\n# >>> qdash managed zsh >>>\n[ -f /workspace/qdash/.devcontainer/zshrc.qdash ] && source /workspace/qdash/.devcontainer/zshrc.qdash\n# <<< qdash managed zsh <<<\n' >> /root/.zshrc \
     && chsh -s /bin/zsh root
 
 COPY ./.devcontainer/update-docker-socket-group.sh /usr/local/bin/update-docker-socket-group

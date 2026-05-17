@@ -1,0 +1,65 @@
+# qdash devcontainer zsh defaults
+
+export HISTFILE=/commandhistory/.zsh_history
+export HISTSIZE=50000
+export SAVEHIST=50000
+export POWERLEVEL9K_DISABLE_GITSTATUS=true
+
+setopt APPEND_HISTORY
+setopt HIST_IGNORE_ALL_DUPS
+setopt HIST_REDUCE_BLANKS
+setopt HIST_VERIFY
+setopt INTERACTIVE_COMMENTS
+setopt AUTO_CD
+setopt AUTO_MENU
+setopt COMPLETE_IN_WORD
+setopt ALWAYS_TO_END
+
+autoload -Uz compinit colors vcs_info up-line-or-beginning-search down-line-or-beginning-search
+colors
+compinit -d "${HOME}/.zcompdump"
+
+zstyle ':completion:*' menu select
+zstyle ':completion:*' group-name ''
+zstyle ':completion:*' matcher-list 'm:{a-z}={A-Z}' 'r:|[._-]=* r:|=*'
+zstyle ':completion:*' list-colors "${(s.:.)LS_COLORS}"
+
+zmodload zsh/complist
+
+zle -N up-line-or-beginning-search
+zle -N down-line-or-beginning-search
+bindkey '^[[A' up-line-or-beginning-search
+bindkey '^[[B' down-line-or-beginning-search
+bindkey '^P' up-line-or-beginning-search
+bindkey '^N' down-line-or-beginning-search
+bindkey '^[[H' beginning-of-line
+bindkey '^[[F' end-of-line
+
+alias ls='ls --color=auto -F'
+alias la='ls -A'
+alias ll='ls -lah'
+alias l='ls -CF'
+
+[ -r /opt/zsh-autosuggestions/zsh-autosuggestions.zsh ] \
+  && source /opt/zsh-autosuggestions/zsh-autosuggestions.zsh
+[ -r /opt/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh ] \
+  && source /opt/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
+
+if [ -r /workspace/qdash/.devcontainer/p10k.zsh ] && [ -r /opt/powerlevel10k/powerlevel10k.zsh-theme ]; then
+  source /workspace/qdash/.devcontainer/p10k.zsh
+  source /opt/powerlevel10k/powerlevel10k.zsh-theme
+else
+  zstyle ':vcs_info:*' enable git
+  zstyle ':vcs_info:git:*' formats ' %F{cyan}[%b]%f'
+  zstyle ':vcs_info:git:*' actionformats ' %F{yellow}[%b|%a]%f'
+
+  precmd_functions=(${precmd_functions:#qdash_precmd_vcs_info})
+  precmd_functions+=(qdash_precmd_vcs_info)
+
+  qdash_precmd_vcs_info() {
+    vcs_info
+  }
+
+  setopt PROMPT_SUBST
+  PROMPT='%F{green}%n@%m%f %F{blue}%1~%f${vcs_info_msg_0_} %# '
+fi
