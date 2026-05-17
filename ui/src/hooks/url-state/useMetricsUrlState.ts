@@ -1,30 +1,25 @@
-import { useCallback, useState, useEffect } from "react";
+import { useCallback, useMemo, useState, useEffect } from "react";
 
-import { useQueryState, parseAsString, parseAsInteger } from "nuqs";
+import { useQueryState, parseAsString } from "nuqs";
 
-import { dateToDateInput } from "@/lib/utils/datetime";
+import { dateToDateTimeLocal } from "@/lib/utils/datetime";
 
-import { type TimeRange, type RangeMode, type SelectionMode, type MetricType } from "./types";
+import { type SelectionMode, type MetricType } from "./types";
 
 interface UseMetricsUrlStateResult {
   selectedChip: string;
-  rangeMode: RangeMode;
-  timeRange: TimeRange;
   selectionMode: SelectionMode;
   metricType: MetricType;
   selectedMetric: string;
-  customDays: number | null;
-  startDate: string | null;
-  endDate: string | null;
+  startDate: string;
+  endDate: string;
   setSelectedChip: (chip: string) => void;
-  setRangeMode: (mode: RangeMode) => void;
-  setTimeRange: (range: TimeRange) => void;
   setSelectionMode: (mode: SelectionMode) => void;
   setMetricType: (type: MetricType) => void;
   setSelectedMetric: (metric: string) => void;
-  setCustomDays: (days: number) => void;
-  setStartDate: (date: string | null) => void;
-  setEndDate: (date: string | null) => void;
+  setStartDate: (date: string) => void;
+  setEndDate: (date: string) => void;
+  setQuickRange: (days: number) => void;
   isInitialized: boolean;
 }
 
@@ -33,22 +28,24 @@ export function useMetricsUrlState(): UseMetricsUrlStateResult {
 
   const [selectedChip, setSelectedChipState] = useQueryState("chip", parseAsString);
 
-  const [rangeMode, setRangeModeState] = useQueryState("rangeMode", parseAsString);
-
-  const [timeRange, setTimeRangeState] = useQueryState("range", parseAsString);
-
   const [selectionMode, setSelectionModeState] = useQueryState("mode", parseAsString);
 
   const [metricType, setMetricTypeState] = useQueryState("type", parseAsString);
 
   const [selectedMetric, setSelectedMetricState] = useQueryState("metric", parseAsString);
 
-  const [customDays, setCustomDaysState] = useQueryState("days", parseAsInteger);
-
   const [startDate, setStartDateState] = useQueryState("start", parseAsString);
   const [endDate, setEndDateState] = useQueryState("end", parseAsString);
 
-  // Mark as initialized after first render
+  const defaults = useMemo(() => {
+    const now = new Date();
+    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    return {
+      start: dateToDateTimeLocal(sevenDaysAgo),
+      end: dateToDateTimeLocal(now),
+    };
+  }, []);
+
   useEffect(() => {
     setIsInitialized(true);
   }, []);
@@ -58,51 +55,6 @@ export function useMetricsUrlState(): UseMetricsUrlStateResult {
       setSelectedChipState(chip || null);
     },
     [setSelectedChipState],
-  );
-
-  const setRangeMode = useCallback(
-    (mode: RangeMode) => {
-      setRangeModeState(mode === "relative" ? null : mode);
-      // Clear the inactive mode's params to keep URLs clean.
-      if (mode === "relative") {
-        setStartDateState(null);
-        setEndDateState(null);
-      } else {
-        setTimeRangeState(null);
-        setCustomDaysState(null);
-        // Seed a 7-day range (from = 6 days ago, to = today) on the first
-        // switch to absolute mode, unless the user already has dates set.
-        if (!startDate && !endDate) {
-          const today = new Date();
-          const sixDaysAgo = new Date(today.getTime() - 6 * 24 * 60 * 60 * 1000);
-          setStartDateState(dateToDateInput(sixDaysAgo));
-          setEndDateState(dateToDateInput(today));
-        }
-      }
-    },
-    [
-      setRangeModeState,
-      setStartDateState,
-      setEndDateState,
-      setTimeRangeState,
-      setCustomDaysState,
-      startDate,
-      endDate,
-    ],
-  );
-
-  const setTimeRange = useCallback(
-    (range: TimeRange) => {
-      setTimeRangeState(range === "7d" ? null : range);
-      // Clear days param when switching away from custom
-      if (range !== "custom") {
-        setCustomDaysState(null);
-      } else if (!customDays) {
-        // Set default of 90 days when entering custom mode
-        setCustomDaysState(90);
-      }
-    },
-    [setTimeRangeState, setCustomDaysState, customDays],
   );
 
   const setSelectionMode = useCallback(
@@ -126,46 +78,44 @@ export function useMetricsUrlState(): UseMetricsUrlStateResult {
     [setSelectedMetricState],
   );
 
-  const setCustomDays = useCallback(
-    (days: number) => {
-      setCustomDaysState(days);
-    },
-    [setCustomDaysState],
-  );
-
   const setStartDate = useCallback(
-    (date: string | null) => {
+    (date: string) => {
       setStartDateState(date && date.length > 0 ? date : null);
     },
     [setStartDateState],
   );
 
   const setEndDate = useCallback(
-    (date: string | null) => {
+    (date: string) => {
       setEndDateState(date && date.length > 0 ? date : null);
     },
     [setEndDateState],
   );
 
+  const setQuickRange = useCallback(
+    (days: number) => {
+      const now = new Date();
+      const past = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+      setStartDateState(dateToDateTimeLocal(past));
+      setEndDateState(dateToDateTimeLocal(now));
+    },
+    [setStartDateState, setEndDateState],
+  );
+
   return {
     selectedChip: selectedChip ?? "",
-    rangeMode: (rangeMode as RangeMode) ?? "relative",
-    timeRange: (timeRange as TimeRange) ?? "7d",
     selectionMode: (selectionMode as SelectionMode) ?? "latest",
     metricType: (metricType as MetricType) ?? "qubit",
     selectedMetric: selectedMetric ?? "t1",
-    customDays: customDays ?? null,
-    startDate: startDate ?? null,
-    endDate: endDate ?? null,
+    startDate: startDate ?? defaults.start,
+    endDate: endDate ?? defaults.end,
     setSelectedChip,
-    setRangeMode,
-    setTimeRange,
     setSelectionMode,
     setMetricType,
     setSelectedMetric,
-    setCustomDays,
     setStartDate,
     setEndDate,
+    setQuickRange,
     isInitialized,
   };
 }
