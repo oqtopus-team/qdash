@@ -47,14 +47,14 @@ class CheckControlAmplitude(QubexTask):
         "frequency_span": RunParameterModel(
             unit="GHz",
             value_type="float",
-            value=0.25,
-            description="Half-span around qubit_frequency for the sweep (±span, default ±250 MHz)",
+            value=0.15,
+            description="Half-span around qubit_frequency for the sweep (±span, default ±150 MHz)",
         ),
         "frequency_step": RunParameterModel(
             unit="GHz",
             value_type="float",
             value=0.0025,
-            description="Frequency step (default 2.5 MHz, ~200 points over ±250 MHz)",
+            description="Frequency step (default 2.5 MHz, ~120 points over ±150 MHz)",
         ),
         "readout_amplitude": RunParameterModel(
             unit="a.u.",
@@ -64,28 +64,6 @@ class CheckControlAmplitude(QubexTask):
                 "Readout amplitude used during the sweep. Matches the "
                 "CheckQubitSpectroscopy default so the qubit response is "
                 "probed under the same readout conditions."
-            ),
-        ),
-        "seed_amplitude_headroom_db": RunParameterModel(
-            unit="dB",
-            value_type="float",
-            value=10.0,
-            description=(
-                "Headroom added on top of coarse_control_amplitude before driving "
-                "the sweep, so the seed sits comfortably above the bare f01 "
-                "detection threshold and the sqrt-Lorentzian fit has enough SNR. "
-                "seed = coarse_control_amplitude * 10**(headroom_db / 20), then "
-                "clipped to max_seed_amplitude."
-            ),
-        ),
-        "max_seed_amplitude": RunParameterModel(
-            unit="a.u.",
-            value_type="float",
-            value=1.0,
-            description=(
-                "Upper bound for the seed amplitude. Protects qubits with high "
-                "f01_repr_db (e.g. -5 dB, where +10 dB headroom would push the "
-                "seed past 1.0) from saturating the drive line."
             ),
         ),
         "target_rabi_rate": RunParameterModel(
@@ -101,8 +79,8 @@ class CheckControlAmplitude(QubexTask):
             description=(
                 "Number of shots per frequency point. Higher than the usual "
                 "CALIBRATION_SHOTS (2048) because this is a 1D scan and the "
-                "phase response is small at the seed amplitude derived from "
-                "f01_repr_db — extra averaging is needed to get the signal "
+                "phase response can still be small near the spectroscopy-derived "
+                "seed amplitude — extra averaging is needed to get the signal "
                 "above the noise floor for a stable sqrt-Lorentzian fit."
             ),
         ),
@@ -117,6 +95,13 @@ class CheckControlAmplitude(QubexTask):
         "control_amplitude": ParameterModel(
             unit="a.u.",
             description="Estimated control amplitude scaled to target Rabi rate",
+        ),
+        "coarse_control_amplitude": ParameterModel(
+            unit="a.u.",
+            description=(
+                "Refined coarse drive-amplitude seed for downstream chevron tasks. "
+                "Still a coarse calibration value, but improved over the spectroscopy seed."
+            ),
         ),
         "coarse_qubit_frequency": ParameterModel(
             unit="GHz",
@@ -153,13 +138,28 @@ class CheckControlAmplitude(QubexTask):
 
         output_params_copy = copy.deepcopy(self.output_parameters)
         if estimated_amplitude is not None:
-            output_params_copy["control_amplitude"].value = float(estimated_amplitude)
+            coarse_input_param = self.input_parameters["coarse_control_amplitude"]
+            coarse_floor = (
+                float(coarse_input_param.value)
+                if coarse_input_param is not None and coarse_input_param.value is not None
+                else None
+            )
+            calibrated_amplitude = float(estimated_amplitude)
+            if coarse_floor is not None and calibrated_amplitude < coarse_floor:
+                print(
+                    f"Estimated control amplitude for qid={qid} was below "
+                    f"coarse_control_amplitude; using floor {coarse_floor:.6f} a.u. "
+                    f"instead of {calibrated_amplitude:.6f} a.u."
+                )
+                calibrated_amplitude = coarse_floor
+            output_params_copy["control_amplitude"].value = calibrated_amplitude
+            output_params_copy["coarse_control_amplitude"].value = calibrated_amplitude
             rabi_rate_msg = (
                 f", rabi_rate={float(rabi_rate) * 1e3:.3f} MHz" if rabi_rate is not None else ""
             )
             print(
                 f"Estimated control amplitude for qid={qid}: "
-                f"{float(estimated_amplitude):.6f} a.u.{rabi_rate_msg}"
+                f"{calibrated_amplitude:.6f} a.u.{rabi_rate_msg}"
             )
         else:
             print(
@@ -213,25 +213,14 @@ class CheckControlAmplitude(QubexTask):
         readout_frequency = float(readout_freq_param.value)
         readout_amplitude = self._get_readout_amplitude_value()
         coarse_control_amplitude = float(seed_amp_param.value)
-        headroom_db = float(self.run_parameters["seed_amplitude_headroom_db"].get_value())
-        max_seed_amplitude = float(self.run_parameters["max_seed_amplitude"].get_value())
-        unclipped_seed = coarse_control_amplitude * (10 ** (headroom_db / 20))
-        seed_control_amplitude = min(unclipped_seed, max_seed_amplitude)
         frequency_range = self._build_frequency_range(qubit_frequency)
 
-        clip_note = (
-            f" (clipped from {unclipped_seed:.6f} by max_seed_amplitude={max_seed_amplitude})"
-            if unclipped_seed > max_seed_amplitude
-            else ""
-        )
         print(
             f"[run] CheckControlAmplitude params for {label}: "
             f"qubit_frequency={qubit_frequency:.6f} GHz, "
             f"sweep=[{frequency_range[0]:.6f}, {frequency_range[-1]:.6f}] GHz "
             f"({len(frequency_range)} points), "
             f"coarse_control_amplitude={coarse_control_amplitude:.6f}, "
-            f"headroom={headroom_db:.1f} dB, "
-            f"seed_control_amplitude={seed_control_amplitude:.6f}{clip_note}, "
             f"readout_frequency={readout_frequency:.6f} GHz, "
             f"readout_amplitude={readout_amplitude:.6f}"
         )
@@ -247,7 +236,7 @@ class CheckControlAmplitude(QubexTask):
             result = exp.measure_qubit_resonance(
                 label,
                 frequency_range=frequency_range,
-                control_amplitude=seed_control_amplitude,
+                control_amplitude=coarse_control_amplitude,
                 readout_amplitude=readout_amplitude,
                 target_rabi_rate=float(self.run_parameters["target_rabi_rate"].get_value()),
                 n_shots=int(self.run_parameters["shots"].get_value()),
