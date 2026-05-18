@@ -1,4 +1,4 @@
-"""Automatic AI triage for calibration task results."""
+"""Automatic AI review for calibration task results."""
 
 from __future__ import annotations
 
@@ -8,22 +8,22 @@ from concurrent.futures import ThreadPoolExecutor
 from threading import Lock
 from typing import TYPE_CHECKING, cast
 
-from qdash.copilot.triage import (
-    apply_ai_triage_config as _shared_ai_triage_config,
+from qdash.copilot.review import (
+    apply_ai_review_config as _shared_ai_review_config,
 )
-from qdash.copilot.triage import (
-    build_ai_triage_context as _shared_build_ai_triage_context,
+from qdash.copilot.review import (
+    build_ai_review_context as _shared_build_ai_review_context,
 )
-from qdash.copilot.triage import (
-    forced_ai_triage_markdown as _shared_forced_ai_triage_markdown,
+from qdash.copilot.review import (
+    forced_ai_review_markdown as _shared_forced_ai_review_markdown,
 )
-from qdash.copilot.triage import (
+from qdash.copilot.review import (
     is_non_representative_mux_result as _shared_is_non_representative_mux_result,
 )
-from qdash.copilot.triage import (
-    render_ai_triage_markdown as _shared_render_ai_triage_markdown,
+from qdash.copilot.review import (
+    render_ai_review_markdown as _shared_render_ai_review_markdown,
 )
-from qdash.copilot.triage import (
+from qdash.copilot.review import (
     select_analysis_model as _shared_select_analysis_model,
 )
 
@@ -34,33 +34,33 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-AI_TRIAGE_ACTOR = "qdash-ai"
-AI_TRIAGE_HEADER = "## AI triage"
-AI_TRIAGE_SEPARATOR = "\n\n---\n\n"
-AI_TRIAGE_SECTION_RE = re.compile(r"^## AI triage\n\n.*?(?:\n\n---\n\n|$)", re.DOTALL)
-MAX_AI_TRIAGE_NOTE_CHARS = 4500
-AI_TRIAGE_WORKERS = 2
-AI_TRIAGE_ELIGIBLE_STATUSES = frozenset({"completed", "failed"})
+AI_REVIEW_ACTOR = "qdash-ai"
+AI_REVIEW_HEADER = "## AI review"
+AI_REVIEW_SEPARATOR = "\n\n---\n\n"
+AI_REVIEW_SECTION_RE = re.compile(r"^## AI review\n\n.*?(?:\n\n---\n\n|$)", re.DOTALL)
+MAX_AI_REVIEW_NOTE_CHARS = 4500
+AI_REVIEW_WORKERS = 2
+AI_REVIEW_ELIGIBLE_STATUSES = frozenset({"completed", "failed"})
 
-_EXECUTOR = ThreadPoolExecutor(max_workers=AI_TRIAGE_WORKERS, thread_name_prefix="ai-triage")
+_EXECUTOR = ThreadPoolExecutor(max_workers=AI_REVIEW_WORKERS, thread_name_prefix="ai-review")
 _IN_FLIGHT_TASK_IDS: set[str] = set()
 _IN_FLIGHT_LOCK = Lock()
 
 
-def enqueue_ai_triage_note(
+def enqueue_ai_review_note(
     task: BaseTaskResultModel,
     execution_model: ExecutionModel,
     *,
     overwrite_existing: bool = False,
 ) -> None:
-    """Schedule AI triage note attachment without blocking calibration progress."""
+    """Schedule AI review note attachment without blocking calibration progress."""
     try:
         from qdash.copilot.config import load_copilot_config
 
         config = load_copilot_config()
         if not config.enabled or not config.analysis.enabled:
             _log_info(
-                "AI triage enqueue skipped: task=%s task_id=%s copilot_enabled=%s "
+                "AI review enqueue skipped: task=%s task_id=%s copilot_enabled=%s "
                 "analysis_enabled=%s",
                 task.name,
                 task.task_id,
@@ -68,17 +68,17 @@ def enqueue_ai_triage_note(
                 config.analysis.enabled,
             )
             return
-        if task.name not in config.analysis.ai_triage_tasks:
+        if task.name not in config.analysis.ai_review_tasks:
             _log_debug(
-                "AI triage enqueue skipped: task=%s task_id=%s not in ai_triage_tasks=%s",
+                "AI review enqueue skipped: task=%s task_id=%s not in ai_review_tasks=%s",
                 task.name,
                 task.task_id,
-                config.analysis.ai_triage_tasks,
+                config.analysis.ai_review_tasks,
             )
             return
-        if not _is_terminal_ai_triage_result(task):
+        if not _is_terminal_ai_review_result(task):
             _log_info(
-                "AI triage enqueue skipped: task=%s task_id=%s status=%s non_terminal=true",
+                "AI review enqueue skipped: task=%s task_id=%s status=%s non_terminal=true",
                 task.name,
                 task.task_id,
                 _task_status_value(task),
@@ -86,7 +86,7 @@ def enqueue_ai_triage_note(
             return
         if _is_non_representative_mux_result(task):
             _log_info(
-                "AI triage enqueue skipped: task=%s task_id=%s qid=%s non_representative_mux=true",
+                "AI review enqueue skipped: task=%s task_id=%s qid=%s non_representative_mux=true",
                 task.name,
                 task.task_id,
                 getattr(task, "qid", ""),
@@ -96,7 +96,7 @@ def enqueue_ai_triage_note(
         with _IN_FLIGHT_LOCK:
             if task.task_id in _IN_FLIGHT_TASK_IDS:
                 _log_debug(
-                    "AI triage enqueue skipped: task=%s task_id=%s already_in_flight=true",
+                    "AI review enqueue skipped: task=%s task_id=%s already_in_flight=true",
                     task.name,
                     task.task_id,
                 )
@@ -107,7 +107,7 @@ def enqueue_ai_triage_note(
         execution_snapshot = execution_model.model_copy(deep=True)
         try:
             _EXECUTOR.submit(
-                _run_enqueued_ai_triage,
+                _run_enqueued_ai_review,
                 task_snapshot,
                 execution_snapshot,
                 overwrite_existing,
@@ -117,24 +117,24 @@ def enqueue_ai_triage_note(
                 _IN_FLIGHT_TASK_IDS.discard(task.task_id)
             raise
         _log_info(
-            "AI triage enqueued: task=%s task_id=%s qid=%s execution_id=%s",
+            "AI review enqueued: task=%s task_id=%s qid=%s execution_id=%s",
             task.name,
             task.task_id,
             getattr(task, "qid", ""),
             execution_model.execution_id,
         )
     except Exception as exc:
-        _log_warning("AI triage enqueue failed for task %s (%s): %s", task.name, task.task_id, exc)
+        _log_warning("AI review enqueue failed for task %s (%s): %s", task.name, task.task_id, exc)
 
 
-def _run_enqueued_ai_triage(
+def _run_enqueued_ai_review(
     task: BaseTaskResultModel,
     execution_model: ExecutionModel,
     overwrite_existing: bool,
 ) -> None:
-    """Run queued AI triage and clear the in-flight marker."""
+    """Run queued AI review and clear the in-flight marker."""
     try:
-        maybe_attach_ai_triage_note(
+        maybe_attach_ai_review_note(
             task,
             execution_model,
             overwrite_existing=overwrite_existing,
@@ -144,13 +144,13 @@ def _run_enqueued_ai_triage(
             _IN_FLIGHT_TASK_IDS.discard(task.task_id)
 
 
-def maybe_attach_ai_triage_note(
+def maybe_attach_ai_review_note(
     task: BaseTaskResultModel,
     execution_model: ExecutionModel,
     *,
     overwrite_existing: bool = False,
 ) -> None:
-    """Attach an AI-generated triage section to a task-result note.
+    """Attach an AI-generated review section to a task-result note.
 
     This is a best-effort side effect. It must never fail calibration execution.
     """
@@ -160,24 +160,24 @@ def maybe_attach_ai_triage_note(
         config = load_copilot_config()
         if not config.enabled or not config.analysis.enabled:
             _log_info(
-                "AI triage skipped: task=%s task_id=%s copilot_enabled=%s analysis_enabled=%s",
+                "AI review skipped: task=%s task_id=%s copilot_enabled=%s analysis_enabled=%s",
                 task.name,
                 task.task_id,
                 config.enabled,
                 config.analysis.enabled,
             )
             return
-        if task.name not in config.analysis.ai_triage_tasks:
+        if task.name not in config.analysis.ai_review_tasks:
             _log_debug(
-                "AI triage skipped: task=%s task_id=%s not in ai_triage_tasks=%s",
+                "AI review skipped: task=%s task_id=%s not in ai_review_tasks=%s",
                 task.name,
                 task.task_id,
-                config.analysis.ai_triage_tasks,
+                config.analysis.ai_review_tasks,
             )
             return
-        if not _is_terminal_ai_triage_result(task):
+        if not _is_terminal_ai_review_result(task):
             _log_info(
-                "AI triage skipped: task=%s task_id=%s status=%s non_terminal=true",
+                "AI review skipped: task=%s task_id=%s status=%s non_terminal=true",
                 task.name,
                 task.task_id,
                 _task_status_value(task),
@@ -185,15 +185,15 @@ def maybe_attach_ai_triage_note(
             return
         if _is_non_representative_mux_result(task):
             _log_info(
-                "AI triage skipped: task=%s task_id=%s qid=%s non_representative_mux=true",
+                "AI review skipped: task=%s task_id=%s qid=%s non_representative_mux=true",
                 task.name,
                 task.task_id,
                 getattr(task, "qid", ""),
             )
             return
-        if not overwrite_existing and _has_ai_triage_note(task, execution_model):
+        if not overwrite_existing and _has_ai_review_note(task, execution_model):
             _log_info(
-                "AI triage skipped: task=%s task_id=%s existing_note=true",
+                "AI review skipped: task=%s task_id=%s existing_note=true",
                 task.name,
                 task.task_id,
             )
@@ -201,7 +201,7 @@ def maybe_attach_ai_triage_note(
 
         selected_model = _select_analysis_model(config)
         _log_info(
-            "AI triage starting: task=%s task_id=%s qid=%s execution_id=%s model=%s/%s",
+            "AI review starting: task=%s task_id=%s qid=%s execution_id=%s model=%s/%s",
             task.name,
             task.task_id,
             getattr(task, "qid", ""),
@@ -209,19 +209,19 @@ def maybe_attach_ai_triage_note(
             selected_model.provider,
             selected_model.name,
         )
-        markdown = _run_ai_triage(task, execution_model, config)
+        markdown = _run_ai_review(task, execution_model, config)
         if not markdown:
             _log_info(
-                "AI triage produced empty output: task=%s task_id=%s",
+                "AI review produced empty output: task=%s task_id=%s",
                 task.name,
                 task.task_id,
             )
             return
-        _upsert_ai_triage_note(task, execution_model, markdown, selected_model)
-        _log_info("AI triage note saved: task=%s task_id=%s", task.name, task.task_id)
+        _upsert_ai_review_note(task, execution_model, markdown, selected_model)
+        _log_info("AI review note saved: task=%s task_id=%s", task.name, task.task_id)
     except Exception as exc:
-        _set_ai_triage_failure(task, execution_model, str(exc))
-        _log_warning("AI triage failed for task %s (%s): %s", task.name, task.task_id, exc)
+        _set_ai_review_failure(task, execution_model, str(exc))
+        _log_warning("AI review failed for task %s (%s): %s", task.name, task.task_id, exc)
 
 
 def _prefect_logger() -> logging.Logger | None:
@@ -263,18 +263,18 @@ def _select_analysis_model(config: CopilotConfig) -> ModelConfig:
     return _shared_select_analysis_model(config)
 
 
-def _ai_triage_config(config: CopilotConfig) -> CopilotConfig:
-    """Apply AI-triage-only speed defaults without changing side-panel chat."""
-    return _shared_ai_triage_config(config)
+def _ai_review_config(config: CopilotConfig) -> CopilotConfig:
+    """Apply AI-review-only speed defaults without changing side-panel chat."""
+    return _shared_ai_review_config(config)
 
 
-def _forced_ai_triage_markdown(task_name: str, output_params: dict[str, object]) -> str | None:
+def _forced_ai_review_markdown(task_name: str, output_params: dict[str, object]) -> str | None:
     """Apply deterministic safety guards before asking a local VLM."""
-    return _shared_forced_ai_triage_markdown(task_name, output_params)
+    return _shared_forced_ai_review_markdown(task_name, output_params)
 
 
 def _is_non_representative_mux_result(task: BaseTaskResultModel) -> bool:
-    """Return True for copied MUX task results that should not receive AI notes."""
+    """Return True for copied MUX task results that should not receive AI review notes."""
     return _shared_is_non_representative_mux_result(task.name, getattr(task, "qid", ""))
 
 
@@ -284,19 +284,19 @@ def _task_status_value(task: BaseTaskResultModel) -> str:
     return str(getattr(status, "value", status))
 
 
-def _is_terminal_ai_triage_result(task: BaseTaskResultModel) -> bool:
-    """Return whether this task result is ready for AI triage."""
-    return _task_status_value(task) in AI_TRIAGE_ELIGIBLE_STATUSES
+def _is_terminal_ai_review_result(task: BaseTaskResultModel) -> bool:
+    """Return whether this task result is ready for AI review."""
+    return _task_status_value(task) in AI_REVIEW_ELIGIBLE_STATUSES
 
 
-def _run_ai_triage(
+def _run_ai_review(
     task: BaseTaskResultModel,
     execution_model: ExecutionModel,
     config: CopilotConfig,
 ) -> str | None:
     """Run Copilot analysis and return markdown content."""
-    config = _ai_triage_config(config)
-    ctx = _shared_build_ai_triage_context(
+    config = _ai_review_config(config)
+    ctx = _shared_build_ai_review_context(
         task_name=task.name,
         chip_id=execution_model.chip_id,
         qid=getattr(task, "qid", ""),
@@ -305,7 +305,7 @@ def _run_ai_triage(
     )
     selected_model = _select_analysis_model(config)
     _log_info(
-        "AI triage request: task=%s task_id=%s provider=%s model=%s image=%s expected_images=%d",
+        "AI review request: task=%s task_id=%s provider=%s model=%s image=%s expected_images=%d",
         task.name,
         task.task_id,
         selected_model.provider,
@@ -313,7 +313,7 @@ def _run_ai_triage(
         bool(ctx.image_base64),
         len(ctx.expected_images),
     )
-    markdown = _shared_render_ai_triage_markdown(
+    markdown = _shared_render_ai_review_markdown(
         task_name=task.name,
         config=config,
         context_bundle=ctx,
@@ -321,38 +321,38 @@ def _run_ai_triage(
     return markdown or None
 
 
-def _has_ai_triage_note(
+def _has_ai_review_note(
     task: BaseTaskResultModel,
     execution_model: ExecutionModel,
 ) -> bool:
-    """Return whether this task result already has an AI triage note section."""
+    """Return whether this task result already has an AI review note section."""
     existing = _get_existing_task_note_content(task, execution_model)
-    return bool(existing and AI_TRIAGE_SECTION_RE.search(existing))
+    return bool(existing and AI_REVIEW_SECTION_RE.search(existing))
 
 
-def _upsert_ai_triage_note(
+def _upsert_ai_review_note(
     task: BaseTaskResultModel,
     execution_model: ExecutionModel,
     markdown: str,
     model: ModelConfig,
 ) -> None:
-    """Insert or replace the AI triage section in the task-result note."""
+    """Insert or replace the AI review section in the task-result note."""
     existing = _get_existing_task_note_content(task, execution_model)
 
-    triage_section = (
-        f"{AI_TRIAGE_HEADER}\n\n{_format_review_metadata(model)}\n\n{_truncate_markdown(markdown)}"
+    review_section = (
+        f"{AI_REVIEW_HEADER}\n\n{_format_review_metadata(model)}\n\n{_truncate_markdown(markdown)}"
     )
-    if AI_TRIAGE_SECTION_RE.search(existing):
-        remainder = AI_TRIAGE_SECTION_RE.sub("", existing).strip()
+    if AI_REVIEW_SECTION_RE.search(existing):
+        remainder = AI_REVIEW_SECTION_RE.sub("", existing).strip()
         content = (
-            f"{triage_section}{AI_TRIAGE_SEPARATOR}{remainder}" if remainder else triage_section
+            f"{review_section}{AI_REVIEW_SEPARATOR}{remainder}" if remainder else review_section
         )
     elif existing.strip():
-        content = f"{triage_section}{AI_TRIAGE_SEPARATOR}{existing.rstrip()}"
+        content = f"{review_section}{AI_REVIEW_SEPARATOR}{existing.rstrip()}"
     else:
-        content = triage_section
+        content = review_section
 
-    _set_task_note_content(task, execution_model, content[:MAX_AI_TRIAGE_NOTE_CHARS], model)
+    _set_task_note_content(task, execution_model, content[:MAX_AI_REVIEW_NOTE_CHARS], model)
 
 
 def _get_existing_task_note_content(
@@ -387,22 +387,22 @@ def _set_task_note_content(
     if doc is None:
         raise ValueError(f"Task result not found: {task.task_id}")
     doc.user_note.content = content
-    doc.user_note.updated_by = AI_TRIAGE_ACTOR
+    doc.user_note.updated_by = AI_REVIEW_ACTOR
     doc.user_note.updated_at = timestamp
-    doc.ai_triage.status = "completed"
-    doc.ai_triage.model_provider = model.provider
-    doc.ai_triage.model_name = model.name
-    doc.ai_triage.completed_at = timestamp
-    doc.ai_triage.error = ""
+    doc.ai_review.status = "completed"
+    doc.ai_review.model_provider = model.provider
+    doc.ai_review.model_name = model.name
+    doc.ai_review.completed_at = timestamp
+    doc.ai_review.error = ""
     doc.save()
 
 
-def _set_ai_triage_failure(
+def _set_ai_review_failure(
     task: BaseTaskResultModel,
     execution_model: ExecutionModel,
     error: str,
 ) -> None:
-    """Persist AI triage failure metadata for workflow-triggered reviews."""
+    """Persist AI review failure metadata for workflow-triggered reviews."""
     from qdash.common.utils.datetime import now
     from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
 
@@ -411,15 +411,15 @@ def _set_ai_triage_failure(
     ).run()
     if doc is None:
         return
-    doc.ai_triage.status = "failed"
-    doc.ai_triage.completed_at = now()
-    doc.ai_triage.error = error[:500]
+    doc.ai_review.status = "failed"
+    doc.ai_review.completed_at = now()
+    doc.ai_review.error = error[:500]
     doc.save()
 
 
 def _truncate_markdown(markdown: str) -> str:
     """Keep note content bounded while preserving a useful tail marker."""
-    budget = MAX_AI_TRIAGE_NOTE_CHARS - 200
+    budget = MAX_AI_REVIEW_NOTE_CHARS - 200
     if len(markdown) <= budget:
         return markdown
     return markdown[:budget].rstrip() + "\n\n[truncated]"

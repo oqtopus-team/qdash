@@ -7,6 +7,6 @@
  */
 
 /**
- * Timestamp when AI triage was requested
+ * Timestamp when AI review was requested
  */
-export type AiTriageReviewModelRequestedAt = string | null;
+export type AiReviewModelRequestedAt = string | null;

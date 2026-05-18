@@ -5,6 +5,5 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { AiTriageReviewModel } from './aiTriageReviewModel';
 
-export type TaskResultAiTriage = AiTriageReviewModel | null;
+export type BulkAiReviewRequestTaskIds = string[] | null;

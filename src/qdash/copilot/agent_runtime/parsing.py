@@ -15,18 +15,18 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-_TRIAGE_DECISIONS = ("PASS_WITH_NOTE", "PASS", "REVIEW", "FAIL")
-_TRIAGE_ASSESSMENT = {
+_REVIEW_DECISIONS = ("PASS_WITH_NOTE", "PASS", "REVIEW", "FAIL")
+_REVIEW_ASSESSMENT = {
     "PASS": "good",
     "PASS_WITH_NOTE": "warning",
     "REVIEW": "warning",
     "FAIL": "bad",
 }
-_TRIAGE_BLOCK_PREFIXES = (
-    "**review triage**",
-    "review triage",
-    "**レビューのトリアージ**",
-    "レビューのトリアージ",
+_REVIEW_BLOCK_PREFIXES = (
+    "**ai review**",
+    "ai review",
+    "**aiレビュー**",
+    "aiレビュー",
 )
 
 
@@ -42,8 +42,8 @@ def strip_code_fences(text: str) -> str:
     return text
 
 
-def extract_triage_fallback(content: str) -> AnalysisResponse | None:
-    """Build a legacy response from a free-form review triage block."""
+def extract_review_fallback(content: str) -> AnalysisResponse | None:
+    """Build a legacy response from a free-form AI review block."""
     fields = {
         "Decision": "",
         "Human label suggestion": "",
@@ -61,7 +61,7 @@ def extract_triage_fallback(content: str) -> AnalysisResponse | None:
             continue
         value = match.group(1).strip().strip("`")
         if field == "Decision":
-            for decision in _TRIAGE_DECISIONS:
+            for decision in _REVIEW_DECISIONS:
                 if re.search(rf"\b{decision}\b", value):
                     value = decision
                     break
@@ -71,13 +71,13 @@ def extract_triage_fallback(content: str) -> AnalysisResponse | None:
     if not decision:
         return None
 
-    triage = "\n".join(
-        ["**Review triage**", *(f"- {field}: {value or 'none'}" for field, value in fields.items())]
+    review = "\n".join(
+        ["**AI review**", *(f"- {field}: {value or 'none'}" for field, value in fields.items())]
     )
     return AnalysisResponse(
         summary=fields["Primary reason"] or "Analysis complete",
-        assessment=_TRIAGE_ASSESSMENT.get(decision, "warning"),
-        explanation=triage,
+        assessment=_REVIEW_ASSESSMENT.get(decision, "warning"),
+        explanation=review,
         potential_issues=[]
         if decision in {"PASS", "PASS_WITH_NOTE"}
         else [fields["Primary reason"]],
@@ -85,17 +85,17 @@ def extract_triage_fallback(content: str) -> AnalysisResponse | None:
     )
 
 
-def has_triage_block(text: str) -> bool:
-    """Return True when text starts with the required review-triage block."""
-    return text.lower().lstrip().startswith(_TRIAGE_BLOCK_PREFIXES)
+def has_review_block(text: str) -> bool:
+    """Return True when text starts with the required AI review block."""
+    return text.lower().lstrip().startswith(_REVIEW_BLOCK_PREFIXES)
 
 
-def missing_triage_response(_content: str) -> AnalysisResponse:
-    """Return a safe review note when a local model omits required triage fields."""
-    summary = "AI triage response did not include the required review block."
-    triage = "\n".join(
+def missing_review_response(_content: str) -> AnalysisResponse:
+    """Return a safe review note when a local model omits required review fields."""
+    summary = "AI review response did not include the required review block."
+    review = "\n".join(
         [
-            "**Review triage**",
+            "**AI review**",
             "- Decision: `REVIEW`",
             "- Human label suggestion: `SUSPICIOUS`",
             "- Accepted parameter(s): `none`",
@@ -104,13 +104,13 @@ def missing_triage_response(_content: str) -> AnalysisResponse:
             "- Closest knowledge case: `none`",
             "- Suggested labels: `model_format_error`",
             "- Recommended action: Open the task result and review the plot manually.",
-            "- Optional note: The raw local-model response was missing the triage block.",
+            "- Optional note: The raw local-model response was missing the review block.",
         ]
     )
     return AnalysisResponse(
         summary=summary,
         assessment="warning",
-        explanation=triage,
+        explanation=review,
         potential_issues=[summary],
         recommendations=["Open the task result and review the plot manually."],
     )
@@ -123,19 +123,19 @@ def parse_response(content: str) -> AnalysisResponse:
     try:
         data = json.loads(text)
         response = AnalysisResponse(**data)
-        if response.explanation and has_triage_block(response.explanation):
+        if response.explanation and has_review_block(response.explanation):
             return response
-        fallback_response = extract_triage_fallback(response.explanation or content)
+        fallback_response = extract_review_fallback(response.explanation or content)
         if fallback_response is not None:
             return fallback_response
-        logger.warning("Local model response omitted required review triage block: %s", content)
-        return missing_triage_response(content)
+        logger.warning("Local model response omitted required AI review block: %s", content)
+        return missing_review_response(content)
     except (json.JSONDecodeError, ValueError):
-        fallback_response = extract_triage_fallback(content)
+        fallback_response = extract_review_fallback(content)
         if fallback_response is not None:
             return fallback_response
-        logger.warning("Local model response omitted required review triage block: %s", content)
-        return missing_triage_response(content)
+        logger.warning("Local model response omitted required AI review block: %s", content)
+        return missing_review_response(content)
 
 
 def extract_first_json_object(text: str) -> dict[str, Any] | None:

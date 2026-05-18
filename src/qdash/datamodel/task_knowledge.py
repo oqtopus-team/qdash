@@ -189,11 +189,11 @@ class TaskKnowledge(BaseModel):
     )
     triage_markdown: str = Field(
         default="",
-        description="Optional AI-triage-specific markdown guidance",
+        description="Optional AI-review-specific markdown guidance",
     )
     triage_images: list[TaskKnowledgeImage] = Field(
         default_factory=list,
-        description="Image references from the triage markdown file",
+        description="Image references from the review markdown file",
     )
     related_context: list[RelatedContextItem] = Field(
         default_factory=list,
@@ -358,7 +358,7 @@ class TaskKnowledge(BaseModel):
         return "\n".join(normalized_lines).strip()
 
     def to_triage_prompt(self) -> str:
-        """Build a compact prompt focused on AI triage decisions."""
+        """Build a compact prompt focused on AI review decisions."""
         lines = [
             f"## Experiment: {self.name}",
             self.summary,
@@ -393,7 +393,7 @@ class TaskKnowledge(BaseModel):
 
         triage_markdown = self._normalize_markdown_block(self.triage_markdown)
         if triage_markdown:
-            lines += ["", "### AI triage guidance", triage_markdown]
+            lines += ["", "### AI review guidance", triage_markdown]
 
         return "\n".join(lines)
 

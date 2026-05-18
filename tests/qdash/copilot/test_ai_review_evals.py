@@ -1,4 +1,4 @@
-"""Tests for AI triage evaluation capture and replay helpers."""
+"""Tests for AI review evaluation capture and replay helpers."""
 
 from __future__ import annotations
 
@@ -8,14 +8,14 @@ from unittest.mock import patch
 
 from qdash.copilot.config import AnalysisConfig, CopilotConfig, ModelConfig
 from qdash.copilot.contracts import AnalysisContextResult, TaskAnalysisContext
-from qdash.copilot.evals.ai_triage import (
-    AITriageEvalSnapshot,
-    AITriageExpectedImage,
-    AITriageModelRef,
-    AITriageSourceRef,
-    capture_ai_triage_snapshot,
-    run_ai_triage_snapshot,
-    write_ai_triage_run_artifacts,
+from qdash.copilot.evals.ai_review import (
+    AIReviewEvalSnapshot,
+    AIReviewExpectedImage,
+    AIReviewModelRef,
+    AIReviewSourceRef,
+    capture_ai_review_snapshot,
+    run_ai_review_snapshot,
+    write_ai_review_run_artifacts,
 )
 
 if TYPE_CHECKING:
@@ -29,8 +29,8 @@ def _config() -> CopilotConfig:
         analysis_models=[ModelConfig(provider="openai", name="gpt-5.1", max_output_tokens=2048)],
         analysis=AnalysisConfig(
             enabled=True,
-            ai_triage_tasks=["CheckQubitSpectroscopy"],
-            ai_triage_message="Review this run carefully.",
+            ai_review_tasks=["CheckQubitSpectroscopy"],
+            ai_review_message="Review this run carefully.",
         ),
     )
 
@@ -56,16 +56,16 @@ def _bundle(task_knowledge_prompt: str = "knowledge-v1") -> AnalysisContextResul
     )
 
 
-def _snapshot() -> AITriageEvalSnapshot:
-    return AITriageEvalSnapshot(
+def _snapshot() -> AIReviewEvalSnapshot:
+    return AIReviewEvalSnapshot(
         captured_at=datetime(2026, 5, 14, tzinfo=UTC),
-        source=AITriageSourceRef(
+        source=AIReviewSourceRef(
             task_name="CheckQubitSpectroscopy",
             chip_id="chip-1",
             qid="4",
             task_id="task-1",
         ),
-        selected_model=AITriageModelRef(
+        selected_model=AIReviewModelRef(
             provider="openai",
             name="gpt-5.1",
             api_style="responses",
@@ -73,14 +73,14 @@ def _snapshot() -> AITriageEvalSnapshot:
         ),
         user_message="stored prompt",
         context=_context(),
-        expected_images=[AITriageExpectedImage(alt_text="expected image", base64_data="abc123")],
+        expected_images=[AIReviewExpectedImage(alt_text="expected image", base64_data="abc123")],
         figure_paths=["/tmp/figure.png"],
     )
 
 
-def test_capture_ai_triage_snapshot_uses_live_context() -> None:
-    with patch("qdash.copilot.evals.ai_triage.build_ai_triage_context", return_value=_bundle()):
-        snapshot = capture_ai_triage_snapshot(
+def test_capture_ai_review_snapshot_uses_live_context() -> None:
+    with patch("qdash.copilot.evals.ai_review.build_ai_review_context", return_value=_bundle()):
+        snapshot = capture_ai_review_snapshot(
             task_name="CheckQubitSpectroscopy",
             chip_id="chip-1",
             qid="4",
@@ -95,15 +95,15 @@ def test_capture_ai_triage_snapshot_uses_live_context() -> None:
     assert "Review this run carefully." in snapshot.user_message
 
 
-def test_run_ai_triage_snapshot_frozen_uses_current_prompt_without_rebuild() -> None:
+def test_run_ai_review_snapshot_frozen_uses_current_prompt_without_rebuild() -> None:
     with (
         patch(
-            "qdash.copilot.evals.ai_triage.render_ai_triage_markdown",
-            return_value="triage markdown",
+            "qdash.copilot.evals.ai_review.render_ai_review_markdown",
+            return_value="review markdown",
         ) as render,
-        patch("qdash.copilot.evals.ai_triage.build_ai_triage_context") as rebuild,
+        patch("qdash.copilot.evals.ai_review.build_ai_review_context") as rebuild,
     ):
-        result = run_ai_triage_snapshot(
+        result = run_ai_review_snapshot(
             _snapshot(),
             mode="frozen",
             config=_config(),
@@ -112,24 +112,24 @@ def test_run_ai_triage_snapshot_frozen_uses_current_prompt_without_rebuild() -> 
     rebuild.assert_not_called()
     render.assert_called_once()
     assert result.context.task_knowledge_prompt == "knowledge-v1"
-    assert result.markdown == "triage markdown"
+    assert result.markdown == "review markdown"
     assert "Review this run carefully." in result.user_message
 
 
-def test_run_ai_triage_snapshot_rebuild_refreshes_context() -> None:
+def test_run_ai_review_snapshot_rebuild_refreshes_context() -> None:
     refreshed_bundle = _bundle(task_knowledge_prompt="knowledge-v2")
 
     with (
         patch(
-            "qdash.copilot.evals.ai_triage.build_ai_triage_context",
+            "qdash.copilot.evals.ai_review.build_ai_review_context",
             return_value=refreshed_bundle,
         ) as rebuild,
         patch(
-            "qdash.copilot.evals.ai_triage.render_ai_triage_markdown",
-            return_value="triage markdown",
+            "qdash.copilot.evals.ai_review.render_ai_review_markdown",
+            return_value="review markdown",
         ),
     ):
-        result = run_ai_triage_snapshot(
+        result = run_ai_review_snapshot(
             _snapshot(),
             mode="rebuild",
             config=_config(),
@@ -139,19 +139,19 @@ def test_run_ai_triage_snapshot_rebuild_refreshes_context() -> None:
     assert result.context.task_knowledge_prompt == "knowledge-v2"
 
 
-def test_write_ai_triage_run_artifacts_writes_expected_files(tmp_path: Path) -> None:
+def test_write_ai_review_run_artifacts_writes_expected_files(tmp_path: Path) -> None:
     with patch(
-        "qdash.copilot.evals.ai_triage.render_ai_triage_markdown",
-        return_value="triage markdown",
+        "qdash.copilot.evals.ai_review.render_ai_review_markdown",
+        return_value="review markdown",
     ):
-        result = run_ai_triage_snapshot(
+        result = run_ai_review_snapshot(
             _snapshot(),
             mode="frozen",
             config=_config(),
         )
 
-    output_dir = write_ai_triage_run_artifacts(result, tmp_path / "run-1")
+    output_dir = write_ai_review_run_artifacts(result, tmp_path / "run-1")
 
-    assert (output_dir / "result.md").read_text(encoding="utf-8").strip() == "triage markdown"
+    assert (output_dir / "result.md").read_text(encoding="utf-8").strip() == "review markdown"
     assert "task_knowledge_prompt" in (output_dir / "context.json").read_text(encoding="utf-8")
     assert "selected_model" in (output_dir / "report.json").read_text(encoding="utf-8")

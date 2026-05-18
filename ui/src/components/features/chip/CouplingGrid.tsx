@@ -19,9 +19,9 @@ import type { Task } from "@/schemas";
 
 import { getGetChipNotesSummaryQueryKey } from "@/client/note/note";
 import { useGetCopilotConfig } from "@/client/copilot/copilot";
-import { downloadFiguresAsZip, requestBulkAiTriageReview } from "@/client/task-result/task-result";
-import { AiTriageConfirmModal } from "@/components/features/chip/AiTriageConfirmModal";
-import type { AiTriageBadgeState } from "@/components/features/chip/aiTriageBadge";
+import { downloadFiguresAsZip, requestBulkAiReview } from "@/client/task-result/task-result";
+import { AiReviewConfirmModal } from "@/components/features/chip/AiReviewConfirmModal";
+import type { AiReviewBadgeState } from "@/components/features/chip/aiReviewBadge";
 import {
   DownloadConfirmModal,
   type DownloadItemCounts,
@@ -49,7 +49,7 @@ interface CouplingGridProps {
   selectedDate: string;
   gridSize: number;
   onDateChange?: (date: string) => void;
-  aiTriageBadgesByTaskId?: Map<string, AiTriageBadgeState>;
+  aiReviewBadgesByTaskId?: Map<string, AiReviewBadgeState>;
 }
 
 interface SelectedTaskInfo {
@@ -61,8 +61,8 @@ interface ExtendedTask extends Task {
   couplingId: string;
 }
 
-type TaskWithAiTriage = Task & {
-  ai_triage?: {
+type TaskWithAiReview = Task & {
+  ai_review?: {
     status?: string;
   } | null;
 };
@@ -71,8 +71,8 @@ const DEFAULT_DOWNLOAD_OPTIONS: DownloadOptions = {
   figureImages: false,
   jsonFigures: true,
   rawData: false,
-  aiTriageNotes: false,
-  aiTriageReplayBundles: false,
+  aiReviewNotes: false,
+  aiReviewReplayBundles: false,
 };
 
 function toPathList(paths: string[] | string | null | undefined): string[] {
@@ -80,17 +80,17 @@ function toPathList(paths: string[] | string | null | undefined): string[] {
   return Array.isArray(paths) ? paths : [paths];
 }
 
-function isAiTriageReviewPending(task: TaskWithAiTriage | null | undefined): boolean {
-  const status = task?.ai_triage?.status;
+function isAiReviewRequestPending(task: TaskWithAiReview | null | undefined): boolean {
+  const status = task?.ai_review?.status;
   return status === "requested" || status === "running";
 }
 
-function getPendingAiTriageTaskIds(
-  tasks: Record<string, TaskWithAiTriage> | undefined,
+function getPendingAiReviewTaskIds(
+  tasks: Record<string, TaskWithAiReview> | undefined,
 ): Set<string> {
   const taskIds = new Set<string>();
   for (const task of Object.values(tasks ?? {})) {
-    if (task.task_id && isAiTriageReviewPending(task)) {
+    if (task.task_id && isAiReviewRequestPending(task)) {
       taskIds.add(task.task_id);
     }
   }
@@ -133,7 +133,7 @@ export function CouplingGrid({
   selectedTask,
   selectedDate,
   gridSize: defaultGridSize,
-  aiTriageBadgesByTaskId,
+  aiReviewBadgesByTaskId,
 }: CouplingGridProps) {
   const queryClient = useQueryClient();
   // Get topology configuration
@@ -186,12 +186,12 @@ export function CouplingGrid({
   const [isDownloading, setIsDownloading] = useState(false);
   const [isDownloadConfirmOpen, setIsDownloadConfirmOpen] = useState(false);
   const [downloadOptions, setDownloadOptions] = useState<DownloadOptions>(DEFAULT_DOWNLOAD_OPTIONS);
-  const [aiTriageSelectionEnabled, setAiTriageSelectionEnabled] = useState(false);
-  const [selectedForAiTriage, setSelectedForAiTriage] = useState<Set<string>>(new Set());
-  const [pendingAiTriageTaskIds, setPendingAiTriageTaskIds] = useState<Set<string>>(new Set());
-  const [isRequestingAiTriage, setIsRequestingAiTriage] = useState(false);
-  const [isAiTriageConfirmOpen, setIsAiTriageConfirmOpen] = useState(false);
-  const [aiTriageStatus, setAiTriageStatus] = useState<string | null>(null);
+  const [aiReviewSelectionEnabled, setAiReviewSelectionEnabled] = useState(false);
+  const [selectedForAiReview, setSelectedForAiReview] = useState<Set<string>>(new Set());
+  const [pendingAiReviewTaskIds, setPendingAiReviewTaskIds] = useState<Set<string>>(new Set());
+  const [isRequestingAiReview, setIsRequestingAiReview] = useState(false);
+  const [isAiReviewConfirmOpen, setIsAiReviewConfirmOpen] = useState(false);
+  const [aiReviewStatus, setAiReviewStatus] = useState<string | null>(null);
   const [selectedModelKey, setSelectedModelKey] = useState(getStoredAnalysisModelKey);
   const { data: copilotConfigResponse } = useGetCopilotConfig();
   const modelOptions = useMemo(
@@ -238,53 +238,53 @@ export function CouplingGrid({
     task: selectedTask,
     selectedDate,
   });
-  const persistedPendingAiTriageTaskIds = useMemo(
-    () => getPendingAiTriageTaskIds(taskResponse?.data?.result),
+  const persistedPendingAiReviewTaskIds = useMemo(
+    () => getPendingAiReviewTaskIds(taskResponse?.data?.result),
     [taskResponse?.data?.result],
   );
-  const visiblePendingAiTriageCount = useMemo(() => {
-    const taskIds = new Set(pendingAiTriageTaskIds);
-    for (const taskId of persistedPendingAiTriageTaskIds) {
+  const visiblePendingAiReviewCount = useMemo(() => {
+    const taskIds = new Set(pendingAiReviewTaskIds);
+    for (const taskId of persistedPendingAiReviewTaskIds) {
       taskIds.add(taskId);
     }
     return taskIds.size;
-  }, [pendingAiTriageTaskIds, persistedPendingAiTriageTaskIds]);
+  }, [pendingAiReviewTaskIds, persistedPendingAiReviewTaskIds]);
   const downloadCounts = useMemo(() => {
     const counts: DownloadItemCounts = {
       figureImages: 0,
       jsonFigures: 0,
       rawData: 0,
-      aiTriageNotes: 0,
-      aiTriageReplayBundles: 0,
+      aiReviewNotes: 0,
+      aiReviewReplayBundles: 0,
     };
     selectedForDownload.forEach((couplingId) => {
       const task = taskResponse?.data?.result?.[couplingId];
       counts.figureImages += toPathList(task?.figure_path).length;
       counts.jsonFigures += toPathList(task?.json_figure_path).length;
       counts.rawData += toPathList(task?.raw_data_path).length;
-      if (task?.task_id && aiTriageBadgesByTaskId?.has(task.task_id)) {
-        counts.aiTriageNotes += 1;
+      if (task?.task_id && aiReviewBadgesByTaskId?.has(task.task_id)) {
+        counts.aiReviewNotes += 1;
       }
       if (task?.task_id) {
-        counts.aiTriageReplayBundles += 1;
+        counts.aiReviewReplayBundles += 1;
       }
     });
     return counts;
-  }, [aiTriageBadgesByTaskId, selectedForDownload, taskResponse?.data?.result]);
+  }, [aiReviewBadgesByTaskId, selectedForDownload, taskResponse?.data?.result]);
 
   useEffect(() => {
-    if (!aiTriageBadgesByTaskId || pendingAiTriageTaskIds.size === 0) return;
-    setPendingAiTriageTaskIds((prev) => {
+    if (!aiReviewBadgesByTaskId || pendingAiReviewTaskIds.size === 0) return;
+    setPendingAiReviewTaskIds((prev) => {
       const next = new Set(prev);
-      for (const taskId of aiTriageBadgesByTaskId.keys()) {
+      for (const taskId of aiReviewBadgesByTaskId.keys()) {
         next.delete(taskId);
       }
       return next.size === prev.size ? prev : next;
     });
-  }, [aiTriageBadgesByTaskId, pendingAiTriageTaskIds.size]);
+  }, [aiReviewBadgesByTaskId, pendingAiReviewTaskIds.size]);
 
   useEffect(() => {
-    if (visiblePendingAiTriageCount === 0) return;
+    if (visiblePendingAiReviewCount === 0) return;
     const intervalId = window.setInterval(() => {
       void refetchTaskResults();
       void queryClient.invalidateQueries({
@@ -292,7 +292,7 @@ export function CouplingGrid({
       });
     }, 5_000);
     return () => window.clearInterval(intervalId);
-  }, [chipId, queryClient, refetchTaskResults, visiblePendingAiTriageCount]);
+  }, [chipId, queryClient, refetchTaskResults, visiblePendingAiReviewCount]);
 
   // Use grid layout hook for responsive sizing
   const displayCols = zoomMode === "region" ? regionSize : gridCols;
@@ -413,8 +413,8 @@ export function CouplingGrid({
     if (selectedForDownload.size === 0) return;
 
     const paths: string[] = [];
-    const aiTriageTaskIds: string[] = [];
-    const aiTriageBundleTaskIds: string[] = [];
+    const aiReviewTaskIds: string[] = [];
+    const aiReviewBundleTaskIds: string[] = [];
     selectedForDownload.forEach((couplingId) => {
       const task = taskResponse?.data?.result?.[couplingId];
       if (!task) return;
@@ -427,15 +427,15 @@ export function CouplingGrid({
       if (downloadOptions.rawData) {
         paths.push(...toPathList(task.raw_data_path));
       }
-      if (downloadOptions.aiTriageNotes && task.task_id) {
-        aiTriageTaskIds.push(task.task_id);
+      if (downloadOptions.aiReviewNotes && task.task_id) {
+        aiReviewTaskIds.push(task.task_id);
       }
-      if (downloadOptions.aiTriageReplayBundles && task.task_id) {
-        aiTriageBundleTaskIds.push(task.task_id);
+      if (downloadOptions.aiReviewReplayBundles && task.task_id) {
+        aiReviewBundleTaskIds.push(task.task_id);
       }
     });
 
-    if (paths.length === 0 && aiTriageTaskIds.length === 0 && aiTriageBundleTaskIds.length === 0)
+    if (paths.length === 0 && aiReviewTaskIds.length === 0 && aiReviewBundleTaskIds.length === 0)
       return;
 
     setIsDownloading(true);
@@ -445,8 +445,8 @@ export function CouplingGrid({
         {
           paths,
           filename,
-          ai_triage_task_ids: aiTriageTaskIds,
-          ai_triage_bundle_task_ids: aiTriageBundleTaskIds,
+          ai_review_task_ids: aiReviewTaskIds,
+          ai_review_bundle_task_ids: aiReviewBundleTaskIds,
         },
         { responseType: "blob" },
       );
@@ -490,30 +490,30 @@ export function CouplingGrid({
   const availableForDownloadCount = Object.entries(taskResponse?.data?.result || {}).filter(
     ([, task]) => hasDownloadableArtifacts(task),
   ).length;
-  const availableForAiTriageCount = Object.values(taskResponse?.data?.result || {}).filter(
+  const availableForAiReviewCount = Object.values(taskResponse?.data?.result || {}).filter(
     (task) => task.task_id,
   ).length;
   const copilotConfig = copilotConfigResponse?.data as
     | {
         enabled?: boolean;
-        analysis?: { enabled?: boolean; ai_triage_tasks?: string[] };
+        analysis?: { enabled?: boolean; ai_review_tasks?: string[] };
       }
     | undefined;
-  const isAiTriageTaskConfigured = Boolean(
+  const isAiReviewTaskConfigured = Boolean(
     copilotConfig?.enabled &&
     copilotConfig.analysis?.enabled &&
-    copilotConfig.analysis.ai_triage_tasks?.includes(selectedTask),
+    copilotConfig.analysis.ai_review_tasks?.includes(selectedTask),
   );
   const handleModelChange = (key: string) => {
     setSelectedModelKey(key);
     setStoredAnalysisModelKey(key);
   };
 
-  const canAiTriageCoupling = (couplingId: string): boolean =>
-    Boolean(isAiTriageTaskConfigured && taskResponse?.data?.result?.[couplingId]?.task_id);
+  const canAiReviewCoupling = (couplingId: string): boolean =>
+    Boolean(isAiReviewTaskConfigured && taskResponse?.data?.result?.[couplingId]?.task_id);
 
-  const toggleAiTriageSelection = (couplingId: string) => {
-    setSelectedForAiTriage((prev) => {
+  const toggleAiReviewSelection = (couplingId: string) => {
+    setSelectedForAiReview((prev) => {
       const newSet = new Set(prev);
       if (newSet.has(couplingId)) {
         newSet.delete(couplingId);
@@ -524,28 +524,28 @@ export function CouplingGrid({
     });
   };
 
-  const selectAllForAiTriage = () => {
+  const selectAllForAiReview = () => {
     const allCouplingIds = Object.keys(taskResponse?.data?.result || {}).filter(
-      canAiTriageCoupling,
+      canAiReviewCoupling,
     );
-    setSelectedForAiTriage(new Set(allCouplingIds));
+    setSelectedForAiReview(new Set(allCouplingIds));
   };
 
-  const clearAiTriageSelection = () => {
-    setSelectedForAiTriage(new Set());
+  const clearAiReviewSelection = () => {
+    setSelectedForAiReview(new Set());
   };
 
-  const handleBulkAiTriage = async () => {
-    if (selectedForAiTriage.size === 0 || !isAiTriageTaskConfigured) return;
+  const handleBulkAiReview = async () => {
+    if (selectedForAiReview.size === 0 || !isAiReviewTaskConfigured) return;
 
-    const taskIds = Array.from(selectedForAiTriage)
+    const taskIds = Array.from(selectedForAiReview)
       .map((couplingId) => taskResponse?.data?.result?.[couplingId]?.task_id)
       .filter((taskId): taskId is string => Boolean(taskId));
     if (taskIds.length === 0) return;
 
-    setIsRequestingAiTriage(true);
+    setIsRequestingAiReview(true);
     try {
-      const response = await requestBulkAiTriageReview({
+      const response = await requestBulkAiReview({
         chip_id: chipId,
         task: selectedTask,
         entity_type: "coupling",
@@ -553,24 +553,22 @@ export function CouplingGrid({
         task_ids: taskIds,
         model_override: selectedModel.model,
       });
-      setAiTriageStatus(
-        `AI triage review requested for ${response.data.requested_count} task results.`,
-      );
-      setPendingAiTriageTaskIds((prev) => {
+      setAiReviewStatus(`AI review requested for ${response.data.requested_count} task results.`);
+      setPendingAiReviewTaskIds((prev) => {
         const next = new Set(prev);
         for (const taskId of response.data.task_ids) {
           next.add(taskId);
         }
         return next;
       });
-      setIsAiTriageConfirmOpen(false);
-      setAiTriageSelectionEnabled(false);
-      setSelectedForAiTriage(new Set());
+      setIsAiReviewConfirmOpen(false);
+      setAiReviewSelectionEnabled(false);
+      setSelectedForAiReview(new Set());
     } catch (error) {
-      console.error("AI triage request error:", error);
-      setAiTriageStatus("AI triage request failed. Please try again.");
+      console.error("AI review request error:", error);
+      setAiReviewStatus("AI review request failed. Please try again.");
     } finally {
-      setIsRequestingAiTriage(false);
+      setIsRequestingAiReview(false);
     }
   };
 
@@ -702,14 +700,14 @@ export function CouplingGrid({
 
           const isSelectedForDownload = selectedForDownload.has(task.couplingId);
           const canBeDownloaded = hasJsonFigures(task.couplingId);
-          const isSelectedForAiTriage = selectedForAiTriage.has(task.couplingId);
-          const canBeAiTriaged = canAiTriageCoupling(task.couplingId);
-          const isAiTriagePending = Boolean(
+          const isSelectedForAiReview = selectedForAiReview.has(task.couplingId);
+          const canBeAiReviewed = canAiReviewCoupling(task.couplingId);
+          const isAiReviewPending = Boolean(
             task.task_id &&
-            (pendingAiTriageTaskIds.has(task.task_id) || isAiTriageReviewPending(task)),
+            (pendingAiReviewTaskIds.has(task.task_id) || isAiReviewRequestPending(task)),
           );
-          const aiTriageBadge = task.task_id
-            ? (aiTriageBadgesByTaskId?.get(task.task_id) ?? null)
+          const aiReviewBadge = task.task_id
+            ? (aiReviewBadgesByTaskId?.get(task.task_id) ?? null)
             : null;
 
           const statusColor =
@@ -727,9 +725,9 @@ export function CouplingGrid({
                 onClick={() => {
                   if (downloadSelectionEnabled) {
                     if (canBeDownloaded) toggleDownloadSelection(task.couplingId);
-                  } else if (aiTriageSelectionEnabled) {
-                    if (canBeAiTriaged) {
-                      toggleAiTriageSelection(task.couplingId);
+                  } else if (aiReviewSelectionEnabled) {
+                    if (canBeAiReviewed) {
+                      toggleAiReviewSelection(task.couplingId);
                     }
                   } else {
                     setSelectedTaskInfo({
@@ -750,31 +748,31 @@ export function CouplingGrid({
                     ? "ring-2 ring-primary ring-offset-1"
                     : ""
                 } ${
-                  aiTriageSelectionEnabled && isSelectedForAiTriage
+                  aiReviewSelectionEnabled && isSelectedForAiReview
                     ? "ring-2 ring-primary ring-offset-1"
                     : ""
                 }`}
               >
-                {isAiTriagePending && (
+                {isAiReviewPending && (
                   <div
                     className="absolute top-0 right-0 rounded bg-info text-info-content p-0.5 shadow-sm"
-                    title="AI triage review requested"
+                    title="AI review requested"
                   >
                     <LoaderCircle size={10} className="animate-spin" />
                   </div>
                 )}
-                {!isAiTriagePending && aiTriageBadge && (
+                {!isAiReviewPending && aiReviewBadge && (
                   <div
-                    className={`absolute top-0 right-0 rounded ${aiTriageBadge.iconClass} p-0.5 shadow-sm`}
-                    title={aiTriageBadge.title}
+                    className={`absolute top-0 right-0 rounded ${aiReviewBadge.iconClass} p-0.5 shadow-sm`}
+                    title={aiReviewBadge.title}
                   >
                     <Bot size={10} />
                   </div>
                 )}
                 <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 bg-base-100 text-base-content text-xs rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
                   {task.couplingId}: {task.status}
-                  {isAiTriagePending ? " · AI triage review requested" : ""}
-                  {aiTriageBadge ? ` · ${aiTriageBadge.tooltip}` : ""}
+                  {isAiReviewPending ? " · AI review requested" : ""}
+                  {aiReviewBadge ? ` · ${aiReviewBadge.tooltip}` : ""}
                 </div>
               </button>
             );
@@ -789,9 +787,9 @@ export function CouplingGrid({
                   if (canBeDownloaded) {
                     toggleDownloadSelection(task.couplingId);
                   }
-                } else if (aiTriageSelectionEnabled) {
-                  if (canBeAiTriaged) {
-                    toggleAiTriageSelection(task.couplingId);
+                } else if (aiReviewSelectionEnabled) {
+                  if (canBeAiReviewed) {
+                    toggleAiReviewSelection(task.couplingId);
                   }
                 } else {
                   setSelectedTaskInfo({
@@ -812,13 +810,13 @@ export function CouplingGrid({
                   ? "ring-2 ring-primary ring-offset-2"
                   : ""
               } ${
-                aiTriageSelectionEnabled && isSelectedForAiTriage
+                aiReviewSelectionEnabled && isSelectedForAiReview
                   ? "ring-2 ring-primary ring-offset-2"
                   : ""
               } ${
                 downloadSelectionEnabled && !canBeDownloaded ? "opacity-40 cursor-not-allowed" : ""
               } ${
-                aiTriageSelectionEnabled && !canBeAiTriaged ? "opacity-40 cursor-not-allowed" : ""
+                aiReviewSelectionEnabled && !canBeAiReviewed ? "opacity-40 cursor-not-allowed" : ""
               }`}
             >
               {figurePath && (
@@ -830,18 +828,18 @@ export function CouplingGrid({
                   />
                 </div>
               )}
-              {isAiTriagePending && (
+              {isAiReviewPending && (
                 <div
                   className="absolute top-1 right-1 rounded bg-info text-info-content p-1 shadow-sm"
-                  title="AI triage review requested"
+                  title="AI review requested"
                 >
                   <LoaderCircle size={14} className="animate-spin" />
                 </div>
               )}
-              {!isAiTriagePending && aiTriageBadge && (
+              {!isAiReviewPending && aiReviewBadge && (
                 <div
-                  className={`absolute top-1 right-1 rounded ${aiTriageBadge.iconClass} p-1 shadow-sm`}
-                  title={aiTriageBadge.title}
+                  className={`absolute top-1 right-1 rounded ${aiReviewBadge.iconClass} p-1 shadow-sm`}
+                  title={aiReviewBadge.title}
                 >
                   <Bot size={14} />
                 </div>
@@ -862,15 +860,15 @@ export function CouplingGrid({
                   )}
                 </div>
               )}
-              {aiTriageSelectionEnabled && canBeAiTriaged && (
+              {aiReviewSelectionEnabled && canBeAiReviewed && (
                 <div
                   className={`absolute inset-0 flex items-center justify-center transition-colors ${
-                    isSelectedForAiTriage
+                    isSelectedForAiReview
                       ? "bg-primary/20"
                       : "bg-transparent hover:bg-base-content/10"
                   }`}
                 >
-                  {isSelectedForAiTriage && (
+                  {isSelectedForAiReview && (
                     <div className="bg-primary text-primary-content rounded-full p-1">
                       <Bot size={16} />
                     </div>
@@ -1020,42 +1018,42 @@ export function CouplingGrid({
                   <X size={16} />
                 </button>
               </div>
-            ) : aiTriageSelectionEnabled ? (
+            ) : aiReviewSelectionEnabled ? (
               <div className="flex items-center gap-2">
                 <span className="text-sm text-base-content/70">
-                  {selectedForAiTriage.size} / {availableForAiTriageCount} selected
+                  {selectedForAiReview.size} / {availableForAiReviewCount} selected
                 </span>
                 <button
                   className="btn btn-xs btn-ghost"
-                  onClick={selectAllForAiTriage}
+                  onClick={selectAllForAiReview}
                   title="Select all"
                 >
                   All
                 </button>
                 <button
                   className="btn btn-xs btn-ghost"
-                  onClick={clearAiTriageSelection}
+                  onClick={clearAiReviewSelection}
                   title="Clear selection"
                 >
                   Clear
                 </button>
                 <button
                   className="btn btn-sm btn-primary gap-1"
-                  onClick={() => setIsAiTriageConfirmOpen(true)}
-                  disabled={selectedForAiTriage.size === 0 || isRequestingAiTriage}
+                  onClick={() => setIsAiReviewConfirmOpen(true)}
+                  disabled={selectedForAiReview.size === 0 || isRequestingAiReview}
                 >
-                  {isRequestingAiTriage ? (
+                  {isRequestingAiReview ? (
                     <span className="loading loading-spinner loading-xs" />
                   ) : (
                     <Bot size={16} />
                   )}
-                  AI Triage
+                  AI Review
                 </button>
                 <button
                   className="btn btn-sm btn-ghost btn-circle"
                   onClick={() => {
-                    setAiTriageSelectionEnabled(false);
-                    setSelectedForAiTriage(new Set());
+                    setAiReviewSelectionEnabled(false);
+                    setSelectedForAiReview(new Set());
                   }}
                   title="Cancel"
                 >
@@ -1067,16 +1065,16 @@ export function CouplingGrid({
                 <button
                   className="btn btn-sm btn-outline gap-2"
                   onClick={() => {
-                    setAiTriageSelectionEnabled(true);
+                    setAiReviewSelectionEnabled(true);
                     setDownloadSelectionEnabled(false);
                     setRegionSelectionEnabled(false);
-                    selectAllForAiTriage();
+                    selectAllForAiReview();
                   }}
-                  title="Request AI triage review for the displayed task results"
-                  disabled={availableForAiTriageCount === 0 || !isAiTriageTaskConfigured}
+                  title="Request AI review for the displayed task results"
+                  disabled={availableForAiReviewCount === 0 || !isAiReviewTaskConfigured}
                 >
                   <Bot size={16} />
-                  AI Triage
+                  AI Review
                 </button>
                 <button
                   className="btn btn-sm btn-outline gap-2"
@@ -1096,29 +1094,29 @@ export function CouplingGrid({
           </>
         )}
       </div>
-      {(aiTriageStatus || visiblePendingAiTriageCount > 0) && (
+      {(aiReviewStatus || visiblePendingAiReviewCount > 0) && (
         <div className="text-xs text-base-content/70 text-right flex justify-end items-center gap-2">
-          {visiblePendingAiTriageCount > 0 && (
+          {visiblePendingAiReviewCount > 0 && (
             <LoaderCircle className="h-3 w-3 animate-spin text-info" />
           )}
           <span>
-            {visiblePendingAiTriageCount > 0
-              ? `${aiTriageStatus ?? "AI triage review is in progress."} Waiting for ${visiblePendingAiTriageCount} note update(s).`
-              : aiTriageStatus}
+            {visiblePendingAiReviewCount > 0
+              ? `${aiReviewStatus ?? "AI review is in progress."} Waiting for ${visiblePendingAiReviewCount} note update(s).`
+              : aiReviewStatus}
           </span>
         </div>
       )}
 
-      <AiTriageConfirmModal
-        isOpen={isAiTriageConfirmOpen}
-        selectedCount={selectedForAiTriage.size}
+      <AiReviewConfirmModal
+        isOpen={isAiReviewConfirmOpen}
+        selectedCount={selectedForAiReview.size}
         taskName={selectedTask}
         modelOptions={modelOptions}
         selectedModelKey={selectedModel.key}
-        isSubmitting={isRequestingAiTriage}
+        isSubmitting={isRequestingAiReview}
         onModelChange={handleModelChange}
-        onConfirm={handleBulkAiTriage}
-        onClose={() => setIsAiTriageConfirmOpen(false)}
+        onConfirm={handleBulkAiReview}
+        onClose={() => setIsAiReviewConfirmOpen(false)}
       />
       <DownloadConfirmModal
         isOpen={isDownloadConfirmOpen}

@@ -1,4 +1,4 @@
-"""Capture and replay AI triage runs for prompt and context tuning."""
+"""Capture and replay AI review runs for prompt and context tuning."""
 
 from __future__ import annotations
 
@@ -12,26 +12,26 @@ from pydantic import BaseModel, Field
 
 from qdash.copilot.config import CopilotConfig, ModelConfig, load_copilot_config
 from qdash.copilot.contracts import AnalysisContextResult, TaskAnalysisContext
-from qdash.copilot.triage import (
-    apply_ai_triage_config,
-    build_ai_triage_context,
-    build_ai_triage_user_message,
+from qdash.copilot.review import (
+    apply_ai_review_config,
+    build_ai_review_context,
+    build_ai_review_user_message,
     build_model_override,
-    render_ai_triage_markdown,
+    render_ai_review_markdown,
     select_analysis_model,
 )
 
 SnapshotMode = Literal["frozen", "rebuild"]
 
 
-class AITriageExpectedImage(BaseModel):
+class AIReviewExpectedImage(BaseModel):
     """Serialized expected image entry for a snapshot."""
 
     alt_text: str
     base64_data: str
 
 
-class AITriageSourceRef(BaseModel):
+class AIReviewSourceRef(BaseModel):
     """Reference to the source task result that produced the snapshot."""
 
     task_name: str
@@ -40,7 +40,7 @@ class AITriageSourceRef(BaseModel):
     task_id: str
 
 
-class AITriageModelRef(BaseModel):
+class AIReviewModelRef(BaseModel):
     """Compact model metadata stored with a snapshot or replay result."""
 
     provider: str
@@ -51,36 +51,36 @@ class AITriageModelRef(BaseModel):
     reasoning_effort: str | None = None
 
 
-class AITriageEvalSnapshot(BaseModel):
-    """Frozen AI triage input that can be replayed later."""
+class AIReviewEvalSnapshot(BaseModel):
+    """Frozen AI review input that can be replayed later."""
 
     snapshot_version: int = 1
     captured_at: datetime
-    source: AITriageSourceRef
-    selected_model: AITriageModelRef
+    source: AIReviewSourceRef
+    selected_model: AIReviewModelRef
     user_message: str
     context: TaskAnalysisContext
     image_base64: str | None = None
-    expected_images: list[AITriageExpectedImage] = Field(default_factory=list)
+    expected_images: list[AIReviewExpectedImage] = Field(default_factory=list)
     figure_paths: list[str] = Field(default_factory=list)
 
 
-class AITriageEvalRunResult(BaseModel):
-    """Replay result and supporting artifacts for one AI triage run."""
+class AIReviewEvalRunResult(BaseModel):
+    """Replay result and supporting artifacts for one AI review run."""
 
     run_at: datetime
     mode: SnapshotMode
-    source: AITriageSourceRef
-    selected_model: AITriageModelRef
+    source: AIReviewSourceRef
+    selected_model: AIReviewModelRef
     user_message: str
     context: TaskAnalysisContext
     image_base64: str | None = None
-    expected_images: list[AITriageExpectedImage] = Field(default_factory=list)
+    expected_images: list[AIReviewExpectedImage] = Field(default_factory=list)
     markdown: str
 
 
-def _model_ref(model: ModelConfig) -> AITriageModelRef:
-    return AITriageModelRef(
+def _model_ref(model: ModelConfig) -> AIReviewModelRef:
+    return AIReviewModelRef(
         provider=model.provider,
         name=model.name,
         api_style=model.api_style,
@@ -90,14 +90,14 @@ def _model_ref(model: ModelConfig) -> AITriageModelRef:
     )
 
 
-def _bundle_to_expected_images(bundle: AnalysisContextResult) -> list[AITriageExpectedImage]:
+def _bundle_to_expected_images(bundle: AnalysisContextResult) -> list[AIReviewExpectedImage]:
     return [
-        AITriageExpectedImage(alt_text=alt_text, base64_data=base64_data)
+        AIReviewExpectedImage(alt_text=alt_text, base64_data=base64_data)
         for base64_data, alt_text in bundle.expected_images
     ]
 
 
-def _snapshot_to_bundle(snapshot: AITriageEvalSnapshot) -> AnalysisContextResult:
+def _snapshot_to_bundle(snapshot: AIReviewEvalSnapshot) -> AnalysisContextResult:
     return AnalysisContextResult(
         context=snapshot.context,
         image_base64=snapshot.image_base64,
@@ -106,7 +106,7 @@ def _snapshot_to_bundle(snapshot: AITriageEvalSnapshot) -> AnalysisContextResult
     )
 
 
-def capture_ai_triage_snapshot(
+def capture_ai_review_snapshot(
     *,
     task_name: str,
     chip_id: str,
@@ -114,29 +114,29 @@ def capture_ai_triage_snapshot(
     task_id: str,
     config: CopilotConfig | None = None,
     model_override: ModelConfig | None = None,
-) -> AITriageEvalSnapshot:
-    """Capture a replayable AI triage snapshot from the live production path."""
-    config = apply_ai_triage_config(config or load_copilot_config())
+) -> AIReviewEvalSnapshot:
+    """Capture a replayable AI review snapshot from the live production path."""
+    config = apply_ai_review_config(config or load_copilot_config())
     if model_override is not None:
         config = config.model_copy(update={"analysis_model": model_override})
 
-    bundle = build_ai_triage_context(
+    bundle = build_ai_review_context(
         task_name=task_name,
         chip_id=chip_id,
         qid=qid,
         task_id=task_id,
         config=config,
     )
-    return AITriageEvalSnapshot(
+    return AIReviewEvalSnapshot(
         captured_at=datetime.now(UTC),
-        source=AITriageSourceRef(
+        source=AIReviewSourceRef(
             task_name=task_name,
             chip_id=chip_id,
             qid=qid,
             task_id=task_id,
         ),
         selected_model=_model_ref(select_analysis_model(config)),
-        user_message=build_ai_triage_user_message(config),
+        user_message=build_ai_review_user_message(config),
         context=bundle.context,
         image_base64=bundle.image_base64,
         expected_images=_bundle_to_expected_images(bundle),
@@ -144,21 +144,21 @@ def capture_ai_triage_snapshot(
     )
 
 
-def run_ai_triage_snapshot(
-    snapshot: AITriageEvalSnapshot,
+def run_ai_review_snapshot(
+    snapshot: AIReviewEvalSnapshot,
     *,
     mode: SnapshotMode = "frozen",
     config: CopilotConfig | None = None,
     model_override: ModelConfig | None = None,
     use_snapshot_message: bool = False,
-) -> AITriageEvalRunResult:
-    """Replay one AI triage snapshot through the same renderer as production."""
-    config = apply_ai_triage_config(config or load_copilot_config())
+) -> AIReviewEvalRunResult:
+    """Replay one AI review snapshot through the same renderer as production."""
+    config = apply_ai_review_config(config or load_copilot_config())
     if model_override is not None:
         config = config.model_copy(update={"analysis_model": model_override})
 
     if mode == "rebuild":
-        bundle = build_ai_triage_context(
+        bundle = build_ai_review_context(
             task_name=snapshot.source.task_name,
             chip_id=snapshot.source.chip_id,
             qid=snapshot.source.qid,
@@ -169,15 +169,15 @@ def run_ai_triage_snapshot(
         bundle = _snapshot_to_bundle(snapshot)
 
     user_message = (
-        snapshot.user_message if use_snapshot_message else build_ai_triage_user_message(config)
+        snapshot.user_message if use_snapshot_message else build_ai_review_user_message(config)
     )
-    markdown = render_ai_triage_markdown(
+    markdown = render_ai_review_markdown(
         task_name=snapshot.source.task_name,
         config=config,
         context_bundle=bundle,
         user_message=user_message,
     )
-    return AITriageEvalRunResult(
+    return AIReviewEvalRunResult(
         run_at=datetime.now(UTC),
         mode=mode,
         source=snapshot.source,
@@ -190,17 +190,17 @@ def run_ai_triage_snapshot(
     )
 
 
-def save_ai_triage_snapshot(snapshot: AITriageEvalSnapshot, path: str | Path) -> None:
+def save_ai_review_snapshot(snapshot: AIReviewEvalSnapshot, path: str | Path) -> None:
     """Persist a snapshot as JSON."""
     Path(path).write_text(snapshot.model_dump_json(indent=2), encoding="utf-8")
 
 
-def load_ai_triage_snapshot(path: str | Path) -> AITriageEvalSnapshot:
+def load_ai_review_snapshot(path: str | Path) -> AIReviewEvalSnapshot:
     """Load a snapshot JSON file."""
-    return AITriageEvalSnapshot.model_validate_json(Path(path).read_text(encoding="utf-8"))
+    return AIReviewEvalSnapshot.model_validate_json(Path(path).read_text(encoding="utf-8"))
 
 
-def write_ai_triage_run_artifacts(result: AITriageEvalRunResult, output_dir: str | Path) -> Path:
+def write_ai_review_run_artifacts(result: AIReviewEvalRunResult, output_dir: str | Path) -> Path:
     """Write replay artifacts for prompt/context inspection."""
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
@@ -218,11 +218,11 @@ def write_ai_triage_run_artifacts(result: AITriageEvalRunResult, output_dir: str
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Capture and replay AI triage runs for prompt/context tuning."
+        description="Capture and replay AI review runs for prompt/context tuning."
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    capture_parser = subparsers.add_parser("capture", help="Capture one live AI triage snapshot.")
+    capture_parser = subparsers.add_parser("capture", help="Capture one live AI review snapshot.")
     capture_parser.add_argument("--task-name", required=True)
     capture_parser.add_argument("--chip-id", required=True)
     capture_parser.add_argument("--qid", required=True)
@@ -230,7 +230,7 @@ def _build_parser() -> argparse.ArgumentParser:
     capture_parser.add_argument("--output", required=True)
     _add_model_override_args(capture_parser)
 
-    run_parser = subparsers.add_parser("run", help="Replay a captured AI triage snapshot.")
+    run_parser = subparsers.add_parser("run", help="Replay a captured AI review snapshot.")
     run_parser.add_argument("--snapshot", required=True)
     run_parser.add_argument("--mode", choices=("frozen", "rebuild"), default="frozen")
     run_parser.add_argument("--output-dir", required=True)
@@ -267,7 +267,7 @@ def _resolve_model_override(args: argparse.Namespace, config: CopilotConfig) -> 
     ):
         return None
 
-    base_model = select_analysis_model(apply_ai_triage_config(config))
+    base_model = select_analysis_model(apply_ai_review_config(config))
     return build_model_override(
         base_model=base_model,
         provider=args.model_provider,
@@ -288,7 +288,7 @@ def main() -> int:
     model_override = _resolve_model_override(args, config)
 
     if args.command == "capture":
-        snapshot = capture_ai_triage_snapshot(
+        snapshot = capture_ai_review_snapshot(
             task_name=args.task_name,
             chip_id=args.chip_id,
             qid=args.qid,
@@ -296,19 +296,19 @@ def main() -> int:
             config=config,
             model_override=model_override,
         )
-        save_ai_triage_snapshot(snapshot, args.output)
+        save_ai_review_snapshot(snapshot, args.output)
         print(Path(args.output))
         return 0
 
-    snapshot = load_ai_triage_snapshot(args.snapshot)
-    result = run_ai_triage_snapshot(
+    snapshot = load_ai_review_snapshot(args.snapshot)
+    result = run_ai_review_snapshot(
         snapshot,
         mode=args.mode,
         config=config,
         model_override=model_override,
         use_snapshot_message=args.use_snapshot_message,
     )
-    output_dir = write_ai_triage_run_artifacts(result, args.output_dir)
+    output_dir = write_ai_review_run_artifacts(result, args.output_dir)
     if args.print_markdown:
         print(result.markdown)
     else:
