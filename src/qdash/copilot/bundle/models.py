@@ -1,4 +1,4 @@
-"""Typed models for AI triage replay bundles."""
+"""Typed models for AI review replay bundles."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from qdash.copilot.contracts import TaskAnalysisContext
 
 
-class AITriageBundleSource(BaseModel):
+class AIReviewBundleSource(BaseModel):
     """Source task result and trigger metadata for one replay bundle."""
 
     project_id: str | None = None
@@ -24,7 +24,7 @@ class AITriageBundleSource(BaseModel):
     trigger: Literal["workflow", "chip_page", "bulk_request"]
 
 
-class AITriageKnowledgeRef(BaseModel):
+class AIReviewKnowledgeRef(BaseModel):
     """Reference to the task-knowledge source used to build the prompt/context."""
 
     repo_url: str | None = None
@@ -33,7 +33,7 @@ class AITriageKnowledgeRef(BaseModel):
     task_name: str
 
 
-class AITriageModelRef(BaseModel):
+class AIReviewModelRef(BaseModel):
     """Compact model metadata stored in replay bundles."""
 
     provider: str
@@ -44,7 +44,7 @@ class AITriageModelRef(BaseModel):
     reasoning_effort: str | None = None
 
 
-class AITriageBundleInputs(BaseModel):
+class AIReviewBundleInputs(BaseModel):
     """Canonical file layout inside a replay bundle archive."""
 
     context_path: str = "context.json"
@@ -56,19 +56,19 @@ class AITriageBundleInputs(BaseModel):
     extra_paths: list[str] = Field(default_factory=list)
 
 
-class AITriageBundleManifest(BaseModel):
-    """Archive manifest for an AI triage replay bundle."""
+class AIReviewBundleManifest(BaseModel):
+    """Archive manifest for an AI review replay bundle."""
 
     schema_version: int = 1
-    bundle_type: Literal["ai_triage_replay"] = "ai_triage_replay"
+    bundle_type: Literal["ai_review_replay"] = "ai_review_replay"
     created_at: datetime
-    source: AITriageBundleSource
-    selected_model: AITriageModelRef
-    knowledge: AITriageKnowledgeRef
-    inputs: AITriageBundleInputs
+    source: AIReviewBundleSource
+    selected_model: AIReviewModelRef
+    knowledge: AIReviewKnowledgeRef
+    inputs: AIReviewBundleInputs
 
 
-class AITriageImageEntry(BaseModel):
+class AIReviewImageEntry(BaseModel):
     """Embedded image entry written into a replay bundle."""
 
     path: str
@@ -76,39 +76,39 @@ class AITriageImageEntry(BaseModel):
     base64_data: str
 
 
-class AITriageFigureEntry(BaseModel):
+class AIReviewFigureEntry(BaseModel):
     """External figure file copied into a replay bundle."""
 
     source_path: str
     archive_path: str
 
 
-class AITriageBundleContext(BaseModel):
-    """Serialized triage context and image payloads for replay."""
+class AIReviewBundleContext(BaseModel):
+    """Serialized review context and image payloads for replay."""
 
     context: TaskAnalysisContext
     image_base64: str | None = None
-    experiment_images: list[AITriageImageEntry] = Field(default_factory=list)
-    expected_images: list[AITriageImageEntry] = Field(default_factory=list)
-    figures: list[AITriageFigureEntry] = Field(default_factory=list)
+    experiment_images: list[AIReviewImageEntry] = Field(default_factory=list)
+    expected_images: list[AIReviewImageEntry] = Field(default_factory=list)
+    figures: list[AIReviewFigureEntry] = Field(default_factory=list)
 
 
-class AITriageRuntimeConfig(BaseModel):
+class AIReviewRuntimeConfig(BaseModel):
     """Triage-relevant subset of Copilot config stored with the bundle."""
 
     enabled: bool
     response_language: str
     thinking_language: str
-    model: AITriageModelRef
-    analysis_model: AITriageModelRef | None = None
-    ai_triage_message: str
+    model: AIReviewModelRef
+    analysis_model: AIReviewModelRef | None = None
+    ai_review_message: str
     max_expected_images: int | None = None
-    ai_triage_max_expected_images: int | None = None
-    ai_triage_max_output_tokens: int | None = None
+    ai_review_max_expected_images: int | None = None
+    ai_review_max_output_tokens: int | None = None
 
 
-AITriageBundleManifest.model_rebuild(_types_namespace={"datetime": __import__("datetime").datetime})
-AITriageBundleContext.model_rebuild(
+AIReviewBundleManifest.model_rebuild(_types_namespace={"datetime": __import__("datetime").datetime})
+AIReviewBundleContext.model_rebuild(
     _types_namespace={
         "TaskAnalysisContext": __import__(
             "qdash.copilot.contracts", fromlist=["TaskAnalysisContext"]

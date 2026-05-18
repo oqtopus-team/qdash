@@ -22,12 +22,12 @@ if TYPE_CHECKING:
 class TestAnalysisRendering:
     """Tests for analysis response rendering."""
 
-    def test_legacy_response_keeps_review_triage_first(self):
+    def test_legacy_response_keeps_ai_review_first(self):
         response = AnalysisResponse(
             summary="f01 is accepted, f12 needs review",
             assessment="warning",
             explanation=(
-                "**Review triage**\n"
+                "**AI review**\n"
                 "- Decision: `REVIEW`\n"
                 "- Accepted parameter(s): qubit_frequency = 7.94 GHz\n"
                 "- Needs review: anharmonicity = -0.185 GHz\n\n"
@@ -39,15 +39,15 @@ class TestAnalysisRendering:
 
         result = legacy_to_blocks(response)
 
-        assert result["blocks"][0]["content"].startswith("**Review triage**")
+        assert result["blocks"][0]["content"].startswith("**AI review**")
         assert "評価" in result["blocks"][1]["content"]
 
-    def test_legacy_response_keeps_japanese_review_triage_first(self):
+    def test_legacy_response_keeps_japanese_ai_review_first(self):
         response = AnalysisResponse(
             summary="f01 は受理、f12 は要レビュー",
             assessment="warning",
             explanation=(
-                "レビューのトリアージ\n\n"
+                "AIレビュー\n\n"
                 "判定: REVIEW\n"
                 "受理されたパラメータ: qubit_frequency = 7.94 GHz\n"
                 "要レビュー: anharmonicity = -0.185 GHz"
@@ -58,7 +58,7 @@ class TestAnalysisRendering:
 
         result = legacy_to_blocks(response)
 
-        assert result["blocks"][0]["content"].startswith("レビューのトリアージ")
+        assert result["blocks"][0]["content"].startswith("AIレビュー")
         assert "評価" in result["blocks"][1]["content"]
 
 

@@ -68,10 +68,10 @@ def legacy_to_blocks(
     summary = (response.summary or "").strip()
     explanation = (response.explanation or "").strip()
     normalized_explanation = explanation.lower().lstrip()
-    explanation_starts_with_triage = normalized_explanation.startswith(
-        ("**review triage**", "review triage", "**レビューのトリアージ**", "レビューのトリアージ")
+    explanation_starts_with_review = normalized_explanation.startswith(
+        ("**ai review**", "ai review", "**aiレビュー**", "aiレビュー")
     )
-    if explanation and explanation != summary and explanation_starts_with_triage:
+    if explanation and explanation != summary and explanation_starts_with_review:
         _text_block(explanation)
 
     badge = format_assessment_badge(response.assessment, lang)
@@ -80,7 +80,7 @@ def legacy_to_blocks(
         body = summary
         _text_block("\n\n".join(p for p in (header, body) if p))
 
-    if explanation and explanation != summary and not explanation_starts_with_triage:
+    if explanation and explanation != summary and not explanation_starts_with_review:
         _text_block(f"**{labels['explanation']}**\n\n{explanation}")
 
     issues = [i for i in response.potential_issues if i and str(i).strip()]

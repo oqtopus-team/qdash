@@ -74,30 +74,30 @@ class TestTaskHistoryRecorder:
             sample_task, sample_execution_model
         )
 
-    @patch("qdash.workflow.engine.task.ai_triage.enqueue_ai_triage_note")
-    def test_record_task_result_attaches_ai_triage_note(
+    @patch("qdash.workflow.engine.task.ai_review.enqueue_ai_review_note")
+    def test_record_task_result_attaches_ai_review_note(
         self,
-        mock_ai_triage: MagicMock,
+        mock_ai_review: MagicMock,
         recorder,
         sample_task,
         sample_execution_model,
     ):
-        """Test record_task_result triggers best-effort AI triage attachment."""
+        """Test record_task_result triggers best-effort AI review attachment."""
         recorder.record_task_result(sample_task, sample_execution_model)
 
-        mock_ai_triage.assert_called_once_with(sample_task, sample_execution_model)
+        mock_ai_review.assert_called_once_with(sample_task, sample_execution_model)
 
-    @patch("qdash.workflow.engine.task.ai_triage.enqueue_ai_triage_note")
-    def test_record_task_result_continues_on_ai_triage_error(
+    @patch("qdash.workflow.engine.task.ai_review.enqueue_ai_review_note")
+    def test_record_task_result_continues_on_ai_review_error(
         self,
-        mock_ai_triage: MagicMock,
+        mock_ai_review: MagicMock,
         recorder,
         mock_repos,
         sample_task,
         sample_execution_model,
     ):
-        """Test AI triage failures do not fail task result recording."""
-        mock_ai_triage.side_effect = Exception("AI triage error")
+        """Test AI review failures do not fail task result recording."""
+        mock_ai_review.side_effect = Exception("AI review error")
 
         recorder.record_task_result(sample_task, sample_execution_model)
 

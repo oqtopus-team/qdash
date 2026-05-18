@@ -10,7 +10,7 @@ interface ModelOption {
   model: ModelOverride | null;
 }
 
-interface AiTriageConfirmModalProps {
+interface AiReviewConfirmModalProps {
   isOpen: boolean;
   selectedCount: number;
   taskName: string;
@@ -22,7 +22,7 @@ interface AiTriageConfirmModalProps {
   onClose: () => void;
 }
 
-export function AiTriageConfirmModal({
+export function AiReviewConfirmModal({
   isOpen,
   selectedCount,
   taskName,
@@ -32,7 +32,7 @@ export function AiTriageConfirmModal({
   onModelChange,
   onConfirm,
   onClose,
-}: AiTriageConfirmModalProps) {
+}: AiReviewConfirmModalProps) {
   if (!isOpen) return null;
 
   const selectedModel =
@@ -47,7 +47,7 @@ export function AiTriageConfirmModal({
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-2">
             <Bot className="h-5 w-5 text-primary" />
-            <h3 className="font-semibold text-lg">Request AI triage review</h3>
+            <h3 className="font-semibold text-lg">Request AI review</h3>
           </div>
           <button
             type="button"

@@ -1,4 +1,4 @@
-"""Tests for AI triage replay bundle models, writer, reader, and exporter."""
+"""Tests for AI review replay bundle models, writer, reader, and exporter."""
 
 from __future__ import annotations
 
@@ -8,20 +8,20 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 from zipfile import ZipFile
 
-from qdash.copilot.bundle.exporters.ai_triage import export_ai_triage_replay_bundle
+from qdash.copilot.bundle.exporters.ai_review import export_ai_review_replay_bundle
 from qdash.copilot.bundle.models import (
-    AITriageBundleContext,
-    AITriageBundleInputs,
-    AITriageBundleManifest,
-    AITriageBundleSource,
-    AITriageFigureEntry,
-    AITriageImageEntry,
-    AITriageKnowledgeRef,
-    AITriageModelRef,
-    AITriageRuntimeConfig,
+    AIReviewBundleContext,
+    AIReviewBundleInputs,
+    AIReviewBundleManifest,
+    AIReviewBundleSource,
+    AIReviewFigureEntry,
+    AIReviewImageEntry,
+    AIReviewKnowledgeRef,
+    AIReviewModelRef,
+    AIReviewRuntimeConfig,
 )
-from qdash.copilot.bundle.reader import load_ai_triage_bundle, load_ai_triage_bundle_metadata
-from qdash.copilot.bundle.writer import write_ai_triage_bundle
+from qdash.copilot.bundle.reader import load_ai_review_bundle, load_ai_review_bundle_metadata
+from qdash.copilot.bundle.writer import write_ai_review_bundle
 from qdash.copilot.config import AnalysisConfig, CopilotConfig, ModelConfig
 from qdash.copilot.contracts import AnalysisContextResult, TaskAnalysisContext
 
@@ -39,8 +39,8 @@ def _config() -> CopilotConfig:
         analysis=AnalysisConfig(
             enabled=True,
             max_expected_images=2,
-            ai_triage_tasks=["CheckQubitSpectroscopy"],
-            ai_triage_message="Review this run carefully.",
+            ai_review_tasks=["CheckQubitSpectroscopy"],
+            ai_review_message="Review this run carefully.",
         ),
     )
 
@@ -57,8 +57,8 @@ def _context() -> TaskAnalysisContext:
     )
 
 
-def _model_ref() -> AITriageModelRef:
-    return AITriageModelRef(
+def _model_ref() -> AIReviewModelRef:
+    return AIReviewModelRef(
         provider="openai",
         name="gpt-5.1",
         api_style="responses",
@@ -67,12 +67,12 @@ def _model_ref() -> AITriageModelRef:
     )
 
 
-def _runtime_config() -> AITriageRuntimeConfig:
-    return AITriageRuntimeConfig(
+def _runtime_config() -> AIReviewRuntimeConfig:
+    return AIReviewRuntimeConfig(
         enabled=True,
         response_language="ja",
         thinking_language="en",
-        model=AITriageModelRef(
+        model=AIReviewModelRef(
             provider="openai",
             name="gpt-4.1",
             api_style="responses",
@@ -80,15 +80,15 @@ def _runtime_config() -> AITriageRuntimeConfig:
             max_output_tokens=16384,
         ),
         analysis_model=_model_ref(),
-        ai_triage_message="Review this run carefully.",
+        ai_review_message="Review this run carefully.",
         max_expected_images=2,
     )
 
 
-def _manifest() -> AITriageBundleManifest:
-    return AITriageBundleManifest(
+def _manifest() -> AIReviewBundleManifest:
+    return AIReviewBundleManifest(
         created_at=datetime(2026, 5, 14, tzinfo=UTC),
-        source=AITriageBundleSource(
+        source=AIReviewBundleSource(
             project_id="proj-1",
             chip_id="chip-1",
             qid="4",
@@ -98,11 +98,11 @@ def _manifest() -> AITriageBundleManifest:
             trigger="chip_page",
         ),
         selected_model=_model_ref(),
-        knowledge=AITriageKnowledgeRef(
+        knowledge=AIReviewKnowledgeRef(
             task_name="CheckQubitSpectroscopy",
             task_path="cw-characterization/CheckQubitSpectroscopy/index.md",
         ),
-        inputs=AITriageBundleInputs(
+        inputs=AIReviewBundleInputs(
             expected_image_paths=["expected_images/00.png"],
             experiment_image_paths=["experiment_images/00.png"],
             figure_paths=["figures/00.png", "figures/01.json"],
@@ -111,24 +111,24 @@ def _manifest() -> AITriageBundleManifest:
     )
 
 
-def _bundle_context(tmp_path: Path) -> AITriageBundleContext:
+def _bundle_context(tmp_path: Path) -> AIReviewBundleContext:
     figure_png = tmp_path / "figure.png"
     figure_png.write_bytes(b"png-bytes")
     figure_json = tmp_path / "figure.json"
     figure_json.write_text('{"value": 1}', encoding="utf-8")
-    return AITriageBundleContext(
+    return AIReviewBundleContext(
         context=_context(),
         image_base64=base64.b64encode(b"experiment").decode("utf-8"),
         expected_images=[
-            AITriageImageEntry(
+            AIReviewImageEntry(
                 path="expected_images/00.png",
                 alt_text="expected image",
                 base64_data=base64.b64encode(b"expected").decode("utf-8"),
             )
         ],
         figures=[
-            AITriageFigureEntry(source_path=str(figure_png), archive_path="figures/00.png"),
-            AITriageFigureEntry(source_path=str(figure_json), archive_path="figures/01.json"),
+            AIReviewFigureEntry(source_path=str(figure_png), archive_path="figures/00.png"),
+            AIReviewFigureEntry(source_path=str(figure_json), archive_path="figures/01.json"),
         ],
     )
 
@@ -153,24 +153,24 @@ def _analysis_context_result(tmp_path: Path) -> AnalysisContextResult:
     )
 
 
-def test_write_and_read_ai_triage_bundle_round_trip(tmp_path: Path) -> None:
+def test_write_and_read_ai_review_bundle_round_trip(tmp_path: Path) -> None:
     output_path = tmp_path / "bundle.zip"
-    write_ai_triage_bundle(
+    write_ai_review_bundle(
         output_path=output_path,
         manifest=_manifest(),
         bundle_context=_bundle_context(tmp_path),
         runtime_config=_runtime_config(),
-        prompt_text="triage prompt",
+        prompt_text="review prompt",
         extra_metadata={"source_task_result": {"task_id": "task-1"}},
     )
 
-    manifest, bundle_context, runtime_config, prompt_text = load_ai_triage_bundle(output_path)
-    metadata = load_ai_triage_bundle_metadata(output_path)
+    manifest, bundle_context, runtime_config, prompt_text = load_ai_review_bundle(output_path)
+    metadata = load_ai_review_bundle_metadata(output_path)
 
     assert manifest.source.task_id == "task-1"
     assert bundle_context.context.task_knowledge_prompt == "knowledge-v1"
-    assert runtime_config.ai_triage_message == "Review this run carefully."
-    assert prompt_text.strip() == "triage prompt"
+    assert runtime_config.ai_review_message == "Review this run carefully."
+    assert prompt_text.strip() == "review prompt"
     assert metadata["source_task_result"]["task_id"] == "task-1"
 
     with ZipFile(output_path) as zf:
@@ -180,7 +180,7 @@ def test_write_and_read_ai_triage_bundle_round_trip(tmp_path: Path) -> None:
         assert "figures/01.json" in zf.namelist()
 
 
-def test_export_ai_triage_replay_bundle_uses_shared_triage_inputs(tmp_path: Path) -> None:
+def test_export_ai_review_replay_bundle_uses_shared_review_inputs(tmp_path: Path) -> None:
     output_path = tmp_path / "exported.zip"
     config = _config()
     context_bundle = _analysis_context_result(tmp_path)
@@ -188,17 +188,17 @@ def test_export_ai_triage_replay_bundle_uses_shared_triage_inputs(tmp_path: Path
     from unittest.mock import patch
 
     with (
-        patch("qdash.copilot.bundle.exporters.ai_triage.load_copilot_config", return_value=config),
+        patch("qdash.copilot.bundle.exporters.ai_review.load_copilot_config", return_value=config),
         patch(
-            "qdash.copilot.bundle.exporters.ai_triage.build_ai_triage_context",
+            "qdash.copilot.bundle.exporters.ai_review.build_ai_review_context",
             return_value=context_bundle,
         ),
         patch(
-            "qdash.copilot.bundle.exporters.ai_triage.get_task_knowledge_repo_metadata",
+            "qdash.copilot.bundle.exporters.ai_review.get_task_knowledge_repo_metadata",
             return_value=("https://github.com/example/qdash-task-knowledge.git", "abc123def456"),
         ),
     ):
-        result_path = export_ai_triage_replay_bundle(
+        result_path = export_ai_review_replay_bundle(
             task_name="CheckQubitSpectroscopy",
             chip_id="chip-1",
             qid="4",
@@ -210,8 +210,8 @@ def test_export_ai_triage_replay_bundle_uses_shared_triage_inputs(tmp_path: Path
         )
 
     assert result_path == output_path
-    manifest, bundle_context, runtime_config, prompt_text = load_ai_triage_bundle(output_path)
-    metadata = load_ai_triage_bundle_metadata(output_path)
+    manifest, bundle_context, runtime_config, prompt_text = load_ai_review_bundle(output_path)
+    metadata = load_ai_review_bundle_metadata(output_path)
 
     assert manifest.source.trigger == "chip_page"
     assert manifest.knowledge.task_path == "cw-characterization/CheckQubitSpectroscopy/index.md"
@@ -240,7 +240,7 @@ def test_export_ai_triage_replay_bundle_uses_shared_triage_inputs(tmp_path: Path
 
     with ZipFile(output_path) as zf:
         assert json.loads(zf.read("manifest.json").decode("utf-8"))["bundle_type"] == (
-            "ai_triage_replay"
+            "ai_review_replay"
         )
         assert "experiment_images/00_raw.png" in zf.namelist()
         assert "experiment_images/01_marked.png" in zf.namelist()

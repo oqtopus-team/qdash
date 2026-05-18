@@ -34,13 +34,13 @@ def _sample_execution_model() -> ExecutionModel:
     )
 
 
-@patch("qdash.workflow.engine.task.ai_triage.enqueue_ai_triage_note")
+@patch("qdash.workflow.engine.task.ai_review.enqueue_ai_review_note")
 @patch("qdash.repository.task_result_history.TaskResultHistoryDocument")
-def test_save_attaches_ai_triage_after_upsert(
+def test_save_attaches_ai_review_after_upsert(
     mock_document: MagicMock,
-    mock_ai_triage: MagicMock,
+    mock_ai_review: MagicMock,
 ) -> None:
-    """Repository save triggers AI triage after task result persistence."""
+    """Repository save triggers AI review after task result persistence."""
     task = _sample_task()
     execution_model = _sample_execution_model()
 
@@ -50,19 +50,19 @@ def test_save_attaches_ai_triage_after_upsert(
         task=task,
         execution_model=execution_model,
     )
-    mock_ai_triage.assert_called_once_with(task, execution_model)
+    mock_ai_review.assert_called_once_with(task, execution_model)
 
 
-@patch("qdash.workflow.engine.task.ai_triage.enqueue_ai_triage_note")
+@patch("qdash.workflow.engine.task.ai_review.enqueue_ai_review_note")
 @patch("qdash.repository.task_result_history.TaskResultHistoryDocument")
-def test_save_continues_when_ai_triage_fails(
+def test_save_continues_when_ai_review_fails(
     mock_document: MagicMock,
-    mock_ai_triage: MagicMock,
+    mock_ai_review: MagicMock,
 ) -> None:
-    """AI triage failures do not fail task result persistence."""
+    """AI review failures do not fail task result persistence."""
     task = _sample_task()
     execution_model = _sample_execution_model()
-    mock_ai_triage.side_effect = Exception("AI triage error")
+    mock_ai_review.side_effect = Exception("AI review error")
 
     MongoTaskResultHistoryRepository().save(task, execution_model)
 

@@ -16,8 +16,8 @@ from qdash.api.lib.project import (
 )
 from qdash.api.schemas.flow import ExecuteFlowResponse
 from qdash.api.schemas.task_result import (
-    BulkAiTriageRequest,
-    BulkAiTriageResponse,
+    BulkAiReviewRequest,
+    BulkAiReviewResponse,
     DownloadFiguresAsZipRequest,
     LatestTaskResultResponse,
     TaskHistoryResponse,
@@ -403,23 +403,23 @@ def get_timeseries_task_results(
 
 
 # =============================================================================
-# AI Triage
+# AI Review
 # =============================================================================
 
 
 @router.post(
-    "/task-results/ai-triage/bulk",
-    response_model=BulkAiTriageResponse,
-    summary="Request bulk AI triage review for latest task results",
-    operation_id="requestBulkAiTriageReview",
+    "/task-results/ai-review/bulk",
+    response_model=BulkAiReviewResponse,
+    summary="Request bulk AI review for latest task results",
+    operation_id="requestBulkAiReview",
 )
-def request_bulk_ai_triage_review(
-    body: BulkAiTriageRequest,
+def request_bulk_ai_review(
+    body: BulkAiReviewRequest,
     ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
     service: Annotated[TaskResultService, Depends(get_task_result_service)],
-) -> BulkAiTriageResponse:
-    """Enqueue AI triage review for the current latest task result per entity."""
-    return service.request_bulk_ai_triage(
+) -> BulkAiReviewResponse:
+    """Enqueue AI review for the current latest task result per entity."""
+    return service.request_bulk_ai_review(
         project_id=ctx.project_id,
         chip_id=body.chip_id,
         task=body.task,
@@ -622,8 +622,8 @@ def download_figures_as_zip(
         body.paths,
         body.filename,
         project_id=ctx.project_id,
-        ai_triage_task_ids=body.ai_triage_task_ids,
-        ai_triage_bundle_task_ids=body.ai_triage_bundle_task_ids,
+        ai_review_task_ids=body.ai_review_task_ids,
+        ai_review_bundle_task_ids=body.ai_review_bundle_task_ids,
     )
 
     return StreamingResponse(

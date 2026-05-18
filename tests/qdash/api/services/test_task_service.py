@@ -92,7 +92,7 @@ def _resonator_knowledge() -> TaskKnowledge:
             )
         ],
         triage_markdown=(
-            "# CheckResonatorSpectroscopy AI Triage Guide\n\n"
+            "# CheckResonatorSpectroscopy AI Review Guide\n\n"
             "Use REVIEW when peak assignment is ambiguous.\n\n"
             "![Triage example](triage.png)"
         ),
@@ -196,6 +196,6 @@ def test_get_task_knowledge_includes_triage_prompt_and_case_images() -> None:
     assert response.triage_images[0].base64_data == "triage-image-b64"
     assert response.cases[0].images[0].base64_data == "case-image-b64"
     assert response.prompt_text
-    assert "### AI triage guidance" in response.triage_prompt_text
+    assert "### AI review guidance" in response.triage_prompt_text
     assert "Use REVIEW when peak assignment is ambiguous." in response.triage_prompt_text
     assert "![Triage example]" not in response.triage_prompt_text

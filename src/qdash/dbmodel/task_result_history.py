@@ -7,7 +7,7 @@ from pymongo import ASCENDING, DESCENDING, IndexModel
 
 from qdash.common.utils.datetime import ensure_timezone, parse_elapsed_time
 from qdash.datamodel.execution import ExecutionModel
-from qdash.datamodel.note import AiTriageReviewModel, NoteModel
+from qdash.datamodel.note import AiReviewModel, NoteModel
 from qdash.datamodel.system_info import SystemInfoModel
 from qdash.datamodel.task import BaseTaskResultModel
 from qdash.dbmodel.user import UserDocument
@@ -54,9 +54,9 @@ class TaskResultHistoryDocument(Document):
         default_factory=NoteModel,
         description="Free-form user note attached to this task result (dashboard)",
     )
-    ai_triage: AiTriageReviewModel = Field(
-        default_factory=AiTriageReviewModel,
-        description="Persistent AI triage review request state for this task result",
+    ai_review: AiReviewModel = Field(
+        default_factory=AiReviewModel,
+        description="Persistent AI review request state for this task result",
     )
     figure_path: list[str] = Field(..., description="The path to the figure")
     json_figure_path: list[str] = Field([], description="The path to the JSON figure")

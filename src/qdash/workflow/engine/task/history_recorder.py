@@ -138,15 +138,15 @@ class TaskHistoryRecorder:
                 # Log but don't fail the task - provenance is optional
                 logger.warning(f"Failed to record provenance for task {task.name}: {e}")
 
-        # Secondary hook for automatic AI triage. The repository also enqueues
-        # this after persistence so direct-save paths are covered; the triage
+        # Secondary hook for automatic AI review. The repository also enqueues
+        # this after persistence so direct-save paths are covered; the review
         # queue de-duplicates in-flight task IDs to avoid duplicate LLM calls.
         try:
-            from qdash.workflow.engine.task.ai_triage import enqueue_ai_triage_note
+            from qdash.workflow.engine.task.ai_review import enqueue_ai_review_note
 
-            enqueue_ai_triage_note(task, execution_model)
+            enqueue_ai_review_note(task, execution_model)
         except Exception as e:
-            logger.warning(f"Failed to attach AI triage note for task {task.name}: {e}")
+            logger.warning(f"Failed to attach AI review note for task {task.name}: {e}")
 
     def set_source_task_id(
         self,

@@ -1,4 +1,4 @@
-"""Writers for AI triage replay bundles."""
+"""Writers for AI review replay bundles."""
 
 from __future__ import annotations
 
@@ -10,9 +10,9 @@ from zipfile import ZIP_DEFLATED, ZipFile
 
 if TYPE_CHECKING:
     from qdash.copilot.bundle.models import (
-        AITriageBundleContext,
-        AITriageBundleManifest,
-        AITriageRuntimeConfig,
+        AIReviewBundleContext,
+        AIReviewBundleManifest,
+        AIReviewRuntimeConfig,
     )
 
 
@@ -31,16 +31,16 @@ def _safe_read_file(path: str | Path) -> bytes | None:
     return file_path.read_bytes()
 
 
-def write_ai_triage_bundle(
+def write_ai_review_bundle(
     *,
     output_path: str | Path,
-    manifest: AITriageBundleManifest,
-    bundle_context: AITriageBundleContext,
-    runtime_config: AITriageRuntimeConfig,
+    manifest: AIReviewBundleManifest,
+    bundle_context: AIReviewBundleContext,
+    runtime_config: AIReviewRuntimeConfig,
     prompt_text: str,
     extra_metadata: dict[str, dict] | None = None,
 ) -> Path:
-    """Write an AI triage replay bundle zip file."""
+    """Write an AI review replay bundle zip file."""
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
 

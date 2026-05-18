@@ -67,11 +67,11 @@ class AnalysisConfig(BaseModel):
     multimodal: bool = True
     max_conversation_turns: int = 10
     max_expected_images: int | None = None
-    ai_triage_max_expected_images: int | None = None
-    ai_triage_max_output_tokens: int | None = None
-    ai_triage_tasks: list[str] = Field(default_factory=list)
-    ai_triage_message: str = (
-        "Review this completed calibration result and attach a concise operational triage note."
+    ai_review_max_expected_images: int | None = None
+    ai_review_max_output_tokens: int | None = None
+    ai_review_tasks: list[str] = Field(default_factory=list)
+    ai_review_message: str = (
+        "Review this completed calibration result and attach a concise operational review note."
     )
 
 

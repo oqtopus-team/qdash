@@ -37,7 +37,7 @@ type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
  * Return compact operational insights for the dashboard.
 
 The first implementation is deterministic: it extracts high-signal patterns
-from persisted AI triage notes and task-result metadata. A later LLM
+from persisted AI review notes and task-result metadata. A later LLM
 synthesis layer can consume the same structured candidate contract.
  * @summary Generate dashboard-level AI insight candidates
  */

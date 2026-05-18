@@ -1,4 +1,4 @@
-# CheckResonatorSpectroscopy AI Triage Guide
+# CheckResonatorSpectroscopy AI Review Guide
 
 This guide helps the AI decide whether a resonator-spectroscopy result is operationally usable for automatic follow-up.
 

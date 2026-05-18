@@ -7,7 +7,7 @@ from pydantic import BaseModel, ConfigDict, field_serializer, field_validator
 
 from qdash.common.utils.datetime import format_elapsed_time, parse_elapsed_time
 from qdash.copilot.config import ModelConfig
-from qdash.datamodel.note import AiTriageReviewModel
+from qdash.datamodel.note import AiReviewModel
 from qdash.datamodel.task import ParameterModel
 
 
@@ -33,7 +33,7 @@ class TaskResult(BaseModel):
     elapsed_time: timedelta | None = None
     task_type: str | None = None
     default_view: bool = True
-    ai_triage: AiTriageReviewModel | None = None
+    ai_review: AiReviewModel | None = None
 
     @field_validator("elapsed_time", mode="before")
     @classmethod
@@ -96,8 +96,8 @@ class TaskResultExcludeResponse(BaseModel):
     excluded_at: datetime | None
 
 
-class BulkAiTriageRequest(BaseModel):
-    """Request body for bulk AI triage review."""
+class BulkAiReviewRequest(BaseModel):
+    """Request body for bulk AI review."""
 
     model_config = ConfigDict(protected_namespaces=())
 
@@ -109,8 +109,8 @@ class BulkAiTriageRequest(BaseModel):
     model_override: ModelConfig | None = None
 
 
-class BulkAiTriageResponse(BaseModel):
-    """Response after enqueueing bulk AI triage review."""
+class BulkAiReviewResponse(BaseModel):
+    """Response after enqueueing bulk AI review."""
 
     chip_id: str
     task: str
@@ -126,5 +126,5 @@ class DownloadFiguresAsZipRequest(BaseModel):
 
     paths: list[str] = []
     filename: str = "figures.zip"
-    ai_triage_task_ids: list[str] = []
-    ai_triage_bundle_task_ids: list[str] = []
+    ai_review_task_ids: list[str] = []
+    ai_review_bundle_task_ids: list[str] = []

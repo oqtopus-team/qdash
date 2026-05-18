@@ -19,36 +19,36 @@ class NoteModel(BaseModel):
     )
 
 
-class AiTriageReviewModel(BaseModel):
-    """Persistent state for an AI triage review request on a task result."""
+class AiReviewModel(BaseModel):
+    """Persistent state for an AI review request on a task result."""
 
     model_config = ConfigDict(protected_namespaces=())
 
     status: str = Field(
         default="",
-        description="AI triage status: requested, running, completed, or failed",
+        description="AI review status: requested, running, completed, or failed",
     )
     requested_at: datetime | None = Field(
         default=None,
-        description="Timestamp when AI triage was requested",
+        description="Timestamp when AI review was requested",
     )
     requested_by: str = Field(
         default="",
-        description="Username that requested AI triage",
+        description="Username that requested AI review",
     )
     model_provider: str = Field(
         default="",
-        description="Provider for the selected AI triage model",
+        description="Provider for the selected AI review model",
     )
     model_name: str = Field(
         default="",
-        description="Name of the selected AI triage model",
+        description="Name of the selected AI review model",
     )
     completed_at: datetime | None = Field(
         default=None,
-        description="Timestamp when AI triage completed or failed",
+        description="Timestamp when AI review completed or failed",
     )
     error: str = Field(
         default="",
-        description="Failure detail if AI triage failed",
+        description="Failure detail if AI review failed",
     )

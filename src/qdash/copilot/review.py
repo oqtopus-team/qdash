@@ -1,4 +1,4 @@
-"""Shared AI triage helpers used by API, workflow, and evaluation tooling."""
+"""Shared AI review helpers used by API, workflow, and evaluation tooling."""
 
 from __future__ import annotations
 
@@ -12,13 +12,13 @@ if TYPE_CHECKING:
     from qdash.copilot.config import CopilotConfig, ModelConfig
     from qdash.copilot.contracts import AnalysisContextResult
 
-AI_TRIAGE_FORMAT_REMINDER = """\
+AI_REVIEW_FORMAT_REMINDER = """\
 
 Required output format:
 Return JSON, but the JSON `explanation` string must start exactly with this
 markdown block. Do not put prose before it.
 
-**Review triage**
+**AI review**
 - Decision: `PASS` | `PASS_WITH_NOTE` | `REVIEW` | `FAIL`
 - Human label suggestion: `CORRECT` | `SUSPICIOUS` | `MISASSIGNMENT` | `NO_SIGNAL` | `ANOMALY`
 - Accepted parameter(s): ...
@@ -38,27 +38,27 @@ def select_analysis_model(config: CopilotConfig) -> ModelConfig:
     )
 
 
-def apply_ai_triage_config(config: CopilotConfig) -> CopilotConfig:
-    """Apply AI-triage-only speed defaults without changing interactive chat."""
+def apply_ai_review_config(config: CopilotConfig) -> CopilotConfig:
+    """Apply AI-review-only speed defaults without changing interactive chat."""
     analysis = config.analysis
-    if analysis.ai_triage_max_expected_images is not None:
+    if analysis.ai_review_max_expected_images is not None:
         analysis = analysis.model_copy(
-            update={"max_expected_images": analysis.ai_triage_max_expected_images}
+            update={"max_expected_images": analysis.ai_review_max_expected_images}
         )
 
     model = select_analysis_model(config)
-    if analysis.ai_triage_max_output_tokens is not None:
-        model = model.model_copy(update={"max_output_tokens": analysis.ai_triage_max_output_tokens})
+    if analysis.ai_review_max_output_tokens is not None:
+        model = model.model_copy(update={"max_output_tokens": analysis.ai_review_max_output_tokens})
 
     return config.model_copy(update={"analysis": analysis, "analysis_model": model})
 
 
-def build_ai_triage_user_message(config: CopilotConfig) -> str:
-    """Build the user message sent to the LLM for automatic AI triage."""
-    return f"{config.analysis.ai_triage_message}\n\n{AI_TRIAGE_FORMAT_REMINDER}"
+def build_ai_review_user_message(config: CopilotConfig) -> str:
+    """Build the user message sent to the LLM for automatic AI review."""
+    return f"{config.analysis.ai_review_message}\n\n{AI_REVIEW_FORMAT_REMINDER}"
 
 
-def build_ai_triage_context(
+def build_ai_review_context(
     *,
     task_name: str,
     chip_id: str,
@@ -66,7 +66,7 @@ def build_ai_triage_context(
     task_id: str,
     config: CopilotConfig,
 ) -> AnalysisContextResult:
-    """Build the compact context used by AI triage analysis."""
+    """Build the compact context used by AI review analysis."""
     context_bundle = CopilotRuntime().build_analysis_context(
         task_name=task_name,
         chip_id=chip_id,
@@ -94,7 +94,7 @@ def _param_value(params: dict[str, object], *names: str) -> object:
     return None
 
 
-def forced_ai_triage_markdown(task_name: str, output_params: dict[str, object]) -> str | None:
+def forced_ai_review_markdown(task_name: str, output_params: dict[str, object]) -> str | None:
     """Apply deterministic safety guards before asking a local VLM."""
     if task_name != "CheckQubitSpectroscopy":
         return None
@@ -111,7 +111,7 @@ def forced_ai_triage_markdown(task_name: str, output_params: dict[str, object]) 
 
     return "\n".join(
         [
-            "**Review triage**",
+            "**AI review**",
             "- Decision: `FAIL`",
             "- Human label suggestion: `NO_SIGNAL`",
             "- Accepted parameter(s): `none`",
@@ -128,7 +128,7 @@ def forced_ai_triage_markdown(task_name: str, output_params: dict[str, object]) 
 
 
 def is_non_representative_mux_result(task_name: str, qid: str | None) -> bool:
-    """Return True for copied MUX resonator results that should not be triaged."""
+    """Return True for copied MUX resonator results that should not be reviewed."""
     if task_name != "CheckResonatorSpectroscopy":
         return False
     try:
@@ -137,21 +137,21 @@ def is_non_representative_mux_result(task_name: str, qid: str | None) -> bool:
         return False
 
 
-def render_ai_triage_markdown(
+def render_ai_review_markdown(
     *,
     task_name: str,
     config: CopilotConfig,
     context_bundle: AnalysisContextResult,
     user_message: str | None = None,
 ) -> str:
-    """Render markdown for one AI triage run."""
-    if forced := forced_ai_triage_markdown(task_name, context_bundle.context.output_parameters):
+    """Render markdown for one AI review run."""
+    if forced := forced_ai_review_markdown(task_name, context_bundle.context.output_parameters):
         return forced
 
     result = asyncio.run(
         run_analysis(
             context=context_bundle.context,
-            user_message=user_message or build_ai_triage_user_message(config),
+            user_message=user_message or build_ai_review_user_message(config),
             config=config,
             image_base64=context_bundle.image_base64,
             expected_images=context_bundle.expected_images,
