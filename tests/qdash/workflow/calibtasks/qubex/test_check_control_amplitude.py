@@ -67,6 +67,28 @@ def test_check_control_amplitude_updates_refined_coarse_seed(monkeypatch) -> Non
     assert result.output_parameters["coarse_control_amplitude"].value == 0.035
 
 
+def test_check_control_amplitude_propagates_spectroscopy_coarse_values_when_fit_is_missing(
+    monkeypatch,
+) -> None:
+    task = CheckControlAmplitude()
+    task.input_parameters["coarse_qubit_frequency"] = ParameterModel(value=4.25, unit="GHz")
+    task.input_parameters["coarse_control_amplitude"] = ParameterModel(value=0.02, unit="a.u.")
+
+    monkeypatch.setattr(task, "get_qubit_label", lambda _backend, _qid: "Q00")
+
+    result = task.postprocess(
+        backend=cast("QubexBackend", object()),
+        execution_id="exec-1",
+        run_result=RunResult(raw_result={"Q00": {"estimated_amplitude": None, "fig": go.Figure()}}),
+        qid="0",
+    )
+
+    assert result.validation_error is None
+    assert result.output_parameters["control_amplitude"].value == 0.02
+    assert result.output_parameters["coarse_control_amplitude"].value == 0.02
+    assert result.output_parameters["coarse_qubit_frequency"].value == 4.25
+
+
 def test_check_control_amplitude_run_uses_coarse_control_amplitude_without_extra_uplift(
     monkeypatch,
 ) -> None:
