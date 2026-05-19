@@ -8,7 +8,6 @@ export const URL_DEFAULTS = {
 } as const;
 
 export type TimeRange = "1d" | "7d" | "30d" | "custom";
-export type RangeMode = "relative" | "absolute";
 export type SelectionMode = "latest" | "best" | "average";
 export type MetricType = "qubit" | "coupling";
 export type ProvenanceTab = "history" | "lineage" | "compare";
