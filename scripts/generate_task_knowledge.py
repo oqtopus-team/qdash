@@ -554,8 +554,8 @@ def _parse_markdown_file(path: Path) -> dict | None:
             ).strip()
             fields[field_name] = clean
 
-    # --- triage guide ---
-    triage_markdown, triage_images = _parse_aux_markdown(path.parent / "triage.md")
+    # --- AI review guide ---
+    triage_markdown, triage_images = _parse_aux_markdown(path.parent / "review.md")
 
     # --- cases ---
     cases = _parse_cases_dir(path.parent)

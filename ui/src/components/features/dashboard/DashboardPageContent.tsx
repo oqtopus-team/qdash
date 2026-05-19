@@ -465,7 +465,7 @@ export function DashboardPageContent() {
               variant="default"
               padding="md"
               title="AI Insights"
-              description="High-signal operational patterns extracted from task triage and dashboard context."
+              description="High-signal operational patterns extracted from AI review notes and dashboard context."
             >
               <DashboardAiInsights
                 chipId={selectedChip}
