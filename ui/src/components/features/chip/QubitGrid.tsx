@@ -427,6 +427,10 @@ export function QubitGrid({
 
   useEffect(() => {
     if (visiblePendingAiReviewCount === 0) return;
+    void refetchTaskResults();
+    void queryClient.invalidateQueries({
+      queryKey: getGetChipNotesSummaryQueryKey(chipId),
+    });
     const intervalId = window.setInterval(() => {
       void refetchTaskResults();
       void queryClient.invalidateQueries({
@@ -686,6 +690,10 @@ export function QubitGrid({
           next.add(taskId);
         }
         return next;
+      });
+      void refetchTaskResults();
+      void queryClient.invalidateQueries({
+        queryKey: getGetChipNotesSummaryQueryKey(chipId),
       });
       setIsAiReviewConfirmOpen(false);
       setAiReviewSelectionEnabled(false);
