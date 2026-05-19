@@ -48,9 +48,9 @@ def test_check_qubit_spectroscopy_outputs_uplifted_coarse_control_amplitude_and_
     assert result.output_parameters["coarse_control_amplitude"].value == pytest.approx(
         10 ** (-10 / 20)
     )
-    assert len(result.figures[1].layout.shapes) == 1
-    assert result.figures[1].layout.shapes[-1]["y0"] == pytest.approx(-10.0)
-    assert result.figures[1].layout.shapes[-1]["y1"] == pytest.approx(-10.0)
+    assert len(result.figures[0].layout.shapes) == 1
+    assert result.figures[0].layout.shapes[-1]["y0"] == pytest.approx(-10.0)
+    assert result.figures[0].layout.shapes[-1]["y1"] == pytest.approx(-10.0)
 
 
 def test_check_qubit_spectroscopy_does_not_output_invalid_frequency(monkeypatch) -> None:

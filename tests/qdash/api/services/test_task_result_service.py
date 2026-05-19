@@ -106,6 +106,7 @@ def _claim_ai_review_document(
     doc: _TaskResultDoc,
     requested_by: str,
     selected_model: ModelConfig,
+    review_run_id: str,
 ) -> _TaskResultDoc | None:
     if doc.ai_review.status in {"requested", "running"}:
         return None
@@ -113,6 +114,7 @@ def _claim_ai_review_document(
         cast("TaskResultHistoryDocument", doc),
         requested_by,
         selected_model,
+        review_run_id,
     )
     return doc
 
@@ -142,6 +144,7 @@ def test_request_bulk_ai_review_enqueues_latest_result_per_qid_with_upsert() -> 
         )
 
     assert response.requested_count == 2
+    assert response.review_run_id.startswith("airv_")
     assert response.task_ids == ["new-q0", "new-q1"]
     assert repo.last_query == {
         "project_id": "proj-1",
@@ -152,6 +155,7 @@ def test_request_bulk_ai_review_enqueues_latest_result_per_qid_with_upsert() -> 
     }
     assert enqueue.call_count == 2
     assert enqueue.call_args_list[0].args[0].task_id == "new-q0"
+    assert enqueue.call_args_list[0].args[0].ai_review.review_run_id == response.review_run_id
     assert enqueue.call_args_list[0].args[1] is None
     assert repo.docs[0].ai_review.status == "requested"
     assert repo.docs[0].ai_review.requested_by == "bob"
@@ -244,7 +248,7 @@ def test_request_bulk_ai_review_skips_non_representative_mux_results() -> None:
     submit.assert_called_once()
 
 
-def test_request_bulk_ai_review_does_not_rewrite_already_claimed_requests() -> None:
+def test_request_bulk_ai_review_does_not_rewrite_already_claimed_runs() -> None:
     now = datetime(2026, 5, 5, tzinfo=timezone.utc)
     repo = _TaskResultRepo([_doc("new-q0", "0", now)])
     repo.docs[0].ai_review = AiReviewModel(
@@ -481,3 +485,114 @@ def test_load_reviewed_task_results_prefers_latest_completed_review_over_newer_p
         )
 
     assert [doc.task_id for doc in docs] == ["done-q0"]
+
+
+def test_list_ai_reviews_extracts_decision_and_paginates() -> None:
+    first_doc = _doc("task-1", "0", datetime(2026, 5, 5, 11, tzinfo=timezone.utc))
+    first_doc.name = "CheckQubitSpectroscopy"
+    first_doc.figure_path = ["/tmp/task-1.png"]
+    first_doc.json_figure_path = ["/tmp/task-1.json"]
+    first_doc.user_note = NoteModel(
+        content=(
+            "## AI review\n\n"
+            "- Decision: `REVIEW`\n"
+            "- Human label suggestion: `SUSPICIOUS`\n"
+            "- Primary reason: signal is weak\n"
+            "- Recommended action: inspect the trace\n"
+        ),
+        updated_at=datetime(2026, 5, 5, 11, 5, tzinfo=timezone.utc),
+    )
+    first_doc.ai_review = AiReviewModel(
+        status="completed",
+        review_run_id="airv_test",
+        model_provider="ollama",
+        model_name="gemma4:26b",
+        completed_at=datetime(2026, 5, 5, 11, 4, tzinfo=timezone.utc),
+    )
+
+    second_doc = _doc("task-2", "1", datetime(2026, 5, 5, 10, tzinfo=timezone.utc))
+    second_doc.user_note = NoteModel(content="## AI review\n\n- Decision: `PASS`\n")
+    second_doc.ai_review = AiReviewModel(status="completed")
+
+    class _Finder:
+        def __init__(self, docs):
+            self._docs = docs
+
+        def run(self):
+            return self._docs
+
+    service = _service(_TaskResultRepo([]))
+    with patch(
+        "qdash.dbmodel.task_result_history.TaskResultHistoryDocument.find",
+        return_value=_Finder([second_doc, first_doc]),
+    ):
+        response = service.list_ai_reviews(
+            project_id="proj-1",
+            decision="REVIEW",
+            skip=0,
+            limit=10,
+        )
+
+    assert response.total == 1
+    assert response.decision_counts == {"REVIEW": 1}
+    item = response.items[0]
+    assert item.task_id == "task-1"
+    assert item.task_name == "CheckQubitSpectroscopy"
+    assert item.target == "Q0"
+    assert item.human_label == "SUSPICIOUS"
+    assert item.primary_reason == "signal is weak"
+    assert item.recommended_action == "inspect the trace"
+    assert item.model == "ollama/gemma4:26b"
+    assert item.figure_path == ["/tmp/task-1.png"]
+    assert item.json_figure_path == ["/tmp/task-1.json"]
+
+
+def test_get_ai_review_run_groups_reviews_by_run_id() -> None:
+    first_doc = _doc("task-1", "0", datetime(2026, 5, 5, 11, tzinfo=timezone.utc))
+    first_doc.user_note = NoteModel(content="## AI review\n\n- Decision: `REVIEW`\n")
+    first_doc.ai_review = AiReviewModel(
+        status="completed",
+        requested_by="bob",
+        review_run_id="airv_group",
+        model_provider="ollama",
+        model_name="gemma4:26b",
+        requested_at=datetime(2026, 5, 5, 11, tzinfo=timezone.utc),
+        completed_at=datetime(2026, 5, 5, 11, 5, tzinfo=timezone.utc),
+    )
+
+    second_doc = _doc("task-2", "1", datetime(2026, 5, 5, 11, tzinfo=timezone.utc))
+    second_doc.user_note = NoteModel(content="## AI review\n\n- Decision: `PASS`\n")
+    second_doc.ai_review = AiReviewModel(
+        status="running",
+        requested_by="bob",
+        review_run_id="airv_group",
+        model_provider="ollama",
+        model_name="gemma4:26b",
+        requested_at=datetime(2026, 5, 5, 11, tzinfo=timezone.utc),
+    )
+
+    class _Finder:
+        def __init__(self, docs):
+            self._docs = docs
+
+        def run(self):
+            return self._docs
+
+    service = _service(_TaskResultRepo([]))
+    with patch(
+        "qdash.dbmodel.task_result_history.TaskResultHistoryDocument.find",
+        return_value=_Finder([second_doc, first_doc]),
+    ):
+        response = service.get_ai_review_run(
+            project_id="proj-1",
+            review_run_id="airv_group",
+        )
+
+    assert response.run.review_run_id == "airv_group"
+    assert response.run.trigger_type == "manual_chip_bulk"
+    assert response.run.execution_ids == ["exec-task-1", "exec-task-2"]
+    assert response.run.total == 2
+    assert response.run.completed_count == 1
+    assert response.run.running_count == 1
+    assert response.run.decision_counts == {"PASS": 1, "REVIEW": 1}
+    assert [item.task_id for item in response.items] == ["task-1", "task-2"]

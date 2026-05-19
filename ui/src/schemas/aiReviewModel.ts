@@ -9,7 +9,7 @@ import type { AiReviewModelRequestedAt } from './aiReviewModelRequestedAt';
 import type { AiReviewModelCompletedAt } from './aiReviewModelCompletedAt';
 
 /**
- * Persistent state for an AI review request on a task result.
+ * Persistent state for an AI review run on a task result.
  */
 export interface AiReviewModel {
   /** AI review status: requested, running, completed, or failed */
@@ -18,6 +18,10 @@ export interface AiReviewModel {
   requested_at?: AiReviewModelRequestedAt;
   /** Username that requested AI review */
   requested_by?: string;
+  /** AI review run identifier shared by task results in the same run */
+  review_run_id?: string;
+  /** How this AI review run was triggered, such as manual_chip_bulk or execution */
+  trigger_type?: string;
   /** Provider for the selected AI review model */
   model_provider?: string;
   /** Name of the selected AI review model */

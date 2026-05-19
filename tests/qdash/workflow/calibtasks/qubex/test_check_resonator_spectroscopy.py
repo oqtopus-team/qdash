@@ -253,7 +253,7 @@ def test_postprocess_allows_left_edge_missing_partial_mux_when_qid_slot_is_avail
 
     assert result.validation_error is None
     assert result.output_parameters["readout_frequency"].value == 6.3
-    annotations = result.figures[1].layout.annotations
+    annotations = result.figures[0].layout.annotations
     texts = [annotation["text"] for annotation in annotations]
     assert "left-edge-missing-cluster-right" in texts
     assert "Q00 / s1" in texts

@@ -30,6 +30,7 @@ import {
   Settings,
   ShieldCheck,
   Bot,
+  ClipboardCheck,
   Sun,
   Workflow,
   X,
@@ -278,6 +279,12 @@ export function Sidebar() {
           href: "/issue-knowledge",
           label: "Knowledge",
           icon: Brain,
+          match: "prefix",
+        },
+        {
+          href: "/ai-reviews",
+          label: "AI Reviews",
+          icon: ClipboardCheck,
           match: "prefix",
         },
         {

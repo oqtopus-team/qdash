@@ -261,13 +261,14 @@ class CheckQubitSpectroscopy(QubexTask):
                 exc_info=True,
             )
 
-        # Return both raw and marked figures
+        # Return the marked figure first (annotated frequencies are the most
+        # useful for review), then the raw figure.
         set_figure_role(raw_fig, "raw")
+        figures: list[go.Figure] = []
         if marked_fig is not None:
             set_figure_role(marked_fig, "marked")
-        figures: list[go.Figure] = [raw_fig]
-        if marked_fig is not None:
             figures.append(marked_fig)
+        figures.append(raw_fig)
 
         # Create a deep copy of output_parameters to avoid sharing state
         output_params_copy = copy.deepcopy(self.output_parameters)

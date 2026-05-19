@@ -112,6 +112,7 @@ class BulkAiReviewRequest(BaseModel):
 class BulkAiReviewResponse(BaseModel):
     """Response after enqueueing bulk AI review."""
 
+    review_run_id: str = ""
     chip_id: str
     task: str
     entity_type: str
@@ -119,6 +120,86 @@ class BulkAiReviewResponse(BaseModel):
     requested_count: int
     task_ids: list[str]
     skipped_reason: str | None = None
+
+
+class AiReviewListItem(BaseModel):
+    """One AI review record extracted from a task result."""
+
+    task_id: str
+    review_run_id: str
+    task_name: str
+    chip_id: str
+    qid: str
+    target: str
+    execution_id: str
+    task_status: str
+    review_status: str
+    decision: str
+    human_label: str
+    accepted_parameters: str
+    needs_review: str
+    primary_reason: str
+    suggested_labels: str
+    recommended_action: str
+    model: str
+    requested_by: str
+    requested_at: datetime | None
+    completed_at: datetime | None
+    note_updated_at: datetime | None
+    start_at: datetime | None
+    figure_path: list[str]
+    json_figure_path: list[str]
+    review_markdown: str
+    format_ok: bool
+
+
+class AiReviewListResponse(BaseModel):
+    """Paginated AI review list response."""
+
+    items: list[AiReviewListItem]
+    total: int
+    skip: int
+    limit: int
+    decision_counts: dict[str, int]
+    status_counts: dict[str, int]
+
+
+class AiReviewRunSummary(BaseModel):
+    """Summary for one bulk AI review run."""
+
+    review_run_id: str
+    trigger_type: str
+    chip_id: str
+    task_name: str
+    entity_type: str
+    execution_ids: list[str]
+    requested_by: str
+    requested_at: datetime | None
+    completed_at: datetime | None
+    model: str
+    total: int
+    completed_count: int
+    failed_count: int
+    running_count: int
+    requested_count: int
+    decision_counts: dict[str, int]
+    status_counts: dict[str, int]
+
+
+class AiReviewRunListResponse(BaseModel):
+    """Paginated AI review run list response."""
+
+    items: list[AiReviewRunSummary]
+    total: int
+    skip: int
+    limit: int
+
+
+class AiReviewRunDetailResponse(BaseModel):
+    """Detail response for one AI review run."""
+
+    run: AiReviewRunSummary
+    items: list[AiReviewListItem]
 
 
 class DownloadFiguresAsZipRequest(BaseModel):
