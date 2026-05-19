@@ -7,16 +7,14 @@ from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import patch
 
 from qdash.api.routers.dashboard import _load_reviewed_task_results
-from qdash.api.services.task_result_service import (
-    _AI_REVIEW_IN_FLIGHT_TASK_IDS,
-    TaskResultService,
-)
+from qdash.api.services.task_result_service import TaskResultService
 from qdash.common.utils.datetime import end_of_day, parse_date, start_of_day
 from qdash.copilot.config import AnalysisConfig, CopilotConfig, ModelConfig
 from qdash.datamodel.note import AiReviewModel, NoteModel
 from qdash.datamodel.system_info import SystemInfoModel
 
 if TYPE_CHECKING:
+    from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
     from qdash.repository.protocols import ChipRepository, TaskResultHistoryRepository
 
 
@@ -98,11 +96,25 @@ def _ai_review_config(tasks: list[str] | None = None) -> CopilotConfig:
 
 
 def _service(repo: _TaskResultRepo) -> TaskResultService:
-    _AI_REVIEW_IN_FLIGHT_TASK_IDS.clear()
     return TaskResultService(
         chip_repository=cast("ChipRepository", _ChipRepo()),
         task_result_repository=cast("TaskResultHistoryRepository", repo),
     )
+
+
+def _claim_ai_review_document(
+    doc: _TaskResultDoc,
+    requested_by: str,
+    selected_model: ModelConfig,
+) -> _TaskResultDoc | None:
+    if doc.ai_review.status in {"requested", "running"}:
+        return None
+    TaskResultService._mark_ai_review_requested(
+        cast("TaskResultHistoryDocument", doc),
+        requested_by,
+        selected_model,
+    )
+    return doc
 
 
 def test_request_bulk_ai_review_enqueues_latest_result_per_qid_with_upsert() -> None:
@@ -118,6 +130,7 @@ def test_request_bulk_ai_review_enqueues_latest_result_per_qid_with_upsert() -> 
 
     with (
         patch.object(service, "_load_ai_review_config", return_value=_ai_review_config()),
+        patch.object(service, "_claim_ai_review_document", side_effect=_claim_ai_review_document),
         patch.object(service, "_submit_ai_review_document") as enqueue,
     ):
         response = service.request_bulk_ai_review(
@@ -154,6 +167,7 @@ def test_request_bulk_ai_review_filters_to_terminal_results() -> None:
 
     with (
         patch.object(service, "_load_ai_review_config", return_value=_ai_review_config()),
+        patch.object(service, "_claim_ai_review_document", side_effect=_claim_ai_review_document),
         patch.object(service, "_submit_ai_review_document"),
     ):
         service.request_bulk_ai_review(
@@ -179,6 +193,7 @@ def test_request_bulk_ai_review_limits_to_selected_task_ids() -> None:
 
     with (
         patch.object(service, "_load_ai_review_config", return_value=_ai_review_config()),
+        patch.object(service, "_claim_ai_review_document", side_effect=_claim_ai_review_document),
         patch.object(service, "_submit_ai_review_document") as enqueue,
     ):
         response = service.request_bulk_ai_review(
@@ -214,6 +229,7 @@ def test_request_bulk_ai_review_skips_non_representative_mux_results() -> None:
             "_load_ai_review_config",
             return_value=_ai_review_config(tasks=["CheckResonatorSpectroscopy"]),
         ),
+        patch.object(service, "_claim_ai_review_document", side_effect=_claim_ai_review_document),
         patch.object(service, "_submit_ai_review_document") as submit,
     ):
         response = service.request_bulk_ai_review(
@@ -228,7 +244,7 @@ def test_request_bulk_ai_review_skips_non_representative_mux_results() -> None:
     submit.assert_called_once()
 
 
-def test_request_bulk_ai_review_does_not_rewrite_in_flight_requests() -> None:
+def test_request_bulk_ai_review_does_not_rewrite_already_claimed_requests() -> None:
     now = datetime(2026, 5, 5, tzinfo=timezone.utc)
     repo = _TaskResultRepo([_doc("new-q0", "0", now)])
     repo.docs[0].ai_review = AiReviewModel(
@@ -239,18 +255,17 @@ def test_request_bulk_ai_review_does_not_rewrite_in_flight_requests() -> None:
     )
     service = _service(repo)
 
-    with patch.object(service, "_load_ai_review_config", return_value=_ai_review_config()):
-        _AI_REVIEW_IN_FLIGHT_TASK_IDS.add("new-q0")
-        try:
-            response = service.request_bulk_ai_review(
-                project_id="proj-1",
-                chip_id="chip-1",
-                task="CheckRabi",
-                entity_type="qubit",
-                requested_by="bob",
-            )
-        finally:
-            _AI_REVIEW_IN_FLIGHT_TASK_IDS.discard("new-q0")
+    with (
+        patch.object(service, "_load_ai_review_config", return_value=_ai_review_config()),
+        patch.object(service, "_claim_ai_review_document", side_effect=_claim_ai_review_document),
+    ):
+        response = service.request_bulk_ai_review(
+            project_id="proj-1",
+            chip_id="chip-1",
+            task="CheckRabi",
+            entity_type="qubit",
+            requested_by="bob",
+        )
 
     assert response.requested_count == 0
     assert response.task_ids == []
@@ -267,6 +282,7 @@ def test_request_bulk_ai_review_passes_model_override() -> None:
 
     with (
         patch.object(service, "_load_ai_review_config", return_value=_ai_review_config()),
+        patch.object(service, "_claim_ai_review_document", side_effect=_claim_ai_review_document),
         patch.object(service, "_submit_ai_review_document") as enqueue,
     ):
         service.request_bulk_ai_review(
@@ -290,6 +306,7 @@ def test_request_bulk_ai_review_historical_date_filters_by_day() -> None:
 
     with (
         patch.object(service, "_load_ai_review_config", return_value=_ai_review_config()),
+        patch.object(service, "_claim_ai_review_document", side_effect=_claim_ai_review_document),
         patch.object(service, "_submit_ai_review_document"),
     ):
         response = service.request_bulk_ai_review(

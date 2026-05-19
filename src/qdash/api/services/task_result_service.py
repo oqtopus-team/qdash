@@ -14,10 +14,10 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
-from threading import Lock
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from bunnet import SortDirection
+from pymongo import ReturnDocument
 
 from qdash.api.schemas.task_result import (
     BulkAiReviewResponse,
@@ -65,13 +65,12 @@ AI_REVIEW_HEADER = "## AI review"
 AI_REVIEW_SEPARATOR = "\n\n---\n\n"
 MAX_AI_REVIEW_NOTE_CHARS = 4500
 AI_REVIEW_WORKERS = 2
+AI_REVIEW_IN_FLIGHT_STATUSES = ("requested", "running")
 
 _AI_REVIEW_EXECUTOR = ThreadPoolExecutor(
     max_workers=AI_REVIEW_WORKERS,
     thread_name_prefix="api-ai-review",
 )
-_AI_REVIEW_IN_FLIGHT_TASK_IDS: set[str] = set()
-_AI_REVIEW_IN_FLIGHT_LOCK = Lock()
 
 
 @dataclass(frozen=True)
@@ -508,13 +507,18 @@ class TaskResultService:
                 continue
             if self._is_non_representative_mux_result(doc.name, doc.qid):
                 continue
-            if not self._claim_ai_review_task_id(doc.task_id):
+            claimed_doc = self._claim_ai_review_document(doc, requested_by, selected_model)
+            if claimed_doc is None:
                 continue
             try:
-                self._mark_ai_review_requested(doc, requested_by, selected_model)
-                self._submit_ai_review_document(doc, model_override)
+                self._submit_ai_review_document(claimed_doc, model_override)
             except Exception:
-                self._release_ai_review_task_id(doc.task_id)
+                self._set_ai_review_status(
+                    doc.project_id,
+                    doc.task_id,
+                    "failed",
+                    error="Failed to enqueue AI review",
+                )
                 raise
             enqueued_task_ids.append(doc.task_id)
         return enqueued_task_ids
@@ -561,19 +565,40 @@ class TaskResultService:
         return task_results
 
     @staticmethod
-    def _claim_ai_review_task_id(task_id: str) -> bool:
-        """Claim a task ID for AI review if it is not already running."""
-        with _AI_REVIEW_IN_FLIGHT_LOCK:
-            if task_id in _AI_REVIEW_IN_FLIGHT_TASK_IDS:
-                return False
-            _AI_REVIEW_IN_FLIGHT_TASK_IDS.add(task_id)
-        return True
+    def _claim_ai_review_document(
+        doc: TaskResultHistoryDocument,
+        requested_by: str,
+        selected_model: Any,
+    ) -> TaskResultHistoryDocument | None:
+        """Atomically mark a task result as requested unless another worker owns it."""
+        from qdash.datamodel.note import AiReviewModel
+        from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
 
-    @staticmethod
-    def _release_ai_review_task_id(task_id: str) -> None:
-        """Release an in-flight AI review claim."""
-        with _AI_REVIEW_IN_FLIGHT_LOCK:
-            _AI_REVIEW_IN_FLIGHT_TASK_IDS.discard(task_id)
+        ai_review = AiReviewModel(
+            status="requested",
+            requested_at=now(),
+            requested_by=requested_by,
+            model_provider=getattr(selected_model, "provider", ""),
+            model_name=getattr(selected_model, "name", ""),
+            completed_at=None,
+            error="",
+        )
+        collection = TaskResultHistoryDocument.get_motor_collection()
+        result = collection.find_one_and_update(
+            {
+                "project_id": doc.project_id,
+                "task_id": doc.task_id,
+                "$or": [
+                    {"ai_review.status": {"$nin": list(AI_REVIEW_IN_FLIGHT_STATUSES)}},
+                    {"ai_review.status": {"$exists": False}},
+                ],
+            },
+            {"$set": {"ai_review": ai_review.model_dump()}},
+            return_document=ReturnDocument.AFTER,
+        )
+        if result is None:
+            return None
+        return cast("TaskResultHistoryDocument", TaskResultHistoryDocument.model_validate(result))
 
     @staticmethod
     def _submit_ai_review_document(
@@ -667,8 +692,6 @@ class TaskResultService:
                 "failed",
                 error=str(exc),
             )
-        finally:
-            TaskResultService._release_ai_review_task_id(task_id)
 
     @staticmethod
     def _load_ai_review_runtime_config(model_override: Any | None) -> Any:
