@@ -11,7 +11,7 @@ export type DashboardInsightCategory = typeof DashboardInsightCategory[keyof typ
 
 // eslint-disable-next-line @typescript-eslint/no-redeclare
 export const DashboardInsightCategory = {
-  triage_cluster: 'triage_cluster',
+  review_cluster: 'review_cluster',
   model_failure: 'model_failure',
   data_consistency: 'data_consistency',
   metric_outlier: 'metric_outlier',

@@ -26,8 +26,8 @@ import type {
 
 import type {
   BodyReExecuteTaskResult,
-  BulkAiTriageRequest,
-  BulkAiTriageResponse,
+  BulkAiReviewRequest,
+  BulkAiReviewResponse,
   DownloadFiguresAsZipRequest,
   ExecuteFlowResponse,
   GetCouplingTaskHistoryParams,
@@ -903,30 +903,30 @@ export function useGetTimeseriesTaskResults<TData = Awaited<ReturnType<typeof ge
 
 
 /**
- * Enqueue AI triage review for the current latest task result per entity.
- * @summary Request bulk AI triage review for latest task results
+ * Enqueue AI review for the current latest task result per entity.
+ * @summary Request bulk AI review for latest task results
  */
-export const requestBulkAiTriageReview = (
-    bulkAiTriageRequest: BulkAiTriageRequest,
+export const requestBulkAiReview = (
+    bulkAiReviewRequest: BulkAiReviewRequest,
  options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
       
       
-      return customInstance<BulkAiTriageResponse>(
-      {url: `/task-results/ai-triage/bulk`, method: 'POST',
+      return customInstance<BulkAiReviewResponse>(
+      {url: `/task-results/ai-review/bulk`, method: 'POST',
       headers: {'Content-Type': 'application/json', },
-      data: bulkAiTriageRequest, signal
+      data: bulkAiReviewRequest, signal
     },
       options);
     }
   
 
 
-export const getRequestBulkAiTriageReviewMutationOptions = <TError = HTTPValidationError,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requestBulkAiTriageReview>>, TError,{data: BulkAiTriageRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
-): UseMutationOptions<Awaited<ReturnType<typeof requestBulkAiTriageReview>>, TError,{data: BulkAiTriageRequest}, TContext> => {
+export const getRequestBulkAiReviewMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requestBulkAiReview>>, TError,{data: BulkAiReviewRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof requestBulkAiReview>>, TError,{data: BulkAiReviewRequest}, TContext> => {
 
-const mutationKey = ['requestBulkAiTriageReview'];
+const mutationKey = ['requestBulkAiReview'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
@@ -936,10 +936,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof requestBulkAiTriageReview>>, {data: BulkAiTriageRequest}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof requestBulkAiReview>>, {data: BulkAiReviewRequest}> = (props) => {
           const {data} = props ?? {};
 
-          return  requestBulkAiTriageReview(data,requestOptions)
+          return  requestBulkAiReview(data,requestOptions)
         }
 
         
@@ -947,23 +947,23 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
   return  { mutationFn, ...mutationOptions }}
 
-    export type RequestBulkAiTriageReviewMutationResult = NonNullable<Awaited<ReturnType<typeof requestBulkAiTriageReview>>>
-    export type RequestBulkAiTriageReviewMutationBody = BulkAiTriageRequest
-    export type RequestBulkAiTriageReviewMutationError = HTTPValidationError
+    export type RequestBulkAiReviewMutationResult = NonNullable<Awaited<ReturnType<typeof requestBulkAiReview>>>
+    export type RequestBulkAiReviewMutationBody = BulkAiReviewRequest
+    export type RequestBulkAiReviewMutationError = HTTPValidationError
 
     /**
- * @summary Request bulk AI triage review for latest task results
+ * @summary Request bulk AI review for latest task results
  */
-export const useRequestBulkAiTriageReview = <TError = HTTPValidationError,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requestBulkAiTriageReview>>, TError,{data: BulkAiTriageRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+export const useRequestBulkAiReview = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requestBulkAiReview>>, TError,{data: BulkAiReviewRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof requestBulkAiTriageReview>>,
+        Awaited<ReturnType<typeof requestBulkAiReview>>,
         TError,
-        {data: BulkAiTriageRequest},
+        {data: BulkAiReviewRequest},
         TContext
       > => {
 
-      const mutationOptions = getRequestBulkAiTriageReviewMutationOptions(options);
+      const mutationOptions = getRequestBulkAiReviewMutationOptions(options);
 
       return useMutation(mutationOptions, queryClient);
     }

@@ -21,7 +21,7 @@ import type { TaskResultStartAt } from './taskResultStartAt';
 import type { TaskResultEndAt } from './taskResultEndAt';
 import type { TaskResultElapsedTime } from './taskResultElapsedTime';
 import type { TaskResultTaskType } from './taskResultTaskType';
-import type { TaskResultAiTriage } from './taskResultAiTriage';
+import type { TaskResultAiReview } from './taskResultAiReview';
 
 /**
  * TaskResult is a Pydantic model that represents a task result.
@@ -46,5 +46,5 @@ export interface TaskResult {
   elapsed_time?: TaskResultElapsedTime;
   task_type?: TaskResultTaskType;
   default_view?: boolean;
-  ai_triage?: TaskResultAiTriage;
+  ai_review?: TaskResultAiReview;
 }

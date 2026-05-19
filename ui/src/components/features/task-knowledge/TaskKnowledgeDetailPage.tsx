@@ -23,8 +23,8 @@ type KnowledgeCase = {
 };
 
 type TaskKnowledgeDetail = {
-  triage_markdown?: string;
-  triage_images?: KnowledgeImage[];
+  review_markdown?: string;
+  review_images?: KnowledgeImage[];
   cases?: KnowledgeCase[];
 };
 
@@ -93,16 +93,16 @@ export function TaskKnowledgeDetailPage({ taskName }: { taskName: string }) {
       </div>
       <MarkdownContent content={markdown} />
 
-      {detail?.triage_markdown?.trim() && (
+      {detail?.review_markdown?.trim() && (
         <section className="mt-10">
           <div className="mb-3">
-            <h2 className="text-lg font-semibold">AI Triage Guide</h2>
+            <h2 className="text-lg font-semibold">AI Review Guide</h2>
             <p className="text-sm text-base-content/60">
               Operational guidance used for automatic review decisions.
             </p>
           </div>
           <div className="rounded-xl border border-base-300 bg-base-100 p-5">
-            <MarkdownContent content={detail.triage_markdown} />
+            <MarkdownContent content={detail.review_markdown} />
           </div>
         </section>
       )}

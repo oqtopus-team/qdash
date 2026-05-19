@@ -18,11 +18,11 @@ from qdash.copilot.config import CopilotConfig, ModelConfig
 from qdash.copilot.contracts import TaskAnalysisContext
 
 
-def test_parse_response_accepts_review_triage_markdown_without_json() -> None:
+def test_parse_response_accepts_ai_review_markdown_without_json() -> None:
     response = parse_response(
         "\n".join(
             [
-                "**Review triage**",
+                "**AI review**",
                 "- Decision: `PASS_WITH_NOTE`",
                 "- Human label suggestion: `CORRECT`",
                 "- Accepted parameter(s): f01",
@@ -43,24 +43,24 @@ def test_parse_response_accepts_review_triage_markdown_without_json() -> None:
     assert "- Decision: PASS_WITH_NOTE" in response.explanation
 
 
-def test_parse_response_converts_missing_triage_json_to_safe_review() -> None:
+def test_parse_response_converts_missing_review_json_to_safe_review() -> None:
     response = parse_response(
         '{"summary":"解析完了","assessment":"warning","explanation":"解析完了"}'
     )
 
     assert response.assessment == "warning"
-    assert response.summary == "AI triage response did not include the required review block."
-    assert response.explanation.startswith("**Review triage**")
+    assert response.summary == "AI review response did not include the required review block."
+    assert response.explanation.startswith("**AI review**")
     assert "- Decision: `REVIEW`" in response.explanation
     assert "- Suggested labels: `model_format_error`" in response.explanation
 
 
-def test_parse_response_converts_plain_missing_triage_text_to_safe_review() -> None:
+def test_parse_response_converts_plain_missing_review_text_to_safe_review() -> None:
     response = parse_response("解析完了")
 
     assert response.assessment == "warning"
-    assert response.summary == "AI triage response did not include the required review block."
-    assert response.explanation.startswith("**Review triage**")
+    assert response.summary == "AI review response did not include the required review block."
+    assert response.explanation.startswith("**AI review**")
     assert "- Decision: `REVIEW`" in response.explanation
     assert "- Suggested labels: `model_format_error`" in response.explanation
 
@@ -124,7 +124,7 @@ async def test_run_chat_completions_passes_ollama_options() -> None:
 async def test_run_chat_completions_uses_reasoning_when_content_is_empty() -> None:
     class _Completions:
         async def create(self, **kwargs):
-            message = SimpleNamespace(content="", reasoning="reasoning triage text")
+            message = SimpleNamespace(content="", reasoning="reasoning review text")
             return SimpleNamespace(choices=[SimpleNamespace(message=message)])
 
     client: Any = SimpleNamespace(chat=SimpleNamespace(completions=_Completions()))
@@ -138,7 +138,7 @@ async def test_run_chat_completions_uses_reasoning_when_content_is_empty() -> No
 
     content = await _run_chat_completions(client, [{"role": "user", "content": "hi"}], config)
 
-    assert content == "reasoning triage text"
+    assert content == "reasoning review text"
 
 
 def test_get_max_tool_rounds_uses_higher_budget_for_ollama() -> None:
@@ -243,7 +243,7 @@ async def test_run_analysis_translates_ollama_output_when_target_language_mismat
     translated = parse_response(
         "\n".join(
             [
-                "**Review triage**",
+                "**AI review**",
                 "- Decision: `PASS`",
                 "- Human label suggestion: `CORRECT`",
                 "- Accepted parameter(s): f01",
@@ -276,4 +276,4 @@ async def test_run_analysis_translates_ollama_output_when_target_language_mismat
         )
 
     translate_mock.assert_awaited_once()
-    assert result["blocks"][0]["content"].startswith("**Review triage**")
+    assert result["blocks"][0]["content"].startswith("**AI review**")

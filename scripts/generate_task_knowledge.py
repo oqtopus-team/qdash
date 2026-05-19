@@ -463,6 +463,11 @@ def _parse_aux_markdown(path: Path) -> tuple[str, list[dict]]:
     return raw, images
 
 
+def _review_markdown_path(task_dir: Path) -> Path:
+    """Return the AI review guide path."""
+    return task_dir / "review.md"
+
+
 def _parse_markdown_file(path: Path) -> dict | None:
     """Parse a Markdown knowledge file into a dict.
 
@@ -554,8 +559,8 @@ def _parse_markdown_file(path: Path) -> dict | None:
             ).strip()
             fields[field_name] = clean
 
-    # --- triage guide ---
-    triage_markdown, triage_images = _parse_aux_markdown(path.parent / "triage.md")
+    # --- AI review guide ---
+    review_markdown, review_images = _parse_aux_markdown(_review_markdown_path(path.parent))
 
     # --- cases ---
     cases = _parse_cases_dir(path.parent)
@@ -580,8 +585,8 @@ def _parse_markdown_file(path: Path) -> dict | None:
         "output_parameters_info": fields.get("output_parameters_info", []),
         "analysis_guide": fields.get("analysis_guide", []),
         "images": images,
-        "triage_markdown": triage_markdown,
-        "triage_images": triage_images,
+        "review_markdown": review_markdown,
+        "review_images": review_images,
         "related_context": fields.get("related_context", []),
         "cases": cases,
     }

@@ -6,4 +6,7 @@
  * OpenAPI spec version: 0.0.1
  */
 
-export type BulkAiTriageResponseDate = string | null;
+/**
+ * Timestamp when AI review completed or failed
+ */
+export type AiReviewModelCompletedAt = string | null;

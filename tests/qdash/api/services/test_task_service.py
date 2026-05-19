@@ -91,17 +91,17 @@ def _resonator_knowledge() -> TaskKnowledge:
                 base64_data="task-image-b64",
             )
         ],
-        triage_markdown=(
-            "# CheckResonatorSpectroscopy AI Triage Guide\n\n"
+        review_markdown=(
+            "# CheckResonatorSpectroscopy AI Review Guide\n\n"
             "Use REVIEW when peak assignment is ambiguous.\n\n"
-            "![Triage example](triage.png)"
+            "![AI review example](review.png)"
         ),
-        triage_images=[
+        review_images=[
             TaskKnowledgeImage(
-                alt_text="Triage example",
-                relative_path="triage.png",
-                section="triage",
-                base64_data="triage-image-b64",
+                alt_text="AI review example",
+                relative_path="review.png",
+                section="review",
+                base64_data="review-image-b64",
             )
         ],
         cases=[
@@ -170,7 +170,7 @@ def test_get_task_knowledge_markdown_falls_back_to_registry_prompt(tmp_path: Pat
     assert markdown.count("data:image/") == 3
 
 
-def test_list_task_knowledge_sets_has_triage_guide_from_markdown() -> None:
+def test_list_task_knowledge_sets_has_review_guide_from_markdown() -> None:
     knowledge = _resonator_knowledge()
     service = _service()
 
@@ -180,22 +180,22 @@ def test_list_task_knowledge_sets_has_triage_guide_from_markdown() -> None:
     assert len(response.items) == 1
     assert response.items[0].name == "CheckResonatorSpectroscopy"
     assert response.items[0].has_analysis_guide is True
-    assert response.items[0].has_triage_guide is True
+    assert response.items[0].has_review_guide is True
     assert response.items[0].case_count == 1
     assert response.items[0].image_count == 1
 
 
-def test_get_task_knowledge_includes_triage_prompt_and_case_images() -> None:
+def test_get_task_knowledge_includes_review_prompt_and_case_images() -> None:
     knowledge = _resonator_knowledge()
     service = _service()
 
     with patch("qdash.api.services.task_service._lookup_knowledge", return_value=knowledge):
         response = service.get_task_knowledge("CheckResonatorSpectroscopy")
 
-    assert response.triage_markdown == knowledge.triage_markdown
-    assert response.triage_images[0].base64_data == "triage-image-b64"
+    assert response.review_markdown == knowledge.review_markdown
+    assert response.review_images[0].base64_data == "review-image-b64"
     assert response.cases[0].images[0].base64_data == "case-image-b64"
     assert response.prompt_text
-    assert "### AI triage guidance" in response.triage_prompt_text
-    assert "Use REVIEW when peak assignment is ambiguous." in response.triage_prompt_text
-    assert "![Triage example]" not in response.triage_prompt_text
+    assert "### AI review guidance" in response.review_prompt_text
+    assert "Use REVIEW when peak assignment is ambiguous." in response.review_prompt_text
+    assert "![AI review example]" not in response.review_prompt_text

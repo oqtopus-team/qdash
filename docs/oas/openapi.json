@@ -5420,14 +5420,14 @@
         }
       }
     },
-    "/task-results/ai-triage/bulk": {
+    "/task-results/ai-review/bulk": {
       "post": {
         "tags": [
           "task-result"
         ],
-        "summary": "Request bulk AI triage review for latest task results",
-        "description": "Enqueue AI triage review for the current latest task result per entity.",
-        "operationId": "requestBulkAiTriageReview",
+        "summary": "Request bulk AI review for latest task results",
+        "description": "Enqueue AI review for the current latest task result per entity.",
+        "operationId": "requestBulkAiReview",
         "security": [
           {
             "HTTPBearer": []
@@ -5456,7 +5456,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/BulkAiTriageRequest"
+                "$ref": "#/components/schemas/BulkAiReviewRequest"
               }
             }
           }
@@ -5467,7 +5467,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/BulkAiTriageResponse"
+                  "$ref": "#/components/schemas/BulkAiReviewResponse"
                 }
               }
             }
@@ -12160,7 +12160,7 @@
           "dashboard"
         ],
         "summary": "Generate dashboard-level AI insight candidates",
-        "description": "Return compact operational insights for the dashboard.\n\nThe first implementation is deterministic: it extracts high-signal patterns\nfrom persisted AI triage notes and task-result metadata. A later LLM\nsynthesis layer can consume the same structured candidate contract.",
+        "description": "Return compact operational insights for the dashboard.\n\nThe first implementation is deterministic: it extracts high-signal patterns\nfrom persisted AI review notes and task-result metadata. A later LLM\nsynthesis layer can consume the same structured candidate contract.",
         "operationId": "getDashboardAiInsights",
         "security": [
           {
@@ -13428,12 +13428,12 @@
         "title": "AddMemberRequest",
         "description": "Request to add a member to a project."
       },
-      "AiTriageReviewModel": {
+      "AiReviewModel": {
         "properties": {
           "status": {
             "type": "string",
             "title": "Status",
-            "description": "AI triage status: requested, running, completed, or failed",
+            "description": "AI review status: requested, running, completed, or failed",
             "default": ""
           },
           "requested_at": {
@@ -13447,24 +13447,24 @@
               }
             ],
             "title": "Requested At",
-            "description": "Timestamp when AI triage was requested"
+            "description": "Timestamp when AI review was requested"
           },
           "requested_by": {
             "type": "string",
             "title": "Requested By",
-            "description": "Username that requested AI triage",
+            "description": "Username that requested AI review",
             "default": ""
           },
           "model_provider": {
             "type": "string",
             "title": "Model Provider",
-            "description": "Provider for the selected AI triage model",
+            "description": "Provider for the selected AI review model",
             "default": ""
           },
           "model_name": {
             "type": "string",
             "title": "Model Name",
-            "description": "Name of the selected AI triage model",
+            "description": "Name of the selected AI review model",
             "default": ""
           },
           "completed_at": {
@@ -13478,18 +13478,18 @@
               }
             ],
             "title": "Completed At",
-            "description": "Timestamp when AI triage completed or failed"
+            "description": "Timestamp when AI review completed or failed"
           },
           "error": {
             "type": "string",
             "title": "Error",
-            "description": "Failure detail if AI triage failed",
+            "description": "Failure detail if AI review failed",
             "default": ""
           }
         },
         "type": "object",
-        "title": "AiTriageReviewModel",
-        "description": "Persistent state for an AI triage review request on a task result."
+        "title": "AiReviewModel",
+        "description": "Persistent state for an AI review request on a task result."
       },
       "AllConfigResponse": {
         "properties": {
@@ -13765,7 +13765,7 @@
         "type": "object",
         "title": "Body_reExecuteTaskResult"
       },
-      "BulkAiTriageRequest": {
+      "BulkAiReviewRequest": {
         "properties": {
           "chip_id": {
             "type": "string",
@@ -13821,10 +13821,10 @@
           "chip_id",
           "task"
         ],
-        "title": "BulkAiTriageRequest",
-        "description": "Request body for bulk AI triage review."
+        "title": "BulkAiReviewRequest",
+        "description": "Request body for bulk AI review."
       },
-      "BulkAiTriageResponse": {
+      "BulkAiReviewResponse": {
         "properties": {
           "chip_id": {
             "type": "string",
@@ -13880,8 +13880,8 @@
           "requested_count",
           "task_ids"
         ],
-        "title": "BulkAiTriageResponse",
-        "description": "Response after enqueueing bulk AI triage review."
+        "title": "BulkAiReviewResponse",
+        "description": "Response after enqueueing bulk AI review."
       },
       "BulkUserImportResponse": {
         "properties": {
@@ -15188,7 +15188,7 @@
           "category": {
             "type": "string",
             "enum": [
-              "triage_cluster",
+              "review_cluster",
               "model_failure",
               "data_consistency",
               "metric_outlier",
@@ -15509,20 +15509,20 @@
             "title": "Filename",
             "default": "figures.zip"
           },
-          "ai_triage_task_ids": {
+          "ai_review_task_ids": {
             "items": {
               "type": "string"
             },
             "type": "array",
-            "title": "Ai Triage Task Ids",
+            "title": "Ai Review Task Ids",
             "default": []
           },
-          "ai_triage_bundle_task_ids": {
+          "ai_review_bundle_task_ids": {
             "items": {
               "type": "string"
             },
             "type": "array",
-            "title": "Ai Triage Bundle Task Ids",
+            "title": "Ai Review Bundle Task Ids",
             "default": []
           }
         },
@@ -22155,17 +22155,17 @@
             "title": "Images",
             "default": []
           },
-          "triage_markdown": {
+          "review_markdown": {
             "type": "string",
-            "title": "Triage Markdown",
+            "title": "Review Markdown",
             "default": ""
           },
-          "triage_images": {
+          "review_images": {
             "items": {
               "$ref": "#/components/schemas/KnowledgeImageResponse"
             },
             "type": "array",
-            "title": "Triage Images",
+            "title": "Review Images",
             "default": []
           },
           "cases": {
@@ -22180,9 +22180,9 @@
             "type": "string",
             "title": "Prompt Text"
           },
-          "triage_prompt_text": {
+          "review_prompt_text": {
             "type": "string",
-            "title": "Triage Prompt Text",
+            "title": "Review Prompt Text",
             "default": ""
           }
         },
@@ -22236,9 +22236,9 @@
             "title": "Has Analysis Guide",
             "default": false
           },
-          "has_triage_guide": {
+          "has_review_guide": {
             "type": "boolean",
-            "title": "Has Triage Guide",
+            "title": "Has Review Guide",
             "default": false
           }
         },
@@ -22536,10 +22536,10 @@
             "title": "Default View",
             "default": true
           },
-          "ai_triage": {
+          "ai_review": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/AiTriageReviewModel"
+                "$ref": "#/components/schemas/AiReviewModel"
               },
               {
                 "type": "null"

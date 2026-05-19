@@ -1,4 +1,4 @@
-"""Prompt builders for task-result analysis and AI triage flows."""
+"""Prompt builders for task-result analysis and AI review flows."""
 
 from __future__ import annotations
 
@@ -40,14 +40,14 @@ In execute_python_analysis, access stored data via data["<data_key>"]
 (e.g., data["t1"]). Do NOT pass context_data manually.
 """
 
-REVIEW_TRIAGE_INSTRUCTION = """\
-## Review triage output
+AI_REVIEW_INSTRUCTION = """\
+## AI review output
 
 When answering about a calibration task result, begin your first text block with
-a short review triage summary before the detailed explanation. Keep it concise
+a short AI review summary before the detailed explanation. Keep it concise
 and use the following markdown shape:
 
-**Review triage**
+**AI review**
 - Decision: `PASS` | `PASS_WITH_NOTE` | `REVIEW` | `FAIL`
 - Human label suggestion: `CORRECT` | `SUSPICIOUS` | `MISASSIGNMENT` | `NO_SIGNAL` | `ANOMALY`
 - Accepted parameter(s): parameter names and values that are well supported, or `none`
@@ -59,12 +59,12 @@ and use the following markdown shape:
 - Optional note: one short caveat only when useful, otherwise `none`
 
 For reliable parsing, the JSON `explanation` string MUST start exactly with
-`**Review triage**`. Every triage field line MUST begin with hyphen-space
+`**AI review**`. Every review field line MUST begin with hyphen-space
 (`- `). Do not omit the hyphens, do not bold the field names, and do not put
-ordinary prose before the triage block. Use this exact skeleton before any
+ordinary prose before the review block. Use this exact skeleton before any
 detailed explanation:
 
-**Review triage**
+**AI review**
 - Decision: `PASS` | `PASS_WITH_NOTE` | `REVIEW` | `FAIL`
 - Human label suggestion: `CORRECT` | `SUSPICIOUS` | `MISASSIGNMENT` | `NO_SIGNAL` | `ANOMALY`
 - Accepted parameter(s): ...
@@ -75,7 +75,7 @@ detailed explanation:
 - Recommended action: ...
 - Optional note: ...
 
-Keep the triage fields internally consistent:
+Keep the review fields internally consistent:
 - Use `PASS` only when all important output parameters are visually and physically supported.
   For `PASS`, set `Needs review: none`, `Suggested labels: none`, and make the recommended
   action an accept/use action rather than a remeasurement action.
@@ -120,10 +120,10 @@ Rules:
 - `potential_issues` and `recommendations` MUST be JSON arrays of strings. Use an empty array `[]` when nothing applies — never a single string or null.
 - `assessment` MUST be exactly one of `good`, `warning`, `bad` (lowercase).
 - Write the user-facing text fields (`summary`, `explanation`, items in `potential_issues` and `recommendations`) in the user's response language as instructed above. Keep technical terms like T1, T2, fidelity in English.
-- The `explanation` field MUST begin with the exact review triage markdown described above, starting with `**Review triage**`.
-- Put the triage fields inside `explanation`; do not add extra JSON keys for them.
-- Keep `assessment` consistent with the triage decision: `good` for `PASS`, `warning` for `PASS_WITH_NOTE` or `REVIEW`, and `bad` for `FAIL`.
-- Keep the response concise for interactive use: after the triage, write at most 6 short bullets or 3 short paragraphs in `explanation`, at most 3 potential issues, and at most 3 recommendations.
+- The `explanation` field MUST begin with the exact AI review markdown described above, starting with `**AI review**`.
+- Put the review fields inside `explanation`; do not add extra JSON keys for them.
+- Keep `assessment` consistent with the review decision: `good` for `PASS`, `warning` for `PASS_WITH_NOTE` or `REVIEW`, and `bad` for `FAIL`.
+- Keep the response concise for interactive use: after the review block, write at most 6 short bullets or 3 short paragraphs in `explanation`, at most 3 potential issues, and at most 3 recommendations.
 - Do not add keys outside this schema.
 """
 
@@ -147,7 +147,7 @@ def _build_scoring_threshold_section(scoring: Mapping[str, ScoringThreshold] | N
 
 
 def build_analysis_system_prompt(options: AnalysisPromptOptions) -> str:
-    """Build the full system prompt for task analysis and AI triage."""
+    """Build the full system prompt for task analysis and AI review."""
     context = options.context
     parts = [ANALYSIS_SYSTEM_PROMPT_BASE, options.language_instruction]
 
@@ -172,7 +172,7 @@ def build_analysis_system_prompt(options: AnalysisPromptOptions) -> str:
         parts.append("\n".join(img_instructions))
 
     parts.append(context.task_knowledge_prompt)
-    parts.append(REVIEW_TRIAGE_INSTRUCTION)
+    parts.append(AI_REVIEW_INSTRUCTION)
 
     scoring_section = _build_scoring_threshold_section(options.scoring)
     if scoring_section:

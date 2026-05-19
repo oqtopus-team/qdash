@@ -19,7 +19,7 @@ from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
 
 router = APIRouter()
 
-AI_TRIAGE_RE = re.compile(r"^## AI triage\n\n(?P<body>.*?)(?=\n\n---\n\n|$)", re.DOTALL)
+AI_REVIEW_RE = re.compile(r"^## AI review\n\n(?P<body>.*?)(?=\n\n---\n\n|$)", re.DOTALL)
 
 
 @router.get(
@@ -52,17 +52,17 @@ def get_dashboard_ai_insights(
     """Return compact operational insights for the dashboard.
 
     The first implementation is deterministic: it extracts high-signal patterns
-    from persisted AI triage notes and task-result metadata. A later LLM
+    from persisted AI review notes and task-result metadata. A later LLM
     synthesis layer can consume the same structured candidate contract.
     """
     _ = (selection_mode, start_at, end_at)
-    docs = _load_triaged_task_results(
+    docs = _load_reviewed_task_results(
         project_id=ctx.project_id,
         chip_id=chip_id,
         task_name=task_name,
         latest_only=latest_only,
     )
-    records = [_parse_triage_record(doc) for doc in docs]
+    records = [_parse_review_record(doc) for doc in docs]
     insights = _build_insights(records)
     routine_pass_count = sum(
         1 for record in records if record["decision"] in {"PASS", "PASS_WITH_NOTE"}
@@ -75,14 +75,14 @@ def get_dashboard_ai_insights(
         suppressed=DashboardInsightSuppressed(
             routine_pass_count=routine_pass_count,
             reason=(
-                "Routine PASS/PASS_WITH_NOTE task triage results are suppressed unless they "
+                "Routine PASS/PASS_WITH_NOTE task review results are suppressed unless they "
                 "form a chip-level pattern."
             ),
         ),
     )
 
 
-def _load_triaged_task_results(
+def _load_reviewed_task_results(
     *,
     project_id: str,
     chip_id: str,
@@ -93,8 +93,8 @@ def _load_triaged_task_results(
         "project_id": project_id,
         "chip_id": chip_id,
         "$or": [
-            {"ai_triage.status": {"$exists": True, "$ne": ""}},
-            {"user_note.content": {"$regex": "^## AI triage"}},
+            {"ai_review.status": {"$exists": True, "$ne": ""}},
+            {"user_note.content": {"$regex": "^## AI review"}},
         ],
     }
     if task_name:
@@ -111,29 +111,29 @@ def _load_triaged_task_results(
         if current is None:
             latest[key] = doc
             continue
-        if _has_terminal_triage_signal(current):
+        if _has_terminal_review_signal(current):
             continue
-        if _has_terminal_triage_signal(doc):
+        if _has_terminal_review_signal(doc):
             latest[key] = doc
     return list(latest.values())
 
 
-def _has_terminal_triage_signal(doc: TaskResultHistoryDocument) -> bool:
+def _has_terminal_review_signal(doc: TaskResultHistoryDocument) -> bool:
     content = doc.user_note.content or ""
     return bool(
-        AI_TRIAGE_RE.search(content)
-        or getattr(doc.ai_triage, "status", "") in {"completed", "failed"}
+        AI_REVIEW_RE.search(content)
+        or getattr(doc.ai_review, "status", "") in {"completed", "failed"}
     )
 
 
-def _parse_triage_record(doc: TaskResultHistoryDocument) -> dict[str, Any]:
+def _parse_review_record(doc: TaskResultHistoryDocument) -> dict[str, Any]:
     content = doc.user_note.content or ""
-    match = AI_TRIAGE_RE.search(content)
+    match = AI_REVIEW_RE.search(content)
     body = match.group("body") if match else content
     decision = _field(body, "Decision")
     if not decision and "必要なレビュー・ブロック" in body:
         decision = "FORMAT_ERROR"
-    if not decision and doc.ai_triage.status == "failed":
+    if not decision and doc.ai_review.status == "failed":
         decision = "FORMAT_ERROR"
     decision = decision or "UNKNOWN"
     labels = _field(body, "Suggested labels")
@@ -143,9 +143,9 @@ def _parse_triage_record(doc: TaskResultHistoryDocument) -> dict[str, Any]:
         "qid": doc.qid,
         "target": _format_target(doc.qid),
         "execution_id": doc.execution_id,
-        "status": doc.ai_triage.status,
+        "status": doc.ai_review.status,
         "model": "/".join(
-            part for part in [doc.ai_triage.model_provider, doc.ai_triage.model_name] if part
+            part for part in [doc.ai_review.model_provider, doc.ai_review.model_name] if part
         ),
         "decision": decision,
         "human_label": _field(body, "Human label suggestion"),
@@ -249,7 +249,7 @@ def _build_insights(records: list[dict[str, Any]]) -> list[DashboardInsight]:
                     "These should be separated from calibration-quality failures.",
                 ],
                 recommended_action=(
-                    "Rerun AI triage for these targets or inspect parser fallback logs before "
+                    "Rerun AI review for these targets or inspect parser fallback logs before "
                     "counting them as calibration review cases."
                 ),
                 confidence="high",
@@ -275,7 +275,7 @@ def _build_insights(records: list[dict[str, Any]]) -> list[DashboardInsight]:
                 title=f"{task} has clustered review decisions",
                 severity="warning",
                 affected_targets=_targets(group),
-                category="triage_cluster",
+                category="review_cluster",
                 evidence=[
                     ", ".join(f"{decision}: {count}" for decision, count in decisions.items()),
                     "The grouped pattern is more useful than reading each task note separately.",
@@ -296,12 +296,12 @@ def _build_insights(records: list[dict[str, Any]]) -> list[DashboardInsight]:
     if failed_status:
         insights.append(
             DashboardInsight(
-                title="Some AI triage requests failed without a structured decision",
+                title="Some AI review requests failed without a structured decision",
                 severity="info",
                 affected_targets=_targets(failed_status),
                 category="model_failure",
-                evidence=[f"{len(failed_status)} triage request(s) have failed status."],
-                recommended_action="Check model availability and retry these AI triage requests.",
+                evidence=[f"{len(failed_status)} review request(s) have failed status."],
+                recommended_action="Check model availability and retry these AI review requests.",
                 confidence="medium",
             )
         )
@@ -328,13 +328,13 @@ def _summary(
     insights: list[DashboardInsight],
 ) -> str:
     if not records:
-        return f"No AI triage records were found for {chip_id}."
+        return f"No AI review records were found for {chip_id}."
     if not insights:
         return (
             f"No high-signal dashboard insight was detected from {len(records)} "
-            "AI triage record(s)."
+            "AI review record(s)."
         )
     return (
         f"Detected {len(insights)} dashboard insight candidate(s) from "
-        f"{len(records)} AI triage record(s) on {chip_id}."
+        f"{len(records)} AI review record(s) on {chip_id}."
     )

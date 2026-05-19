@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 InsightSeverity = Literal["info", "warning", "critical"]
 InsightConfidence = Literal["low", "medium", "high"]
 InsightCategory = Literal[
-    "triage_cluster",
+    "review_cluster",
     "model_failure",
     "data_consistency",
     "metric_outlier",

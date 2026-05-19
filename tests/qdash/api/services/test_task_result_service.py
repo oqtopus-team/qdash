@@ -6,17 +6,15 @@ from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import patch
 
-from qdash.api.routers.dashboard import _load_triaged_task_results
-from qdash.api.services.task_result_service import (
-    _AI_TRIAGE_IN_FLIGHT_TASK_IDS,
-    TaskResultService,
-)
+from qdash.api.routers.dashboard import _load_reviewed_task_results
+from qdash.api.services.task_result_service import TaskResultService
 from qdash.common.utils.datetime import end_of_day, parse_date, start_of_day
 from qdash.copilot.config import AnalysisConfig, CopilotConfig, ModelConfig
-from qdash.datamodel.note import AiTriageReviewModel, NoteModel
+from qdash.datamodel.note import AiReviewModel, NoteModel
 from qdash.datamodel.system_info import SystemInfoModel
 
 if TYPE_CHECKING:
+    from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
     from qdash.repository.protocols import ChipRepository, TaskResultHistoryRepository
 
 
@@ -83,29 +81,43 @@ def _doc(task_id: str, qid: str, end_at: datetime) -> _TaskResultDoc:
         execution_id=f"exec-{task_id}",
         tags=[],
         chip_id="chip-1",
-        ai_triage=AiTriageReviewModel(),
+        ai_review=AiReviewModel(),
         user_note=NoteModel(),
     )
 
 
-def _ai_triage_config(tasks: list[str] | None = None) -> CopilotConfig:
+def _ai_review_config(tasks: list[str] | None = None) -> CopilotConfig:
     return CopilotConfig(
         enabled=True,
         model=ModelConfig(provider="openai", name="gpt-4.1"),
         analysis_models=[ModelConfig(provider="openai", name="gpt-5.1")],
-        analysis=AnalysisConfig(enabled=True, ai_triage_tasks=tasks or ["CheckRabi"]),
+        analysis=AnalysisConfig(enabled=True, ai_review_tasks=tasks or ["CheckRabi"]),
     )
 
 
 def _service(repo: _TaskResultRepo) -> TaskResultService:
-    _AI_TRIAGE_IN_FLIGHT_TASK_IDS.clear()
     return TaskResultService(
         chip_repository=cast("ChipRepository", _ChipRepo()),
         task_result_repository=cast("TaskResultHistoryRepository", repo),
     )
 
 
-def test_request_bulk_ai_triage_enqueues_latest_result_per_qid_with_upsert() -> None:
+def _claim_ai_review_document(
+    doc: _TaskResultDoc,
+    requested_by: str,
+    selected_model: ModelConfig,
+) -> _TaskResultDoc | None:
+    if doc.ai_review.status in {"requested", "running"}:
+        return None
+    TaskResultService._mark_ai_review_requested(
+        cast("TaskResultHistoryDocument", doc),
+        requested_by,
+        selected_model,
+    )
+    return doc
+
+
+def test_request_bulk_ai_review_enqueues_latest_result_per_qid_with_upsert() -> None:
     now = datetime(2026, 5, 5, tzinfo=timezone.utc)
     repo = _TaskResultRepo(
         [
@@ -117,10 +129,11 @@ def test_request_bulk_ai_triage_enqueues_latest_result_per_qid_with_upsert() -> 
     service = _service(repo)
 
     with (
-        patch.object(service, "_load_ai_triage_config", return_value=_ai_triage_config()),
-        patch.object(service, "_submit_ai_triage_document") as enqueue,
+        patch.object(service, "_load_ai_review_config", return_value=_ai_review_config()),
+        patch.object(service, "_claim_ai_review_document", side_effect=_claim_ai_review_document),
+        patch.object(service, "_submit_ai_review_document") as enqueue,
     ):
-        response = service.request_bulk_ai_triage(
+        response = service.request_bulk_ai_review(
             project_id="proj-1",
             chip_id="chip-1",
             task="CheckRabi",
@@ -140,23 +153,24 @@ def test_request_bulk_ai_triage_enqueues_latest_result_per_qid_with_upsert() -> 
     assert enqueue.call_count == 2
     assert enqueue.call_args_list[0].args[0].task_id == "new-q0"
     assert enqueue.call_args_list[0].args[1] is None
-    assert repo.docs[0].ai_triage.status == "requested"
-    assert repo.docs[0].ai_triage.requested_by == "bob"
-    assert repo.docs[0].ai_triage.model_provider == "openai"
-    assert repo.docs[0].ai_triage.model_name == "gpt-5.1"
+    assert repo.docs[0].ai_review.status == "requested"
+    assert repo.docs[0].ai_review.requested_by == "bob"
+    assert repo.docs[0].ai_review.model_provider == "openai"
+    assert repo.docs[0].ai_review.model_name == "gpt-5.1"
     assert repo.docs[0].saved is True
 
 
-def test_request_bulk_ai_triage_filters_to_terminal_results() -> None:
+def test_request_bulk_ai_review_filters_to_terminal_results() -> None:
     now = datetime(2026, 5, 5, tzinfo=timezone.utc)
     repo = _TaskResultRepo([_doc("new-q0", "0", now)])
     service = _service(repo)
 
     with (
-        patch.object(service, "_load_ai_triage_config", return_value=_ai_triage_config()),
-        patch.object(service, "_submit_ai_triage_document"),
+        patch.object(service, "_load_ai_review_config", return_value=_ai_review_config()),
+        patch.object(service, "_claim_ai_review_document", side_effect=_claim_ai_review_document),
+        patch.object(service, "_submit_ai_review_document"),
     ):
-        service.request_bulk_ai_triage(
+        service.request_bulk_ai_review(
             project_id="proj-1",
             chip_id="chip-1",
             task="CheckRabi",
@@ -167,7 +181,7 @@ def test_request_bulk_ai_triage_filters_to_terminal_results() -> None:
     assert repo.last_query["status"] == {"$in": ["completed", "failed"]}
 
 
-def test_request_bulk_ai_triage_limits_to_selected_task_ids() -> None:
+def test_request_bulk_ai_review_limits_to_selected_task_ids() -> None:
     now = datetime(2026, 5, 5, tzinfo=timezone.utc)
     repo = _TaskResultRepo(
         [
@@ -178,10 +192,11 @@ def test_request_bulk_ai_triage_limits_to_selected_task_ids() -> None:
     service = _service(repo)
 
     with (
-        patch.object(service, "_load_ai_triage_config", return_value=_ai_triage_config()),
-        patch.object(service, "_submit_ai_triage_document") as enqueue,
+        patch.object(service, "_load_ai_review_config", return_value=_ai_review_config()),
+        patch.object(service, "_claim_ai_review_document", side_effect=_claim_ai_review_document),
+        patch.object(service, "_submit_ai_review_document") as enqueue,
     ):
-        response = service.request_bulk_ai_triage(
+        response = service.request_bulk_ai_review(
             project_id="proj-1",
             chip_id="chip-1",
             task="CheckRabi",
@@ -196,7 +211,7 @@ def test_request_bulk_ai_triage_limits_to_selected_task_ids() -> None:
     enqueue.assert_called_once()
 
 
-def test_request_bulk_ai_triage_skips_non_representative_mux_results() -> None:
+def test_request_bulk_ai_review_skips_non_representative_mux_results() -> None:
     now = datetime(2026, 5, 5, tzinfo=timezone.utc)
     repo = _TaskResultRepo(
         [
@@ -211,12 +226,13 @@ def test_request_bulk_ai_triage_skips_non_representative_mux_results() -> None:
     with (
         patch.object(
             service,
-            "_load_ai_triage_config",
-            return_value=_ai_triage_config(tasks=["CheckResonatorSpectroscopy"]),
+            "_load_ai_review_config",
+            return_value=_ai_review_config(tasks=["CheckResonatorSpectroscopy"]),
         ),
-        patch.object(service, "_submit_ai_triage_document") as submit,
+        patch.object(service, "_claim_ai_review_document", side_effect=_claim_ai_review_document),
+        patch.object(service, "_submit_ai_review_document") as submit,
     ):
-        response = service.request_bulk_ai_triage(
+        response = service.request_bulk_ai_review(
             project_id="proj-1",
             chip_id="chip-1",
             task="CheckResonatorSpectroscopy",
@@ -228,10 +244,10 @@ def test_request_bulk_ai_triage_skips_non_representative_mux_results() -> None:
     submit.assert_called_once()
 
 
-def test_request_bulk_ai_triage_does_not_rewrite_in_flight_requests() -> None:
+def test_request_bulk_ai_review_does_not_rewrite_already_claimed_requests() -> None:
     now = datetime(2026, 5, 5, tzinfo=timezone.utc)
     repo = _TaskResultRepo([_doc("new-q0", "0", now)])
-    repo.docs[0].ai_triage = AiTriageReviewModel(
+    repo.docs[0].ai_review = AiReviewModel(
         status="running",
         requested_by="alice",
         model_provider="openai",
@@ -239,37 +255,37 @@ def test_request_bulk_ai_triage_does_not_rewrite_in_flight_requests() -> None:
     )
     service = _service(repo)
 
-    with patch.object(service, "_load_ai_triage_config", return_value=_ai_triage_config()):
-        _AI_TRIAGE_IN_FLIGHT_TASK_IDS.add("new-q0")
-        try:
-            response = service.request_bulk_ai_triage(
-                project_id="proj-1",
-                chip_id="chip-1",
-                task="CheckRabi",
-                entity_type="qubit",
-                requested_by="bob",
-            )
-        finally:
-            _AI_TRIAGE_IN_FLIGHT_TASK_IDS.discard("new-q0")
+    with (
+        patch.object(service, "_load_ai_review_config", return_value=_ai_review_config()),
+        patch.object(service, "_claim_ai_review_document", side_effect=_claim_ai_review_document),
+    ):
+        response = service.request_bulk_ai_review(
+            project_id="proj-1",
+            chip_id="chip-1",
+            task="CheckRabi",
+            entity_type="qubit",
+            requested_by="bob",
+        )
 
     assert response.requested_count == 0
     assert response.task_ids == []
-    assert repo.docs[0].ai_triage.requested_by == "alice"
-    assert repo.docs[0].ai_triage.status == "running"
+    assert repo.docs[0].ai_review.requested_by == "alice"
+    assert repo.docs[0].ai_review.status == "running"
     assert repo.docs[0].saved is False
 
 
-def test_request_bulk_ai_triage_passes_model_override() -> None:
+def test_request_bulk_ai_review_passes_model_override() -> None:
     now = datetime(2026, 5, 5, tzinfo=timezone.utc)
     repo = _TaskResultRepo([_doc("new-q0", "0", now)])
     service = _service(repo)
     model_override = ModelConfig(provider="anthropic", name="claude-sonnet-4.5")
 
     with (
-        patch.object(service, "_load_ai_triage_config", return_value=_ai_triage_config()),
-        patch.object(service, "_submit_ai_triage_document") as enqueue,
+        patch.object(service, "_load_ai_review_config", return_value=_ai_review_config()),
+        patch.object(service, "_claim_ai_review_document", side_effect=_claim_ai_review_document),
+        patch.object(service, "_submit_ai_review_document") as enqueue,
     ):
-        service.request_bulk_ai_triage(
+        service.request_bulk_ai_review(
             project_id="proj-1",
             chip_id="chip-1",
             task="CheckRabi",
@@ -279,20 +295,21 @@ def test_request_bulk_ai_triage_passes_model_override() -> None:
         )
 
     assert enqueue.call_args.args[1] is model_override
-    assert repo.docs[0].ai_triage.model_provider == "anthropic"
-    assert repo.docs[0].ai_triage.model_name == "claude-sonnet-4.5"
+    assert repo.docs[0].ai_review.model_provider == "anthropic"
+    assert repo.docs[0].ai_review.model_name == "claude-sonnet-4.5"
 
 
-def test_request_bulk_ai_triage_historical_date_filters_by_day() -> None:
+def test_request_bulk_ai_review_historical_date_filters_by_day() -> None:
     now = datetime(2026, 5, 5, 12, tzinfo=timezone.utc)
     repo = _TaskResultRepo([_doc("hist-q0", "0", now)])
     service = _service(repo)
 
     with (
-        patch.object(service, "_load_ai_triage_config", return_value=_ai_triage_config()),
-        patch.object(service, "_submit_ai_triage_document"),
+        patch.object(service, "_load_ai_review_config", return_value=_ai_review_config()),
+        patch.object(service, "_claim_ai_review_document", side_effect=_claim_ai_review_document),
+        patch.object(service, "_submit_ai_review_document"),
     ):
-        response = service.request_bulk_ai_triage(
+        response = service.request_bulk_ai_review(
             project_id="proj-1",
             chip_id="chip-1",
             task="CheckRabi",
@@ -310,16 +327,16 @@ def test_request_bulk_ai_triage_historical_date_filters_by_day() -> None:
     }
 
 
-def test_request_bulk_ai_triage_skips_task_not_configured() -> None:
+def test_request_bulk_ai_review_skips_task_not_configured() -> None:
     repo = _TaskResultRepo([])
     service = _service(repo)
 
     with patch.object(
         service,
-        "_load_ai_triage_config",
-        return_value=_ai_triage_config(tasks=["CheckT1"]),
+        "_load_ai_review_config",
+        return_value=_ai_review_config(tasks=["CheckT1"]),
     ):
-        response = service.request_bulk_ai_triage(
+        response = service.request_bulk_ai_review(
             project_id="proj-1",
             chip_id="chip-1",
             task="CheckRabi",
@@ -332,7 +349,7 @@ def test_request_bulk_ai_triage_skips_task_not_configured() -> None:
     assert repo.last_query is None
 
 
-def test_bulk_ai_triage_config_applies_local_vlm_defaults_only_to_triage() -> None:
+def test_bulk_ai_review_config_applies_local_vlm_defaults_only_to_review() -> None:
     config = CopilotConfig(
         enabled=True,
         model=ModelConfig(provider="openai", name="gpt-4.1", max_output_tokens=4096),
@@ -340,34 +357,34 @@ def test_bulk_ai_triage_config_applies_local_vlm_defaults_only_to_triage() -> No
         analysis=AnalysisConfig(
             enabled=True,
             max_expected_images=2,
-            ai_triage_max_expected_images=0,
-            ai_triage_max_output_tokens=1024,
+            ai_review_max_expected_images=0,
+            ai_review_max_output_tokens=1024,
         ),
     )
 
-    triage_config = TaskResultService._ai_triage_config(config)
+    review_config = TaskResultService._ai_review_config(config)
 
     assert config.analysis.max_expected_images == 2
     assert config.analysis_models[0].max_output_tokens == 4096
-    assert triage_config.analysis.max_expected_images == 0
-    assert triage_config.analysis_model is not None
-    assert triage_config.analysis_model.max_output_tokens == 1024
+    assert review_config.analysis.max_expected_images == 0
+    assert review_config.analysis_model is not None
+    assert review_config.analysis_model.max_output_tokens == 1024
 
 
-def test_bulk_ai_triage_forced_markdown_marks_missing_f01_as_no_signal() -> None:
-    markdown = TaskResultService._forced_ai_triage_markdown("CheckQubitSpectroscopy", {})
+def test_bulk_ai_review_forced_markdown_marks_missing_f01_as_no_signal() -> None:
+    markdown = TaskResultService._forced_ai_review_markdown("CheckQubitSpectroscopy", {})
 
     assert markdown is not None
     assert "- Decision: `FAIL`" in markdown
     assert "- Human label suggestion: `NO_SIGNAL`" in markdown
 
 
-def test_persist_ai_triage_markdown_marks_empty_content_as_failed() -> None:
+def test_persist_ai_review_markdown_marks_empty_content_as_failed() -> None:
     with (
-        patch.object(TaskResultService, "_set_ai_triage_status") as set_status,
-        patch.object(TaskResultService, "_upsert_ai_triage_note") as upsert,
+        patch.object(TaskResultService, "_set_ai_review_status") as set_status,
+        patch.object(TaskResultService, "_upsert_ai_review_note") as upsert,
     ):
-        TaskResultService._persist_ai_triage_markdown(
+        TaskResultService._persist_ai_review_markdown(
             project_id="proj-1",
             task_id="task-1",
             markdown="",
@@ -378,72 +395,72 @@ def test_persist_ai_triage_markdown_marks_empty_content_as_failed() -> None:
         "proj-1",
         "task-1",
         "failed",
-        error="AI triage returned empty content",
+        error="AI review returned empty content",
     )
     upsert.assert_not_called()
 
 
-def test_create_figures_zip_includes_ai_triage_markdown(tmp_path) -> None:
+def test_create_figures_zip_includes_ai_review_markdown(tmp_path) -> None:
     figure = tmp_path / "figure.json"
     figure.write_text('{"data":[]}', encoding="utf-8")
 
     with patch.object(
         TaskResultService,
-        "_load_ai_triage_note_entries",
+        "_load_ai_review_note_entries",
         return_value=[
-            ("ai_triage/CheckRabi_0_task-1.md", "## AI triage\n\n- Decision: `REVIEW`\n")
+            ("ai_review/CheckRabi_0_task-1.md", "## AI review\n\n- Decision: `REVIEW`\n")
         ],
     ):
         buffer, filename = TaskResultService.create_figures_zip(
             [str(figure)],
             "artifacts.zip",
             project_id="proj-1",
-            ai_triage_task_ids=["task-1"],
+            ai_review_task_ids=["task-1"],
         )
 
     assert filename == "artifacts.zip"
     with zipfile.ZipFile(buffer) as archive:
         assert sorted(archive.namelist()) == [
-            "ai_triage/CheckRabi_0_task-1.md",
+            "ai_review/CheckRabi_0_task-1.md",
             "figure.json",
         ]
-        assert archive.read("ai_triage/CheckRabi_0_task-1.md").decode() == (
-            "## AI triage\n\n- Decision: `REVIEW`\n"
+        assert archive.read("ai_review/CheckRabi_0_task-1.md").decode() == (
+            "## AI review\n\n- Decision: `REVIEW`\n"
         )
 
 
-def test_create_figures_zip_includes_ai_triage_replay_bundle(tmp_path) -> None:
+def test_create_figures_zip_includes_ai_review_replay_bundle(tmp_path) -> None:
     figure = tmp_path / "figure.json"
     figure.write_text('{"data":[]}', encoding="utf-8")
 
     with patch.object(
         TaskResultService,
-        "_load_ai_triage_bundle_entries",
-        return_value=[("ai_triage_bundle/CheckRabi_0_task-1.zip", b"bundle-bytes")],
+        "_load_ai_review_bundle_entries",
+        return_value=[("ai_review_bundle/CheckRabi_0_task-1.zip", b"bundle-bytes")],
     ):
         buffer, filename = TaskResultService.create_figures_zip(
             [str(figure)],
             "artifacts.zip",
             project_id="proj-1",
-            ai_triage_bundle_task_ids=["task-1"],
+            ai_review_bundle_task_ids=["task-1"],
         )
 
     assert filename == "artifacts.zip"
     with zipfile.ZipFile(buffer) as archive:
         assert sorted(archive.namelist()) == [
-            "ai_triage_bundle/CheckRabi_0_task-1.zip",
+            "ai_review_bundle/CheckRabi_0_task-1.zip",
             "figure.json",
         ]
-        assert archive.read("ai_triage_bundle/CheckRabi_0_task-1.zip") == b"bundle-bytes"
+        assert archive.read("ai_review_bundle/CheckRabi_0_task-1.zip") == b"bundle-bytes"
 
 
-def test_load_triaged_task_results_prefers_latest_completed_triage_over_newer_pending() -> None:
+def test_load_reviewed_task_results_prefers_latest_completed_review_over_newer_pending() -> None:
     completed_doc = _doc("done-q0", "0", datetime(2026, 5, 5, 10, tzinfo=timezone.utc))
-    completed_doc.user_note = NoteModel(content="## AI triage\n\n- Decision: `PASS`\n")
-    completed_doc.ai_triage = AiTriageReviewModel(status="completed")
+    completed_doc.user_note = NoteModel(content="## AI review\n\n- Decision: `PASS`\n")
+    completed_doc.ai_review = AiReviewModel(status="completed")
 
     pending_doc = _doc("pending-q0", "0", datetime(2026, 5, 5, 11, tzinfo=timezone.utc))
-    pending_doc.ai_triage = AiTriageReviewModel(status="running")
+    pending_doc.ai_review = AiReviewModel(status="running")
 
     class _Finder:
         def __init__(self, docs):
@@ -456,7 +473,7 @@ def test_load_triaged_task_results_prefers_latest_completed_triage_over_newer_pe
         "qdash.api.routers.dashboard.TaskResultHistoryDocument.find",
         return_value=_Finder([pending_doc, completed_doc]),
     ):
-        docs = _load_triaged_task_results(
+        docs = _load_reviewed_task_results(
             project_id="proj-1",
             chip_id="chip-1",
             task_name="CheckRabi",

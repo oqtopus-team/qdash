@@ -137,13 +137,19 @@ class CheckControlAmplitude(QubexTask):
             figures.append(fig)
 
         output_params_copy = copy.deepcopy(self.output_parameters)
+        coarse_input_param = self.input_parameters["coarse_control_amplitude"]
+        coarse_floor = (
+            float(coarse_input_param.value)
+            if coarse_input_param is not None and coarse_input_param.value is not None
+            else None
+        )
+        coarse_frequency_param = self.input_parameters["coarse_qubit_frequency"]
+        coarse_frequency = (
+            float(coarse_frequency_param.value)
+            if coarse_frequency_param is not None and coarse_frequency_param.value is not None
+            else None
+        )
         if estimated_amplitude is not None:
-            coarse_input_param = self.input_parameters["coarse_control_amplitude"]
-            coarse_floor = (
-                float(coarse_input_param.value)
-                if coarse_input_param is not None and coarse_input_param.value is not None
-                else None
-            )
             calibrated_amplitude = float(estimated_amplitude)
             if coarse_floor is not None and calibrated_amplitude < coarse_floor:
                 print(
@@ -164,8 +170,13 @@ class CheckControlAmplitude(QubexTask):
         else:
             print(
                 f"[WARNING] Failed to estimate control amplitude for qid={qid}: "
-                "sqrt-Lorentzian fit did not converge"
+                "sqrt-Lorentzian fit did not converge; propagating spectroscopy coarse values"
             )
+            if coarse_floor is not None:
+                output_params_copy["control_amplitude"].value = coarse_floor
+                output_params_copy["coarse_control_amplitude"].value = coarse_floor
+            if coarse_frequency is not None:
+                output_params_copy["coarse_qubit_frequency"].value = coarse_frequency
 
         # Refine coarse_qubit_frequency from the bounded sqrt-Lorentzian fit center.
         # The fit's f0 is constrained to [sweep_min, sweep_max] (see
@@ -178,15 +189,6 @@ class CheckControlAmplitude(QubexTask):
 
         for value in output_params_copy.values():
             value.execution_id = execution_id
-
-        if estimated_amplitude is None:
-            return PostProcessResult(
-                output_parameters=output_params_copy,
-                figures=figures,
-                validation_error=(
-                    f"Failed to estimate control amplitude for qid={qid}: no Rabi rate fit"
-                ),
-            )
 
         return PostProcessResult(
             output_parameters=output_params_copy,
