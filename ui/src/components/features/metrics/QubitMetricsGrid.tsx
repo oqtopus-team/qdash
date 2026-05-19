@@ -666,7 +666,7 @@ export function QubitMetricsGrid({
   );
 
   return (
-    <div className="flex flex-col h-full space-y-2 max-w-2xl mx-auto w-full">
+    <div className="flex flex-col h-full space-y-2 max-w-4xl mx-auto w-full mt-8">
       {/* View Mode Toggle */}
       <div className="flex items-center gap-4">
         <div className="tabs tabs-boxed bg-base-200 w-fit">
