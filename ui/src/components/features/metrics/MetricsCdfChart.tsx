@@ -174,7 +174,7 @@ export function MetricsCdfChart(props: MetricsCdfChartProps) {
 
   return (
     <div
-      className={`collapse collapse-arrow bg-base-100 rounded-lg shadow-sm border border-base-300 transition-all ${isCompact ? "max-w-2xl mx-auto" : ""}`}
+      className={`collapse collapse-arrow bg-base-100 rounded-lg shadow-sm border border-base-300 transition-all ${isCompact ? "max-w-xl mx-auto" : ""}`}
     >
       <input type="checkbox" defaultChecked />
       <div className="collapse-title px-4 py-2 min-h-0 font-semibold text-sm flex items-center">
