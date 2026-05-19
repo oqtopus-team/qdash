@@ -20,7 +20,7 @@ class NoteModel(BaseModel):
 
 
 class AiReviewModel(BaseModel):
-    """Persistent state for an AI review request on a task result."""
+    """Persistent state for an AI review run on a task result."""
 
     model_config = ConfigDict(protected_namespaces=())
 
@@ -35,6 +35,14 @@ class AiReviewModel(BaseModel):
     requested_by: str = Field(
         default="",
         description="Username that requested AI review",
+    )
+    review_run_id: str = Field(
+        default="",
+        description="AI review run identifier shared by task results in the same run",
+    )
+    trigger_type: str = Field(
+        default="manual_chip_bulk",
+        description="How this AI review run was triggered, such as manual_chip_bulk or execution",
     )
     model_provider: str = Field(
         default="",

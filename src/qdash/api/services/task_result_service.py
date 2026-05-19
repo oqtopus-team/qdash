@@ -8,8 +8,11 @@ from __future__ import annotations
 
 import io
 import logging
+import re
 import tempfile
+import uuid
 import zipfile
+from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -20,6 +23,11 @@ from bunnet import SortDirection
 from pymongo import ReturnDocument
 
 from qdash.api.schemas.task_result import (
+    AiReviewListItem,
+    AiReviewListResponse,
+    AiReviewRunDetailResponse,
+    AiReviewRunListResponse,
+    AiReviewRunSummary,
     BulkAiReviewResponse,
     LatestTaskResultResponse,
     TaskHistoryResponse,
@@ -66,6 +74,7 @@ AI_REVIEW_SEPARATOR = "\n\n---\n\n"
 MAX_AI_REVIEW_NOTE_CHARS = 4500
 AI_REVIEW_WORKERS = 2
 AI_REVIEW_IN_FLIGHT_STATUSES = ("requested", "running")
+AI_REVIEW_SECTION_RE = re.compile(r"^## AI review\n\n(?P<body>.*?)(?=\n\n---\n\n|$)", re.DOTALL)
 
 _AI_REVIEW_EXECUTOR = ThreadPoolExecutor(
     max_workers=AI_REVIEW_WORKERS,
@@ -75,7 +84,7 @@ _AI_REVIEW_EXECUTOR = ThreadPoolExecutor(
 
 @dataclass(frozen=True)
 class _BulkAiReviewSelection:
-    """Resolved target entities and repository filter for a bulk AI review request."""
+    """Resolved target entities and repository filter for a bulk AI review run."""
 
     qids: list[str]
     query_filter: dict[str, Any]
@@ -114,6 +123,68 @@ def _truncate_ai_review_markdown(markdown: str) -> str:
     return markdown[:budget].rstrip() + "\n\n[truncated]"
 
 
+def _ai_review_field(text: str, name: str) -> str:
+    pattern = re.compile(
+        rf"^-\s*{re.escape(name)}:\s*`?(?P<value>.+?)`?\s*$",
+        re.MULTILINE,
+    )
+    match = pattern.search(text)
+    if not match:
+        return ""
+    return match.group("value").strip().strip("`")
+
+
+def _target_label(qid: str) -> str:
+    if not qid:
+        return "unknown"
+    return qid if qid.startswith("Q") else f"Q{qid}"
+
+
+def _parse_ai_review_item(doc: TaskResultHistoryDocument) -> AiReviewListItem:
+    content = doc.user_note.content or ""
+    match = AI_REVIEW_SECTION_RE.search(content)
+    review_markdown = match.group(0).strip() if match else content.strip()
+    body = match.group("body") if match else content
+    decision = _ai_review_field(body, "Decision")
+    if not decision and "必要なレビュー・ブロック" in body:
+        decision = "FORMAT_ERROR"
+    if not decision and doc.ai_review.status == "failed":
+        decision = "FORMAT_ERROR"
+    decision = decision or "UNKNOWN"
+    model = "/".join(
+        part for part in [doc.ai_review.model_provider, doc.ai_review.model_name] if part
+    )
+    format_ok = decision not in {"FORMAT_ERROR", "UNKNOWN"} and "model_format_error" not in body
+    return AiReviewListItem(
+        task_id=doc.task_id,
+        review_run_id=doc.ai_review.review_run_id,
+        task_name=doc.name,
+        chip_id=doc.chip_id,
+        qid=doc.qid,
+        target=_target_label(doc.qid),
+        execution_id=doc.execution_id,
+        task_status=doc.status,
+        review_status=doc.ai_review.status or ("completed" if match else ""),
+        decision=decision,
+        human_label=_ai_review_field(body, "Human label suggestion"),
+        accepted_parameters=_ai_review_field(body, "Accepted parameter(s)"),
+        needs_review=_ai_review_field(body, "Needs review"),
+        primary_reason=_ai_review_field(body, "Primary reason"),
+        suggested_labels=_ai_review_field(body, "Suggested labels"),
+        recommended_action=_ai_review_field(body, "Recommended action"),
+        model=model,
+        requested_by=doc.ai_review.requested_by,
+        requested_at=doc.ai_review.requested_at,
+        completed_at=doc.ai_review.completed_at,
+        note_updated_at=doc.user_note.updated_at,
+        start_at=doc.start_at,
+        figure_path=doc.figure_path,
+        json_figure_path=doc.json_figure_path,
+        review_markdown=review_markdown,
+        format_ok=format_ok,
+    )
+
+
 class TaskResultService:
     """Service for task result operations."""
 
@@ -124,6 +195,199 @@ class TaskResultService:
     ) -> None:
         self._chip_repo = chip_repository
         self._task_result_repo = task_result_repository
+
+    def list_ai_reviews(
+        self,
+        *,
+        project_id: str,
+        chip_id: str | None = None,
+        task_name: str | None = None,
+        status: str | None = None,
+        decision: str | None = None,
+        latest_only: bool = False,
+        skip: int = 0,
+        limit: int = 50,
+    ) -> AiReviewListResponse:
+        """List task results that have AI review state or AI review markdown."""
+        from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
+
+        query: dict[str, Any] = {
+            "project_id": project_id,
+            "$or": [
+                {"ai_review.status": {"$exists": True, "$ne": ""}},
+                {"user_note.content": {"$regex": "^## AI review"}},
+            ],
+        }
+        if chip_id:
+            query["chip_id"] = chip_id
+        if task_name:
+            query["name"] = task_name
+        if status:
+            query["ai_review.status"] = status
+
+        docs = list(TaskResultHistoryDocument.find(query).run())
+        docs.sort(key=lambda doc: doc.start_at or datetime.min, reverse=True)
+
+        if latest_only:
+            latest: dict[tuple[str, str, str], TaskResultHistoryDocument] = {}
+            for doc in docs:
+                key = (doc.chip_id, doc.name, doc.qid)
+                if key not in latest:
+                    latest[key] = doc
+            docs = list(latest.values())
+
+        items = [_parse_ai_review_item(doc) for doc in docs]
+        if decision:
+            items = [item for item in items if item.decision == decision]
+
+        total = len(items)
+        decision_counts = Counter(item.decision for item in items)
+        status_counts = Counter(item.review_status or "unknown" for item in items)
+        page_items = items[skip : skip + limit]
+        return AiReviewListResponse(
+            items=page_items,
+            total=total,
+            skip=skip,
+            limit=limit,
+            decision_counts=dict(sorted(decision_counts.items())),
+            status_counts=dict(sorted(status_counts.items())),
+        )
+
+    def list_ai_review_runs(
+        self,
+        *,
+        project_id: str,
+        chip_id: str | None = None,
+        task_name: str | None = None,
+        skip: int = 0,
+        limit: int = 50,
+    ) -> AiReviewRunListResponse:
+        """List bulk AI review runs."""
+        docs = self._load_ai_review_run_docs(
+            project_id=project_id,
+            chip_id=chip_id,
+            task_name=task_name,
+        )
+        summaries = self._summarize_ai_review_runs(docs)
+        summaries.sort(key=lambda summary: summary.requested_at or datetime.min, reverse=True)
+        total = len(summaries)
+        return AiReviewRunListResponse(
+            items=summaries[skip : skip + limit],
+            total=total,
+            skip=skip,
+            limit=limit,
+        )
+
+    def get_ai_review_run(
+        self,
+        *,
+        project_id: str,
+        review_run_id: str,
+    ) -> AiReviewRunDetailResponse:
+        """Return one bulk AI review run and its task-result reviews."""
+        from starlette.exceptions import HTTPException
+
+        docs = self._load_ai_review_run_docs(
+            project_id=project_id,
+            review_run_id=review_run_id,
+        )
+        if not docs:
+            raise HTTPException(
+                status_code=404,
+                detail=f"AI review run '{review_run_id}' not found",
+            )
+        summaries = self._summarize_ai_review_runs(docs)
+        if not summaries:
+            raise HTTPException(
+                status_code=404,
+                detail=f"AI review run '{review_run_id}' not found",
+            )
+        items = [_parse_ai_review_item(doc) for doc in docs]
+        items.sort(key=self._review_item_sort_key)
+        return AiReviewRunDetailResponse(run=summaries[0], items=items)
+
+    @staticmethod
+    def _review_item_sort_key(item: AiReviewListItem) -> tuple[int, str]:
+        qid = item.qid.removeprefix("Q")
+        try:
+            return (int(qid), item.task_id)
+        except ValueError:
+            return (10**9, item.task_id)
+
+    @staticmethod
+    def _load_ai_review_run_docs(
+        *,
+        project_id: str,
+        chip_id: str | None = None,
+        task_name: str | None = None,
+        review_run_id: str | None = None,
+    ) -> list[TaskResultHistoryDocument]:
+        from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
+
+        query: dict[str, Any] = {
+            "project_id": project_id,
+            "ai_review.review_run_id": {"$exists": True, "$ne": ""},
+        }
+        if review_run_id:
+            query["ai_review.review_run_id"] = review_run_id
+        if chip_id:
+            query["chip_id"] = chip_id
+        if task_name:
+            query["name"] = task_name
+        docs = list(TaskResultHistoryDocument.find(query).run())
+        docs.sort(key=lambda doc: doc.start_at or datetime.min, reverse=True)
+        return docs
+
+    @staticmethod
+    def _summarize_ai_review_runs(
+        docs: list[TaskResultHistoryDocument],
+    ) -> list[AiReviewRunSummary]:
+        grouped: dict[str, list[TaskResultHistoryDocument]] = {}
+        for doc in docs:
+            review_run_id = doc.ai_review.review_run_id
+            if not review_run_id:
+                continue
+            grouped.setdefault(review_run_id, []).append(doc)
+
+        summaries: list[AiReviewRunSummary] = []
+        for review_run_id, request_docs in grouped.items():
+            items = [_parse_ai_review_item(doc) for doc in request_docs]
+            status_counts = Counter(item.review_status or "unknown" for item in items)
+            decision_counts = Counter(item.decision for item in items)
+            requested_at_values = [
+                doc.ai_review.requested_at for doc in request_docs if doc.ai_review.requested_at
+            ]
+            completed_at_values = [
+                doc.ai_review.completed_at for doc in request_docs if doc.ai_review.completed_at
+            ]
+            first = request_docs[0]
+            model = "/".join(
+                part
+                for part in [first.ai_review.model_provider, first.ai_review.model_name]
+                if part
+            )
+            summaries.append(
+                AiReviewRunSummary(
+                    review_run_id=review_run_id,
+                    trigger_type=first.ai_review.trigger_type or "manual_chip_bulk",
+                    chip_id=first.chip_id,
+                    task_name=first.name,
+                    entity_type="coupling" if "-" in (first.qid or "") else "qubit",
+                    execution_ids=sorted({doc.execution_id for doc in request_docs}),
+                    requested_by=first.ai_review.requested_by,
+                    requested_at=min(requested_at_values) if requested_at_values else None,
+                    completed_at=max(completed_at_values) if completed_at_values else None,
+                    model=model,
+                    total=len(request_docs),
+                    completed_count=status_counts.get("completed", 0),
+                    failed_count=status_counts.get("failed", 0),
+                    running_count=status_counts.get("running", 0),
+                    requested_count=status_counts.get("requested", 0),
+                    decision_counts=dict(sorted(decision_counts.items())),
+                    status_counts=dict(sorted(status_counts.items())),
+                )
+            )
+        return summaries
 
     def get_latest_results(
         self,
@@ -386,6 +650,7 @@ class TaskResultService:
         skipped_reason = self._get_ai_review_skip_reason(config, task)
         if skipped_reason is not None:
             return BulkAiReviewResponse(
+                review_run_id="",
                 chip_id=chip_id,
                 task=task,
                 entity_type=entity_type,
@@ -406,14 +671,17 @@ class TaskResultService:
             date=date,
             task_ids=task_ids,
         )
+        review_run_id = f"airv_{uuid.uuid4().hex}"
         enqueued_task_ids = self._enqueue_bulk_ai_review(
             selection=selection,
+            review_run_id=review_run_id,
             requested_by=requested_by,
             selected_model=selected_model,
             model_override=model_override,
         )
 
         return BulkAiReviewResponse(
+            review_run_id=review_run_id,
             chip_id=chip_id,
             task=task,
             entity_type=entity_type,
@@ -432,7 +700,7 @@ class TaskResultService:
         date: str | None,
         task_ids: list[str] | None,
     ) -> _BulkAiReviewSelection:
-        """Resolve the entity set and repository query for a bulk AI review request."""
+        """Resolve the entity set and repository query for a bulk AI review run."""
         is_latest = date is None or date == "latest"
         qids = (
             self._get_entity_ids(project_id, chip_id, entity_type)
@@ -487,6 +755,7 @@ class TaskResultService:
         self,
         *,
         selection: _BulkAiReviewSelection,
+        review_run_id: str,
         requested_by: str,
         selected_model: Any,
         model_override: Any | None,
@@ -507,7 +776,12 @@ class TaskResultService:
                 continue
             if self._is_non_representative_mux_result(doc.name, doc.qid):
                 continue
-            claimed_doc = self._claim_ai_review_document(doc, requested_by, selected_model)
+            claimed_doc = self._claim_ai_review_document(
+                doc,
+                requested_by,
+                selected_model,
+                review_run_id,
+            )
             if claimed_doc is None:
                 continue
             try:
@@ -569,6 +843,7 @@ class TaskResultService:
         doc: TaskResultHistoryDocument,
         requested_by: str,
         selected_model: Any,
+        review_run_id: str,
     ) -> TaskResultHistoryDocument | None:
         """Atomically mark a task result as requested unless another worker owns it."""
         from qdash.datamodel.note import AiReviewModel
@@ -578,6 +853,8 @@ class TaskResultService:
             status="requested",
             requested_at=now(),
             requested_by=requested_by,
+            review_run_id=review_run_id,
+            trigger_type="manual_chip_bulk",
             model_provider=getattr(selected_model, "provider", ""),
             model_name=getattr(selected_model, "name", ""),
             completed_at=None,
@@ -621,14 +898,17 @@ class TaskResultService:
         doc: TaskResultHistoryDocument,
         requested_by: str,
         selected_model: Any,
+        review_run_id: str = "",
     ) -> None:
-        """Persist that an AI review request was accepted for this task result."""
+        """Persist that an AI review run was accepted for this task result."""
         from qdash.datamodel.note import AiReviewModel
 
         doc.ai_review = AiReviewModel(
             status="requested",
             requested_at=now(),
             requested_by=requested_by,
+            review_run_id=review_run_id,
+            trigger_type="manual_chip_bulk",
             model_provider=getattr(selected_model, "provider", ""),
             model_name=getattr(selected_model, "name", ""),
         )

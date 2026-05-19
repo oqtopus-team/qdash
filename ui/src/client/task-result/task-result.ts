@@ -25,6 +25,9 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  AiReviewListResponse,
+  AiReviewRunDetailResponse,
+  AiReviewRunListResponse,
   BodyReExecuteTaskResult,
   BulkAiReviewRequest,
   BulkAiReviewResponse,
@@ -39,6 +42,8 @@ import type {
   GetTimeseriesTaskResultsParams,
   HTTPValidationError,
   LatestTaskResultResponse,
+  ListTaskResultAiReviewRunsParams,
+  ListTaskResultAiReviewsParams,
   TaskHistoryResponse,
   TaskResultExcludeRequest,
   TaskResultExcludeResponse,
@@ -892,6 +897,284 @@ export function useGetTimeseriesTaskResults<TData = Awaited<ReturnType<typeof ge
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
 
   const queryOptions = getGetTimeseriesTaskResultsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey ;
+
+  return query;
+}
+
+
+
+/**
+ * Return bulk AI review runs for run-oriented browsing.
+ * @summary List bulk AI review runs
+ */
+export const listTaskResultAiReviewRuns = (
+    params?: ListTaskResultAiReviewRunsParams,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+      
+      
+      return customInstance<AiReviewRunListResponse>(
+      {url: `/task-results/ai-review/runs`, method: 'GET',
+        params, signal
+    },
+      options);
+    }
+  
+
+
+
+export const getListTaskResultAiReviewRunsQueryKey = (params?: ListTaskResultAiReviewRunsParams,) => {
+    return [
+    `/task-results/ai-review/runs`, ...(params ? [params]: [])
+    ] as const;
+    }
+
+    
+export const getListTaskResultAiReviewRunsQueryOptions = <TData = Awaited<ReturnType<typeof listTaskResultAiReviewRuns>>, TError = HTTPValidationError>(params?: ListTaskResultAiReviewRunsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listTaskResultAiReviewRuns>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListTaskResultAiReviewRunsQueryKey(params);
+
+  
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listTaskResultAiReviewRuns>>> = ({ signal }) => listTaskResultAiReviewRuns(params, requestOptions, signal);
+
+      
+
+      
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listTaskResultAiReviewRuns>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+}
+
+export type ListTaskResultAiReviewRunsQueryResult = NonNullable<Awaited<ReturnType<typeof listTaskResultAiReviewRuns>>>
+export type ListTaskResultAiReviewRunsQueryError = HTTPValidationError
+
+
+export function useListTaskResultAiReviewRuns<TData = Awaited<ReturnType<typeof listTaskResultAiReviewRuns>>, TError = HTTPValidationError>(
+ params: undefined |  ListTaskResultAiReviewRunsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listTaskResultAiReviewRuns>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listTaskResultAiReviewRuns>>,
+          TError,
+          Awaited<ReturnType<typeof listTaskResultAiReviewRuns>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useListTaskResultAiReviewRuns<TData = Awaited<ReturnType<typeof listTaskResultAiReviewRuns>>, TError = HTTPValidationError>(
+ params?: ListTaskResultAiReviewRunsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listTaskResultAiReviewRuns>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listTaskResultAiReviewRuns>>,
+          TError,
+          Awaited<ReturnType<typeof listTaskResultAiReviewRuns>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useListTaskResultAiReviewRuns<TData = Awaited<ReturnType<typeof listTaskResultAiReviewRuns>>, TError = HTTPValidationError>(
+ params?: ListTaskResultAiReviewRunsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listTaskResultAiReviewRuns>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+/**
+ * @summary List bulk AI review runs
+ */
+
+export function useListTaskResultAiReviewRuns<TData = Awaited<ReturnType<typeof listTaskResultAiReviewRuns>>, TError = HTTPValidationError>(
+ params?: ListTaskResultAiReviewRunsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listTaskResultAiReviewRuns>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+
+  const queryOptions = getListTaskResultAiReviewRunsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey ;
+
+  return query;
+}
+
+
+
+/**
+ * Return one bulk AI review run and its task-result review rows.
+ * @summary Get one bulk AI review run
+ */
+export const getTaskResultAiReviewRun = (
+    reviewRunId: string,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+      
+      
+      return customInstance<AiReviewRunDetailResponse>(
+      {url: `/task-results/ai-review/runs/${reviewRunId}`, method: 'GET', signal
+    },
+      options);
+    }
+  
+
+
+
+export const getGetTaskResultAiReviewRunQueryKey = (reviewRunId?: string,) => {
+    return [
+    `/task-results/ai-review/runs/${reviewRunId}`
+    ] as const;
+    }
+
+    
+export const getGetTaskResultAiReviewRunQueryOptions = <TData = Awaited<ReturnType<typeof getTaskResultAiReviewRun>>, TError = HTTPValidationError>(reviewRunId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTaskResultAiReviewRun>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetTaskResultAiReviewRunQueryKey(reviewRunId);
+
+  
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getTaskResultAiReviewRun>>> = ({ signal }) => getTaskResultAiReviewRun(reviewRunId, requestOptions, signal);
+
+      
+
+      
+
+   return  { queryKey, queryFn, enabled: !!(reviewRunId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getTaskResultAiReviewRun>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+}
+
+export type GetTaskResultAiReviewRunQueryResult = NonNullable<Awaited<ReturnType<typeof getTaskResultAiReviewRun>>>
+export type GetTaskResultAiReviewRunQueryError = HTTPValidationError
+
+
+export function useGetTaskResultAiReviewRun<TData = Awaited<ReturnType<typeof getTaskResultAiReviewRun>>, TError = HTTPValidationError>(
+ reviewRunId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTaskResultAiReviewRun>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getTaskResultAiReviewRun>>,
+          TError,
+          Awaited<ReturnType<typeof getTaskResultAiReviewRun>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useGetTaskResultAiReviewRun<TData = Awaited<ReturnType<typeof getTaskResultAiReviewRun>>, TError = HTTPValidationError>(
+ reviewRunId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTaskResultAiReviewRun>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getTaskResultAiReviewRun>>,
+          TError,
+          Awaited<ReturnType<typeof getTaskResultAiReviewRun>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useGetTaskResultAiReviewRun<TData = Awaited<ReturnType<typeof getTaskResultAiReviewRun>>, TError = HTTPValidationError>(
+ reviewRunId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTaskResultAiReviewRun>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+/**
+ * @summary Get one bulk AI review run
+ */
+
+export function useGetTaskResultAiReviewRun<TData = Awaited<ReturnType<typeof getTaskResultAiReviewRun>>, TError = HTTPValidationError>(
+ reviewRunId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTaskResultAiReviewRun>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+
+  const queryOptions = getGetTaskResultAiReviewRunQueryOptions(reviewRunId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey ;
+
+  return query;
+}
+
+
+
+/**
+ * Return task-result AI reviews for review queue style browsing.
+ * @summary List task-result AI reviews
+ */
+export const listTaskResultAiReviews = (
+    params?: ListTaskResultAiReviewsParams,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+      
+      
+      return customInstance<AiReviewListResponse>(
+      {url: `/task-results/ai-review`, method: 'GET',
+        params, signal
+    },
+      options);
+    }
+  
+
+
+
+export const getListTaskResultAiReviewsQueryKey = (params?: ListTaskResultAiReviewsParams,) => {
+    return [
+    `/task-results/ai-review`, ...(params ? [params]: [])
+    ] as const;
+    }
+
+    
+export const getListTaskResultAiReviewsQueryOptions = <TData = Awaited<ReturnType<typeof listTaskResultAiReviews>>, TError = HTTPValidationError>(params?: ListTaskResultAiReviewsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listTaskResultAiReviews>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListTaskResultAiReviewsQueryKey(params);
+
+  
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listTaskResultAiReviews>>> = ({ signal }) => listTaskResultAiReviews(params, requestOptions, signal);
+
+      
+
+      
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listTaskResultAiReviews>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+}
+
+export type ListTaskResultAiReviewsQueryResult = NonNullable<Awaited<ReturnType<typeof listTaskResultAiReviews>>>
+export type ListTaskResultAiReviewsQueryError = HTTPValidationError
+
+
+export function useListTaskResultAiReviews<TData = Awaited<ReturnType<typeof listTaskResultAiReviews>>, TError = HTTPValidationError>(
+ params: undefined |  ListTaskResultAiReviewsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listTaskResultAiReviews>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listTaskResultAiReviews>>,
+          TError,
+          Awaited<ReturnType<typeof listTaskResultAiReviews>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useListTaskResultAiReviews<TData = Awaited<ReturnType<typeof listTaskResultAiReviews>>, TError = HTTPValidationError>(
+ params?: ListTaskResultAiReviewsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listTaskResultAiReviews>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listTaskResultAiReviews>>,
+          TError,
+          Awaited<ReturnType<typeof listTaskResultAiReviews>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useListTaskResultAiReviews<TData = Awaited<ReturnType<typeof listTaskResultAiReviews>>, TError = HTTPValidationError>(
+ params?: ListTaskResultAiReviewsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listTaskResultAiReviews>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+/**
+ * @summary List task-result AI reviews
+ */
+
+export function useListTaskResultAiReviews<TData = Awaited<ReturnType<typeof listTaskResultAiReviews>>, TError = HTTPValidationError>(
+ params?: ListTaskResultAiReviewsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listTaskResultAiReviews>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
+
+  const queryOptions = getListTaskResultAiReviewsQueryOptions(params,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
 

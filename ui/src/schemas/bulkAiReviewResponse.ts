@@ -12,6 +12,7 @@ import type { BulkAiReviewResponseSkippedReason } from './bulkAiReviewResponseSk
  * Response after enqueueing bulk AI review.
  */
 export interface BulkAiReviewResponse {
+  review_run_id?: string;
   chip_id: string;
   task: string;
   entity_type: string;
