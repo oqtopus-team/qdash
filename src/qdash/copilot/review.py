@@ -74,7 +74,7 @@ def build_ai_review_context(
         task_id=task_id,
         image_base64=None,
         config=config,
-        use_triage_knowledge=True,
+        use_review_knowledge=True,
     )
     context_bundle.context = context_bundle.context.model_copy(
         update={"recent_values": [], "history_results": []}

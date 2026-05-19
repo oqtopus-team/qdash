@@ -459,15 +459,15 @@ class TestBuildAnalysisContext:
             knowledge,
             max_images=2,
             include_case_images=True,
-            include_triage_images=False,
+            include_review_images=False,
         )
         assert result.image_base64 == "encoded-image"
         assert result.expected_images == [("img-1", "expected alt")]
 
-    def test_triage_context_uses_triage_prompt_and_triage_images(self):
+    def test_review_context_uses_review_prompt_and_review_images(self):
         service = CopilotRuntime(data_access=MagicMock())
         knowledge = MagicMock()
-        knowledge.to_triage_prompt.return_value = "Triage prompt body"
+        knowledge.to_review_prompt.return_value = "AI review prompt body"
         knowledge.related_context = []
 
         with (
@@ -488,7 +488,7 @@ class TestBuildAnalysisContext:
             patch.object(
                 service,
                 "collect_expected_images",
-                return_value=[("triage-img", "triage alt")],
+                return_value=[("review-img", "review alt")],
             ) as collect_expected,
             patch("qdash.datamodel.task_knowledge.get_task_knowledge", return_value=knowledge),
         ):
@@ -499,7 +499,7 @@ class TestBuildAnalysisContext:
                 task_id="task-1",
                 image_base64=None,
                 config=self._config(multimodal=True),
-                use_triage_knowledge=True,
+                use_review_knowledge=True,
             )
 
         load_fig.assert_called_once_with(["/tmp/figure.png"])
@@ -507,8 +507,8 @@ class TestBuildAnalysisContext:
             knowledge,
             max_images=2,
             include_case_images=False,
-            include_triage_images=True,
+            include_review_images=True,
         )
-        assert result.context.task_knowledge_prompt == "Triage prompt body"
+        assert result.context.task_knowledge_prompt == "AI review prompt body"
         assert result.image_base64 == "encoded-image"
-        assert result.expected_images == [("triage-img", "triage alt")]
+        assert result.expected_images == [("review-img", "review alt")]

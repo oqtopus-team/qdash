@@ -152,14 +152,14 @@ class CopilotRuntime:
         max_images: int | None,
         *,
         include_case_images: bool = True,
-        include_triage_images: bool = True,
+        include_review_images: bool = True,
     ) -> list[tuple[str, str]]:
         """Forward expected-image lookup for analysis context assembly."""
         return self.collect_expected_images(
             knowledge,
             max_images=max_images,
             include_case_images=include_case_images,
-            include_triage_images=include_triage_images,
+            include_review_images=include_review_images,
         )
 
     def _provenance_resolve_project_id(self, chip_id: str) -> str | None:
@@ -196,7 +196,7 @@ class CopilotRuntime:
         max_images: int | None = None,
         *,
         include_case_images: bool = True,
-        include_triage_images: bool = True,
+        include_review_images: bool = True,
     ) -> list[tuple[str, str]]:
         """Collect expected reference images from TaskKnowledge.
 
@@ -207,7 +207,7 @@ class CopilotRuntime:
             knowledge,
             max_images=max_images,
             include_case_images=include_case_images,
-            include_triage_images=include_triage_images,
+            include_review_images=include_review_images,
         )
 
     def load_task_history(
@@ -450,7 +450,7 @@ class CopilotRuntime:
         task_id: str,
         image_base64: str | None,
         config: CopilotConfig,
-        use_triage_knowledge: bool = False,
+        use_review_knowledge: bool = False,
     ) -> AnalysisContextResult:
         """Build a full analysis context from DB data and TaskKnowledge.
 
@@ -465,7 +465,7 @@ class CopilotRuntime:
             task_id=task_id,
             image_base64=image_base64,
             config=config,
-            use_triage_knowledge=use_triage_knowledge,
+            use_review_knowledge=use_review_knowledge,
         )
 
     @staticmethod

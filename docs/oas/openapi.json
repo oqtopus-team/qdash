@@ -22155,17 +22155,17 @@
             "title": "Images",
             "default": []
           },
-          "triage_markdown": {
+          "review_markdown": {
             "type": "string",
-            "title": "Triage Markdown",
+            "title": "Review Markdown",
             "default": ""
           },
-          "triage_images": {
+          "review_images": {
             "items": {
               "$ref": "#/components/schemas/KnowledgeImageResponse"
             },
             "type": "array",
-            "title": "Triage Images",
+            "title": "Review Images",
             "default": []
           },
           "cases": {
@@ -22180,9 +22180,9 @@
             "type": "string",
             "title": "Prompt Text"
           },
-          "triage_prompt_text": {
+          "review_prompt_text": {
             "type": "string",
-            "title": "Triage Prompt Text",
+            "title": "Review Prompt Text",
             "default": ""
           }
         },
@@ -22236,9 +22236,9 @@
             "title": "Has Analysis Guide",
             "default": false
           },
-          "has_triage_guide": {
+          "has_review_guide": {
             "type": "boolean",
-            "title": "Has Triage Guide",
+            "title": "Has Review Guide",
             "default": false
           }
         },
