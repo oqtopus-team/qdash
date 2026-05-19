@@ -87,7 +87,7 @@ The DevContainer installs Python, frontend, and Lefthook dependencies automatica
 creation. To refresh dependencies manually, run:
 
 ```shell
-uv sync --all-groups
+uv sync --all-groups --all-packages
 
 cd ui && bun install --frozen-lockfile
 ```
@@ -198,8 +198,8 @@ task build-api
 # Build workflow Docker image
 task build-workflow
 
-# Export all requirements
-task export-all
+# Check dependency locks
+task check-locks
 ```
 
 ### Documentation

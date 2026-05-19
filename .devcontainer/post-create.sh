@@ -6,7 +6,7 @@ chmod -R u+rwX /root/.cache/pip /root/.cache/uv /workspace/qdash/ui/node_modules
 
 cd /workspace/qdash
 
-uv sync --all-groups
+uv sync --locked --all-groups --all-packages
 
 cd /workspace/qdash/ui
 bun install --frozen-lockfile

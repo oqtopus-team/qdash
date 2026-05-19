@@ -21,13 +21,7 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = [
-    "src",
     "src/qdash",
-    "src/qdash/api",
-    "src/qdash/common",
-    "src/qdash/workflow",
-    "src/qdash/dbmodel",
-    "src/qdash/datamodel",
 ]
 
 [tool.ruff]
@@ -156,57 +150,6 @@ exclude_lines = [
 ]
 
 [dependency-groups]
-api = [
-    "fastapi",
-    "uvicorn[standard]",
-    "gunicorn==26.0.0",
-    "python-dotenv>=1.2.2",
-    "pymongo==4.17.0",
-    "bunnet==1.3.0",
-    "passlib[bcrypt]==1.7.4",
-    "pyyaml==6.0.3",
-    "python-multipart>=0.0.27",
-    "numpy>=1.26.0,<2.5.0",
-    "scipy",
-    "matplotlib>=3.8.0",
-    "networkx>=3.4.2",
-    "httpx>=0.27.0",  # For deployment service communication
-    "ruff==0.15.13",  # For auto-formatting saved flows
-    "gitpython>=3.1.50",  # For Git operations in file router
-    "pendulum>=3.1.0",  # For timestamp formatting in Git commits
-    "pydantic-settings>=2.0.0",  # For Settings configuration
-    "reportlab>=4.4.1",  # For PDF generation
-    "pandas>=2.0.0",  # For copilot sandbox data analysis
-    "plotly>=5.18.0",  # For chart generation
-    "kaleido>=0.2.1",  # For Plotly image export
-    "pillow>=12.2.0",  # For image processing
-    "croniter>=6.0.0",  # For cron schedule parsing
-    "python-json-logger>=3.3.0",  # For structured JSON logging
-    "openai>=1.0.0",  # For copilot agent (LLM chat/analysis)
-    "prefect-client"
-]
-workflow = [
-    "prefect[dask]>=3,<4",
-   "pymongo==4.17.0",
-    "bunnet==1.3.0",
-    "slack-sdk==3.41.0",
-    "python-dotenv>=1.2.2",
-    "numpy>=1.26.0,<2.5.0",
-    "matplotlib>=3.8.0,<4.0.0",
-    "pyyaml==6.0.3",
-    "qubex[backend]",
-    "filelock>=3.17.0",
-    "gitpython>=3.1.50",
-    "reportlab>=4.4.1",
-    "pillow>=12.2.0",
-    "ruamel.yaml>=0.18.0",
-    "pydantic",
-    "pydantic-settings",
-    "openai",
-    "fastapi",
-    "uvicorn[standard]"
-
-    ]
 dev = [
     "ruff==0.15.13",
     "pytest==9.0.3",
@@ -224,5 +167,12 @@ dev = [
     "types-requests>=2.32.0.20250809",
     "setuptools>=80.9.0",
 ]
+
+[tool.uv.workspace]
+members = [
+    "src/qdash/api",
+    "src/qdash/workflow",
+]
+
 [tool.uv.sources]
 qubex = { git = "https://github.com/amachino/qubex.git", branch = "develop" }
