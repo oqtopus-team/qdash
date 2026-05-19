@@ -12,10 +12,15 @@ RUN apt-get update \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-COPY ./src/qdash/api/requirements.txt ./
-
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
-RUN uv pip install --system --no-cache-dir -r requirements.txt
+ENV UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy \
+    UV_PYTHON_DOWNLOADS=0
+
+COPY pyproject.toml uv.lock ./
+COPY src/qdash/api/pyproject.toml src/qdash/api/pyproject.toml
+COPY src/qdash/workflow/pyproject.toml src/qdash/workflow/pyproject.toml
+RUN uv sync --locked --package qdash-api --no-dev
 
 FROM python:3.11-slim-bookworm
 
@@ -27,6 +32,7 @@ RUN apt-get update \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-COPY --from=builder /app /app
-COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
-COPY --from=builder /usr/local/bin /usr/local/bin
+COPY --from=builder /app/.venv /app/.venv
+
+ENV VIRTUAL_ENV=/app/.venv
+ENV PATH="/app/.venv/bin:$PATH"
