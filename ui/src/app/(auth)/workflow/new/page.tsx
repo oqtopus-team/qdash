@@ -229,7 +229,7 @@ export default function NewFlowPage() {
         {/* Main Editor Area */}
         <div className="flex-1 flex overflow-hidden">
           {/* Editor */}
-          <div className="flex-1 flex flex-col">
+          <div className="flex-1 flex flex-col min-w-0">
             <Editor
               height="100%"
               language="python"
