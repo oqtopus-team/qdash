@@ -294,7 +294,7 @@ class TaskService:
                 case_count=len(k.cases),
                 image_count=len(k.images),
                 has_analysis_guide=len(k.analysis_guide) > 0,
-                has_triage_guide=bool(k.triage_markdown.strip()),
+                has_review_guide=bool(k.review_markdown.strip()),
             )
             for k in all_knowledge
         ]
@@ -344,11 +344,11 @@ class TaskService:
             analysis_guide=knowledge.analysis_guide,
             prerequisites=knowledge.prerequisites,
             images=[KnowledgeImageResponse(**img.model_dump()) for img in knowledge.images],
-            triage_markdown=knowledge.triage_markdown,
-            triage_images=[
-                KnowledgeImageResponse(**img.model_dump()) for img in knowledge.triage_images
+            review_markdown=knowledge.review_markdown,
+            review_images=[
+                KnowledgeImageResponse(**img.model_dump()) for img in knowledge.review_images
             ],
             cases=[KnowledgeCaseResponse(**case.model_dump()) for case in knowledge.cases],
             prompt_text=knowledge.to_prompt(),
-            triage_prompt_text=knowledge.to_triage_prompt(),
+            review_prompt_text=knowledge.to_review_prompt(),
         )
