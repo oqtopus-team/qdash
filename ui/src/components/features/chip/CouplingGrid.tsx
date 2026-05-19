@@ -931,7 +931,7 @@ export function CouplingGrid({
   );
 
   return (
-    <div className="flex flex-col h-full space-y-2 max-w-2xl mx-auto w-full">
+    <div className="flex flex-col h-full space-y-2 max-w-4xl mx-auto w-full mt-8">
       {isError && (
         <div className="alert alert-error">
           Failed to load {selectedTask} data for {selectedDate}
