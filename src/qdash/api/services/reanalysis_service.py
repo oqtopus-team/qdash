@@ -25,6 +25,7 @@ from qdash.analysis.spectroscopy import (
     create_marked_figure,
     estimate_and_mark_qubit_figure,
     estimate_resonator_frequency_from_figure,
+    guess_sorted_slots_for_partial_mux,
 )
 from qdash.api.schemas.reanalysis import (
     ReanalyzeOutputParameter,
@@ -95,7 +96,8 @@ class ReanalysisService:
         )
         marked_fig = create_marked_figure(raw_fig, resonances, rejected_resonances=rejected)
 
-        readout_frequency = self._pick_resonator_for_qid(qid, frequencies)
+        trace = raw_fig.data[0]
+        readout_frequency = self._pick_resonator_for_qid(qid, list(trace.x), frequencies)
         outputs = [
             ReanalyzeOutputParameter(
                 name="readout_frequency",
@@ -330,30 +332,33 @@ class ReanalysisService:
         )
 
     @staticmethod
-    def _pick_resonator_for_qid(qid: str, frequencies: list[float]) -> float:
-        """Map the requested qid to one of the four resonator frequencies in the MUX.
-
-        Mirrors the logic in CheckResonatorSpectroscopy.postprocess so the
-        re-analysis preview matches what the workflow would have stored.
-        """
+    def _pick_resonator_for_qid(qid: str, xs: list[float], frequencies: list[float]) -> float:
+        """Map the requested qid to the workflow-equivalent resonator frequency."""
         if not frequencies:
             return 0.0
-        if len(frequencies) != NUM_RESONATORS:
-            logger.warning(
-                "Resonator reanalysis for qid=%s produced %d frequencies (expected %d); "
-                "using order-preserved fallback.",
-                qid,
-                len(frequencies),
-                NUM_RESONATORS,
-            )
-            try:
-                return float(frequencies[int(qid) % len(frequencies)])
-            except ValueError:
-                return float(frequencies[0])
         try:
-            id_in_mux = int(qid) % 4
+            qid_int = int(qid)
         except ValueError as exc:
             raise HTTPException(
                 status_code=400, detail=f"qid {qid!r} is not a valid integer qubit id."
             ) from exc
-        return float(frequencies[PEAK_POSITIONS[id_in_mux]])
+
+        id_in_mux = qid_int % NUM_RESONATORS
+        assigned_slot = PEAK_POSITIONS[id_in_mux]
+        sorted_slots, assignment_mode = guess_sorted_slots_for_partial_mux(xs, frequencies)
+        resonance_index = (
+            sorted_slots.index(assigned_slot) if assigned_slot in sorted_slots else None
+        )
+        if resonance_index is not None and resonance_index < len(frequencies):
+            return float(frequencies[resonance_index])
+
+        logger.warning(
+            "Resonator reanalysis for qid=%s produced %d frequencies (expected %d); "
+            "assigned slot %d unavailable in mode %s.",
+            qid,
+            len(frequencies),
+            NUM_RESONATORS,
+            assigned_slot,
+            assignment_mode,
+        )
+        return 0.0

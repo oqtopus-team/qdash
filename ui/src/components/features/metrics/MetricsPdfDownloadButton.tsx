@@ -7,7 +7,6 @@ import { downloadMetricsPdf } from "@/client/metrics/metrics";
 
 interface MetricsPdfDownloadButtonProps {
   chipId: string;
-  withinHours?: number;
   startAt?: string | null;
   endAt?: string | null;
   selectionMode: "latest" | "best" | "average";
@@ -16,7 +15,6 @@ interface MetricsPdfDownloadButtonProps {
 
 export function MetricsPdfDownloadButton({
   chipId,
-  withinHours,
   startAt,
   endAt,
   selectionMode,
@@ -35,7 +33,6 @@ export function MetricsPdfDownloadButton({
       const response = await downloadMetricsPdf(
         chipId,
         {
-          within_hours: withinHours,
           start_at: startAt ?? undefined,
           end_at: endAt ?? undefined,
           selection_mode: selectionMode,

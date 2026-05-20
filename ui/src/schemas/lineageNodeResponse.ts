@@ -5,9 +5,9 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { LineageNodeResponseEntity } from "./lineageNodeResponseEntity";
-import type { LineageNodeResponseActivity } from "./lineageNodeResponseActivity";
-import type { LineageNodeResponseLatestVersion } from "./lineageNodeResponseLatestVersion";
+import type { LineageNodeResponseEntity } from './lineageNodeResponseEntity';
+import type { LineageNodeResponseActivity } from './lineageNodeResponseActivity';
+import type { LineageNodeResponseLatestVersion } from './lineageNodeResponseLatestVersion';
 
 /**
  * Response model for a node in the lineage graph.

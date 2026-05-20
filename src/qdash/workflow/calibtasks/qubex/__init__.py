@@ -35,6 +35,7 @@ from qdash.workflow.calibtasks.qubex.cw.check_resonator_spectroscopy import (
     CheckResonatorSpectroscopy,
 )
 from qdash.workflow.calibtasks.qubex.measurement.readout_classification import ReadoutClassification
+from qdash.workflow.calibtasks.qubex.one_qubit_coarse.check_chevron import CheckChevron
 from qdash.workflow.calibtasks.qubex.one_qubit_coarse.check_coarse_chevron import (
     CheckCoarseChevron,
 )
@@ -87,6 +88,7 @@ __all__ = [
     "Check2QGateCoherenceLimit",
     "CheckBellState",
     "CheckBellStateTomography",
+    "CheckChevron",
     "CheckCoarseChevron",
     "CheckControlAmplitude",
     "CheckCrossResonance",

@@ -601,7 +601,7 @@ export function CouplingMetricsGrid({
   );
 
   return (
-    <div className="flex flex-col h-full" ref={containerRef}>
+    <div className="flex flex-col h-full max-w-4xl mx-auto w-full mt-8" ref={containerRef}>
       {/* View mode toggle */}
       <div className="flex items-center justify-between px-1 md:px-4 py-2">
         <div className="tabs tabs-boxed bg-base-200/50 p-1">
@@ -682,7 +682,7 @@ export function CouplingMetricsGrid({
             pinch={{ step: 5 }}
             doubleClick={{ mode: "zoomIn", step: 0.7 }}
             panning={{ velocityDisabled: false }}
-            smooth={true}
+            smooth={false}
             centerOnInit={true}
             onTransform={handleTransform}
           >

@@ -5,7 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { BodyReExecuteTaskResultParameterOverrides } from "./bodyReExecuteTaskResultParameterOverrides";
+import type { BodyReExecuteTaskResultParameterOverrides } from './bodyReExecuteTaskResultParameterOverrides';
 
 export interface BodyReExecuteTaskResult {
   /** Optional parameter overrides: {run: {...}, input: {...}} */

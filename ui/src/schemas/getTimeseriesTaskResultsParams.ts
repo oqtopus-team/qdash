@@ -7,28 +7,28 @@
  */
 
 export type GetTimeseriesTaskResultsParams = {
-  /**
-   * Chip ID
-   */
-  chip_id: string;
-  /**
-   * Parameter name
-   */
-  parameter: string;
-  /**
-   * Start time in ISO format
-   */
-  start_at: string;
-  /**
-   * End time in ISO format
-   */
-  end_at: string;
-  /**
-   * Tag to filter by
-   */
-  tag?: string | null;
-  /**
-   * Optional qubit ID to filter by
-   */
-  qid?: string | null;
+/**
+ * Chip ID
+ */
+chip_id: string;
+/**
+ * Parameter name
+ */
+parameter: string;
+/**
+ * Start time in ISO format
+ */
+start_at: string;
+/**
+ * End time in ISO format
+ */
+end_at: string;
+/**
+ * Tag to filter by
+ */
+tag?: string | null;
+/**
+ * Optional qubit ID to filter by
+ */
+qid?: string | null;
 };

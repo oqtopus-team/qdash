@@ -5,7 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { Tag } from "./tag";
+import type { Tag } from './tag';
 
 /**
  * Response model for a list of tags.

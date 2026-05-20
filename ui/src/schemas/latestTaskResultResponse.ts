@@ -5,7 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { LatestTaskResultResponseResult } from "./latestTaskResultResponseResult";
+import type { LatestTaskResultResponseResult } from './latestTaskResultResponseResult';
 
 /**
  * Response model for fetching the latest tasks grouped by qid/coupling_id.

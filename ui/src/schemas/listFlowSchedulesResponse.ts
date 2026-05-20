@@ -5,7 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { FlowScheduleSummary } from "./flowScheduleSummary";
+import type { FlowScheduleSummary } from './flowScheduleSummary';
 
 /**
  * Response for listing flow schedules.

@@ -241,7 +241,7 @@ export function DashboardPageContent() {
         .map((t) => ({
           taskId: t.task_id,
           qid: t.qid,
-          content: stripAiTriageSection(t.note?.content ?? ""),
+          content: stripAiReviewSection(t.note?.content ?? ""),
           username: t.note?.updated_by ?? "",
           updatedAt: t.note?.updated_at ?? "",
         }))
@@ -465,7 +465,7 @@ export function DashboardPageContent() {
               variant="default"
               padding="md"
               title="AI Insights"
-              description="High-signal operational patterns extracted from task triage and dashboard context."
+              description="High-signal operational patterns extracted from AI review notes and dashboard context."
             >
               <DashboardAiInsights
                 chipId={selectedChip}
@@ -697,6 +697,6 @@ export function DashboardPageContent() {
   );
 }
 
-function stripAiTriageSection(content: string): string {
-  return content.replace(/^## AI triage\n\n.*?(?:\n\n---\n\n|$)/s, "").trim();
+function stripAiReviewSection(content: string): string {
+  return content.replace(/^## AI review\n\n.*?(?:\n\n---\n\n|$)/s, "").trim();
 }

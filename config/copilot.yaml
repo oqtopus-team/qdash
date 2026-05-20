@@ -8,7 +8,7 @@ enabled: true
 # thinking_language: Language for internal reasoning (en recommended for technical accuracy)
 # response_language: Language for user-facing responses (ja or en)
 thinking_language: en
-response_language: ja
+response_language: en
 
 # Model configuration
 # `model` is used as the default for general chat (side-panel Q&A, tool use, explanations).
@@ -83,10 +83,10 @@ analysis_models:
     base_url: env:OLLAMA_BASE_URL
     # Optional. If unset or missing, Ollama uses a dummy "ollama" API key.
     api_key_env: OLLAMA_API_KEY
-    # Keep the local VLM resident between automatic triage requests and avoid
+    # Keep the local VLM resident between automatic review requests and avoid
     # repeated cold model loads between short qdash reviews.
     keep_alive: 30m
-    # Gemma 4 best-practice sampling for stable local VLM triage.
+    # Gemma 4 best-practice sampling for stable local VLM review.
     temperature: 1.0
     top_p: 0.95
     top_k: 64
@@ -96,7 +96,7 @@ analysis_models:
   - provider: ollama
     name: gemma4:31b
     # Higher-stability local VLM fallback. It is slower than 26B but showed
-    # fewer format failures in qdash triage spot checks.
+    # fewer format failures in qdash review spot checks.
     base_url: env:OLLAMA_BASE_URL
     api_key_env: OLLAMA_API_KEY
     keep_alive: 30m
@@ -210,23 +210,23 @@ analysis:
   enabled: true
   # Whether to send result figures to the LLM (requires multimodal model)
   multimodal: true
-  # Reference images to send during task analysis and automatic AI triage.
+  # Reference images to send during task analysis and automatic AI review.
   max_expected_images: 2
-  # Automatic AI triage prioritizes review quality by default and inherits the
+  # Automatic AI review prioritizes review quality by default and inherits the
   # same reference-image and output-token settings as task analysis. Set these
-  # optional overrides only when a lower-latency triage mode is required.
-  ai_triage_max_expected_images: null
-  ai_triage_max_output_tokens: null
-  # Terminal task results whose notes should receive automatic AI triage. Both
+  # optional overrides only when a lower-latency review mode is required.
+  ai_review_max_expected_images: null
+  ai_review_max_output_tokens: null
+  # Terminal task results whose notes should receive automatic AI review. Both
   # completed and failed results are eligible; running, pending, scheduled, and
   # skipped results are ignored. The hook runs asynchronously after history
   # persistence and does not block calibration progress.
-  ai_triage_tasks:
+  ai_review_tasks:
     - CheckQubitSpectroscopy
     - CheckResonatorSpectroscopy
-  ai_triage_message: >-
+  ai_review_message: >-
     Review this calibration result and attach a concise operational
-    triage note. Auto-pass results that are good enough for routine parameter
+    review note. Auto-pass results that are good enough for routine parameter
     update. History consistency alone is not enough to accept visually
     unsupported output parameters, but weak f12 support by itself should usually
     become PASS_WITH_NOTE when f01 is clearly supported and no clearly stronger

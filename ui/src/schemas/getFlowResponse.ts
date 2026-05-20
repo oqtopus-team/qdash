@@ -5,8 +5,8 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { GetFlowResponseDefaultParameters } from "./getFlowResponseDefaultParameters";
-import type { GetFlowResponseDefaultRunParameters } from "./getFlowResponseDefaultRunParameters";
+import type { GetFlowResponseDefaultParameters } from './getFlowResponseDefaultParameters';
+import type { GetFlowResponseDefaultRunParameters } from './getFlowResponseDefaultRunParameters';
 
 /**
  * Response for getting flow details.

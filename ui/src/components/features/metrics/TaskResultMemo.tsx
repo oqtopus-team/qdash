@@ -45,16 +45,16 @@ export function TaskResultMemo({ taskId, chipId, hideWhenEmpty = false }: TaskRe
 
   const [isEditing, setIsEditing] = useState(false);
   const [draft, setDraft] = useState(noteContent);
-  const aiTriageSummary = useMemo(() => getAiTriageSummary(noteContent), [noteContent]);
-  const [isExpanded, setIsExpanded] = useState(!aiTriageSummary);
+  const aiReviewSummary = useMemo(() => getAiReviewSummary(noteContent), [noteContent]);
+  const [isExpanded, setIsExpanded] = useState(!aiReviewSummary);
 
   useEffect(() => {
     setDraft(noteContent);
   }, [noteContent]);
 
   useEffect(() => {
-    setIsExpanded(!aiTriageSummary);
-  }, [aiTriageSummary]);
+    setIsExpanded(!aiReviewSummary);
+  }, [aiReviewSummary]);
 
   const invalidate = async () => {
     await queryClient.invalidateQueries({
@@ -100,12 +100,12 @@ export function TaskResultMemo({ taskId, chipId, hideWhenEmpty = false }: TaskRe
         <h3 className="text-sm font-semibold flex items-center gap-2">
           <StickyNote className="h-4 w-4" />
           Note
-          {aiTriageSummary?.decision && (
+          {aiReviewSummary?.decision && (
             <span
-              className={`badge badge-xs ${getAiTriageDecisionBadgeClass(aiTriageSummary.decision)}`}
-              title="AI triage decision"
+              className={`badge badge-xs ${getAiReviewDecisionBadgeClass(aiReviewSummary.decision)}`}
+              title="AI review decision"
             >
-              {aiTriageSummary.decision}
+              {aiReviewSummary.decision}
             </span>
           )}
           {note?.updated_by && (
@@ -176,10 +176,10 @@ export function TaskResultMemo({ taskId, chipId, hideWhenEmpty = false }: TaskRe
         ) : note ? (
           <>
             <MarkdownContent
-              content={aiTriageSummary && !isExpanded ? aiTriageSummary.summary : noteContent}
+              content={aiReviewSummary && !isExpanded ? aiReviewSummary.summary : noteContent}
               className="break-words [&>:first-child]:mt-0 [&>:last-child]:mb-0 [&_ul]:my-1.5 [&_ol]:my-1.5 [&_li]:my-0.5 [&_li>p]:my-0"
             />
-            {aiTriageSummary && (
+            {aiReviewSummary && (
               <button
                 type="button"
                 className="btn btn-xs btn-ghost mt-2"
@@ -199,8 +199,8 @@ export function TaskResultMemo({ taskId, chipId, hideWhenEmpty = false }: TaskRe
   );
 }
 
-function getAiTriageSummary(content: string): { summary: string; decision: string | null } | null {
-  const header = "## AI triage";
+function getAiReviewSummary(content: string): { summary: string; decision: string | null } | null {
+  const header = "## AI review";
   const headerIndex = content.indexOf(header);
   if (headerIndex === -1) return null;
 
@@ -214,7 +214,7 @@ function getAiTriageSummary(content: string): { summary: string; decision: strin
   const summaryLines: string[] = [header];
   let decision: string | null = null;
   const importantLinePattern =
-    /^(?:[-*]\s*)?(?:\*\*)?(Review triage|Decision|判定|Human label suggestion|Accepted parameter\(s\)|受理されたパラメータ|Needs review|要レビュー|Primary reason|主な理由|Closest knowledge case|最も近い知識事例|Suggested labels|推奨ラベル|Recommended action|推奨アクション|Optional note)(?:\*\*)?\s*:?/i;
+    /^(?:[-*]\s*)?(?:\*\*)?(AI review|Decision|判定|Human label suggestion|Accepted parameter\(s\)|受理されたパラメータ|Needs review|要レビュー|Primary reason|主な理由|Closest knowledge case|最も近い知識事例|Suggested labels|推奨ラベル|Recommended action|推奨アクション|Optional note)(?:\*\*)?\s*:?/i;
 
   for (const line of lines) {
     const trimmed = line.trim();
@@ -226,7 +226,7 @@ function getAiTriageSummary(content: string): { summary: string; decision: strin
     }
     if (importantLinePattern.test(trimmed)) {
       summaryLines.push(line);
-      decision ??= extractAiTriageDecision(trimmed);
+      decision ??= extractAiReviewDecision(trimmed);
       continue;
     }
     if (summaryLines.length <= 2) {
@@ -239,12 +239,12 @@ function getAiTriageSummary(content: string): { summary: string; decision: strin
   return { summary, decision };
 }
 
-function extractAiTriageDecision(line: string): string | null {
+function extractAiReviewDecision(line: string): string | null {
   const match = line.match(/(?:Decision|判定)\s*:\s*`?([A-Z_]+)`?/i);
   return match?.[1]?.toUpperCase() ?? null;
 }
 
-function getAiTriageDecisionBadgeClass(decision: string): string {
+function getAiReviewDecisionBadgeClass(decision: string): string {
   switch (decision) {
     case "PASS":
       return "badge-success";

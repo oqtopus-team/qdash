@@ -5,7 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { FlowSummary } from "./flowSummary";
+import type { FlowSummary } from './flowSummary';
 
 /**
  * Response for listing flows.

@@ -5,9 +5,9 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { CryostatResponseCommissionedAt } from "./cryostatResponseCommissionedAt";
-import type { CryostatResponseDecommissionedAt } from "./cryostatResponseDecommissionedAt";
-import type { NoteModel } from "./noteModel";
+import type { CryostatResponseCommissionedAt } from './cryostatResponseCommissionedAt';
+import type { CryostatResponseDecommissionedAt } from './cryostatResponseDecommissionedAt';
+import type { NoteModel } from './noteModel';
 
 /**
  * Single cryostat record.

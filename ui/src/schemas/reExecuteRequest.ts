@@ -5,7 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { ReExecuteRequestParameterOverrides } from "./reExecuteRequestParameterOverrides";
+import type { ReExecuteRequestParameterOverrides } from './reExecuteRequestParameterOverrides';
 
 /**
  * Request model for re-executing an execution from snapshot parameters.

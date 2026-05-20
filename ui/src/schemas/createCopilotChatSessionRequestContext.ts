@@ -5,7 +5,6 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { CreateCopilotChatSessionRequestContextAnyOf } from "./createCopilotChatSessionRequestContextAnyOf";
+import type { CreateCopilotChatSessionRequestContextAnyOf } from './createCopilotChatSessionRequestContextAnyOf';
 
-export type CreateCopilotChatSessionRequestContext =
-  CreateCopilotChatSessionRequestContextAnyOf | null;
+export type CreateCopilotChatSessionRequestContext = CreateCopilotChatSessionRequestContextAnyOf | null;

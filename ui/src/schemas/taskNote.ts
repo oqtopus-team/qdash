@@ -5,6 +5,6 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { TaskNoteAnyOf } from "./taskNoteAnyOf";
+import type { TaskNoteAnyOf } from './taskNoteAnyOf';
 
 export type TaskNote = TaskNoteAnyOf | null;

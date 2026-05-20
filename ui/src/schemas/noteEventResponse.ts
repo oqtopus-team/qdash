@@ -5,8 +5,8 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { NoteEventResponseActorUserId } from "./noteEventResponseActorUserId";
-import type { NoteEventResponseExtra } from "./noteEventResponseExtra";
+import type { NoteEventResponseActorUserId } from './noteEventResponseActorUserId';
+import type { NoteEventResponseExtra } from './noteEventResponseExtra';
 
 /**
  * One row of the note audit log.

@@ -5,9 +5,9 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { DashboardInsightSeverity } from "./dashboardInsightSeverity";
-import type { DashboardInsightCategory } from "./dashboardInsightCategory";
-import type { DashboardInsightConfidence } from "./dashboardInsightConfidence";
+import type { DashboardInsightSeverity } from './dashboardInsightSeverity';
+import type { DashboardInsightCategory } from './dashboardInsightCategory';
+import type { DashboardInsightConfidence } from './dashboardInsightConfidence';
 
 /**
  * One operator-facing dashboard insight.

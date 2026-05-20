@@ -5,7 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { ParameterChangeResponse } from "./parameterChangeResponse";
+import type { ParameterChangeResponse } from './parameterChangeResponse';
 
 /**
  * Response model for recent parameter changes.

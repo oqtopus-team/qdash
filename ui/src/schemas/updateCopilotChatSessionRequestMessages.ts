@@ -5,8 +5,6 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { CopilotChatMessageSchema } from "./copilotChatMessageSchema";
+import type { CopilotChatMessageSchema } from './copilotChatMessageSchema';
 
-export type UpdateCopilotChatSessionRequestMessages =
-  | CopilotChatMessageSchema[]
-  | null;
+export type UpdateCopilotChatSessionRequestMessages = CopilotChatMessageSchema[] | null;

@@ -7,5 +7,5 @@
  */
 
 export type GetFileContentParams = {
-  path: string;
+path: string;
 };

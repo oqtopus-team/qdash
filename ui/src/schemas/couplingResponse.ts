@@ -5,9 +5,9 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { CouplingResponseData } from "./couplingResponseData";
-import type { NoteModel } from "./noteModel";
-import type { CouplingResponseMetricNotes } from "./couplingResponseMetricNotes";
+import type { CouplingResponseData } from './couplingResponseData';
+import type { NoteModel } from './noteModel';
+import type { CouplingResponseMetricNotes } from './couplingResponseMetricNotes';
 
 /**
  * Response model for a single coupling.

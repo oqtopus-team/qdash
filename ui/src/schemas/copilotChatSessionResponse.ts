@@ -5,8 +5,8 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { CopilotChatSessionResponseContext } from "./copilotChatSessionResponseContext";
-import type { CopilotChatMessageSchema } from "./copilotChatMessageSchema";
+import type { CopilotChatSessionResponseContext } from './copilotChatSessionResponseContext';
+import type { CopilotChatMessageSchema } from './copilotChatMessageSchema';
 
 /**
  * Full session payload returned to the client.

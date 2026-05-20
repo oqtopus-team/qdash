@@ -7,12 +7,12 @@
  */
 
 export type CompareExecutionsParams = {
-  /**
-   * First execution ID (before)
-   */
-  execution_id_before: string;
-  /**
-   * Second execution ID (after)
-   */
-  execution_id_after: string;
+/**
+ * First execution ID (before)
+ */
+execution_id_before: string;
+/**
+ * Second execution ID (after)
+ */
+execution_id_after: string;
 };

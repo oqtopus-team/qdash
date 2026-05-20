@@ -6,17 +6,17 @@
  * OpenAPI spec version: 0.0.1
  */
 
-export type DashboardInsightCategory =
-  (typeof DashboardInsightCategory)[keyof typeof DashboardInsightCategory];
+export type DashboardInsightCategory = typeof DashboardInsightCategory[keyof typeof DashboardInsightCategory];
+
 
 // eslint-disable-next-line @typescript-eslint/no-redeclare
 export const DashboardInsightCategory = {
-  triage_cluster: "triage_cluster",
-  model_failure: "model_failure",
-  data_consistency: "data_consistency",
-  metric_outlier: "metric_outlier",
-  coverage_gap: "coverage_gap",
-  provenance_impact: "provenance_impact",
-  note_cluster: "note_cluster",
-  other: "other",
+  review_cluster: 'review_cluster',
+  model_failure: 'model_failure',
+  data_consistency: 'data_consistency',
+  metric_outlier: 'metric_outlier',
+  coverage_gap: 'coverage_gap',
+  provenance_impact: 'provenance_impact',
+  note_cluster: 'note_cluster',
+  other: 'other',
 } as const;

@@ -5,12 +5,12 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { ParameterChangeResponseValue } from "./parameterChangeResponseValue";
-import type { ParameterChangeResponsePreviousValue } from "./parameterChangeResponsePreviousValue";
-import type { ParameterChangeResponseDelta } from "./parameterChangeResponseDelta";
-import type { ParameterChangeResponseDeltaPercent } from "./parameterChangeResponseDeltaPercent";
-import type { ParameterChangeResponseValidFrom } from "./parameterChangeResponseValidFrom";
-import type { ParameterChangeResponsePreviousError } from "./parameterChangeResponsePreviousError";
+import type { ParameterChangeResponseValue } from './parameterChangeResponseValue';
+import type { ParameterChangeResponsePreviousValue } from './parameterChangeResponsePreviousValue';
+import type { ParameterChangeResponseDelta } from './parameterChangeResponseDelta';
+import type { ParameterChangeResponseDeltaPercent } from './parameterChangeResponseDeltaPercent';
+import type { ParameterChangeResponseValidFrom } from './parameterChangeResponseValidFrom';
+import type { ParameterChangeResponsePreviousError } from './parameterChangeResponsePreviousError';
 
 /**
  * Response model for a parameter change (with delta from previous version).

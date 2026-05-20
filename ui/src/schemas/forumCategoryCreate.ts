@@ -5,8 +5,8 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { ForumCategoryCreateKey } from "./forumCategoryCreateKey";
-import type { ForumCategoryCreateSortOrder } from "./forumCategoryCreateSortOrder";
+import type { ForumCategoryCreateKey } from './forumCategoryCreateKey';
+import type { ForumCategoryCreateSortOrder } from './forumCategoryCreateSortOrder';
 
 /**
  * Request schema for creating a forum category.

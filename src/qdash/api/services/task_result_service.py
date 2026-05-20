@@ -8,18 +8,27 @@ from __future__ import annotations
 
 import io
 import logging
+import re
+import tempfile
+import uuid
 import zipfile
+from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
-from threading import Lock
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from bunnet import SortDirection
+from pymongo import ReturnDocument
 
 from qdash.api.schemas.task_result import (
-    BulkAiTriageResponse,
+    AiReviewListItem,
+    AiReviewListResponse,
+    AiReviewRunDetailResponse,
+    AiReviewRunListResponse,
+    AiReviewRunSummary,
+    BulkAiReviewResponse,
     LatestTaskResultResponse,
     TaskHistoryResponse,
     TaskResult,
@@ -33,6 +42,24 @@ from qdash.common.utils.datetime import (
     parse_elapsed_time,
     start_of_day,
 )
+from qdash.copilot.review import (
+    apply_ai_review_config as _shared_ai_review_config,
+)
+from qdash.copilot.review import (
+    build_ai_review_context as _shared_build_ai_review_context,
+)
+from qdash.copilot.review import (
+    forced_ai_review_markdown as _shared_forced_ai_review_markdown,
+)
+from qdash.copilot.review import (
+    is_non_representative_mux_result as _shared_is_non_representative_mux_result,
+)
+from qdash.copilot.review import (
+    render_ai_review_markdown as _shared_render_ai_review_markdown,
+)
+from qdash.copilot.review import (
+    select_analysis_model as _shared_select_analysis_model,
+)
 from qdash.datamodel.task import ParameterModel
 
 if TYPE_CHECKING:
@@ -41,40 +68,23 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-AI_TRIAGE_ACTOR = "qdash-ai"
-AI_TRIAGE_HEADER = "## AI triage"
-AI_TRIAGE_SEPARATOR = "\n\n---\n\n"
-MAX_AI_TRIAGE_NOTE_CHARS = 4500
-AI_TRIAGE_WORKERS = 2
-AI_TRIAGE_FORMAT_REMINDER = """\
+AI_REVIEW_ACTOR = "qdash-ai"
+AI_REVIEW_HEADER = "## AI review"
+AI_REVIEW_SEPARATOR = "\n\n---\n\n"
+MAX_AI_REVIEW_NOTE_CHARS = 4500
+AI_REVIEW_WORKERS = 2
+AI_REVIEW_IN_FLIGHT_STATUSES = ("requested", "running")
+AI_REVIEW_SECTION_RE = re.compile(r"^## AI review\n\n(?P<body>.*?)(?=\n\n---\n\n|$)", re.DOTALL)
 
-Required output format:
-Return JSON, but the JSON `explanation` string must start exactly with this
-markdown block. Do not put prose before it.
-
-**Review triage**
-- Decision: `PASS` | `PASS_WITH_NOTE` | `REVIEW` | `FAIL`
-- Human label suggestion: `CORRECT` | `SUSPICIOUS` | `MISASSIGNMENT` | `NO_SIGNAL` | `ANOMALY`
-- Accepted parameter(s): ...
-- Needs review: ...
-- Primary reason: ...
-- Closest knowledge case: ...
-- Suggested labels: ...
-- Recommended action: ...
-- Optional note: ...
-"""
-
-_AI_TRIAGE_EXECUTOR = ThreadPoolExecutor(
-    max_workers=AI_TRIAGE_WORKERS,
-    thread_name_prefix="api-ai-triage",
+_AI_REVIEW_EXECUTOR = ThreadPoolExecutor(
+    max_workers=AI_REVIEW_WORKERS,
+    thread_name_prefix="api-ai-review",
 )
-_AI_TRIAGE_IN_FLIGHT_TASK_IDS: set[str] = set()
-_AI_TRIAGE_IN_FLIGHT_LOCK = Lock()
 
 
 @dataclass(frozen=True)
-class _BulkAiTriageSelection:
-    """Resolved target entities and repository filter for a bulk AI triage request."""
+class _BulkAiReviewSelection:
+    """Resolved target entities and repository filter for a bulk AI review run."""
 
     qids: list[str]
     query_filter: dict[str, Any]
@@ -101,16 +111,78 @@ def _document_to_task_result(doc: TaskResultHistoryDocument) -> TaskResult:
         end_at=doc.end_at,
         elapsed_time=parse_elapsed_time(doc.elapsed_time),
         task_type=doc.task_type,
-        ai_triage=doc.ai_triage,
+        ai_review=doc.ai_review,
     )
 
 
-def _truncate_ai_triage_markdown(markdown: str) -> str:
-    """Keep AI triage note content bounded while preserving a tail marker."""
-    budget = MAX_AI_TRIAGE_NOTE_CHARS - 200
+def _truncate_ai_review_markdown(markdown: str) -> str:
+    """Keep AI review note content bounded while preserving a tail marker."""
+    budget = MAX_AI_REVIEW_NOTE_CHARS - 200
     if len(markdown) <= budget:
         return markdown
     return markdown[:budget].rstrip() + "\n\n[truncated]"
+
+
+def _ai_review_field(text: str, name: str) -> str:
+    pattern = re.compile(
+        rf"^-\s*{re.escape(name)}:\s*`?(?P<value>.+?)`?\s*$",
+        re.MULTILINE,
+    )
+    match = pattern.search(text)
+    if not match:
+        return ""
+    return match.group("value").strip().strip("`")
+
+
+def _target_label(qid: str) -> str:
+    if not qid:
+        return "unknown"
+    return qid if qid.startswith("Q") else f"Q{qid}"
+
+
+def _parse_ai_review_item(doc: TaskResultHistoryDocument) -> AiReviewListItem:
+    content = doc.user_note.content or ""
+    match = AI_REVIEW_SECTION_RE.search(content)
+    review_markdown = match.group(0).strip() if match else content.strip()
+    body = match.group("body") if match else content
+    decision = _ai_review_field(body, "Decision")
+    if not decision and "必要なレビュー・ブロック" in body:
+        decision = "FORMAT_ERROR"
+    if not decision and doc.ai_review.status == "failed":
+        decision = "FORMAT_ERROR"
+    decision = decision or "UNKNOWN"
+    model = "/".join(
+        part for part in [doc.ai_review.model_provider, doc.ai_review.model_name] if part
+    )
+    format_ok = decision not in {"FORMAT_ERROR", "UNKNOWN"} and "model_format_error" not in body
+    return AiReviewListItem(
+        task_id=doc.task_id,
+        review_run_id=doc.ai_review.review_run_id,
+        task_name=doc.name,
+        chip_id=doc.chip_id,
+        qid=doc.qid,
+        target=_target_label(doc.qid),
+        execution_id=doc.execution_id,
+        task_status=doc.status,
+        review_status=doc.ai_review.status or ("completed" if match else ""),
+        decision=decision,
+        human_label=_ai_review_field(body, "Human label suggestion"),
+        accepted_parameters=_ai_review_field(body, "Accepted parameter(s)"),
+        needs_review=_ai_review_field(body, "Needs review"),
+        primary_reason=_ai_review_field(body, "Primary reason"),
+        suggested_labels=_ai_review_field(body, "Suggested labels"),
+        recommended_action=_ai_review_field(body, "Recommended action"),
+        model=model,
+        requested_by=doc.ai_review.requested_by,
+        requested_at=doc.ai_review.requested_at,
+        completed_at=doc.ai_review.completed_at,
+        note_updated_at=doc.user_note.updated_at,
+        start_at=doc.start_at,
+        figure_path=doc.figure_path,
+        json_figure_path=doc.json_figure_path,
+        review_markdown=review_markdown,
+        format_ok=format_ok,
+    )
 
 
 class TaskResultService:
@@ -123,6 +195,199 @@ class TaskResultService:
     ) -> None:
         self._chip_repo = chip_repository
         self._task_result_repo = task_result_repository
+
+    def list_ai_reviews(
+        self,
+        *,
+        project_id: str,
+        chip_id: str | None = None,
+        task_name: str | None = None,
+        status: str | None = None,
+        decision: str | None = None,
+        latest_only: bool = False,
+        skip: int = 0,
+        limit: int = 50,
+    ) -> AiReviewListResponse:
+        """List task results that have AI review state or AI review markdown."""
+        from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
+
+        query: dict[str, Any] = {
+            "project_id": project_id,
+            "$or": [
+                {"ai_review.status": {"$exists": True, "$ne": ""}},
+                {"user_note.content": {"$regex": "^## AI review"}},
+            ],
+        }
+        if chip_id:
+            query["chip_id"] = chip_id
+        if task_name:
+            query["name"] = task_name
+        if status:
+            query["ai_review.status"] = status
+
+        docs = list(TaskResultHistoryDocument.find(query).run())
+        docs.sort(key=lambda doc: doc.start_at or datetime.min, reverse=True)
+
+        if latest_only:
+            latest: dict[tuple[str, str, str], TaskResultHistoryDocument] = {}
+            for doc in docs:
+                key = (doc.chip_id, doc.name, doc.qid)
+                if key not in latest:
+                    latest[key] = doc
+            docs = list(latest.values())
+
+        items = [_parse_ai_review_item(doc) for doc in docs]
+        if decision:
+            items = [item for item in items if item.decision == decision]
+
+        total = len(items)
+        decision_counts = Counter(item.decision for item in items)
+        status_counts = Counter(item.review_status or "unknown" for item in items)
+        page_items = items[skip : skip + limit]
+        return AiReviewListResponse(
+            items=page_items,
+            total=total,
+            skip=skip,
+            limit=limit,
+            decision_counts=dict(sorted(decision_counts.items())),
+            status_counts=dict(sorted(status_counts.items())),
+        )
+
+    def list_ai_review_runs(
+        self,
+        *,
+        project_id: str,
+        chip_id: str | None = None,
+        task_name: str | None = None,
+        skip: int = 0,
+        limit: int = 50,
+    ) -> AiReviewRunListResponse:
+        """List bulk AI review runs."""
+        docs = self._load_ai_review_run_docs(
+            project_id=project_id,
+            chip_id=chip_id,
+            task_name=task_name,
+        )
+        summaries = self._summarize_ai_review_runs(docs)
+        summaries.sort(key=lambda summary: summary.requested_at or datetime.min, reverse=True)
+        total = len(summaries)
+        return AiReviewRunListResponse(
+            items=summaries[skip : skip + limit],
+            total=total,
+            skip=skip,
+            limit=limit,
+        )
+
+    def get_ai_review_run(
+        self,
+        *,
+        project_id: str,
+        review_run_id: str,
+    ) -> AiReviewRunDetailResponse:
+        """Return one bulk AI review run and its task-result reviews."""
+        from starlette.exceptions import HTTPException
+
+        docs = self._load_ai_review_run_docs(
+            project_id=project_id,
+            review_run_id=review_run_id,
+        )
+        if not docs:
+            raise HTTPException(
+                status_code=404,
+                detail=f"AI review run '{review_run_id}' not found",
+            )
+        summaries = self._summarize_ai_review_runs(docs)
+        if not summaries:
+            raise HTTPException(
+                status_code=404,
+                detail=f"AI review run '{review_run_id}' not found",
+            )
+        items = [_parse_ai_review_item(doc) for doc in docs]
+        items.sort(key=self._review_item_sort_key)
+        return AiReviewRunDetailResponse(run=summaries[0], items=items)
+
+    @staticmethod
+    def _review_item_sort_key(item: AiReviewListItem) -> tuple[int, str]:
+        qid = item.qid.removeprefix("Q")
+        try:
+            return (int(qid), item.task_id)
+        except ValueError:
+            return (10**9, item.task_id)
+
+    @staticmethod
+    def _load_ai_review_run_docs(
+        *,
+        project_id: str,
+        chip_id: str | None = None,
+        task_name: str | None = None,
+        review_run_id: str | None = None,
+    ) -> list[TaskResultHistoryDocument]:
+        from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
+
+        query: dict[str, Any] = {
+            "project_id": project_id,
+            "ai_review.review_run_id": {"$exists": True, "$ne": ""},
+        }
+        if review_run_id:
+            query["ai_review.review_run_id"] = review_run_id
+        if chip_id:
+            query["chip_id"] = chip_id
+        if task_name:
+            query["name"] = task_name
+        docs = list(TaskResultHistoryDocument.find(query).run())
+        docs.sort(key=lambda doc: doc.start_at or datetime.min, reverse=True)
+        return docs
+
+    @staticmethod
+    def _summarize_ai_review_runs(
+        docs: list[TaskResultHistoryDocument],
+    ) -> list[AiReviewRunSummary]:
+        grouped: dict[str, list[TaskResultHistoryDocument]] = {}
+        for doc in docs:
+            review_run_id = doc.ai_review.review_run_id
+            if not review_run_id:
+                continue
+            grouped.setdefault(review_run_id, []).append(doc)
+
+        summaries: list[AiReviewRunSummary] = []
+        for review_run_id, request_docs in grouped.items():
+            items = [_parse_ai_review_item(doc) for doc in request_docs]
+            status_counts = Counter(item.review_status or "unknown" for item in items)
+            decision_counts = Counter(item.decision for item in items)
+            requested_at_values = [
+                doc.ai_review.requested_at for doc in request_docs if doc.ai_review.requested_at
+            ]
+            completed_at_values = [
+                doc.ai_review.completed_at for doc in request_docs if doc.ai_review.completed_at
+            ]
+            first = request_docs[0]
+            model = "/".join(
+                part
+                for part in [first.ai_review.model_provider, first.ai_review.model_name]
+                if part
+            )
+            summaries.append(
+                AiReviewRunSummary(
+                    review_run_id=review_run_id,
+                    trigger_type=first.ai_review.trigger_type or "manual_chip_bulk",
+                    chip_id=first.chip_id,
+                    task_name=first.name,
+                    entity_type="coupling" if "-" in (first.qid or "") else "qubit",
+                    execution_ids=sorted({doc.execution_id for doc in request_docs}),
+                    requested_by=first.ai_review.requested_by,
+                    requested_at=min(requested_at_values) if requested_at_values else None,
+                    completed_at=max(completed_at_values) if completed_at_values else None,
+                    model=model,
+                    total=len(request_docs),
+                    completed_count=status_counts.get("completed", 0),
+                    failed_count=status_counts.get("failed", 0),
+                    running_count=status_counts.get("running", 0),
+                    requested_count=status_counts.get("requested", 0),
+                    decision_counts=dict(sorted(decision_counts.items())),
+                    status_counts=dict(sorted(status_counts.items())),
+                )
+            )
+        return summaries
 
     def get_latest_results(
         self,
@@ -363,7 +628,7 @@ class TaskResultService:
 
         return TimeSeriesData(data=timeseries_by_qid)
 
-    def request_bulk_ai_triage(
+    def request_bulk_ai_review(
         self,
         *,
         project_id: str,
@@ -374,17 +639,18 @@ class TaskResultService:
         task_ids: list[str] | None = None,
         model_override: Any | None = None,
         requested_by: str = "",
-    ) -> BulkAiTriageResponse:
-        """Enqueue AI triage review for the latest task results on a chip."""
+    ) -> BulkAiReviewResponse:
+        """Enqueue AI review for the latest task results on a chip."""
         from starlette.exceptions import HTTPException
 
         if entity_type not in {"qubit", "coupling"}:
             raise HTTPException(status_code=400, detail="entity_type must be 'qubit' or 'coupling'")
 
-        config = self._load_ai_triage_config()
-        skipped_reason = self._get_ai_triage_skip_reason(config, task)
+        config = self._load_ai_review_config()
+        skipped_reason = self._get_ai_review_skip_reason(config, task)
         if skipped_reason is not None:
-            return BulkAiTriageResponse(
+            return BulkAiReviewResponse(
+                review_run_id="",
                 chip_id=chip_id,
                 task=task,
                 entity_type=entity_type,
@@ -393,11 +659,11 @@ class TaskResultService:
                 task_ids=[],
                 skipped_reason=skipped_reason,
             )
-        triage_config = config
+        review_config = config
         if model_override is not None:
-            triage_config = config.model_copy(update={"analysis_model": model_override})
-        selected_model = self._select_analysis_model(triage_config)
-        selection = self._resolve_bulk_ai_triage_selection(
+            review_config = config.model_copy(update={"analysis_model": model_override})
+        selected_model = self._select_analysis_model(review_config)
+        selection = self._resolve_bulk_ai_review_selection(
             project_id=project_id,
             chip_id=chip_id,
             task=task,
@@ -405,14 +671,17 @@ class TaskResultService:
             date=date,
             task_ids=task_ids,
         )
-        enqueued_task_ids = self._enqueue_bulk_ai_triage(
+        review_run_id = f"airv_{uuid.uuid4().hex}"
+        enqueued_task_ids = self._enqueue_bulk_ai_review(
             selection=selection,
+            review_run_id=review_run_id,
             requested_by=requested_by,
             selected_model=selected_model,
             model_override=model_override,
         )
 
-        return BulkAiTriageResponse(
+        return BulkAiReviewResponse(
+            review_run_id=review_run_id,
             chip_id=chip_id,
             task=task,
             entity_type=entity_type,
@@ -421,7 +690,7 @@ class TaskResultService:
             task_ids=enqueued_task_ids,
         )
 
-    def _resolve_bulk_ai_triage_selection(
+    def _resolve_bulk_ai_review_selection(
         self,
         *,
         project_id: str,
@@ -430,8 +699,8 @@ class TaskResultService:
         entity_type: str,
         date: str | None,
         task_ids: list[str] | None,
-    ) -> _BulkAiTriageSelection:
-        """Resolve the entity set and repository query for a bulk AI triage request."""
+    ) -> _BulkAiReviewSelection:
+        """Resolve the entity set and repository query for a bulk AI review run."""
         is_latest = date is None or date == "latest"
         qids = (
             self._get_entity_ids(project_id, chip_id, entity_type)
@@ -439,7 +708,7 @@ class TaskResultService:
             else self._get_historical_entity_ids(project_id, chip_id, entity_type, date or "")
         )
 
-        query_filter = self._build_bulk_ai_triage_query_filter(
+        query_filter = self._build_bulk_ai_review_query_filter(
             project_id=project_id,
             chip_id=chip_id,
             task=task,
@@ -447,7 +716,7 @@ class TaskResultService:
             date=None if is_latest else (date or ""),
             task_ids=task_ids,
         )
-        return _BulkAiTriageSelection(
+        return _BulkAiReviewSelection(
             qids=qids,
             query_filter=query_filter,
             response_date=None if is_latest else date,
@@ -455,7 +724,7 @@ class TaskResultService:
         )
 
     @staticmethod
-    def _build_bulk_ai_triage_query_filter(
+    def _build_bulk_ai_review_query_filter(
         *,
         project_id: str,
         chip_id: str,
@@ -464,7 +733,7 @@ class TaskResultService:
         date: str | None,
         task_ids: list[str] | None,
     ) -> dict[str, Any]:
-        """Build the repository query for bulk AI triage candidate results."""
+        """Build the repository query for bulk AI review candidate results."""
         query_filter: dict[str, Any] = {
             "project_id": project_id,
             "chip_id": chip_id,
@@ -482,15 +751,16 @@ class TaskResultService:
             query_filter["task_id"] = {"$in": task_ids}
         return query_filter
 
-    def _enqueue_bulk_ai_triage(
+    def _enqueue_bulk_ai_review(
         self,
         *,
-        selection: _BulkAiTriageSelection,
+        selection: _BulkAiReviewSelection,
+        review_run_id: str,
         requested_by: str,
         selected_model: Any,
         model_override: Any | None,
     ) -> list[str]:
-        """Mark and enqueue the latest triage candidate for each requested entity."""
+        """Mark and enqueue the latest review candidate for each requested entity."""
         all_results = self._task_result_repo.find(
             selection.query_filter,
             sort=[("end_at", SortDirection.DESCENDING)],
@@ -504,8 +774,26 @@ class TaskResultService:
                 continue
             if selection.requested_task_ids and doc.task_id not in selection.requested_task_ids:
                 continue
-            self._mark_ai_triage_requested(doc, requested_by, selected_model)
-            self._enqueue_ai_triage_for_document(doc, model_override)
+            if self._is_non_representative_mux_result(doc.name, doc.qid):
+                continue
+            claimed_doc = self._claim_ai_review_document(
+                doc,
+                requested_by,
+                selected_model,
+                review_run_id,
+            )
+            if claimed_doc is None:
+                continue
+            try:
+                self._submit_ai_review_document(claimed_doc, model_override)
+            except Exception:
+                self._set_ai_review_status(
+                    doc.project_id,
+                    doc.task_id,
+                    "failed",
+                    error="Failed to enqueue AI review",
+                )
+                raise
             enqueued_task_ids.append(doc.task_id)
         return enqueued_task_ids
 
@@ -551,18 +839,52 @@ class TaskResultService:
         return task_results
 
     @staticmethod
-    def _enqueue_ai_triage_for_document(
+    def _claim_ai_review_document(
+        doc: TaskResultHistoryDocument,
+        requested_by: str,
+        selected_model: Any,
+        review_run_id: str,
+    ) -> TaskResultHistoryDocument | None:
+        """Atomically mark a task result as requested unless another worker owns it."""
+        from qdash.datamodel.note import AiReviewModel
+        from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
+
+        ai_review = AiReviewModel(
+            status="requested",
+            requested_at=now(),
+            requested_by=requested_by,
+            review_run_id=review_run_id,
+            trigger_type="manual_chip_bulk",
+            model_provider=getattr(selected_model, "provider", ""),
+            model_name=getattr(selected_model, "name", ""),
+            completed_at=None,
+            error="",
+        )
+        collection = TaskResultHistoryDocument.get_motor_collection()
+        result = collection.find_one_and_update(
+            {
+                "project_id": doc.project_id,
+                "task_id": doc.task_id,
+                "$or": [
+                    {"ai_review.status": {"$nin": list(AI_REVIEW_IN_FLIGHT_STATUSES)}},
+                    {"ai_review.status": {"$exists": False}},
+                ],
+            },
+            {"$set": {"ai_review": ai_review.model_dump()}},
+            return_document=ReturnDocument.AFTER,
+        )
+        if result is None:
+            return None
+        return cast("TaskResultHistoryDocument", TaskResultHistoryDocument.model_validate(result))
+
+    @staticmethod
+    def _submit_ai_review_document(
         doc: TaskResultHistoryDocument,
         model_override: Any | None = None,
     ) -> None:
-        """Enqueue API-side AI triage review for a task result document."""
-        with _AI_TRIAGE_IN_FLIGHT_LOCK:
-            if doc.task_id in _AI_TRIAGE_IN_FLIGHT_TASK_IDS:
-                return
-            _AI_TRIAGE_IN_FLIGHT_TASK_IDS.add(doc.task_id)
-
-        _AI_TRIAGE_EXECUTOR.submit(
-            TaskResultService._run_ai_triage_for_task_result,
+        """Submit API-side AI review for a previously claimed task result."""
+        _AI_REVIEW_EXECUTOR.submit(
+            TaskResultService._run_ai_review_for_task_result,
             doc.project_id,
             doc.chip_id,
             doc.qid,
@@ -572,43 +894,46 @@ class TaskResultService:
         )
 
     @staticmethod
-    def _mark_ai_triage_requested(
+    def _mark_ai_review_requested(
         doc: TaskResultHistoryDocument,
         requested_by: str,
         selected_model: Any,
+        review_run_id: str = "",
     ) -> None:
-        """Persist that an AI triage request was accepted for this task result."""
-        from qdash.datamodel.note import AiTriageReviewModel
+        """Persist that an AI review run was accepted for this task result."""
+        from qdash.datamodel.note import AiReviewModel
 
-        doc.ai_triage = AiTriageReviewModel(
+        doc.ai_review = AiReviewModel(
             status="requested",
             requested_at=now(),
             requested_by=requested_by,
+            review_run_id=review_run_id,
+            trigger_type="manual_chip_bulk",
             model_provider=getattr(selected_model, "provider", ""),
             model_name=getattr(selected_model, "name", ""),
         )
         doc.save()
 
     @staticmethod
-    def _load_ai_triage_config() -> Any:
+    def _load_ai_review_config() -> Any:
         """Load Copilot config lazily so tests can patch it."""
-        from qdash.common.copilot.config import load_copilot_config
+        from qdash.copilot.config import load_copilot_config
 
         return load_copilot_config()
 
     @staticmethod
-    def _get_ai_triage_skip_reason(config: Any, task: str) -> str | None:
-        """Return why bulk AI triage should be skipped for this task."""
+    def _get_ai_review_skip_reason(config: Any, task: str) -> str | None:
+        """Return why bulk AI review should be skipped for this task."""
         if not config.enabled:
             return "copilot_disabled"
         if not config.analysis.enabled:
             return "analysis_disabled"
-        if task not in config.analysis.ai_triage_tasks:
+        if task not in config.analysis.ai_review_tasks:
             return "task_not_configured"
         return None
 
     @staticmethod
-    def _run_ai_triage_for_task_result(
+    def _run_ai_review_for_task_result(
         project_id: str | None,
         chip_id: str,
         qid: str,
@@ -616,53 +941,50 @@ class TaskResultService:
         task_id: str,
         model_override: Any | None = None,
     ) -> None:
-        """Run AI triage in the API process and upsert the dashboard note."""
+        """Run AI review in the API process and upsert the dashboard note."""
         try:
-            TaskResultService._set_ai_triage_status(project_id, task_id, "running")
-            config = TaskResultService._load_ai_triage_runtime_config(model_override)
+            TaskResultService._set_ai_review_status(project_id, task_id, "running")
+            config = TaskResultService._load_ai_review_runtime_config(model_override)
             selected_model = TaskResultService._select_analysis_model(config)
-            context_bundle = TaskResultService._build_ai_triage_context(
+            context_bundle = TaskResultService._build_ai_review_context(
                 task_name=task_name,
                 chip_id=chip_id,
                 qid=qid,
                 task_id=task_id,
                 config=config,
             )
-            markdown = TaskResultService._render_ai_triage_markdown(
+            markdown = TaskResultService._render_ai_review_markdown(
                 task_name=task_name,
                 config=config,
                 context_bundle=context_bundle,
             )
-            TaskResultService._persist_ai_triage_markdown(
+            TaskResultService._persist_ai_review_markdown(
                 project_id=project_id,
                 task_id=task_id,
                 markdown=markdown,
                 selected_model=selected_model,
             )
         except Exception as exc:
-            logger.warning("AI triage failed for task result %s: %s", task_id, exc)
-            TaskResultService._set_ai_triage_status(
+            logger.warning("AI review failed for task result %s: %s", task_id, exc)
+            TaskResultService._set_ai_review_status(
                 project_id,
                 task_id,
                 "failed",
                 error=str(exc),
             )
-        finally:
-            with _AI_TRIAGE_IN_FLIGHT_LOCK:
-                _AI_TRIAGE_IN_FLIGHT_TASK_IDS.discard(task_id)
 
     @staticmethod
-    def _load_ai_triage_runtime_config(model_override: Any | None) -> Any:
-        """Load Copilot config and apply AI-triage-specific defaults."""
-        from qdash.common.copilot.config import load_copilot_config
+    def _load_ai_review_runtime_config(model_override: Any | None) -> Any:
+        """Load Copilot config and apply AI-review-specific defaults."""
+        from qdash.copilot.config import load_copilot_config
 
         config = load_copilot_config()
         if model_override is not None:
             config = config.model_copy(update={"analysis_model": model_override})
-        return TaskResultService._ai_triage_config(config)
+        return TaskResultService._ai_review_config(config)
 
     @staticmethod
-    def _build_ai_triage_context(
+    def _build_ai_review_context(
         *,
         task_name: str,
         chip_id: str,
@@ -670,73 +992,49 @@ class TaskResultService:
         task_id: str,
         config: Any,
     ) -> Any:
-        """Build the compact context passed to AI triage analysis."""
-        from qdash.common.copilot.runtime import CopilotRuntime
-
-        context_bundle = CopilotRuntime().build_analysis_context(
+        """Build the compact context passed to AI review analysis."""
+        return _shared_build_ai_review_context(
             task_name=task_name,
             chip_id=chip_id,
             qid=qid,
             task_id=task_id,
-            image_base64=None,
             config=config,
         )
-        context_bundle.context = context_bundle.context.model_copy(
-            update={"recent_values": [], "history_results": []}
-        )
-        return context_bundle
 
     @staticmethod
-    def _render_ai_triage_markdown(
+    def _render_ai_review_markdown(
         *,
         task_name: str,
         config: Any,
         context_bundle: Any,
     ) -> str:
-        """Render markdown for a triage run, using deterministic guards when possible."""
-        import asyncio
-
-        from qdash.common.copilot.agent import blocks_to_markdown, run_analysis
-
-        if forced := TaskResultService._forced_ai_triage_markdown(
-            task_name,
-            context_bundle.context.output_parameters,
-        ):
-            return forced
-
-        result = asyncio.run(
-            run_analysis(
-                context=context_bundle.context,
-                user_message=f"{config.analysis.ai_triage_message}\n\n{AI_TRIAGE_FORMAT_REMINDER}",
-                config=config,
-                image_base64=context_bundle.image_base64,
-                expected_images=context_bundle.expected_images,
-                conversation_history=[],
-                tool_executors=None,
-            )
+        """Render markdown for a review run, using deterministic guards when possible."""
+        return _shared_render_ai_review_markdown(
+            task_name=task_name,
+            config=config,
+            context_bundle=context_bundle,
         )
-        return blocks_to_markdown(result).strip()
 
     @staticmethod
-    def _persist_ai_triage_markdown(
+    def _persist_ai_review_markdown(
         *,
         project_id: str | None,
         task_id: str,
         markdown: str,
         selected_model: Any,
     ) -> None:
-        """Persist a successful triage note or mark the run as failed."""
+        """Persist a successful review note or mark the run as failed."""
         if not markdown:
-            TaskResultService._set_ai_triage_status(
+            TaskResultService._set_ai_review_status(
                 project_id,
                 task_id,
                 "failed",
-                error="AI triage returned empty content",
+                error="AI review returned empty content",
             )
             return
 
         model_label = f"{selected_model.provider}/{selected_model.name}"
-        TaskResultService._upsert_ai_triage_note(
+        TaskResultService._upsert_ai_review_note(
             project_id,
             task_id,
             markdown,
@@ -744,138 +1042,93 @@ class TaskResultService:
         )
 
     @staticmethod
-    def _set_ai_triage_status(
+    def _set_ai_review_status(
         project_id: str | None,
         task_id: str,
         status: str,
         *,
         error: str = "",
     ) -> None:
-        """Persist AI triage status without changing the requested model metadata."""
+        """Persist AI review status without changing the requested model metadata."""
         from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
 
         doc = TaskResultHistoryDocument.find_one(
             {"project_id": project_id, "task_id": task_id}
         ).run()
         if doc is None:
-            logger.warning("AI triage status skipped: task result not found %s", task_id)
+            logger.warning("AI review status skipped: task result not found %s", task_id)
             return
 
-        doc.ai_triage.status = status
-        doc.ai_triage.error = error[:500]
+        doc.ai_review.status = status
+        doc.ai_review.error = error[:500]
         if status in {"completed", "failed"}:
-            doc.ai_triage.completed_at = now()
+            doc.ai_review.completed_at = now()
         doc.save()
 
     @staticmethod
-    def _upsert_ai_triage_note(
+    def _upsert_ai_review_note(
         project_id: str | None,
         task_id: str,
         markdown: str,
         model_label: str,
     ) -> None:
-        """Insert or replace the AI triage section in the task-result note."""
+        """Insert or replace the AI review section in the task-result note."""
         import re
 
         from qdash.common.utils.datetime import now
         from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
 
-        section_re = re.compile(r"^## AI triage\n\n.*?(?:\n\n---\n\n|$)", re.DOTALL)
+        section_re = re.compile(r"^## AI review\n\n.*?(?:\n\n---\n\n|$)", re.DOTALL)
         doc = TaskResultHistoryDocument.find_one(
             {"project_id": project_id, "task_id": task_id}
         ).run()
         if doc is None:
-            logger.warning("AI triage note skipped: task result not found %s", task_id)
+            logger.warning("AI review note skipped: task result not found %s", task_id)
             return
 
         existing = doc.user_note.content or ""
-        triage_section = (
-            f"{AI_TRIAGE_HEADER}\n\n"
+        review_section = (
+            f"{AI_REVIEW_HEADER}\n\n"
             f"*Reviewed by: {model_label} at {now().isoformat()}*\n\n"
-            f"{_truncate_ai_triage_markdown(markdown)}"
+            f"{_truncate_ai_review_markdown(markdown)}"
         )
         if section_re.search(existing):
             remainder = section_re.sub("", existing).strip()
             content = (
-                f"{triage_section}{AI_TRIAGE_SEPARATOR}{remainder}" if remainder else triage_section
+                f"{review_section}{AI_REVIEW_SEPARATOR}{remainder}" if remainder else review_section
             )
         elif existing.strip():
-            content = f"{triage_section}{AI_TRIAGE_SEPARATOR}{existing.rstrip()}"
+            content = f"{review_section}{AI_REVIEW_SEPARATOR}{existing.rstrip()}"
         else:
-            content = triage_section
+            content = review_section
 
-        doc.user_note.content = content[:MAX_AI_TRIAGE_NOTE_CHARS]
-        doc.user_note.updated_by = AI_TRIAGE_ACTOR
+        doc.user_note.content = content[:MAX_AI_REVIEW_NOTE_CHARS]
+        doc.user_note.updated_by = AI_REVIEW_ACTOR
         doc.user_note.updated_at = now()
-        doc.ai_triage.status = "completed"
-        doc.ai_triage.completed_at = now()
-        doc.ai_triage.error = ""
+        doc.ai_review.status = "completed"
+        doc.ai_review.completed_at = now()
+        doc.ai_review.error = ""
         doc.save()
 
     @staticmethod
     def _select_analysis_model(config: Any) -> Any:
         """Return the effective model used for task-result analysis."""
-        return config.analysis_model or (
-            config.analysis_models[0] if config.analysis_models else config.model
-        )
+        return _shared_select_analysis_model(config)
 
     @staticmethod
-    def _ai_triage_config(config: Any) -> Any:
-        """Apply AI-triage-only speed defaults without changing side-panel chat."""
-        analysis = config.analysis
-        if analysis.ai_triage_max_expected_images is not None:
-            analysis = analysis.model_copy(
-                update={"max_expected_images": analysis.ai_triage_max_expected_images}
-            )
-        model = TaskResultService._select_analysis_model(config)
-        if analysis.ai_triage_max_output_tokens is not None:
-            model = model.model_copy(
-                update={"max_output_tokens": analysis.ai_triage_max_output_tokens}
-            )
-        return config.model_copy(update={"analysis": analysis, "analysis_model": model})
+    def _ai_review_config(config: Any) -> Any:
+        """Apply AI-review-only speed defaults without changing side-panel chat."""
+        return _shared_ai_review_config(config)
 
     @staticmethod
-    def _param_value(params: dict[str, Any], *names: str) -> Any:
-        """Return a compact output-parameter value from possible parameter names."""
-        for name in names:
-            if name not in params:
-                continue
-            raw = params[name]
-            if isinstance(raw, dict):
-                return raw.get("value")
-            return raw
-        return None
-
-    @staticmethod
-    def _forced_ai_triage_markdown(task_name: str, output_params: dict[str, Any]) -> str | None:
+    def _forced_ai_review_markdown(task_name: str, output_params: dict[str, Any]) -> str | None:
         """Apply deterministic safety guards before asking a local VLM."""
-        if task_name != "CheckQubitSpectroscopy":
-            return None
-        f01 = TaskResultService._param_value(
-            output_params,
-            "coarse_qubit_frequency",
-            "coarse_qubit_frequency_ghz",
-            "f01_frequency",
-            "f01_frequency_ghz",
-        )
-        if f01 is not None:
-            return None
-        return "\n".join(
-            [
-                "**Review triage**",
-                "- Decision: `FAIL`",
-                "- Human label suggestion: `NO_SIGNAL`",
-                "- Accepted parameter(s): `none`",
-                "- Needs review: `none`",
-                "- Primary reason: No f01 output parameter was detected, so the "
-                "result is not safe for automatic update.",
-                "- Closest knowledge case: `none`",
-                "- Suggested labels: `no_signal`",
-                "- Recommended action: Rerun qubit spectroscopy with an adjusted "
-                "frequency range or drive power.",
-                "- Optional note: Deterministic safety guard applied before local VLM review.",
-            ]
-        )
+        return _shared_forced_ai_review_markdown(task_name, output_params)
+
+    @staticmethod
+    def _is_non_representative_mux_result(task_name: str, qid: str | None) -> bool:
+        """Return True for copied MUX resonator results that should not be reviewed."""
+        return _shared_is_non_representative_mux_result(task_name, qid)
 
     @staticmethod
     def create_figures_zip(
@@ -883,7 +1136,8 @@ class TaskResultService:
         filename: str,
         *,
         project_id: str | None = None,
-        ai_triage_task_ids: list[str] | None = None,
+        ai_review_task_ids: list[str] | None = None,
+        ai_review_bundle_task_ids: list[str] | None = None,
     ) -> tuple[io.BytesIO, str]:
         """Create a ZIP archive from the given file paths.
 
@@ -907,11 +1161,15 @@ class TaskResultService:
         """
         from starlette.exceptions import HTTPException
 
-        ai_triage_entries = TaskResultService._load_ai_triage_note_entries(
+        ai_review_entries = TaskResultService._load_ai_review_note_entries(
             project_id=project_id,
-            task_ids=ai_triage_task_ids or [],
+            task_ids=ai_review_task_ids or [],
         )
-        if not paths and not ai_triage_entries:
+        ai_review_bundle_entries = TaskResultService._load_ai_review_bundle_entries(
+            project_id=project_id,
+            task_ids=ai_review_bundle_task_ids or [],
+        )
+        if not paths and not ai_review_entries and not ai_review_bundle_entries:
             raise HTTPException(status_code=400, detail="No files provided")
 
         missing = [p for p in paths if not Path(p).exists()]
@@ -926,8 +1184,10 @@ class TaskResultService:
             for file_path in paths:
                 path = Path(file_path)
                 zf.write(path, path.name)
-            for entry_name, content in ai_triage_entries:
-                zf.writestr(entry_name, content)
+            for entry_name, note_content in ai_review_entries:
+                zf.writestr(entry_name, note_content)
+            for entry_name, bundle_content in ai_review_bundle_entries:
+                zf.writestr(entry_name, bundle_content)
         zip_buffer.seek(0)
 
         safe_filename = (
@@ -939,12 +1199,12 @@ class TaskResultService:
         return zip_buffer, safe_filename
 
     @staticmethod
-    def _load_ai_triage_note_entries(
+    def _load_ai_review_note_entries(
         *,
         project_id: str | None,
         task_ids: list[str],
     ) -> list[tuple[str, str]]:
-        """Return ZIP entries containing AI triage markdown sections for task results."""
+        """Return ZIP entries containing AI review markdown sections for task results."""
         if not task_ids:
             return []
 
@@ -961,12 +1221,12 @@ class TaskResultService:
             doc = docs_by_task_id.get(task_id)
             if doc is None:
                 continue
-            content = TaskResultService._extract_ai_triage_section(doc.user_note.content)
+            content = TaskResultService._extract_ai_review_section(doc.user_note.content)
             if not content:
                 continue
             qid = doc.qid or "unknown"
             base_name = TaskResultService._safe_zip_entry_name(
-                f"ai_triage/{doc.name}_{qid}_{doc.task_id}.md"
+                f"ai_review/{doc.name}_{qid}_{doc.task_id}.md"
             )
             entry_name = base_name
             suffix = 2
@@ -978,13 +1238,64 @@ class TaskResultService:
         return entries
 
     @staticmethod
-    def _extract_ai_triage_section(content: str) -> str:
-        """Extract only the AI triage section from a task-result note."""
+    def _load_ai_review_bundle_entries(
+        *,
+        project_id: str | None,
+        task_ids: list[str],
+    ) -> list[tuple[str, bytes]]:
+        """Return ZIP entries containing replay bundles for selected task results."""
+        if not task_ids:
+            return []
+
+        from qdash.copilot.bundle.exporters.ai_review import export_ai_review_replay_bundle
+        from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
+
+        docs = TaskResultHistoryDocument.find(
+            {"project_id": project_id, "task_id": {"$in": task_ids}}
+        ).run()
+        docs_by_task_id = {doc.task_id: doc for doc in docs}
+
+        entries: list[tuple[str, bytes]] = []
+        used_names: set[str] = set()
+        for task_id in task_ids:
+            doc = docs_by_task_id.get(task_id)
+            if doc is None:
+                continue
+
+            qid = doc.qid or "unknown"
+            base_name = TaskResultService._safe_zip_entry_name(
+                f"ai_review_bundle/{doc.name}_{qid}_{doc.task_id}.zip"
+            )
+            entry_name = base_name
+            suffix = 2
+            while entry_name in used_names:
+                entry_name = base_name.replace(".zip", f"_{suffix}.zip")
+                suffix += 1
+            used_names.add(entry_name)
+
+            with tempfile.TemporaryDirectory() as tmp_dir:
+                bundle_path = Path(tmp_dir) / "bundle.zip"
+                export_ai_review_replay_bundle(
+                    task_name=doc.name,
+                    chip_id=doc.chip_id,
+                    qid=doc.qid or "",
+                    task_id=doc.task_id,
+                    trigger="chip_page",
+                    output_path=bundle_path,
+                    project_id=project_id,
+                    execution_id=doc.execution_id,
+                )
+                entries.append((entry_name, bundle_path.read_bytes()))
+        return entries
+
+    @staticmethod
+    def _extract_ai_review_section(content: str) -> str:
+        """Extract only the AI review section from a task-result note."""
         import re
 
         if not content:
             return ""
-        match = re.search(r"^## AI triage\n\n.*?(?=\n\n---\n\n|$)", content, re.DOTALL)
+        match = re.search(r"^## AI review\n\n.*?(?=\n\n---\n\n|$)", content, re.DOTALL)
         return match.group(0).strip() + "\n" if match else ""
 
     @staticmethod

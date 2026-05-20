@@ -7,20 +7,20 @@
  */
 
 export type GetRecentChangesParams = {
-  /**
-   * Maximum number of changes to return
-   * @minimum 1
-   * @maximum 50
-   */
-  limit?: number;
-  /**
-   * Time window in hours
-   * @minimum 1
-   * @maximum 168
-   */
-  within_hours?: number;
-  /**
-   * Filter by parameter names (from metrics config)
-   */
-  parameter_names?: string[] | null;
+/**
+ * Maximum number of changes to return
+ * @minimum 1
+ * @maximum 50
+ */
+limit?: number;
+/**
+ * Time window in hours
+ * @minimum 1
+ * @maximum 168
+ */
+within_hours?: number;
+/**
+ * Filter by parameter names (from metrics config)
+ */
+parameter_names?: string[] | null;
 };

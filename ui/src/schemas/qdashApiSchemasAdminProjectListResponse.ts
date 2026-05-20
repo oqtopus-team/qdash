@@ -5,7 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { ProjectListItem } from "./projectListItem";
+import type { ProjectListItem } from './projectListItem';
 
 /**
  * Response containing list of all projects.

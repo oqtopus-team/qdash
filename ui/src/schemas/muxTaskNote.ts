@@ -5,6 +5,6 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { MuxTaskNoteAnyOf } from "./muxTaskNoteAnyOf";
+import type { MuxTaskNoteAnyOf } from './muxTaskNoteAnyOf';
 
 export type MuxTaskNote = MuxTaskNoteAnyOf | null;

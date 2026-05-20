@@ -7,18 +7,18 @@
  */
 
 export type GetParameterHistoryParams = {
-  /**
-   * Name of the parameter
-   */
-  parameter_name: string;
-  /**
-   * Qubit or coupling identifier
-   */
-  qid: string;
-  /**
-   * Maximum number of versions
-   * @minimum 1
-   * @maximum 100
-   */
-  limit?: number;
+/**
+ * Name of the parameter
+ */
+parameter_name: string;
+/**
+ * Qubit or coupling identifier
+ */
+qid: string;
+/**
+ * Maximum number of versions
+ * @minimum 1
+ * @maximum 100
+ */
+limit?: number;
 };

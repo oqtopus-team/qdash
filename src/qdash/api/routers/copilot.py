@@ -35,13 +35,13 @@ from qdash.api.schemas.copilot_chat_session import (
 from qdash.api.services.copilot_chat_session_service import (
     CopilotChatSessionService,
 )
-from qdash.common.copilot.config import CopilotConfig, ModelConfig, load_copilot_config
-from qdash.common.copilot.contracts import (
+from qdash.copilot.config import CopilotConfig, ModelConfig, load_copilot_config
+from qdash.copilot.contracts import (
     AnalysisResponse,
     AnalyzeRequest,
     ChatRequest,
 )
-from qdash.common.copilot.runtime import CopilotRuntime
+from qdash.copilot.runtime import CopilotRuntime
 from qdash.datamodel.task_knowledge import get_task_knowledge
 
 router = APIRouter()
@@ -160,7 +160,7 @@ async def analyze_task_result(
 
     # Run the analysis agent
     try:
-        from qdash.common.copilot.agent import run_analysis
+        from qdash.copilot.agent import run_analysis
 
         result = await run_analysis(
             context=ctx.context,
@@ -168,6 +168,7 @@ async def analyze_task_result(
             config=analysis_config,
             image_base64=ctx.image_base64,
             expected_images=ctx.expected_images,
+            experiment_images=ctx.experiment_images,
             conversation_history=request.conversation_history,
             tool_executors=tool_executors,
         )
@@ -176,6 +177,7 @@ async def analyze_task_result(
             ctx.figure_paths,
             ctx.expected_images,
             request.task_name,
+            ctx.experiment_images,
         )
         return result
     except ImportError:
@@ -241,7 +243,7 @@ async def analyze_task_result_stream(
         bridge = SSETaskBridge(tool_labels=TOOL_LABELS, status_labels=STATUS_LABELS)
 
         try:
-            from qdash.common.copilot.agent import run_analysis
+            from qdash.copilot.agent import run_analysis
 
             coro = partial(
                 run_analysis,
@@ -250,6 +252,7 @@ async def analyze_task_result_stream(
                 config=analysis_config,
                 image_base64=ctx.image_base64,
                 expected_images=ctx.expected_images,
+                experiment_images=ctx.experiment_images,
                 conversation_history=request.conversation_history,
                 tool_executors=tool_executors,
             )
@@ -280,6 +283,7 @@ async def analyze_task_result_stream(
             ctx.figure_paths,
             ctx.expected_images,
             request.task_name,
+            ctx.experiment_images,
         )
 
         # Complete
@@ -337,7 +341,7 @@ async def chat_stream(
         bridge = SSETaskBridge(tool_labels=TOOL_LABELS, status_labels=STATUS_LABELS)
 
         try:
-            from qdash.common.copilot.agent import run_chat
+            from qdash.copilot.agent import run_chat
 
             coro = partial(
                 run_chat,

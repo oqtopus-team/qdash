@@ -1,20 +1,22 @@
 "use client";
 
-import { Database, FileJson, FileText, Image, X } from "lucide-react";
+import { Bot, Database, FileJson, FileText, Image, X } from "lucide-react";
 import type { ReactNode } from "react";
 
 export interface DownloadOptions {
   figureImages: boolean;
   jsonFigures: boolean;
   rawData: boolean;
-  aiTriageNotes: boolean;
+  aiReviewNotes: boolean;
+  aiReviewReplayBundles: boolean;
 }
 
 export interface DownloadItemCounts {
   figureImages: number;
   jsonFigures: number;
   rawData: number;
-  aiTriageNotes: number;
+  aiReviewNotes: number;
+  aiReviewReplayBundles: number;
 }
 
 interface DownloadConfirmModalProps {
@@ -44,7 +46,8 @@ export function DownloadConfirmModal({
     (options.figureImages ? counts.figureImages : 0) +
     (options.jsonFigures ? counts.jsonFigures : 0) +
     (options.rawData ? counts.rawData : 0) +
-    (options.aiTriageNotes ? counts.aiTriageNotes : 0);
+    (options.aiReviewNotes ? counts.aiReviewNotes : 0) +
+    (options.aiReviewReplayBundles ? counts.aiReviewReplayBundles : 0);
 
   const toggle = (key: keyof DownloadOptions) => {
     onOptionsChange({ ...options, [key]: !options[key] });
@@ -94,10 +97,17 @@ export function DownloadConfirmModal({
           />
           <DownloadOptionRow
             icon={<FileText className="h-4 w-4" />}
-            label="AI triage notes"
-            count={counts.aiTriageNotes}
-            checked={options.aiTriageNotes}
-            onToggle={() => toggle("aiTriageNotes")}
+            label="AI review notes"
+            count={counts.aiReviewNotes}
+            checked={options.aiReviewNotes}
+            onToggle={() => toggle("aiReviewNotes")}
+          />
+          <DownloadOptionRow
+            icon={<Bot className="h-4 w-4" />}
+            label="AI review replay bundles"
+            count={counts.aiReviewReplayBundles}
+            checked={options.aiReviewReplayBundles}
+            onToggle={() => toggle("aiReviewReplayBundles")}
           />
         </div>
 

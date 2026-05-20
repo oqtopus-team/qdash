@@ -5,8 +5,8 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { DashboardInsight } from "./dashboardInsight";
-import type { DashboardInsightSuppressed } from "./dashboardInsightSuppressed";
+import type { DashboardInsight } from './dashboardInsight';
+import type { DashboardInsightSuppressed } from './dashboardInsightSuppressed';
 
 /**
  * Dashboard-level AI insight response.

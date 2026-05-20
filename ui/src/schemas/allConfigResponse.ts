@@ -5,9 +5,9 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { UISettings } from "./uISettings";
-import type { AllConfigResponseMetrics } from "./allConfigResponseMetrics";
-import type { AllConfigResponseCopilot } from "./allConfigResponseCopilot";
+import type { UISettings } from './uISettings';
+import type { AllConfigResponseMetrics } from './allConfigResponseMetrics';
+import type { AllConfigResponseCopilot } from './allConfigResponseCopilot';
 
 /**
  * Response containing all application configuration.

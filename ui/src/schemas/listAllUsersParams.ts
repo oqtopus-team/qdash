@@ -7,6 +7,6 @@
  */
 
 export type ListAllUsersParams = {
-  skip?: number;
-  limit?: number;
+skip?: number;
+limit?: number;
 };

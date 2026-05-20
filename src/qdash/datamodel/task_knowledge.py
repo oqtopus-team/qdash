@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -186,6 +187,14 @@ class TaskKnowledge(BaseModel):
         default_factory=list,
         description="Image references from the markdown file",
     )
+    review_markdown: str = Field(
+        default="",
+        description="Optional AI-review-specific markdown guidance",
+    )
+    review_images: list[TaskKnowledgeImage] = Field(
+        default_factory=list,
+        description="Image references from the review markdown file",
+    )
     related_context: list[RelatedContextItem] = Field(
         default_factory=list,
         description="Additional data sources to load during analysis",
@@ -335,6 +344,59 @@ class TaskKnowledge(BaseModel):
 
         return "\n".join(lines)
 
+    @staticmethod
+    def _normalize_markdown_block(markdown: str) -> str:
+        """Strip top-level heading and image lines from a markdown block."""
+        normalized_lines: list[str] = []
+        for line in markdown.splitlines():
+            stripped = line.strip()
+            if stripped.startswith("# "):
+                continue
+            if stripped.startswith("!["):
+                continue
+            normalized_lines.append(line)
+        return "\n".join(normalized_lines).strip()
+
+    def to_review_prompt(self) -> str:
+        """Build a compact prompt focused on AI review decisions."""
+        lines = [
+            f"## Experiment: {self.name}",
+            self.summary,
+            "",
+            "### What it measures",
+            self.what_it_measures,
+            "",
+            "### Expected result",
+            self.expected_result.description,
+        ]
+
+        if self.expected_result.good_visual:
+            lines += ["", f"- Good result looks like: {self.expected_result.good_visual}"]
+
+        if self.check_questions:
+            lines += ["", "### Review questions"]
+            lines += [f"- {question}" for question in self.check_questions]
+
+        if self.failure_modes:
+            lines += ["", "### Common failure patterns"]
+            for failure in self.failure_modes:
+                lines.append(f"- [{failure.severity}] {failure.description}")
+                if failure.visual:
+                    lines.append(f"  - Visual: {failure.visual}")
+                if failure.next_action:
+                    lines.append(f"  - Next: {failure.next_action}")
+
+        if self.analysis_guide:
+            lines += ["", "### Analysis guide"]
+            for index, step in enumerate(self.analysis_guide, 1):
+                lines.append(f"{index}. {step}")
+
+        review_markdown = self._normalize_markdown_block(self.review_markdown)
+        if review_markdown:
+            lines += ["", "### AI review guidance", review_markdown]
+
+        return "\n".join(lines)
+
 
 # ---------------------------------------------------------------------------
 # Registry building (from generated JSON)
@@ -359,6 +421,21 @@ def _resolve_json_path() -> Path | None:
     legacy_path = config_dir / "task-knowledge.json"
     if legacy_path.is_file():
         return legacy_path
+    return None
+
+
+def _resolve_repo_dir() -> Path | None:
+    """Locate the cloned task-knowledge repository directory, if available."""
+    from qdash.common.config.loader import ConfigLoader
+
+    repo_dir = ConfigLoader.get_config_dir() / "task-knowledge"
+    if repo_dir.is_dir():
+        return repo_dir
+
+    json_path = _resolve_json_path()
+    if json_path is not None and json_path.parent.name == "task-knowledge":
+        return json_path.parent
+
     return None
 
 
@@ -388,6 +465,25 @@ def get_task_knowledge(task_name: str) -> TaskKnowledge | None:
 def list_all_task_knowledge() -> list[TaskKnowledge]:
     """Return all task knowledge entries."""
     return list(TASK_KNOWLEDGE_REGISTRY.values())
+
+
+def get_task_knowledge_repo_metadata() -> tuple[str | None, str | None]:
+    """Return the configured knowledge repo URL and current commit if available."""
+    repo_url = os.getenv("KNOWLEDGE_REPO_URL") or None
+    repo_dir = _resolve_repo_dir()
+    if repo_dir is None:
+        return repo_url, None
+
+    try:
+        from git import Repo
+        from git.exc import GitError, InvalidGitRepositoryError, NoSuchPathError
+
+        repo = Repo(repo_dir)
+        if repo_url is None and repo.remotes:
+            repo_url = next((remote.url for remote in repo.remotes if remote.url), None)
+        return repo_url, repo.head.commit.hexsha
+    except (GitError, InvalidGitRepositoryError, NoSuchPathError, ValueError):
+        return repo_url, None
 
 
 # Category slug → display name mapping

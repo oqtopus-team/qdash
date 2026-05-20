@@ -6,6 +6,4 @@
  * OpenAPI spec version: 0.0.1
  */
 
-export type BodyReExecuteTaskResultParameterOverridesAnyOf = {
-  [key: string]: { [key: string]: unknown };
-};
+export type BodyReExecuteTaskResultParameterOverridesAnyOf = {[key: string]: { [key: string]: unknown }};

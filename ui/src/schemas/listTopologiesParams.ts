@@ -7,5 +7,5 @@
  */
 
 export type ListTopologiesParams = {
-  size?: number | null;
+size?: number | null;
 };

@@ -11,7 +11,7 @@ import { dateToDateInput, formatDateTime } from "@/lib/utils/datetime";
 import { CouplingGrid } from "./CouplingGrid";
 import { QubitGrid } from "./QubitGrid";
 import { ChipManageModal } from "./ChipManageModal";
-import { getAiTriageBadgeState, type AiTriageBadgeState } from "./aiTriageBadge";
+import { getAiReviewBadgeState, type AiReviewBadgeState } from "./aiReviewBadge";
 import { CreateChipModal } from "./modals/CreateChipModal";
 
 import type { Task, MuxDetailResponseDetail, TaskInfo } from "@/schemas";
@@ -119,11 +119,11 @@ export function ChipPageContent() {
     query: { enabled: !!selectedChip, staleTime: 30_000 },
   });
 
-  const aiTriageBadgesByTaskId = useMemo(() => {
-    const badges = new Map<string, AiTriageBadgeState>();
+  const aiReviewBadgesByTaskId = useMemo(() => {
+    const badges = new Map<string, AiReviewBadgeState>();
     for (const entry of notesSummaryData?.data?.task_notes ?? []) {
       const content = entry.note?.content ?? "";
-      const badge = getAiTriageBadgeState(content);
+      const badge = getAiReviewBadgeState(content);
       if (badge) {
         badges.set(entry.task_id, badge);
       }
@@ -492,7 +492,7 @@ export function ChipPageContent() {
               selectedDate={selectedDate}
               gridSize={gridSize}
               onDateChange={setSelectedDate}
-              aiTriageBadgesByTaskId={aiTriageBadgesByTaskId}
+              aiReviewBadgesByTaskId={aiReviewBadgesByTaskId}
             />
           ) : viewMode === "2q" ? (
             <CouplingGrid
@@ -504,7 +504,7 @@ export function ChipPageContent() {
               selectedDate={selectedDate}
               gridSize={gridSize}
               onDateChange={setSelectedDate}
-              aiTriageBadgesByTaskId={aiTriageBadgesByTaskId}
+              aiReviewBadgesByTaskId={aiReviewBadgesByTaskId}
             />
           ) : (
             <div className="space-y-4">
@@ -589,8 +589,8 @@ export function ChipPageContent() {
                                   }
 
                                   const figurePath = getFigurePath(task);
-                                  const aiTriageBadge = task.task_id
-                                    ? aiTriageBadgesByTaskId.get(task.task_id)
+                                  const aiReviewBadge = task.task_id
+                                    ? aiReviewBadgesByTaskId.get(task.task_id)
                                     : null;
 
                                   return (
@@ -611,13 +611,13 @@ export function ChipPageContent() {
                                             <div className="flex justify-between items-center mb-1">
                                               <span>QID: {qid}</span>
                                               <div className="flex items-center gap-1">
-                                                {aiTriageBadge && (
+                                                {aiReviewBadge && (
                                                   <span
-                                                    className={`badge ${aiTriageBadge.badgeClass} badge-xs gap-1`}
-                                                    title={aiTriageBadge.title}
+                                                    className={`badge ${aiReviewBadge.badgeClass} badge-xs gap-1`}
+                                                    title={aiReviewBadge.title}
                                                   >
                                                     <Bot className="h-3 w-3" />
-                                                    {aiTriageBadge.label}
+                                                    {aiReviewBadge.label}
                                                   </span>
                                                 )}
                                                 <div

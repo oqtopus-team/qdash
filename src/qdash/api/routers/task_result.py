@@ -16,8 +16,11 @@ from qdash.api.lib.project import (
 )
 from qdash.api.schemas.flow import ExecuteFlowResponse
 from qdash.api.schemas.task_result import (
-    BulkAiTriageRequest,
-    BulkAiTriageResponse,
+    AiReviewListResponse,
+    AiReviewRunDetailResponse,
+    AiReviewRunListResponse,
+    BulkAiReviewRequest,
+    BulkAiReviewResponse,
     DownloadFiguresAsZipRequest,
     LatestTaskResultResponse,
     TaskHistoryResponse,
@@ -403,23 +406,98 @@ def get_timeseries_task_results(
 
 
 # =============================================================================
-# AI Triage
+# AI Review
 # =============================================================================
 
 
-@router.post(
-    "/task-results/ai-triage/bulk",
-    response_model=BulkAiTriageResponse,
-    summary="Request bulk AI triage review for latest task results",
-    operation_id="requestBulkAiTriageReview",
+@router.get(
+    "/task-results/ai-review/runs",
+    response_model=AiReviewRunListResponse,
+    summary="List bulk AI review runs",
+    operation_id="listTaskResultAiReviewRuns",
 )
-def request_bulk_ai_triage_review(
-    body: BulkAiTriageRequest,
+def list_task_result_ai_review_runs(
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    service: Annotated[TaskResultService, Depends(get_task_result_service)],
+    chip_id: Annotated[str | None, Query(description="Optional chip ID filter")] = None,
+    task_name: Annotated[str | None, Query(description="Optional task name filter")] = None,
+    skip: Annotated[int, Query(ge=0, description="Number of rows to skip")] = 0,
+    limit: Annotated[int, Query(ge=1, le=200, description="Maximum rows to return")] = 50,
+) -> AiReviewRunListResponse:
+    """Return bulk AI review runs for run-oriented browsing."""
+    return service.list_ai_review_runs(
+        project_id=ctx.project_id,
+        chip_id=chip_id,
+        task_name=task_name,
+        skip=skip,
+        limit=limit,
+    )
+
+
+@router.get(
+    "/task-results/ai-review/runs/{review_run_id}",
+    response_model=AiReviewRunDetailResponse,
+    summary="Get one bulk AI review run",
+    operation_id="getTaskResultAiReviewRun",
+)
+def get_task_result_ai_review_run(
+    review_run_id: str,
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    service: Annotated[TaskResultService, Depends(get_task_result_service)],
+) -> AiReviewRunDetailResponse:
+    """Return one bulk AI review run and its task-result review rows."""
+    return service.get_ai_review_run(
+        project_id=ctx.project_id,
+        review_run_id=review_run_id,
+    )
+
+
+@router.get(
+    "/task-results/ai-review",
+    response_model=AiReviewListResponse,
+    summary="List task-result AI reviews",
+    operation_id="listTaskResultAiReviews",
+)
+def list_task_result_ai_reviews(
+    ctx: Annotated[ProjectContext, Depends(get_project_context)],
+    service: Annotated[TaskResultService, Depends(get_task_result_service)],
+    chip_id: Annotated[str | None, Query(description="Optional chip ID filter")] = None,
+    task_name: Annotated[str | None, Query(description="Optional task name filter")] = None,
+    status: Annotated[str | None, Query(description="Optional AI review status filter")] = None,
+    decision: Annotated[str | None, Query(description="Optional AI review decision filter")] = None,
+    latest_only: Annotated[
+        bool,
+        Query(description="If true, keep only the latest review per chip, task, and target"),
+    ] = False,
+    skip: Annotated[int, Query(ge=0, description="Number of rows to skip")] = 0,
+    limit: Annotated[int, Query(ge=1, le=200, description="Maximum rows to return")] = 50,
+) -> AiReviewListResponse:
+    """Return task-result AI reviews for review queue style browsing."""
+    return service.list_ai_reviews(
+        project_id=ctx.project_id,
+        chip_id=chip_id,
+        task_name=task_name,
+        status=status,
+        decision=decision,
+        latest_only=latest_only,
+        skip=skip,
+        limit=limit,
+    )
+
+
+@router.post(
+    "/task-results/ai-review/bulk",
+    response_model=BulkAiReviewResponse,
+    summary="Request bulk AI review for latest task results",
+    operation_id="requestBulkAiReview",
+)
+def request_bulk_ai_review(
+    body: BulkAiReviewRequest,
     ctx: Annotated[ProjectContext, Depends(get_project_context_editor)],
     service: Annotated[TaskResultService, Depends(get_task_result_service)],
-) -> BulkAiTriageResponse:
-    """Enqueue AI triage review for the current latest task result per entity."""
-    return service.request_bulk_ai_triage(
+) -> BulkAiReviewResponse:
+    """Enqueue AI review for the current latest task result per entity."""
+    return service.request_bulk_ai_review(
         project_id=ctx.project_id,
         chip_id=body.chip_id,
         task=body.task,
@@ -622,7 +700,8 @@ def download_figures_as_zip(
         body.paths,
         body.filename,
         project_id=ctx.project_id,
-        ai_triage_task_ids=body.ai_triage_task_ids,
+        ai_review_task_ids=body.ai_review_task_ids,
+        ai_review_bundle_task_ids=body.ai_review_bundle_task_ids,
     )
 
     return StreamingResponse(

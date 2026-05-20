@@ -7,10 +7,10 @@
  */
 
 export type GetRecentExecutionsParams = {
-  /**
-   * Maximum number of execution IDs to return
-   * @minimum 1
-   * @maximum 50
-   */
-  limit?: number;
+/**
+ * Maximum number of execution IDs to return
+ * @minimum 1
+ * @maximum 50
+ */
+limit?: number;
 };

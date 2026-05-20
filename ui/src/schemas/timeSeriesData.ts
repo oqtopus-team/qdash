@@ -5,7 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { TimeSeriesDataData } from "./timeSeriesDataData";
+import type { TimeSeriesDataData } from './timeSeriesDataData';
 
 /**
  * Response model for time series data.

@@ -5,7 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { ExecutionIdResponseValidFrom } from "./executionIdResponseValidFrom";
+import type { ExecutionIdResponseValidFrom } from './executionIdResponseValidFrom';
 
 /**
  * Response model for a single execution ID with timestamp.

@@ -5,7 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { ExecuteFlowRequestParameters } from "./executeFlowRequestParameters";
+import type { ExecuteFlowRequestParameters } from './executeFlowRequestParameters';
 
 /**
  * Request to execute a Flow.

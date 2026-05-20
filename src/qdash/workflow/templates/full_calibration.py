@@ -3,12 +3,13 @@
 This template demonstrates the step-based calibration API.
 
 Execution flow:
-    1. OneQubitCheck: Basic 1Q characterization (Rabi, HPI, T1, T2, Ramsey)
-    2. FilterByStatus: Filter to only successful qubits
-    3. OneQubitFineTune: Advanced 1Q calibration (DRAG, RB, X90 IRB)
-    4. FilterByMetric: Filter by X90 fidelity threshold
-    5. GenerateCRSchedule: Generate 2Q execution schedule
-    6. TwoQubitCalibration: 2Q coupling calibration
+    1. ConfigureAll: Push the current full-chip configuration to the selected MUXes
+    2. OneQubitCheck: Basic 1Q characterization (Rabi, HPI, T1, T2, Ramsey)
+    3. FilterByStatus: Filter to only successful qubits
+    4. OneQubitFineTune: Advanced 1Q calibration (DRAG, RB, X90 IRB)
+    5. FilterByMetric: Filter by X90 fidelity threshold
+    6. GenerateCRSchedule: Generate 2Q execution schedule
+    7. TwoQubitCalibration: 2Q coupling calibration
 
 Example:
     full_calibration(
@@ -26,6 +27,7 @@ from prefect import flow
 from qdash.workflow.service import CalibService
 from qdash.workflow.service.calib_service import on_flow_cancellation
 from qdash.workflow.service.steps import (
+    ConfigureAll,
     FilterByMetric,
     FilterByStatus,
     GenerateCRSchedule,
@@ -91,6 +93,8 @@ def full_calibration(
     # =========================================================================
 
     steps = [
+        # Stage 0: Push current configuration to all selected MUXes
+        ConfigureAll(),
         # Stage 1: Basic 1Q characterization
         OneQubitCheck(mode="synchronized"),
         FilterByStatus(),  # Only proceed with successful qubits

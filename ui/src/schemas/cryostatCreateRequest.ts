@@ -5,7 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { CryostatCreateRequestCommissionedAt } from "./cryostatCreateRequestCommissionedAt";
+import type { CryostatCreateRequestCommissionedAt } from './cryostatCreateRequestCommissionedAt';
 
 /**
  * Body for creating a cryostat.

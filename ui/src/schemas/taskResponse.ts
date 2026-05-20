@@ -5,9 +5,9 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { TaskResponseBackend } from "./taskResponseBackend";
-import type { TaskResponseInputParameters } from "./taskResponseInputParameters";
-import type { TaskResponseOutputParameters } from "./taskResponseOutputParameters";
+import type { TaskResponseBackend } from './taskResponseBackend';
+import type { TaskResponseInputParameters } from './taskResponseInputParameters';
+import type { TaskResponseOutputParameters } from './taskResponseOutputParameters';
 
 /**
  * Response model for a task.

@@ -5,8 +5,8 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { CalibrationNoteResponseNote } from "./calibrationNoteResponseNote";
-import type { CalibrationNoteResponseTimestamp } from "./calibrationNoteResponseTimestamp";
+import type { CalibrationNoteResponseNote } from './calibrationNoteResponseNote';
+import type { CalibrationNoteResponseTimestamp } from './calibrationNoteResponseTimestamp';
 
 /**
  * CalibrationNote is a subclass of BaseModel.

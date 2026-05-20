@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import logging
+import math
 from typing import TYPE_CHECKING, Any, ClassVar
 
 from qdash.analysis.spectroscopy import (
@@ -16,8 +17,11 @@ from qdash.analysis.spectroscopy import (
     estimate_minimum_usable_power,
     estimate_optimal_powers,
     estimate_resonator_frequency_from_figure,
+    guess_sorted_slots_for_partial_mux,
+    qid_for_sorted_slot,
     remove_false_spike_from_figure,
 )
+from qdash.common.visualization.figure_metadata import set_figure_role
 from qdash.datamodel.task import ParameterModel, RunParameterModel
 from qdash.workflow.calibtasks.base import (
     PostProcessResult,
@@ -31,6 +35,9 @@ if TYPE_CHECKING:
     from qdash.workflow.engine.backend.qubex import QubexBackend
 
 logger = logging.getLogger(__name__)
+
+_guess_sorted_slots_for_partial_mux = guess_sorted_slots_for_partial_mux
+_qid_for_sorted_slot = qid_for_sorted_slot
 
 
 class CheckResonatorSpectroscopy(QubexTask):
@@ -245,10 +252,40 @@ class CheckResonatorSpectroscopy(QubexTask):
                 optimal_powers=optimal_powers,
             )
 
-            if len(frequencies) == NUM_RESONATORS:
-                # Get frequency for current qid based on its position in the MUX
-                id_in_mux = int(qid) % 4
-                resonance_index = PEAK_POSITIONS[id_in_mux]
+            id_in_mux = int(qid) % 4
+            sorted_slots, assignment_mode = guess_sorted_slots_for_partial_mux(
+                list(trace.x),
+                frequencies,
+            )
+            if marked_fig is not None:
+                for sorted_slot, frequency in zip(sorted_slots, frequencies, strict=False):
+                    if sorted_slot is None:
+                        continue
+                    marked_fig.add_annotation(
+                        x=frequency,
+                        y=1.02,
+                        yref="paper",
+                        text=f"Q{qid_for_sorted_slot(int(qid) // NUM_RESONATORS, sorted_slot):02d} / s{sorted_slot}",
+                        showarrow=False,
+                        font={"color": "red", "size": 11},
+                        align="center",
+                    )
+                if assignment_mode != "full":
+                    marked_fig.add_annotation(
+                        xref="paper",
+                        yref="paper",
+                        x=0.01,
+                        y=1.08,
+                        text=assignment_mode,
+                        showarrow=False,
+                        font={"color": "red", "size": 11},
+                        align="left",
+                    )
+            assigned_slot = PEAK_POSITIONS[id_in_mux]
+            resonance_index = (
+                sorted_slots.index(assigned_slot) if assigned_slot in sorted_slots else None
+            )
+            if resonance_index is not None and resonance_index < len(optimal_powers):
                 estimated_frequency = frequencies[resonance_index]
                 optimal_power = optimal_powers[resonance_index]
                 readout_amplitude = float(10 ** (optimal_power / 20))
@@ -256,6 +293,8 @@ class CheckResonatorSpectroscopy(QubexTask):
                 print(
                     f"Estimated resonator frequency for qid={qid}: "
                     f"{estimated_frequency:.6f} GHz (id_in_mux={id_in_mux}, "
+                    f"assigned_slot={assigned_slot}, "
+                    f"assignment_mode={assignment_mode}, "
                     f"optimal_power={optimal_power:.2f} dB, "
                     f"readout_amplitude={readout_amplitude:.6f} a.u., "
                     f"all={[f'{f:.6f}' for f in frequencies]})"
@@ -263,7 +302,8 @@ class CheckResonatorSpectroscopy(QubexTask):
             else:
                 print(
                     f"[WARNING] Failed to detect resonator frequency for qid={qid}: "
-                    f"expected {NUM_RESONATORS} peaks, found {len(frequencies)}"
+                    f"assigned slot {assigned_slot} unavailable "
+                    f"(mode={assignment_mode}, found {len(frequencies)}/{NUM_RESONATORS} peaks)"
                 )
         except Exception:
             logger.warning(
@@ -272,10 +312,14 @@ class CheckResonatorSpectroscopy(QubexTask):
                 exc_info=True,
             )
 
-        # Return both raw and marked figures
-        figures: list[go.Figure] = [raw_fig]
+        # Return the marked figure first (annotated resonances are the most
+        # useful for review), then the raw figure.
+        set_figure_role(raw_fig, "raw")
+        figures: list[go.Figure] = []
         if marked_fig is not None:
+            set_figure_role(marked_fig, "marked")
             figures.append(marked_fig)
+        figures.append(raw_fig)
 
         # Create a deep copy of output_parameters to avoid sharing state
         # between multiple qids (output_parameters is a ClassVar)
@@ -287,6 +331,26 @@ class CheckResonatorSpectroscopy(QubexTask):
             output_params_copy["readout_amplitude"].value = readout_amplitude
         for value in output_params_copy.values():
             value.execution_id = execution_id
+
+        error_msg: str | None = None
+        if not math.isfinite(estimated_frequency) or estimated_frequency <= 0.0:
+            error_msg = f"Invalid resonator frequency for qid={qid}: {estimated_frequency:.6f} GHz"
+        elif optimal_power is None or not math.isfinite(optimal_power):
+            error_msg = f"Invalid optimal_power for qid={qid}: {optimal_power}"
+        elif (
+            readout_amplitude is None
+            or not math.isfinite(readout_amplitude)
+            or readout_amplitude <= 0.0
+        ):
+            error_msg = f"Invalid readout_amplitude for qid={qid}: {readout_amplitude}"
+
+        if error_msg is not None:
+            print(f"[ERROR] {error_msg}")
+            return PostProcessResult(
+                output_parameters={},
+                figures=figures,
+                validation_error=error_msg,
+            )
 
         return PostProcessResult(
             output_parameters=output_params_copy,

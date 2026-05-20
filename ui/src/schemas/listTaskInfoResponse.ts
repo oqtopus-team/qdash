@@ -5,7 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { TaskInfo } from "./taskInfo";
+import type { TaskInfo } from './taskInfo';
 
 /**
  * Response model for listing task info.

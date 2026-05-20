@@ -22,11 +22,16 @@ RUN apt-get update \
 ENV TZ=Asia/Tokyo
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
-COPY ./src/qdash/workflow/requirements.txt ./
-
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
-ENV UV_HTTP_TIMEOUT=300
-RUN uv pip install --system --no-cache-dir -r requirements.txt
+ENV UV_COMPILE_BYTECODE=1 \
+    UV_HTTP_TIMEOUT=300 \
+    UV_LINK_MODE=copy \
+    UV_PYTHON_DOWNLOADS=0
+
+COPY pyproject.toml uv.lock ./
+COPY src/qdash/api/pyproject.toml src/qdash/api/pyproject.toml
+COPY src/qdash/workflow/pyproject.toml src/qdash/workflow/pyproject.toml
+RUN uv sync --locked --package qdash-workflow --no-dev
 
 FROM python:3.11-slim-bookworm
 
@@ -47,6 +52,7 @@ RUN apt-get update \
 ENV TZ=Asia/Tokyo
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
-COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
-COPY --from=builder /usr/local/bin /usr/local/bin
-ENV PYTHONPATH=/usr/local/lib/python3.11/site-packages
+COPY --from=builder /app/.venv /app/.venv
+
+ENV VIRTUAL_ENV=/app/.venv
+ENV PATH="/app/.venv/bin:$PATH"

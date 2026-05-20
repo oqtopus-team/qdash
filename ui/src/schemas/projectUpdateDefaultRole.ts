@@ -5,7 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { ProjectRole } from "./projectRole";
+import type { ProjectRole } from './projectRole';
 
 /**
  * Default role for new members

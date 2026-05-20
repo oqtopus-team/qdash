@@ -7,5 +7,5 @@
  */
 
 export interface BodyBulkImportUsers {
-  file: Blob;
+  file: string;
 }

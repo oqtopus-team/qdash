@@ -14,11 +14,6 @@
     },
     "version": "0.0.1"
   },
-  "servers": [
-    {
-      "url": "/api"
-    }
-  ],
   "paths": {
     "/auth/login": {
       "post": {
@@ -5425,14 +5420,362 @@
         }
       }
     },
-    "/task-results/ai-triage/bulk": {
+    "/task-results/ai-review/runs": {
+      "get": {
+        "tags": [
+          "task-result"
+        ],
+        "summary": "List bulk AI review runs",
+        "description": "Return bulk AI review runs for run-oriented browsing.",
+        "operationId": "listTaskResultAiReviewRuns",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chip_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional chip ID filter",
+              "title": "Chip Id"
+            },
+            "description": "Optional chip ID filter"
+          },
+          {
+            "name": "task_name",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional task name filter",
+              "title": "Task Name"
+            },
+            "description": "Optional task name filter"
+          },
+          {
+            "name": "skip",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Number of rows to skip",
+              "default": 0,
+              "title": "Skip"
+            },
+            "description": "Number of rows to skip"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "description": "Maximum rows to return",
+              "default": 50,
+              "title": "Limit"
+            },
+            "description": "Maximum rows to return"
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiReviewRunListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/task-results/ai-review/runs/{review_run_id}": {
+      "get": {
+        "tags": [
+          "task-result"
+        ],
+        "summary": "Get one bulk AI review run",
+        "description": "Return one bulk AI review run and its task-result review rows.",
+        "operationId": "getTaskResultAiReviewRun",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "review_run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Review Run Id"
+            }
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiReviewRunDetailResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/task-results/ai-review": {
+      "get": {
+        "tags": [
+          "task-result"
+        ],
+        "summary": "List task-result AI reviews",
+        "description": "Return task-result AI reviews for review queue style browsing.",
+        "operationId": "listTaskResultAiReviews",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chip_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional chip ID filter",
+              "title": "Chip Id"
+            },
+            "description": "Optional chip ID filter"
+          },
+          {
+            "name": "task_name",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional task name filter",
+              "title": "Task Name"
+            },
+            "description": "Optional task name filter"
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional AI review status filter",
+              "title": "Status"
+            },
+            "description": "Optional AI review status filter"
+          },
+          {
+            "name": "decision",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional AI review decision filter",
+              "title": "Decision"
+            },
+            "description": "Optional AI review decision filter"
+          },
+          {
+            "name": "latest_only",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "If true, keep only the latest review per chip, task, and target",
+              "default": false,
+              "title": "Latest Only"
+            },
+            "description": "If true, keep only the latest review per chip, task, and target"
+          },
+          {
+            "name": "skip",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Number of rows to skip",
+              "default": 0,
+              "title": "Skip"
+            },
+            "description": "Number of rows to skip"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "description": "Maximum rows to return",
+              "default": 50,
+              "title": "Limit"
+            },
+            "description": "Maximum rows to return"
+          },
+          {
+            "name": "X-Project-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiReviewListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/task-results/ai-review/bulk": {
       "post": {
         "tags": [
           "task-result"
         ],
-        "summary": "Request bulk AI triage review for latest task results",
-        "description": "Enqueue AI triage review for the current latest task result per entity.",
-        "operationId": "requestBulkAiTriageReview",
+        "summary": "Request bulk AI review for latest task results",
+        "description": "Enqueue AI review for the current latest task result per entity.",
+        "operationId": "requestBulkAiReview",
         "security": [
           {
             "HTTPBearer": []
@@ -5461,7 +5804,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/BulkAiTriageRequest"
+                "$ref": "#/components/schemas/BulkAiReviewRequest"
               }
             }
           }
@@ -5472,7 +5815,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/BulkAiTriageResponse"
+                  "$ref": "#/components/schemas/BulkAiReviewResponse"
                 }
               }
             }
@@ -12165,7 +12508,7 @@
           "dashboard"
         ],
         "summary": "Generate dashboard-level AI insight candidates",
-        "description": "Return compact operational insights for the dashboard.\n\nThe first implementation is deterministic: it extracts high-signal patterns\nfrom persisted AI triage notes and task-result metadata. A later LLM\nsynthesis layer can consume the same structured candidate contract.",
+        "description": "Return compact operational insights for the dashboard.\n\nThe first implementation is deterministic: it extracts high-signal patterns\nfrom persisted AI review notes and task-result metadata. A later LLM\nsynthesis layer can consume the same structured candidate contract.",
         "operationId": "getDashboardAiInsights",
         "security": [
           {
@@ -13433,12 +13776,237 @@
         "title": "AddMemberRequest",
         "description": "Request to add a member to a project."
       },
-      "AiTriageReviewModel": {
+      "AiReviewListItem": {
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "title": "Task Id"
+          },
+          "review_run_id": {
+            "type": "string",
+            "title": "Review Run Id"
+          },
+          "task_name": {
+            "type": "string",
+            "title": "Task Name"
+          },
+          "chip_id": {
+            "type": "string",
+            "title": "Chip Id"
+          },
+          "qid": {
+            "type": "string",
+            "title": "Qid"
+          },
+          "target": {
+            "type": "string",
+            "title": "Target"
+          },
+          "execution_id": {
+            "type": "string",
+            "title": "Execution Id"
+          },
+          "task_status": {
+            "type": "string",
+            "title": "Task Status"
+          },
+          "review_status": {
+            "type": "string",
+            "title": "Review Status"
+          },
+          "decision": {
+            "type": "string",
+            "title": "Decision"
+          },
+          "human_label": {
+            "type": "string",
+            "title": "Human Label"
+          },
+          "accepted_parameters": {
+            "type": "string",
+            "title": "Accepted Parameters"
+          },
+          "needs_review": {
+            "type": "string",
+            "title": "Needs Review"
+          },
+          "primary_reason": {
+            "type": "string",
+            "title": "Primary Reason"
+          },
+          "suggested_labels": {
+            "type": "string",
+            "title": "Suggested Labels"
+          },
+          "recommended_action": {
+            "type": "string",
+            "title": "Recommended Action"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "requested_by": {
+            "type": "string",
+            "title": "Requested By"
+          },
+          "requested_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested At"
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          },
+          "note_updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note Updated At"
+          },
+          "start_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start At"
+          },
+          "figure_path": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Figure Path"
+          },
+          "json_figure_path": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Json Figure Path"
+          },
+          "review_markdown": {
+            "type": "string",
+            "title": "Review Markdown"
+          },
+          "format_ok": {
+            "type": "boolean",
+            "title": "Format Ok"
+          }
+        },
+        "type": "object",
+        "required": [
+          "task_id",
+          "review_run_id",
+          "task_name",
+          "chip_id",
+          "qid",
+          "target",
+          "execution_id",
+          "task_status",
+          "review_status",
+          "decision",
+          "human_label",
+          "accepted_parameters",
+          "needs_review",
+          "primary_reason",
+          "suggested_labels",
+          "recommended_action",
+          "model",
+          "requested_by",
+          "requested_at",
+          "completed_at",
+          "note_updated_at",
+          "start_at",
+          "figure_path",
+          "json_figure_path",
+          "review_markdown",
+          "format_ok"
+        ],
+        "title": "AiReviewListItem",
+        "description": "One AI review record extracted from a task result."
+      },
+      "AiReviewListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AiReviewListItem"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "skip": {
+            "type": "integer",
+            "title": "Skip"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          },
+          "decision_counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Decision Counts"
+          },
+          "status_counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Status Counts"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "skip",
+          "limit",
+          "decision_counts",
+          "status_counts"
+        ],
+        "title": "AiReviewListResponse",
+        "description": "Paginated AI review list response."
+      },
+      "AiReviewModel": {
         "properties": {
           "status": {
             "type": "string",
             "title": "Status",
-            "description": "AI triage status: requested, running, completed, or failed",
+            "description": "AI review status: requested, running, completed, or failed",
             "default": ""
           },
           "requested_at": {
@@ -13452,24 +14020,36 @@
               }
             ],
             "title": "Requested At",
-            "description": "Timestamp when AI triage was requested"
+            "description": "Timestamp when AI review was requested"
           },
           "requested_by": {
             "type": "string",
             "title": "Requested By",
-            "description": "Username that requested AI triage",
+            "description": "Username that requested AI review",
             "default": ""
+          },
+          "review_run_id": {
+            "type": "string",
+            "title": "Review Run Id",
+            "description": "AI review run identifier shared by task results in the same run",
+            "default": ""
+          },
+          "trigger_type": {
+            "type": "string",
+            "title": "Trigger Type",
+            "description": "How this AI review run was triggered, such as manual_chip_bulk or execution",
+            "default": "manual_chip_bulk"
           },
           "model_provider": {
             "type": "string",
             "title": "Model Provider",
-            "description": "Provider for the selected AI triage model",
+            "description": "Provider for the selected AI review model",
             "default": ""
           },
           "model_name": {
             "type": "string",
             "title": "Model Name",
-            "description": "Name of the selected AI triage model",
+            "description": "Name of the selected AI review model",
             "default": ""
           },
           "completed_at": {
@@ -13483,18 +14063,190 @@
               }
             ],
             "title": "Completed At",
-            "description": "Timestamp when AI triage completed or failed"
+            "description": "Timestamp when AI review completed or failed"
           },
           "error": {
             "type": "string",
             "title": "Error",
-            "description": "Failure detail if AI triage failed",
+            "description": "Failure detail if AI review failed",
             "default": ""
           }
         },
         "type": "object",
-        "title": "AiTriageReviewModel",
-        "description": "Persistent state for an AI triage review request on a task result."
+        "title": "AiReviewModel",
+        "description": "Persistent state for an AI review run on a task result."
+      },
+      "AiReviewRunDetailResponse": {
+        "properties": {
+          "run": {
+            "$ref": "#/components/schemas/AiReviewRunSummary"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AiReviewListItem"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "run",
+          "items"
+        ],
+        "title": "AiReviewRunDetailResponse",
+        "description": "Detail response for one AI review run."
+      },
+      "AiReviewRunListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AiReviewRunSummary"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "skip": {
+            "type": "integer",
+            "title": "Skip"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "skip",
+          "limit"
+        ],
+        "title": "AiReviewRunListResponse",
+        "description": "Paginated AI review run list response."
+      },
+      "AiReviewRunSummary": {
+        "properties": {
+          "review_run_id": {
+            "type": "string",
+            "title": "Review Run Id"
+          },
+          "trigger_type": {
+            "type": "string",
+            "title": "Trigger Type"
+          },
+          "chip_id": {
+            "type": "string",
+            "title": "Chip Id"
+          },
+          "task_name": {
+            "type": "string",
+            "title": "Task Name"
+          },
+          "entity_type": {
+            "type": "string",
+            "title": "Entity Type"
+          },
+          "execution_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Execution Ids"
+          },
+          "requested_by": {
+            "type": "string",
+            "title": "Requested By"
+          },
+          "requested_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested At"
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "completed_count": {
+            "type": "integer",
+            "title": "Completed Count"
+          },
+          "failed_count": {
+            "type": "integer",
+            "title": "Failed Count"
+          },
+          "running_count": {
+            "type": "integer",
+            "title": "Running Count"
+          },
+          "requested_count": {
+            "type": "integer",
+            "title": "Requested Count"
+          },
+          "decision_counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Decision Counts"
+          },
+          "status_counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Status Counts"
+          }
+        },
+        "type": "object",
+        "required": [
+          "review_run_id",
+          "trigger_type",
+          "chip_id",
+          "task_name",
+          "entity_type",
+          "execution_ids",
+          "requested_by",
+          "requested_at",
+          "completed_at",
+          "model",
+          "total",
+          "completed_count",
+          "failed_count",
+          "running_count",
+          "requested_count",
+          "decision_counts",
+          "status_counts"
+        ],
+        "title": "AiReviewRunSummary",
+        "description": "Summary for one bulk AI review run."
       },
       "AllConfigResponse": {
         "properties": {
@@ -13708,7 +14460,7 @@
         "properties": {
           "file": {
             "type": "string",
-            "format": "binary",
+            "contentMediaType": "application/octet-stream",
             "title": "File"
           }
         },
@@ -13770,7 +14522,7 @@
         "type": "object",
         "title": "Body_reExecuteTaskResult"
       },
-      "BulkAiTriageRequest": {
+      "BulkAiReviewRequest": {
         "properties": {
           "chip_id": {
             "type": "string",
@@ -13826,11 +14578,16 @@
           "chip_id",
           "task"
         ],
-        "title": "BulkAiTriageRequest",
-        "description": "Request body for bulk AI triage review."
+        "title": "BulkAiReviewRequest",
+        "description": "Request body for bulk AI review."
       },
-      "BulkAiTriageResponse": {
+      "BulkAiReviewResponse": {
         "properties": {
+          "review_run_id": {
+            "type": "string",
+            "title": "Review Run Id",
+            "default": ""
+          },
           "chip_id": {
             "type": "string",
             "title": "Chip Id"
@@ -13885,8 +14642,8 @@
           "requested_count",
           "task_ids"
         ],
-        "title": "BulkAiTriageResponse",
-        "description": "Response after enqueueing bulk AI triage review."
+        "title": "BulkAiReviewResponse",
+        "description": "Response after enqueueing bulk AI review."
       },
       "BulkUserImportResponse": {
         "properties": {
@@ -15193,7 +15950,7 @@
           "category": {
             "type": "string",
             "enum": [
-              "triage_cluster",
+              "review_cluster",
               "model_failure",
               "data_consistency",
               "metric_outlier",
@@ -15514,12 +16271,20 @@
             "title": "Filename",
             "default": "figures.zip"
           },
-          "ai_triage_task_ids": {
+          "ai_review_task_ids": {
             "items": {
               "type": "string"
             },
             "type": "array",
-            "title": "Ai Triage Task Ids",
+            "title": "Ai Review Task Ids",
+            "default": []
+          },
+          "ai_review_bundle_task_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Ai Review Bundle Task Ids",
             "default": []
           }
         },
@@ -17609,6 +18374,14 @@
             "type": "string",
             "title": "Prompt Guidance",
             "default": ""
+          },
+          "images": {
+            "items": {
+              "$ref": "#/components/schemas/KnowledgeImageResponse"
+            },
+            "type": "array",
+            "title": "Images",
+            "default": []
           }
         },
         "type": "object",
@@ -19038,6 +19811,11 @@
             "type": "boolean",
             "title": "Disable Thinking Instruction",
             "default": false
+          },
+          "api_style": {
+            "type": "string",
+            "title": "Api Style",
+            "default": "responses"
           }
         },
         "type": "object",
@@ -21501,6 +22279,14 @@
             "title": "Client Url",
             "default": ""
           },
+          "api_cors_origins": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Api Cors Origins",
+            "default": []
+          },
           "prefect_api_url": {
             "type": "string",
             "title": "Prefect Api Url"
@@ -22131,6 +22917,19 @@
             "title": "Images",
             "default": []
           },
+          "review_markdown": {
+            "type": "string",
+            "title": "Review Markdown",
+            "default": ""
+          },
+          "review_images": {
+            "items": {
+              "$ref": "#/components/schemas/KnowledgeImageResponse"
+            },
+            "type": "array",
+            "title": "Review Images",
+            "default": []
+          },
           "cases": {
             "items": {
               "$ref": "#/components/schemas/KnowledgeCaseResponse"
@@ -22142,6 +22941,11 @@
           "prompt_text": {
             "type": "string",
             "title": "Prompt Text"
+          },
+          "review_prompt_text": {
+            "type": "string",
+            "title": "Review Prompt Text",
+            "default": ""
           }
         },
         "type": "object",
@@ -22192,6 +22996,11 @@
           "has_analysis_guide": {
             "type": "boolean",
             "title": "Has Analysis Guide",
+            "default": false
+          },
+          "has_review_guide": {
+            "type": "boolean",
+            "title": "Has Review Guide",
             "default": false
           }
         },
@@ -22489,10 +23298,10 @@
             "title": "Default View",
             "default": true
           },
-          "ai_triage": {
+          "ai_review": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/AiTriageReviewModel"
+                "$ref": "#/components/schemas/AiReviewModel"
               },
               {
                 "type": "null"
@@ -23585,6 +24394,13 @@
           "type": {
             "type": "string",
             "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
           }
         },
         "type": "object",
@@ -23690,5 +24506,10 @@
         "scheme": "bearer"
       }
     }
-  }
+  },
+  "servers": [
+    {
+      "url": "/api"
+    }
+  ]
 }

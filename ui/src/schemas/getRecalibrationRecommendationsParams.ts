@@ -7,10 +7,10 @@
  */
 
 export type GetRecalibrationRecommendationsParams = {
-  /**
-   * Maximum impact traversal depth
-   * @minimum 1
-   * @maximum 20
-   */
-  max_depth?: number;
+/**
+ * Maximum impact traversal depth
+ * @minimum 1
+ * @maximum 20
+ */
+max_depth?: number;
 };

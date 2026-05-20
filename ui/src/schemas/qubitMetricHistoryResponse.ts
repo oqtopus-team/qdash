@@ -5,7 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { MetricHistoryItem } from "./metricHistoryItem";
+import type { MetricHistoryItem } from './metricHistoryItem';
 
 /**
  * Historical metric data for a single qubit.

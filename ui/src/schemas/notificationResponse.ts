@@ -5,9 +5,9 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { NotificationResponseRecipientUserId } from "./notificationResponseRecipientUserId";
-import type { NotificationResponseActorUserId } from "./notificationResponseActorUserId";
-import type { NotificationResponseReadAt } from "./notificationResponseReadAt";
+import type { NotificationResponseRecipientUserId } from './notificationResponseRecipientUserId';
+import type { NotificationResponseActorUserId } from './notificationResponseActorUserId';
+import type { NotificationResponseReadAt } from './notificationResponseReadAt';
 
 /**
  * Single notification row.

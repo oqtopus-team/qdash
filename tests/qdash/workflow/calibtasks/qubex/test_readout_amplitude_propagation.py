@@ -1,18 +1,21 @@
 from qdash.datamodel.task import ParameterModel
 from qdash.workflow.calibtasks.qubex.cw.check_control_amplitude import CheckControlAmplitude
 from qdash.workflow.calibtasks.qubex.cw.check_qubit_spectroscopy import CheckQubitSpectroscopy
+from qdash.workflow.calibtasks.qubex.one_qubit_coarse.check_chevron import CheckChevron
 from qdash.workflow.calibtasks.qubex.one_qubit_coarse.check_coarse_chevron import (
     CheckCoarseChevron,
 )
 from qdash.workflow.calibtasks.qubex.one_qubit_coarse.check_fine_chevron import (
     CheckFineChevron,
 )
+from qdash.workflow.service.tasks import BRINGUP_TASKS
 
 
 def test_bringup_tasks_prefer_loaded_readout_amplitude() -> None:
     for task_cls in (
         CheckQubitSpectroscopy,
         CheckControlAmplitude,
+        CheckChevron,
         CheckCoarseChevron,
         CheckFineChevron,
     ):
@@ -32,7 +35,19 @@ def test_bringup_tasks_declare_readout_amplitude_as_calibration_input() -> None:
     for task_cls in (
         CheckQubitSpectroscopy,
         CheckControlAmplitude,
+        CheckChevron,
         CheckCoarseChevron,
         CheckFineChevron,
     ):
         assert "readout_amplitude" in task_cls.input_parameters
+
+
+def test_bringup_uses_adaptive_check_chevron_before_fine_refinement() -> None:
+    assert "CheckChevron" in BRINGUP_TASKS
+    assert "CheckCoarseChevron" not in BRINGUP_TASKS
+    assert "CheckControlAmplitude" in BRINGUP_TASKS
+    assert BRINGUP_TASKS.index("CheckControlAmplitude") > BRINGUP_TASKS.index(
+        "CheckQubitSpectroscopy"
+    )
+    assert BRINGUP_TASKS.index("CheckChevron") > BRINGUP_TASKS.index("CheckControlAmplitude")
+    assert BRINGUP_TASKS.index("CheckChevron") > BRINGUP_TASKS.index("CheckQubitSpectroscopy")

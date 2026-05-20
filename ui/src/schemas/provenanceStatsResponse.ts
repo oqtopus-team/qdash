@@ -5,8 +5,8 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { ProvenanceStatsResponseRelationCounts } from "./provenanceStatsResponseRelationCounts";
-import type { ParameterVersionResponse } from "./parameterVersionResponse";
+import type { ProvenanceStatsResponseRelationCounts } from './provenanceStatsResponseRelationCounts';
+import type { ParameterVersionResponse } from './parameterVersionResponse';
 
 /**
  * Response model for provenance statistics.

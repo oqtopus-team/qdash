@@ -5,23 +5,23 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { IssueKnowledgeUpdateTitle } from "./issueKnowledgeUpdateTitle";
-import type { IssueKnowledgeUpdateSeverity } from "./issueKnowledgeUpdateSeverity";
-import type { IssueKnowledgeUpdateHumanLabel } from "./issueKnowledgeUpdateHumanLabel";
-import type { IssueKnowledgeUpdateFailureModeLabels } from "./issueKnowledgeUpdateFailureModeLabels";
-import type { IssueKnowledgeUpdateCaseType } from "./issueKnowledgeUpdateCaseType";
-import type { IssueKnowledgeUpdateModelErrorType } from "./issueKnowledgeUpdateModelErrorType";
-import type { IssueKnowledgeUpdateResolutionLabel } from "./issueKnowledgeUpdateResolutionLabel";
-import type { IssueKnowledgeUpdateSymptom } from "./issueKnowledgeUpdateSymptom";
-import type { IssueKnowledgeUpdateModelPrediction } from "./issueKnowledgeUpdateModelPrediction";
-import type { IssueKnowledgeUpdateHumanReviewDecision } from "./issueKnowledgeUpdateHumanReviewDecision";
-import type { IssueKnowledgeUpdateRootCause } from "./issueKnowledgeUpdateRootCause";
-import type { IssueKnowledgeUpdateResolution } from "./issueKnowledgeUpdateResolution";
-import type { IssueKnowledgeUpdateBoundaryCriteria } from "./issueKnowledgeUpdateBoundaryCriteria";
-import type { IssueKnowledgeUpdateLessonLearned } from "./issueKnowledgeUpdateLessonLearned";
-import type { IssueKnowledgeUpdateApplicability } from "./issueKnowledgeUpdateApplicability";
-import type { IssueKnowledgeUpdateCounterexample } from "./issueKnowledgeUpdateCounterexample";
-import type { IssueKnowledgeUpdatePromptGuidance } from "./issueKnowledgeUpdatePromptGuidance";
+import type { IssueKnowledgeUpdateTitle } from './issueKnowledgeUpdateTitle';
+import type { IssueKnowledgeUpdateSeverity } from './issueKnowledgeUpdateSeverity';
+import type { IssueKnowledgeUpdateHumanLabel } from './issueKnowledgeUpdateHumanLabel';
+import type { IssueKnowledgeUpdateFailureModeLabels } from './issueKnowledgeUpdateFailureModeLabels';
+import type { IssueKnowledgeUpdateCaseType } from './issueKnowledgeUpdateCaseType';
+import type { IssueKnowledgeUpdateModelErrorType } from './issueKnowledgeUpdateModelErrorType';
+import type { IssueKnowledgeUpdateResolutionLabel } from './issueKnowledgeUpdateResolutionLabel';
+import type { IssueKnowledgeUpdateSymptom } from './issueKnowledgeUpdateSymptom';
+import type { IssueKnowledgeUpdateModelPrediction } from './issueKnowledgeUpdateModelPrediction';
+import type { IssueKnowledgeUpdateHumanReviewDecision } from './issueKnowledgeUpdateHumanReviewDecision';
+import type { IssueKnowledgeUpdateRootCause } from './issueKnowledgeUpdateRootCause';
+import type { IssueKnowledgeUpdateResolution } from './issueKnowledgeUpdateResolution';
+import type { IssueKnowledgeUpdateBoundaryCriteria } from './issueKnowledgeUpdateBoundaryCriteria';
+import type { IssueKnowledgeUpdateLessonLearned } from './issueKnowledgeUpdateLessonLearned';
+import type { IssueKnowledgeUpdateApplicability } from './issueKnowledgeUpdateApplicability';
+import type { IssueKnowledgeUpdateCounterexample } from './issueKnowledgeUpdateCounterexample';
+import type { IssueKnowledgeUpdatePromptGuidance } from './issueKnowledgeUpdatePromptGuidance';
 
 /**
  * Request schema for editing a knowledge draft.

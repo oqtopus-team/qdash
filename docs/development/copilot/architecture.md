@@ -20,8 +20,8 @@ Both modes use the same underlying LLM agent with tool-calling capabilities, san
 | `src/qdash/api/routers/copilot.py` | FastAPI router with `/config`, `/analyze`, `/analyze/stream`, `/chat/stream` endpoints; SSE event generation via `SSETaskBridge` |
 | `src/qdash/api/services/copilot_data_service.py` | Data loading service: `build_analysis_context()`, `build_images_sent_metadata()`, qubit/task/history queries, tool executor wiring |
 | `src/qdash/api/lib/copilot_agent.py` | LLM agent: system prompt construction, OpenAI Responses API calls, tool call loop, response parsing |
-| `src/qdash/common/copilot/` | Shared Copilot runtime used outside the API process, including workflow-side automatic triage |
-| `src/qdash/workflow/engine/task/ai_triage.py` | Asynchronous task-result triage hook that writes AI review notes to task history |
+| `src/qdash/copilot/` | Shared Copilot runtime used outside the API process, including workflow-side automatic review |
+| `src/qdash/workflow/engine/task/ai_review.py` | Asynchronous task-result review hook that writes AI review notes to task history |
 | `src/qdash/api/lib/copilot_sandbox.py` | Sandboxed Python execution: AST validation, restricted builtins, resource limits |
 | `src/qdash/api/lib/copilot_analysis.py` | Pydantic models: `TaskAnalysisContext`, `AnalysisResponse`, `AnalysisContextResult`; request schemas |
 | `src/qdash/api/lib/sse.py` | SSE utilities: `sse_event()` formatter, `SSETaskBridge` for queue-poll-heartbeat-drain pattern |
@@ -42,7 +42,7 @@ enabled: true
 
 # Language settings
 thinking_language: en      # Internal reasoning language
-response_language: ja      # User-facing response language
+response_language: en      # User-facing response language
 
 # Model settings
 model:
@@ -95,11 +95,11 @@ analysis:
   enabled: true
   multimodal: true
   max_expected_images: 2
-  ai_triage_max_expected_images: null
-  ai_triage_max_output_tokens: null
-  ai_triage_tasks: [CheckQubitSpectroscopy, CheckResonatorSpectroscopy]
-  ai_triage_message: >-
-    Review this calibration result and attach a concise operational triage note.
+  ai_review_max_expected_images: null
+  ai_review_max_output_tokens: null
+  ai_review_tasks: [CheckQubitSpectroscopy, CheckResonatorSpectroscopy]
+  ai_review_message: >-
+    Review this calibration result and attach a concise operational review note.
   max_conversation_turns: 10
 ```
 
@@ -137,37 +137,39 @@ A standalone page (`/copilot`) for general questions about the calibration syste
 - **Use case**: "Compare T1 across all qubits", "Show me the frequency trend for Q16"
 - **Sessions**: Persisted to localStorage with multi-session support
 
-### Automatic AI Triage
+### Automatic AI Review
 
-Automatic AI triage attaches an LLM-generated operational review note to selected terminal task results after they are persisted. It is designed for tasks where visual or contextual review is valuable, but sending every calibration result to an LLM would be too slow or expensive.
+Automatic AI review attaches an LLM-generated operational review note to selected terminal task results after they are persisted. It is designed for tasks where visual or contextual review is valuable, but sending every calibration result to an LLM would be too slow or expensive.
 
-- **Entry point**: `enqueue_ai_triage_note()` in `src/qdash/workflow/engine/task/ai_triage.py`
+For prompt and task-knowledge tuning, use the [AI review evaluation loop](./ai-review-evals.md) to capture a real task result once and replay it in either frozen-context or rebuilt-context mode.
+
+- **Entry point**: `enqueue_ai_review_note()` in `src/qdash/workflow/engine/task/ai_review.py`
 - **Trigger**: task-result history save paths in the workflow recorder and repository
-- **Configuration**: `analysis.ai_triage_tasks` and `analysis.ai_triage_message` in `config/copilot.yaml`
+- **Configuration**: `analysis.ai_review_tasks` and `analysis.ai_review_message` in `config/copilot.yaml`
 - **Execution model**: asynchronous background thread pool, de-duplicated by `task_id`
 - **Model selection**: `analysis_model`, then the first `analysis_models` entry, then the general `model`
-- **AI triage quality path**: automatic triage inherits
+- **AI review quality path**: automatic review inherits
   `analysis.max_expected_images` and the selected model's `max_output_tokens`
-  by default. Set `analysis.ai_triage_max_expected_images` or
-  `analysis.ai_triage_max_output_tokens` only for an explicit low-latency mode.
-- **Storage**: task-result `user_note.content`, under a `## AI triage` Markdown section
-- **UI**: task detail modals render the note as Markdown; chip page badges are shown only when the triage decision requires review
+  by default. Set `analysis.ai_review_max_expected_images` or
+  `analysis.ai_review_max_output_tokens` only for an explicit low-latency mode.
+- **Storage**: task-result `user_note.content`, under a `## AI review` Markdown section
+- **UI**: task detail modals render the note as Markdown; chip page badges are shown only when the review decision requires review
 
-The hook is best effort. It must not block calibration progress and must not change the task outcome when the LLM request fails. Both successful and failed task results are eligible when the task name is listed in `ai_triage_tasks`; running, pending, scheduled, and skipped results are ignored. Automatic triage uses the current task result, current qubit parameters, task knowledge, figures, and reference images, but drops historical result runs from the prompt so the dashboard note is not framed as a past-history comparison.
+The hook is best effort. It must not block calibration progress and must not change the task outcome when the LLM request fails. Both successful and failed task results are eligible when the task name is listed in `ai_review_tasks`; running, pending, scheduled, and skipped results are ignored. Automatic review uses the current task result, current qubit parameters, task knowledge, figures, and reference images, but drops historical result runs from the prompt so the dashboard note is not framed as a past-history comparison.
 
-For `CheckResonatorSpectroscopy`, QDash records one AI triage note per MUX group. The representative result is the qid where `int(qid) % 4 == 0`; copied sibling resonator results are skipped to avoid duplicate LLM calls and duplicate notes.
+For `CheckResonatorSpectroscopy`, QDash records one AI review note per MUX group. The representative result is the qid where `int(qid) % 4 == 0`; copied sibling resonator results are skipped to avoid duplicate LLM calls and duplicate notes.
 
 For `CheckQubitSpectroscopy`, QDash applies a deterministic safety guard before
 calling the VLM: if no f01-like output parameter is present, the note is marked
 as `FAIL` / `NO_SIGNAL`. This avoids accepting an empty parameter update when a
 compact local model returns an overly optimistic free-form response.
 
-The expected triage note begins with a compact review block:
+The expected review note begins with a compact review block:
 
 ```markdown
-## AI triage
+## AI review
 
-**Review triage**
+**AI review**
 - Decision: `PASS` | `PASS_WITH_NOTE` | `REVIEW` | `FAIL`
 - Accepted parameter(s): ...
 - Needs review: ...

@@ -5,7 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { IssueResponse } from "./issueResponse";
+import type { IssueResponse } from './issueResponse';
 
 /**
  * Paginated list of issues.

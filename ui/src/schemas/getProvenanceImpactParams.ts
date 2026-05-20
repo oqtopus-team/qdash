@@ -7,10 +7,10 @@
  */
 
 export type GetProvenanceImpactParams = {
-  /**
-   * Maximum traversal depth
-   * @minimum 1
-   * @maximum 20
-   */
-  max_depth?: number;
+/**
+ * Maximum traversal depth
+ * @minimum 1
+ * @maximum 20
+ */
+max_depth?: number;
 };

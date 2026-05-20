@@ -164,8 +164,8 @@ class CustomOneQubit(CalibrationStep):
 class OneQubitCheck(CalibrationStep):
     """Basic 1-qubit characterization step.
 
-    Executes CHECK_1Q_TASKS: CheckRabi, CreateHPIPulse, CheckHPIPulse,
-    CheckT1Average, CheckT2EchoAverage, CheckRamsey.
+    Executes CHECK_1Q_TASKS including Rabi/half-pi pulse checks,
+    optimal readout amplitude search, and T1/T2/Ramsey characterization.
 
     Provides: one_qubit_check
     """

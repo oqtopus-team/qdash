@@ -5,7 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { ChipResponse } from "./chipResponse";
+import type { ChipResponse } from './chipResponse';
 
 /**
  * Response model for listing chips.

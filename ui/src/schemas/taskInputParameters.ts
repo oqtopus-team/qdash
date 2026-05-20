@@ -5,6 +5,6 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { TaskInputParametersAnyOf } from "./taskInputParametersAnyOf";
+import type { TaskInputParametersAnyOf } from './taskInputParametersAnyOf';
 
 export type TaskInputParameters = TaskInputParametersAnyOf | null;

@@ -5,7 +5,10 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import { useMutation, useQuery } from "@tanstack/react-query";
+import {
+  useMutation,
+  useQuery
+} from '@tanstack/react-query';
 import type {
   DataTag,
   DefinedInitialDataOptions,
@@ -18,8 +21,8 @@ import type {
   UseMutationOptions,
   UseMutationResult,
   UseQueryOptions,
-  UseQueryResult,
-} from "@tanstack/react-query";
+  UseQueryResult
+} from '@tanstack/react-query';
 
 import type {
   ForumCategoryCreate,
@@ -34,1335 +37,900 @@ import type {
   ListForumCategoriesResponse,
   ListForumPostsParams,
   ListForumPostsResponse,
-  SuccessResponse,
-} from "../../schemas";
+  SuccessResponse
+} from '../../schemas';
 
-import { customInstance } from "../../lib/custom-instance";
+import { customInstance } from '../../lib/custom-instance';
+
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
+
+
 
 /**
  * List forum categories for the active project.
  * @summary List forum categories
  */
 export const listForumCategories = (
-  params?: ListForumCategoriesParams,
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
+    params?: ListForumCategoriesParams,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  return customInstance<ListForumCategoriesResponse>(
-    { url: `/forum/categories`, method: "GET", params, signal },
-    options,
-  );
-};
+      
+      
+      return customInstance<ListForumCategoriesResponse>(
+      {url: `/forum/categories`, method: 'GET',
+        params, signal
+    },
+      options);
+    }
+  
 
-export const getListForumCategoriesQueryKey = (
-  params?: ListForumCategoriesParams,
+
+
+export const getListForumCategoriesQueryKey = (params?: ListForumCategoriesParams,) => {
+    return [
+    `/forum/categories`, ...(params ? [params]: [])
+    ] as const;
+    }
+
+    
+export const getListForumCategoriesQueryOptions = <TData = Awaited<ReturnType<typeof listForumCategories>>, TError = HTTPValidationError>(params?: ListForumCategoriesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listForumCategories>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
-  return [`/forum/categories`, ...(params ? [params] : [])] as const;
-};
 
-export const getListForumCategoriesQueryOptions = <
-  TData = Awaited<ReturnType<typeof listForumCategories>>,
-  TError = HTTPValidationError,
->(
-  params?: ListForumCategoriesParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof listForumCategories>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
+const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =
-    queryOptions?.queryKey ?? getListForumCategoriesQueryKey(params);
+  const queryKey =  queryOptions?.queryKey ?? getListForumCategoriesQueryKey(params);
 
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof listForumCategories>>
-  > = ({ signal }) => listForumCategories(params, requestOptions, signal);
+  
 
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof listForumCategories>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData> };
-};
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listForumCategories>>> = ({ signal }) => listForumCategories(params, requestOptions, signal);
 
-export type ListForumCategoriesQueryResult = NonNullable<
-  Awaited<ReturnType<typeof listForumCategories>>
->;
-export type ListForumCategoriesQueryError = HTTPValidationError;
+      
 
-export function useListForumCategories<
-  TData = Awaited<ReturnType<typeof listForumCategories>>,
-  TError = HTTPValidationError,
->(
-  params: undefined | ListForumCategoriesParams,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof listForumCategories>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
+      
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listForumCategories>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+}
+
+export type ListForumCategoriesQueryResult = NonNullable<Awaited<ReturnType<typeof listForumCategories>>>
+export type ListForumCategoriesQueryError = HTTPValidationError
+
+
+export function useListForumCategories<TData = Awaited<ReturnType<typeof listForumCategories>>, TError = HTTPValidationError>(
+ params: undefined |  ListForumCategoriesParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listForumCategories>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof listForumCategories>>,
           TError,
           Awaited<ReturnType<typeof listForumCategories>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData>;
-};
-export function useListForumCategories<
-  TData = Awaited<ReturnType<typeof listForumCategories>>,
-  TError = HTTPValidationError,
->(
-  params?: ListForumCategoriesParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof listForumCategories>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useListForumCategories<TData = Awaited<ReturnType<typeof listForumCategories>>, TError = HTTPValidationError>(
+ params?: ListForumCategoriesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listForumCategories>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof listForumCategories>>,
           TError,
           Awaited<ReturnType<typeof listForumCategories>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
-export function useListForumCategories<
-  TData = Awaited<ReturnType<typeof listForumCategories>>,
-  TError = HTTPValidationError,
->(
-  params?: ListForumCategoriesParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof listForumCategories>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useListForumCategories<TData = Awaited<ReturnType<typeof listForumCategories>>, TError = HTTPValidationError>(
+ params?: ListForumCategoriesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listForumCategories>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
 /**
  * @summary List forum categories
  */
 
-export function useListForumCategories<
-  TData = Awaited<ReturnType<typeof listForumCategories>>,
-  TError = HTTPValidationError,
->(
-  params?: ListForumCategoriesParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof listForumCategories>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
-  const queryOptions = getListForumCategoriesQueryOptions(params, options);
+export function useListForumCategories<TData = Awaited<ReturnType<typeof listForumCategories>>, TError = HTTPValidationError>(
+ params?: ListForumCategoriesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listForumCategories>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
 
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData> };
+  const queryOptions = getListForumCategoriesQueryOptions(params,options)
 
-  query.queryKey = queryOptions.queryKey;
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey ;
 
   return query;
 }
+
+
 
 /**
  * Create a forum category. Only project owners can manage categories.
  * @summary Create a forum category
  */
 export const createForumCategory = (
-  forumCategoryCreate: ForumCategoryCreate,
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
+    forumCategoryCreate: ForumCategoryCreate,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  return customInstance<ForumCategoryResponse>(
-    {
-      url: `/forum/categories`,
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      data: forumCategoryCreate,
-      signal,
+      
+      
+      return customInstance<ForumCategoryResponse>(
+      {url: `/forum/categories`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: forumCategoryCreate, signal
     },
-    options,
-  );
-};
+      options);
+    }
+  
 
-export const getCreateForumCategoryMutationOptions = <
-  TError = HTTPValidationError,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof createForumCategory>>,
-    TError,
-    { data: ForumCategoryCreate },
-    TContext
-  >;
-  request?: SecondParameter<typeof customInstance>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof createForumCategory>>,
-  TError,
-  { data: ForumCategoryCreate },
-  TContext
-> => {
-  const mutationKey = ["createForumCategory"];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      "mutationKey" in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
 
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof createForumCategory>>,
-    { data: ForumCategoryCreate }
-  > = (props) => {
-    const { data } = props ?? {};
+export const getCreateForumCategoryMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createForumCategory>>, TError,{data: ForumCategoryCreate}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof createForumCategory>>, TError,{data: ForumCategoryCreate}, TContext> => {
 
-    return createForumCategory(data, requestOptions);
-  };
+const mutationKey = ['createForumCategory'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
 
-  return { mutationFn, ...mutationOptions };
-};
+      
 
-export type CreateForumCategoryMutationResult = NonNullable<
-  Awaited<ReturnType<typeof createForumCategory>>
->;
-export type CreateForumCategoryMutationBody = ForumCategoryCreate;
-export type CreateForumCategoryMutationError = HTTPValidationError;
 
-/**
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createForumCategory>>, {data: ForumCategoryCreate}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createForumCategory(data,requestOptions)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateForumCategoryMutationResult = NonNullable<Awaited<ReturnType<typeof createForumCategory>>>
+    export type CreateForumCategoryMutationBody = ForumCategoryCreate
+    export type CreateForumCategoryMutationError = HTTPValidationError
+
+    /**
  * @summary Create a forum category
  */
-export const useCreateForumCategory = <
-  TError = HTTPValidationError,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof createForumCategory>>,
-      TError,
-      { data: ForumCategoryCreate },
-      TContext
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof createForumCategory>>,
-  TError,
-  { data: ForumCategoryCreate },
-  TContext
-> => {
-  const mutationOptions = getCreateForumCategoryMutationOptions(options);
+export const useCreateForumCategory = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createForumCategory>>, TError,{data: ForumCategoryCreate}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof createForumCategory>>,
+        TError,
+        {data: ForumCategoryCreate},
+        TContext
+      > => {
 
-  return useMutation(mutationOptions, queryClient);
-};
-/**
+      const mutationOptions = getCreateForumCategoryMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    /**
  * Update a forum category. Only project owners can manage categories.
  * @summary Update a forum category
  */
 export const updateForumCategory = (
-  categoryKey: string,
-  forumCategoryUpdate: ForumCategoryUpdate,
-  options?: SecondParameter<typeof customInstance>,
-) => {
-  return customInstance<ForumCategoryResponse>(
-    {
-      url: `/forum/categories/${categoryKey}`,
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      data: forumCategoryUpdate,
+    categoryKey: string,
+    forumCategoryUpdate: ForumCategoryUpdate,
+ options?: SecondParameter<typeof customInstance>,) => {
+      
+      
+      return customInstance<ForumCategoryResponse>(
+      {url: `/forum/categories/${categoryKey}`, method: 'PATCH',
+      headers: {'Content-Type': 'application/json', },
+      data: forumCategoryUpdate
     },
-    options,
-  );
-};
+      options);
+    }
+  
 
-export const getUpdateForumCategoryMutationOptions = <
-  TError = HTTPValidationError,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof updateForumCategory>>,
-    TError,
-    { categoryKey: string; data: ForumCategoryUpdate },
-    TContext
-  >;
-  request?: SecondParameter<typeof customInstance>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof updateForumCategory>>,
-  TError,
-  { categoryKey: string; data: ForumCategoryUpdate },
-  TContext
-> => {
-  const mutationKey = ["updateForumCategory"];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      "mutationKey" in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
 
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof updateForumCategory>>,
-    { categoryKey: string; data: ForumCategoryUpdate }
-  > = (props) => {
-    const { categoryKey, data } = props ?? {};
+export const getUpdateForumCategoryMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateForumCategory>>, TError,{categoryKey: string;data: ForumCategoryUpdate}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateForumCategory>>, TError,{categoryKey: string;data: ForumCategoryUpdate}, TContext> => {
 
-    return updateForumCategory(categoryKey, data, requestOptions);
-  };
+const mutationKey = ['updateForumCategory'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
 
-  return { mutationFn, ...mutationOptions };
-};
+      
 
-export type UpdateForumCategoryMutationResult = NonNullable<
-  Awaited<ReturnType<typeof updateForumCategory>>
->;
-export type UpdateForumCategoryMutationBody = ForumCategoryUpdate;
-export type UpdateForumCategoryMutationError = HTTPValidationError;
 
-/**
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateForumCategory>>, {categoryKey: string;data: ForumCategoryUpdate}> = (props) => {
+          const {categoryKey,data} = props ?? {};
+
+          return  updateForumCategory(categoryKey,data,requestOptions)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateForumCategoryMutationResult = NonNullable<Awaited<ReturnType<typeof updateForumCategory>>>
+    export type UpdateForumCategoryMutationBody = ForumCategoryUpdate
+    export type UpdateForumCategoryMutationError = HTTPValidationError
+
+    /**
  * @summary Update a forum category
  */
-export const useUpdateForumCategory = <
-  TError = HTTPValidationError,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof updateForumCategory>>,
-      TError,
-      { categoryKey: string; data: ForumCategoryUpdate },
-      TContext
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof updateForumCategory>>,
-  TError,
-  { categoryKey: string; data: ForumCategoryUpdate },
-  TContext
-> => {
-  const mutationOptions = getUpdateForumCategoryMutationOptions(options);
+export const useUpdateForumCategory = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateForumCategory>>, TError,{categoryKey: string;data: ForumCategoryUpdate}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof updateForumCategory>>,
+        TError,
+        {categoryKey: string;data: ForumCategoryUpdate},
+        TContext
+      > => {
 
-  return useMutation(mutationOptions, queryClient);
-};
-/**
+      const mutationOptions = getUpdateForumCategoryMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    /**
  * Archive a forum category. Existing threads keep their category key.
  * @summary Archive a forum category
  */
 export const deleteForumCategory = (
-  categoryKey: string,
-  options?: SecondParameter<typeof customInstance>,
-) => {
-  return customInstance<SuccessResponse>(
-    { url: `/forum/categories/${categoryKey}`, method: "DELETE" },
-    options,
-  );
-};
+    categoryKey: string,
+ options?: SecondParameter<typeof customInstance>,) => {
+      
+      
+      return customInstance<SuccessResponse>(
+      {url: `/forum/categories/${categoryKey}`, method: 'DELETE'
+    },
+      options);
+    }
+  
 
-export const getDeleteForumCategoryMutationOptions = <
-  TError = HTTPValidationError,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof deleteForumCategory>>,
-    TError,
-    { categoryKey: string },
-    TContext
-  >;
-  request?: SecondParameter<typeof customInstance>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof deleteForumCategory>>,
-  TError,
-  { categoryKey: string },
-  TContext
-> => {
-  const mutationKey = ["deleteForumCategory"];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      "mutationKey" in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
 
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof deleteForumCategory>>,
-    { categoryKey: string }
-  > = (props) => {
-    const { categoryKey } = props ?? {};
+export const getDeleteForumCategoryMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteForumCategory>>, TError,{categoryKey: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteForumCategory>>, TError,{categoryKey: string}, TContext> => {
 
-    return deleteForumCategory(categoryKey, requestOptions);
-  };
+const mutationKey = ['deleteForumCategory'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
 
-  return { mutationFn, ...mutationOptions };
-};
+      
 
-export type DeleteForumCategoryMutationResult = NonNullable<
-  Awaited<ReturnType<typeof deleteForumCategory>>
->;
 
-export type DeleteForumCategoryMutationError = HTTPValidationError;
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteForumCategory>>, {categoryKey: string}> = (props) => {
+          const {categoryKey} = props ?? {};
 
-/**
+          return  deleteForumCategory(categoryKey,requestOptions)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteForumCategoryMutationResult = NonNullable<Awaited<ReturnType<typeof deleteForumCategory>>>
+    
+    export type DeleteForumCategoryMutationError = HTTPValidationError
+
+    /**
  * @summary Archive a forum category
  */
-export const useDeleteForumCategory = <
-  TError = HTTPValidationError,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof deleteForumCategory>>,
-      TError,
-      { categoryKey: string },
-      TContext
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof deleteForumCategory>>,
-  TError,
-  { categoryKey: string },
-  TContext
-> => {
-  const mutationOptions = getDeleteForumCategoryMutationOptions(options);
+export const useDeleteForumCategory = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteForumCategory>>, TError,{categoryKey: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof deleteForumCategory>>,
+        TError,
+        {categoryKey: string},
+        TContext
+      > => {
 
-  return useMutation(mutationOptions, queryClient);
-};
-/**
+      const mutationOptions = getDeleteForumCategoryMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    /**
  * List root forum threads for the active project.
  * @summary List forum threads
  */
 export const listForumPosts = (
-  params?: ListForumPostsParams,
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
+    params?: ListForumPostsParams,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  return customInstance<ListForumPostsResponse>(
-    { url: `/forum/posts`, method: "GET", params, signal },
-    options,
-  );
-};
+      
+      
+      return customInstance<ListForumPostsResponse>(
+      {url: `/forum/posts`, method: 'GET',
+        params, signal
+    },
+      options);
+    }
+  
 
-export const getListForumPostsQueryKey = (params?: ListForumPostsParams) => {
-  return [`/forum/posts`, ...(params ? [params] : [])] as const;
-};
 
-export const getListForumPostsQueryOptions = <
-  TData = Awaited<ReturnType<typeof listForumPosts>>,
-  TError = HTTPValidationError,
->(
-  params?: ListForumPostsParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof listForumPosts>>, TError, TData>
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
+
+export const getListForumPostsQueryKey = (params?: ListForumPostsParams,) => {
+    return [
+    `/forum/posts`, ...(params ? [params]: [])
+    ] as const;
+    }
+
+    
+export const getListForumPostsQueryOptions = <TData = Awaited<ReturnType<typeof listForumPosts>>, TError = HTTPValidationError>(params?: ListForumPostsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listForumPosts>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey = queryOptions?.queryKey ?? getListForumPostsQueryKey(params);
+const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof listForumPosts>>> = ({
-    signal,
-  }) => listForumPosts(params, requestOptions, signal);
+  const queryKey =  queryOptions?.queryKey ?? getListForumPostsQueryKey(params);
 
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof listForumPosts>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData> };
-};
+  
 
-export type ListForumPostsQueryResult = NonNullable<
-  Awaited<ReturnType<typeof listForumPosts>>
->;
-export type ListForumPostsQueryError = HTTPValidationError;
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listForumPosts>>> = ({ signal }) => listForumPosts(params, requestOptions, signal);
 
-export function useListForumPosts<
-  TData = Awaited<ReturnType<typeof listForumPosts>>,
-  TError = HTTPValidationError,
->(
-  params: undefined | ListForumPostsParams,
-  options: {
-    query: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof listForumPosts>>, TError, TData>
-    > &
-      Pick<
+      
+
+      
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listForumPosts>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+}
+
+export type ListForumPostsQueryResult = NonNullable<Awaited<ReturnType<typeof listForumPosts>>>
+export type ListForumPostsQueryError = HTTPValidationError
+
+
+export function useListForumPosts<TData = Awaited<ReturnType<typeof listForumPosts>>, TError = HTTPValidationError>(
+ params: undefined |  ListForumPostsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listForumPosts>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof listForumPosts>>,
           TError,
           Awaited<ReturnType<typeof listForumPosts>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData>;
-};
-export function useListForumPosts<
-  TData = Awaited<ReturnType<typeof listForumPosts>>,
-  TError = HTTPValidationError,
->(
-  params?: ListForumPostsParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof listForumPosts>>, TError, TData>
-    > &
-      Pick<
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useListForumPosts<TData = Awaited<ReturnType<typeof listForumPosts>>, TError = HTTPValidationError>(
+ params?: ListForumPostsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listForumPosts>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof listForumPosts>>,
           TError,
           Awaited<ReturnType<typeof listForumPosts>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
-export function useListForumPosts<
-  TData = Awaited<ReturnType<typeof listForumPosts>>,
-  TError = HTTPValidationError,
->(
-  params?: ListForumPostsParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof listForumPosts>>, TError, TData>
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useListForumPosts<TData = Awaited<ReturnType<typeof listForumPosts>>, TError = HTTPValidationError>(
+ params?: ListForumPostsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listForumPosts>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
 /**
  * @summary List forum threads
  */
 
-export function useListForumPosts<
-  TData = Awaited<ReturnType<typeof listForumPosts>>,
-  TError = HTTPValidationError,
->(
-  params?: ListForumPostsParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof listForumPosts>>, TError, TData>
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
-  const queryOptions = getListForumPostsQueryOptions(params, options);
+export function useListForumPosts<TData = Awaited<ReturnType<typeof listForumPosts>>, TError = HTTPValidationError>(
+ params?: ListForumPostsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listForumPosts>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
 
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData> };
+  const queryOptions = getListForumPostsQueryOptions(params,options)
 
-  query.queryKey = queryOptions.queryKey;
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey ;
 
   return query;
 }
+
+
 
 /**
  * Create a new project forum thread or reply.
  * @summary Create a forum thread or reply
  */
 export const createForumPost = (
-  forumPostCreate: ForumPostCreate,
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
+    forumPostCreate: ForumPostCreate,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  return customInstance<ForumPostResponse>(
-    {
-      url: `/forum/posts`,
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      data: forumPostCreate,
-      signal,
+      
+      
+      return customInstance<ForumPostResponse>(
+      {url: `/forum/posts`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: forumPostCreate, signal
     },
-    options,
-  );
-};
+      options);
+    }
+  
 
-export const getCreateForumPostMutationOptions = <
-  TError = HTTPValidationError,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof createForumPost>>,
-    TError,
-    { data: ForumPostCreate },
-    TContext
-  >;
-  request?: SecondParameter<typeof customInstance>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof createForumPost>>,
-  TError,
-  { data: ForumPostCreate },
-  TContext
-> => {
-  const mutationKey = ["createForumPost"];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      "mutationKey" in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
 
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof createForumPost>>,
-    { data: ForumPostCreate }
-  > = (props) => {
-    const { data } = props ?? {};
+export const getCreateForumPostMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createForumPost>>, TError,{data: ForumPostCreate}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof createForumPost>>, TError,{data: ForumPostCreate}, TContext> => {
 
-    return createForumPost(data, requestOptions);
-  };
+const mutationKey = ['createForumPost'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
 
-  return { mutationFn, ...mutationOptions };
-};
+      
 
-export type CreateForumPostMutationResult = NonNullable<
-  Awaited<ReturnType<typeof createForumPost>>
->;
-export type CreateForumPostMutationBody = ForumPostCreate;
-export type CreateForumPostMutationError = HTTPValidationError;
 
-/**
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createForumPost>>, {data: ForumPostCreate}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createForumPost(data,requestOptions)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateForumPostMutationResult = NonNullable<Awaited<ReturnType<typeof createForumPost>>>
+    export type CreateForumPostMutationBody = ForumPostCreate
+    export type CreateForumPostMutationError = HTTPValidationError
+
+    /**
  * @summary Create a forum thread or reply
  */
-export const useCreateForumPost = <
-  TError = HTTPValidationError,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof createForumPost>>,
-      TError,
-      { data: ForumPostCreate },
-      TContext
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof createForumPost>>,
-  TError,
-  { data: ForumPostCreate },
-  TContext
-> => {
-  const mutationOptions = getCreateForumPostMutationOptions(options);
+export const useCreateForumPost = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createForumPost>>, TError,{data: ForumPostCreate}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof createForumPost>>,
+        TError,
+        {data: ForumPostCreate},
+        TContext
+      > => {
 
-  return useMutation(mutationOptions, queryClient);
-};
-/**
+      const mutationOptions = getCreateForumPostMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    /**
  * Get a forum post by ID.
  * @summary Get a forum post
  */
 export const getForumPost = (
-  postId: string,
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
+    postId: string,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  return customInstance<ForumPostResponse>(
-    { url: `/forum/posts/${postId}`, method: "GET", signal },
-    options,
-  );
-};
+      
+      
+      return customInstance<ForumPostResponse>(
+      {url: `/forum/posts/${postId}`, method: 'GET', signal
+    },
+      options);
+    }
+  
 
-export const getGetForumPostQueryKey = (postId?: string) => {
-  return [`/forum/posts/${postId}`] as const;
-};
 
-export const getGetForumPostQueryOptions = <
-  TData = Awaited<ReturnType<typeof getForumPost>>,
-  TError = HTTPValidationError,
->(
-  postId: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof getForumPost>>, TError, TData>
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
+
+export const getGetForumPostQueryKey = (postId?: string,) => {
+    return [
+    `/forum/posts/${postId}`
+    ] as const;
+    }
+
+    
+export const getGetForumPostQueryOptions = <TData = Awaited<ReturnType<typeof getForumPost>>, TError = HTTPValidationError>(postId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getForumPost>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey = queryOptions?.queryKey ?? getGetForumPostQueryKey(postId);
+const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof getForumPost>>> = ({
-    signal,
-  }) => getForumPost(postId, requestOptions, signal);
+  const queryKey =  queryOptions?.queryKey ?? getGetForumPostQueryKey(postId);
 
-  return {
-    queryKey,
-    queryFn,
-    enabled: !!postId,
-    ...queryOptions,
-  } as UseQueryOptions<
-    Awaited<ReturnType<typeof getForumPost>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData> };
-};
+  
 
-export type GetForumPostQueryResult = NonNullable<
-  Awaited<ReturnType<typeof getForumPost>>
->;
-export type GetForumPostQueryError = HTTPValidationError;
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getForumPost>>> = ({ signal }) => getForumPost(postId, requestOptions, signal);
 
-export function useGetForumPost<
-  TData = Awaited<ReturnType<typeof getForumPost>>,
-  TError = HTTPValidationError,
->(
-  postId: string,
-  options: {
-    query: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof getForumPost>>, TError, TData>
-    > &
-      Pick<
+      
+
+      
+
+   return  { queryKey, queryFn, enabled: !!(postId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getForumPost>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+}
+
+export type GetForumPostQueryResult = NonNullable<Awaited<ReturnType<typeof getForumPost>>>
+export type GetForumPostQueryError = HTTPValidationError
+
+
+export function useGetForumPost<TData = Awaited<ReturnType<typeof getForumPost>>, TError = HTTPValidationError>(
+ postId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getForumPost>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getForumPost>>,
           TError,
           Awaited<ReturnType<typeof getForumPost>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData>;
-};
-export function useGetForumPost<
-  TData = Awaited<ReturnType<typeof getForumPost>>,
-  TError = HTTPValidationError,
->(
-  postId: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof getForumPost>>, TError, TData>
-    > &
-      Pick<
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useGetForumPost<TData = Awaited<ReturnType<typeof getForumPost>>, TError = HTTPValidationError>(
+ postId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getForumPost>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getForumPost>>,
           TError,
           Awaited<ReturnType<typeof getForumPost>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
-export function useGetForumPost<
-  TData = Awaited<ReturnType<typeof getForumPost>>,
-  TError = HTTPValidationError,
->(
-  postId: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof getForumPost>>, TError, TData>
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useGetForumPost<TData = Awaited<ReturnType<typeof getForumPost>>, TError = HTTPValidationError>(
+ postId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getForumPost>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
 /**
  * @summary Get a forum post
  */
 
-export function useGetForumPost<
-  TData = Awaited<ReturnType<typeof getForumPost>>,
-  TError = HTTPValidationError,
->(
-  postId: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof getForumPost>>, TError, TData>
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
-  const queryOptions = getGetForumPostQueryOptions(postId, options);
+export function useGetForumPost<TData = Awaited<ReturnType<typeof getForumPost>>, TError = HTTPValidationError>(
+ postId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getForumPost>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
 
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData> };
+  const queryOptions = getGetForumPostQueryOptions(postId,options)
 
-  query.queryKey = queryOptions.queryKey;
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey ;
 
   return query;
 }
+
+
 
 /**
  * Update a forum post. Only the author can edit.
  * @summary Update a forum post
  */
 export const updateForumPost = (
-  postId: string,
-  forumPostUpdate: ForumPostUpdate,
-  options?: SecondParameter<typeof customInstance>,
-) => {
-  return customInstance<ForumPostResponse>(
-    {
-      url: `/forum/posts/${postId}`,
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      data: forumPostUpdate,
+    postId: string,
+    forumPostUpdate: ForumPostUpdate,
+ options?: SecondParameter<typeof customInstance>,) => {
+      
+      
+      return customInstance<ForumPostResponse>(
+      {url: `/forum/posts/${postId}`, method: 'PATCH',
+      headers: {'Content-Type': 'application/json', },
+      data: forumPostUpdate
     },
-    options,
-  );
-};
+      options);
+    }
+  
 
-export const getUpdateForumPostMutationOptions = <
-  TError = HTTPValidationError,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof updateForumPost>>,
-    TError,
-    { postId: string; data: ForumPostUpdate },
-    TContext
-  >;
-  request?: SecondParameter<typeof customInstance>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof updateForumPost>>,
-  TError,
-  { postId: string; data: ForumPostUpdate },
-  TContext
-> => {
-  const mutationKey = ["updateForumPost"];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      "mutationKey" in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
 
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof updateForumPost>>,
-    { postId: string; data: ForumPostUpdate }
-  > = (props) => {
-    const { postId, data } = props ?? {};
+export const getUpdateForumPostMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateForumPost>>, TError,{postId: string;data: ForumPostUpdate}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateForumPost>>, TError,{postId: string;data: ForumPostUpdate}, TContext> => {
 
-    return updateForumPost(postId, data, requestOptions);
-  };
+const mutationKey = ['updateForumPost'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
 
-  return { mutationFn, ...mutationOptions };
-};
+      
 
-export type UpdateForumPostMutationResult = NonNullable<
-  Awaited<ReturnType<typeof updateForumPost>>
->;
-export type UpdateForumPostMutationBody = ForumPostUpdate;
-export type UpdateForumPostMutationError = HTTPValidationError;
 
-/**
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateForumPost>>, {postId: string;data: ForumPostUpdate}> = (props) => {
+          const {postId,data} = props ?? {};
+
+          return  updateForumPost(postId,data,requestOptions)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateForumPostMutationResult = NonNullable<Awaited<ReturnType<typeof updateForumPost>>>
+    export type UpdateForumPostMutationBody = ForumPostUpdate
+    export type UpdateForumPostMutationError = HTTPValidationError
+
+    /**
  * @summary Update a forum post
  */
-export const useUpdateForumPost = <
-  TError = HTTPValidationError,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof updateForumPost>>,
-      TError,
-      { postId: string; data: ForumPostUpdate },
-      TContext
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof updateForumPost>>,
-  TError,
-  { postId: string; data: ForumPostUpdate },
-  TContext
-> => {
-  const mutationOptions = getUpdateForumPostMutationOptions(options);
+export const useUpdateForumPost = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateForumPost>>, TError,{postId: string;data: ForumPostUpdate}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof updateForumPost>>,
+        TError,
+        {postId: string;data: ForumPostUpdate},
+        TContext
+      > => {
 
-  return useMutation(mutationOptions, queryClient);
-};
-/**
+      const mutationOptions = getUpdateForumPostMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    /**
  * Delete a forum post. Only the author can delete.
  * @summary Delete a forum post
  */
 export const deleteForumPost = (
-  postId: string,
-  options?: SecondParameter<typeof customInstance>,
-) => {
-  return customInstance<SuccessResponse>(
-    { url: `/forum/posts/${postId}`, method: "DELETE" },
-    options,
-  );
-};
+    postId: string,
+ options?: SecondParameter<typeof customInstance>,) => {
+      
+      
+      return customInstance<SuccessResponse>(
+      {url: `/forum/posts/${postId}`, method: 'DELETE'
+    },
+      options);
+    }
+  
 
-export const getDeleteForumPostMutationOptions = <
-  TError = HTTPValidationError,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof deleteForumPost>>,
-    TError,
-    { postId: string },
-    TContext
-  >;
-  request?: SecondParameter<typeof customInstance>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof deleteForumPost>>,
-  TError,
-  { postId: string },
-  TContext
-> => {
-  const mutationKey = ["deleteForumPost"];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      "mutationKey" in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
 
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof deleteForumPost>>,
-    { postId: string }
-  > = (props) => {
-    const { postId } = props ?? {};
+export const getDeleteForumPostMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteForumPost>>, TError,{postId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteForumPost>>, TError,{postId: string}, TContext> => {
 
-    return deleteForumPost(postId, requestOptions);
-  };
+const mutationKey = ['deleteForumPost'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
 
-  return { mutationFn, ...mutationOptions };
-};
+      
 
-export type DeleteForumPostMutationResult = NonNullable<
-  Awaited<ReturnType<typeof deleteForumPost>>
->;
 
-export type DeleteForumPostMutationError = HTTPValidationError;
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteForumPost>>, {postId: string}> = (props) => {
+          const {postId} = props ?? {};
 
-/**
+          return  deleteForumPost(postId,requestOptions)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteForumPostMutationResult = NonNullable<Awaited<ReturnType<typeof deleteForumPost>>>
+    
+    export type DeleteForumPostMutationError = HTTPValidationError
+
+    /**
  * @summary Delete a forum post
  */
-export const useDeleteForumPost = <
-  TError = HTTPValidationError,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof deleteForumPost>>,
-      TError,
-      { postId: string },
-      TContext
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof deleteForumPost>>,
-  TError,
-  { postId: string },
-  TContext
-> => {
-  const mutationOptions = getDeleteForumPostMutationOptions(options);
+export const useDeleteForumPost = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteForumPost>>, TError,{postId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof deleteForumPost>>,
+        TError,
+        {postId: string},
+        TContext
+      > => {
 
-  return useMutation(mutationOptions, queryClient);
-};
-/**
+      const mutationOptions = getDeleteForumPostMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    /**
  * List replies for a forum thread.
  * @summary List forum replies
  */
 export const getForumPostReplies = (
-  postId: string,
-  params?: GetForumPostRepliesParams,
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
+    postId: string,
+    params?: GetForumPostRepliesParams,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  return customInstance<ForumPostResponse[]>(
-    { url: `/forum/posts/${postId}/replies`, method: "GET", params, signal },
-    options,
-  );
-};
+      
+      
+      return customInstance<ForumPostResponse[]>(
+      {url: `/forum/posts/${postId}/replies`, method: 'GET',
+        params, signal
+    },
+      options);
+    }
+  
 
-export const getGetForumPostRepliesQueryKey = (
-  postId?: string,
-  params?: GetForumPostRepliesParams,
+
+
+export const getGetForumPostRepliesQueryKey = (postId?: string,
+    params?: GetForumPostRepliesParams,) => {
+    return [
+    `/forum/posts/${postId}/replies`, ...(params ? [params]: [])
+    ] as const;
+    }
+
+    
+export const getGetForumPostRepliesQueryOptions = <TData = Awaited<ReturnType<typeof getForumPostReplies>>, TError = HTTPValidationError>(postId: string,
+    params?: GetForumPostRepliesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getForumPostReplies>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
-  return [
-    `/forum/posts/${postId}/replies`,
-    ...(params ? [params] : []),
-  ] as const;
-};
 
-export const getGetForumPostRepliesQueryOptions = <
-  TData = Awaited<ReturnType<typeof getForumPostReplies>>,
-  TError = HTTPValidationError,
->(
-  postId: string,
-  params?: GetForumPostRepliesParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getForumPostReplies>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
+const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =
-    queryOptions?.queryKey ?? getGetForumPostRepliesQueryKey(postId, params);
+  const queryKey =  queryOptions?.queryKey ?? getGetForumPostRepliesQueryKey(postId,params);
 
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof getForumPostReplies>>
-  > = ({ signal }) =>
-    getForumPostReplies(postId, params, requestOptions, signal);
+  
 
-  return {
-    queryKey,
-    queryFn,
-    enabled: !!postId,
-    ...queryOptions,
-  } as UseQueryOptions<
-    Awaited<ReturnType<typeof getForumPostReplies>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData> };
-};
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getForumPostReplies>>> = ({ signal }) => getForumPostReplies(postId,params, requestOptions, signal);
 
-export type GetForumPostRepliesQueryResult = NonNullable<
-  Awaited<ReturnType<typeof getForumPostReplies>>
->;
-export type GetForumPostRepliesQueryError = HTTPValidationError;
+      
 
-export function useGetForumPostReplies<
-  TData = Awaited<ReturnType<typeof getForumPostReplies>>,
-  TError = HTTPValidationError,
->(
-  postId: string,
-  params: undefined | GetForumPostRepliesParams,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getForumPostReplies>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
+      
+
+   return  { queryKey, queryFn, enabled: !!(postId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getForumPostReplies>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+}
+
+export type GetForumPostRepliesQueryResult = NonNullable<Awaited<ReturnType<typeof getForumPostReplies>>>
+export type GetForumPostRepliesQueryError = HTTPValidationError
+
+
+export function useGetForumPostReplies<TData = Awaited<ReturnType<typeof getForumPostReplies>>, TError = HTTPValidationError>(
+ postId: string,
+    params: undefined |  GetForumPostRepliesParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getForumPostReplies>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getForumPostReplies>>,
           TError,
           Awaited<ReturnType<typeof getForumPostReplies>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData>;
-};
-export function useGetForumPostReplies<
-  TData = Awaited<ReturnType<typeof getForumPostReplies>>,
-  TError = HTTPValidationError,
->(
-  postId: string,
-  params?: GetForumPostRepliesParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getForumPostReplies>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useGetForumPostReplies<TData = Awaited<ReturnType<typeof getForumPostReplies>>, TError = HTTPValidationError>(
+ postId: string,
+    params?: GetForumPostRepliesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getForumPostReplies>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getForumPostReplies>>,
           TError,
           Awaited<ReturnType<typeof getForumPostReplies>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
-export function useGetForumPostReplies<
-  TData = Awaited<ReturnType<typeof getForumPostReplies>>,
-  TError = HTTPValidationError,
->(
-  postId: string,
-  params?: GetForumPostRepliesParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getForumPostReplies>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useGetForumPostReplies<TData = Awaited<ReturnType<typeof getForumPostReplies>>, TError = HTTPValidationError>(
+ postId: string,
+    params?: GetForumPostRepliesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getForumPostReplies>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
 /**
  * @summary List forum replies
  */
 
-export function useGetForumPostReplies<
-  TData = Awaited<ReturnType<typeof getForumPostReplies>>,
-  TError = HTTPValidationError,
->(
-  postId: string,
-  params?: GetForumPostRepliesParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getForumPostReplies>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
-  const queryOptions = getGetForumPostRepliesQueryOptions(
-    postId,
-    params,
-    options,
-  );
+export function useGetForumPostReplies<TData = Awaited<ReturnType<typeof getForumPostReplies>>, TError = HTTPValidationError>(
+ postId: string,
+    params?: GetForumPostRepliesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getForumPostReplies>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
 
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData> };
+  const queryOptions = getGetForumPostRepliesQueryOptions(postId,params,options)
 
-  query.queryKey = queryOptions.queryKey;
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey ;
 
   return query;
 }
+
+
 
 /**
  * Close a forum thread. Only the author or project owner can close.
  * @summary Close a forum thread
  */
 export const closeForumPost = (
-  postId: string,
-  options?: SecondParameter<typeof customInstance>,
-) => {
-  return customInstance<SuccessResponse>(
-    { url: `/forum/posts/${postId}/close`, method: "PATCH" },
-    options,
-  );
-};
+    postId: string,
+ options?: SecondParameter<typeof customInstance>,) => {
+      
+      
+      return customInstance<SuccessResponse>(
+      {url: `/forum/posts/${postId}/close`, method: 'PATCH'
+    },
+      options);
+    }
+  
 
-export const getCloseForumPostMutationOptions = <
-  TError = HTTPValidationError,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof closeForumPost>>,
-    TError,
-    { postId: string },
-    TContext
-  >;
-  request?: SecondParameter<typeof customInstance>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof closeForumPost>>,
-  TError,
-  { postId: string },
-  TContext
-> => {
-  const mutationKey = ["closeForumPost"];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      "mutationKey" in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
 
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof closeForumPost>>,
-    { postId: string }
-  > = (props) => {
-    const { postId } = props ?? {};
+export const getCloseForumPostMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof closeForumPost>>, TError,{postId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof closeForumPost>>, TError,{postId: string}, TContext> => {
 
-    return closeForumPost(postId, requestOptions);
-  };
+const mutationKey = ['closeForumPost'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
 
-  return { mutationFn, ...mutationOptions };
-};
+      
 
-export type CloseForumPostMutationResult = NonNullable<
-  Awaited<ReturnType<typeof closeForumPost>>
->;
 
-export type CloseForumPostMutationError = HTTPValidationError;
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof closeForumPost>>, {postId: string}> = (props) => {
+          const {postId} = props ?? {};
 
-/**
+          return  closeForumPost(postId,requestOptions)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CloseForumPostMutationResult = NonNullable<Awaited<ReturnType<typeof closeForumPost>>>
+    
+    export type CloseForumPostMutationError = HTTPValidationError
+
+    /**
  * @summary Close a forum thread
  */
-export const useCloseForumPost = <
-  TError = HTTPValidationError,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof closeForumPost>>,
-      TError,
-      { postId: string },
-      TContext
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof closeForumPost>>,
-  TError,
-  { postId: string },
-  TContext
-> => {
-  const mutationOptions = getCloseForumPostMutationOptions(options);
+export const useCloseForumPost = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof closeForumPost>>, TError,{postId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof closeForumPost>>,
+        TError,
+        {postId: string},
+        TContext
+      > => {
 
-  return useMutation(mutationOptions, queryClient);
-};
-/**
+      const mutationOptions = getCloseForumPostMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    /**
  * Reopen a forum thread. Only the author or project owner can reopen.
  * @summary Reopen a forum thread
  */
 export const reopenForumPost = (
-  postId: string,
-  options?: SecondParameter<typeof customInstance>,
-) => {
-  return customInstance<SuccessResponse>(
-    { url: `/forum/posts/${postId}/reopen`, method: "PATCH" },
-    options,
-  );
-};
+    postId: string,
+ options?: SecondParameter<typeof customInstance>,) => {
+      
+      
+      return customInstance<SuccessResponse>(
+      {url: `/forum/posts/${postId}/reopen`, method: 'PATCH'
+    },
+      options);
+    }
+  
 
-export const getReopenForumPostMutationOptions = <
-  TError = HTTPValidationError,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof reopenForumPost>>,
-    TError,
-    { postId: string },
-    TContext
-  >;
-  request?: SecondParameter<typeof customInstance>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof reopenForumPost>>,
-  TError,
-  { postId: string },
-  TContext
-> => {
-  const mutationKey = ["reopenForumPost"];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      "mutationKey" in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
 
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof reopenForumPost>>,
-    { postId: string }
-  > = (props) => {
-    const { postId } = props ?? {};
+export const getReopenForumPostMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reopenForumPost>>, TError,{postId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof reopenForumPost>>, TError,{postId: string}, TContext> => {
 
-    return reopenForumPost(postId, requestOptions);
-  };
+const mutationKey = ['reopenForumPost'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
 
-  return { mutationFn, ...mutationOptions };
-};
+      
 
-export type ReopenForumPostMutationResult = NonNullable<
-  Awaited<ReturnType<typeof reopenForumPost>>
->;
 
-export type ReopenForumPostMutationError = HTTPValidationError;
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof reopenForumPost>>, {postId: string}> = (props) => {
+          const {postId} = props ?? {};
 
-/**
+          return  reopenForumPost(postId,requestOptions)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ReopenForumPostMutationResult = NonNullable<Awaited<ReturnType<typeof reopenForumPost>>>
+    
+    export type ReopenForumPostMutationError = HTTPValidationError
+
+    /**
  * @summary Reopen a forum thread
  */
-export const useReopenForumPost = <
-  TError = HTTPValidationError,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof reopenForumPost>>,
-      TError,
-      { postId: string },
-      TContext
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof reopenForumPost>>,
-  TError,
-  { postId: string },
-  TContext
-> => {
-  const mutationOptions = getReopenForumPostMutationOptions(options);
+export const useReopenForumPost = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reopenForumPost>>, TError,{postId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof reopenForumPost>>,
+        TError,
+        {postId: string},
+        TContext
+      > => {
 
-  return useMutation(mutationOptions, queryClient);
-};
+      const mutationOptions = getReopenForumPostMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    

@@ -5,7 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { IssueUpdateTitle } from "./issueUpdateTitle";
+import type { IssueUpdateTitle } from './issueUpdateTitle';
 
 /**
  * Request schema for updating an issue.

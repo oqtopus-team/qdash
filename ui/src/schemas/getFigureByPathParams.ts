@@ -7,5 +7,5 @@
  */
 
 export type GetFigureByPathParams = {
-  path: string;
+path: string;
 };

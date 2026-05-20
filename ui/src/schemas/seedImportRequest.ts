@@ -5,10 +5,10 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { SeedImportSource } from "./seedImportSource";
-import type { SeedImportRequestParameters } from "./seedImportRequestParameters";
-import type { SeedImportRequestQids } from "./seedImportRequestQids";
-import type { SeedImportRequestManualData } from "./seedImportRequestManualData";
+import type { SeedImportSource } from './seedImportSource';
+import type { SeedImportRequestParameters } from './seedImportRequestParameters';
+import type { SeedImportRequestQids } from './seedImportRequestQids';
+import type { SeedImportRequestManualData } from './seedImportRequestManualData';
 
 /**
  * Request to import seed parameters from qubex or manual input.

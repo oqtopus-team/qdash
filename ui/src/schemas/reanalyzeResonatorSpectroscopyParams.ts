@@ -5,12 +5,12 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { ReanalyzeResonatorSpectroscopyParamsNumResonators } from "./reanalyzeResonatorSpectroscopyParamsNumResonators";
-import type { ReanalyzeResonatorSpectroscopyParamsHighPowerMin } from "./reanalyzeResonatorSpectroscopyParamsHighPowerMin";
-import type { ReanalyzeResonatorSpectroscopyParamsHighPowerMax } from "./reanalyzeResonatorSpectroscopyParamsHighPowerMax";
-import type { ReanalyzeResonatorSpectroscopyParamsLowPower } from "./reanalyzeResonatorSpectroscopyParamsLowPower";
-import type { ReanalyzeResonatorSpectroscopyParamsBareShiftEstimatorType } from "./reanalyzeResonatorSpectroscopyParamsBareShiftEstimatorType";
-import type { ReanalyzeResonatorSpectroscopyParamsBareShiftStrengthLimit } from "./reanalyzeResonatorSpectroscopyParamsBareShiftStrengthLimit";
+import type { ReanalyzeResonatorSpectroscopyParamsNumResonators } from './reanalyzeResonatorSpectroscopyParamsNumResonators';
+import type { ReanalyzeResonatorSpectroscopyParamsHighPowerMin } from './reanalyzeResonatorSpectroscopyParamsHighPowerMin';
+import type { ReanalyzeResonatorSpectroscopyParamsHighPowerMax } from './reanalyzeResonatorSpectroscopyParamsHighPowerMax';
+import type { ReanalyzeResonatorSpectroscopyParamsLowPower } from './reanalyzeResonatorSpectroscopyParamsLowPower';
+import type { ReanalyzeResonatorSpectroscopyParamsBareShiftEstimatorType } from './reanalyzeResonatorSpectroscopyParamsBareShiftEstimatorType';
+import type { ReanalyzeResonatorSpectroscopyParamsBareShiftStrengthLimit } from './reanalyzeResonatorSpectroscopyParamsBareShiftStrengthLimit';
 
 /**
  * Optional analysis-parameter overrides for resonator spectroscopy.

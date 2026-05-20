@@ -5,9 +5,9 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { UITaskFilesSettingsDefaultBackend } from "./uITaskFilesSettingsDefaultBackend";
-import type { UITaskFilesSettingsDefaultViewMode } from "./uITaskFilesSettingsDefaultViewMode";
-import type { UITaskFilesSettingsSortOrder } from "./uITaskFilesSettingsSortOrder";
+import type { UITaskFilesSettingsDefaultBackend } from './uITaskFilesSettingsDefaultBackend';
+import type { UITaskFilesSettingsDefaultViewMode } from './uITaskFilesSettingsDefaultViewMode';
+import type { UITaskFilesSettingsSortOrder } from './uITaskFilesSettingsSortOrder';
 
 /**
  * Task files editor settings.

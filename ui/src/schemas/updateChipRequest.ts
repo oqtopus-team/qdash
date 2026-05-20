@@ -5,8 +5,8 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { UpdateChipRequestTopologyId } from "./updateChipRequestTopologyId";
-import type { UpdateChipRequestNote } from "./updateChipRequestNote";
+import type { UpdateChipRequestTopologyId } from './updateChipRequestTopologyId';
+import type { UpdateChipRequestNote } from './updateChipRequestNote';
 
 /**
  * Body for updating chip metadata. All fields optional.

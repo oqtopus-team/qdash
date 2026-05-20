@@ -5,13 +5,13 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { CryostatUpdateRequestName } from "./cryostatUpdateRequestName";
-import type { CryostatUpdateRequestManufacturer } from "./cryostatUpdateRequestManufacturer";
-import type { CryostatUpdateRequestModel } from "./cryostatUpdateRequestModel";
-import type { CryostatUpdateRequestLocation } from "./cryostatUpdateRequestLocation";
-import type { CryostatUpdateRequestStatus } from "./cryostatUpdateRequestStatus";
-import type { CryostatUpdateRequestCommissionedAt } from "./cryostatUpdateRequestCommissionedAt";
-import type { CryostatUpdateRequestDecommissionedAt } from "./cryostatUpdateRequestDecommissionedAt";
+import type { CryostatUpdateRequestName } from './cryostatUpdateRequestName';
+import type { CryostatUpdateRequestManufacturer } from './cryostatUpdateRequestManufacturer';
+import type { CryostatUpdateRequestModel } from './cryostatUpdateRequestModel';
+import type { CryostatUpdateRequestLocation } from './cryostatUpdateRequestLocation';
+import type { CryostatUpdateRequestStatus } from './cryostatUpdateRequestStatus';
+import type { CryostatUpdateRequestCommissionedAt } from './cryostatUpdateRequestCommissionedAt';
+import type { CryostatUpdateRequestDecommissionedAt } from './cryostatUpdateRequestDecommissionedAt';
 
 /**
  * Body for updating a cryostat. All fields optional.

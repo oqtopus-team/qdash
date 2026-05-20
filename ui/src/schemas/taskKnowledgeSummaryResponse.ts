@@ -17,4 +17,5 @@ export interface TaskKnowledgeSummaryResponse {
   case_count?: number;
   image_count?: number;
   has_analysis_guide?: boolean;
+  has_review_guide?: boolean;
 }

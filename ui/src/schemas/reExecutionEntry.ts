@@ -5,7 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { ReExecutionEntryStartAt } from "./reExecutionEntryStartAt";
+import type { ReExecutionEntryStartAt } from './reExecutionEntryStartAt';
 
 /**
  * A child task result created by re-execution.

@@ -5,7 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { IssueKnowledgeResponse } from "./issueKnowledgeResponse";
+import type { IssueKnowledgeResponse } from './issueKnowledgeResponse';
 
 /**
  * Paginated list of knowledge cases.

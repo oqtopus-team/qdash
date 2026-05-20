@@ -7,20 +7,20 @@
  */
 
 export type GetProvenancePolicyImpactViolationsParams = {
-  /**
-   * Maximum traversal depth
-   * @minimum 1
-   * @maximum 20
-   */
-  max_depth?: number;
-  /**
-   * Filter by severity (warn)
-   */
-  severity?: string | null;
-  /**
-   * Maximum number of violations to return
-   * @minimum 1
-   * @maximum 500
-   */
-  limit?: number;
+/**
+ * Maximum traversal depth
+ * @minimum 1
+ * @maximum 20
+ */
+max_depth?: number;
+/**
+ * Filter by severity (warn)
+ */
+severity?: string | null;
+/**
+ * Maximum number of violations to return
+ * @minimum 1
+ * @maximum 500
+ */
+limit?: number;
 };

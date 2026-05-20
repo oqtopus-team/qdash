@@ -5,7 +5,10 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import { useMutation, useQuery } from "@tanstack/react-query";
+import {
+  useMutation,
+  useQuery
+} from '@tanstack/react-query';
 import type {
   DataTag,
   DefinedInitialDataOptions,
@@ -18,8 +21,8 @@ import type {
   UseMutationOptions,
   UseMutationResult,
   UseQueryOptions,
-  UseQueryResult,
-} from "@tanstack/react-query";
+  UseQueryResult
+} from '@tanstack/react-query';
 
 import type {
   AddMemberRequest,
@@ -37,1318 +40,895 @@ import type {
   RemoveProjectMemberAdmin200,
   UpdateUserRequest,
   UserDetailResponse,
-  UserListResponse,
-} from "../../schemas";
+  UserListResponse
+} from '../../schemas';
 
-import { customInstance } from "../../lib/custom-instance";
+import { customInstance } from '../../lib/custom-instance';
+
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
+
+
 
 /**
  * Reload cached YAML configuration (admin only).
  * @summary Reload configuration caches
  */
 export const reloadConfigCaches = (
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
+    
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  return customInstance<ConfigReloadResponse>(
-    { url: `/admin/config/reload`, method: "POST", signal },
-    options,
-  );
-};
+      
+      
+      return customInstance<ConfigReloadResponse>(
+      {url: `/admin/config/reload`, method: 'POST', signal
+    },
+      options);
+    }
+  
 
-export const getReloadConfigCachesMutationOptions = <
-  TError = void,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof reloadConfigCaches>>,
-    TError,
-    void,
-    TContext
-  >;
-  request?: SecondParameter<typeof customInstance>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof reloadConfigCaches>>,
-  TError,
-  void,
-  TContext
-> => {
-  const mutationKey = ["reloadConfigCaches"];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      "mutationKey" in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
 
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof reloadConfigCaches>>,
-    void
-  > = () => {
-    return reloadConfigCaches(requestOptions);
-  };
+export const getReloadConfigCachesMutationOptions = <TError = void,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reloadConfigCaches>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof reloadConfigCaches>>, TError,void, TContext> => {
 
-  return { mutationFn, ...mutationOptions };
-};
+const mutationKey = ['reloadConfigCaches'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
 
-export type ReloadConfigCachesMutationResult = NonNullable<
-  Awaited<ReturnType<typeof reloadConfigCaches>>
->;
+      
 
-export type ReloadConfigCachesMutationError = void;
 
-/**
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof reloadConfigCaches>>, void> = () => {
+          
+
+          return  reloadConfigCaches(requestOptions)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ReloadConfigCachesMutationResult = NonNullable<Awaited<ReturnType<typeof reloadConfigCaches>>>
+    
+    export type ReloadConfigCachesMutationError = void
+
+    /**
  * @summary Reload configuration caches
  */
-export const useReloadConfigCaches = <TError = void, TContext = unknown>(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof reloadConfigCaches>>,
-      TError,
-      void,
-      TContext
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof reloadConfigCaches>>,
-  TError,
-  void,
-  TContext
-> => {
-  const mutationOptions = getReloadConfigCachesMutationOptions(options);
+export const useReloadConfigCaches = <TError = void,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reloadConfigCaches>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof reloadConfigCaches>>,
+        TError,
+        void,
+        TContext
+      > => {
 
-  return useMutation(mutationOptions, queryClient);
-};
-/**
+      const mutationOptions = getReloadConfigCachesMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    /**
  * List all users in the system (admin only).
  * @summary List all users
  */
 export const listAllUsers = (
-  params?: ListAllUsersParams,
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
+    params?: ListAllUsersParams,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  return customInstance<UserListResponse>(
-    { url: `/admin/users`, method: "GET", params, signal },
-    options,
-  );
-};
+      
+      
+      return customInstance<UserListResponse>(
+      {url: `/admin/users`, method: 'GET',
+        params, signal
+    },
+      options);
+    }
+  
 
-export const getListAllUsersQueryKey = (params?: ListAllUsersParams) => {
-  return [`/admin/users`, ...(params ? [params] : [])] as const;
-};
 
-export const getListAllUsersQueryOptions = <
-  TData = Awaited<ReturnType<typeof listAllUsers>>,
-  TError = void | HTTPValidationError,
->(
-  params?: ListAllUsersParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof listAllUsers>>, TError, TData>
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
+
+export const getListAllUsersQueryKey = (params?: ListAllUsersParams,) => {
+    return [
+    `/admin/users`, ...(params ? [params]: [])
+    ] as const;
+    }
+
+    
+export const getListAllUsersQueryOptions = <TData = Awaited<ReturnType<typeof listAllUsers>>, TError = void | HTTPValidationError>(params?: ListAllUsersParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listAllUsers>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey = queryOptions?.queryKey ?? getListAllUsersQueryKey(params);
+const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof listAllUsers>>> = ({
-    signal,
-  }) => listAllUsers(params, requestOptions, signal);
+  const queryKey =  queryOptions?.queryKey ?? getListAllUsersQueryKey(params);
 
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof listAllUsers>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData> };
-};
+  
 
-export type ListAllUsersQueryResult = NonNullable<
-  Awaited<ReturnType<typeof listAllUsers>>
->;
-export type ListAllUsersQueryError = void | HTTPValidationError;
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listAllUsers>>> = ({ signal }) => listAllUsers(params, requestOptions, signal);
 
-export function useListAllUsers<
-  TData = Awaited<ReturnType<typeof listAllUsers>>,
-  TError = void | HTTPValidationError,
->(
-  params: undefined | ListAllUsersParams,
-  options: {
-    query: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof listAllUsers>>, TError, TData>
-    > &
-      Pick<
+      
+
+      
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listAllUsers>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+}
+
+export type ListAllUsersQueryResult = NonNullable<Awaited<ReturnType<typeof listAllUsers>>>
+export type ListAllUsersQueryError = void | HTTPValidationError
+
+
+export function useListAllUsers<TData = Awaited<ReturnType<typeof listAllUsers>>, TError = void | HTTPValidationError>(
+ params: undefined |  ListAllUsersParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listAllUsers>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof listAllUsers>>,
           TError,
           Awaited<ReturnType<typeof listAllUsers>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData>;
-};
-export function useListAllUsers<
-  TData = Awaited<ReturnType<typeof listAllUsers>>,
-  TError = void | HTTPValidationError,
->(
-  params?: ListAllUsersParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof listAllUsers>>, TError, TData>
-    > &
-      Pick<
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useListAllUsers<TData = Awaited<ReturnType<typeof listAllUsers>>, TError = void | HTTPValidationError>(
+ params?: ListAllUsersParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listAllUsers>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof listAllUsers>>,
           TError,
           Awaited<ReturnType<typeof listAllUsers>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
-export function useListAllUsers<
-  TData = Awaited<ReturnType<typeof listAllUsers>>,
-  TError = void | HTTPValidationError,
->(
-  params?: ListAllUsersParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof listAllUsers>>, TError, TData>
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useListAllUsers<TData = Awaited<ReturnType<typeof listAllUsers>>, TError = void | HTTPValidationError>(
+ params?: ListAllUsersParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listAllUsers>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
 /**
  * @summary List all users
  */
 
-export function useListAllUsers<
-  TData = Awaited<ReturnType<typeof listAllUsers>>,
-  TError = void | HTTPValidationError,
->(
-  params?: ListAllUsersParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof listAllUsers>>, TError, TData>
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
-  const queryOptions = getListAllUsersQueryOptions(params, options);
+export function useListAllUsers<TData = Awaited<ReturnType<typeof listAllUsers>>, TError = void | HTTPValidationError>(
+ params?: ListAllUsersParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listAllUsers>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
 
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData> };
+  const queryOptions = getListAllUsersQueryOptions(params,options)
 
-  query.queryKey = queryOptions.queryKey;
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey ;
 
   return query;
 }
+
+
 
 /**
  * Get detailed information about a specific user (admin only).
  * @summary Get user details
  */
 export const getUserDetails = (
-  username: string,
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
+    username: string,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  return customInstance<UserDetailResponse>(
-    { url: `/admin/users/${username}`, method: "GET", signal },
-    options,
-  );
-};
+      
+      
+      return customInstance<UserDetailResponse>(
+      {url: `/admin/users/${username}`, method: 'GET', signal
+    },
+      options);
+    }
+  
 
-export const getGetUserDetailsQueryKey = (username?: string) => {
-  return [`/admin/users/${username}`] as const;
-};
 
-export const getGetUserDetailsQueryOptions = <
-  TData = Awaited<ReturnType<typeof getUserDetails>>,
-  TError = void | HTTPValidationError,
->(
-  username: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof getUserDetails>>, TError, TData>
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
+
+export const getGetUserDetailsQueryKey = (username?: string,) => {
+    return [
+    `/admin/users/${username}`
+    ] as const;
+    }
+
+    
+export const getGetUserDetailsQueryOptions = <TData = Awaited<ReturnType<typeof getUserDetails>>, TError = void | HTTPValidationError>(username: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUserDetails>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey =
-    queryOptions?.queryKey ?? getGetUserDetailsQueryKey(username);
+const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof getUserDetails>>> = ({
-    signal,
-  }) => getUserDetails(username, requestOptions, signal);
+  const queryKey =  queryOptions?.queryKey ?? getGetUserDetailsQueryKey(username);
 
-  return {
-    queryKey,
-    queryFn,
-    enabled: !!username,
-    ...queryOptions,
-  } as UseQueryOptions<
-    Awaited<ReturnType<typeof getUserDetails>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData> };
-};
+  
 
-export type GetUserDetailsQueryResult = NonNullable<
-  Awaited<ReturnType<typeof getUserDetails>>
->;
-export type GetUserDetailsQueryError = void | HTTPValidationError;
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getUserDetails>>> = ({ signal }) => getUserDetails(username, requestOptions, signal);
 
-export function useGetUserDetails<
-  TData = Awaited<ReturnType<typeof getUserDetails>>,
-  TError = void | HTTPValidationError,
->(
-  username: string,
-  options: {
-    query: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof getUserDetails>>, TError, TData>
-    > &
-      Pick<
+      
+
+      
+
+   return  { queryKey, queryFn, enabled: !!(username), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getUserDetails>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+}
+
+export type GetUserDetailsQueryResult = NonNullable<Awaited<ReturnType<typeof getUserDetails>>>
+export type GetUserDetailsQueryError = void | HTTPValidationError
+
+
+export function useGetUserDetails<TData = Awaited<ReturnType<typeof getUserDetails>>, TError = void | HTTPValidationError>(
+ username: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUserDetails>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getUserDetails>>,
           TError,
           Awaited<ReturnType<typeof getUserDetails>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData>;
-};
-export function useGetUserDetails<
-  TData = Awaited<ReturnType<typeof getUserDetails>>,
-  TError = void | HTTPValidationError,
->(
-  username: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof getUserDetails>>, TError, TData>
-    > &
-      Pick<
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useGetUserDetails<TData = Awaited<ReturnType<typeof getUserDetails>>, TError = void | HTTPValidationError>(
+ username: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUserDetails>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getUserDetails>>,
           TError,
           Awaited<ReturnType<typeof getUserDetails>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
-export function useGetUserDetails<
-  TData = Awaited<ReturnType<typeof getUserDetails>>,
-  TError = void | HTTPValidationError,
->(
-  username: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof getUserDetails>>, TError, TData>
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useGetUserDetails<TData = Awaited<ReturnType<typeof getUserDetails>>, TError = void | HTTPValidationError>(
+ username: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUserDetails>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
 /**
  * @summary Get user details
  */
 
-export function useGetUserDetails<
-  TData = Awaited<ReturnType<typeof getUserDetails>>,
-  TError = void | HTTPValidationError,
->(
-  username: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof getUserDetails>>, TError, TData>
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
-  const queryOptions = getGetUserDetailsQueryOptions(username, options);
+export function useGetUserDetails<TData = Awaited<ReturnType<typeof getUserDetails>>, TError = void | HTTPValidationError>(
+ username: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUserDetails>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
 
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData> };
+  const queryOptions = getGetUserDetailsQueryOptions(username,options)
 
-  query.queryKey = queryOptions.queryKey;
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey ;
 
   return query;
 }
+
+
 
 /**
  * Update user settings (admin only).
  * @summary Update user settings
  */
 export const updateUserSettings = (
-  username: string,
-  updateUserRequest: UpdateUserRequest,
-  options?: SecondParameter<typeof customInstance>,
-) => {
-  return customInstance<UserDetailResponse>(
-    {
-      url: `/admin/users/${username}`,
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      data: updateUserRequest,
+    username: string,
+    updateUserRequest: UpdateUserRequest,
+ options?: SecondParameter<typeof customInstance>,) => {
+      
+      
+      return customInstance<UserDetailResponse>(
+      {url: `/admin/users/${username}`, method: 'PUT',
+      headers: {'Content-Type': 'application/json', },
+      data: updateUserRequest
     },
-    options,
-  );
-};
+      options);
+    }
+  
 
-export const getUpdateUserSettingsMutationOptions = <
-  TError = void | HTTPValidationError,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof updateUserSettings>>,
-    TError,
-    { username: string; data: UpdateUserRequest },
-    TContext
-  >;
-  request?: SecondParameter<typeof customInstance>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof updateUserSettings>>,
-  TError,
-  { username: string; data: UpdateUserRequest },
-  TContext
-> => {
-  const mutationKey = ["updateUserSettings"];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      "mutationKey" in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
 
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof updateUserSettings>>,
-    { username: string; data: UpdateUserRequest }
-  > = (props) => {
-    const { username, data } = props ?? {};
+export const getUpdateUserSettingsMutationOptions = <TError = void | HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateUserSettings>>, TError,{username: string;data: UpdateUserRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateUserSettings>>, TError,{username: string;data: UpdateUserRequest}, TContext> => {
 
-    return updateUserSettings(username, data, requestOptions);
-  };
+const mutationKey = ['updateUserSettings'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
 
-  return { mutationFn, ...mutationOptions };
-};
+      
 
-export type UpdateUserSettingsMutationResult = NonNullable<
-  Awaited<ReturnType<typeof updateUserSettings>>
->;
-export type UpdateUserSettingsMutationBody = UpdateUserRequest;
-export type UpdateUserSettingsMutationError = void | HTTPValidationError;
 
-/**
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateUserSettings>>, {username: string;data: UpdateUserRequest}> = (props) => {
+          const {username,data} = props ?? {};
+
+          return  updateUserSettings(username,data,requestOptions)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateUserSettingsMutationResult = NonNullable<Awaited<ReturnType<typeof updateUserSettings>>>
+    export type UpdateUserSettingsMutationBody = UpdateUserRequest
+    export type UpdateUserSettingsMutationError = void | HTTPValidationError
+
+    /**
  * @summary Update user settings
  */
-export const useUpdateUserSettings = <
-  TError = void | HTTPValidationError,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof updateUserSettings>>,
-      TError,
-      { username: string; data: UpdateUserRequest },
-      TContext
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof updateUserSettings>>,
-  TError,
-  { username: string; data: UpdateUserRequest },
-  TContext
-> => {
-  const mutationOptions = getUpdateUserSettingsMutationOptions(options);
+export const useUpdateUserSettings = <TError = void | HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateUserSettings>>, TError,{username: string;data: UpdateUserRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof updateUserSettings>>,
+        TError,
+        {username: string;data: UpdateUserRequest},
+        TContext
+      > => {
 
-  return useMutation(mutationOptions, queryClient);
-};
-/**
+      const mutationOptions = getUpdateUserSettingsMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    /**
  * Delete a user account (admin only).
  * @summary Delete user
  */
 export const deleteUser = (
-  username: string,
-  options?: SecondParameter<typeof customInstance>,
-) => {
-  return customInstance<DeleteUser200>(
-    { url: `/admin/users/${username}`, method: "DELETE" },
-    options,
-  );
-};
+    username: string,
+ options?: SecondParameter<typeof customInstance>,) => {
+      
+      
+      return customInstance<DeleteUser200>(
+      {url: `/admin/users/${username}`, method: 'DELETE'
+    },
+      options);
+    }
+  
 
-export const getDeleteUserMutationOptions = <
-  TError = void | HTTPValidationError,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof deleteUser>>,
-    TError,
-    { username: string },
-    TContext
-  >;
-  request?: SecondParameter<typeof customInstance>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof deleteUser>>,
-  TError,
-  { username: string },
-  TContext
-> => {
-  const mutationKey = ["deleteUser"];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      "mutationKey" in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
 
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof deleteUser>>,
-    { username: string }
-  > = (props) => {
-    const { username } = props ?? {};
+export const getDeleteUserMutationOptions = <TError = void | HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteUser>>, TError,{username: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteUser>>, TError,{username: string}, TContext> => {
 
-    return deleteUser(username, requestOptions);
-  };
+const mutationKey = ['deleteUser'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
 
-  return { mutationFn, ...mutationOptions };
-};
+      
 
-export type DeleteUserMutationResult = NonNullable<
-  Awaited<ReturnType<typeof deleteUser>>
->;
 
-export type DeleteUserMutationError = void | HTTPValidationError;
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteUser>>, {username: string}> = (props) => {
+          const {username} = props ?? {};
 
-/**
+          return  deleteUser(username,requestOptions)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteUserMutationResult = NonNullable<Awaited<ReturnType<typeof deleteUser>>>
+    
+    export type DeleteUserMutationError = void | HTTPValidationError
+
+    /**
  * @summary Delete user
  */
-export const useDeleteUser = <
-  TError = void | HTTPValidationError,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof deleteUser>>,
-      TError,
-      { username: string },
-      TContext
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof deleteUser>>,
-  TError,
-  { username: string },
-  TContext
-> => {
-  const mutationOptions = getDeleteUserMutationOptions(options);
+export const useDeleteUser = <TError = void | HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteUser>>, TError,{username: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof deleteUser>>,
+        TError,
+        {username: string},
+        TContext
+      > => {
 
-  return useMutation(mutationOptions, queryClient);
-};
-/**
+      const mutationOptions = getDeleteUserMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    /**
  * Create users from a CSV file and return generated temporary passwords.
  * @summary Bulk import users from CSV
  */
 export const bulkImportUsers = (
-  bodyBulkImportUsers: BodyBulkImportUsers,
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
+    bodyBulkImportUsers: BodyBulkImportUsers,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  const formData = new FormData();
-  formData.append(`file`, bodyBulkImportUsers.file);
+      
+      const formData = new FormData();
+formData.append(`file`, bodyBulkImportUsers.file)
 
-  return customInstance<BulkUserImportResponse>(
-    {
-      url: `/admin/users/bulk-import`,
-      method: "POST",
-      headers: { "Content-Type": "multipart/form-data" },
-      data: formData,
-      signal,
+      return customInstance<BulkUserImportResponse>(
+      {url: `/admin/users/bulk-import`, method: 'POST',
+      headers: {'Content-Type': 'multipart/form-data', },
+       data: formData, signal
     },
-    options,
-  );
-};
+      options);
+    }
+  
 
-export const getBulkImportUsersMutationOptions = <
-  TError = void | HTTPValidationError,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof bulkImportUsers>>,
-    TError,
-    { data: BodyBulkImportUsers },
-    TContext
-  >;
-  request?: SecondParameter<typeof customInstance>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof bulkImportUsers>>,
-  TError,
-  { data: BodyBulkImportUsers },
-  TContext
-> => {
-  const mutationKey = ["bulkImportUsers"];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      "mutationKey" in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
 
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof bulkImportUsers>>,
-    { data: BodyBulkImportUsers }
-  > = (props) => {
-    const { data } = props ?? {};
+export const getBulkImportUsersMutationOptions = <TError = void | HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof bulkImportUsers>>, TError,{data: BodyBulkImportUsers}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof bulkImportUsers>>, TError,{data: BodyBulkImportUsers}, TContext> => {
 
-    return bulkImportUsers(data, requestOptions);
-  };
+const mutationKey = ['bulkImportUsers'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
 
-  return { mutationFn, ...mutationOptions };
-};
+      
 
-export type BulkImportUsersMutationResult = NonNullable<
-  Awaited<ReturnType<typeof bulkImportUsers>>
->;
-export type BulkImportUsersMutationBody = BodyBulkImportUsers;
-export type BulkImportUsersMutationError = void | HTTPValidationError;
 
-/**
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof bulkImportUsers>>, {data: BodyBulkImportUsers}> = (props) => {
+          const {data} = props ?? {};
+
+          return  bulkImportUsers(data,requestOptions)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type BulkImportUsersMutationResult = NonNullable<Awaited<ReturnType<typeof bulkImportUsers>>>
+    export type BulkImportUsersMutationBody = BodyBulkImportUsers
+    export type BulkImportUsersMutationError = void | HTTPValidationError
+
+    /**
  * @summary Bulk import users from CSV
  */
-export const useBulkImportUsers = <
-  TError = void | HTTPValidationError,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof bulkImportUsers>>,
-      TError,
-      { data: BodyBulkImportUsers },
-      TContext
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof bulkImportUsers>>,
-  TError,
-  { data: BodyBulkImportUsers },
-  TContext
-> => {
-  const mutationOptions = getBulkImportUsersMutationOptions(options);
+export const useBulkImportUsers = <TError = void | HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof bulkImportUsers>>, TError,{data: BodyBulkImportUsers}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof bulkImportUsers>>,
+        TError,
+        {data: BodyBulkImportUsers},
+        TContext
+      > => {
 
-  return useMutation(mutationOptions, queryClient);
-};
-/**
+      const mutationOptions = getBulkImportUsersMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    /**
  * List all projects in the system (admin only).
  * @summary List all projects
  */
 export const listAllProjects = (
-  params?: ListAllProjectsParams,
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
+    params?: ListAllProjectsParams,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  return customInstance<QdashApiSchemasAdminProjectListResponse>(
-    { url: `/admin/projects`, method: "GET", params, signal },
-    options,
-  );
-};
+      
+      
+      return customInstance<QdashApiSchemasAdminProjectListResponse>(
+      {url: `/admin/projects`, method: 'GET',
+        params, signal
+    },
+      options);
+    }
+  
 
-export const getListAllProjectsQueryKey = (params?: ListAllProjectsParams) => {
-  return [`/admin/projects`, ...(params ? [params] : [])] as const;
-};
 
-export const getListAllProjectsQueryOptions = <
-  TData = Awaited<ReturnType<typeof listAllProjects>>,
-  TError = void | HTTPValidationError,
->(
-  params?: ListAllProjectsParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof listAllProjects>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
+
+export const getListAllProjectsQueryKey = (params?: ListAllProjectsParams,) => {
+    return [
+    `/admin/projects`, ...(params ? [params]: [])
+    ] as const;
+    }
+
+    
+export const getListAllProjectsQueryOptions = <TData = Awaited<ReturnType<typeof listAllProjects>>, TError = void | HTTPValidationError>(params?: ListAllProjectsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listAllProjects>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey = queryOptions?.queryKey ?? getListAllProjectsQueryKey(params);
+const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof listAllProjects>>> = ({
-    signal,
-  }) => listAllProjects(params, requestOptions, signal);
+  const queryKey =  queryOptions?.queryKey ?? getListAllProjectsQueryKey(params);
 
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof listAllProjects>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData> };
-};
+  
 
-export type ListAllProjectsQueryResult = NonNullable<
-  Awaited<ReturnType<typeof listAllProjects>>
->;
-export type ListAllProjectsQueryError = void | HTTPValidationError;
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listAllProjects>>> = ({ signal }) => listAllProjects(params, requestOptions, signal);
 
-export function useListAllProjects<
-  TData = Awaited<ReturnType<typeof listAllProjects>>,
-  TError = void | HTTPValidationError,
->(
-  params: undefined | ListAllProjectsParams,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof listAllProjects>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
+      
+
+      
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listAllProjects>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+}
+
+export type ListAllProjectsQueryResult = NonNullable<Awaited<ReturnType<typeof listAllProjects>>>
+export type ListAllProjectsQueryError = void | HTTPValidationError
+
+
+export function useListAllProjects<TData = Awaited<ReturnType<typeof listAllProjects>>, TError = void | HTTPValidationError>(
+ params: undefined |  ListAllProjectsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listAllProjects>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof listAllProjects>>,
           TError,
           Awaited<ReturnType<typeof listAllProjects>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData>;
-};
-export function useListAllProjects<
-  TData = Awaited<ReturnType<typeof listAllProjects>>,
-  TError = void | HTTPValidationError,
->(
-  params?: ListAllProjectsParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof listAllProjects>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useListAllProjects<TData = Awaited<ReturnType<typeof listAllProjects>>, TError = void | HTTPValidationError>(
+ params?: ListAllProjectsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listAllProjects>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof listAllProjects>>,
           TError,
           Awaited<ReturnType<typeof listAllProjects>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
-export function useListAllProjects<
-  TData = Awaited<ReturnType<typeof listAllProjects>>,
-  TError = void | HTTPValidationError,
->(
-  params?: ListAllProjectsParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof listAllProjects>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useListAllProjects<TData = Awaited<ReturnType<typeof listAllProjects>>, TError = void | HTTPValidationError>(
+ params?: ListAllProjectsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listAllProjects>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
 /**
  * @summary List all projects
  */
 
-export function useListAllProjects<
-  TData = Awaited<ReturnType<typeof listAllProjects>>,
-  TError = void | HTTPValidationError,
->(
-  params?: ListAllProjectsParams,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof listAllProjects>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
-  const queryOptions = getListAllProjectsQueryOptions(params, options);
+export function useListAllProjects<TData = Awaited<ReturnType<typeof listAllProjects>>, TError = void | HTTPValidationError>(
+ params?: ListAllProjectsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listAllProjects>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
 
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData> };
+  const queryOptions = getListAllProjectsQueryOptions(params,options)
 
-  query.queryKey = queryOptions.queryKey;
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey ;
 
   return query;
 }
+
+
 
 /**
  * Delete a project and all its memberships (admin only).
  * @summary Delete project
  */
 export const adminDeleteProject = (
-  projectId: string,
-  options?: SecondParameter<typeof customInstance>,
-) => {
-  return customInstance<AdminDeleteProject200>(
-    { url: `/admin/projects/${projectId}`, method: "DELETE" },
-    options,
-  );
-};
+    projectId: string,
+ options?: SecondParameter<typeof customInstance>,) => {
+      
+      
+      return customInstance<AdminDeleteProject200>(
+      {url: `/admin/projects/${projectId}`, method: 'DELETE'
+    },
+      options);
+    }
+  
 
-export const getAdminDeleteProjectMutationOptions = <
-  TError = void | HTTPValidationError,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof adminDeleteProject>>,
-    TError,
-    { projectId: string },
-    TContext
-  >;
-  request?: SecondParameter<typeof customInstance>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof adminDeleteProject>>,
-  TError,
-  { projectId: string },
-  TContext
-> => {
-  const mutationKey = ["adminDeleteProject"];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      "mutationKey" in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
 
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof adminDeleteProject>>,
-    { projectId: string }
-  > = (props) => {
-    const { projectId } = props ?? {};
+export const getAdminDeleteProjectMutationOptions = <TError = void | HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof adminDeleteProject>>, TError,{projectId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof adminDeleteProject>>, TError,{projectId: string}, TContext> => {
 
-    return adminDeleteProject(projectId, requestOptions);
-  };
+const mutationKey = ['adminDeleteProject'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
 
-  return { mutationFn, ...mutationOptions };
-};
+      
 
-export type AdminDeleteProjectMutationResult = NonNullable<
-  Awaited<ReturnType<typeof adminDeleteProject>>
->;
 
-export type AdminDeleteProjectMutationError = void | HTTPValidationError;
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof adminDeleteProject>>, {projectId: string}> = (props) => {
+          const {projectId} = props ?? {};
 
-/**
+          return  adminDeleteProject(projectId,requestOptions)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AdminDeleteProjectMutationResult = NonNullable<Awaited<ReturnType<typeof adminDeleteProject>>>
+    
+    export type AdminDeleteProjectMutationError = void | HTTPValidationError
+
+    /**
  * @summary Delete project
  */
-export const useAdminDeleteProject = <
-  TError = void | HTTPValidationError,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof adminDeleteProject>>,
-      TError,
-      { projectId: string },
-      TContext
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof adminDeleteProject>>,
-  TError,
-  { projectId: string },
-  TContext
-> => {
-  const mutationOptions = getAdminDeleteProjectMutationOptions(options);
+export const useAdminDeleteProject = <TError = void | HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof adminDeleteProject>>, TError,{projectId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof adminDeleteProject>>,
+        TError,
+        {projectId: string},
+        TContext
+      > => {
 
-  return useMutation(mutationOptions, queryClient);
-};
-/**
+      const mutationOptions = getAdminDeleteProjectMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    /**
  * List all members of a project (admin only).
  * @summary List project members
  */
 export const listProjectMembersAdmin = (
-  projectId: string,
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
+    projectId: string,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  return customInstance<QdashApiSchemasAdminMemberListResponse>(
-    { url: `/admin/projects/${projectId}/members`, method: "GET", signal },
-    options,
-  );
-};
+      
+      
+      return customInstance<QdashApiSchemasAdminMemberListResponse>(
+      {url: `/admin/projects/${projectId}/members`, method: 'GET', signal
+    },
+      options);
+    }
+  
 
-export const getListProjectMembersAdminQueryKey = (projectId?: string) => {
-  return [`/admin/projects/${projectId}/members`] as const;
-};
 
-export const getListProjectMembersAdminQueryOptions = <
-  TData = Awaited<ReturnType<typeof listProjectMembersAdmin>>,
-  TError = void | HTTPValidationError,
->(
-  projectId: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof listProjectMembersAdmin>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
+
+export const getListProjectMembersAdminQueryKey = (projectId?: string,) => {
+    return [
+    `/admin/projects/${projectId}/members`
+    ] as const;
+    }
+
+    
+export const getListProjectMembersAdminQueryOptions = <TData = Awaited<ReturnType<typeof listProjectMembersAdmin>>, TError = void | HTTPValidationError>(projectId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listProjectMembersAdmin>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey =
-    queryOptions?.queryKey ?? getListProjectMembersAdminQueryKey(projectId);
+const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof listProjectMembersAdmin>>
-  > = ({ signal }) =>
-    listProjectMembersAdmin(projectId, requestOptions, signal);
+  const queryKey =  queryOptions?.queryKey ?? getListProjectMembersAdminQueryKey(projectId);
 
-  return {
-    queryKey,
-    queryFn,
-    enabled: !!projectId,
-    ...queryOptions,
-  } as UseQueryOptions<
-    Awaited<ReturnType<typeof listProjectMembersAdmin>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData> };
-};
+  
 
-export type ListProjectMembersAdminQueryResult = NonNullable<
-  Awaited<ReturnType<typeof listProjectMembersAdmin>>
->;
-export type ListProjectMembersAdminQueryError = void | HTTPValidationError;
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listProjectMembersAdmin>>> = ({ signal }) => listProjectMembersAdmin(projectId, requestOptions, signal);
 
-export function useListProjectMembersAdmin<
-  TData = Awaited<ReturnType<typeof listProjectMembersAdmin>>,
-  TError = void | HTTPValidationError,
->(
-  projectId: string,
-  options: {
-    query: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof listProjectMembersAdmin>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
+      
+
+      
+
+   return  { queryKey, queryFn, enabled: !!(projectId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listProjectMembersAdmin>>, TError, TData> & { queryKey: DataTag<QueryKey, TData> }
+}
+
+export type ListProjectMembersAdminQueryResult = NonNullable<Awaited<ReturnType<typeof listProjectMembersAdmin>>>
+export type ListProjectMembersAdminQueryError = void | HTTPValidationError
+
+
+export function useListProjectMembersAdmin<TData = Awaited<ReturnType<typeof listProjectMembersAdmin>>, TError = void | HTTPValidationError>(
+ projectId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listProjectMembersAdmin>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof listProjectMembersAdmin>>,
           TError,
           Awaited<ReturnType<typeof listProjectMembersAdmin>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): DefinedUseQueryResult<TData, TError> & {
-  queryKey: DataTag<QueryKey, TData>;
-};
-export function useListProjectMembersAdmin<
-  TData = Awaited<ReturnType<typeof listProjectMembersAdmin>>,
-  TError = void | HTTPValidationError,
->(
-  projectId: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof listProjectMembersAdmin>>,
-        TError,
-        TData
-      >
-    > &
-      Pick<
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useListProjectMembersAdmin<TData = Awaited<ReturnType<typeof listProjectMembersAdmin>>, TError = void | HTTPValidationError>(
+ projectId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listProjectMembersAdmin>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof listProjectMembersAdmin>>,
           TError,
           Awaited<ReturnType<typeof listProjectMembersAdmin>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
-export function useListProjectMembersAdmin<
-  TData = Awaited<ReturnType<typeof listProjectMembersAdmin>>,
-  TError = void | HTTPValidationError,
->(
-  projectId: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof listProjectMembersAdmin>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
+export function useListProjectMembersAdmin<TData = Awaited<ReturnType<typeof listProjectMembersAdmin>>, TError = void | HTTPValidationError>(
+ projectId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listProjectMembersAdmin>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> }
 /**
  * @summary List project members
  */
 
-export function useListProjectMembersAdmin<
-  TData = Awaited<ReturnType<typeof listProjectMembersAdmin>>,
-  TError = void | HTTPValidationError,
->(
-  projectId: string,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof listProjectMembersAdmin>>,
-        TError,
-        TData
-      >
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
-  const queryOptions = getListProjectMembersAdminQueryOptions(
-    projectId,
-    options,
-  );
+export function useListProjectMembersAdmin<TData = Awaited<ReturnType<typeof listProjectMembersAdmin>>, TError = void | HTTPValidationError>(
+ projectId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listProjectMembersAdmin>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient 
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> } {
 
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<
-    TData,
-    TError
-  > & { queryKey: DataTag<QueryKey, TData> };
+  const queryOptions = getListProjectMembersAdminQueryOptions(projectId,options)
 
-  query.queryKey = queryOptions.queryKey;
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData> };
+
+  query.queryKey = queryOptions.queryKey ;
 
   return query;
 }
+
+
 
 /**
  * Add a member to a project (admin only).
  * @summary Add member to project
  */
 export const addProjectMemberAdmin = (
-  projectId: string,
-  addMemberRequest: AddMemberRequest,
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
+    projectId: string,
+    addMemberRequest: AddMemberRequest,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  return customInstance<MemberItem>(
-    {
-      url: `/admin/projects/${projectId}/members`,
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      data: addMemberRequest,
-      signal,
+      
+      
+      return customInstance<MemberItem>(
+      {url: `/admin/projects/${projectId}/members`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: addMemberRequest, signal
     },
-    options,
-  );
-};
+      options);
+    }
+  
 
-export const getAddProjectMemberAdminMutationOptions = <
-  TError = void | HTTPValidationError,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof addProjectMemberAdmin>>,
-    TError,
-    { projectId: string; data: AddMemberRequest },
-    TContext
-  >;
-  request?: SecondParameter<typeof customInstance>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof addProjectMemberAdmin>>,
-  TError,
-  { projectId: string; data: AddMemberRequest },
-  TContext
-> => {
-  const mutationKey = ["addProjectMemberAdmin"];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      "mutationKey" in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
 
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof addProjectMemberAdmin>>,
-    { projectId: string; data: AddMemberRequest }
-  > = (props) => {
-    const { projectId, data } = props ?? {};
+export const getAddProjectMemberAdminMutationOptions = <TError = void | HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof addProjectMemberAdmin>>, TError,{projectId: string;data: AddMemberRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof addProjectMemberAdmin>>, TError,{projectId: string;data: AddMemberRequest}, TContext> => {
 
-    return addProjectMemberAdmin(projectId, data, requestOptions);
-  };
+const mutationKey = ['addProjectMemberAdmin'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
 
-  return { mutationFn, ...mutationOptions };
-};
+      
 
-export type AddProjectMemberAdminMutationResult = NonNullable<
-  Awaited<ReturnType<typeof addProjectMemberAdmin>>
->;
-export type AddProjectMemberAdminMutationBody = AddMemberRequest;
-export type AddProjectMemberAdminMutationError = void | HTTPValidationError;
 
-/**
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof addProjectMemberAdmin>>, {projectId: string;data: AddMemberRequest}> = (props) => {
+          const {projectId,data} = props ?? {};
+
+          return  addProjectMemberAdmin(projectId,data,requestOptions)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AddProjectMemberAdminMutationResult = NonNullable<Awaited<ReturnType<typeof addProjectMemberAdmin>>>
+    export type AddProjectMemberAdminMutationBody = AddMemberRequest
+    export type AddProjectMemberAdminMutationError = void | HTTPValidationError
+
+    /**
  * @summary Add member to project
  */
-export const useAddProjectMemberAdmin = <
-  TError = void | HTTPValidationError,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof addProjectMemberAdmin>>,
-      TError,
-      { projectId: string; data: AddMemberRequest },
-      TContext
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof addProjectMemberAdmin>>,
-  TError,
-  { projectId: string; data: AddMemberRequest },
-  TContext
-> => {
-  const mutationOptions = getAddProjectMemberAdminMutationOptions(options);
+export const useAddProjectMemberAdmin = <TError = void | HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof addProjectMemberAdmin>>, TError,{projectId: string;data: AddMemberRequest}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof addProjectMemberAdmin>>,
+        TError,
+        {projectId: string;data: AddMemberRequest},
+        TContext
+      > => {
 
-  return useMutation(mutationOptions, queryClient);
-};
-/**
+      const mutationOptions = getAddProjectMemberAdminMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    /**
  * Remove a member from a project (admin only).
  * @summary Remove member from project
  */
 export const removeProjectMemberAdmin = (
-  projectId: string,
-  username: string,
-  options?: SecondParameter<typeof customInstance>,
-) => {
-  return customInstance<RemoveProjectMemberAdmin200>(
-    {
-      url: `/admin/projects/${projectId}/members/${username}`,
-      method: "DELETE",
+    projectId: string,
+    username: string,
+ options?: SecondParameter<typeof customInstance>,) => {
+      
+      
+      return customInstance<RemoveProjectMemberAdmin200>(
+      {url: `/admin/projects/${projectId}/members/${username}`, method: 'DELETE'
     },
-    options,
-  );
-};
+      options);
+    }
+  
 
-export const getRemoveProjectMemberAdminMutationOptions = <
-  TError = void | HTTPValidationError,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof removeProjectMemberAdmin>>,
-    TError,
-    { projectId: string; username: string },
-    TContext
-  >;
-  request?: SecondParameter<typeof customInstance>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof removeProjectMemberAdmin>>,
-  TError,
-  { projectId: string; username: string },
-  TContext
-> => {
-  const mutationKey = ["removeProjectMemberAdmin"];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      "mutationKey" in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
 
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof removeProjectMemberAdmin>>,
-    { projectId: string; username: string }
-  > = (props) => {
-    const { projectId, username } = props ?? {};
+export const getRemoveProjectMemberAdminMutationOptions = <TError = void | HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof removeProjectMemberAdmin>>, TError,{projectId: string;username: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof removeProjectMemberAdmin>>, TError,{projectId: string;username: string}, TContext> => {
 
-    return removeProjectMemberAdmin(projectId, username, requestOptions);
-  };
+const mutationKey = ['removeProjectMemberAdmin'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
 
-  return { mutationFn, ...mutationOptions };
-};
+      
 
-export type RemoveProjectMemberAdminMutationResult = NonNullable<
-  Awaited<ReturnType<typeof removeProjectMemberAdmin>>
->;
 
-export type RemoveProjectMemberAdminMutationError = void | HTTPValidationError;
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof removeProjectMemberAdmin>>, {projectId: string;username: string}> = (props) => {
+          const {projectId,username} = props ?? {};
 
-/**
+          return  removeProjectMemberAdmin(projectId,username,requestOptions)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RemoveProjectMemberAdminMutationResult = NonNullable<Awaited<ReturnType<typeof removeProjectMemberAdmin>>>
+    
+    export type RemoveProjectMemberAdminMutationError = void | HTTPValidationError
+
+    /**
  * @summary Remove member from project
  */
-export const useRemoveProjectMemberAdmin = <
-  TError = void | HTTPValidationError,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof removeProjectMemberAdmin>>,
-      TError,
-      { projectId: string; username: string },
-      TContext
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof removeProjectMemberAdmin>>,
-  TError,
-  { projectId: string; username: string },
-  TContext
-> => {
-  const mutationOptions = getRemoveProjectMemberAdminMutationOptions(options);
+export const useRemoveProjectMemberAdmin = <TError = void | HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof removeProjectMemberAdmin>>, TError,{projectId: string;username: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof removeProjectMemberAdmin>>,
+        TError,
+        {projectId: string;username: string},
+        TContext
+      > => {
 
-  return useMutation(mutationOptions, queryClient);
-};
-/**
+      const mutationOptions = getRemoveProjectMemberAdminMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    /**
  * Create a default project for a user who doesn't have one (admin only).
  * @summary Create project for user
  */
 export const createProjectForUser = (
-  username: string,
-  options?: SecondParameter<typeof customInstance>,
-  signal?: AbortSignal,
+    username: string,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
 ) => {
-  return customInstance<UserDetailResponse>(
-    { url: `/admin/users/${username}/project`, method: "POST", signal },
-    options,
-  );
-};
+      
+      
+      return customInstance<UserDetailResponse>(
+      {url: `/admin/users/${username}/project`, method: 'POST', signal
+    },
+      options);
+    }
+  
 
-export const getCreateProjectForUserMutationOptions = <
-  TError = void | HTTPValidationError,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof createProjectForUser>>,
-    TError,
-    { username: string },
-    TContext
-  >;
-  request?: SecondParameter<typeof customInstance>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof createProjectForUser>>,
-  TError,
-  { username: string },
-  TContext
-> => {
-  const mutationKey = ["createProjectForUser"];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      "mutationKey" in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
 
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof createProjectForUser>>,
-    { username: string }
-  > = (props) => {
-    const { username } = props ?? {};
+export const getCreateProjectForUserMutationOptions = <TError = void | HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createProjectForUser>>, TError,{username: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof createProjectForUser>>, TError,{username: string}, TContext> => {
 
-    return createProjectForUser(username, requestOptions);
-  };
+const mutationKey = ['createProjectForUser'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
 
-  return { mutationFn, ...mutationOptions };
-};
+      
 
-export type CreateProjectForUserMutationResult = NonNullable<
-  Awaited<ReturnType<typeof createProjectForUser>>
->;
 
-export type CreateProjectForUserMutationError = void | HTTPValidationError;
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createProjectForUser>>, {username: string}> = (props) => {
+          const {username} = props ?? {};
 
-/**
+          return  createProjectForUser(username,requestOptions)
+        }
+
+        
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateProjectForUserMutationResult = NonNullable<Awaited<ReturnType<typeof createProjectForUser>>>
+    
+    export type CreateProjectForUserMutationError = void | HTTPValidationError
+
+    /**
  * @summary Create project for user
  */
-export const useCreateProjectForUser = <
-  TError = void | HTTPValidationError,
-  TContext = unknown,
->(
-  options?: {
-    mutation?: UseMutationOptions<
-      Awaited<ReturnType<typeof createProjectForUser>>,
-      TError,
-      { username: string },
-      TContext
-    >;
-    request?: SecondParameter<typeof customInstance>;
-  },
-  queryClient?: QueryClient,
-): UseMutationResult<
-  Awaited<ReturnType<typeof createProjectForUser>>,
-  TError,
-  { username: string },
-  TContext
-> => {
-  const mutationOptions = getCreateProjectForUserMutationOptions(options);
+export const useCreateProjectForUser = <TError = void | HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createProjectForUser>>, TError,{username: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof createProjectForUser>>,
+        TError,
+        {username: string},
+        TContext
+      > => {
 
-  return useMutation(mutationOptions, queryClient);
-};
+      const mutationOptions = getCreateProjectForUserMutationOptions(options);
+
+      return useMutation(mutationOptions, queryClient);
+    }
+    

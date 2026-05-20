@@ -5,8 +5,8 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { CreateCopilotChatSessionRequestContext } from "./createCopilotChatSessionRequestContext";
-import type { CopilotChatMessageSchema } from "./copilotChatMessageSchema";
+import type { CreateCopilotChatSessionRequestContext } from './createCopilotChatSessionRequestContext';
+import type { CopilotChatMessageSchema } from './copilotChatMessageSchema';
 
 /**
  * Body for POST /copilot/chat/sessions.

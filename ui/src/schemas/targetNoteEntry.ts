@@ -5,8 +5,8 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { NoteModel } from "./noteModel";
-import type { TargetNoteEntryMetricNotes } from "./targetNoteEntryMetricNotes";
+import type { NoteModel } from './noteModel';
+import type { TargetNoteEntryMetricNotes } from './targetNoteEntryMetricNotes';
 
 /**
  * Per-target row for the dashboard summary (qubit or coupling).

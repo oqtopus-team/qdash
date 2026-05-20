@@ -5,10 +5,10 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { ExecutionResponseSummary } from "./executionResponseSummary";
-import type { ListExecutionsResponseTotal } from "./listExecutionsResponseTotal";
-import type { ListExecutionsResponseSkip } from "./listExecutionsResponseSkip";
-import type { ListExecutionsResponseLimit } from "./listExecutionsResponseLimit";
+import type { ExecutionResponseSummary } from './executionResponseSummary';
+import type { ListExecutionsResponseTotal } from './listExecutionsResponseTotal';
+import type { ListExecutionsResponseSkip } from './listExecutionsResponseSkip';
+import type { ListExecutionsResponseLimit } from './listExecutionsResponseLimit';
 
 /**
  * Response model for listing executions.

@@ -5,14 +5,14 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { ModelConfigTemperature } from "./modelConfigTemperature";
-import type { ModelConfigBaseUrl } from "./modelConfigBaseUrl";
-import type { ModelConfigApiKeyEnv } from "./modelConfigApiKeyEnv";
-import type { ModelConfigKeepAlive } from "./modelConfigKeepAlive";
-import type { ModelConfigNumCtx } from "./modelConfigNumCtx";
-import type { ModelConfigTopP } from "./modelConfigTopP";
-import type { ModelConfigTopK } from "./modelConfigTopK";
-import type { ModelConfigReasoningEffort } from "./modelConfigReasoningEffort";
+import type { ModelConfigTemperature } from './modelConfigTemperature';
+import type { ModelConfigBaseUrl } from './modelConfigBaseUrl';
+import type { ModelConfigApiKeyEnv } from './modelConfigApiKeyEnv';
+import type { ModelConfigKeepAlive } from './modelConfigKeepAlive';
+import type { ModelConfigNumCtx } from './modelConfigNumCtx';
+import type { ModelConfigTopP } from './modelConfigTopP';
+import type { ModelConfigTopK } from './modelConfigTopK';
+import type { ModelConfigReasoningEffort } from './modelConfigReasoningEffort';
 
 /**
  * Model configuration for CopilotKit.
@@ -30,4 +30,5 @@ export interface ModelConfig {
   top_k?: ModelConfigTopK;
   reasoning_effort?: ModelConfigReasoningEffort;
   disable_thinking_instruction?: boolean;
+  api_style?: string;
 }

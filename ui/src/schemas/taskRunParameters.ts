@@ -5,6 +5,6 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { TaskRunParametersAnyOf } from "./taskRunParametersAnyOf";
+import type { TaskRunParametersAnyOf } from './taskRunParametersAnyOf';
 
 export type TaskRunParameters = TaskRunParametersAnyOf | null;

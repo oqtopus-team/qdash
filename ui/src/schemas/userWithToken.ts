@@ -5,13 +5,13 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { UserWithTokenDisplayName } from "./userWithTokenDisplayName";
-import type { UserWithTokenOrganization } from "./userWithTokenOrganization";
-import type { UserWithTokenAvatarKey } from "./userWithTokenAvatarKey";
-import type { UserWithTokenDisabled } from "./userWithTokenDisabled";
-import type { UserWithTokenDefaultProjectId } from "./userWithTokenDefaultProjectId";
-import type { SystemRole } from "./systemRole";
-import type { UserWithTokenInitialPassword } from "./userWithTokenInitialPassword";
+import type { UserWithTokenDisplayName } from './userWithTokenDisplayName';
+import type { UserWithTokenOrganization } from './userWithTokenOrganization';
+import type { UserWithTokenAvatarKey } from './userWithTokenAvatarKey';
+import type { UserWithTokenDisabled } from './userWithTokenDisabled';
+import type { UserWithTokenDefaultProjectId } from './userWithTokenDefaultProjectId';
+import type { SystemRole } from './systemRole';
+import type { UserWithTokenInitialPassword } from './userWithTokenInitialPassword';
 
 /**
  * User model with access token for login/register responses.

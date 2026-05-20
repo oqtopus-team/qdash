@@ -6,8 +6,4 @@
  * OpenAPI spec version: 0.0.1
  */
 
-export type ParameterChangeResponsePreviousValue =
-  | number
-  | number
-  | string
-  | null;
+export type ParameterChangeResponsePreviousValue = number | number | string | null;

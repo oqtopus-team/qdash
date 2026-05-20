@@ -5,8 +5,6 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { InputParameterModel } from "./inputParameterModel";
+import type { InputParameterModel } from './inputParameterModel';
 
-export type TaskResponseInputParameters = {
-  [key: string]: InputParameterModel;
-};
+export type TaskResponseInputParameters = {[key: string]: InputParameterModel};

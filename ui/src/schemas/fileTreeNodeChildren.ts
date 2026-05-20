@@ -5,6 +5,6 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { FileTreeNode } from "./fileTreeNode";
+import type { FileTreeNode } from './fileTreeNode';
 
 export type FileTreeNodeChildren = FileTreeNode[] | null;

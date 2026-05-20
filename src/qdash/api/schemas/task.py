@@ -97,6 +97,7 @@ class KnowledgeCaseResponse(BaseModel):
     applicability: str = ""
     counterexample: str = ""
     prompt_guidance: str = ""
+    images: list[KnowledgeImageResponse] = []
     model_config = ConfigDict(protected_namespaces=())
 
 
@@ -117,8 +118,11 @@ class TaskKnowledgeResponse(BaseModel):
     analysis_guide: list[str] = []
     prerequisites: list[str] = []
     images: list[KnowledgeImageResponse] = []
+    review_markdown: str = ""
+    review_images: list[KnowledgeImageResponse] = []
     cases: list[KnowledgeCaseResponse] = []
     prompt_text: str
+    review_prompt_text: str = ""
 
 
 class TaskKnowledgeSummaryResponse(BaseModel):
@@ -131,6 +135,7 @@ class TaskKnowledgeSummaryResponse(BaseModel):
     case_count: int = 0
     image_count: int = 0
     has_analysis_guide: bool = False
+    has_review_guide: bool = False
 
 
 class ListTaskKnowledgeResponse(BaseModel):

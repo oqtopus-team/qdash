@@ -5,7 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { ParameterDiffResponse } from "./parameterDiffResponse";
+import type { ParameterDiffResponse } from './parameterDiffResponse';
 
 /**
  * Response model for execution comparison.

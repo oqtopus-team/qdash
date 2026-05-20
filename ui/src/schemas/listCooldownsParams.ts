@@ -7,12 +7,12 @@
  */
 
 export type ListCooldownsParams = {
-  /**
-   * Filter by cryostat
-   */
-  cryo_id?: string | null;
-  /**
-   * Filter by chip membership
-   */
-  chip_id?: string | null;
+/**
+ * Filter by cryostat
+ */
+cryo_id?: string | null;
+/**
+ * Filter by chip membership
+ */
+chip_id?: string | null;
 };

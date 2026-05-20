@@ -7,21 +7,21 @@
  */
 
 export type ListIssueKnowledgeParams = {
-  /**
-   * @minimum 0
-   */
-  skip?: number;
-  /**
-   * @minimum 1
-   * @maximum 200
-   */
-  limit?: number;
-  /**
-   * Filter by status: draft, approved, rejected
-   */
-  status?: string | null;
-  /**
-   * Filter by task name
-   */
-  task_name?: string | null;
+/**
+ * @minimum 0
+ */
+skip?: number;
+/**
+ * @minimum 1
+ * @maximum 200
+ */
+limit?: number;
+/**
+ * Filter by status: draft, approved, rejected
+ */
+status?: string | null;
+/**
+ * Filter by task name
+ */
+task_name?: string | null;
 };

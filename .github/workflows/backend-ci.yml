@@ -45,7 +45,7 @@ jobs:
         run: uv python install 3.11
 
       - name: Install dependencies
-        run: uv sync --all-groups
+        run: uv sync --all-packages --all-groups
 
       - name: Run lint check
         run: task ci-lint
@@ -73,7 +73,7 @@ jobs:
         run: uv python install 3.11
 
       - name: Install dependencies
-        run: uv sync --all-groups
+        run: uv sync --all-packages --all-groups
 
       - name: Run type check
         run: task ci-typecheck
@@ -106,7 +106,7 @@ jobs:
         run: uv python install ${{ matrix.python-version }}
 
       - name: Install dependencies
-        run: uv sync --all-groups
+        run: uv sync --all-packages --all-groups
 
       - name: Run tests with coverage
         run: task ci-test

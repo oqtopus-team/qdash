@@ -5,8 +5,8 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { SeedImportResultItemValue } from "./seedImportResultItemValue";
-import type { SeedImportResultItemMessage } from "./seedImportResultItemMessage";
+import type { SeedImportResultItemValue } from './seedImportResultItemValue';
+import type { SeedImportResultItemMessage } from './seedImportResultItemMessage';
 
 /**
  * Result for a single parameter import.

@@ -5,8 +5,8 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { ProjectResponseDescription } from "./projectResponseDescription";
-import type { ProjectRole } from "./projectRole";
+import type { ProjectResponseDescription } from './projectResponseDescription';
+import type { ProjectRole } from './projectRole';
 
 /**
  * Response schema for project information.

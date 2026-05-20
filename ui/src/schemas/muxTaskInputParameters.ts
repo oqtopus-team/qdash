@@ -5,6 +5,6 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { MuxTaskInputParametersAnyOf } from "./muxTaskInputParametersAnyOf";
+import type { MuxTaskInputParametersAnyOf } from './muxTaskInputParametersAnyOf';
 
 export type MuxTaskInputParameters = MuxTaskInputParametersAnyOf | null;

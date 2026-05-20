@@ -5,7 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { FidelityCondition } from "./fidelityCondition";
+import type { FidelityCondition } from './fidelityCondition';
 
 /**
  * Condition for filtering device topology.

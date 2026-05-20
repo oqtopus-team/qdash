@@ -5,11 +5,11 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
-import type { BulkUserImportResultDisplayName } from "./bulkUserImportResultDisplayName";
-import type { BulkUserImportResultOrganization } from "./bulkUserImportResultOrganization";
-import type { SystemRole } from "./systemRole";
-import type { BulkUserImportResultInitialPassword } from "./bulkUserImportResultInitialPassword";
-import type { BulkUserImportResultMessage } from "./bulkUserImportResultMessage";
+import type { BulkUserImportResultDisplayName } from './bulkUserImportResultDisplayName';
+import type { BulkUserImportResultOrganization } from './bulkUserImportResultOrganization';
+import type { SystemRole } from './systemRole';
+import type { BulkUserImportResultInitialPassword } from './bulkUserImportResultInitialPassword';
+import type { BulkUserImportResultMessage } from './bulkUserImportResultMessage';
 
 /**
  * Result for a single row in a bulk user import.
