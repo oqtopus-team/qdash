@@ -9,6 +9,8 @@ from pathlib import Path
 import yaml
 
 _CONFIG_DIR = Path("/app/config/logging")
+_REPO_ROOT = Path(__file__).resolve().parents[4]
+_LOCAL_CONFIG_DIR = _REPO_ROOT / "config" / "logging"
 
 
 def setup_logging(
@@ -19,12 +21,20 @@ def setup_logging(
 ) -> None:
     """Load a YAML logging config and apply it via ``logging.config.dictConfig``."""
     config_dir = config_dir or _CONFIG_DIR
+    if not config_dir.exists() and config_dir == _CONFIG_DIR:
+        config_dir = _LOCAL_CONFIG_DIR
     yaml_path = config_dir / f"{config_name}.yaml"
 
     log_level = os.getenv("LOG_LEVEL", "INFO").upper()
     log_file = log_file or f"/app/logs/{config_name}.log"
 
-    os.makedirs(os.path.dirname(log_file), exist_ok=True)
+    try:
+        os.makedirs(os.path.dirname(log_file), exist_ok=True)
+    except OSError:
+        if not log_file.startswith("/app/logs/"):
+            raise
+        log_file = str(_REPO_ROOT / "logs" / f"{config_name}.log")
+        os.makedirs(os.path.dirname(log_file), exist_ok=True)
 
     raw = yaml_path.read_text()
     raw = raw.replace("${LOG_LEVEL}", log_level)

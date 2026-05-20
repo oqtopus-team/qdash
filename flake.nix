@@ -44,6 +44,7 @@
             go-task
             jq
             lefthook
+            lsof
             nodejs_20
             pkg-config
             postgresql_14
@@ -54,11 +55,12 @@
 
           env = {
             UV_LINK_MODE = "copy";
+            UV_PYTHON = "${pkgs.python311}/bin/python";
             LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath runtimeLibs;
           };
 
           shellHook = ''
-            export PATH="$PWD/.venv/bin:$PWD/ui/node_modules/.bin:$PATH"
+            export PATH="$PWD/ui/node_modules/.bin:$PATH:$PWD/.venv/bin"
 
             if [ ! -d .venv ]; then
               echo "Run: uv sync --locked --all-groups --all-packages"

@@ -94,9 +94,10 @@ nix develop
 ```
 
 The shell provides Python 3.11, uv, Bun, Node.js 20, go-task, Docker CLI/Compose, jq, PostgreSQL
-client tools, and the secret scanning tools used by the project. It does not start MongoDB,
-PostgreSQL, Prefect, API, or UI services by itself; use the existing Docker Compose tasks for
-those services.
+client tools, and the secret scanning tools used by the project. It also sets `UV_PYTHON` to the
+Nix-provided Python 3.11 so `uv sync` does not accidentally select Python 3.12 on macOS, where
+some workflow backend dependencies may fail to build. It does not start MongoDB, PostgreSQL,
+Prefect, API, or UI services by itself; use the existing Docker Compose tasks for those services.
 
 To load the shell automatically when entering the repository, install
 [direnv](https://direnv.net/) and run:
@@ -112,6 +113,15 @@ uv sync --locked --all-groups --all-packages
 
 cd ui && bun install --frozen-lockfile
 ```
+
+Then start the lightweight development stack:
+
+```shell
+task dev-local
+```
+
+This starts MongoDB, PostgreSQL, Prefect, and the deployment service with Docker Compose, then
+runs the API and UI on the host. The UI is available at <http://localhost:5714>.
 
 ### Install Dependencies
 

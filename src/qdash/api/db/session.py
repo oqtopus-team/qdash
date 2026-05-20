@@ -28,11 +28,13 @@ def get_mongo_client() -> MongoClient[Any]:
     """
     global _client
     if _client is None:
-        # Note: MONGO_PORT is for host-side port mapping, not container-to-container communication
-        # MongoDB always listens on 27017 inside the Docker network
+        mongo_host = os.getenv("MONGO_HOST", "mongo")
+        # MONGO_PORT is for host-side port mapping. Inside the Docker network,
+        # MongoDB always listens on 27017.
+        mongo_port = 27017 if mongo_host == "mongo" else int(os.getenv("MONGO_PORT", "27017"))
         _client = MongoClient(
-            os.getenv("MONGO_HOST", "mongo"),
-            port=27017,
+            mongo_host,
+            port=mongo_port,
             username=os.getenv("MONGO_INITDB_ROOT_USERNAME"),
             password=os.getenv("MONGO_INITDB_ROOT_PASSWORD"),
         )

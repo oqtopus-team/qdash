@@ -21,9 +21,11 @@ def _get_client() -> MongoClient[Any]:
     """Get or create MongoDB client (lazy initialization)."""
     global _client
     if _client is None:
+        mongo_host = os.getenv("MONGO_HOST", "mongo")
+        mongo_port = 27017 if mongo_host == "mongo" else int(os.getenv("MONGO_PORT", "27017"))
         _client = MongoClient(
-            "mongo",  # Docker service name
-            port=27017,  # Docker internal port
+            mongo_host,
+            port=mongo_port,
             username=os.getenv("MONGO_INITDB_ROOT_USERNAME"),
             password=os.getenv("MONGO_INITDB_ROOT_PASSWORD"),
         )
