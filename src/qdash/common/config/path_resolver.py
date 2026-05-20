@@ -32,7 +32,7 @@ def _resolve_runtime_base_path(
     """Resolve a base path with explicit env, container, then repo-local fallback."""
     if env_name:
         env_value = _env_path(env_name)
-        if env_value is not None:
+        if env_value is not None and env_value.exists():
             return env_value
     if container_path.exists():
         return container_path
