@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import base64
-from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol, cast
 
+from qdash.common.config.path_resolver import resolve_calib_data_path
 from qdash.common.utils.json import sanitize_for_json
 
 if TYPE_CHECKING:
     import logging
+    from pathlib import Path
 
 
 class CopilotSupportDataAccessProtocol(Protocol):
@@ -79,7 +80,7 @@ class CopilotSupportService:
         """Read existing PNG figures and return labeled target images."""
         images: list[tuple[str, str]] = []
         for figure_path in figure_paths:
-            path = Path(figure_path)
+            path = resolve_calib_data_path(figure_path)
             if path.is_file() and path.suffix.lower() == ".png":
                 if path.stat().st_size > self._max_figure_size:
                     self._logger.warning("Figure %s exceeds 5MB size limit, skipping", figure_path)

@@ -180,6 +180,37 @@ def test_write_and_read_ai_review_bundle_round_trip(tmp_path: Path) -> None:
         assert "figures/01.json" in zf.namelist()
 
 
+def test_write_ai_review_bundle_maps_container_calib_data_path(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    local_base = tmp_path / "calib_data"
+    figure = local_base / "proj-1" / "figure.png"
+    figure.parent.mkdir(parents=True)
+    figure.write_bytes(b"png-bytes")
+    monkeypatch.setenv("CALIB_DATA_PATH", str(local_base))
+
+    context = _bundle_context(tmp_path)
+    context.figures = [
+        AIReviewFigureEntry(
+            source_path="/app/calib_data/proj-1/figure.png",
+            archive_path="figures/00.png",
+        )
+    ]
+    output_path = tmp_path / "bundle.zip"
+
+    write_ai_review_bundle(
+        output_path=output_path,
+        manifest=_manifest(),
+        bundle_context=context,
+        runtime_config=_runtime_config(),
+        prompt_text="review prompt",
+    )
+
+    with ZipFile(output_path) as zf:
+        assert zf.read("figures/00.png") == b"png-bytes"
+
+
 def test_export_ai_review_replay_bundle_uses_shared_review_inputs(tmp_path: Path) -> None:
     output_path = tmp_path / "exported.zip"
     config = _config()

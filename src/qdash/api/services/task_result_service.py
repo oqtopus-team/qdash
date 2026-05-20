@@ -35,6 +35,7 @@ from qdash.api.schemas.task_result import (
     TimeSeriesData,
     TimeSeriesProjection,
 )
+from qdash.common.config.path_resolver import resolve_calib_data_path
 from qdash.common.utils.datetime import (
     end_of_day,
     now,
@@ -1162,7 +1163,8 @@ class TaskResultService:
         if not paths and not ai_review_entries and not ai_review_bundle_entries:
             raise HTTPException(status_code=400, detail="No files provided")
 
-        missing = [p for p in paths if not Path(p).exists()]
+        resolved_paths = [(p, resolve_calib_data_path(p)) for p in paths]
+        missing = [p for p, resolved in resolved_paths if not resolved.exists()]
         if missing:
             detail = f"Files not found: {', '.join(missing[:5])}"
             if len(missing) > 5:
@@ -1171,8 +1173,7 @@ class TaskResultService:
 
         zip_buffer = io.BytesIO()
         with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
-            for file_path in paths:
-                path = Path(file_path)
+            for _, path in resolved_paths:
                 zf.write(path, path.name)
             for entry_name, note_content in ai_review_entries:
                 zf.writestr(entry_name, note_content)

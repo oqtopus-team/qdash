@@ -434,6 +434,24 @@ def test_create_figures_zip_includes_ai_review_markdown(tmp_path) -> None:
         )
 
 
+def test_create_figures_zip_maps_container_calib_data_path(tmp_path, monkeypatch) -> None:
+    local_base = tmp_path / "calib_data"
+    figure = local_base / "proj-1" / "figure.json"
+    figure.parent.mkdir(parents=True)
+    figure.write_text('{"data":[]}', encoding="utf-8")
+    monkeypatch.setenv("CALIB_DATA_PATH", str(local_base))
+
+    buffer, filename = TaskResultService.create_figures_zip(
+        ["/app/calib_data/proj-1/figure.json"],
+        "artifacts.zip",
+    )
+
+    assert filename == "artifacts.zip"
+    with zipfile.ZipFile(buffer) as archive:
+        assert archive.namelist() == ["figure.json"]
+        assert archive.read("figure.json").decode() == '{"data":[]}'
+
+
 def test_create_figures_zip_includes_ai_review_replay_bundle(tmp_path) -> None:
     figure = tmp_path / "figure.json"
     figure.write_text('{"data":[]}', encoding="utf-8")

@@ -348,6 +348,7 @@ export function Sidebar() {
                 width={100}
                 height={25}
                 className="object-contain"
+                style={{ height: "auto" }}
                 priority
               />
             </Link>

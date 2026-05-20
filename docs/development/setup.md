@@ -109,9 +109,7 @@ direnv allow
 After entering the Nix shell for the first time, install project dependencies:
 
 ```shell
-uv sync --locked --all-groups --all-packages
-
-cd ui && bun install --frozen-lockfile
+task dev-local-setup
 ```
 
 Then start the lightweight development stack:
@@ -200,7 +198,7 @@ task fmt-ui
 task lint
 
 # Run mypy type checking
-task lint-mypy
+task ci-typecheck
 ```
 
 ### Testing

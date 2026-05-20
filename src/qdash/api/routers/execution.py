@@ -7,7 +7,6 @@ Business logic is delegated to ExecutionService for better testability.
 from __future__ import annotations
 
 import logging
-from pathlib import Path
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
@@ -31,6 +30,7 @@ from qdash.api.schemas.execution import (
 from qdash.api.schemas.flow import ExecuteFlowResponse
 from qdash.api.services.execution_service import ExecutionService
 from qdash.api.services.flow_service import FlowService
+from qdash.common.config.path_resolver import resolve_calib_data_path
 
 router = APIRouter()
 
@@ -66,13 +66,14 @@ def get_figure_by_path(path: str) -> FileResponse:
         404 if the file does not exist at the specified path
 
     """
-    if not Path(path).exists():
+    resolved_path = resolve_calib_data_path(path)
+    if not resolved_path.exists():
         raise HTTPException(
             status_code=404,
             detail=f"File not found: {path}",
         )
     # FileResponse sets Content-Length, avoiding chunked encoding
-    return FileResponse(path, media_type="image/png")
+    return FileResponse(resolved_path, media_type="image/png")
 
 
 @router.get(

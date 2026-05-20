@@ -8,9 +8,6 @@ import logging
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
 
-if TYPE_CHECKING:
-    from pathlib import Path
-
 from fastapi import HTTPException
 
 from qdash.api.lib.file_utils import validate_relative_path
@@ -31,9 +28,12 @@ from qdash.common.config.backend import (
     load_backend_config,
 )
 from qdash.common.config.loader import ConfigLoader
-from qdash.common.config.paths import CALIBTASKS_DIR
+from qdash.common.config.path_resolver import resolve_calibtasks_base_path
 
 logger = logging.getLogger(__name__)
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 class TaskFileService:
@@ -48,7 +48,7 @@ class TaskFileService:
             Base path for calibration task files. Defaults to CALIBTASKS_DIR.
 
         """
-        self._base_path = calibtasks_base_path or CALIBTASKS_DIR
+        self._base_path = calibtasks_base_path or resolve_calibtasks_base_path()
         self._task_cache: dict[str, tuple[float, list[TaskInfo]]] = {}
 
     def get_settings(self) -> TaskFileSettings:
