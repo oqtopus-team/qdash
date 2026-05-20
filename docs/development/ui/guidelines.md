@@ -17,8 +17,8 @@
 | -------------------- | -------------------------------------- |
 | Tailwind CSS         | Utility-first CSS framework            |
 | DaisyUI              | Component library built on Tailwind    |
-| plotly.js-basic-dist | Lightweight data visualization         |
-| React Flow           | Node-based diagrams and workflows      |
+| plotly.js-dist-min   | Plotly chart rendering                 |
+| XYFlow               | Node-based diagrams and workflows      |
 | Lucide React         | Icon components (see [design-policy.md](design-policy.md)) |
 
 ### State Management
@@ -760,12 +760,12 @@ Before committing, ensure:
 
 ```bash
 # Install dependencies
-bun install
+task dev-local-setup
 
-# Start development server
-bun run dev
+# Start the host-side development stack
+task dev-local
 
-# Access at http://localhost:3000
+# Access at http://localhost:5714
 ```
 
 ### API Client Generation
@@ -782,10 +782,6 @@ task generate
 ```bash
 # Build production bundle
 bun run build
-
-# Start production server
-bun run start
-```
 
 ### Common Tasks
 

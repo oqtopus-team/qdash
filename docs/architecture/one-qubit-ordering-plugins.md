@@ -231,7 +231,7 @@ def frequency_aware_calibration(username: str, chip_id: str):
     """Calibration with frequency-aware qubit ordering."""
     scheduler = OneQubitScheduler(
         chip_id=chip_id,
-        wiring_config_path=f"/app/config/qubex/{chip_id}/config/wiring.yaml",
+        wiring_config_path=f"/app/config/qubex-config/{chip_id}/config/wiring.yaml",
     )
 
     # Generate schedule with checkerboard ordering
@@ -494,7 +494,7 @@ def synchronized_calibration(username: str, chip_id: str):
 
 - [1-Qubit Scheduler](./one-qubit-scheduler.md) - Core scheduler documentation
 - [Square Lattice Topology](./square-lattice-topology.md) - Chip layout details
-- Source: `src/qdash/workflow/engine/calibration/scheduler/one_qubit_plugins.py`
-- Source: `src/qdash/workflow/engine/calibration/scheduler/one_qubit_scheduler.py`
-- Tests: `tests/qdash/workflow/engine/calibration/scheduler/test_one_qubit_plugins.py`
-- Tests: `tests/qdash/workflow/engine/calibration/scheduler/test_one_qubit_scheduler.py`
+- Source: `src/qdash/workflow/engine/scheduler/one_qubit_plugins.py`
+- Source: `src/qdash/workflow/engine/scheduler/one_qubit_scheduler.py`
+- Tests: `tests/qdash/workflow/engine/scheduler/test_one_qubit_plugins.py`
+- Tests: `tests/qdash/workflow/engine/scheduler/test_one_qubit_scheduler.py`

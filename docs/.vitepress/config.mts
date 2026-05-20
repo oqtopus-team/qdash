@@ -61,7 +61,8 @@ export default withMermaid(
 
       nav: [
         { text: "Home", link: "/" },
-        { text: "Guide", link: "/getting-started/what-is-qdash" },
+        { text: "Operator Guide", link: "/operator-guide/" },
+        { text: "Developer Guide", link: "/developer-guide/" },
         { text: "Reference", link: "/reference/database-structure" },
         {
           text: "Links",
@@ -82,8 +83,12 @@ export default withMermaid(
           ],
         },
         {
-          text: "User Guide",
+          text: "Operator Guide",
           items: [
+            { text: "Overview", link: "/operator-guide/" },
+            { text: "Setup", link: "/operator-guide/setup" },
+            { text: "Operations", link: "/operator-guide/operations" },
+            { text: "Workflows", link: "/operator-guide/workflows" },
             {
               text: "Authentication",
               link: "/user-guide/authentication",
@@ -103,23 +108,37 @@ export default withMermaid(
           ],
         },
         {
-          text: "Development",
+          text: "Developer Guide",
           collapsed: false,
           items: [
-            {
-              text: "Development Flow",
-              link: "/development/development-flow",
-            },
-            { text: "Setup", link: "/development/setup" },
-            { text: "Datetime Handling", link: "/development/datetime" },
-            { text: "Logging", link: "/development/logging" },
-            { text: "Credential Scanning", link: "/development/credential-scan" },
+            { text: "Overview", link: "/developer-guide/" },
+            { text: "Setup", link: "/developer-guide/setup" },
+            { text: "Codebase", link: "/developer-guide/codebase" },
+            { text: "Commands", link: "/developer-guide/commands" },
+            { text: "Testing", link: "/developer-guide/testing" },
+          ],
+        },
+        {
+          text: "Developer Deep Dives",
+          collapsed: true,
+          items: [
+            { text: "Development Flow", link: "/development/development-flow" },
+            { text: "Full Setup Notes", link: "/development/setup" },
             {
               text: "API",
               collapsed: true,
               items: [
                 { text: "Design Guidelines", link: "/development/api/design" },
                 { text: "Testing", link: "/development/api/testing" },
+              ],
+            },
+            {
+              text: "Workflow",
+              collapsed: true,
+              items: [
+                { text: "Quickstart", link: "/development/workflow/quickstart" },
+                { text: "Engine Architecture", link: "/development/workflow/engine-architecture" },
+                { text: "Testing", link: "/development/workflow/testing" },
               ],
             },
             {
@@ -133,22 +152,16 @@ export default withMermaid(
               ],
             },
             {
-              text: "Workflow",
-              collapsed: true,
-              items: [
-                { text: "Engine Architecture", link: "/development/workflow/engine-architecture" },
-                { text: "Testing", link: "/development/workflow/testing" },
-              ],
-            },
-            {
               text: "Copilot",
               collapsed: true,
               items: [
                 { text: "Architecture", link: "/development/copilot/architecture" },
+                { text: "AI Review Evals", link: "/development/copilot/ai-review-evals" },
                 { text: "Sandbox", link: "/development/copilot/sandbox" },
                 { text: "LLM Agent", link: "/development/copilot/agent" },
                 { text: "LLM Integration Patterns", link: "/development/copilot/llm-integration-patterns" },
                 { text: "SSE Streaming", link: "/development/copilot/streaming" },
+                { text: "Tool Result Compression", link: "/development/copilot/tool-result-compression" },
               ],
             },
             {
@@ -158,6 +171,11 @@ export default withMermaid(
                 { text: "Architecture", link: "/development/issues/architecture" },
               ],
             },
+            { text: "Datetime Handling", link: "/development/datetime" },
+            { text: "Logging", link: "/development/logging" },
+            { text: "QID Validation", link: "/development/qid-validation" },
+            { text: "Credential Scanning", link: "/development/credential-scan" },
+            { text: "Docs Guidelines", link: "/development/docs-guidelines" },
           ],
         },
         {
@@ -180,7 +198,7 @@ export default withMermaid(
           items: taskKnowledgeSidebar,
         },
         {
-          text: "Architecture Details",
+          text: "Architecture Deep Dives",
           collapsed: true,
           items: [
             { text: "Overview", link: "/architecture/README" },

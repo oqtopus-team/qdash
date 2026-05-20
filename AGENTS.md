@@ -51,7 +51,9 @@ When backend API schemas or routes change, run `task generate` from the reposito
 Run commands from the repository root unless a directory is specified.
 
 - Show available tasks: `task -l`
-- Start full local stack: `task deploy-local`
+- Install host-side local dependencies: `task dev-local-setup`
+- Start lightweight host-side stack: `task dev-local`
+- Start full Docker Compose stack: `task deploy-local`
 - Start API only: `uvicorn src.qdash.api.main:app --reload`
 - Start UI dev server: `task dev-ui` or `bun run dev` in `ui/`
 - Generate API client: `task generate`
@@ -116,4 +118,3 @@ Prefer focused tests for narrow changes, then broader checks when touching share
 - If changing UI behavior, add or adjust Vitest tests where practical and run the relevant UI checks.
 - If changing workflow or repository behavior, run the matching Python tests.
 - Mention any verification that could not be run and why.
-

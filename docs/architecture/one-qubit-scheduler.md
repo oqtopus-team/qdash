@@ -214,7 +214,7 @@ for i, stage in enumerate(schedule.stages, 1):
 
 ## References
 
-- Core Implementation: `src/qdash/workflow/engine/calibration/scheduler/one_qubit_scheduler.py`
-- Tests: `tests/qdash/workflow/engine/calibration/scheduler/test_one_qubit_scheduler.py`
+- Core Implementation: `src/qdash/workflow/engine/scheduler/one_qubit_scheduler.py`
+- Tests: `tests/qdash/workflow/engine/scheduler/test_one_qubit_scheduler.py`
 - CR Scheduler: [CR Gate Scheduler](./cr-scheduler.md)
 - Topology: [Square Lattice Topology](./square-lattice-topology.md)
