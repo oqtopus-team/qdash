@@ -99,13 +99,6 @@ Nix-provided Python 3.11 so `uv sync` does not accidentally select Python 3.12 o
 some workflow backend dependencies may fail to build. It does not start MongoDB, PostgreSQL,
 Prefect, API, or UI services by itself; use the existing Docker Compose tasks for those services.
 
-To load the shell automatically when entering the repository, install
-[direnv](https://direnv.net/) and run:
-
-```shell
-direnv allow
-```
-
 After entering the Nix shell for the first time, install project dependencies:
 
 ```shell
