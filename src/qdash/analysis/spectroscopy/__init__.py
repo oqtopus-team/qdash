@@ -39,7 +39,12 @@ from qdash.analysis.spectroscopy.estimate_resonator_frequency import (
     estimate_resonator_frequency,
     estimate_resonator_frequency_from_figure,
 )
-from qdash.analysis.spectroscopy.mux import NUM_RESONATORS, PEAK_POSITIONS
+from qdash.analysis.spectroscopy.mux import (
+    NUM_RESONATORS,
+    PEAK_POSITIONS,
+    guess_sorted_slots_for_partial_mux,
+    qid_for_sorted_slot,
+)
 from qdash.analysis.spectroscopy.remove_false_spike import (
     RemoveFalseSpikeRange,
     remove_false_spike,
@@ -53,23 +58,18 @@ from qdash.analysis.spectroscopy.representative_y import (
 )
 
 __all__ = [
-    # MUX layout
     "NUM_RESONATORS",
     "PEAK_POSITIONS",
-    # Bare-shift boundary estimation
     "BareShiftBoundary",
     "BareShiftBoundaryEstimator",
     "BareShiftDebugOptions",
-    # Resonator frequency estimation
     "ComposeResonancesConfig",
     "ConfigBareShiftBoundaryEstimator",
-    # Qubit frequency estimation
     "EstimateQubitFrequencyConfig",
     "EstimateResonatorFrequencyConfig",
     "F01Result",
     "F12Result",
     "FindPeaksConfig",
-    # Representative-y strategies
     "FirstPointMeetingWidthFromTipStrategy",
     "GroupPeaksConfig",
     "GroupResonancesConfig",
@@ -79,7 +79,6 @@ __all__ = [
     "PeakRepresentativeYStrategy",
     "QubitFrequencyResult",
     "QubitResponse",
-    # Remove false spike
     "RemoveFalseSpikeRange",
     "Resonance",
     "WidthEstimator",
@@ -95,6 +94,8 @@ __all__ = [
     "estimate_qubit_frequency_from_figure",
     "estimate_resonator_frequency",
     "estimate_resonator_frequency_from_figure",
+    "guess_sorted_slots_for_partial_mux",
+    "qid_for_sorted_slot",
     "remove_false_spike",
     "remove_false_spike_from_figure",
 ]
