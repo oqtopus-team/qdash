@@ -89,21 +89,14 @@ Gitleaks runs on every commit via a Lefthook-managed pre-commit hook and blocks 
 
 `task check` includes `scan-leaks`.
 
-## Claude Code Custom Commands
+## Pull Requests
 
-The project includes custom slash commands for Claude Code to assist with development:
+Open pull requests against `develop` unless the release process requires another base branch.
+Use the repository pull request template and keep the description focused on the behavior change,
+important implementation notes, and verification performed.
 
-| Command           | Description                                           |
-| ----------------- | ----------------------------------------------------- |
-| `/commit`         | Analyze changes and suggest a commit message          |
-| `/suggest-commit` | Generate commit message suggestion without committing |
-| `/auto-commit`    | Automatically commit with generated message           |
-
-### Using Task Commands
-
-For manual commit assistance, you can also use:
+Before opening a PR, run focused checks for the files you changed. For broad changes, prefer:
 
 ```bash
-task commit    # Interactive auto-commit script
-task ac        # Alias for task commit
+task check
 ```

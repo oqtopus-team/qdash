@@ -249,30 +249,26 @@ Edges are named as `"q1-q2"` where:
 - `q2` is the higher qubit ID
 - Example: `"0-1"`, `"16-17"`, `"1-4"`
 
-## Visualization Tools
+## Topology Generation
 
-### Available Tools
+### Available Script
 
-1. **`src/tools/cr_scheduler_visualizer.py`**
-   - Visualizes CR schedule with color-coded groups
-   - Shows qubit lattice layout
-   - Highlights MUX boundaries
-
-2. **`src/tools/device_topology_generator.py`**
+1. **`scripts/generate_topology.py`**
    - Generates device topology configurations
    - Exports coupling graph data
 
 ### Usage
 
 ```bash
-# Generate CR schedule visualization
-python src/tools/cr_scheduler_visualizer.py
-
-# Output: .tmp/schedule_output/combined_schedule.png
+# Generate a 64-qubit square-lattice topology
+uv run python scripts/generate_topology.py \
+  --template square-lattice-mux \
+  --size 64 \
+  --output config/topologies/64q-square-lattice.yaml
 ```
 
 ## References
 
-- Wiring configuration: `/workspace/qdash/config/qubex/{chip_id}/config/wiring.yaml`
-- CR Scheduler implementation: `src/qdash/workflow/engine/calibration/cr_scheduler.py`
-- Visualization tools: `src/tools/`
+- Wiring configuration: `config/qubex-config/{chip_id}/config/wiring.yaml`
+- CR Scheduler implementation: `src/qdash/workflow/engine/scheduler/cr_scheduler.py`
+- Topology generator: `scripts/generate_topology.py`

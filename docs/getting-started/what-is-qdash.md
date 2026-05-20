@@ -64,10 +64,10 @@ Here are some screenshots of QDash in action:
 
 ### Frontend
 
-- **Framework**: Next.js 14, React 18
+- **Framework**: Next.js 16, React 19
 - **Language**: TypeScript
 - **Styling**: Tailwind CSS, DaisyUI
-- **Charts**: Plotly.js, React Flow
+- **Charts**: Plotly.js, XYFlow
 - **State Management**: TanStack Query
 
 ### Backend

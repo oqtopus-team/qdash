@@ -654,7 +654,7 @@ def register_user(
 When adding new endpoints or modifying existing ones:
 
 1. **Follow conventions from the start**: Use this guide for all new development
-2. **Update clients immediately**: Regenerate API clients after changes (`bun run generate-qdash`)
+2. **Update clients immediately**: Regenerate API clients after changes (`task generate`)
 3. **Avoid breaking changes**: If breaking changes are necessary, use versioning or deprecation
 
 ### Deprecation Pattern
@@ -678,4 +678,3 @@ def list_chips():
 def list_chips_v2():
     pass
 ```
-
