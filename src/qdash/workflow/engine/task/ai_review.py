@@ -326,8 +326,11 @@ def _has_ai_review_note(
     execution_model: ExecutionModel,
 ) -> bool:
     """Return whether this task result already has an AI review note section."""
-    existing = _get_existing_task_note_content(task, execution_model)
-    return bool(existing and AI_REVIEW_SECTION_RE.search(existing))
+    existing = _get_existing_ai_review_note_content(task, execution_model)
+    if existing:
+        return True
+    legacy = _get_existing_task_note_content(task, execution_model)
+    return bool(legacy and AI_REVIEW_SECTION_RE.search(legacy))
 
 
 def _upsert_ai_review_note(
@@ -337,22 +340,13 @@ def _upsert_ai_review_note(
     model: ModelConfig,
 ) -> None:
     """Insert or replace the AI review section in the task-result note."""
-    existing = _get_existing_task_note_content(task, execution_model)
-
     review_section = (
         f"{AI_REVIEW_HEADER}\n\n{_format_review_metadata(model)}\n\n{_truncate_markdown(markdown)}"
     )
-    if AI_REVIEW_SECTION_RE.search(existing):
-        remainder = AI_REVIEW_SECTION_RE.sub("", existing).strip()
-        content = (
-            f"{review_section}{AI_REVIEW_SEPARATOR}{remainder}" if remainder else review_section
-        )
-    elif existing.strip():
-        content = f"{review_section}{AI_REVIEW_SEPARATOR}{existing.rstrip()}"
-    else:
-        content = review_section
 
-    _set_task_note_content(task, execution_model, content[:MAX_AI_REVIEW_NOTE_CHARS], model)
+    _set_ai_review_note_content(
+        task, execution_model, review_section[:MAX_AI_REVIEW_NOTE_CHARS], model
+    )
 
 
 def _get_existing_task_note_content(
@@ -370,13 +364,28 @@ def _get_existing_task_note_content(
     return doc.user_note.content or ""
 
 
-def _set_task_note_content(
+def _get_existing_ai_review_note_content(
+    task: BaseTaskResultModel,
+    execution_model: ExecutionModel,
+) -> str:
+    """Load the AI-generated review note content directly from history."""
+    from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
+
+    doc = TaskResultHistoryDocument.find_one(
+        {"project_id": execution_model.project_id, "task_id": task.task_id}
+    ).run()
+    if doc is None:
+        return ""
+    return doc.ai_review_note.content or ""
+
+
+def _set_ai_review_note_content(
     task: BaseTaskResultModel,
     execution_model: ExecutionModel,
     content: str,
     model: ModelConfig,
 ) -> None:
-    """Persist the dashboard-facing task-result note directly on history."""
+    """Persist the AI-generated review note directly on history."""
     from qdash.common.utils.datetime import now
     from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
 
@@ -386,9 +395,9 @@ def _set_task_note_content(
     ).run()
     if doc is None:
         raise ValueError(f"Task result not found: {task.task_id}")
-    doc.user_note.content = content
-    doc.user_note.updated_by = AI_REVIEW_ACTOR
-    doc.user_note.updated_at = timestamp
+    doc.ai_review_note.content = content
+    doc.ai_review_note.updated_by = AI_REVIEW_ACTOR
+    doc.ai_review_note.updated_at = timestamp
     doc.ai_review.status = "completed"
     doc.ai_review.model_provider = model.provider
     doc.ai_review.model_name = model.name

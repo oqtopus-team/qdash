@@ -2,6 +2,7 @@
 
 from datetime import UTC, datetime
 
+from qdash.datamodel.note import NoteModel
 from qdash.datamodel.project import ProjectRole
 from qdash.datamodel.system_info import SystemInfoModel
 from qdash.dbmodel.chip import ChipDocument
@@ -11,6 +12,7 @@ from qdash.dbmodel.metric_note import MetricNoteDocument
 from qdash.dbmodel.project import ProjectDocument
 from qdash.dbmodel.project_membership import ProjectMembershipDocument
 from qdash.dbmodel.qubit import QubitDocument
+from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
 from qdash.dbmodel.user import UserDocument
 
 
@@ -49,6 +51,40 @@ def _create_chip(*, cooldown_id: str | None = "cd-1") -> None:
         size=64,
         current_cooldown_id=cooldown_id,
         system_info=SystemInfoModel(),
+    ).insert()
+
+
+def _create_task_result(
+    *,
+    task_id: str,
+    qid: str = "63",
+    note: NoteModel,
+) -> None:
+    TaskResultHistoryDocument(
+        project_id="note_project",
+        username="note_user",
+        task_id=task_id,
+        name="CheckQubitSpectroscopy",
+        upstream_id="",
+        status="completed",
+        message="",
+        input_parameters={},
+        output_parameters={},
+        output_parameter_names=[],
+        note={},
+        user_note=note,
+        figure_path=[],
+        json_figure_path=[],
+        raw_data_path=[],
+        start_at=datetime(2026, 1, 1, tzinfo=UTC),
+        end_at=datetime(2026, 1, 1, tzinfo=UTC),
+        elapsed_time=1.0,
+        task_type="qubit",
+        system_info=SystemInfoModel(),
+        qid=qid,
+        execution_id="exec-1",
+        tags=[],
+        chip_id="chip-1",
     ).insert()
 
 
@@ -251,3 +287,47 @@ def test_time_range_scope_infers_later_cooldown_document(test_client, init_db):
     assert metric_note is not None
     assert metric_note.scope_key == "cooldown:cd-later"
     assert metric_note.scope_source == "inferred_from_range"
+
+
+def test_notes_summary_classifies_old_ai_triage_task_notes(test_client, init_db):
+    headers = _create_project_user()
+    _create_chip(cooldown_id=None)
+    _create_task_result(
+        task_id="task-ai",
+        note=NoteModel(
+            content=(
+                "## AI triage *Reviewed by: ollama/gemma4:26b at "
+                "2026-05-18T01:40:05.413718+00:00* **Review triage** "
+                "- Decision: `PASS_WITH_NOTE`"
+            ),
+            updated_by="qdash-ai",
+            updated_at=datetime(2026, 5, 19, tzinfo=UTC),
+        ),
+    )
+
+    response = test_client.get("/chips/chip-1/notes-summary", headers=headers)
+
+    assert response.status_code == 200
+    task_note = response.json()["task_notes"][0]
+    assert task_note["note"]["content"] == ""
+    assert task_note["ai_review_note"]["content"].startswith("## AI triage")
+
+
+def test_notes_summary_keeps_user_part_when_ai_review_prefix_exists(test_client, init_db):
+    headers = _create_project_user()
+    _create_chip(cooldown_id=None)
+    _create_task_result(
+        task_id="task-user",
+        note=NoteModel(
+            content="## AI review\n\n- Decision: `PASS`\n\n---\n\noperator follow-up",
+            updated_by="note_user",
+            updated_at=datetime(2026, 5, 19, tzinfo=UTC),
+        ),
+    )
+
+    response = test_client.get("/chips/chip-1/notes-summary", headers=headers)
+
+    assert response.status_code == 200
+    task_note = response.json()["task_notes"][0]
+    assert task_note["note"]["content"] == "operator follow-up"
+    assert task_note["ai_review_note"]["content"].startswith("## AI review")

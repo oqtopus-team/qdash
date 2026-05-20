@@ -30,7 +30,6 @@ import { useMetricsUrlState, useRangeModeUrlState } from "@/hooks/useUrlState";
 import { dateToDateTimeLocal } from "@/lib/utils/datetime";
 
 import { DashboardCdfChart } from "./DashboardCdfChart";
-import { DashboardAiInsights } from "./DashboardAiInsights";
 import { DashboardCouplingGrid } from "./DashboardCouplingGrid";
 import { DashboardNotesSummary } from "./DashboardNotesSummary";
 import { DashboardQubitGrid } from "./DashboardQubitGrid";
@@ -241,7 +240,7 @@ export function DashboardPageContent() {
         .map((t) => ({
           taskId: t.task_id,
           qid: t.qid,
-          content: stripAiReviewSection(t.note?.content ?? ""),
+          content: stripAiGeneratedNoteSections(t.note?.content ?? ""),
           username: t.note?.updated_by ?? "",
           updatedAt: t.note?.updated_at ?? "",
         }))
@@ -254,11 +253,13 @@ export function DashboardPageContent() {
     const collect = (entries: TargetNoteEntry[] | undefined) => {
       (entries ?? []).forEach((entry) => {
         Object.entries(entry.metric_notes ?? {}).forEach(([metricKey, note]) => {
+          const content = stripAiGeneratedNoteSections(note?.content ?? "");
+          if (!content) return;
           if (!map[metricKey]) map[metricKey] = {};
           map[metricKey][entry.target_id] = {
             targetId: entry.target_id,
             metricKey,
-            content: note?.content ?? "",
+            content,
             username: note?.updated_by ?? "",
             updatedAt: note?.updated_at ?? "",
           };
@@ -279,12 +280,14 @@ export function DashboardPageContent() {
     const collect = (entries: TargetNoteEntry[] | undefined) => {
       (entries ?? []).forEach((entry) => {
         Object.entries(entry.metric_notes ?? {}).forEach(([metricKey, note]) => {
+          const content = stripAiGeneratedNoteSections(note?.content ?? "");
+          if (!content) return;
           if (!map[entry.target_id]) map[entry.target_id] = [];
           map[entry.target_id].push({
             targetId: entry.target_id,
             metricKey,
             metricTitle: titleByKey.get(metricKey) ?? metricKey,
-            content: note?.content ?? "",
+            content,
             username: note?.updated_by ?? "",
             updatedAt: note?.updated_at ?? "",
           });
@@ -460,21 +463,6 @@ export function DashboardPageContent() {
           />
         ) : (
           <>
-            {/* Chip-level operational insights */}
-            <Card
-              variant="default"
-              padding="md"
-              title="AI Insights"
-              description="High-signal operational patterns extracted from AI review notes and dashboard context."
-            >
-              <DashboardAiInsights
-                chipId={selectedChip}
-                selectionMode={selectionMode}
-                startAt={queryParams.start_at}
-                endAt={queryParams.end_at}
-              />
-            </Card>
-
             {/* All notes overview */}
             <Card
               variant="default"
@@ -697,6 +685,10 @@ export function DashboardPageContent() {
   );
 }
 
-function stripAiReviewSection(content: string): string {
-  return content.replace(/^## AI review\n\n.*?(?:\n\n---\n\n|$)/s, "").trim();
+function stripAiGeneratedNoteSections(content: string): string {
+  const aiGeneratedNotePattern = new RegExp(
+    "^\\s*(?:(?:#{1,6}\\s*)?AI\\s+(?:review|triage)|\\*\\*AI\\s+(?:review|triage)\\*\\*)\\b[\\s\\S]*?(?:\\r?\\n\\r?\\n---\\r?\\n\\r?\\n|$)",
+    "i",
+  );
+  return content.replace(aiGeneratedNotePattern, "").trim();
 }
