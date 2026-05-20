@@ -20,18 +20,18 @@
 #   workflow:
 #     volumes:
 #       - /nas/shared/calib_data:/app/calib_data
-#       - /nas/shared/qubex_config:/app/config/qubex
+#       - /nas/shared/qubex_config:/app/config/qubex-config
 #
 #   api:
 #     volumes:
 #       - /nas/shared/calib_data:/app/calib_data
 #       - /nas/shared/qpu_data:/app/qpu_data
-#       - /nas/shared/qubex_config:/app/config/qubex
+#       - /nas/shared/qubex_config:/app/config/qubex-config
 #
 #   user-flow-worker:
 #     volumes:
 #       - /nas/shared/calib_data:/app/calib_data
-#       - /nas/shared/qubex_config:/app/config/qubex
+#       - /nas/shared/qubex_config:/app/config/qubex-config
 
 # -----------------------------------------------------------------------------
 # Example: Custom network with static IPs
