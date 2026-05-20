@@ -23,6 +23,7 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 from pymongo import MongoClient
+from pymongo.errors import ServerSelectionTimeoutError
 
 if TYPE_CHECKING:
     from pymongo.collection import Collection
@@ -115,7 +116,9 @@ def apply_cleanup_plan(collection: Collection[dict[str, Any]], doc: dict[str, An
     return result.modified_count > 0
 
 
-def _mongo_uri() -> str:
+def _mongo_uri(args: argparse.Namespace) -> str:
+    if args.mongodb_uri:
+        return args.mongodb_uri
     if uri := os.getenv("MONGO_URI"):
         return uri
     user = os.getenv("MONGO_INITDB_ROOT_USERNAME")
@@ -144,9 +147,28 @@ def _query(args: argparse.Namespace) -> dict[str, Any]:
 
 
 def run(args: argparse.Namespace) -> int:
-    client: MongoClient[Any] = MongoClient(_mongo_uri())
+    client: MongoClient[Any] = MongoClient(
+        _mongo_uri(args),
+        serverSelectionTimeoutMS=args.server_selection_timeout_ms,
+    )
     db = client[os.getenv("MONGO_DB_NAME", "qdash")]
     collection = db["task_result_history"]
+
+    try:
+        client.admin.command("ping")
+    except ServerSelectionTimeoutError as exc:
+        print(f"ERROR: Could not connect to MongoDB: {exc}", file=sys.stderr)
+        print(
+            "Hint: start Mongo with `docker compose up -d mongo`, or pass "
+            "`--mongodb-uri mongodb://USER:PASSWORD@HOST:PORT/`.",
+            file=sys.stderr,
+        )
+        print(
+            "When running inside the compose network, HOST is usually `mongo` and PORT is `27017`. "
+            "From the host, PORT is the published `MONGO_PORT` from `.env`.",
+            file=sys.stderr,
+        )
+        return 2
 
     scanned = 0
     matched = 0
@@ -195,6 +217,16 @@ def main() -> int:
     )
     parser.add_argument("--apply", action="store_true", help="Write changes to MongoDB")
     parser.add_argument("--dry-run", action="store_true", help="Preview only (default)")
+    parser.add_argument(
+        "--mongodb-uri",
+        help="MongoDB URI. Defaults to MONGO_URI or MONGO_* environment variables.",
+    )
+    parser.add_argument(
+        "--server-selection-timeout-ms",
+        type=int,
+        default=5000,
+        help="MongoDB connection timeout in milliseconds",
+    )
     parser.add_argument("--project-id", help="Limit cleanup to one project")
     parser.add_argument("--chip-id", help="Limit cleanup to one chip")
     parser.add_argument("--task-id", help="Limit cleanup to one task result")
