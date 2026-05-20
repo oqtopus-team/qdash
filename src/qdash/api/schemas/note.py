@@ -19,6 +19,10 @@ class TaskNoteEntry(BaseModel):
     task_id: str
     qid: str
     note: NoteModel
+    ai_review_note: NoteModel = Field(
+        default_factory=NoteModel,
+        description="AI-generated review note for this task result",
+    )
 
 
 class TargetNoteEntry(BaseModel):

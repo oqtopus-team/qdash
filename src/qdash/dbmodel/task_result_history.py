@@ -54,6 +54,10 @@ class TaskResultHistoryDocument(Document):
         default_factory=NoteModel,
         description="Free-form user note attached to this task result (dashboard)",
     )
+    ai_review_note: NoteModel = Field(
+        default_factory=NoteModel,
+        description="AI-generated review note attached to this task result",
+    )
     ai_review: AiReviewModel = Field(
         default_factory=AiReviewModel,
         description="Persistent AI review request state for this task result",

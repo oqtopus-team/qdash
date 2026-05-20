@@ -60,6 +60,7 @@ from qdash.copilot.review import (
 from qdash.copilot.review import (
     select_analysis_model as _shared_select_analysis_model,
 )
+from qdash.datamodel.note import NoteModel
 from qdash.datamodel.task import ParameterModel
 
 if TYPE_CHECKING:
@@ -141,7 +142,8 @@ def _target_label(qid: str) -> str:
 
 
 def _parse_ai_review_item(doc: TaskResultHistoryDocument) -> AiReviewListItem:
-    content = doc.user_note.content or ""
+    ai_review_note = getattr(doc, "ai_review_note", NoteModel())
+    content = ai_review_note.content or doc.user_note.content or ""
     match = AI_REVIEW_SECTION_RE.search(content)
     review_markdown = match.group(0).strip() if match else content.strip()
     body = match.group("body") if match else content
@@ -176,7 +178,7 @@ def _parse_ai_review_item(doc: TaskResultHistoryDocument) -> AiReviewListItem:
         requested_by=doc.ai_review.requested_by,
         requested_at=doc.ai_review.requested_at,
         completed_at=doc.ai_review.completed_at,
-        note_updated_at=doc.user_note.updated_at,
+        note_updated_at=ai_review_note.updated_at or doc.user_note.updated_at,
         start_at=doc.start_at,
         figure_path=doc.figure_path,
         json_figure_path=doc.json_figure_path,
@@ -1072,13 +1074,10 @@ class TaskResultService:
         markdown: str,
         model_label: str,
     ) -> None:
-        """Insert or replace the AI review section in the task-result note."""
-        import re
-
+        """Insert or replace the AI review note for a task result."""
         from qdash.common.utils.datetime import now
         from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
 
-        section_re = re.compile(r"^## AI review\n\n.*?(?:\n\n---\n\n|$)", re.DOTALL)
         doc = TaskResultHistoryDocument.find_one(
             {"project_id": project_id, "task_id": task_id}
         ).run()
@@ -1086,25 +1085,15 @@ class TaskResultService:
             logger.warning("AI review note skipped: task result not found %s", task_id)
             return
 
-        existing = doc.user_note.content or ""
         review_section = (
             f"{AI_REVIEW_HEADER}\n\n"
             f"*Reviewed by: {model_label} at {now().isoformat()}*\n\n"
             f"{_truncate_ai_review_markdown(markdown)}"
         )
-        if section_re.search(existing):
-            remainder = section_re.sub("", existing).strip()
-            content = (
-                f"{review_section}{AI_REVIEW_SEPARATOR}{remainder}" if remainder else review_section
-            )
-        elif existing.strip():
-            content = f"{review_section}{AI_REVIEW_SEPARATOR}{existing.rstrip()}"
-        else:
-            content = review_section
 
-        doc.user_note.content = content[:MAX_AI_REVIEW_NOTE_CHARS]
-        doc.user_note.updated_by = AI_REVIEW_ACTOR
-        doc.user_note.updated_at = now()
+        doc.ai_review_note.content = review_section[:MAX_AI_REVIEW_NOTE_CHARS]
+        doc.ai_review_note.updated_by = AI_REVIEW_ACTOR
+        doc.ai_review_note.updated_at = now()
         doc.ai_review.status = "completed"
         doc.ai_review.completed_at = now()
         doc.ai_review.error = ""
@@ -1221,7 +1210,10 @@ class TaskResultService:
             doc = docs_by_task_id.get(task_id)
             if doc is None:
                 continue
-            content = TaskResultService._extract_ai_review_section(doc.user_note.content)
+            ai_review_note = getattr(doc, "ai_review_note", NoteModel())
+            content = TaskResultService._extract_ai_review_section(
+                ai_review_note.content or doc.user_note.content
+            )
             if not content:
                 continue
             qid = doc.qid or "unknown"

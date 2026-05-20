@@ -152,21 +152,24 @@ def test_forced_ai_review_markdown_allows_present_f01() -> None:
 
 
 @patch("qdash.dbmodel.task_result_history.TaskResultHistoryDocument.find_one")
-def test_set_task_note_content_updates_ai_review_metadata(mock_find_one: MagicMock) -> None:
+def test_set_ai_review_note_content_updates_ai_review_metadata(mock_find_one: MagicMock) -> None:
     doc = MagicMock()
     doc.user_note = NoteModel()
+    doc.ai_review_note = NoteModel()
     doc.ai_review = AiReviewModel(status="running")
     mock_find_one.return_value.run.return_value = doc
 
-    from qdash.workflow.engine.task.ai_review import _set_task_note_content
+    from qdash.workflow.engine.task.ai_review import _set_ai_review_note_content
 
-    _set_task_note_content(
+    _set_ai_review_note_content(
         _task("CheckQubitSpectroscopy", "4"),
         _execution_model(),
         "## AI review\n\n- Decision: `PASS`",
         ModelConfig(provider="ollama", name="gemma4:26b"),
     )
 
+    assert doc.ai_review_note.content.startswith("## AI review")
+    assert doc.ai_review_note.updated_by == "qdash-ai"
     assert doc.ai_review.status == "completed"
     assert doc.ai_review.model_provider == "ollama"
     assert doc.ai_review.model_name == "gemma4:26b"
