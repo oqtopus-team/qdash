@@ -13,6 +13,7 @@ import type { ReExecutionEntry } from './reExecutionEntry';
 import type { TaskResultResponseStartAt } from './taskResultResponseStartAt';
 import type { TaskResultResponseEndAt } from './taskResultResponseEndAt';
 import type { TaskResultResponseElapsedTime } from './taskResultResponseElapsedTime';
+import type { NoteModel } from './noteModel';
 
 /**
  * Response model for task result by task_id.
@@ -55,4 +56,6 @@ export interface TaskResultResponse {
   start_at?: TaskResultResponseStartAt;
   end_at?: TaskResultResponseEndAt;
   elapsed_time?: TaskResultResponseElapsedTime;
+  /** AI-generated review note for this task result */
+  ai_review_note?: NoteModel;
 }

@@ -3,9 +3,10 @@
 from datetime import datetime, timedelta
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, field_serializer, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_serializer, field_validator
 
 from qdash.common.utils.datetime import format_elapsed_time, parse_elapsed_time
+from qdash.datamodel.note import NoteModel
 
 
 class InputParameterModel(BaseModel):
@@ -197,6 +198,10 @@ class TaskResultResponse(BaseModel):
     start_at: datetime | None = None
     end_at: datetime | None = None
     elapsed_time: timedelta | None = None
+    ai_review_note: NoteModel = Field(
+        default_factory=NoteModel,
+        description="AI-generated review note for this task result",
+    )
 
     model_config = ConfigDict(from_attributes=True)
 
