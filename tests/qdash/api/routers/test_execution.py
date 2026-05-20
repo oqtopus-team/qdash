@@ -1,6 +1,7 @@
 """Tests for execution router endpoints."""
 
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -173,6 +174,27 @@ def sample_flow(test_project: ProjectDocument) -> FlowDocument:
 
 
 CANCEL_FLOW_RUN_ID = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+
+
+def test_get_figure_by_path_maps_container_calib_data_path(
+    test_client: TestClient,
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    """Serve figures stored under the container calib-data mount from host API mode."""
+    local_base = tmp_path / "calib_data"
+    figure = local_base / "proj-1" / "figure.png"
+    figure.parent.mkdir(parents=True)
+    figure.write_bytes(b"png")
+    monkeypatch.setenv("CALIB_DATA_PATH", str(local_base))
+
+    response = test_client.get(
+        "/executions/figure",
+        params={"path": "/app/calib_data/proj-1/figure.png"},
+    )
+
+    assert response.status_code == 200
+    assert response.content == b"png"
 
 
 class TestCancelExecution:

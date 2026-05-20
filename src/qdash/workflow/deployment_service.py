@@ -14,6 +14,7 @@ from typing import Any, cast
 
 from fastapi import FastAPI, HTTPException
 from prefect.client.orchestration import get_client
+from prefect.client.schemas.actions import WorkPoolCreate
 from pydantic import BaseModel
 
 from qdash.workflow.logging_config import setup_logging
@@ -46,6 +47,42 @@ class RegisterDeploymentResponse(BaseModel):
 
     deployment_id: str
     deployment_name: str
+
+
+def _is_prefect_status_error(exc: Exception, *, names: set[str], status_codes: set[int]) -> bool:
+    """Return true when a Prefect client exception matches name or HTTP status."""
+    if type(exc).__name__ in names:
+        return True
+    status_code = getattr(exc, "status_code", None)
+    if status_code in status_codes:
+        return True
+    response = getattr(exc, "response", None)
+    return getattr(response, "status_code", None) in status_codes
+
+
+async def _ensure_work_pool(client: Any) -> None:
+    """Create the user flow work pool if it does not exist."""
+    try:
+        await client.read_work_pool(WORK_POOL_NAME)
+        return
+    except Exception as e:
+        if not _is_prefect_status_error(e, names={"ObjectNotFound"}, status_codes={404}):
+            raise
+
+    try:
+        work_pool = await client.create_work_pool(
+            WorkPoolCreate(
+                name=WORK_POOL_NAME,
+                type="process",
+                description="Work pool for user-defined flows",
+            )
+        )
+        logger.info(f"Work pool '{WORK_POOL_NAME}' created successfully: {work_pool.id}")
+    except Exception as e:
+        if _is_prefect_status_error(e, names={"ObjectAlreadyExists"}, status_codes={409}):
+            logger.info(f"Work pool '{WORK_POOL_NAME}' was created by another process")
+        else:
+            raise
 
 
 @app.post("/register-deployment", response_model=RegisterDeploymentResponse)
@@ -118,6 +155,8 @@ async def register_deployment(request: RegisterDeploymentRequest) -> RegisterDep
         # Register flow and create deployment using Prefect 3 client API
         logger.info(f"Creating deployment with work pool: {WORK_POOL_NAME}")
         async with get_client() as client:
+            await _ensure_work_pool(client)
+
             # Register the flow (returns existing if same name)
             flow_id = await client.create_flow(flow_obj)
             logger.info(f"Flow registered with ID: {flow_id}")

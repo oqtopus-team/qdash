@@ -11,7 +11,7 @@ import {
   Maximize2,
   Move,
 } from "lucide-react";
-import { useMemo, useState, useRef, useCallback, memo, useEffect } from "react";
+import { useMemo, useState, useRef, useCallback, memo, useEffect, type KeyboardEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { TransformWrapper, TransformComponent, useControls } from "react-zoom-pan-pinch";
 
@@ -239,9 +239,19 @@ const GridCell = memo(function GridCell({
   }
 
   // Zoomed-in: show full figure
+  const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      onClick();
+    }
+  };
+
   return (
-    <button
+    <div
+      role="button"
+      tabIndex={0}
       onClick={onClick}
+      onKeyDown={handleKeyDown}
       className={`aspect-square rounded-xl bg-white shadow-md border border-base-300/60 overflow-hidden transition-all duration-200 hover:shadow-xl hover:scale-105 hover:border-primary/40 relative w-full ${muxBgClass} ${
         isSelectionMode && isSelected ? "ring-2 ring-primary ring-offset-2" : ""
       } ${isSelectionMode && !canBeSelected ? "opacity-40 cursor-not-allowed" : ""}`}
@@ -292,7 +302,7 @@ const GridCell = memo(function GridCell({
           )}
         </div>
       )}
-    </button>
+    </div>
   );
 });
 

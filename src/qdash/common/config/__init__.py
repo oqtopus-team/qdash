@@ -27,6 +27,16 @@ from qdash.common.config.metrics import (
     get_qubit_metric_metadata,
     load_metrics_config,
 )
+from qdash.common.config.path_resolver import (
+    resolve_calib_data_path,
+    resolve_calibtasks_base_path,
+    resolve_config_base_path,
+    resolve_user_flows_dir,
+    resolve_workflow_path,
+    resolve_workflow_service_dir,
+    resolve_workflow_templates_dir,
+    to_container_user_flow_path,
+)
 from qdash.common.config.paths import (
     CALIB_DATA_BASE,
     CALIBTASKS_DIR,
@@ -84,4 +94,12 @@ __all__ = [
     "load_backend_config",
     "load_metrics_config",
     "load_topology",
+    "resolve_calib_data_path",
+    "resolve_calibtasks_base_path",
+    "resolve_config_base_path",
+    "resolve_user_flows_dir",
+    "resolve_workflow_path",
+    "resolve_workflow_service_dir",
+    "resolve_workflow_templates_dir",
+    "to_container_user_flow_path",
 ]

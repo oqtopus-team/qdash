@@ -82,34 +82,27 @@ tasks:
   dev-services:
     desc: Start only the services needed by host-side API/UI development
     cmds:
-      - docker compose up -d mongo postgres prefect-server deployment-service
+      - docker compose up -d mongo postgres prefect-server deployment-service user-flow-worker
+
+  dev-local-setup:
+    desc: Install dependencies needed by host-side API/UI development
+    cmds:
+      - uv sync --locked --all-groups --all-packages
+      - mkdir -p "${CONFIG_PATH:-./config/qubex-config}"
+      - bun --cwd ui install --frozen-lockfile
 
   dev-api-local:
     desc: Start the API on the host against Docker services
     dotenv: [.env]
     cmds:
-      - |
-        if command -v lsof >/dev/null 2>&1 && lsof -nP -iTCP:"${API_PORT:-5715}" -sTCP:LISTEN; then
-          echo "Port ${API_PORT:-5715} is already in use. Stop that process or set API_PORT to another port." >&2
-          exit 1
-        fi
-        export MONGO_HOST="${MONGO_HOST:-localhost}"
-        export DEPLOYMENT_SERVICE_URL="http://localhost:${DEPLOYMENT_SERVICE_PORT:-4006}"
-        uv run uvicorn src.qdash.api.main:app --reload --port "${API_PORT:-5715}"
+      - MONGO_HOST="${MONGO_HOST:-localhost}" PREFECT_API_URL="http://127.0.0.1:${PREFECT_PORT:-4200}/api" DEPLOYMENT_SERVICE_URL="http://127.0.0.1:${DEPLOYMENT_SERVICE_PORT:-4006}" uv run uvicorn src.qdash.api.main:app --reload --host 127.0.0.1 --port "${API_PORT:-5715}"
 
   dev-ui-local:
     desc: Start the UI on the host against the local API
     dir: ui
     dotenv: [../.env]
     cmds:
-      - |
-        if command -v lsof >/dev/null 2>&1 && lsof -nP -iTCP:"${UI_PORT:-5714}" -sTCP:LISTEN; then
-          echo "Port ${UI_PORT:-5714} is already in use. Stop that process or set UI_PORT to another port." >&2
-          exit 1
-        fi
-        export PORT="${UI_PORT:-5714}"
-        export INTERNAL_API_URL="http://localhost:${API_PORT:-5715}"
-        bun run dev
+      - PORT="${UI_PORT:-5714}" INTERNAL_API_URL="http://127.0.0.1:${API_PORT:-5715}" bun run dev
 
   dev-local:
     desc: Start lightweight local development services, API, and UI
@@ -311,15 +304,6 @@ tasks:
     cmds:
       - bun run build
 
-  # =============================================================================
-  # Legacy aliases (for backwards compatibility)
-  # =============================================================================
-
-  lint-mypy:
-    desc: "[Deprecated] Use ci-typecheck instead"
-    cmds:
-      - task: ci-typecheck
-
   tbls-docs:
     cmds:
       - tbls doc -c .tbls.yml -f
@@ -346,26 +330,6 @@ tasks:
       - task check-lock-workflow
       - task check-lock-dev
     desc: Check dependency locks
-
-  export-api:
-    cmds:
-      - task: check-lock-api
-    desc: "[Deprecated] Use check-lock-api instead"
-
-  export-workflow:
-    cmds:
-      - task: check-lock-workflow
-    desc: "[Deprecated] Use check-lock-workflow instead"
-
-  export-dev:
-    cmds:
-      - task: check-lock-dev
-    desc: "[Deprecated] Use check-lock-dev instead"
-
-  export-all:
-    cmds:
-      - task: check-locks
-    desc: "[Deprecated] Use check-locks instead"
 
   build-api:
     cmds:

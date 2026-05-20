@@ -476,7 +476,7 @@ export default function SettingsPage() {
   const [copied, setCopied] = useState(false);
   const [copiedCurl, setCopiedCurl] = useState(false);
   const [showToken, setShowToken] = useState(false);
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5715";
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:5715";
 
   const handleCopyToken = async () => {
     if (accessToken) {

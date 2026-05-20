@@ -4,7 +4,7 @@ const nextConfig = {
   async rewrites() {
     // Proxy /api/* to backend API server
     // This allows UI-only deployment without exposing API port
-    const apiUrl = process.env.INTERNAL_API_URL || "http://localhost:5715";
+    const apiUrl = process.env.INTERNAL_API_URL || "http://127.0.0.1:5715";
     return [
       {
         source: "/api/:path*",

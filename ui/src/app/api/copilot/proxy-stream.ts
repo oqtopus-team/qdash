@@ -6,7 +6,7 @@
  * FastAPI backend to the browser.
  */
 
-const INTERNAL_API_URL = process.env.INTERNAL_API_URL || "http://localhost:5715";
+const INTERNAL_API_URL = process.env.INTERNAL_API_URL || "http://127.0.0.1:5715";
 
 /**
  * Forward relevant headers from the incoming request to the backend.

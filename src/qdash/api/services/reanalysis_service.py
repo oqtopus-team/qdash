@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import json
 import logging
-from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from bunnet import SortDirection
@@ -33,6 +32,7 @@ from qdash.api.schemas.reanalysis import (
     ReanalyzeResonatorSpectroscopyParams,
     ReanalyzeResponse,
 )
+from qdash.common.config.path_resolver import resolve_calib_data_path
 from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
 
 if TYPE_CHECKING:
@@ -241,7 +241,7 @@ class ReanalysisService:
                     f"Task result {doc.task_id!r} has no stored figure JSON; cannot re-analyze."
                 ),
             )
-        figure_path = Path(doc.json_figure_path[0])
+        figure_path = resolve_calib_data_path(doc.json_figure_path[0])
         if not figure_path.exists():
             raise HTTPException(
                 status_code=410,

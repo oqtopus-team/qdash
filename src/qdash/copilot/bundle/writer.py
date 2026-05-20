@@ -8,6 +8,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 from zipfile import ZIP_DEFLATED, ZipFile
 
+from qdash.common.config.path_resolver import resolve_calib_data_path
+
 if TYPE_CHECKING:
     from qdash.copilot.bundle.models import (
         AIReviewBundleContext,
@@ -25,7 +27,7 @@ def _decode_base64(data: str) -> bytes:
 
 
 def _safe_read_file(path: str | Path) -> bytes | None:
-    file_path = Path(path)
+    file_path = resolve_calib_data_path(path)
     if not file_path.exists() or not file_path.is_file():
         return None
     return file_path.read_bytes()
