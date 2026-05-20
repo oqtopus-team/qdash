@@ -81,6 +81,38 @@ git config --global user.email
 
 Set them in the container if either command is empty.
 
+### Using Nix (Lightweight Local Shell)
+
+Nix can provide the local CLI toolchain without starting the DevContainer. This is useful when
+you want to run Python tests, UI checks, or Docker Compose tasks from the host shell while keeping
+the service stack in Docker.
+
+Install [Nix](https://nixos.org/download/) with flakes enabled, then enter the development shell:
+
+```shell
+nix develop
+```
+
+The shell provides Python 3.11, uv, Bun, Node.js 20, go-task, Docker CLI/Compose, jq, PostgreSQL
+client tools, and the secret scanning tools used by the project. It does not start MongoDB,
+PostgreSQL, Prefect, API, or UI services by itself; use the existing Docker Compose tasks for
+those services.
+
+To load the shell automatically when entering the repository, install
+[direnv](https://direnv.net/) and run:
+
+```shell
+direnv allow
+```
+
+After entering the Nix shell for the first time, install project dependencies:
+
+```shell
+uv sync --locked --all-groups --all-packages
+
+cd ui && bun install --frozen-lockfile
+```
+
 ### Install Dependencies
 
 The DevContainer installs Python, frontend, and Lefthook dependencies automatically during
