@@ -788,14 +788,17 @@ class NoteService:
                 CouplingDocument.chip_id == chip_id,
             ).run()
         )
-        # Use the partial sparse index on user_note.updated_at so we only scan
-        # the small subset of task results that actually have a note set.
+        # Use partial sparse note indexes so the dashboard only scans task
+        # results with user-authored notes or AI review notes.
         task_docs = list(
             TaskResultHistoryDocument.find(
                 {
                     "project_id": project_id,
                     "chip_id": chip_id,
-                    "user_note.updated_at": {"$ne": None},
+                    "$or": [
+                        {"user_note.updated_at": {"$ne": None}},
+                        {"ai_review_note.updated_at": {"$ne": None}},
+                    ],
                 }
             ).run()
         )

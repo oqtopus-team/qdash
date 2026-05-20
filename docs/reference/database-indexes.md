@@ -138,13 +138,17 @@ db.task_result_history.create_index([
     ("project_id", 1), ("chip_id", 1), ("name", 1), ("qid", 1), ("start_at", -1)
 ])  # Latest task result queries
 
-# Partial sparse index for the dashboard notes summary — only indexes rows
-# that have a user note, so chip_notes_summary doesn't scan the entire
-# task_result_history collection.
+# Partial sparse indexes for the dashboard notes summary — only index rows
+# that have a user-authored note or an AI review note.
 db.task_result_history.create_index(
     [("project_id", 1), ("chip_id", 1), ("user_note.updated_at", -1)],
     name="project_chip_user_note_idx",
     partialFilterExpression={"user_note.updated_at": {"$type": "date"}},
+)
+db.task_result_history.create_index(
+    [("project_id", 1), ("chip_id", 1), ("ai_review_note.updated_at", -1)],
+    name="project_chip_ai_review_note_idx",
+    partialFilterExpression={"ai_review_note.updated_at": {"$type": "date"}},
 )
 
 # Cool-down filter — list task results for a specific cool-down cycle.

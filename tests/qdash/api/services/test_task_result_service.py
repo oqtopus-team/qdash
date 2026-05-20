@@ -83,6 +83,7 @@ def _doc(task_id: str, qid: str, end_at: datetime) -> _TaskResultDoc:
         chip_id="chip-1",
         ai_review=AiReviewModel(),
         user_note=NoteModel(),
+        ai_review_note=NoteModel(),
     )
 
 
@@ -460,7 +461,7 @@ def test_create_figures_zip_includes_ai_review_replay_bundle(tmp_path) -> None:
 
 def test_load_reviewed_task_results_prefers_latest_completed_review_over_newer_pending() -> None:
     completed_doc = _doc("done-q0", "0", datetime(2026, 5, 5, 10, tzinfo=timezone.utc))
-    completed_doc.user_note = NoteModel(content="## AI review\n\n- Decision: `PASS`\n")
+    completed_doc.ai_review_note = NoteModel(content="## AI review\n\n- Decision: `PASS`\n")
     completed_doc.ai_review = AiReviewModel(status="completed")
 
     pending_doc = _doc("pending-q0", "0", datetime(2026, 5, 5, 11, tzinfo=timezone.utc))
@@ -492,7 +493,7 @@ def test_list_ai_reviews_extracts_decision_and_paginates() -> None:
     first_doc.name = "CheckQubitSpectroscopy"
     first_doc.figure_path = ["/tmp/task-1.png"]
     first_doc.json_figure_path = ["/tmp/task-1.json"]
-    first_doc.user_note = NoteModel(
+    first_doc.ai_review_note = NoteModel(
         content=(
             "## AI review\n\n"
             "- Decision: `REVIEW`\n"
@@ -511,7 +512,7 @@ def test_list_ai_reviews_extracts_decision_and_paginates() -> None:
     )
 
     second_doc = _doc("task-2", "1", datetime(2026, 5, 5, 10, tzinfo=timezone.utc))
-    second_doc.user_note = NoteModel(content="## AI review\n\n- Decision: `PASS`\n")
+    second_doc.ai_review_note = NoteModel(content="## AI review\n\n- Decision: `PASS`\n")
     second_doc.ai_review = AiReviewModel(status="completed")
 
     class _Finder:
@@ -549,7 +550,7 @@ def test_list_ai_reviews_extracts_decision_and_paginates() -> None:
 
 def test_get_ai_review_run_groups_reviews_by_run_id() -> None:
     first_doc = _doc("task-1", "0", datetime(2026, 5, 5, 11, tzinfo=timezone.utc))
-    first_doc.user_note = NoteModel(content="## AI review\n\n- Decision: `REVIEW`\n")
+    first_doc.ai_review_note = NoteModel(content="## AI review\n\n- Decision: `REVIEW`\n")
     first_doc.ai_review = AiReviewModel(
         status="completed",
         requested_by="bob",
@@ -561,7 +562,7 @@ def test_get_ai_review_run_groups_reviews_by_run_id() -> None:
     )
 
     second_doc = _doc("task-2", "1", datetime(2026, 5, 5, 11, tzinfo=timezone.utc))
-    second_doc.user_note = NoteModel(content="## AI review\n\n- Decision: `PASS`\n")
+    second_doc.ai_review_note = NoteModel(content="## AI review\n\n- Decision: `PASS`\n")
     second_doc.ai_review = AiReviewModel(
         status="running",
         requested_by="bob",
