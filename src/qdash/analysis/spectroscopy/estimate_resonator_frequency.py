@@ -528,7 +528,9 @@ def _nearby_resonance_score(resonance: Resonance) -> tuple[bool, float, bool, fl
     )
 
 
-def _refill_resonance_score(resonance: Resonance) -> tuple[bool, float, float, bool, float, float]:
+def _refill_resonance_score(
+    resonance: Resonance,
+) -> tuple[bool, float, float | bool, bool | float, float, float]:
     if resonance.high_power_x_span == 0:
         return (
             resonance.has_high_power_peaks,
@@ -538,14 +540,7 @@ def _refill_resonance_score(resonance: Resonance) -> tuple[bool, float, float, b
             resonance.high_power_grad,
             resonance.max_prominence,
         )
-    return (
-        resonance.has_high_power_peaks,
-        resonance.high_power_x_span,
-        resonance.has_low_power_peak,
-        resonance.high_power_grad,
-        resonance.max_prominence,
-        float("-inf"),
-    )
+    return resonance.score
 
 
 def _deduplicate_nearby_resonances(
@@ -553,12 +548,6 @@ def _deduplicate_nearby_resonances(
 ) -> tuple[list[Resonance], list[Resonance]]:
     if not resonances:
         return [], []
-
-    max_x_span = max(
-        (resonance.high_power_x_span for resonance in resonances if resonance.has_high_power_peaks),
-        default=0,
-    )
-    x_distance_max += int(max_x_span)
 
     clusters: list[list[Resonance]] = []
     for resonance in sorted(resonances, key=attrgetter("x")):
@@ -575,6 +564,111 @@ def _deduplicate_nearby_resonances(
         rejected.extend(sorted_cluster[1:])
 
     return selected, rejected
+
+
+def _diverse_resonance_score(
+    resonance: Resonance,
+) -> tuple[bool, bool, bool, float, float, float]:
+    high_power_prominence = (
+        resonance.high_power_prominence if resonance.has_high_power_peaks else 0.0
+    )
+    high_power_x_span_capped = (
+        min(max(resonance.high_power_x_span, 0), 12) if resonance.has_high_power_peaks else 0.0
+    )
+    return (
+        resonance.has_high_power_peaks,
+        resonance.has_adjacent_low_power_peak,
+        resonance.has_low_power_peak,
+        high_power_prominence,
+        high_power_x_span_capped,
+        resonance.max_prominence,
+    )
+
+
+def _rebalance_edge_resonances(
+    selected: Sequence[Resonance],
+    resonances: Sequence[Resonance],
+) -> list[Resonance]:
+    selected_ids = {id(resonance) for resonance in selected}
+    selected = sorted(selected, key=attrgetter("x"))
+    rejected = [resonance for resonance in resonances if id(resonance) not in selected_ids]
+
+    if not selected:
+        return list(selected)
+
+    left_edge_candidates = [
+        resonance
+        for resonance in rejected
+        if resonance.x < selected[0].x
+        and resonance.has_high_power_peaks
+        and resonance.has_low_power_peak
+        and not resonance.has_adjacent_low_power_peak
+        and resonance.high_power_x_span >= 12
+        and resonance.max_prominence >= 0.2
+    ]
+    if not left_edge_candidates:
+        return list(selected)
+
+    right_edge = selected[-1]
+    if (
+        not right_edge.has_high_power_peaks
+        or right_edge.high_power_x_span > 2
+        or right_edge.max_prominence >= 0.8
+    ):
+        return list(selected)
+
+    left_edge = sorted(
+        left_edge_candidates,
+        key=lambda resonance: (resonance.high_power_x_span, resonance.max_prominence),
+        reverse=True,
+    )[0]
+
+    return [left_edge, *selected[:-1]]
+
+
+def _select_diverse_resonances(
+    resonances: Sequence[Resonance], num_resonators: int, x_distance_max: int
+) -> tuple[list[Resonance], list[Resonance]]:
+    if len(resonances) <= num_resonators:
+        return list(resonances), []
+
+    x_distance_max = min(x_distance_max, 15)
+    best_score: tuple[float, ...] | None = None
+    best_resonances: tuple[Resonance, ...] | None = None
+
+    for candidates in itertools.combinations(resonances, num_resonators):
+        xs = sorted(resonance.x for resonance in candidates)
+        if any(x1 - x0 <= x_distance_max for x0, x1 in itertools.pairwise(xs)):
+            continue
+
+        score = tuple(
+            sum(score_part for score_part in score_parts)
+            for score_parts in zip(
+                *(_diverse_resonance_score(resonance) for resonance in candidates),
+                strict=False,
+            )
+        )
+        if best_score is None or score > best_score:
+            best_score = score
+            best_resonances = candidates
+
+    if best_resonances is None:
+        best_resonances = tuple(
+            sorted(resonances, key=_diverse_resonance_score, reverse=True)[:num_resonators]
+        )
+
+    best_resonances = tuple(_rebalance_edge_resonances(best_resonances, resonances))
+    selected_ids = {id(resonance) for resonance in best_resonances}
+    rejected = [resonance for resonance in resonances if id(resonance) not in selected_ids]
+    return list(best_resonances), rejected
+
+
+def _needs_diverse_reselection(resonances: Sequence[Resonance]) -> bool:
+    return any(
+        not resonance.has_high_power_peaks
+        or (not resonance.has_adjacent_low_power_peak and resonance.max_prominence < 0.8)
+        for resonance in resonances
+    )
 
 
 def _select_local_resonance(resonances: Sequence[Resonance]) -> tuple[Resonance, list[Resonance]]:
@@ -616,18 +710,20 @@ def _select_resonances(
 
     selected: list[Resonance] = []
     rejected: list[Resonance] = []
+    candidates: list[Resonance] = []
     for res_group in _group_resonances(composed, config.group_resonances_conf.x_distance_max):
+        candidates.extend(res_group)
         resonance, rest = _select_local_resonance(res_group)
         selected.append(resonance)
         rejected.extend(rest)
 
-    candidates = sorted(selected, key=attrgetter("score"), reverse=True)
+    ranked_selected = sorted(selected, key=attrgetter("score"), reverse=True)
     selected, additional_rejected = _deduplicate_nearby_resonances(
-        candidates[: config.num_resonators],
+        ranked_selected[: config.num_resonators],
         config.group_resonances_conf.x_distance_max,
     )
     rejected.extend(additional_rejected)
-    rejected.extend(candidates[config.num_resonators :])
+    rejected.extend(ranked_selected[config.num_resonators :])
 
     if len(selected) < config.num_resonators:
         refill_candidates = sorted(rejected, key=_refill_resonance_score, reverse=True)
@@ -659,6 +755,13 @@ def _select_resonances(
     selected = sorted(selected, key=attrgetter("score"), reverse=True)[: config.num_resonators]
     selected_ids = {id(resonance) for resonance in selected}
     rejected = [resonance for resonance in composed if id(resonance) not in selected_ids]
+
+    if _needs_diverse_reselection(selected):
+        selected, rejected = _select_diverse_resonances(
+            candidates,
+            config.num_resonators,
+            config.group_resonances_conf.x_distance_max,
+        )
 
     selected = sorted(selected, key=attrgetter("x"))
     rejected = sorted(rejected, key=attrgetter("x"))
