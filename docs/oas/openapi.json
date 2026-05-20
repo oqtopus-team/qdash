@@ -23530,6 +23530,10 @@
               }
             ],
             "title": "Elapsed Time"
+          },
+          "ai_review_note": {
+            "$ref": "#/components/schemas/NoteModel",
+            "description": "AI-generated review note for this task result"
           }
         },
         "type": "object",

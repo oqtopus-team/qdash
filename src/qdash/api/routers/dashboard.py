@@ -15,6 +15,7 @@ from qdash.api.schemas.dashboard import (
     DashboardInsight,
     DashboardInsightSuppressed,
 )
+from qdash.datamodel.note import NoteModel
 from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
 
 router = APIRouter()
@@ -94,6 +95,7 @@ def _load_reviewed_task_results(
         "chip_id": chip_id,
         "$or": [
             {"ai_review.status": {"$exists": True, "$ne": ""}},
+            {"ai_review_note.content": {"$regex": "^## AI review"}},
             {"user_note.content": {"$regex": "^## AI review"}},
         ],
     }
@@ -119,7 +121,7 @@ def _load_reviewed_task_results(
 
 
 def _has_terminal_review_signal(doc: TaskResultHistoryDocument) -> bool:
-    content = doc.user_note.content or ""
+    content = _ai_review_note_content(doc)
     return bool(
         AI_REVIEW_RE.search(content)
         or getattr(doc.ai_review, "status", "") in {"completed", "failed"}
@@ -127,7 +129,7 @@ def _has_terminal_review_signal(doc: TaskResultHistoryDocument) -> bool:
 
 
 def _parse_review_record(doc: TaskResultHistoryDocument) -> dict[str, Any]:
-    content = doc.user_note.content or ""
+    content = _ai_review_note_content(doc)
     match = AI_REVIEW_RE.search(content)
     body = match.group("body") if match else content
     decision = _field(body, "Decision")
@@ -158,6 +160,11 @@ def _parse_review_record(doc: TaskResultHistoryDocument) -> dict[str, Any]:
         or ("no_signal" in labels.lower() and "Deterministic safety guard" in body),
         "is_format_error": decision == "FORMAT_ERROR" or "model_format_error" in body,
     }
+
+
+def _ai_review_note_content(doc: TaskResultHistoryDocument) -> str:
+    ai_review_note = getattr(doc, "ai_review_note", NoteModel())
+    return ai_review_note.content or doc.user_note.content or ""
 
 
 def _field(text: str, name: str) -> str:

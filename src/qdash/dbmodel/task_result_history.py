@@ -208,6 +208,15 @@ class TaskResultHistoryDocument(Document):
                 # docs whose user_note.updated_at is an actual date (i.e. set).
                 partialFilterExpression={"user_note.updated_at": {"$type": "date"}},
             ),
+            IndexModel(
+                [
+                    ("project_id", ASCENDING),
+                    ("chip_id", ASCENDING),
+                    ("ai_review_note.updated_at", DESCENDING),
+                ],
+                name="project_chip_ai_review_note_idx",
+                partialFilterExpression={"ai_review_note.updated_at": {"$type": "date"}},
+            ),
             # Cool-down filter: list task results that ran in a specific
             # cool-down. Sparse so empty (legacy) rows are not indexed.
             IndexModel(

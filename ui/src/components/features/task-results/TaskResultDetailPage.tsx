@@ -22,6 +22,7 @@ import { useCreateIssue, getGetTaskResultIssuesQueryKey } from "@/client/issue/i
 import { useQueryClient } from "@tanstack/react-query";
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { ParametersTable } from "@/components/features/metrics/ParametersTable";
+import { TaskResultAiReviewNote } from "@/components/features/metrics/TaskResultAiReviewNote";
 import { TaskResultMemo } from "@/components/features/metrics/TaskResultMemo";
 import { ReanalysisPanel } from "@/components/features/qubit/ReanalysisPanel";
 import { MarkdownContent } from "@/components/ui/MarkdownContent";
@@ -653,6 +654,7 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
         )}
       </div>
 
+      <TaskResultAiReviewNote note={taskResult.ai_review_note} hideWhenEmpty />
       <TaskResultMemo taskId={taskId} chipId={taskResult.chip_id} />
 
       {/* Divider: Issues */}

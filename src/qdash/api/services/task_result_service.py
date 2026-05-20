@@ -217,6 +217,7 @@ class TaskResultService:
             "project_id": project_id,
             "$or": [
                 {"ai_review.status": {"$exists": True, "$ne": ""}},
+                {"ai_review_note.content": {"$regex": "^## AI review"}},
                 {"user_note.content": {"$regex": "^## AI review"}},
             ],
         }

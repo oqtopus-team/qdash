@@ -16,6 +16,7 @@ import { useUpdateCalibrationParameters } from "@/client/calibration/calibration
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { ParametersTable } from "@/components/features/metrics/ParametersTable";
 import { useManualOverrides } from "@/hooks/useManualOverrides";
+import { TaskResultAiReviewNote } from "@/components/features/metrics/TaskResultAiReviewNote";
 import { TaskResultIssues } from "@/components/features/metrics/TaskResultIssues";
 import { TaskResultMemo } from "@/components/features/metrics/TaskResultMemo";
 import type { AnalysisContext } from "@/hooks/useAnalysisChat";
@@ -396,6 +397,9 @@ export function CouplingTaskHistoryModal({
         </div>
       )}
 
+      {selectedTask?.task_id && (
+        <TaskResultAiReviewNote taskId={selectedTask.task_id} hideWhenEmpty />
+      )}
       {selectedTask?.task_id && (
         <TaskResultMemo taskId={selectedTask.task_id} chipId={chipId} hideWhenEmpty />
       )}
