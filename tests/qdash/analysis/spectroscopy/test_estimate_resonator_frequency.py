@@ -6,12 +6,15 @@ from qdash.analysis.spectroscopy.estimate_resonator_frequency import (
     Peak,
     PeakGroup,
     Resonance,
+    _needs_diverse_reselection,
     _refine_high_power_only_resonance_x,
+    _select_diverse_resonances,
     _select_local_resonance,
     _select_resonances,
     estimate_local_bare_shift_boundary,
     estimate_optimal_powers,
 )
+from qdash.analysis.spectroscopy.mux import guess_sorted_slots_for_partial_mux
 
 
 def test_estimate_optimal_powers_uses_midpoint_between_minimum_and_local_low_power() -> None:
@@ -145,3 +148,55 @@ def test_refine_high_power_only_resonance_x_sets_representative_x_from_stronger_
     assert refined.representative_x == 4
     assert refined.x == 4
     assert refined.complementary_peaks[-1] == Peak(x=4, y=0, prominence=8.0)
+
+
+def test_select_diverse_resonances_rebalances_weak_right_edge_with_left_candidate() -> None:
+    left_edge = Resonance(
+        high_power_peaks=PeakGroup(
+            [Peak(x=10, y=4, prominence=0.2), Peak(x=22, y=5, prominence=0.3)]
+        ),
+        low_power_peak=Peak(x=10, y=2, prominence=0.1),
+    )
+    middle_a = Resonance(
+        high_power_peaks=PeakGroup([Peak(x=40, y=4, prominence=0.9)]),
+        low_power_peak=Peak(x=40, y=3, prominence=0.4),
+    )
+    middle_b = Resonance(
+        high_power_peaks=PeakGroup([Peak(x=60, y=4, prominence=0.9)]),
+        low_power_peak=Peak(x=60, y=3, prominence=0.4),
+    )
+    middle_c = Resonance(
+        high_power_peaks=PeakGroup([Peak(x=80, y=4, prominence=0.9)]),
+        low_power_peak=Peak(x=80, y=3, prominence=0.4),
+    )
+    weak_right_edge = Resonance(
+        high_power_peaks=PeakGroup([Peak(x=100, y=4, prominence=0.7)]),
+        low_power_peak=Peak(x=100, y=3, prominence=0.4),
+    )
+
+    selected, rejected = _select_diverse_resonances(
+        [left_edge, middle_a, middle_b, middle_c, weak_right_edge],
+        num_resonators=4,
+        x_distance_max=25,
+    )
+
+    assert [resonance.x for resonance in selected] == [10, 40, 60, 80]
+    assert rejected == [weak_right_edge]
+
+
+def test_needs_diverse_reselection_for_weak_non_adjacent_resonance() -> None:
+    weak_non_adjacent = Resonance(
+        high_power_peaks=PeakGroup([Peak(x=10, y=5, prominence=0.3)]),
+        low_power_peak=Peak(x=20, y=2, prominence=0.2),
+    )
+
+    assert _needs_diverse_reselection([weak_non_adjacent])
+
+
+def test_guess_sorted_slots_for_partial_mux_assigns_large_gap_missing_slot() -> None:
+    xs = [float(i) for i in range(100)]
+
+    slots, mode = guess_sorted_slots_for_partial_mux(xs, [10.0, 50.0, 60.0])
+
+    assert slots == [0, 2, 3]
+    assert mode == "slot1-missing-large-left-gap"
