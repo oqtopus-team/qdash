@@ -1,14 +1,14 @@
 "use client";
 
 import { useMemo, useState, memo } from "react";
-import { TransformWrapper, TransformComponent, useControls } from "react-zoom-pan-pinch";
-import { ZoomIn, ZoomOut, Maximize2 } from "lucide-react";
+import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 
 import type { Task } from "@/schemas";
 
 import { useGetChip } from "@/client/chip/chip";
 import { TaskFigure } from "@/components/charts/TaskFigure";
 import { TaskDetailModal } from "@/components/features/chip/modals/TaskDetailModal";
+import { GridZoomControls } from "@/components/ui/GridZoomControls";
 import { useGridLayout } from "@/hooks/useGridLayout";
 import { useTopologyConfig } from "@/hooks/useTopologyConfig";
 import { getQubitGridPosition, type TopologyLayoutParams } from "@/lib/utils/grid-position";
@@ -17,37 +17,8 @@ import { calculateGridContainerWidth } from "@/lib/utils/grid-layout";
 interface ExecutionTopologyViewProps {
   chipId: string;
   tasks: Task[];
+  topologyMode: "1q" | "2q";
   filterTaskName: string;
-}
-
-// Zoom control buttons
-function ZoomControls() {
-  const { zoomIn, zoomOut, resetTransform } = useControls();
-  return (
-    <div className="absolute top-2 right-2 z-30 flex flex-col gap-1">
-      <button
-        onClick={() => zoomIn()}
-        className="btn btn-sm btn-square btn-ghost bg-base-100/90 shadow-md hover:bg-base-200"
-        title="Zoom in"
-      >
-        <ZoomIn className="h-4 w-4" />
-      </button>
-      <button
-        onClick={() => zoomOut()}
-        className="btn btn-sm btn-square btn-ghost bg-base-100/90 shadow-md hover:bg-base-200"
-        title="Zoom out"
-      >
-        <ZoomOut className="h-4 w-4" />
-      </button>
-      <button
-        onClick={() => resetTransform()}
-        className="btn btn-sm btn-square btn-ghost bg-base-100/90 shadow-md hover:bg-base-200"
-        title="Reset view"
-      >
-        <Maximize2 className="h-4 w-4" />
-      </button>
-    </div>
-  );
 }
 
 function getStatusColor(status: string | undefined): string {
@@ -67,6 +38,20 @@ function aggregateStatus(tasks: Task[]): string {
   if (tasks.some((t) => t.status === "running")) return "running";
   if (tasks.every((t) => t.status === "completed")) return "completed";
   return "pending";
+}
+
+function normalizeQid(qid: string): string {
+  const numericQid = Number.parseInt(qid.replace(/\D/g, ""), 10);
+  return Number.isNaN(numericQid) ? qid : String(numericQid);
+}
+
+function compareQid(first: string, second: string): number {
+  const firstNumber = Number(first);
+  const secondNumber = Number(second);
+  if (!Number.isNaN(firstNumber) && !Number.isNaN(secondNumber)) {
+    return firstNumber - secondNumber;
+  }
+  return first.localeCompare(second);
 }
 
 const EmptyCell = memo(function EmptyCell({ muxBgClass }: { muxBgClass: string }) {
@@ -157,12 +142,94 @@ const TopologyCell = memo(function TopologyCell({
   );
 });
 
+interface CouplingMarkerProps {
+  couplingId: string;
+  tasks: Task[];
+  figurePath: string | null;
+  jsonFigurePath: string | null;
+  showFigures: boolean;
+  cellSize: number;
+  left: number;
+  top: number;
+  onClick: () => void;
+}
+
+const CouplingMarker = memo(function CouplingMarker({
+  couplingId,
+  tasks,
+  figurePath,
+  jsonFigurePath,
+  showFigures,
+  cellSize,
+  left,
+  top,
+  onClick,
+}: CouplingMarkerProps) {
+  const status = tasks.length === 1 ? tasks[0].status : aggregateStatus(tasks);
+
+  if (!showFigures) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        className={`absolute z-20 rounded-md shadow-sm group cursor-pointer border border-base-100/70 -translate-x-1/2 -translate-y-1/2 ${getStatusColor(status)}`}
+        style={{
+          left,
+          top,
+          width: Math.max(24, cellSize * 0.44),
+          height: Math.max(24, cellSize * 0.44),
+        }}
+      >
+        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-base-100 text-base-content text-xs rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-30">
+          {couplingId}: {status}
+          {tasks.length > 1 && ` (${tasks.length} tasks)`}
+        </div>
+      </button>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="absolute z-20 rounded-xl bg-white shadow-md border border-base-300/60 overflow-hidden transition-all duration-200 hover:shadow-xl hover:scale-105 hover:border-primary/40 -translate-x-1/2 -translate-y-1/2"
+      style={{
+        left,
+        top,
+        width: Math.max(48, cellSize * 0.7),
+        height: Math.max(48, cellSize * 0.7),
+      }}
+    >
+      {figurePath && (
+        <div className="absolute inset-1">
+          <TaskFigure
+            path={figurePath}
+            jsonFigurePath={jsonFigurePath || undefined}
+            qid={couplingId}
+            className="w-full h-full object-contain"
+          />
+        </div>
+      )}
+      <div className="absolute top-1 left-1 bg-base-100/80 px-1.5 py-0.5 rounded text-[0.65rem] font-medium">
+        {couplingId}
+      </div>
+      <div className={`absolute bottom-1 right-1 w-2 h-2 rounded-full ${getStatusColor(status)}`} />
+      {tasks.length > 1 && (
+        <div className="absolute top-1 right-1 bg-base-100/80 px-1 py-px rounded text-[0.6rem] font-bold">
+          {tasks.length}
+        </div>
+      )}
+    </button>
+  );
+});
+
 export function ExecutionTopologyView({
   chipId,
   tasks,
+  topologyMode,
   filterTaskName,
 }: ExecutionTopologyViewProps) {
-  const [selectedQid, setSelectedQid] = useState<string | null>(null);
+  const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null);
 
   // Get chip data to derive topology_id
   const { data: chipData } = useGetChip(chipId, {
@@ -211,16 +278,32 @@ export function ExecutionTopologyView({
     [hasMux, muxSize, gridSize, layoutType],
   );
 
-  // Group tasks by qid. If filterTaskName is set, only include matching tasks.
-  const tasksByQid = useMemo(() => {
+  // Group one-qubit tasks by qid. If filterTaskName is set, only include matching tasks.
+  const oneQTasksByQid = useMemo(() => {
     const map: Record<string, Task[]> = {};
     for (const task of tasks) {
       if (!task.qid) continue;
-      // Only include qubit-level tasks (skip coupling tasks like "10-11")
       if (task.qid.includes("-")) continue;
-      if (filterTaskName !== "all" && task.name !== filterTaskName) continue;
-      if (!map[task.qid]) map[task.qid] = [];
-      map[task.qid].push(task);
+      if (!filterTaskName || task.name !== filterTaskName) continue;
+      const qid = normalizeQid(task.qid);
+      if (!map[qid]) map[qid] = [];
+      map[qid].push(task);
+    }
+    return map;
+  }, [tasks, filterTaskName]);
+
+  const couplingTasksByQid = useMemo(() => {
+    const map: Record<string, Task[]> = {};
+    for (const task of tasks) {
+      if (!task.qid || !task.qid.includes("-")) continue;
+      if (!filterTaskName || task.name !== filterTaskName) continue;
+      const [first, second] = task.qid.split("-");
+      if (!first || !second) continue;
+      const normalizedQid = [normalizeQid(first), normalizeQid(second)]
+        .sort(compareQid)
+        .join("-");
+      if (!map[normalizedQid]) map[normalizedQid] = [];
+      map[normalizedQid].push(task);
     }
     return map;
   }, [tasks, filterTaskName]);
@@ -228,23 +311,33 @@ export function ExecutionTopologyView({
   // Build grid positions for all qids
   const gridPositions = useMemo(() => {
     const positions: Record<string, { row: number; col: number }> = {};
-    for (const qid of Object.keys(tasksByQid)) {
-      const numericId = parseInt(qid.replace(/\D/g, ""), 10);
-      if (topologyQubits && topologyQubits[numericId]) {
-        positions[qid] = topologyQubits[numericId];
-      } else {
-        positions[qid] = getQubitGridPosition(qid, layoutParams);
-      }
+    if (topologyQubits) {
+      Object.entries(topologyQubits).forEach(([qid, position]) => {
+        positions[qid] = position;
+      });
+      return positions;
+    }
+    for (let index = 0; index < chipSize; index += 1) {
+      const qid = String(index);
+      positions[qid] = getQubitGridPosition(qid, layoutParams);
     }
     return positions;
-  }, [tasksByQid, topologyQubits, layoutParams]);
+  }, [chipSize, topologyQubits, layoutParams]);
+
+  const qidByPosition = useMemo(() => {
+    const map: Record<string, string> = {};
+    Object.entries(gridPositions).forEach(([qid, position]) => {
+      map[`${position.row}:${position.col}`] = qid;
+    });
+    return map;
+  }, [gridPositions]);
 
   // Responsive grid sizing
   const { containerRef, cellSize, isMobile, viewportHeight, gap, padding } = useGridLayout({
     cols: gridCols,
     rows: gridRows,
     reservedHeight: { mobile: 300, desktop: 350 },
-    deps: [tasksByQid, topologyQubits],
+    deps: [oneQTasksByQid, couplingTasksByQid, topologyMode, topologyQubits],
   });
 
   const MIN_FIGURE_CELL_SIZE = 60;
@@ -256,17 +349,22 @@ export function ExecutionTopologyView({
 
   // Selected task for modal
   const selectedTask = useMemo(() => {
-    if (!selectedQid || !tasksByQid[selectedQid]) return null;
-    const qidTasks = tasksByQid[selectedQid];
-    // Show the first (or only) task
-    return qidTasks[0] ?? null;
-  }, [selectedQid, tasksByQid]);
+    if (!selectedEntityId) return null;
+    const selectedTasks =
+      topologyMode === "2q"
+        ? couplingTasksByQid[selectedEntityId]
+        : oneQTasksByQid[selectedEntityId];
+    return selectedTasks?.[0] ?? null;
+  }, [couplingTasksByQid, oneQTasksByQid, selectedEntityId, topologyMode]);
 
-  if (Object.keys(tasksByQid).length === 0) {
+  const visibleTaskGroups = topologyMode === "2q" ? couplingTasksByQid : oneQTasksByQid;
+
+  if (Object.keys(visibleTaskGroups).length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-base-content/50">
-        <p className="text-sm">No qubit tasks to display in topology view</p>
-        <p className="text-xs mt-1">Coupling tasks are not shown in this view</p>
+        <p className="text-sm">
+          No {topologyMode === "2q" ? "coupling" : "one-qubit"} tasks to display in topology view
+        </p>
       </div>
     );
   }
@@ -297,15 +395,13 @@ export function ExecutionTopologyView({
               : "ring-2 ring-inset ring-secondary/20"
             : "";
 
-        const qid = Object.keys(gridPositions).find(
-          (key) => gridPositions[key].row === row && gridPositions[key].col === col,
-        );
+        const qid = qidByPosition[`${row}:${col}`];
 
         if (!qid) {
           return <EmptyCell key={`empty-${index}`} muxBgClass={muxBgClass} />;
         }
 
-        const qidTasks = tasksByQid[qid] || [];
+        const qidTasks = topologyMode === "1q" ? oneQTasksByQid[qid] || [] : [];
         // Pick the representative task (first one) for figure display
         const repTask = qidTasks[0];
         const figurePath = repTask
@@ -329,7 +425,7 @@ export function ExecutionTopologyView({
             muxBgClass={muxBgClass}
             showLabels={showLabels}
             showFigures={showFigures}
-            onClick={() => setSelectedQid(qid)}
+            onClick={() => setSelectedEntityId(qid)}
           />
         );
       })}
@@ -381,39 +477,88 @@ export function ExecutionTopologyView({
           </div>
         </div>
       )}
+
+      {topologyMode === "2q" &&
+        Object.entries(couplingTasksByQid).map(([couplingId, couplingTasks]) => {
+          const [first, second] = couplingId.split("-");
+          const firstPosition = first ? gridPositions[first] : undefined;
+          const secondPosition = second ? gridPositions[second] : undefined;
+          if (!firstPosition || !secondPosition) return null;
+
+          const centerCol = (firstPosition.col + secondPosition.col) / 2;
+          const centerRow = (firstPosition.row + secondPosition.row) / 2;
+          const left = padding / 2 + centerCol * (baseCellSize + gap) + baseCellSize / 2;
+          const top = padding / 2 + centerRow * (baseCellSize + gap) + baseCellSize / 2;
+          const repTask = couplingTasks[0];
+          const figurePath = repTask
+            ? Array.isArray(repTask.figure_path)
+              ? repTask.figure_path[0]
+              : repTask.figure_path || null
+            : null;
+          const jsonFigurePath = repTask
+            ? Array.isArray(repTask.json_figure_path)
+              ? repTask.json_figure_path[0]
+              : repTask.json_figure_path || null
+            : null;
+
+          return (
+            <CouplingMarker
+              key={couplingId}
+              couplingId={couplingId}
+              tasks={couplingTasks}
+              figurePath={figurePath}
+              jsonFigurePath={jsonFigurePath}
+              showFigures={showFigures}
+              cellSize={baseCellSize}
+              left={left}
+              top={top}
+              onClick={() => setSelectedEntityId(couplingId)}
+            />
+          );
+        })}
     </div>
   );
 
   return (
-    <div ref={containerRef} className="w-full relative">
-      <TransformWrapper
-        initialScale={1}
-        minScale={0.3}
-        maxScale={5}
-        wheel={{ step: 0.1 }}
-        doubleClick={{ mode: "zoomIn", step: 0.7 }}
-        centerOnInit
+    <div className="flex flex-col h-full space-y-2 max-w-4xl mx-auto w-full">
+      <div
+        ref={containerRef}
+        className="flex-1 relative overflow-hidden flex justify-center bg-base-200/30 border-2 border-dashed border-base-300 rounded-lg"
+        style={{ padding: `${Math.max(4, padding / 4)}px` }}
       >
-        <ZoomControls />
-        <TransformComponent
-          wrapperStyle={{ width: "100%", overflow: "hidden" }}
-          contentStyle={{
-            display: "flex",
-            justifyContent: "center",
-          }}
+        <TransformWrapper
+          initialScale={1}
+          minScale={0.3}
+          maxScale={5}
+          wheel={{ step: 0.08 }}
+          pinch={{ step: 5 }}
+          doubleClick={{ mode: "zoomIn", step: 0.7 }}
+          panning={{ velocityDisabled: false }}
+          smooth={false}
+          centerOnInit
         >
-          {gridContent}
-        </TransformComponent>
-      </TransformWrapper>
+          <GridZoomControls />
+          <TransformComponent
+            wrapperStyle={{ width: "100%", minHeight: "520px", overflow: "hidden" }}
+            contentStyle={{
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+            }}
+          >
+            {gridContent}
+          </TransformComponent>
+        </TransformWrapper>
+      </div>
 
       {/* Task detail modal */}
-      {selectedQid && selectedTask && (
+      {selectedEntityId && selectedTask && (
         <TaskDetailModal
-          isOpen={!!selectedQid}
+          isOpen={!!selectedEntityId}
           task={selectedTask}
-          qid={selectedQid}
+          qid={selectedEntityId}
           chipId={chipId}
-          onClose={() => setSelectedQid(null)}
+          onClose={() => setSelectedEntityId(null)}
           taskId={selectedTask.task_id || undefined}
           taskName={selectedTask.name || undefined}
           variant="detailed"
