@@ -100,23 +100,3 @@ export function AnimatedCounter({
     </span>
   );
 }
-
-/**
- * Animated percentage display
- */
-export function AnimatedPercentage({
-  value,
-  duration = 1000,
-  decimals = 1,
-  className = "",
-}: Omit<AnimatedCounterProps, "prefix" | "suffix">) {
-  return (
-    <AnimatedCounter
-      value={value}
-      duration={duration}
-      decimals={decimals}
-      suffix="%"
-      className={className}
-    />
-  );
-}
