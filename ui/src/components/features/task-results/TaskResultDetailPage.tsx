@@ -16,6 +16,7 @@ import {
   ChevronRight,
   RotateCcw,
   AlertCircle,
+  UserRound,
 } from "lucide-react";
 import { useGetTaskResult, getGetTaskResultQueryKey } from "@/client/task/task";
 import { useCreateIssue, getGetTaskResultIssuesQueryKey } from "@/client/issue/issue";
@@ -41,6 +42,16 @@ import { formatDateTime, formatRelativeTime } from "@/lib/utils/datetime";
 import { useToast } from "@/components/ui/Toast";
 
 const REANALYZABLE_TASKS = new Set(["CheckResonatorSpectroscopy", "CheckQubitSpectroscopy"]);
+
+type ActorFields = {
+  user_id?: string | null;
+  username?: string;
+};
+
+function formatActorLabel(actor?: ActorFields | null) {
+  if (actor?.username) return `@${actor.username}`;
+  return actor?.user_id || "Unknown";
+}
 
 /** Extract the display value from a parameter entry (may be a dict with `value` key or a plain value). */
 function extractParamValue(entry: unknown): string {
@@ -469,11 +480,18 @@ export function TaskResultDetailPage({ taskId }: { taskId: string }) {
       {/* Task Info Box */}
       <div className="bg-base-200/50 rounded-lg p-4 mb-4">
         <h2 className="text-sm font-semibold mb-2">{taskResult.task_name}</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-xs">
           <div>
             <span className="text-base-content/50">Execution ID</span>
             <p className="font-mono truncate" title={taskResult.execution_id}>
               {taskResult.execution_id}
+            </p>
+          </div>
+          <div>
+            <span className="text-base-content/50">User</span>
+            <p className="inline-flex max-w-full items-center gap-1 truncate">
+              <UserRound className="h-3 w-3 flex-shrink-0" />
+              <span className="truncate">{formatActorLabel(taskResult)}</span>
             </p>
           </div>
           <div>

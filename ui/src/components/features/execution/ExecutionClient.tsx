@@ -11,6 +11,7 @@ import {
   Download,
   ExternalLink,
   StopCircle,
+  UserRound,
   XCircle,
 } from "lucide-react";
 import Select, { type SingleValue, type StylesConfig } from "react-select";
@@ -32,9 +33,19 @@ type FilterOption = {
 
 type TopologyMode = "1q" | "2q";
 
+type ActorFields = {
+  user_id?: string | null;
+  username?: string;
+};
+
 interface ExecutionDetailClientProps {
   chipId: string;
   executionId: string;
+}
+
+function formatActorLabel(actor?: ActorFields | null) {
+  if (actor?.username) return `@${actor.username}`;
+  return actor?.user_id || "Unknown";
 }
 
 export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailClientProps) {
@@ -259,6 +270,11 @@ export function ExecutionDetailClient({ chipId, executionId }: ExecutionDetailCl
               <Clock className="mr-2 text-info/70 flex-shrink-0" size={14} />
               <span className="font-medium mr-1">Duration:</span>
               <span>{execution.elapsed_time}</span>
+            </div>
+            <div className="flex items-center text-base-content/70 min-w-0">
+              <UserRound className="mr-2 text-info/70 flex-shrink-0" size={14} />
+              <span className="font-medium mr-1">User:</span>
+              <span className="truncate">{formatActorLabel(execution)}</span>
             </div>
           </div>
         </div>

@@ -5,6 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
+import type { ExecutionResponseDetailUserId } from './executionResponseDetailUserId';
 import type { ExecutionResponseDetailStartAt } from './executionResponseDetailStartAt';
 import type { ExecutionResponseDetailEndAt } from './executionResponseDetailEndAt';
 import type { ExecutionResponseDetailElapsedTime } from './executionResponseDetailElapsedTime';
@@ -21,6 +22,8 @@ Attributes
     start_at (datetime | None): The start time of the execution.
     end_at (datetime | None): The end time of the execution.
     elapsed_time (timedelta | None): The total elapsed time of the execution.
+    user_id (str | None): Internal ID of the user who started the execution.
+    username (str): Username snapshot of the user who started the execution.
     task (list[Task]): List of tasks in the execution.
     note (dict): Notes for the execution.
     tags (list[str]): Tags associated with the execution.
@@ -30,6 +33,8 @@ export interface ExecutionResponseDetail {
   name: string;
   status: string;
   flow_name?: string;
+  user_id?: ExecutionResponseDetailUserId;
+  username?: string;
   start_at?: ExecutionResponseDetailStartAt;
   end_at?: ExecutionResponseDetailEndAt;
   elapsed_time?: ExecutionResponseDetailElapsedTime;

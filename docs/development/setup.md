@@ -301,3 +301,4 @@ Key environment variables are configured in `.env`. See `.env.example` for avail
 | `CONFIG_PATH`             | -       | Qubex config path           |
 | `NEXT_PUBLIC_API_URL`     | -       | Public API URL for frontend |
 | `NEXT_PUBLIC_PREFECT_URL` | -       | Prefect dashboard URL       |
+| `NEXT_ALLOWED_DEV_ORIGINS` | -       | Additional hostnames allowed to access the Next.js dev server |

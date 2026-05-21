@@ -1,6 +1,12 @@
 /** @type {import('next').NextConfig} */
+const allowedDevOrigins = (process.env.NEXT_ALLOWED_DEV_ORIGINS || "")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
 const nextConfig = {
   output: "standalone",
+  ...(allowedDevOrigins.length > 0 ? { allowedDevOrigins } : {}),
   async rewrites() {
     // Proxy /api/* to backend API server
     // This allows UI-only deployment without exposing API port

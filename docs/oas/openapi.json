@@ -15010,7 +15010,7 @@
           "task_notes"
         ],
         "title": "ChipNotesSummaryResponse",
-        "description": "All notes for a chip in one fetch — drives the dashboard summary view."
+        "description": "All notes for a chip in one fetch \u2014 drives the dashboard summary view."
       },
       "ChipResponse": {
         "properties": {
@@ -16045,7 +16045,7 @@
             "type": "number",
             "title": "Delta Per Step",
             "description": "Average delta per step",
-            "default": 0
+            "default": 0.0
           },
           "current_value": {
             "anyOf": [
@@ -16454,6 +16454,22 @@
             "title": "Flow Name",
             "default": ""
           },
+          "user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Id"
+          },
+          "username": {
+            "type": "string",
+            "title": "Username",
+            "default": ""
+          },
           "start_at": {
             "anyOf": [
               {
@@ -16524,7 +16540,7 @@
           "note"
         ],
         "title": "ExecutionResponseDetail",
-        "description": "ExecutionResponseDetail is a Pydantic model that represents the detail of an execution response.\n\nAttributes\n----------\n    name (str): The name of the execution.\n    status (str): The current status of the execution.\n    start_at (datetime | None): The start time of the execution.\n    end_at (datetime | None): The end time of the execution.\n    elapsed_time (timedelta | None): The total elapsed time of the execution.\n    task (list[Task]): List of tasks in the execution.\n    note (dict): Notes for the execution.\n    tags (list[str]): Tags associated with the execution.\n    chip_id (str): The chip ID for the execution."
+        "description": "ExecutionResponseDetail is a Pydantic model that represents the detail of an execution response.\n\nAttributes\n----------\n    name (str): The name of the execution.\n    status (str): The current status of the execution.\n    start_at (datetime | None): The start time of the execution.\n    end_at (datetime | None): The end time of the execution.\n    elapsed_time (timedelta | None): The total elapsed time of the execution.\n    user_id (str | None): Internal ID of the user who started the execution.\n    username (str): Username snapshot of the user who started the execution.\n    task (list[Task]): List of tasks in the execution.\n    note (dict): Notes for the execution.\n    tags (list[str]): Tags associated with the execution.\n    chip_id (str): The chip ID for the execution."
       },
       "ExecutionResponseSummary": {
         "properties": {
@@ -16539,6 +16555,22 @@
           "status": {
             "type": "string",
             "title": "Status"
+          },
+          "user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Id"
+          },
+          "username": {
+            "type": "string",
+            "title": "Username",
+            "default": ""
           },
           "start_at": {
             "anyOf": [
@@ -16598,7 +16630,7 @@
           "note"
         ],
         "title": "ExecutionResponseSummary",
-        "description": "ExecutionResponseSummary is a Pydantic model that represents the summary of an execution response.\n\nAttributes\n----------\n    name (str): The name of the execution.\n    execution_id (str): The ID of the execution.\n    status (str): The current status of the execution.\n    start_at (datetime | None): The start time of the execution.\n    end_at (datetime | None): The end time of the execution.\n    elapsed_time (timedelta | None): The total elapsed time of the execution.\n    tags (list[str]): Tags associated with the execution.\n    note (dict): Notes for the execution."
+        "description": "ExecutionResponseSummary is a Pydantic model that represents the summary of an execution response.\n\nAttributes\n----------\n    name (str): The name of the execution.\n    execution_id (str): The ID of the execution.\n    status (str): The current status of the execution.\n    start_at (datetime | None): The start time of the execution.\n    end_at (datetime | None): The end time of the execution.\n    elapsed_time (timedelta | None): The total elapsed time of the execution.\n    user_id (str | None): Internal ID of the user who started the execution.\n    username (str): Username snapshot of the user who started the execution.\n    tags (list[str]): Tags associated with the execution.\n    note (dict): Notes for the execution."
       },
       "ExpectedResultResponse": {
         "properties": {
@@ -17038,8 +17070,8 @@
             "anyOf": [
               {
                 "type": "integer",
-                "maximum": 10000,
-                "minimum": 0
+                "maximum": 10000.0,
+                "minimum": 0.0
               },
               {
                 "type": "null"
@@ -17179,8 +17211,8 @@
             "anyOf": [
               {
                 "type": "integer",
-                "maximum": 10000,
-                "minimum": 0
+                "maximum": 10000.0,
+                "minimum": 0.0
               },
               {
                 "type": "null"
@@ -20390,7 +20422,7 @@
           "error": {
             "type": "number",
             "title": "Error",
-            "default": 0
+            "default": 0.0
           },
           "previous_error": {
             "anyOf": [
@@ -20628,7 +20660,7 @@
           "error": {
             "type": "number",
             "title": "Error",
-            "default": 0
+            "default": 0.0
           },
           "version": {
             "type": "integer",
@@ -20770,7 +20802,7 @@
           "error": {
             "type": "number",
             "title": "Error",
-            "default": 0
+            "default": 0.0
           },
           "valid_from": {
             "anyOf": [
@@ -22438,6 +22470,22 @@
       },
       "Task": {
         "properties": {
+          "user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Id"
+          },
+          "username": {
+            "type": "string",
+            "title": "Username",
+            "default": ""
+          },
           "task_id": {
             "anyOf": [
               {
@@ -23428,6 +23476,22 @@
             "title": "Flow Name",
             "default": ""
           },
+          "user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Id"
+          },
+          "username": {
+            "type": "string",
+            "title": "Username",
+            "default": ""
+          },
           "figure_path": {
             "items": {
               "type": "string"
@@ -23549,7 +23613,7 @@
           "output_parameters"
         ],
         "title": "TaskResultResponse",
-        "description": "Response model for task result by task_id.\n\nAttributes\n----------\n    task_id (str): The task ID.\n    task_name (str): The name of the task.\n    qid (str): The qubit or coupling ID.\n    status (str): The task status.\n    execution_id (str): The execution ID.\n    figure_path (list[str]): List of figure paths.\n    json_figure_path (list[str]): List of JSON figure paths.\n    input_parameters (dict): Input parameters.\n    output_parameters (dict): Output parameters.\n    start_at (datetime | None): Start time.\n    end_at (datetime | None): End time.\n    elapsed_time (timedelta | None): Elapsed time.\n    source_task_id (str | None): Parent task ID this was re-executed from.\n    re_executions (list[ReExecutionEntry]): Child task results from re-executions."
+        "description": "Response model for task result by task_id.\n\nAttributes\n----------\n    task_id (str): The task ID.\n    task_name (str): The name of the task.\n    qid (str): The qubit or coupling ID.\n    status (str): The task status.\n    execution_id (str): The execution ID.\n    user_id (str | None): Internal ID of the user who executed the task.\n    username (str): Username snapshot of the user who executed the task.\n    figure_path (list[str]): List of figure paths.\n    json_figure_path (list[str]): List of JSON figure paths.\n    input_parameters (dict): Input parameters.\n    output_parameters (dict): Output parameters.\n    start_at (datetime | None): Start time.\n    end_at (datetime | None): End time.\n    elapsed_time (timedelta | None): Elapsed time.\n    source_task_id (str | None): Parent task ID this was re-executed from.\n    re_executions (list[ReExecutionEntry]): Child task results from re-executions."
       },
       "TimeSeriesData": {
         "properties": {
@@ -23668,7 +23732,7 @@
         "properties": {
           "unread_count": {
             "type": "integer",
-            "minimum": 0,
+            "minimum": 0.0,
             "title": "Unread Count"
           }
         },
@@ -24514,10 +24578,5 @@
         "scheme": "bearer"
       }
     }
-  },
-  "servers": [
-    {
-      "url": "/api"
-    }
-  ]
+  }
 }
