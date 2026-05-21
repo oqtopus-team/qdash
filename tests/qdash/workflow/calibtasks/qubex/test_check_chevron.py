@@ -62,7 +62,7 @@ def test_check_chevron_run_uses_adaptive_helper(monkeypatch) -> None:
     monkeypatch.setattr(task, "save_calibration", fake_save_calibration)
     monkeypatch.setattr(
         "qdash.workflow.calibtasks.qubex.one_qubit_coarse.check_chevron."
-        "_estimate_qubit_frequency_from_chevron_adaptive",
+        "estimate_qubit_frequency_from_chevron_adaptive",
         fake_estimate_qubit_frequency_from_chevron_adaptive,
     )
 
@@ -72,6 +72,8 @@ def test_check_chevron_run_uses_adaptive_helper(monkeypatch) -> None:
     assert captured["targets"] == ["Q00"]
     assert captured["frequencies"] == {"Q00": 4.25}
     assert captured["amplitudes"] == {"Q00": 0.07}
+    assert captured["plot"] is False
+    assert captured["save_image"] is False
     assert result.raw_result["resonant_frequencies"]["Q00"] == 4.321
     assert result.raw_result["control_amplitude_used"] == 0.082
     assert result.raw_result["readout_amplitude_used"] == 0.031

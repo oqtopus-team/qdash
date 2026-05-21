@@ -1,10 +1,11 @@
 from collections.abc import Mapping
-from importlib import import_module
 from typing import Any, ClassVar
 
+from qubex.contrib.experiment.simultaneous_qubit_spectroscopy import simultaneous_qubit_spectroscopy
 from qubex.measurement.measurement_defaults import DEFAULT_INTERVAL
 
-from qdash.datamodel.task import RunParameterModel
+from qdash.datamodel.task import ParameterModel, RunParameterModel
+from qdash.repository.qubit import MongoQubitCalibrationRepository
 from qdash.workflow.calibtasks.base import RunResult
 from qdash.workflow.calibtasks.qubex.cw.check_qubit_spectroscopy import CheckQubitSpectroscopy
 from qdash.workflow.engine.backend.qubex import QubexBackend
@@ -50,17 +51,9 @@ class CheckSimultaneousQubitSpectroscopy(CheckQubitSpectroscopy):
         exp = self.get_experiment(backend)
         labels = [self.get_qubit_label(backend, qid) for qid in qids]
 
-        helper = self._load_simultaneous_qubit_spectroscopy()
-        single_target = len(labels) == 1
-        readout_amplitudes = None
-        readout_frequencies = None
-        if single_target:
-            readout_amplitudes = {labels[0]: self._get_readout_amplitude_value()}
-            readout_freq_param = self.input_parameters.get("readout_frequency")
-            if readout_freq_param is not None:
-                readout_frequencies = {labels[0]: readout_freq_param.value}
+        readout_amplitudes, readout_frequencies = self._build_readout_maps(backend, qids, labels)
 
-        raw_result = helper(
+        raw_result = simultaneous_qubit_spectroscopy(
             exp,
             targets=labels,
             frequency_range=self._select_frequency_range(backend),
@@ -74,16 +67,60 @@ class CheckSimultaneousQubitSpectroscopy(CheckQubitSpectroscopy):
         self.save_calibration(backend)
         return RunResult(raw_result=self._normalize_results(raw_result, labels))
 
+    def _build_readout_maps(
+        self, backend: QubexBackend, qids: list[str], labels: list[str]
+    ) -> tuple[dict[str, float] | None, dict[str, float] | None]:
+        """Build per-target readout overrides for simultaneous spectroscopy."""
+        if len(labels) == 1:
+            readout_amplitudes = {labels[0]: self._get_readout_amplitude_value()}
+            readout_freq_param = self.input_parameters.get("readout_frequency")
+            readout_frequencies = (
+                {labels[0]: float(readout_freq_param.value)}
+                if readout_freq_param is not None and readout_freq_param.value is not None
+                else None
+            )
+            return readout_amplitudes, readout_frequencies
+
+        project_id = backend.config.get("project_id")
+        chip_id = backend.config.get("chip_id")
+        if not project_id or not chip_id:
+            return None, None
+
+        qubit_repo = MongoQubitCalibrationRepository()
+        readout_amplitudes: dict[str, float] = {}
+        readout_frequencies: dict[str, float] = {}
+        for qid, label in zip(qids, labels, strict=True):
+            calib_data = qubit_repo.get_calibration_data(
+                project_id=project_id,
+                chip_id=chip_id,
+                qid=qid,
+            )
+            self._add_readout_value(readout_amplitudes, label, calib_data.get("readout_amplitude"))
+            self._add_readout_value(
+                readout_frequencies, label, calib_data.get("readout_frequency")
+            )
+
+        return readout_amplitudes or None, readout_frequencies or None
+
     @staticmethod
-    def _load_simultaneous_qubit_spectroscopy() -> Any:
-        """Load the contributed qubex simultaneous spectroscopy helper."""
-        return import_module("qubex.contrib").simultaneous_qubit_spectroscopy
+    def _add_readout_value(
+        values: dict[str, float], label: str, parameter: Any
+    ) -> None:
+        """Add a readout value from a stored ParameterModel-shaped payload."""
+        if isinstance(parameter, ParameterModel):
+            value = parameter.value
+        elif isinstance(parameter, Mapping):
+            value = parameter.get("value")
+        else:
+            value = None
+        if value is not None:
+            values[label] = float(value)
 
     @staticmethod
     def _normalize_results(raw_result: Any, labels: list[str]) -> dict[str, Any]:
         """Normalize contrib output to the label-keyed payload used by postprocess.
 
-        qubex.contrib.simultaneous_qubit_spectroscopy returns the same
+        qubex.contrib.experiment.simultaneous_qubit_spectroscopy returns the same
         label-keyed payload shape for both single-target and multi-target runs.
         """
         if isinstance(raw_result, Mapping):

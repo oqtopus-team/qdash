@@ -1,4 +1,4 @@
-"""Experimental bring-up with simultaneous qubit spectroscopy."""
+"""Experimental single-execution bring-up with simultaneous qubit spectroscopy."""
 
 from typing import Any
 
@@ -21,7 +21,7 @@ def experimental_simultaneous_bringup(
     flow_name: str | None = None,
     project_id: str | None = None,
 ) -> Any:
-    """Run resonator spectroscopy and experimental simultaneous qubit spectroscopy."""
+    """Run resonator and simultaneous qubit spectroscopy in one execution."""
     if mux_ids is None:
         mux_ids = list(range(16))
     if exclude_qids is None:
@@ -45,6 +45,7 @@ def experimental_simultaneous_bringup(
         flow_name=flow_name,
         tags=tags,
         project_id=project_id,
+        # ExperimentalSimultaneousBringUp owns one combined Execution.
         skip_execution=True,
         default_run_parameters={
             "interval": {"value": 150 * 1024, "value_type": "int"},

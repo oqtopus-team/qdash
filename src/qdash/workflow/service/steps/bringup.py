@@ -266,41 +266,111 @@ class ExperimentalSimultaneousBringUp(CalibrationStep):
         targets: Target,
         ctx: StepContext,
     ) -> StepContext:
-        """Execute resonator spectroscopy first, then local-index simultaneous spectroscopy."""
+        """Execute resonator and simultaneous qubit spectroscopy in one execution."""
         logger = get_run_logger()
-        from qdash.workflow.service.strategy import OneQubitConfig, get_one_qubit_strategy
+        from qdash.workflow.engine import OneQubitScheduler
+        from qdash.workflow.engine.backend.qubex_paths import get_qubex_paths
+        from qdash.workflow.service.calib_service import (
+            finish_calibration,
+            get_session,
+            init_calibration,
+        )
+        from qdash.workflow.service.github import ConfigFileType, GitHubPushConfig
+        from qdash.workflow.service.one_qubit_stage_runner import OneQubitStageRunner
         from qdash.workflow.service.targets import MuxTargets
 
         if not isinstance(targets, MuxTargets):
             msg = "ExperimentalSimultaneousBringUp currently requires MuxTargets"
             raise ValueError(msg)
+        if self.resonator_mode != "scheduled":
+            msg = "ExperimentalSimultaneousBringUp currently supports resonator_mode='scheduled'"
+            raise ValueError(msg)
+        if self.qubit_mode != "simultaneous_spectroscopy":
+            msg = (
+                "ExperimentalSimultaneousBringUp currently supports "
+                "qubit_mode='simultaneous_spectroscopy'"
+            )
+            raise ValueError(msg)
 
-        reso_tasks = ["CheckResonatorSpectroscopy"]
-        qubit_tasks = ["CheckSimultaneousQubitSpectroscopy"]
+        wiring_config_path = str(get_qubex_paths().wiring_yaml(service.chip_id))
+        scheduler = OneQubitScheduler(
+            chip_id=service.chip_id, wiring_config_path=wiring_config_path
+        )
+        reso_schedule = scheduler.generate_from_mux(
+            mux_ids=targets.mux_ids, exclude_qids=targets.exclude_qids
+        )
+        qubit_schedule = scheduler.generate_simultaneous_spectroscopy_batches_from_mux(
+            mux_ids=targets.mux_ids, exclude_qids=targets.exclude_qids
+        )
+        runner = OneQubitStageRunner(service, project_id=service.project_id)
+
+        all_qids = list(
+            dict.fromkeys(
+                runner.collect_scheduled_qids(reso_schedule)
+                + runner.collect_simultaneous_qids(qubit_schedule)
+            )
+        )
+        if not all_qids:
+            result = BringUp(tasks=[])._build_result({})
+            ctx.metadata["experimental_simultaneous_bringup"] = result
+            ctx.metadata["bringup"] = result
+            return ctx
+
+        stage_flow_name = (
+            f"{service.flow_name}_{self.name}" if service.flow_name else self.name
+        )
+        created_execution = service.skip_execution or service.execution_service is None
+        if created_execution:
+            init_calibration(
+                service.username,
+                service.chip_id,
+                all_qids,
+                flow_name=stage_flow_name,
+                backend_name=service.backend_name,
+                tags=service.tags or ([service.flow_name] if service.flow_name else None),
+                project_id=service.project_id,
+                use_lock=False,
+                enable_github_pull=True,
+                github_push_config=GitHubPushConfig(
+                    enabled=True,
+                    file_types=[ConfigFileType.CALIB_NOTE, ConfigFileType.ALL_PARAMS],
+                ),
+                note={
+                    "type": "experimental-simultaneous-bringup",
+                    "resonator_strategy": self.resonator_mode,
+                    "qubit_strategy": qubit_schedule.metadata["strategy"],
+                    "total_qubits": len(all_qids),
+                    "total_steps": qubit_schedule.total_steps,
+                },
+            )
+            session = get_session()
+        else:
+            session = service
+
+        assert session.execution_id is not None
+        session_config = runner.build_session_config(
+            execution_id=session.execution_id,
+            flow_name=stage_flow_name,
+        )
 
         logger.info("[%s] Running resonator spectroscopy", self.name)
-        reso_config = OneQubitConfig(
-            mux_ids=targets.mux_ids,
-            exclude_qids=targets.exclude_qids,
-            tasks=reso_tasks,
-            flow_name=f"{service.flow_name}_{self.name}_resonator"
-            if service.flow_name
-            else f"{self.name}_resonator",
-            project_id=service.project_id,
+        reso_results = runner.execute_scheduled_mux_schedule(
+            reso_schedule,
+            tasks=["CheckResonatorSpectroscopy"],
+            session_config=session_config,
         )
-        reso_results = get_one_qubit_strategy(self.resonator_mode).execute(service, reso_config)
 
         logger.info("[%s] Running simultaneous qubit spectroscopy", self.name)
-        qubit_config = OneQubitConfig(
-            mux_ids=targets.mux_ids,
-            exclude_qids=targets.exclude_qids,
-            tasks=qubit_tasks,
-            flow_name=f"{service.flow_name}_{self.name}_qubit"
-            if service.flow_name
-            else f"{self.name}_qubit",
-            project_id=service.project_id,
+        qubit_results = runner.execute_simultaneous_spectroscopy_schedule(
+            qubit_schedule,
+            tasks=["CheckSimultaneousQubitSpectroscopy"],
         )
-        qubit_results = get_one_qubit_strategy(self.qubit_mode).execute(service, qubit_config)
+
+        session = get_session() if created_execution else service
+        stage_results = {"resonator": reso_results, "qubit": qubit_results}
+        session.record_stage_result("experimental_simultaneous_bringup", stage_results)
+        if created_execution:
+            finish_calibration()
 
         result = BringUp(tasks=[])._build_result(
             {"combined": self._merge_qid_results(reso_results, qubit_results)}

@@ -50,7 +50,11 @@ def test_batch_run_calls_contrib_helper_with_labels(monkeypatch: pytest.MonkeyPa
     monkeypatch.setattr(task, "get_experiment", lambda _backend: experiment)
     monkeypatch.setattr(task, "get_qubit_label", lambda _backend, qid: f"Q{int(qid):02d}")
     monkeypatch.setattr(task, "save_calibration", lambda _backend: None)
-    monkeypatch.setattr(task, "_load_simultaneous_qubit_spectroscopy", lambda: helper)
+    monkeypatch.setattr(
+        "qdash.workflow.calibtasks.qubex.cw.check_simultaneous_qubit_spectroscopy."
+        "simultaneous_qubit_spectroscopy",
+        helper,
+    )
 
     result = task.batch_run(cast("QubexBackend", backend), ["0", "1"])
 
@@ -64,6 +68,72 @@ def test_batch_run_calls_contrib_helper_with_labels(monkeypatch: pytest.MonkeyPa
     assert calls["readout_frequencies"] is None
     assert calls["shots"] == 1024
     assert isinstance(calls["interval"], int)
+
+
+def test_batch_run_builds_readout_maps_from_calibration_data(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    task = CheckSimultaneousQubitSpectroscopy()
+    calls: dict[str, Any] = {}
+
+    calibration_data = {
+        "0": {
+            "readout_amplitude": {"value": 0.017},
+            "readout_frequency": {"value": 6.123},
+        },
+        "1": {
+            "readout_amplitude": {"value": 0.019},
+            "readout_frequency": {"value": 6.456},
+        },
+    }
+
+    class FakeQubitRepository:
+        def get_calibration_data(
+            self, *, project_id: str, chip_id: str, qid: str
+        ) -> dict[str, Any]:
+            assert project_id == "project-1"
+            assert chip_id == "144Q-test"
+            return calibration_data[qid]
+
+    def helper(
+        _exp: Any,
+        *,
+        targets: list[str],
+        readout_amplitudes: dict[str, float] | None,
+        readout_frequencies: dict[str, float] | None,
+        **_kwargs: Any,
+    ) -> dict[str, Any]:
+        calls.update(
+            {
+                "targets": targets,
+                "readout_amplitudes": readout_amplitudes,
+                "readout_frequencies": readout_frequencies,
+            }
+        )
+        return {"Q00": {"fig": "fig-0"}, "Q01": {"fig": "fig-1"}}
+
+    backend = SimpleNamespace(config={"chip_id": "144Q-test", "project_id": "project-1"})
+
+    monkeypatch.setattr(task, "get_experiment", lambda _backend: object())
+    monkeypatch.setattr(task, "get_qubit_label", lambda _backend, qid: f"Q{int(qid):02d}")
+    monkeypatch.setattr(task, "save_calibration", lambda _backend: None)
+    monkeypatch.setattr(
+        "qdash.workflow.calibtasks.qubex.cw.check_simultaneous_qubit_spectroscopy."
+        "MongoQubitCalibrationRepository",
+        FakeQubitRepository,
+    )
+    monkeypatch.setattr(
+        "qdash.workflow.calibtasks.qubex.cw.check_simultaneous_qubit_spectroscopy."
+        "simultaneous_qubit_spectroscopy",
+        helper,
+    )
+
+    result = task.batch_run(cast("QubexBackend", backend), ["0", "1"])
+
+    assert result.raw_result == {"Q00": {"fig": "fig-0"}, "Q01": {"fig": "fig-1"}}
+    assert calls["targets"] == ["Q00", "Q01"]
+    assert calls["readout_amplitudes"] == {"Q00": 0.017, "Q01": 0.019}
+    assert calls["readout_frequencies"] == {"Q00": 6.123, "Q01": 6.456}
 
 
 def test_single_run_passes_loaded_readout_maps(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -94,7 +164,11 @@ def test_single_run_passes_loaded_readout_maps(monkeypatch: pytest.MonkeyPatch) 
     monkeypatch.setattr(task, "get_experiment", lambda _backend: object())
     monkeypatch.setattr(task, "get_qubit_label", lambda _backend, _qid: "Q00")
     monkeypatch.setattr(task, "save_calibration", lambda _backend: None)
-    monkeypatch.setattr(task, "_load_simultaneous_qubit_spectroscopy", lambda: helper)
+    monkeypatch.setattr(
+        "qdash.workflow.calibtasks.qubex.cw.check_simultaneous_qubit_spectroscopy."
+        "simultaneous_qubit_spectroscopy",
+        helper,
+    )
 
     result = task.run(cast("QubexBackend", backend), "0")
 

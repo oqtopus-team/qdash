@@ -344,7 +344,8 @@ class OneQubitSimultaneousSpectroscopyStrategy(OneQubitStrategy):
         config: OneQubitConfig,
     ) -> dict[str, Any]:
         """Execute local-index spectroscopy steps as hardware-aware batches."""
-        logger = get_run_logger()
+        from qdash.workflow.service.one_qubit_stage_runner import OneQubitStageRunner
+
         wiring_config_path = self._get_wiring_config_path(cal_service.chip_id)
         scheduler = OneQubitScheduler(
             chip_id=cal_service.chip_id, wiring_config_path=wiring_config_path
@@ -354,10 +355,8 @@ class OneQubitSimultaneousSpectroscopyStrategy(OneQubitStrategy):
             exclude_qids=config.exclude_qids,
         )
 
-        all_qids = []
-        for step in schedule.steps:
-            all_qids.extend(self._filter_qids(step.parallel_qids, config.qids))
-        all_qids = list(dict.fromkeys(all_qids))
+        runner = OneQubitStageRunner(cal_service, project_id=config.project_id)
+        all_qids = runner.collect_simultaneous_qids(schedule, config.qids)
         if not all_qids:
             return {}
 
@@ -384,23 +383,11 @@ class OneQubitSimultaneousSpectroscopyStrategy(OneQubitStrategy):
             },
         )
 
-        all_results = {}
-        for step in schedule.steps:
-            step_qids = self._filter_qids(step.parallel_qids, config.qids)
-            if not step_qids:
-                continue
-            logger.info(
-                "Running simultaneous spectroscopy step %s with %s qids",
-                step.step_index,
-                len(step_qids),
-            )
-            session = get_session()
-            step_results: dict[str, dict[str, Any]] = {qid: {} for qid in step_qids}
-            for task_name in config.tasks:
-                task_results = session.execute_task_batch(task_name, step_qids)
-                for qid, task_result in task_results.items():
-                    step_results.setdefault(qid, {})[task_name] = task_result
-            all_results[f"step_{step.step_index}"] = step_results
+        all_results = runner.execute_simultaneous_spectroscopy_schedule(
+            schedule,
+            tasks=config.tasks,
+            allowed_qids=config.qids,
+        )
 
         session = get_session()
         session.record_stage_result("experimental_simultaneous_spectroscopy", all_results)
