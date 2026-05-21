@@ -7,7 +7,7 @@ import Link from "next/link";
 
 import { formatDate, formatDateTime } from "@/lib/utils/datetime";
 
-import { ExecutionStats } from "./ExecutionStats";
+import { ExecutionDurationBreakdown } from "./ExecutionDurationBreakdown";
 
 import type { ExecutionResponseSummary } from "@/schemas";
 
@@ -224,10 +224,11 @@ export function ExecutionPageContent() {
         </PageFiltersBar.Group>
       </PageFiltersBar>
       {/* Statistics display */}
-      <ExecutionStats
+      <ExecutionDurationBreakdown
         executions={cardData}
         selectedTag={selectedTag}
         onTagSelect={setSelectedTag}
+        allItemsHref={`/execution/durations${selectedChip ? `?chip=${encodeURIComponent(selectedChip)}` : ""}`}
       />
       {/* Pagination controls - Top */}
       <PaginationControls
