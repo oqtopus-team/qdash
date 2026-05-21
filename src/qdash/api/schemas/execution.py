@@ -17,6 +17,8 @@ class ExecutionLockStatusResponse(BaseModel):
 class Task(BaseModel):
     """Task is a Pydantic model that represents a task."""
 
+    user_id: str | None = None
+    username: str = ""
     task_id: str | None = None
     qid: str | None = None
     name: str = ""  # Default empty string for name
@@ -61,6 +63,8 @@ class ExecutionResponseSummary(BaseModel):
         start_at (datetime | None): The start time of the execution.
         end_at (datetime | None): The end time of the execution.
         elapsed_time (timedelta | None): The total elapsed time of the execution.
+        user_id (str | None): Internal ID of the user who started the execution.
+        username (str): Username snapshot of the user who started the execution.
         tags (list[str]): Tags associated with the execution.
         note (dict): Notes for the execution.
 
@@ -69,6 +73,8 @@ class ExecutionResponseSummary(BaseModel):
     name: str
     execution_id: str
     status: str
+    user_id: str | None = None
+    username: str = ""
     start_at: datetime | None = None
     end_at: datetime | None = None
     elapsed_time: timedelta | None = None
@@ -98,6 +104,8 @@ class ExecutionResponseDetail(BaseModel):
         start_at (datetime | None): The start time of the execution.
         end_at (datetime | None): The end time of the execution.
         elapsed_time (timedelta | None): The total elapsed time of the execution.
+        user_id (str | None): Internal ID of the user who started the execution.
+        username (str): Username snapshot of the user who started the execution.
         task (list[Task]): List of tasks in the execution.
         note (dict): Notes for the execution.
         tags (list[str]): Tags associated with the execution.
@@ -108,6 +116,8 @@ class ExecutionResponseDetail(BaseModel):
     name: str
     status: str
     flow_name: str = ""
+    user_id: str | None = None
+    username: str = ""
     start_at: datetime | None = None
     end_at: datetime | None = None
     elapsed_time: timedelta | None = None

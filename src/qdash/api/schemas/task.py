@@ -166,6 +166,8 @@ class TaskResultResponse(BaseModel):
         qid (str): The qubit or coupling ID.
         status (str): The task status.
         execution_id (str): The execution ID.
+        user_id (str | None): Internal ID of the user who executed the task.
+        username (str): Username snapshot of the user who executed the task.
         figure_path (list[str]): List of figure paths.
         json_figure_path (list[str]): List of JSON figure paths.
         input_parameters (dict): Input parameters.
@@ -185,6 +187,8 @@ class TaskResultResponse(BaseModel):
     status: str
     execution_id: str
     flow_name: str = ""
+    user_id: str | None = None
+    username: str = ""
     figure_path: list[str]
     json_figure_path: list[str]
     input_parameters: dict[str, Any]

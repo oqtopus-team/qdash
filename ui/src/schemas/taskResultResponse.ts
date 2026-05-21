@@ -5,6 +5,7 @@
  * API for QDash
  * OpenAPI spec version: 0.0.1
  */
+import type { TaskResultResponseUserId } from './taskResultResponseUserId';
 import type { TaskResultResponseInputParameters } from './taskResultResponseInputParameters';
 import type { TaskResultResponseOutputParameters } from './taskResultResponseOutputParameters';
 import type { TaskResultResponseRunParameters } from './taskResultResponseRunParameters';
@@ -25,6 +26,8 @@ Attributes
     qid (str): The qubit or coupling ID.
     status (str): The task status.
     execution_id (str): The execution ID.
+    user_id (str | None): Internal ID of the user who executed the task.
+    username (str): Username snapshot of the user who executed the task.
     figure_path (list[str]): List of figure paths.
     json_figure_path (list[str]): List of JSON figure paths.
     input_parameters (dict): Input parameters.
@@ -43,6 +46,8 @@ export interface TaskResultResponse {
   status: string;
   execution_id: string;
   flow_name?: string;
+  user_id?: TaskResultResponseUserId;
+  username?: string;
   figure_path: string[];
   json_figure_path: string[];
   input_parameters: TaskResultResponseInputParameters;
