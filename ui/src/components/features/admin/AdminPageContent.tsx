@@ -3,7 +3,7 @@
 import { useState } from "react";
 
 import { useQueryClient } from "@tanstack/react-query";
-import { Download, FolderPlus, Info, Search, Trash2, Upload, UserPlus, X } from "lucide-react";
+import { Download, Info, Search, Upload, UserPlus, X } from "lucide-react";
 
 import type {
   UserListItem,
@@ -29,6 +29,8 @@ import {
   useBulkImportUsers,
 } from "@/client/admin/admin";
 import { useRegisterUser, useResetPassword } from "@/client/auth/auth";
+import { AdminProjectsPanel } from "@/components/features/admin/AdminProjectsPanel";
+import { AdminUsersPanel } from "@/components/features/admin/AdminUsersPanel";
 import { SettingsCard } from "@/components/features/settings/SettingsCard";
 import { PageContainer } from "@/components/ui/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -420,452 +422,45 @@ export function AdminPageContent() {
 
       {/* Users Tab */}
       {activeTab === "users" && (
-        <div className="card bg-base-200 shadow-lg">
-          <div className="card-body">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-              <h2 className="card-title">User Management</h2>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  className="btn btn-outline btn-sm"
-                  onClick={() => setIsBulkImportModalOpen(true)}
-                >
-                  <Upload className="h-4 w-4" />
-                  Bulk Import
-                </button>
-                <button
-                  className="btn btn-primary btn-sm"
-                  onClick={() => setIsCreateModalOpen(true)}
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-4 w-4"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 4v16m8-8H4"
-                    />
-                  </svg>
-                  Create User
-                </button>
-              </div>
-            </div>
-
-            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-              <label className="input input-bordered flex items-center gap-2 w-full sm:flex-1 sm:min-w-[16rem]">
-                <Search size={16} className="text-base-content/50" />
-                <input
-                  type="text"
-                  className="grow"
-                  value={userSearch}
-                  onChange={(event) => setUserSearch(event.target.value)}
-                  placeholder="Search username, display name, organization"
-                  aria-label="Search users"
-                />
-              </label>
-              <select
-                className="select select-bordered w-full sm:w-auto"
-                value={userRoleFilter}
-                onChange={(event) =>
-                  setUserRoleFilter(event.target.value as "all" | "admin" | "user")
-                }
-                aria-label="Filter by role"
-              >
-                <option value="all">All roles</option>
-                <option value="admin">Admins</option>
-                <option value="user">Users</option>
-              </select>
-              <select
-                className="select select-bordered w-full sm:w-auto"
-                value={userProjectFilter}
-                onChange={(event) =>
-                  setUserProjectFilter(event.target.value as "all" | "with" | "without")
-                }
-                aria-label="Filter by default project"
-              >
-                <option value="all">All projects</option>
-                <option value="with">Has default project</option>
-                <option value="without">No default project</option>
-              </select>
-              <span className="text-sm text-base-content/70 sm:ml-auto">
-                Showing {filteredUsers.length} of {allUsers.length} users
-              </span>
-            </div>
-
-            {selectedUsers.length > 0 && (
-              <div className="mb-4 alert alert-info flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                  <span className="font-medium">{selectedUsers.length} selected</span>
-                  <span className="text-sm opacity-80">
-                    {bulkProjectCandidates.length} can get a default project
-                  </span>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    className="btn btn-sm btn-error"
-                    onClick={() => setBulkDeleteTargets(selectedUsers)}
-                    disabled={bulkAction !== null}
-                  >
-                    <Trash2 size={16} />
-                    Delete Selected
-                  </button>
-                  <button
-                    className="btn btn-sm btn-primary"
-                    onClick={handleBulkCreateProjects}
-                    disabled={bulkAction !== null || bulkProjectCandidates.length === 0}
-                  >
-                    {bulkAction === "create-project" ? (
-                      <span className="loading loading-spinner loading-xs" />
-                    ) : (
-                      <FolderPlus size={16} />
-                    )}
-                    Create Default Projects
-                  </button>
-                  <button
-                    className="btn btn-sm btn-outline"
-                    onClick={() => setIsAssignProjectModalOpen(true)}
-                    disabled={bulkAction !== null}
-                  >
-                    <UserPlus size={16} />
-                    Assign To Project
-                  </button>
-                  <button className="btn btn-sm btn-ghost" onClick={clearUserSelection}>
-                    Clear
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Mobile card view */}
-            <div className="sm:hidden space-y-3">
-              <label className="flex items-center gap-3 bg-base-100 rounded-box border border-base-300 px-3 py-2">
-                <input
-                  type="checkbox"
-                  className="checkbox checkbox-sm"
-                  checked={allSelectableUsersSelected}
-                  onChange={handleToggleSelectAllUsers}
-                  disabled={selectableFilteredUsers.length === 0}
-                />
-                <span className="text-sm font-medium">Select all removable users in view</span>
-              </label>
-
-              {filteredUsers.map((userItem: UserListItem) => (
-                <div key={userItem.username} className="card bg-base-100 shadow-sm">
-                  <div className="card-body p-4">
-                    <div className="flex justify-between items-start">
-                      <div className="flex items-start gap-3">
-                        <input
-                          type="checkbox"
-                          className="checkbox checkbox-sm mt-1"
-                          checked={selectedUsernames.includes(userItem.username)}
-                          disabled={
-                            userItem.system_role === "admin" || userItem.username === user?.username
-                          }
-                          onChange={() => handleToggleUserSelection(userItem.username)}
-                        />
-                        <div>
-                          <h3 className="font-mono font-medium">{userItem.username}</h3>
-                          <p className="text-sm text-base-content/60">
-                            {userItem.display_name || "-"}
-                          </p>
-                          <p className="text-xs text-base-content/50">
-                            {userItem.organization || "No organization"}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex flex-col gap-1 items-end">
-                        <span
-                          className={`badge badge-sm ${
-                            userItem.system_role === "admin" ? "badge-primary" : "badge-ghost"
-                          }`}
-                        >
-                          {userItem.system_role}
-                        </span>
-                        <span
-                          className={`badge badge-sm ${
-                            userItem.disabled ? "badge-error" : "badge-success"
-                          }`}
-                        >
-                          {userItem.disabled ? "Disabled" : "Active"}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="flex justify-between items-center mt-2 pt-2 border-t border-base-300">
-                      <div>
-                        {userItem.default_project_id ? (
-                          <span className="badge badge-success badge-sm">Default Project</span>
-                        ) : (
-                          <button
-                            className="btn btn-xs btn-primary"
-                            onClick={() => handleCreateProject(userItem.username)}
-                            disabled={createProjectMutation.isPending}
-                          >
-                            {createProjectMutation.isPending ? (
-                              <span className="loading loading-spinner loading-xs"></span>
-                            ) : (
-                              "Create Default"
-                            )}
-                          </button>
-                        )}
-                      </div>
-                      <div className="flex gap-1">
-                        <button
-                          className="btn btn-xs btn-ghost"
-                          onClick={() => handleEdit(userItem)}
-                        >
-                          Edit
-                        </button>
-                        <button
-                          className="btn btn-xs btn-error btn-ghost"
-                          onClick={() => handleDelete(userItem)}
-                          disabled={userItem.username === user?.username}
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-              {filteredUsers.length === 0 && (
-                <div className="bg-base-100 rounded-box border border-dashed border-base-300 p-6 text-center text-sm text-base-content/60">
-                  No users match the current filters.
-                </div>
-              )}
-            </div>
-
-            {/* Desktop table view */}
-            <div className="hidden sm:block overflow-x-auto">
-              <table className="table table-zebra">
-                <thead>
-                  <tr>
-                    <th>
-                      <input
-                        type="checkbox"
-                        className="checkbox checkbox-sm"
-                        checked={allSelectableUsersSelected}
-                        onChange={handleToggleSelectAllUsers}
-                        disabled={selectableFilteredUsers.length === 0}
-                      />
-                    </th>
-                    <th>Username</th>
-                    <th>Display Name</th>
-                    <th>Organization</th>
-                    <th>System Role</th>
-                    <th>Default Project</th>
-                    <th>Status</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredUsers.map((userItem: UserListItem) => (
-                    <tr key={userItem.username}>
-                      <td>
-                        <input
-                          type="checkbox"
-                          className="checkbox checkbox-sm"
-                          checked={selectedUsernames.includes(userItem.username)}
-                          disabled={
-                            userItem.system_role === "admin" || userItem.username === user?.username
-                          }
-                          onChange={() => handleToggleUserSelection(userItem.username)}
-                        />
-                      </td>
-                      <td className="font-mono">{userItem.username}</td>
-                      <td>{userItem.display_name || "-"}</td>
-                      <td>{userItem.organization || "-"}</td>
-                      <td>
-                        <span
-                          className={`badge ${
-                            userItem.system_role === "admin" ? "badge-primary" : "badge-ghost"
-                          }`}
-                        >
-                          {userItem.system_role}
-                        </span>
-                      </td>
-                      <td>
-                        {userItem.default_project_id ? (
-                          <span className="badge badge-success badge-sm">Default Project</span>
-                        ) : (
-                          <button
-                            className="btn btn-xs btn-primary"
-                            onClick={() => handleCreateProject(userItem.username)}
-                            disabled={createProjectMutation.isPending}
-                          >
-                            {createProjectMutation.isPending ? (
-                              <span className="loading loading-spinner loading-xs"></span>
-                            ) : (
-                              "Create Default"
-                            )}
-                          </button>
-                        )}
-                      </td>
-                      <td>
-                        <span
-                          className={`badge ${userItem.disabled ? "badge-error" : "badge-success"}`}
-                        >
-                          {userItem.disabled ? "Disabled" : "Active"}
-                        </span>
-                      </td>
-                      <td>
-                        <div className="flex gap-2">
-                          <button
-                            className="btn btn-sm btn-ghost"
-                            onClick={() => handleEdit(userItem)}
-                          >
-                            Edit
-                          </button>
-                          <button
-                            className="btn btn-sm btn-error btn-ghost"
-                            onClick={() => handleDelete(userItem)}
-                            disabled={userItem.username === user?.username}
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                  {filteredUsers.length === 0 && (
-                    <tr>
-                      <td colSpan={8} className="text-center text-base-content/60">
-                        No users match the current filters.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
+        <AdminUsersPanel
+          users={allUsers}
+          filteredUsers={filteredUsers}
+          selectedUsers={selectedUsers}
+          selectedUsernames={selectedUsernames}
+          bulkProjectCandidates={bulkProjectCandidates}
+          userSearch={userSearch}
+          userRoleFilter={userRoleFilter}
+          userProjectFilter={userProjectFilter}
+          currentUsername={user?.username}
+          allSelectableUsersSelected={allSelectableUsersSelected}
+          selectableFilteredUsersCount={selectableFilteredUsers.length}
+          bulkAction={bulkAction}
+          isCreatingProject={createProjectMutation.isPending}
+          onSearchChange={setUserSearch}
+          onRoleFilterChange={setUserRoleFilter}
+          onProjectFilterChange={setUserProjectFilter}
+          onOpenBulkImport={() => setIsBulkImportModalOpen(true)}
+          onOpenCreateUser={() => setIsCreateModalOpen(true)}
+          onSetBulkDeleteTargets={setBulkDeleteTargets}
+          onBulkCreateProjects={handleBulkCreateProjects}
+          onOpenAssignProject={() => setIsAssignProjectModalOpen(true)}
+          onClearSelection={clearUserSelection}
+          onToggleSelectAll={handleToggleSelectAllUsers}
+          onToggleUserSelection={handleToggleUserSelection}
+          onCreateProject={handleCreateProject}
+          onEditUser={handleEdit}
+          onDeleteUser={handleDelete}
+        />
       )}
 
       {/* Projects Tab */}
       {activeTab === "projects" && (
-        <div className="card bg-base-200 shadow-lg">
-          <div className="card-body">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="card-title">Project Management</h2>
-            </div>
-
-            {/* Mobile card view */}
-            <div className="sm:hidden space-y-3">
-              {projectsData?.data?.projects.map((project: ProjectListItem) => (
-                <div key={project.project_id} className="card bg-base-100 shadow-sm">
-                  <div className="card-body p-4">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <h3 className="font-medium">{project.name}</h3>
-                        {project.description && (
-                          <p className="text-xs text-base-content/60">{project.description}</p>
-                        )}
-                      </div>
-                      <span className="badge badge-ghost badge-sm">
-                        {project.member_count} members
-                      </span>
-                    </div>
-                    <div className="text-sm text-base-content/60 mt-1">
-                      <span className="font-mono">{project.owner_username}</span>
-                      {project.created_at && (
-                        <span className="ml-2">· {formatDate(project.created_at)}</span>
-                      )}
-                    </div>
-                    <div className="flex justify-end gap-1 mt-2 pt-2 border-t border-base-300">
-                      <button
-                        className="btn btn-xs btn-ghost"
-                        onClick={() => handleManageMembers(project)}
-                      >
-                        Members
-                      </button>
-                      {project.owner_username === user?.username ? (
-                        <span
-                          className="btn btn-xs btn-ghost btn-disabled opacity-50"
-                          title="Cannot delete your own project"
-                        >
-                          Delete
-                        </span>
-                      ) : (
-                        <button
-                          className="btn btn-xs btn-error btn-ghost"
-                          onClick={() => handleDeleteProject(project)}
-                        >
-                          Delete
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Desktop table view */}
-            <div className="hidden sm:block overflow-x-auto">
-              <table className="table table-zebra">
-                <thead>
-                  <tr>
-                    <th>Project Name</th>
-                    <th>Owner</th>
-                    <th>Members</th>
-                    <th>Created</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {projectsData?.data?.projects.map((project: ProjectListItem) => (
-                    <tr key={project.project_id}>
-                      <td>
-                        <div>
-                          <div className="font-medium">{project.name}</div>
-                          {project.description && (
-                            <div className="text-xs text-base-content/60">
-                              {project.description}
-                            </div>
-                          )}
-                        </div>
-                      </td>
-                      <td className="font-mono">{project.owner_username}</td>
-                      <td>
-                        <span className="badge badge-ghost">{project.member_count}</span>
-                      </td>
-                      <td className="text-sm text-base-content/60">
-                        {formatDate(project.created_at)}
-                      </td>
-                      <td>
-                        <div className="flex gap-2">
-                          <button
-                            className="btn btn-sm btn-ghost"
-                            onClick={() => handleManageMembers(project)}
-                          >
-                            Members
-                          </button>
-                          {project.owner_username === user?.username ? (
-                            <span
-                              className="btn btn-sm btn-ghost btn-disabled opacity-50"
-                              title="Cannot delete your own project"
-                            >
-                              Delete
-                            </span>
-                          ) : (
-                            <button
-                              className="btn btn-sm btn-error btn-ghost"
-                              onClick={() => handleDeleteProject(project)}
-                            >
-                              Delete
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
+        <AdminProjectsPanel
+          projects={projectsData?.data?.projects ?? []}
+          currentUsername={user?.username}
+          onManageMembers={handleManageMembers}
+          onDeleteProject={handleDeleteProject}
+        />
       )}
 
       {/* System Tab */}
