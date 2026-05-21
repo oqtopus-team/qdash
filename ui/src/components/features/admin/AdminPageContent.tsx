@@ -28,9 +28,16 @@ import {
   useCreateProjectForUser,
   useBulkImportUsers,
 } from "@/client/admin/admin";
-import { useRegisterUser, useResetPassword } from "@/client/auth/auth";
+import { useRegisterUser } from "@/client/auth/auth";
+import {
+  BulkDeleteUsersDialog,
+  DeleteProjectDialog,
+  DeleteUserDialog,
+} from "@/components/features/admin/AdminConfirmDialogs";
 import { AdminProjectsPanel } from "@/components/features/admin/AdminProjectsPanel";
 import { AdminUsersPanel } from "@/components/features/admin/AdminUsersPanel";
+import { CreateUserModal } from "@/components/features/admin/CreateUserModal";
+import { EditUserModal } from "@/components/features/admin/EditUserModal";
 import { SettingsCard } from "@/components/features/settings/SettingsCard";
 import { PageContainer } from "@/components/ui/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -482,94 +489,24 @@ export function AdminPageContent() {
 
       {/* Delete Confirmation Modal */}
       {isDeleteModalOpen && selectedUser && (
-        <dialog className="modal modal-open">
-          <div className="modal-box">
-            <h3 className="font-bold text-lg">Confirm Delete</h3>
-            <p className="py-4">
-              Are you sure you want to delete user{" "}
-              <span className="font-bold">{selectedUser.username}</span>? This action cannot be
-              undone.
-            </p>
-            <div className="modal-action">
-              <button
-                className="btn"
-                onClick={() => {
-                  setIsDeleteModalOpen(false);
-                  setSelectedUser(null);
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                className="btn btn-error"
-                onClick={handleConfirmDelete}
-                disabled={deleteUserMutation.isPending}
-              >
-                {deleteUserMutation.isPending ? (
-                  <span className="loading loading-spinner loading-sm"></span>
-                ) : (
-                  "Delete"
-                )}
-              </button>
-            </div>
-          </div>
-          <form method="dialog" className="modal-backdrop">
-            <button
-              onClick={() => {
-                setIsDeleteModalOpen(false);
-                setSelectedUser(null);
-              }}
-            >
-              close
-            </button>
-          </form>
-        </dialog>
+        <DeleteUserDialog
+          user={selectedUser}
+          isLoading={deleteUserMutation.isPending}
+          onClose={() => {
+            setIsDeleteModalOpen(false);
+            setSelectedUser(null);
+          }}
+          onConfirm={handleConfirmDelete}
+        />
       )}
 
       {bulkDeleteTargets.length > 0 && (
-        <dialog className="modal modal-open">
-          <div className="modal-box">
-            <h3 className="font-bold text-lg">Delete Selected Users</h3>
-            <p className="py-4">
-              Delete {bulkDeleteTargets.length} selected user
-              {bulkDeleteTargets.length !== 1 ? "s" : ""}?
-            </p>
-            <p className="text-sm text-base-content/60">
-              Owned projects and project memberships for these users will also be removed.
-            </p>
-            <div className="mt-4 card bg-base-200">
-              <div className="card-body p-3">
-                <div className="text-sm font-medium">Targets</div>
-                <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto">
-                  {bulkDeleteTargets.map((userItem) => (
-                    <span key={userItem.username} className="badge badge-ghost font-mono">
-                      {userItem.username}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            </div>
-            <div className="modal-action">
-              <button className="btn" onClick={() => setBulkDeleteTargets([])}>
-                Cancel
-              </button>
-              <button
-                className="btn btn-error"
-                onClick={handleBulkDeleteUsers}
-                disabled={bulkAction === "delete"}
-              >
-                {bulkAction === "delete" ? (
-                  <span className="loading loading-spinner loading-sm" />
-                ) : (
-                  "Delete Users"
-                )}
-              </button>
-            </div>
-          </div>
-          <form method="dialog" className="modal-backdrop">
-            <button onClick={() => setBulkDeleteTargets([])}>close</button>
-          </form>
-        </dialog>
+        <BulkDeleteUsersDialog
+          users={bulkDeleteTargets}
+          isLoading={bulkAction === "delete"}
+          onClose={() => setBulkDeleteTargets([])}
+          onConfirm={handleBulkDeleteUsers}
+        />
       )}
 
       {/* Create User Modal */}
@@ -593,50 +530,15 @@ export function AdminPageContent() {
 
       {/* Delete Project Confirmation Modal */}
       {isDeleteProjectModalOpen && selectedProject && (
-        <dialog className="modal modal-open">
-          <div className="modal-box">
-            <h3 className="font-bold text-lg">Confirm Delete Project</h3>
-            <p className="py-4">
-              Are you sure you want to delete project{" "}
-              <span className="font-bold">{selectedProject.name}</span>?
-            </p>
-            <p className="text-sm text-base-content/60">
-              This will also remove all project memberships. This action cannot be undone.
-            </p>
-            <div className="modal-action">
-              <button
-                className="btn"
-                onClick={() => {
-                  setIsDeleteProjectModalOpen(false);
-                  setSelectedProject(null);
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                className="btn btn-error"
-                onClick={handleConfirmDeleteProject}
-                disabled={deleteProjectMutation.isPending}
-              >
-                {deleteProjectMutation.isPending ? (
-                  <span className="loading loading-spinner loading-sm"></span>
-                ) : (
-                  "Delete"
-                )}
-              </button>
-            </div>
-          </div>
-          <form method="dialog" className="modal-backdrop">
-            <button
-              onClick={() => {
-                setIsDeleteProjectModalOpen(false);
-                setSelectedProject(null);
-              }}
-            >
-              close
-            </button>
-          </form>
-        </dialog>
+        <DeleteProjectDialog
+          project={selectedProject}
+          isLoading={deleteProjectMutation.isPending}
+          onClose={() => {
+            setIsDeleteProjectModalOpen(false);
+            setSelectedProject(null);
+          }}
+          onConfirm={handleConfirmDeleteProject}
+        />
       )}
 
       {/* Members Management Modal */}
@@ -693,417 +595,6 @@ export function AdminPageContent() {
         />
       )}
     </PageContainer>
-  );
-}
-
-// Edit User Modal Component
-function EditUserModal({
-  user,
-  currentUsername,
-  onClose,
-  onSave,
-  isLoading,
-}: {
-  user: UserListItem;
-  currentUsername?: string;
-  onClose: () => void;
-  onSave: (updates: {
-    organization?: string;
-    disabled?: boolean;
-    system_role?: SystemRole;
-  }) => void;
-  isLoading: boolean;
-}) {
-  const [organization, setOrganization] = useState(user.organization ?? "");
-  const [disabled, setDisabled] = useState(user.disabled ?? false);
-  const [systemRole, setSystemRole] = useState<SystemRole>(user.system_role ?? "user");
-  const isSelf = user.username === currentUsername;
-  const [showPasswordReset, setShowPasswordReset] = useState(false);
-  const [newPassword, setNewPassword] = useState("");
-  const [passwordError, setPasswordError] = useState<string | null>(null);
-  const [passwordSuccess, setPasswordSuccess] = useState(false);
-
-  const resetPasswordMutation = useResetPassword();
-
-  const handleSave = () => {
-    onSave({
-      organization: organization.trim(),
-      disabled,
-      system_role: systemRole,
-    });
-  };
-
-  const handleResetPassword = async () => {
-    setPasswordError(null);
-    setPasswordSuccess(false);
-
-    if (!newPassword.trim()) {
-      setPasswordError("Password is required");
-      return;
-    }
-    if (newPassword.length < 4) {
-      setPasswordError("Password must be at least 4 characters");
-      return;
-    }
-
-    try {
-      await resetPasswordMutation.mutateAsync({
-        data: {
-          username: user.username,
-          new_password: newPassword,
-        },
-      });
-      setPasswordSuccess(true);
-      setNewPassword("");
-      setTimeout(() => {
-        setShowPasswordReset(false);
-        setPasswordSuccess(false);
-      }, 2000);
-    } catch {
-      setPasswordError("Failed to reset password");
-    }
-  };
-
-  return (
-    <dialog className="modal modal-open">
-      <div className="modal-box max-w-2xl">
-        <h3 className="font-bold text-lg mb-4">Edit User: {user.username}</h3>
-
-        <div className="space-y-4">
-          <div className="form-control">
-            <label className="label">
-              <span className="label-text font-medium">Organization</span>
-            </label>
-            <input
-              type="text"
-              className="input input-bordered w-full"
-              value={organization}
-              onChange={(e) => setOrganization(e.target.value)}
-              placeholder="Enter organization or affiliation"
-            />
-          </div>
-
-          {/* Status */}
-          <div className="form-control">
-            <label className="label cursor-pointer justify-start gap-4">
-              <input
-                type="checkbox"
-                className="toggle toggle-error"
-                checked={disabled}
-                onChange={(e) => setDisabled(e.target.checked)}
-              />
-              <span className="label-text">
-                Account Disabled
-                {disabled && <span className="text-error ml-2">(User cannot login)</span>}
-              </span>
-            </label>
-          </div>
-
-          {/* System Role */}
-          <div className="form-control flex flex-col gap-1">
-            <label className="label">
-              <span className="label-text font-medium">System Role</span>
-            </label>
-            <select
-              className="select select-bordered"
-              value={systemRole}
-              onChange={(e) => setSystemRole(e.target.value as SystemRole)}
-              disabled={isSelf}
-            >
-              <option value="user">User</option>
-              <option value="admin">Admin</option>
-            </select>
-            <label className="label">
-              <span className="label-text-alt text-base-content/60">
-                {isSelf
-                  ? "You cannot change your own system role"
-                  : "Admin users can manage all users and system settings"}
-              </span>
-            </label>
-          </div>
-
-          {/* Password Reset Section */}
-          <div className="divider">Password</div>
-
-          {!showPasswordReset ? (
-            <button
-              className="btn btn-outline btn-warning btn-sm"
-              onClick={() => setShowPasswordReset(true)}
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-4 w-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"
-                />
-              </svg>
-              Reset Password
-            </button>
-          ) : (
-            <div className="bg-base-300 p-4 rounded-lg space-y-3">
-              <h4 className="font-medium text-sm">Reset Password</h4>
-
-              {passwordError && (
-                <div className="alert alert-error py-2">
-                  <span className="text-sm">{passwordError}</span>
-                </div>
-              )}
-
-              {passwordSuccess && (
-                <div className="alert alert-success py-2">
-                  <span className="text-sm">Password reset successfully!</span>
-                </div>
-              )}
-
-              <div className="form-control">
-                <input
-                  type="password"
-                  className="input input-bordered input-sm w-full"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="Enter new password"
-                  disabled={passwordSuccess}
-                />
-              </div>
-
-              <div className="flex gap-2">
-                <button
-                  className="btn btn-warning btn-sm"
-                  onClick={handleResetPassword}
-                  disabled={resetPasswordMutation.isPending || passwordSuccess}
-                >
-                  {resetPasswordMutation.isPending ? (
-                    <span className="loading loading-spinner loading-xs"></span>
-                  ) : (
-                    "Confirm Reset"
-                  )}
-                </button>
-                <button
-                  className="btn btn-ghost btn-sm"
-                  onClick={() => {
-                    setShowPasswordReset(false);
-                    setNewPassword("");
-                    setPasswordError(null);
-                  }}
-                  disabled={resetPasswordMutation.isPending}
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div className="modal-action">
-          <button className="btn" onClick={onClose}>
-            Cancel
-          </button>
-          <button className="btn btn-primary" onClick={handleSave} disabled={isLoading}>
-            {isLoading ? (
-              <span className="loading loading-spinner loading-sm"></span>
-            ) : (
-              "Save Changes"
-            )}
-          </button>
-        </div>
-      </div>
-      <form method="dialog" className="modal-backdrop">
-        <button onClick={onClose}>close</button>
-      </form>
-    </dialog>
-  );
-}
-
-// Create User Modal Component
-function CreateUserModal({
-  onClose,
-  onSave,
-  isLoading,
-  error,
-}: {
-  onClose: () => void;
-  onSave: (userData: {
-    username: string;
-    display_name?: string;
-    organization?: string;
-    create_default_project?: boolean;
-  }) => Promise<string | null>;
-  isLoading: boolean;
-  error: Error | unknown | null;
-}) {
-  const [username, setUsername] = useState("");
-  const [displayName, setDisplayName] = useState("");
-  const [organization, setOrganization] = useState("");
-  const [createDefaultProject, setCreateDefaultProject] = useState(false);
-  const [localError, setLocalError] = useState<string | null>(null);
-  const [temporaryPassword, setTemporaryPassword] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
-
-  const handleSave = async () => {
-    setLocalError(null);
-
-    if (!username.trim()) {
-      setLocalError("Username is required");
-      return;
-    }
-
-    try {
-      const generatedPassword = await onSave({
-        username: username.trim(),
-        display_name: displayName.trim() || undefined,
-        organization: organization.trim() || undefined,
-        create_default_project: createDefaultProject,
-      });
-      setTemporaryPassword(generatedPassword);
-    } catch {
-      // Error is handled by the mutation
-    }
-  };
-
-  const handleCopyPassword = async () => {
-    if (!temporaryPassword) return;
-    await navigator.clipboard.writeText(temporaryPassword);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  const displayError =
-    localError || (error ? "Failed to create user. Username may already exist." : null);
-
-  return (
-    <dialog className="modal modal-open">
-      <div className="modal-box">
-        <h3 className="font-bold text-lg mb-4">Create New User</h3>
-
-        {displayError && (
-          <div className="alert alert-error mb-4">
-            <span>{displayError}</span>
-          </div>
-        )}
-
-        {temporaryPassword ? (
-          <div className="space-y-4">
-            <div className="alert alert-success">
-              <span>
-                User <span className="font-mono font-semibold">{username}</span> was created. Share
-                this temporary password securely.
-              </span>
-            </div>
-            <div className="form-control">
-              <label className="label">
-                <span className="label-text font-medium">Temporary Password</span>
-              </label>
-              <div className="join w-full">
-                <input
-                  className="input input-bordered join-item w-full font-mono"
-                  value={temporaryPassword}
-                  readOnly
-                />
-                <button
-                  type="button"
-                  className={`btn join-item ${copied ? "btn-success" : "btn-primary"}`}
-                  onClick={handleCopyPassword}
-                >
-                  {copied ? "Copied" : "Copy"}
-                </button>
-              </div>
-              <label className="label">
-                <span className="label-text-alt text-base-content/60">
-                  This password is shown only once. The user must change it after signing in.
-                </span>
-              </label>
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            <div className="form-control">
-              <label className="label">
-                <span className="label-text font-medium">Username *</span>
-              </label>
-              <input
-                type="text"
-                className="input input-bordered w-full"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="Enter username"
-              />
-            </div>
-
-            <div className="form-control">
-              <label className="label">
-                <span className="label-text font-medium">Display Name</span>
-              </label>
-              <input
-                type="text"
-                className="input input-bordered w-full"
-                value={displayName}
-                onChange={(e) => setDisplayName(e.target.value)}
-                placeholder="Enter display name (optional)"
-              />
-              <label className="label">
-                <span className="label-text-alt text-base-content/60">
-                  A temporary password will be generated for this user
-                </span>
-              </label>
-            </div>
-
-            <div className="form-control">
-              <label className="label">
-                <span className="label-text font-medium">Organization</span>
-              </label>
-              <input
-                type="text"
-                className="input input-bordered w-full"
-                value={organization}
-                onChange={(e) => setOrganization(e.target.value)}
-                placeholder="Enter organization or affiliation (optional)"
-              />
-            </div>
-            <label className="form-control cursor-pointer rounded-lg border border-base-300 bg-base-100 p-3">
-              <div className="flex items-start gap-3">
-                <input
-                  type="checkbox"
-                  className="checkbox checkbox-primary mt-1"
-                  checked={createDefaultProject}
-                  onChange={(event) => setCreateDefaultProject(event.target.checked)}
-                />
-                <div>
-                  <div className="font-medium">Create default project</div>
-                  <div className="text-sm text-base-content/60">
-                    Provision a personal project for this user and set it as their default project.
-                  </div>
-                </div>
-              </div>
-            </label>
-          </div>
-        )}
-
-        <div className="modal-action">
-          <button className="btn" onClick={onClose}>
-            {temporaryPassword ? "Close" : "Cancel"}
-          </button>
-          {!temporaryPassword && (
-            <button className="btn btn-primary" onClick={handleSave} disabled={isLoading}>
-              {isLoading ? (
-                <span className="loading loading-spinner loading-sm"></span>
-              ) : (
-                "Create User"
-              )}
-            </button>
-          )}
-        </div>
-      </div>
-      <form method="dialog" className="modal-backdrop">
-        <button onClick={onClose}>close</button>
-      </form>
-    </dialog>
   );
 }
 
