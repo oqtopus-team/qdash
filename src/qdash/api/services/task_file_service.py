@@ -23,6 +23,7 @@ from qdash.api.schemas.task_file import (
     TaskInfo,
 )
 from qdash.common.config.backend import (
+    get_default_backend,
     get_task_category,
     get_tasks,
     load_backend_config,
@@ -65,7 +66,7 @@ class TaskFileService:
             ui_settings = settings.get("ui", {})
             task_files_settings = ui_settings.get("task_files", {})
             return TaskFileSettings(
-                default_backend=task_files_settings.get("default_backend"),
+                default_backend=get_default_backend(),
                 default_view_mode=task_files_settings.get("default_view_mode"),
                 sort_order=task_files_settings.get("sort_order"),
             )
@@ -215,7 +216,7 @@ class TaskFileService:
         try:
             config = load_backend_config()
             return BackendConfigResponse(
-                default_backend=config.default_backend,
+                default_backend=get_default_backend(),
                 backends={
                     name: {"description": b.description, "tasks": b.tasks}
                     for name, b in config.backends.items()
