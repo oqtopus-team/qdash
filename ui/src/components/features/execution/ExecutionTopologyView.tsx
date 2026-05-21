@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, memo } from "react";
+import { useMemo, useState, memo, type KeyboardEvent } from "react";
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 
 import type { Task } from "@/schemas";
@@ -58,6 +58,12 @@ const EmptyCell = memo(function EmptyCell({ muxBgClass }: { muxBgClass: string }
   return <div className={`aspect-square bg-base-300/50 rounded-lg ${muxBgClass}`} />;
 });
 
+function handleActivationKey(event: KeyboardEvent<HTMLDivElement>, onClick: () => void) {
+  if (event.key !== "Enter" && event.key !== " ") return;
+  event.preventDefault();
+  onClick();
+}
+
 interface TopologyCellProps {
   qid: string;
   tasks: Task[];
@@ -113,8 +119,11 @@ const TopologyCell = memo(function TopologyCell({
 
   // Zoomed-in: show figure
   return (
-    <button
+    <div
+      role="button"
+      tabIndex={0}
       onClick={onClick}
+      onKeyDown={(event) => handleActivationKey(event, onClick)}
       className={`aspect-square rounded-xl bg-white shadow-md border border-base-300/60 overflow-hidden transition-all duration-200 hover:shadow-xl hover:scale-105 hover:border-primary/40 relative w-full ${muxBgClass}`}
     >
       {figurePath && (
@@ -138,7 +147,7 @@ const TopologyCell = memo(function TopologyCell({
           {tasks.length}
         </div>
       )}
-    </button>
+    </div>
   );
 });
 
@@ -189,9 +198,11 @@ const CouplingMarker = memo(function CouplingMarker({
   }
 
   return (
-    <button
-      type="button"
+    <div
+      role="button"
+      tabIndex={0}
       onClick={onClick}
+      onKeyDown={(event) => handleActivationKey(event, onClick)}
       className="absolute z-20 rounded-xl bg-white shadow-md border border-base-300/60 overflow-hidden transition-all duration-200 hover:shadow-xl hover:scale-105 hover:border-primary/40 -translate-x-1/2 -translate-y-1/2"
       style={{
         left,
@@ -219,7 +230,7 @@ const CouplingMarker = memo(function CouplingMarker({
           {tasks.length}
         </div>
       )}
-    </button>
+    </div>
   );
 });
 
@@ -299,9 +310,7 @@ export function ExecutionTopologyView({
       if (!filterTaskName || task.name !== filterTaskName) continue;
       const [first, second] = task.qid.split("-");
       if (!first || !second) continue;
-      const normalizedQid = [normalizeQid(first), normalizeQid(second)]
-        .sort(compareQid)
-        .join("-");
+      const normalizedQid = [normalizeQid(first), normalizeQid(second)].sort(compareQid).join("-");
       if (!map[normalizedQid]) map[normalizedQid] = [];
       map[normalizedQid].push(task);
     }
