@@ -32,9 +32,7 @@ def test_falls_back_to_container_calibtasks_path(monkeypatch, tmp_path: Path) ->
     assert service._base_path == calibtasks_dir
 
 
-def test_ignores_nonexistent_caltasks_path_from_environment(
-    monkeypatch, tmp_path: Path
-) -> None:
+def test_ignores_nonexistent_caltasks_path_from_environment(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setenv("CALTASKS_PATH", str(tmp_path / "missing"))
     calibtasks_dir = tmp_path / "calibtasks"
     calibtasks_dir.mkdir()
@@ -96,15 +94,11 @@ def test_get_task_names_uses_effective_default_backend_and_resolved_calibtasks_p
     fake_dir.mkdir(parents=True)
     qubex_dir.mkdir()
     (fake_dir / "fake_task.py").write_text(
-        "class FakeTask:\n"
-        "    name: str = \"FakeOnlyTask\"\n"
-        "    task_type: str = \"qubit\"\n",
+        'class FakeTask:\n    name: str = "FakeOnlyTask"\n    task_type: str = "qubit"\n',
         encoding="utf-8",
     )
     (qubex_dir / "qubex_task.py").write_text(
-        "class QubexTask:\n"
-        "    name: str = \"QubexOnlyTask\"\n"
-        "    task_type: str = \"qubit\"\n",
+        'class QubexTask:\n    name: str = "QubexOnlyTask"\n    task_type: str = "qubit"\n',
         encoding="utf-8",
     )
     monkeypatch.setenv("CALTASKS_PATH", str(calibtasks_dir))
