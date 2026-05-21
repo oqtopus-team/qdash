@@ -174,3 +174,84 @@ class SynchronizedOneQubitScheduleResult:
         """String representation."""
         total_qubits = sum(len(step.parallel_qids) for step in self.steps)
         return f"SynchronizedOneQubitScheduleResult(qubits={total_qubits}, steps={len(self.steps)})"
+
+
+@dataclass
+class MuxBatchStepInfo:
+    """Information about one MUX-batch execution step.
+
+    Each batch contains qids from one MUX and should be executed by one
+    Experiment/session. Batches within the same step can run in parallel.
+
+    Attributes:
+        step_index: Index of this step in the full schedule
+        box_type: Type of box ("A", "B", or "MIXED")
+        parallel_batches: MUX-based qid batches that can run in parallel
+    """
+
+    step_index: int
+    box_type: str
+    parallel_batches: list[list[str]]
+
+    @property
+    def parallel_qids(self) -> list[str]:
+        """Flattened qids in this step."""
+        return [qid for batch in self.parallel_batches for qid in batch]
+
+    def __repr__(self) -> str:
+        """String representation."""
+        return (
+            f"MuxBatchStep({self.step_index}, {self.box_type}, "
+            f"batches={len(self.parallel_batches)})"
+        )
+
+
+@dataclass
+class MuxBatchScheduleResult:
+    """Result object for MUX-batch scheduling.
+
+    This result format is intended for simultaneous spectroscopy tasks where
+    one experiment call handles all selected qids in one MUX.
+    """
+
+    steps: list[MuxBatchStepInfo]
+    metadata: dict[str, Any]
+    mux_box_map: dict[int, set[str]]
+    qid_to_mux: dict[str, int]
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to dictionary format for serialization."""
+        return {
+            "steps": [
+                {
+                    "step_index": step.step_index,
+                    "box_type": step.box_type,
+                    "parallel_batches": step.parallel_batches,
+                    "parallel_qids": step.parallel_qids,
+                }
+                for step in self.steps
+            ],
+            "metadata": self.metadata,
+        }
+
+    @property
+    def total_steps(self) -> int:
+        """Total number of MUX-batch steps."""
+        return len(self.steps)
+
+    @property
+    def total_batches(self) -> int:
+        """Total number of MUX batches across all steps."""
+        return sum(len(step.parallel_batches) for step in self.steps)
+
+    def get_steps_by_box(self, box_type: str) -> list[MuxBatchStepInfo]:
+        """Get steps for a specific box type."""
+        return [step for step in self.steps if step.box_type == box_type]
+
+    def __repr__(self) -> str:
+        """String representation."""
+        total_qubits = sum(len(step.parallel_qids) for step in self.steps)
+        return (
+            f"MuxBatchScheduleResult(qubits={total_qubits}, "
+            f"batches={self.total_batches}, steps={len(self.steps)})"
+        )

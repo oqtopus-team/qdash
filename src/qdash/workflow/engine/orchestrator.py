@@ -367,6 +367,28 @@ class CalibOrchestrator:
         # Step 5: Merge results and return
         return self._merge_and_extract_results(executed_context, task_name, task_type, qid)
 
+    def run_task_batch(
+        self,
+        task_name: str,
+        qids: list[str],
+        task_details: dict[str, Any] | None = None,
+        upstream_id: str | None = None,
+    ) -> dict[str, dict[str, Any]]:
+        """Run one calibration task for a batch of qubits."""
+        if not qids:
+            return {}
+
+        task_instance = self._create_task_instance(task_name, task_details)
+        task_type = task_instance.get_task_type()
+
+        for qid in qids:
+            self._ensure_task_in_workflow(task_name, task_type, qid)
+
+        exec_context = self._prepare_batch_execution_context(qids, upstream_id)
+        executed_context = self._run_prefect_batch_task(task_instance, exec_context, qids)
+
+        return self._merge_and_extract_batch_results(executed_context, task_name, task_type, qids)
+
     def _create_task_instance(
         self,
         task_name: str,
@@ -496,6 +518,56 @@ class CalibOrchestrator:
 
         return exec_context
 
+    def _prepare_batch_execution_context(
+        self,
+        qids: list[str],
+        upstream_id: str | None,
+    ) -> TaskContext:
+        """Prepare a TaskContext for batch task execution."""
+        from copy import deepcopy
+
+        from qdash.datamodel.task import CalibDataModel
+
+        config = self.config
+        exec_context = TaskContext(
+            username=config.username,
+            execution_id=config.execution_id,
+            qids=qids,
+            calib_dir=self.task_context.calib_dir,
+            history_recorder=self._create_history_recorder(),
+            snapshot_loader=self._snapshot_loader,
+            source_task_id=self._source_task_id,
+            force_update_params=config.force_update_params,
+        )
+
+        relevant_qids: list[str] = []
+        for qid in qids:
+            relevant_qids.extend(self._get_relevant_qubit_ids(qid))
+        relevant_qids = list(dict.fromkeys(relevant_qids))
+
+        exec_context.state.calib_data = CalibDataModel(
+            qubit={
+                q: deepcopy(self.task_context.calib_data.qubit[q])
+                for q in relevant_qids
+                if q in self.task_context.calib_data.qubit
+            },
+            coupling={
+                q: deepcopy(self.task_context.calib_data.coupling[q])
+                for q in qids
+                if q in self.task_context.calib_data.coupling
+            },
+        )
+
+        if upstream_id is not None:
+            exec_context.set_upstream_task_id(upstream_id)
+        else:
+            last_ids = [self._last_executed_task_id_by_qid.get(qid, "") for qid in qids]
+            exec_context.set_upstream_task_id(
+                next((task_id for task_id in last_ids if task_id), "")
+            )
+
+        return exec_context
+
     def _run_prefect_task(
         self,
         task_instance: Any,
@@ -516,6 +588,31 @@ class CalibOrchestrator:
             task_context=exec_context,
             task_instance=task_instance,
             qid=qid,
+        )
+        execution_service, executed_context = result
+        self._execution_service = execution_service
+
+        return cast("TaskContext", executed_context)
+
+    def _run_prefect_batch_task(
+        self,
+        task_instance: Any,
+        exec_context: TaskContext,
+        qids: list[str],
+    ) -> TaskContext:
+        """Execute a batch task via Prefect and return executed context."""
+        from qdash.workflow.engine.task_runner import execute_dynamic_task_batch_service
+
+        result = execute_dynamic_task_batch_service.with_options(
+            timeout_seconds=task_instance.timeout,
+            task_run_name=task_instance.name,
+            log_prints=True,
+        )(
+            backend=self.backend,
+            execution_service=self.execution_service,
+            task_context=exec_context,
+            task_instance=task_instance,
+            qids=qids,
         )
         execution_service, executed_context = result
         self._execution_service = execution_service
@@ -544,6 +641,31 @@ class CalibOrchestrator:
         result["task_id"] = executed_task.task_id
 
         return dict(result)
+
+    def _merge_and_extract_batch_results(
+        self,
+        executed_context: TaskContext,
+        task_name: str,
+        task_type: str,
+        qids: list[str],
+    ) -> dict[str, dict[str, Any]]:
+        """Merge batch execution results back to main context and extract outputs."""
+        self.task_context.state.calib_data.qubit.update(executed_context.calib_data.qubit)
+        self.task_context.state.calib_data.coupling.update(executed_context.calib_data.coupling)
+
+        results: dict[str, dict[str, Any]] = {}
+        for qid in qids:
+            executed_task = executed_context.get_task(
+                task_name=task_name, task_type=task_type, qid=qid
+            )
+            self._last_executed_task_id_by_qid[qid] = executed_task.task_id
+            result = executed_context.state.get_output_parameter_by_task_name(
+                task_name, task_type=task_type, qid=qid
+            )
+            result["task_id"] = executed_task.task_id
+            results[qid] = dict(result)
+
+        return results
 
     def _ensure_task_in_workflow(self, task_name: str, task_type: str, qid: str) -> None:
         """Ensure task exists in TaskContext's workflow structure."""

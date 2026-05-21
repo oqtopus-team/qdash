@@ -335,6 +335,79 @@ class OneQubitSynchronizedStrategy(OneQubitStrategy):
         return all_results
 
 
+class OneQubitSimultaneousSpectroscopyStrategy(OneQubitStrategy):
+    """Experimental 4-step local-index strategy for simultaneous spectroscopy."""
+
+    def execute(
+        self,
+        cal_service: CalibService,
+        config: OneQubitConfig,
+    ) -> dict[str, Any]:
+        """Execute local-index spectroscopy steps as hardware-aware batches."""
+        logger = get_run_logger()
+        wiring_config_path = self._get_wiring_config_path(cal_service.chip_id)
+        scheduler = OneQubitScheduler(
+            chip_id=cal_service.chip_id, wiring_config_path=wiring_config_path
+        )
+        schedule = scheduler.generate_simultaneous_spectroscopy_batches_from_mux(
+            mux_ids=config.mux_ids,
+            exclude_qids=config.exclude_qids,
+        )
+
+        all_qids = []
+        for step in schedule.steps:
+            all_qids.extend(self._filter_qids(step.parallel_qids, config.qids))
+        all_qids = list(dict.fromkeys(all_qids))
+        if not all_qids:
+            return {}
+
+        stage_flow_name = config.flow_name or "simultaneous_spectroscopy"
+        init_calibration(
+            cal_service.username,
+            cal_service.chip_id,
+            all_qids,
+            flow_name=stage_flow_name,
+            backend_name=cal_service.backend_name,
+            tags=cal_service.tags or ([config.flow_name] if config.flow_name else None),
+            project_id=config.project_id,
+            use_lock=False,
+            enable_github_pull=True,
+            github_push_config=GitHubPushConfig(
+                enabled=True,
+                file_types=[ConfigFileType.CALIB_NOTE, ConfigFileType.ALL_PARAMS],
+            ),
+            note={
+                "type": "experimental-simultaneous-spectroscopy",
+                "strategy": schedule.metadata["strategy"],
+                "total_qubits": len(all_qids),
+                "total_steps": schedule.total_steps,
+            },
+        )
+
+        all_results = {}
+        for step in schedule.steps:
+            step_qids = self._filter_qids(step.parallel_qids, config.qids)
+            if not step_qids:
+                continue
+            logger.info(
+                "Running simultaneous spectroscopy step %s with %s qids",
+                step.step_index,
+                len(step_qids),
+            )
+            session = get_session()
+            step_results: dict[str, dict[str, Any]] = {qid: {} for qid in step_qids}
+            for task_name in config.tasks:
+                task_results = session.execute_task_batch(task_name, step_qids)
+                for qid, task_result in task_results.items():
+                    step_results.setdefault(qid, {})[task_name] = task_result
+            all_results[f"step_{step.step_index}"] = step_results
+
+        session = get_session()
+        session.record_stage_result("experimental_simultaneous_spectroscopy", all_results)
+        finish_calibration()
+        return all_results
+
+
 class OneQubitSerialStrategy(OneQubitStrategy):
     """Fully serial 1-qubit calibration.
 
@@ -419,6 +492,7 @@ class OneQubitSerialStrategy(OneQubitStrategy):
 ONE_QUBIT_STRATEGIES: dict[str, type[OneQubitStrategy]] = {
     "synchronized": OneQubitSynchronizedStrategy,
     "scheduled": OneQubitScheduledStrategy,
+    "simultaneous_spectroscopy": OneQubitSimultaneousSpectroscopyStrategy,
     "serial": OneQubitSerialStrategy,
 }
 

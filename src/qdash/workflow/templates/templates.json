@@ -8,6 +8,14 @@
     "function_name": "bringup"
   },
   {
+    "id": "experimental_simultaneous_bringup",
+    "name": "Experimental Simultaneous Bring-up",
+    "description": "Experimental bring-up with resonator spectroscopy followed by local-index simultaneous qubit spectroscopy.",
+    "category": "advanced",
+    "filename": "experimental_simultaneous_bringup.py",
+    "function_name": "experimental_simultaneous_bringup"
+  },
+  {
     "id": "simple",
     "name": "Simple Calibration",
     "description": "Basic calibration for learning and simple tasks. Supports MUX-based and qubit-based targeting with customizable tasks and execution modes.",

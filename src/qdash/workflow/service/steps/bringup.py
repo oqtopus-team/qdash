@@ -17,7 +17,7 @@ from prefect import get_run_logger
 
 from qdash.workflow.service.results import OneQubitResult
 from qdash.workflow.service.steps.base import CalibrationStep
-from qdash.workflow.service.tasks import BRINGUP_TASKS
+from qdash.workflow.service.tasks import BRINGUP_TASKS, EXPERIMENTAL_SIMULTANEOUS_BRINGUP_TASKS
 
 if TYPE_CHECKING:
     from qdash.workflow.service.calib_service import CalibService
@@ -242,3 +242,93 @@ class BringUp(CalibrationStep):
                 )
 
         return metrics
+
+
+@dataclass
+class ExperimentalSimultaneousBringUp(CalibrationStep):
+    """Experimental bring-up using resonator spectroscopy and simultaneous qubit spectroscopy."""
+
+    resonator_mode: str = "scheduled"
+    qubit_mode: str = "simultaneous_spectroscopy"
+    tasks: list[str] = field(default_factory=lambda: list(EXPERIMENTAL_SIMULTANEOUS_BRINGUP_TASKS))
+
+    @property
+    def name(self) -> str:
+        return "experimental_simultaneous_bringup"
+
+    @property
+    def provides(self) -> set[str]:
+        return {"experimental_simultaneous_bringup", "bringup"}
+
+    def execute(
+        self,
+        service: CalibService,
+        targets: Target,
+        ctx: StepContext,
+    ) -> StepContext:
+        """Execute resonator spectroscopy first, then local-index simultaneous spectroscopy."""
+        logger = get_run_logger()
+        from qdash.workflow.service.strategy import OneQubitConfig, get_one_qubit_strategy
+        from qdash.workflow.service.targets import MuxTargets
+
+        if not isinstance(targets, MuxTargets):
+            msg = "ExperimentalSimultaneousBringUp currently requires MuxTargets"
+            raise ValueError(msg)
+
+        reso_tasks = ["CheckResonatorSpectroscopy"]
+        qubit_tasks = ["CheckSimultaneousQubitSpectroscopy"]
+
+        logger.info("[%s] Running resonator spectroscopy", self.name)
+        reso_config = OneQubitConfig(
+            mux_ids=targets.mux_ids,
+            exclude_qids=targets.exclude_qids,
+            tasks=reso_tasks,
+            flow_name=f"{service.flow_name}_{self.name}_resonator"
+            if service.flow_name
+            else f"{self.name}_resonator",
+            project_id=service.project_id,
+        )
+        reso_results = get_one_qubit_strategy(self.resonator_mode).execute(service, reso_config)
+
+        logger.info("[%s] Running simultaneous qubit spectroscopy", self.name)
+        qubit_config = OneQubitConfig(
+            mux_ids=targets.mux_ids,
+            exclude_qids=targets.exclude_qids,
+            tasks=qubit_tasks,
+            flow_name=f"{service.flow_name}_{self.name}_qubit"
+            if service.flow_name
+            else f"{self.name}_qubit",
+            project_id=service.project_id,
+        )
+        qubit_results = get_one_qubit_strategy(self.qubit_mode).execute(service, qubit_config)
+
+        result = BringUp(tasks=[])._build_result(
+            {"combined": self._merge_qid_results(reso_results, qubit_results)}
+        )
+        ctx.metadata["experimental_simultaneous_bringup"] = result
+        ctx.metadata["bringup"] = result
+        return ctx
+
+    @staticmethod
+    def _flatten_strategy_results(raw_results: dict[str, Any]) -> dict[str, Any]:
+        """Flatten strategy results from stage/step keys to qid keys."""
+        flattened: dict[str, Any] = {}
+        for stage_data in raw_results.values():
+            if not isinstance(stage_data, dict):
+                continue
+            flattened.update({qid: raw for qid, raw in stage_data.items() if isinstance(raw, dict)})
+        return flattened
+
+    @classmethod
+    def _merge_qid_results(cls, *raw_results: dict[str, Any]) -> dict[str, Any]:
+        """Merge multiple strategy result payloads by qid."""
+        merged: dict[str, Any] = {}
+        for raw_result in raw_results:
+            for qid, raw in cls._flatten_strategy_results(raw_result).items():
+                qid_result = merged.setdefault(qid, {})
+                qid_result.update(raw)
+                if raw.get("status") == "failed":
+                    qid_result["status"] = "failed"
+                elif "status" not in qid_result:
+                    qid_result["status"] = raw.get("status", "success")
+        return merged

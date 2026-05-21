@@ -64,6 +64,8 @@ from qdash.workflow.engine.scheduler.one_qubit_types import (
     BOX_A,
     BOX_B,
     BOX_MIXED,
+    MuxBatchScheduleResult,
+    MuxBatchStepInfo,
     OneQubitScheduleResult,
     OneQubitStageInfo,
 )
@@ -75,6 +77,8 @@ __all__ = [
     "CRScheduleResult",
     # CR Scheduler (2-qubit)
     "CRScheduler",
+    "MuxBatchScheduleResult",
+    "MuxBatchStepInfo",
     "OneQubitScheduleResult",
     # 1-Qubit Scheduler
     "OneQubitScheduler",
