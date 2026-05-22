@@ -1111,7 +1111,11 @@ export function QubitGrid({
 
       {/* Grid display */}
       <div
-        className="flex-1 relative overflow-hidden flex justify-center border-2 border-base-300 rounded-lg"
+        className={`flex-1 relative overflow-hidden flex justify-center ${
+          viewMode === "pan-zoom"
+            ? "bg-base-200/30 border-2 border-dashed border-base-300 rounded-lg"
+            : "border-2 border-base-300 rounded-lg"
+        }`}
         style={{ padding: `${Math.max(4, padding / 4)}px` }}
         ref={containerRef}
       >
