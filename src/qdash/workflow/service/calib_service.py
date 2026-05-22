@@ -856,7 +856,9 @@ class CalibService:
         configured_param_files = self.github_push_config.params_file_names
         if configured_param_files is not None:
             self.github_push_config.params_file_names = [
-                file_name for file_name in configured_param_files if file_name in updated_param_files
+                file_name
+                for file_name in configured_param_files
+                if file_name in updated_param_files
             ]
             skipped_files = sorted(set(configured_param_files) - updated_param_files)
             if skipped_files:
@@ -879,6 +881,8 @@ class CalibService:
             return
 
         try:
+            from bunnet import SortDirection
+
             from qdash.datamodel.task import CalibDataModel, ParameterModel, TaskTypes
             from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
 
@@ -890,7 +894,7 @@ class CalibService:
                         "status": "completed",
                     }
                 )
-                .sort([("end_at", 1)])
+                .sort([("end_at", SortDirection.ASCENDING)])
                 .run()
             )
 

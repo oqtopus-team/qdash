@@ -356,7 +356,9 @@ class TestCalibServiceParameterManagement:
 
         session._merge_task_result_calib_data_before_push(MagicMock())
 
-        merged = session.execution_service.calib_data.qubit["0"]["control_amplitude"]
+        execution_service = session.execution_service
+        assert execution_service is not None
+        merged = execution_service.calib_data.qubit["0"]["control_amplitude"]
         assert isinstance(merged, ParameterModel)
         assert merged.value == 0.25
 
