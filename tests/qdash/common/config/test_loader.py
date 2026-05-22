@@ -28,6 +28,20 @@ def test_load_settings_falls_back_to_legacy_root_yaml(monkeypatch, tmp_path):
     ConfigLoader.clear_cache()
 
 
+def test_load_settings_expands_environment_variables(monkeypatch, tmp_path):
+    monkeypatch.setenv("QDASH_TASK_FILE_SORT_ORDER", "updated_at")
+    _write_yaml(
+        tmp_path / "app" / "settings.yaml",
+        "ui:\n  task_files:\n    sort_order: ${QDASH_TASK_FILE_SORT_ORDER}\n",
+    )
+    monkeypatch.setattr(ConfigLoader, "_CONFIG_DIR", tmp_path)
+    ConfigLoader.clear_cache()
+
+    assert ConfigLoader.load_settings() == {"ui": {"task_files": {"sort_order": "updated_at"}}}
+
+    ConfigLoader.clear_cache()
+
+
 def test_load_backend_reads_app_yaml(monkeypatch, tmp_path):
     _write_yaml(tmp_path / "app" / "backend.yaml", "default_backend: fake\n")
     monkeypatch.setattr(ConfigLoader, "_CONFIG_DIR", tmp_path)

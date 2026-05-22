@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -20,6 +21,17 @@ def _deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any
         else:
             result[key] = value
     return result
+
+
+def _expand_env_vars(value: Any) -> Any:
+    """Expand environment variable references in loaded YAML values."""
+    if isinstance(value, str):
+        return os.path.expandvars(value)
+    if isinstance(value, list):
+        return [_expand_env_vars(item) for item in value]
+    if isinstance(value, dict):
+        return {key: _expand_env_vars(item) for key, item in value.items()}
+    return value
 
 
 class ConfigLoader:
@@ -41,7 +53,9 @@ class ConfigLoader:
         if not path.exists():
             return {}
         with path.open(encoding="utf-8") as f:
-            return yaml.safe_load(f) or {}
+            config = yaml.safe_load(f) or {}
+        expanded = _expand_env_vars(config)
+        return expanded if isinstance(expanded, dict) else {}
 
     @classmethod
     def _load_with_local(cls, filename: str) -> dict[str, Any]:
