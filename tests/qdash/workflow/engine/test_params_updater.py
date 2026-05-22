@@ -276,17 +276,15 @@ data:
         backend.get_instance.side_effect = AssertionError("should not connect")
 
         with patch(
-            "qdash.workflow.engine.params_updater.ConfigLoader.load_settings",
+            "qdash.workflow.engine.params_updater.ConfigLoader.load_workflow",
             return_value={
-                "workflow": {
-                    "params_updater": {
-                        "parameter_file_map": {
-                            "control_amplitude": "custom_amplitude.yaml",
-                        },
-                        "extra_file_map": {
-                            "control_amplitude": ["mirrored_amplitude.yaml"],
-                        },
-                    }
+                "params_updater": {
+                    "parameter_file_map": {
+                        "control_amplitude": "custom_amplitude.yaml",
+                    },
+                    "extra_file_map": {
+                        "control_amplitude": ["mirrored_amplitude.yaml"],
+                    },
                 }
             },
         ):
@@ -315,7 +313,7 @@ data:
         backend.get_instance.side_effect = AssertionError("should not connect")
 
         with patch(
-            "qdash.workflow.engine.params_updater.ConfigLoader.load_settings",
+            "qdash.workflow.engine.params_updater.ConfigLoader.load_workflow",
             return_value={},
         ):
             updater = _QubexParamsUpdater(backend, chip_id="144Qv1")
@@ -330,14 +328,12 @@ data:
         """Configured mapping should reject paths outside params/*.yaml filenames."""
         with (
             patch(
-                "qdash.workflow.engine.params_updater.ConfigLoader.load_settings",
+                "qdash.workflow.engine.params_updater.ConfigLoader.load_workflow",
                 return_value={
-                    "workflow": {
-                        "params_updater": {
-                            "parameter_file_map": {
-                                "control_amplitude": "../control_amplitude.yaml",
-                            },
-                        }
+                    "params_updater": {
+                        "parameter_file_map": {
+                            "control_amplitude": "../control_amplitude.yaml",
+                        },
                     }
                 },
             ),
@@ -349,14 +345,12 @@ data:
         """Extra file mapping values must be YAML filename lists."""
         with (
             patch(
-                "qdash.workflow.engine.params_updater.ConfigLoader.load_settings",
+                "qdash.workflow.engine.params_updater.ConfigLoader.load_workflow",
                 return_value={
-                    "workflow": {
-                        "params_updater": {
-                            "extra_file_map": {
-                                "qubit_frequency": "control_frequency.yaml",
-                            },
-                        }
+                    "params_updater": {
+                        "extra_file_map": {
+                            "qubit_frequency": "control_frequency.yaml",
+                        },
                     }
                 },
             ),

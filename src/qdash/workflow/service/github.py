@@ -38,7 +38,7 @@ class ConfigFileType(Enum):
 
 def _load_default_params_file_names() -> list[str] | None:
     """Load default params batch allowlist from QDash settings."""
-    workflow_settings = ConfigLoader.load_settings().get("workflow", {})
+    workflow_settings = ConfigLoader.load_workflow()
     if not isinstance(workflow_settings, dict):
         return None
     github_settings = workflow_settings.get("github", {})
@@ -60,7 +60,7 @@ class GitHubPushConfig(BaseModel):
         file_types: List of file types to push (default: [CALIB_NOTE, ALL_PARAMS])
         params_file_names: Optional allowlist for ALL_PARAMS, such as
             ["params.yaml", "drag.yaml"]. If omitted, defaults to
-            workflow.github.params_file_names from QDash settings. If neither is
+            workflow.github.params_file_names from QDash workflow config. If neither is
             configured, all *.yaml files are pushed.
         commit_message: Custom commit message (default: auto-generated)
         branch: Target branch (default: "main")

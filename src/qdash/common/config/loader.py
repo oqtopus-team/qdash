@@ -81,6 +81,22 @@ class ConfigLoader:
         return cls._load_with_local("backend.yaml")
 
     @classmethod
+    @lru_cache(maxsize=1)
+    def load_workflow(cls) -> dict[str, Any]:
+        """Load workflow configuration.
+
+        Workflow settings used to live under ``settings.yaml``. Keep that path
+        as a fallback so local overrides continue to work during migration.
+        """
+        workflow_config = cls._load_with_local("workflow.yaml")
+        if workflow_config:
+            return workflow_config
+
+        settings = cls.load_settings()
+        workflow_settings = settings.get("workflow", {})
+        return workflow_settings if isinstance(workflow_settings, dict) else {}
+
+    @classmethod
     def load_policy(cls) -> dict[str, Any]:
         """Load provenance policy configuration."""
         return cls._load_with_local("policy.yaml")
@@ -92,3 +108,4 @@ class ConfigLoader:
         cls.load_metrics.cache_clear()
         cls.load_copilot.cache_clear()
         cls.load_backend.cache_clear()
+        cls.load_workflow.cache_clear()
