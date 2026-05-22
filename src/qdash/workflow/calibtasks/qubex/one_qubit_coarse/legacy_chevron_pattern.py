@@ -10,7 +10,7 @@ CheckCoarseChevron. This file preserves the old class name so:
    ``BaseTask.registry``.
 
 New workflows should reference CheckFineChevron directly. This class is NOT
-listed in ``config/backend.yaml`` ``qubex.tasks``, so the UI marks it as
+listed in ``config/app/backend.yaml`` ``qubex.tasks``, so the UI marks it as
 ``enabled=False`` and it won't be picked up by default task lists.
 """
 
