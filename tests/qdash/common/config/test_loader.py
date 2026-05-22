@@ -1,8 +1,58 @@
+from pathlib import Path
+
 from qdash.common.config.loader import ConfigLoader
 
 
+def _write_yaml(path: Path, content: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content, encoding="utf-8")
+
+
+def test_load_settings_reads_app_yaml(monkeypatch, tmp_path):
+    _write_yaml(tmp_path / "app" / "settings.yaml", "ui:\n  task_files:\n    sort_order: name\n")
+    monkeypatch.setattr(ConfigLoader, "_CONFIG_DIR", tmp_path)
+    ConfigLoader.clear_cache()
+
+    assert ConfigLoader.load_settings() == {"ui": {"task_files": {"sort_order": "name"}}}
+
+    ConfigLoader.clear_cache()
+
+
+def test_load_settings_falls_back_to_legacy_root_yaml(monkeypatch, tmp_path):
+    _write_yaml(tmp_path / "settings.yaml", "ui:\n  task_files:\n    sort_order: name\n")
+    monkeypatch.setattr(ConfigLoader, "_CONFIG_DIR", tmp_path)
+    ConfigLoader.clear_cache()
+
+    assert ConfigLoader.load_settings() == {"ui": {"task_files": {"sort_order": "name"}}}
+
+    ConfigLoader.clear_cache()
+
+
+def test_load_backend_reads_app_yaml(monkeypatch, tmp_path):
+    _write_yaml(tmp_path / "app" / "backend.yaml", "default_backend: fake\n")
+    monkeypatch.setattr(ConfigLoader, "_CONFIG_DIR", tmp_path)
+    ConfigLoader.clear_cache()
+
+    assert ConfigLoader.load_backend() == {"default_backend": "fake"}
+
+    ConfigLoader.clear_cache()
+
+
 def test_load_workflow_reads_workflow_yaml(monkeypatch, tmp_path):
-    (tmp_path / "workflow.yaml").write_text("github:\n  params_file_names:\n    - params.yaml\n")
+    _write_yaml(
+        tmp_path / "app" / "workflow.yaml",
+        "github:\n  params_file_names:\n    - params.yaml\n",
+    )
+    monkeypatch.setattr(ConfigLoader, "_CONFIG_DIR", tmp_path)
+    ConfigLoader.clear_cache()
+
+    assert ConfigLoader.load_workflow() == {"github": {"params_file_names": ["params.yaml"]}}
+
+    ConfigLoader.clear_cache()
+
+
+def test_load_workflow_falls_back_to_legacy_root_yaml(monkeypatch, tmp_path):
+    _write_yaml(tmp_path / "workflow.yaml", "github:\n  params_file_names:\n    - params.yaml\n")
     monkeypatch.setattr(ConfigLoader, "_CONFIG_DIR", tmp_path)
     ConfigLoader.clear_cache()
 
@@ -12,7 +62,7 @@ def test_load_workflow_reads_workflow_yaml(monkeypatch, tmp_path):
 
 
 def test_load_workflow_falls_back_to_settings_yaml_workflow(monkeypatch, tmp_path):
-    (tmp_path / "settings.yaml").write_text("workflow:\n  github:\n    params_file_names: []\n")
+    _write_yaml(tmp_path / "settings.yaml", "workflow:\n  github:\n    params_file_names: []\n")
     monkeypatch.setattr(ConfigLoader, "_CONFIG_DIR", tmp_path)
     ConfigLoader.clear_cache()
 
@@ -22,9 +72,7 @@ def test_load_workflow_falls_back_to_settings_yaml_workflow(monkeypatch, tmp_pat
 
 
 def test_load_metrics_reads_domain_yaml(monkeypatch, tmp_path):
-    domain_dir = tmp_path / "domain"
-    domain_dir.mkdir()
-    (domain_dir / "metrics.yaml").write_text("qubit_metrics:\n  t1:\n    title: T1\n")
+    _write_yaml(tmp_path / "domain" / "metrics.yaml", "qubit_metrics:\n  t1:\n    title: T1\n")
     monkeypatch.setattr(ConfigLoader, "_CONFIG_DIR", tmp_path)
     ConfigLoader.clear_cache()
 
@@ -34,7 +82,7 @@ def test_load_metrics_reads_domain_yaml(monkeypatch, tmp_path):
 
 
 def test_load_metrics_falls_back_to_legacy_root_yaml(monkeypatch, tmp_path):
-    (tmp_path / "metrics.yaml").write_text("qubit_metrics:\n  t2_echo:\n    title: T2 Echo\n")
+    _write_yaml(tmp_path / "metrics.yaml", "qubit_metrics:\n  t2_echo:\n    title: T2 Echo\n")
     monkeypatch.setattr(ConfigLoader, "_CONFIG_DIR", tmp_path)
     ConfigLoader.clear_cache()
 
@@ -44,9 +92,7 @@ def test_load_metrics_falls_back_to_legacy_root_yaml(monkeypatch, tmp_path):
 
 
 def test_load_policy_reads_domain_yaml(monkeypatch, tmp_path):
-    domain_dir = tmp_path / "domain"
-    domain_dir.mkdir()
-    (domain_dir / "policy.yaml").write_text("version: 1\nrules: []\n")
+    _write_yaml(tmp_path / "domain" / "policy.yaml", "version: 1\nrules: []\n")
     monkeypatch.setattr(ConfigLoader, "_CONFIG_DIR", tmp_path)
     ConfigLoader.clear_cache()
 
@@ -56,9 +102,7 @@ def test_load_policy_reads_domain_yaml(monkeypatch, tmp_path):
 
 
 def test_load_copilot_reads_copilot_config_yaml(monkeypatch, tmp_path):
-    copilot_dir = tmp_path / "copilot"
-    copilot_dir.mkdir()
-    (copilot_dir / "config.yaml").write_text("enabled: true\n")
+    _write_yaml(tmp_path / "copilot" / "config.yaml", "enabled: true\n")
     monkeypatch.setattr(ConfigLoader, "_CONFIG_DIR", tmp_path)
     ConfigLoader.clear_cache()
 
@@ -68,14 +112,14 @@ def test_load_copilot_reads_copilot_config_yaml(monkeypatch, tmp_path):
 
 
 def test_load_copilot_merges_chat_and_review_yaml(monkeypatch, tmp_path):
-    copilot_dir = tmp_path / "copilot"
-    copilot_dir.mkdir()
-    (copilot_dir / "config.yaml").write_text("enabled: true\n")
-    (copilot_dir / "chat.yaml").write_text(
-        "chat_models:\n  - provider: openai\n    name: gpt-5.4\n"
+    _write_yaml(tmp_path / "copilot" / "config.yaml", "enabled: true\n")
+    _write_yaml(
+        tmp_path / "copilot" / "chat.yaml",
+        "chat_models:\n  - provider: openai\n    name: gpt-5.4\n",
     )
-    (copilot_dir / "review.yaml").write_text(
-        "analysis:\n  ai_review_tasks:\n    - CheckQubitSpectroscopy\n"
+    _write_yaml(
+        tmp_path / "copilot" / "review.yaml",
+        "analysis:\n  ai_review_tasks:\n    - CheckQubitSpectroscopy\n",
     )
     monkeypatch.setattr(ConfigLoader, "_CONFIG_DIR", tmp_path)
     ConfigLoader.clear_cache()
@@ -90,7 +134,7 @@ def test_load_copilot_merges_chat_and_review_yaml(monkeypatch, tmp_path):
 
 
 def test_load_copilot_falls_back_to_legacy_root_yaml(monkeypatch, tmp_path):
-    (tmp_path / "copilot.yaml").write_text("enabled: false\n")
+    _write_yaml(tmp_path / "copilot.yaml", "enabled: false\n")
     monkeypatch.setattr(ConfigLoader, "_CONFIG_DIR", tmp_path)
     ConfigLoader.clear_cache()
 

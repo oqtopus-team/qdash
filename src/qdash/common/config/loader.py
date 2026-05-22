@@ -65,10 +65,18 @@ class ConfigLoader:
         return cls._load_with_local(filename)
 
     @classmethod
+    def _load_app_with_local(cls, filename: str) -> dict[str, Any]:
+        """Load an app YAML file, falling back to the legacy config root."""
+        config = cls._load_with_local(f"app/{filename}")
+        if config:
+            return config
+        return cls._load_with_local(filename)
+
+    @classmethod
     @lru_cache(maxsize=1)
     def load_settings(cls) -> dict[str, Any]:
         """Load settings configuration."""
-        return cls._load_with_local("settings.yaml")
+        return cls._load_app_with_local("settings.yaml")
 
     @classmethod
     @lru_cache(maxsize=1)
@@ -95,7 +103,7 @@ class ConfigLoader:
     @lru_cache(maxsize=1)
     def load_backend(cls) -> dict[str, Any]:
         """Load backend configuration."""
-        return cls._load_with_local("backend.yaml")
+        return cls._load_app_with_local("backend.yaml")
 
     @classmethod
     @lru_cache(maxsize=1)
@@ -105,7 +113,7 @@ class ConfigLoader:
         Workflow settings used to live under ``settings.yaml``. Keep that path
         as a fallback so local overrides continue to work during migration.
         """
-        workflow_config = cls._load_with_local("workflow.yaml")
+        workflow_config = cls._load_app_with_local("workflow.yaml")
         if workflow_config:
             return workflow_config
 

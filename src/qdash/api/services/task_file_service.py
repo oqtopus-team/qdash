@@ -53,7 +53,7 @@ class TaskFileService:
         self._task_cache: dict[str, tuple[float, list[TaskInfo]]] = {}
 
     def get_settings(self) -> TaskFileSettings:
-        """Get task file settings from config/settings.yaml.
+        """Get task file settings from config/app/settings.yaml.
 
         Returns
         -------
@@ -205,7 +205,7 @@ class TaskFileService:
             raise HTTPException(status_code=500, detail=f"Error saving file: {e!s}")
 
     def get_backend_config(self) -> BackendConfigResponse:
-        """Get backend configuration from backend.yaml.
+        """Get backend configuration from config/app/backend.yaml.
 
         Returns
         -------
@@ -242,7 +242,7 @@ class TaskFileService:
         sort_order : str | None
             Sort order for tasks.
         enabled_only : bool
-            If True, only return tasks enabled in backend.yaml.
+            If True, only return tasks enabled in config/app/backend.yaml.
 
         Returns
         -------

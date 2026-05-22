@@ -50,13 +50,13 @@ def reload_config_caches(
     clear_policy_config_cache()
     return ConfigReloadResponse(
         cleared=[
-            "settings.yaml",
+            "app/settings.yaml",
             "domain/metrics.yaml",
             "copilot/config.yaml",
             "copilot/chat.yaml",
             "copilot/review.yaml",
-            "backend.yaml",
-            "workflow.yaml",
+            "app/backend.yaml",
+            "app/workflow.yaml",
             "domain/policy.yaml",
         ]
     )
