@@ -503,3 +503,62 @@ def get_flow_schedule_service() -> "FlowScheduleService":
     return FlowScheduleService(
         flow_repository=get_flow_repository(),
     )
+
+
+def clear_dependency_caches() -> None:
+    """Clear cached dependency providers.
+
+    Use this from tests or application reload hooks when provider instances
+    must be rebuilt after dependency overrides, configuration changes, or
+    database session resets.
+    """
+    get_chip_repository.cache_clear()
+    get_execution_counter_repository.cache_clear()
+    get_task_result_repository.cache_clear()
+    get_chip_service.cache_clear()
+    get_execution_history_repository.cache_clear()
+    get_execution_lock_repository.cache_clear()
+    get_execution_service.cache_clear()
+    get_calibration_note_repository.cache_clear()
+    get_calibration_service.cache_clear()
+    get_device_topology_service.cache_clear()
+    get_metrics_service.cache_clear()
+    get_task_result_service.cache_clear()
+    get_tag_repository.cache_clear()
+    get_backend_repository.cache_clear()
+    get_task_definition_repository.cache_clear()
+    get_qubit_calibration_repository.cache_clear()
+    get_coupling_calibration_repository.cache_clear()
+    get_parameter_version_repository.cache_clear()
+    get_provenance_relation_repository.cache_clear()
+    get_activity_repository.cache_clear()
+    get_seed_import_service.cache_clear()
+    get_manual_update_service.cache_clear()
+    get_provenance_service.cache_clear()
+    get_issue_service.cache_clear()
+    get_forum_service.cache_clear()
+    get_issue_knowledge_service.cache_clear()
+    get_copilot_runtime.cache_clear()
+    get_admin_service.cache_clear()
+    get_config_service.cache_clear()
+    get_task_service.cache_clear()
+    get_note_service.cache_clear()
+    get_notification_service.cache_clear()
+    get_copilot_chat_session_service.cache_clear()
+    get_cryostat_repository.cache_clear()
+    get_cryostat_service.cache_clear()
+    get_cooldown_repository.cache_clear()
+    get_cooldown_wiring_event_repository.cache_clear()
+    get_cooldown_service.cache_clear()
+    get_cooldown_wiring_event_service.cache_clear()
+    get_user_repository.cache_clear()
+    get_auth_service.cache_clear()
+    get_project_repository.cache_clear()
+    get_membership_repository.cache_clear()
+    get_project_service.cache_clear()
+    get_task_file_service.cache_clear()
+    get_file_service.cache_clear()
+    get_reanalysis_service.cache_clear()
+    get_flow_repository.cache_clear()
+    get_flow_service.cache_clear()
+    get_flow_schedule_service.cache_clear()
