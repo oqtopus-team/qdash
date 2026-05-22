@@ -4,14 +4,18 @@ This module provides FastAPI dependency functions for injecting
 repositories and services into route handlers.
 """
 
-from collections.abc import Callable
-from functools import lru_cache
-from typing import TYPE_CHECKING, ParamSpec, Protocol, TypeVar
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from qdash.api.services.flow_schedule_service import FlowScheduleService
     from qdash.api.services.flow_service import FlowService
 
+from qdash.api.dependency_cache import (
+    cached_dependency_provider,
+)
+from qdash.api.dependency_cache import (
+    clear_dependency_caches as _clear_dependency_caches,
+)
 from qdash.api.services.admin_service import AdminService
 from qdash.api.services.auth_service import AuthService
 from qdash.api.services.calibration_service import CalibrationService
@@ -64,27 +68,6 @@ from qdash.repository.provenance import (
 from qdash.repository.qubit import MongoQubitCalibrationRepository
 from qdash.repository.tag import MongoTagRepository
 from qdash.repository.task_definition import MongoTaskDefinitionRepository
-
-P = ParamSpec("P")
-R = TypeVar("R")
-
-
-class CachedDependencyProvider(Protocol[P, R]):
-    """Callable dependency provider with an attached cache clear hook."""
-
-    def __call__(self, *args: P.args, **kwargs: P.kwargs) -> R: ...
-
-    def cache_clear(self) -> None: ...
-
-
-_cached_dependency_providers: list[CachedDependencyProvider[..., object]] = []
-
-
-def cached_dependency_provider(func: Callable[P, R]) -> CachedDependencyProvider[P, R]:
-    """Cache and register a dependency provider for centralized reset."""
-    cached = lru_cache(maxsize=1)(func)
-    _cached_dependency_providers.append(cached)
-    return cached
 
 
 @cached_dependency_provider
@@ -528,11 +511,5 @@ def get_flow_schedule_service() -> "FlowScheduleService":
 
 
 def clear_dependency_caches() -> None:
-    """Clear cached dependency providers.
-
-    Use this from tests or application reload hooks when provider instances
-    must be rebuilt after dependency overrides, configuration changes, or
-    database session resets.
-    """
-    for provider in _cached_dependency_providers:
-        provider.cache_clear()
+    """Clear cached dependency providers."""
+    _clear_dependency_caches()
