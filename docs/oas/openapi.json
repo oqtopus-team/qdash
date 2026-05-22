@@ -4483,7 +4483,7 @@
           "task-file"
         ],
         "summary": "Get task file settings",
-        "description": "Get task file settings from config/settings.yaml.\n\nReturns\n-------\n    Task file settings including default backend",
+        "description": "Get task file settings from config/app/settings.yaml.\n\nReturns\n-------\n    Task file settings including default backend",
         "operationId": "getTaskFileSettings",
         "responses": {
           "200": {
@@ -4688,7 +4688,7 @@
           "task-file"
         ],
         "summary": "Get backend configuration",
-        "description": "Get backend configuration from backend.yaml.\n\nReturns\n-------\n    Backend configuration",
+        "description": "Get backend configuration from config/app/backend.yaml.\n\nReturns\n-------\n    Backend configuration",
         "operationId": "getBackendConfig",
         "responses": {
           "200": {
@@ -15010,7 +15010,7 @@
           "task_notes"
         ],
         "title": "ChipNotesSummaryResponse",
-        "description": "All notes for a chip in one fetch \u2014 drives the dashboard summary view."
+        "description": "All notes for a chip in one fetch — drives the dashboard summary view."
       },
       "ChipResponse": {
         "properties": {
