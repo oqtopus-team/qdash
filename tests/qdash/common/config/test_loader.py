@@ -38,9 +38,7 @@ def test_load_metrics_falls_back_to_legacy_root_yaml(monkeypatch, tmp_path):
     monkeypatch.setattr(ConfigLoader, "_CONFIG_DIR", tmp_path)
     ConfigLoader.clear_cache()
 
-    assert ConfigLoader.load_metrics() == {
-        "qubit_metrics": {"t2_echo": {"title": "T2 Echo"}}
-    }
+    assert ConfigLoader.load_metrics() == {"qubit_metrics": {"t2_echo": {"title": "T2 Echo"}}}
 
     ConfigLoader.clear_cache()
 
