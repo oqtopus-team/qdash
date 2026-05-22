@@ -54,6 +54,7 @@ def reload_config_caches(
             "metrics.yaml",
             "copilot.yaml",
             "backend.yaml",
+            "workflow.yaml",
             "policy.yaml",
         ]
     )

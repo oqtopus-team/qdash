@@ -139,7 +139,7 @@ class TestGitHubPushConfigDefaults:
         """Default params_file_names keeps the historical all-yaml behavior."""
         from qdash.workflow.service.github import GitHubPushConfig
 
-        with patch("qdash.workflow.service.github.ConfigLoader.load_settings", return_value={}):
+        with patch("qdash.workflow.service.github.ConfigLoader.load_workflow", return_value={}):
             config = GitHubPushConfig()
         assert config.params_file_names is None
 
@@ -148,8 +148,8 @@ class TestGitHubPushConfigDefaults:
         from qdash.workflow.service.github import GitHubPushConfig
 
         with patch(
-            "qdash.workflow.service.github.ConfigLoader.load_settings",
-            return_value={"workflow": {"github": {"params_file_names": ["params.yaml"]}}},
+            "qdash.workflow.service.github.ConfigLoader.load_workflow",
+            return_value={"github": {"params_file_names": ["params.yaml"]}},
         ):
             config = GitHubPushConfig()
 
@@ -160,8 +160,8 @@ class TestGitHubPushConfigDefaults:
         from qdash.workflow.service.github import GitHubPushConfig
 
         with patch(
-            "qdash.workflow.service.github.ConfigLoader.load_settings",
-            return_value={"workflow": {"github": {"params_file_names": ["params.yaml"]}}},
+            "qdash.workflow.service.github.ConfigLoader.load_workflow",
+            return_value={"github": {"params_file_names": ["params.yaml"]}},
         ):
             config = GitHubPushConfig(params_file_names=["drag.yaml"])
 
@@ -173,8 +173,8 @@ class TestGitHubPushConfigDefaults:
 
         with (
             patch(
-                "qdash.workflow.service.github.ConfigLoader.load_settings",
-                return_value={"workflow": {"github": {"params_file_names": "params.yaml"}}},
+                "qdash.workflow.service.github.ConfigLoader.load_workflow",
+                return_value={"github": {"params_file_names": "params.yaml"}},
             ),
             pytest.raises(ValueError, match=r"workflow\.github\.params_file_names"),
         ):

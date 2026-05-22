@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 
 def _load_params_updater_settings() -> dict[str, Any]:
-    workflow_settings = ConfigLoader.load_settings().get("workflow", {})
+    workflow_settings = ConfigLoader.load_workflow()
     if not isinstance(workflow_settings, dict):
         return {}
     settings = workflow_settings.get("params_updater", {})
