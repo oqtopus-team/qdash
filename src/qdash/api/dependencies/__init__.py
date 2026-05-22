@@ -19,7 +19,7 @@ from qdash.api.dependencies.cache import (
 from qdash.api.services.admin_service import AdminService
 from qdash.api.services.auth_service import AuthService
 from qdash.api.services.calibration_service import CalibrationService
-from qdash.api.services.chip_service import ChipService
+from qdash.api.services.chip import ChipService
 from qdash.api.services.config_service import ConfigService
 from qdash.api.services.cooldown_service import CooldownService
 from qdash.api.services.cooldown_wiring_event_service import CooldownWiringEventService

@@ -42,8 +42,7 @@ from qdash.api.schemas.reanalysis import (
     ReanalyzeResponse,
 )
 from qdash.api.schemas.success import SuccessResponse
-from qdash.api.services.chip_initializer import ChipInitializer
-from qdash.api.services.chip_service import ChipService
+from qdash.api.services.chip import ChipInitializer, ChipService
 from qdash.api.services.reanalysis_service import ReanalysisService
 
 router = APIRouter()
