@@ -9,7 +9,12 @@ import pytest
 from ruamel.yaml import YAML
 from ruamel.yaml.comments import CommentedMap
 
-from qdash.workflow.engine.params_updater import _QubexParamsUpdater, get_params_updater
+from qdash.workflow.engine.params_updater import (
+    _load_extra_file_map,
+    _load_param_file_map,
+    _QubexParamsUpdater,
+    get_params_updater,
+)
 
 
 class TestParamsUpdaterNoneHandling:
@@ -254,6 +259,110 @@ data:
             )
 
         assert updated_files == {"control_frequency.yaml", "t1.yaml"}
+
+    def test_update_uses_params_mapping_from_qdash_settings(self, tmp_path):
+        """Parameter-to-YAML mapping should be configurable through QDash settings."""
+        params_dir = tmp_path / "params"
+        params_dir.mkdir()
+        (params_dir / "custom_amplitude.yaml").write_text("data:\n  Q047: 0.1\n")
+        (params_dir / "mirrored_amplitude.yaml").write_text("data:\n  Q047: 0.1\n")
+
+        backend = MagicMock()
+        backend.config = {
+            "project_id": "project-1",
+            "chip_id": "144Qv1",
+            "params_dir": str(params_dir),
+        }
+        backend.get_instance.side_effect = AssertionError("should not connect")
+
+        with patch(
+            "qdash.workflow.engine.params_updater.ConfigLoader.load_settings",
+            return_value={
+                "workflow": {
+                    "params_updater": {
+                        "parameter_file_map": {
+                            "control_amplitude": "custom_amplitude.yaml",
+                        },
+                        "extra_file_map": {
+                            "control_amplitude": ["mirrored_amplitude.yaml"],
+                        },
+                    }
+                }
+            },
+        ):
+            updater = _QubexParamsUpdater(backend, chip_id="144Qv1")
+
+        with patch("qdash.common.domain.qubit._get_chip_size", return_value=144):
+            updated_files = updater.update("47", {"control_amplitude": {"value": 0.25}})
+
+        assert updated_files == {"custom_amplitude.yaml", "mirrored_amplitude.yaml"}
+        assert "Q047: 0.25" in (params_dir / "custom_amplitude.yaml").read_text()
+        assert "Q047: 0.25" in (params_dir / "mirrored_amplitude.yaml").read_text()
+
+    def test_missing_params_mapping_does_not_update_yaml(self, tmp_path):
+        """Without YAML settings, there should be no code-side fallback mapping."""
+        params_dir = tmp_path / "params"
+        params_dir.mkdir()
+        yaml_file = params_dir / "control_amplitude.yaml"
+        yaml_file.write_text("data:\n  Q047: 0.1\n")
+
+        backend = MagicMock()
+        backend.config = {
+            "project_id": "project-1",
+            "chip_id": "144Qv1",
+            "params_dir": str(params_dir),
+        }
+        backend.get_instance.side_effect = AssertionError("should not connect")
+
+        with patch(
+            "qdash.workflow.engine.params_updater.ConfigLoader.load_settings",
+            return_value={},
+        ):
+            updater = _QubexParamsUpdater(backend, chip_id="144Qv1")
+
+        with patch("qdash.common.domain.qubit._get_chip_size", return_value=144):
+            updated_files = updater.update("47", {"control_amplitude": {"value": 0.25}})
+
+        assert updated_files == set()
+        assert "Q047: 0.1" in yaml_file.read_text()
+
+    def test_invalid_params_mapping_file_name_raises(self):
+        """Configured mapping should reject paths outside params/*.yaml filenames."""
+        with (
+            patch(
+                "qdash.workflow.engine.params_updater.ConfigLoader.load_settings",
+                return_value={
+                    "workflow": {
+                        "params_updater": {
+                            "parameter_file_map": {
+                                "control_amplitude": "../control_amplitude.yaml",
+                            },
+                        }
+                    }
+                },
+            ),
+            pytest.raises(ValueError, match="Invalid params updater YAML file name"),
+        ):
+            _load_param_file_map()
+
+    def test_invalid_extra_file_map_shape_raises(self):
+        """Extra file mapping values must be YAML filename lists."""
+        with (
+            patch(
+                "qdash.workflow.engine.params_updater.ConfigLoader.load_settings",
+                return_value={
+                    "workflow": {
+                        "params_updater": {
+                            "extra_file_map": {
+                                "qubit_frequency": "control_frequency.yaml",
+                            },
+                        }
+                    }
+                },
+            ),
+            pytest.raises(ValueError, match="workflow\\.params_updater\\.extra_file_map"),
+        ):
+            _load_extra_file_map()
 
     def test_fake_backend_uses_yaml_params_updater(self, tmp_path):
         """Fake backend should support params YAML updates for local verification."""
