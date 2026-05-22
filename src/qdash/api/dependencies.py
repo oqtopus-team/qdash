@@ -51,6 +51,7 @@ from qdash.repository.backend import MongoBackendRepository
 from qdash.repository.calibration_note import MongoCalibrationNoteRepository
 from qdash.repository.cooldown import MongoCooldownRepository
 from qdash.repository.cooldown_wiring_event import MongoCooldownWiringEventRepository
+from qdash.repository.coupling import MongoCouplingCalibrationRepository
 from qdash.repository.cryostat import MongoCryostatRepository
 from qdash.repository.execution_history import MongoExecutionHistoryRepository
 from qdash.repository.execution_lock import MongoExecutionLockRepository
@@ -59,6 +60,7 @@ from qdash.repository.provenance import (
     MongoParameterVersionRepository,
     MongoProvenanceRelationRepository,
 )
+from qdash.repository.qubit import MongoQubitCalibrationRepository
 from qdash.repository.tag import MongoTagRepository
 from qdash.repository.task_definition import MongoTaskDefinitionRepository
 
@@ -256,24 +258,65 @@ def get_task_definition_repository() -> MongoTaskDefinitionRepository:
 
 
 @lru_cache(maxsize=1)
+def get_qubit_calibration_repository() -> MongoQubitCalibrationRepository:
+    """Get the qubit calibration repository instance."""
+    return MongoQubitCalibrationRepository()
+
+
+@lru_cache(maxsize=1)
+def get_coupling_calibration_repository() -> MongoCouplingCalibrationRepository:
+    """Get the coupling calibration repository instance."""
+    return MongoCouplingCalibrationRepository()
+
+
+@lru_cache(maxsize=1)
+def get_parameter_version_repository() -> MongoParameterVersionRepository:
+    """Get the parameter version repository instance."""
+    return MongoParameterVersionRepository()
+
+
+@lru_cache(maxsize=1)
+def get_provenance_relation_repository() -> MongoProvenanceRelationRepository:
+    """Get the provenance relation repository instance."""
+    return MongoProvenanceRelationRepository()
+
+
+@lru_cache(maxsize=1)
+def get_activity_repository() -> MongoActivityRepository:
+    """Get the provenance activity repository instance."""
+    return MongoActivityRepository()
+
+
+@lru_cache(maxsize=1)
 def get_seed_import_service() -> SeedImportService:
     """Get the seed import service instance."""
-    return SeedImportService()
+    return SeedImportService(
+        activity_repo=get_activity_repository(),
+        param_version_repo=get_parameter_version_repository(),
+        relation_repo=get_provenance_relation_repository(),
+        user_repository=get_user_repository(),
+    )
 
 
 @lru_cache(maxsize=1)
 def get_manual_update_service() -> ManualUpdateService:
     """Get the manual parameter update service instance."""
-    return ManualUpdateService()
+    return ManualUpdateService(
+        qubit_repo=get_qubit_calibration_repository(),
+        coupling_repo=get_coupling_calibration_repository(),
+        activity_repo=get_activity_repository(),
+        param_version_repo=get_parameter_version_repository(),
+        relation_repo=get_provenance_relation_repository(),
+    )
 
 
 @lru_cache(maxsize=1)
 def get_provenance_service() -> ProvenanceService:
     """Get the provenance service instance."""
     return ProvenanceService(
-        parameter_version_repo=MongoParameterVersionRepository(),
-        provenance_relation_repo=MongoProvenanceRelationRepository(),
-        activity_repo=MongoActivityRepository(),
+        parameter_version_repo=get_parameter_version_repository(),
+        provenance_relation_repo=get_provenance_relation_repository(),
+        activity_repo=get_activity_repository(),
     )
 
 
