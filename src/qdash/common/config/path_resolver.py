@@ -51,7 +51,7 @@ def _resolve_runtime_base_path(
 
 
 def resolve_config_base_path() -> Path:
-    """Resolve the Qubex config directory for host and container execution."""
+    """Resolve the Qubex backend configuration tree for host and container execution."""
     return _resolve_runtime_base_path(
         env_name="CONFIG_PATH",
         container_path=QUBEX_CONFIG_BASE,
