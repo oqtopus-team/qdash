@@ -838,17 +838,97 @@ class CalibService:
     def _sync_backend_params_before_push(self, logger: Any) -> None:
         """Sync recent calibration results into backend YAML params prior to GitHub push."""
         assert self.execution_service is not None, "ExecutionService not initialized"
+        assert self.github_push_config is not None, "GitHubPushConfig not initialized"
+        self._merge_task_result_calib_data_before_push(logger)
         updater_instance = get_params_updater(self.backend, self.chip_id)
         if updater_instance is None:
             return
 
+        updated_param_files: set[str] = set()
         for qid, params in self.execution_service.calib_data.qubit.items():
             if "-" in qid or not params:
                 continue
             try:
-                updater_instance.update(qid, params)
+                updated_param_files.update(updater_instance.update(qid, params))
             except Exception as exc:
                 logger.warning(f"Failed to sync params for qid={qid}: {exc}")
+
+        configured_param_files = self.github_push_config.params_file_names
+        if configured_param_files is not None:
+            self.github_push_config.params_file_names = [
+                file_name for file_name in configured_param_files if file_name in updated_param_files
+            ]
+            skipped_files = sorted(set(configured_param_files) - updated_param_files)
+            if skipped_files:
+                logger.info(
+                    "Skipping unchanged params files from GitHub push: %s",
+                    ", ".join(skipped_files),
+                )
+
+    def _merge_task_result_calib_data_before_push(self, logger: Any) -> None:
+        """Reload completed task outputs into parent calib_data before GitHub push.
+
+        Parallel strategies run isolated child sessions. Those sessions persist
+        TaskResultHistoryDocument rows, but their in-memory calib_data does not
+        flow back to the parent process. Rebuild the parent in-memory calib_data
+        from completed task results before deciding which params YAML files changed.
+        """
+        assert self.execution_service is not None, "ExecutionService not initialized"
+        execution_id = getattr(self, "execution_id", None)
+        if not execution_id:
+            return
+
+        try:
+            from qdash.datamodel.task import CalibDataModel, ParameterModel, TaskTypes
+            from qdash.dbmodel.task_result_history import TaskResultHistoryDocument
+
+            docs = (
+                TaskResultHistoryDocument.find(
+                    {
+                        "project_id": self.project_id,
+                        "execution_id": execution_id,
+                        "status": "completed",
+                    }
+                )
+                .sort([("end_at", 1)])
+                .run()
+            )
+
+            calib_data = CalibDataModel()
+            for doc in docs:
+                if not doc.qid or not doc.output_parameters:
+                    continue
+
+                for name, value in doc.output_parameters.items():
+                    try:
+                        parameter = (
+                            value
+                            if isinstance(value, ParameterModel)
+                            else ParameterModel.model_validate(value)
+                        )
+                    except Exception:
+                        logger.debug(
+                            "Skipping invalid output parameter %s from task_id=%s",
+                            name,
+                            doc.task_id,
+                            exc_info=True,
+                        )
+                        continue
+
+                    if doc.task_type == TaskTypes.COUPLING or "-" in doc.qid:
+                        calib_data.put_coupling_data(doc.qid, name, parameter)
+                    else:
+                        calib_data.put_qubit_data(doc.qid, name, parameter)
+
+            if calib_data.qubit or calib_data.coupling:
+                self.execution_service.merge_calib_data(calib_data)
+                logger.info(
+                    "Merged task result calib_data before GitHub push: %d qubit(s), %d coupling(s)",
+                    len(calib_data.qubit),
+                    len(calib_data.coupling),
+                )
+        except Exception as exc:
+            logger.warning(f"Failed to merge task result calib_data before push: {exc}")
 
     def finish_calibration(
         self,
