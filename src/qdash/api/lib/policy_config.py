@@ -41,7 +41,8 @@ def load_policy_config() -> PolicyConfig:
     """Load policy configuration from YAML.
 
     Uses ConfigLoader for unified loading with local override support.
-    Configuration is loaded from policy.yaml with optional policy.local.yaml overlay.
+    Configuration is loaded from domain/policy.yaml with optional
+    domain/policy.local.yaml overlay.
     """
     data: dict[str, Any] = ConfigLoader.load_policy()
     try:
@@ -53,6 +54,6 @@ def load_policy_config() -> PolicyConfig:
 def clear_policy_config_cache() -> None:
     """Clear the cached policy configuration.
 
-    Useful when policy.yaml changes and needs to be reloaded without restarting.
+    Useful when domain/policy.yaml changes and needs to be reloaded without restarting.
     """
     return

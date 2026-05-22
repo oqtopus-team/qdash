@@ -51,11 +51,11 @@ def reload_config_caches(
     return ConfigReloadResponse(
         cleared=[
             "settings.yaml",
-            "metrics.yaml",
+            "domain/metrics.yaml",
             "copilot.yaml",
             "backend.yaml",
             "workflow.yaml",
-            "policy.yaml",
+            "domain/policy.yaml",
         ]
     )
 

@@ -264,7 +264,7 @@ Edges are named as `"q1-q2"` where:
 uv run python scripts/generate_topology.py \
   --template square-lattice-mux \
   --size 64 \
-  --output config/topologies/64q-square-lattice.yaml
+  --output config/domain/topologies/64q-square-lattice.yaml
 ```
 
 ## References

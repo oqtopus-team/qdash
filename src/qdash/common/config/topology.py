@@ -55,7 +55,8 @@ class TopologyDefinition(BaseModel):
     visualization: VisualizationConfig = Field(default_factory=VisualizationConfig)
 
 
-TOPOLOGIES_DIR = "topologies"
+TOPOLOGIES_DIR = "domain/topologies"
+LEGACY_TOPOLOGIES_DIR = "topologies"
 
 
 def _get_config_dir() -> Path:
@@ -63,11 +64,18 @@ def _get_config_dir() -> Path:
     return ConfigLoader.get_config_dir()
 
 
+def _topologies_dir() -> Path:
+    config_dir = _get_config_dir()
+    topologies_dir = config_dir / TOPOLOGIES_DIR
+    if topologies_dir.exists():
+        return topologies_dir
+    return config_dir / LEGACY_TOPOLOGIES_DIR
+
+
 @lru_cache(maxsize=32)
 def load_topology(topology_id: str) -> TopologyDefinition:
     """Load a specific topology definition."""
-    config_dir = _get_config_dir()
-    topology_path = config_dir / TOPOLOGIES_DIR / f"{topology_id}.yaml"
+    topology_path = _topologies_dir() / f"{topology_id}.yaml"
 
     if not topology_path.exists():
         raise FileNotFoundError(f"Topology file not found: {topology_path}")
@@ -80,8 +88,7 @@ def load_topology(topology_id: str) -> TopologyDefinition:
 
 def list_topologies(size: int | None = None) -> list[dict[str, str]]:
     """List all available topology definitions."""
-    config_dir = _get_config_dir()
-    topologies_dir = config_dir / TOPOLOGIES_DIR
+    topologies_dir = _topologies_dir()
 
     if not topologies_dir.exists():
         return []

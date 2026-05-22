@@ -57,6 +57,14 @@ class ConfigLoader:
         return config
 
     @classmethod
+    def _load_domain_with_local(cls, filename: str) -> dict[str, Any]:
+        """Load a domain YAML file, falling back to the legacy config root."""
+        config = cls._load_with_local(f"domain/{filename}")
+        if config:
+            return config
+        return cls._load_with_local(filename)
+
+    @classmethod
     @lru_cache(maxsize=1)
     def load_settings(cls) -> dict[str, Any]:
         """Load settings configuration."""
@@ -66,7 +74,7 @@ class ConfigLoader:
     @lru_cache(maxsize=1)
     def load_metrics(cls) -> dict[str, Any]:
         """Load metrics configuration."""
-        return cls._load_with_local("metrics.yaml")
+        return cls._load_domain_with_local("metrics.yaml")
 
     @classmethod
     @lru_cache(maxsize=1)
@@ -99,7 +107,7 @@ class ConfigLoader:
     @classmethod
     def load_policy(cls) -> dict[str, Any]:
         """Load provenance policy configuration."""
-        return cls._load_with_local("policy.yaml")
+        return cls._load_domain_with_local("policy.yaml")
 
     @classmethod
     def clear_cache(cls) -> None:
