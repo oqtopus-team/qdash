@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.routing import APIRoute
 
+from qdash.api.app.metadata import API_METADATA, OPENAPI_EXTRA
 from qdash.api.app.router_registry import register_routers
 from qdash.api.db.session import lifespan
 from qdash.api.middleware.request_id import RequestIdMiddleware
@@ -18,37 +19,13 @@ def custom_generate_unique_id(route: APIRoute) -> str:
 def create_app(settings: Settings | None = None) -> FastAPI:
     """Create and configure the QDash API app."""
     app = FastAPI(
-        title="QDash API",
-        description="API for QDash",
-        summary="QDash API",
-        version="0.0.1",
-        contact={
-            "name": "QDash",
-            "email": "oqtopus-team@googlegroups.com",
-        },
-        license_info={
-            "name": "Apache 2.0",
-            "url": "https://www.apache.org/licenses/LICENSE-2.0.html",
-        },
+        **API_METADATA,
         generate_unique_id_function=custom_generate_unique_id,
         separate_input_output_schemas=False,
         lifespan=lifespan,
         root_path="/api",
         swagger_ui_parameters={"defaultModelsExpandDepth": -1},
-        openapi_extra={
-            "components": {
-                "securitySchemes": {
-                    "BearerAuth": {
-                        "type": "http",
-                        "scheme": "bearer",
-                        "description": (
-                            "Bearer token authentication. Use the access_token from login response."
-                        ),
-                    }
-                }
-            },
-            "security": [{"BearerAuth": []}],
-        },
+        openapi_extra=OPENAPI_EXTRA,
     )
 
     app_settings = settings or get_settings()
