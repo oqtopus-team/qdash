@@ -9,6 +9,7 @@ on:
 #Permissions are required for PRs by dependabot.
 permissions:
   pull-requests: write
+  issues: write
   contents: write
 
 jobs:
@@ -75,6 +76,9 @@ jobs:
           labels: ${{ steps.set-labels.outputs.labels }}
 
       - name: Assign PR creator
+        if: >-
+          github.event.pull_request.head.repo.full_name == github.repository &&
+          github.actor != 'dependabot[bot]'
         uses: actions/github-script@v9
         with:
           script: |
