@@ -2,13 +2,14 @@
 #
 # Policy files are loaded in this order (later overrides earlier):
 #   1. METRICS_CONFIG_PATH (if set) is for metrics.yaml, not policy.yaml.
-#   2. config/policy.yaml
-#   3. config/policy.local.yaml (optional, gitignored)
-#   4. /app/config/policy.yaml (Docker)
+#   2. config/domain/policy.yaml
+#   3. config/domain/policy.local.yaml (optional, gitignored)
+#   4. /app/config/domain/policy.yaml (Docker)
+#   5. config/policy.yaml (legacy fallback)
 #
 # To customize locally:
-#   cp config/custom/policy.yaml.template config/policy.local.yaml
-#   # Edit config/policy.local.yaml as needed
+#   cp config/custom/policy.yaml.template config/domain/policy.local.yaml
+#   # Edit config/domain/policy.local.yaml as needed
 #
 # Notes:
 # - Policies apply to current (latest valid) parameter versions.

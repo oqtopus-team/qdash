@@ -6,8 +6,9 @@
 # Priority order:
 #   1. METRICS_CONFIG_PATH environment variable (highest priority)
 #   2. config/custom/metrics.yaml
-#   3. /app/config/metrics.yaml (Docker)
-#   4. config/metrics.yaml (default)
+#   3. /app/config/domain/metrics.yaml (Docker)
+#   4. config/domain/metrics.yaml (default)
+#   5. config/metrics.yaml (legacy fallback)
 #
 # Example usage:
 #   cp config/custom/metrics.yaml.template config/custom/metrics.yaml
