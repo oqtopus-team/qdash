@@ -52,7 +52,9 @@ def reload_config_caches(
         cleared=[
             "settings.yaml",
             "domain/metrics.yaml",
-            "copilot.yaml",
+            "copilot/config.yaml",
+            "copilot/chat.yaml",
+            "copilot/review.yaml",
             "backend.yaml",
             "workflow.yaml",
             "domain/policy.yaml",
