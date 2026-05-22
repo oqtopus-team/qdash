@@ -124,7 +124,7 @@ services:
     command: python start_worker.py
     environment:
       - PREFECT_API_URL=http://prefect-server:4200/api
-      - PREFECT_LOGGING_SETTINGS_PATH=/app/config/logging/prefect.yaml
+      - PREFECT_LOGGING_SETTINGS_PATH=/app/config/app/logging/prefect.yaml
       - PYTHONPATH=/app:/app/qdash:/app/qdash/workflow:/app/qdash/dbmodel
       - DEFAULT_BACKEND=${DEFAULT_BACKEND:-qubex}
     networks:

@@ -8,9 +8,23 @@ from pathlib import Path
 
 import yaml
 
-_CONFIG_DIR = Path("/app/config/logging")
+_CONFIG_DIR = Path("/app/config/app/logging")
+_LEGACY_CONFIG_DIR = Path("/app/config/logging")
 _REPO_ROOT = Path(__file__).resolve().parents[4]
-_LOCAL_CONFIG_DIR = _REPO_ROOT / "config" / "logging"
+_LOCAL_CONFIG_DIR = _REPO_ROOT / "config" / "app" / "logging"
+_LEGACY_LOCAL_CONFIG_DIR = _REPO_ROOT / "config" / "logging"
+
+
+def _resolve_config_dir(config_dir: Path) -> Path:
+    if config_dir.exists():
+        return config_dir
+    if config_dir == _CONFIG_DIR and _LEGACY_CONFIG_DIR.exists():
+        return _LEGACY_CONFIG_DIR
+    if config_dir == _CONFIG_DIR and _LOCAL_CONFIG_DIR.exists():
+        return _LOCAL_CONFIG_DIR
+    if config_dir == _CONFIG_DIR and _LEGACY_LOCAL_CONFIG_DIR.exists():
+        return _LEGACY_LOCAL_CONFIG_DIR
+    return config_dir
 
 
 def setup_logging(
@@ -20,9 +34,7 @@ def setup_logging(
     config_dir: Path | None = None,
 ) -> None:
     """Load a YAML logging config and apply it via ``logging.config.dictConfig``."""
-    config_dir = config_dir or _CONFIG_DIR
-    if not config_dir.exists() and config_dir == _CONFIG_DIR:
-        config_dir = _LOCAL_CONFIG_DIR
+    config_dir = _resolve_config_dir(config_dir or _CONFIG_DIR)
     yaml_path = config_dir / f"{config_name}.yaml"
 
     log_level = os.getenv("LOG_LEVEL", "INFO").upper()
