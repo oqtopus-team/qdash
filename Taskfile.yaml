@@ -17,14 +17,15 @@ tasks:
     desc: Restart the API service
 
   generate:
-    dir: ui
     dotenv: [.env]
     cmds:
-      - docker compose -f ../compose.yaml restart api && sleep 2
-      - curl http://api:$API_PORT/openapi.json | jq > ../docs/oas/openapi.json
-      - bunx orval@7.14.0 --config ./orval.config.cjs
-      - bun run fmt
-      - bun run lint:fix
+      - |
+        OPENAPI_TMP="$(mktemp)"
+        ENV=test uv run python -c 'import json, os; from dotenv import load_dotenv; load_dotenv(".env"); os.environ["ENV"] = "test"; from qdash.api.main import app; print(json.dumps(app.openapi(), ensure_ascii=False, indent=2))' > "$OPENAPI_TMP"
+        mv "$OPENAPI_TMP" docs/oas/openapi.json
+      - cd ui && bunx orval@7.14.0 --config ./orval.config.cjs
+      - cd ui && bun run fmt
+      - cd ui && bun run lint:fix
     desc: Generate the TypeScript client
 
   knowledge:
