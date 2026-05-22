@@ -4,9 +4,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.routing import APIRoute
 
+from qdash.api.app.router_registry import register_routers
 from qdash.api.db.session import lifespan
 from qdash.api.middleware.request_id import RequestIdMiddleware
-from qdash.api.router_registry import register_routers
 from qdash.config import Settings, get_settings, resolve_api_cors_origins
 
 

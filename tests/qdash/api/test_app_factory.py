@@ -4,7 +4,7 @@ from typing import Any, cast
 
 from fastapi.middleware.cors import CORSMiddleware
 
-from qdash.api.app_factory import create_app
+from qdash.api.app import create_app
 from qdash.config import Settings
 
 
