@@ -9,13 +9,7 @@ from qdash.workflow.logging_config import setup_logging
 
 
 def _prefect_logging_yaml_path() -> Path:
-    path = Path("/app/config/app/logging/prefect.yaml")
-    if path.exists():
-        return path
-    legacy_path = Path("/app/config/logging/prefect.yaml")
-    if legacy_path.exists():
-        return legacy_path
-    return path
+    return Path("/app/config/app/logging/prefect.yaml")
 
 
 if __name__ == "__main__":

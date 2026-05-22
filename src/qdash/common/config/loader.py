@@ -35,7 +35,7 @@ def _expand_env_vars(value: Any) -> Any:
 
 
 class ConfigLoader:
-    """Unified configuration loader with local override support."""
+    """Unified configuration loader."""
 
     _CONFIG_DIR: Path = CONFIG_DIR
     LOCAL_CONFIG_DIR: Path = Path(__file__).resolve().parents[4] / "config"
@@ -58,45 +58,21 @@ class ConfigLoader:
         return expanded if isinstance(expanded, dict) else {}
 
     @classmethod
-    def _load_with_local(cls, filename: str) -> dict[str, Any]:
-        """Load a YAML file with local override support."""
-        config_dir = cls.get_config_dir()
-        base_path = config_dir / filename
-        local_path = config_dir / filename.replace(".yaml", ".local.yaml")
-
-        config = cls._load_yaml(base_path)
-        if local_path.exists():
-            local_config = cls._load_yaml(local_path)
-            config = _deep_merge(config, local_config)
-        return config
-
-    @classmethod
-    def _load_domain_with_local(cls, filename: str) -> dict[str, Any]:
-        """Load a domain YAML file, falling back to the legacy config root."""
-        config = cls._load_with_local(f"domain/{filename}")
-        if config:
-            return config
-        return cls._load_with_local(filename)
-
-    @classmethod
-    def _load_app_with_local(cls, filename: str) -> dict[str, Any]:
-        """Load an app YAML file, falling back to the legacy config root."""
-        config = cls._load_with_local(f"app/{filename}")
-        if config:
-            return config
-        return cls._load_with_local(filename)
+    def _load_config(cls, filename: str) -> dict[str, Any]:
+        """Load a YAML file relative to the configuration directory."""
+        return cls._load_yaml(cls.get_config_dir() / filename)
 
     @classmethod
     @lru_cache(maxsize=1)
     def load_settings(cls) -> dict[str, Any]:
         """Load settings configuration."""
-        return cls._load_app_with_local("settings.yaml")
+        return cls._load_config("app/settings.yaml")
 
     @classmethod
     @lru_cache(maxsize=1)
     def load_metrics(cls) -> dict[str, Any]:
         """Load metrics configuration."""
-        return cls._load_domain_with_local("metrics.yaml")
+        return cls._load_config("domain/metrics.yaml")
 
     @classmethod
     @lru_cache(maxsize=1)
@@ -108,37 +84,25 @@ class ConfigLoader:
             "copilot/chat.yaml",
             "copilot/review.yaml",
         ):
-            config = _deep_merge(config, cls._load_with_local(filename))
-        if config:
-            return config
-        return cls._load_with_local("copilot.yaml")
+            config = _deep_merge(config, cls._load_config(filename))
+        return config
 
     @classmethod
     @lru_cache(maxsize=1)
     def load_backend(cls) -> dict[str, Any]:
         """Load backend configuration."""
-        return cls._load_app_with_local("backend.yaml")
+        return cls._load_config("app/backend.yaml")
 
     @classmethod
     @lru_cache(maxsize=1)
     def load_workflow(cls) -> dict[str, Any]:
-        """Load workflow configuration.
-
-        Workflow settings used to live under ``settings.yaml``. Keep that path
-        as a fallback so local overrides continue to work during migration.
-        """
-        workflow_config = cls._load_app_with_local("workflow.yaml")
-        if workflow_config:
-            return workflow_config
-
-        settings = cls.load_settings()
-        workflow_settings = settings.get("workflow", {})
-        return workflow_settings if isinstance(workflow_settings, dict) else {}
+        """Load workflow configuration."""
+        return cls._load_config("app/workflow.yaml")
 
     @classmethod
     def load_policy(cls) -> dict[str, Any]:
         """Load provenance policy configuration."""
-        return cls._load_domain_with_local("policy.yaml")
+        return cls._load_config("domain/policy.yaml")
 
     @classmethod
     def clear_cache(cls) -> None:

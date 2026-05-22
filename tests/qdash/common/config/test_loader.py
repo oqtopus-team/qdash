@@ -18,16 +18,6 @@ def test_load_settings_reads_app_yaml(monkeypatch, tmp_path):
     ConfigLoader.clear_cache()
 
 
-def test_load_settings_falls_back_to_legacy_root_yaml(monkeypatch, tmp_path):
-    _write_yaml(tmp_path / "settings.yaml", "ui:\n  task_files:\n    sort_order: name\n")
-    monkeypatch.setattr(ConfigLoader, "_CONFIG_DIR", tmp_path)
-    ConfigLoader.clear_cache()
-
-    assert ConfigLoader.load_settings() == {"ui": {"task_files": {"sort_order": "name"}}}
-
-    ConfigLoader.clear_cache()
-
-
 def test_load_settings_expands_environment_variables(monkeypatch, tmp_path):
     monkeypatch.setenv("QDASH_TASK_FILE_SORT_ORDER", "updated_at")
     _write_yaml(
@@ -65,42 +55,12 @@ def test_load_workflow_reads_workflow_yaml(monkeypatch, tmp_path):
     ConfigLoader.clear_cache()
 
 
-def test_load_workflow_falls_back_to_legacy_root_yaml(monkeypatch, tmp_path):
-    _write_yaml(tmp_path / "workflow.yaml", "github:\n  params_file_names:\n    - params.yaml\n")
-    monkeypatch.setattr(ConfigLoader, "_CONFIG_DIR", tmp_path)
-    ConfigLoader.clear_cache()
-
-    assert ConfigLoader.load_workflow() == {"github": {"params_file_names": ["params.yaml"]}}
-
-    ConfigLoader.clear_cache()
-
-
-def test_load_workflow_falls_back_to_settings_yaml_workflow(monkeypatch, tmp_path):
-    _write_yaml(tmp_path / "settings.yaml", "workflow:\n  github:\n    params_file_names: []\n")
-    monkeypatch.setattr(ConfigLoader, "_CONFIG_DIR", tmp_path)
-    ConfigLoader.clear_cache()
-
-    assert ConfigLoader.load_workflow() == {"github": {"params_file_names": []}}
-
-    ConfigLoader.clear_cache()
-
-
 def test_load_metrics_reads_domain_yaml(monkeypatch, tmp_path):
     _write_yaml(tmp_path / "domain" / "metrics.yaml", "qubit_metrics:\n  t1:\n    title: T1\n")
     monkeypatch.setattr(ConfigLoader, "_CONFIG_DIR", tmp_path)
     ConfigLoader.clear_cache()
 
     assert ConfigLoader.load_metrics() == {"qubit_metrics": {"t1": {"title": "T1"}}}
-
-    ConfigLoader.clear_cache()
-
-
-def test_load_metrics_falls_back_to_legacy_root_yaml(monkeypatch, tmp_path):
-    _write_yaml(tmp_path / "metrics.yaml", "qubit_metrics:\n  t2_echo:\n    title: T2 Echo\n")
-    monkeypatch.setattr(ConfigLoader, "_CONFIG_DIR", tmp_path)
-    ConfigLoader.clear_cache()
-
-    assert ConfigLoader.load_metrics() == {"qubit_metrics": {"t2_echo": {"title": "T2 Echo"}}}
 
     ConfigLoader.clear_cache()
 
@@ -143,15 +103,5 @@ def test_load_copilot_merges_chat_and_review_yaml(monkeypatch, tmp_path):
         "chat_models": [{"provider": "openai", "name": "gpt-5.4"}],
         "analysis": {"ai_review_tasks": ["CheckQubitSpectroscopy"]},
     }
-
-    ConfigLoader.clear_cache()
-
-
-def test_load_copilot_falls_back_to_legacy_root_yaml(monkeypatch, tmp_path):
-    _write_yaml(tmp_path / "copilot.yaml", "enabled: false\n")
-    monkeypatch.setattr(ConfigLoader, "_CONFIG_DIR", tmp_path)
-    ConfigLoader.clear_cache()
-
-    assert ConfigLoader.load_copilot() == {"enabled": False}
 
     ConfigLoader.clear_cache()

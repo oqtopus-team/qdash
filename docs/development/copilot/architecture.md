@@ -93,11 +93,9 @@ analysis:
 ```
 
 Configuration is loaded via `ConfigLoader` by deep-merging `config.yaml`, `chat.yaml`, and
-`review.yaml`. Each file supports a `.local.yaml` overlay, and legacy root-level
-`copilot.yaml` remains a fallback during migration. YAML string values support shell-style
-environment variable references such as `${OPENAI_API_KEY}`, so environment-specific or
-sensitive values should be supplied through environment variables instead of committed
-template files.
+`review.yaml`. YAML string values support shell-style environment variable references such
+as `${OPENAI_API_KEY}`, so environment-specific or sensitive values should be supplied
+through environment variables instead of committed template files.
 
 ### Environment Variables
 
